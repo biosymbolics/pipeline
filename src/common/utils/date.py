@@ -2,7 +2,15 @@
 Utils related to dates
 """
 
-from datetime import date
+from datetime import date, datetime
+
+
+def parse_date(date_str: str, formatter: str = "%Y-%m-%d") -> date:
+    """
+    Turns date str (YYYY-MM-DD, e.g. 2003-01-01) into date object
+    """
+    _date = datetime.strptime(date_str, formatter)
+    return _date
 
 
 def format_date(_date: date, formatter: str = "%Y-%m-%d") -> str:

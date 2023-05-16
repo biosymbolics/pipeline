@@ -53,8 +53,8 @@ def __table_to_data_frame(table):
     text_headers = get_table_headers(table)
     contents = get_table_rows(table, text_headers)
     schema = __get_schema(text_headers)
-    logging.info("Table schema %s", schema)
-    df = pl.DataFrame(contents, schema=schema)
+    logging.debug("Table schema %s", schema)
+    df = pl.DataFrame(contents, schema=schema).sort("product")
     return df
 
 
@@ -63,7 +63,7 @@ def parse_product_tables(html):
     Parse out product tables
     """
     table_contents = []
-    soup = BeautifulSoup(html, "html")
+    soup = BeautifulSoup(html, features="html.parser")
     tables = soup.find_all("table")
     product_tables = [table for table in tables if __is_product_table(table)]
     for table in product_tables:
