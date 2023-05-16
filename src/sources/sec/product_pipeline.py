@@ -10,9 +10,11 @@ from common.utils.ner import normalize_entity_name
 from sources.sec.sec import fetch_quarterly_reports
 from sources.sec.sec_client import extract_section
 from sources.sec.types import SecFiling
+from src.common.utils.llm.llama_index import create_and_query_index
+from src.sources.sec.types import SecProductQueryStrategy
 
 
-def __get_normalized_products(df: pl.DataFrame) -> list[str]:
+def __get_products_via_parse(df: pl.DataFrame) -> list[str]:
     """
     Get products from df and normalize
     """
@@ -26,7 +28,36 @@ def __get_normalized_products(df: pl.DataFrame) -> list[str]:
     return valid
 
 
-def parse_pipeline_by_period(reports: list[SecFiling]) -> pl.DataFrame:
+def __get_products_via_llama(namespace: str, period: str, url: str) -> list[str]:
+    return create_and_query_index(
+        "what are the products in currently in development?", namespace, period, url
+    )
+
+
+def get_normalized_products(
+    report: SecFiling, strategy: SecProductQueryStrategy = "TABLE_PARSE"
+):
+    """
+    Get normalized products from report
+    """
+    if strategy == "TABLE_PARSE":
+        return flatten(
+            map(
+                __get_products_via_parse,
+                extract_section(report.get("linkToHtml")),
+            )
+        )
+
+    return __get_products_via_llama(
+        namespace=report["ticker"],
+        period=report.get("periodOfReport"),
+        url=report.get("linkToHtml"),
+    )
+
+
+def parse_pipeline_by_period(
+    reports: list[SecFiling], strategy: SecProductQueryStrategy = "TABLE_PARSE"
+) -> pl.DataFrame:
     """
     Parse pipeline by period
     """
@@ -34,12 +65,7 @@ def parse_pipeline_by_period(reports: list[SecFiling]) -> pl.DataFrame:
         map(
             lambda report: {
                 "period": report.get("periodOfReport"),  # parse_date
-                "products": flatten(
-                    map(
-                        __get_normalized_products,
-                        extract_section(report.get("linkToHtml")),
-                    )
-                ),
+                "products": get_normalized_products(report, strategy),
             },
             reports,
         )
@@ -70,7 +96,10 @@ def get_pipeline_diffs(products_by_period) -> list[list[str]]:
 
 
 def get_pipeline_by_ticker(
-    ticker: str, start_date: date, end_date: date = datetime.now()
+    ticker: str,
+    start_date: date,
+    end_date: date = datetime.now(),
+    strategy: SecProductQueryStrategy = "TABLE_PARSE",
 ) -> pl.DataFrame:
     """
     Get the R&D pipeline for a given company
@@ -80,7 +109,7 @@ def get_pipeline_by_ticker(
     """
     quarterly_reports = fetch_quarterly_reports(ticker, start_date, end_date)
 
-    pipeline_df = parse_pipeline_by_period(quarterly_reports)
+    pipeline_df = parse_pipeline_by_period(quarterly_reports, strategy)
     diffs = get_pipeline_diffs(pipeline_df)
     pipeline_df = pipeline_df.with_columns(pl.Series(name="dropped", values=diffs))
 

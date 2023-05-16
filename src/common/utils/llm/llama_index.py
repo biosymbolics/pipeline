@@ -11,15 +11,35 @@ API_KEY = os.environ["OPENAI_API_KEY"]
 index_map: dict[str, dict[str, GPTListIndex]] = {}
 
 
+def create_index(namespace: str, index_key: str, url: str):
+    """
+    Create singular llama index from supplied document url
+    Skips creation if it already exists
+    """
+    if index_key in index_map[namespace]:
+        logging.info("Not recreating index %s/%s", namespace, index_key)
+        return
+
+    documents = SimpleWebPageReader(html_to_text=True).load_data(url)
+    index = GPTListIndex.from_documents(documents)
+    index_map[namespace][index_key] = index
+
+
+def create_and_query_index(query: str, namespace: str, index_key: str, url: str) -> str:
+    """
+    Creates the index if nx, and queries
+    """
+    create_index(namespace, index_key, url)
+    return query_index(query, namespace, index_key)
+
+
 def create_indicies(namespace: str, url_map: dict[str, str]):
     """
     Create indicies out of the supplied map (key: url)
     e.g. namespace: pfe-10q, url_map: {"2020-01-01": "https://sec.gov/pfizer-10q.htm"}
     """
     for key in url_map.keys():
-        documents = SimpleWebPageReader(html_to_text=True).load_data([url_map[key]])
-        index = GPTListIndex.from_documents(documents)
-        index_map[namespace][key] = index
+        create_index(namespace, key, url_map[key])
 
 
 def get_query_engine(namespace: str, index_key: str):
@@ -31,7 +51,7 @@ def get_query_engine(namespace: str, index_key: str):
         return query_engine
     except Exception as ex:
         logging.error("Error generating query engine: %s", ex)
-        return None
+        raise ex
 
 
 def query_index(query: str, namespace: str, index_key: str) -> str:

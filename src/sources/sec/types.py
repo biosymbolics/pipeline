@@ -1,7 +1,7 @@
 """
 SEC-related types
 """
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class SecFilingSection(TypedDict):
@@ -32,3 +32,6 @@ class SecFiling(TypedDict):
 class SecFilingResponse(TypedDict):
     # ...other stuff
     filings: list[SecFiling]
+
+
+SecProductQueryStrategy = Literal["TABLE_PARSE", "LLAMA_INDEX"]
