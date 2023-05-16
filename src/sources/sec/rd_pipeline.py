@@ -7,6 +7,7 @@ from pydash import flatten
 import polars as pl
 
 from common.utils.date import parse_date
+from common.utils.list import diff_lists
 from sources.sec.sec import fetch_quarterly_reports
 from sources.sec.sec_client import extract_section
 
@@ -22,22 +23,35 @@ def get_pipeline(
     """
     quarterly_reports = fetch_quarterly_reports(ticker, start_date, end_date)
 
-    product_tables = flatten(
+    products_by_period = flatten(
         map(
             lambda report: {
                 "period": parse_date(report.get("periodOfReport")),
-                "table": extract_section(report.get("linkToHtml")),
+                "products": flatten(
+                    map(
+                        lambda t: t.select(pl.col("product")).to_series().to_list(),
+                        extract_section(report.get("linkToHtml")),
+                    )
+                ),
             },
             quarterly_reports,
         )
     )
 
-    product_tables = sorted(product_tables, key=lambda r: r["period"])
+    products_by_period = sorted(products_by_period, key=lambda r: r["period"])
 
-    # products = list(
-    #     map(lambda table: table.select(pl.col(["product"])), product_tables)
-    # )
+    for idx, curr in enumerate(products_by_period):
+        if idx == 0:
+            continue
+        previous = products_by_period[idx - 1]
+        if not previous["products"]:
+            continue
+        diff = diff_lists(previous["products"], curr["products"])
+        logging.info(
+            "Diff between %s and %s: %s", previous["period"], curr["period"], diff
+        )
+
     pl.Config.set_tbl_rows(100)
-    logging.info("Products: %s", product_tables)
+    # logging.info("Products: %s", products_by_period)
 
-    return product_tables
+    return products_by_period

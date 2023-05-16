@@ -1,7 +1,6 @@
 """
 SEC module tests
 """
-import logging
 import unittest
 from datetime import datetime
 

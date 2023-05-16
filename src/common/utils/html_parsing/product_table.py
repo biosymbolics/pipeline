@@ -73,6 +73,6 @@ def parse_product_tables(html):
             table_contents.append(df)
             print(df)
         except Exception as ex:
-            logging.error(ex)  # oops
+            logging.warning("Error parsing table: %s", ex)  # oops
 
     return table_contents
