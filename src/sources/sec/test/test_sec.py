@@ -4,7 +4,7 @@ SEC module tests
 import unittest
 from datetime import datetime
 
-from sources.sec.rd_pipeline import get_pipeline
+from sources.sec.product_pipeline import get_pipeline_by_ticker
 
 
 class TestSec(unittest.TestCase):
@@ -21,5 +21,5 @@ class TestSec(unittest.TestCase):
         ]
 
         for test in test_cases:
-            result = get_pipeline(test["ticker"], test["start"])
+            result = get_pipeline_by_ticker(test["ticker"], test["start"])
             self.assertEqual(len(result), test["expected"])

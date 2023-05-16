@@ -1,7 +1,6 @@
 """
 Utils for parsing html tables
 """
-import logging
 from pydash import compact
 
 

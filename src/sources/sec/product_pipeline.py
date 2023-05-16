@@ -33,7 +33,7 @@ def parse_pipeline_by_period(reports: list[SecFiling]) -> pl.DataFrame:
     products_by_period = flatten(
         map(
             lambda report: {
-                "period": parse_date(report.get("periodOfReport")),
+                "period": report.get("periodOfReport"),
                 "products": flatten(
                     map(
                         __get_normalized_products,
@@ -69,9 +69,9 @@ def get_pipeline_diffs(products_by_period) -> list[list[str]]:
     return diffs
 
 
-def get_pipeline(
+def get_pipeline_by_ticker(
     ticker: str, start_date: date, end_date: date = datetime.now()
-) -> list[list[str]]:
+) -> pl.DataFrame:
     """
     Get the R&D pipeline for a given company
     TODO
@@ -84,7 +84,7 @@ def get_pipeline(
     diffs = get_pipeline_diffs(pipeline_df)
     pipeline_df = pipeline_df.with_columns(pl.Series(name="dropped", values=diffs))
 
-    pl.Config.set_tbl_rows(100)
-    logging.info("Products: %s", pipeline_df)
+    # pl.Config.set_tbl_rows(100)
+    # logging.info("Products: %s", pipeline_df)
 
     return pipeline_df

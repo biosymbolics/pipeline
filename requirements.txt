@@ -1,4 +1,5 @@
 bs4
 polars
+pyairtable
 pydash
 sec_api
