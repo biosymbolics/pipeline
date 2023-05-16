@@ -25,7 +25,6 @@ def parse_entity_names(entity_str: str) -> list[str]:
     - remove short junk like "(a)"
     """
     matches = re.findall(RE_PARENS_NAME, entity_str)
-    print("MATCHES", matches)
     names = list(map(__clean_name, matches))
     return names
 
@@ -46,6 +45,8 @@ def normalize_entity_name(entity_str: str) -> str:
     - lookup in map
     """
     names = parse_entity_names(entity_str)
+    if not names:
+        return ""
     primary_name = names[0]
 
     normalized = list(map(lambda name: __ner_map_get_or_put(name, primary_name), names))

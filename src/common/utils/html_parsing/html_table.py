@@ -37,10 +37,8 @@ def get_table_headers(table) -> list[str]:
     headers = table.find_all("th")
 
     if headers:
-        logging.debug("Found table headers")
         return __get_text(headers)
 
-    logging.debug("No table headers; using first row")
     text_rows = __get_text_rows(table)
     return __infer_table_header(text_rows)
 

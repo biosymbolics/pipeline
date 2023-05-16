@@ -15,7 +15,7 @@ class TestSec(unittest.TestCase):
         test_cases = [
             {
                 "ticker": "PFE",
-                "start": datetime(2020, 1, 1),
+                "start": datetime(2022, 1, 1),
                 "expected": 10,
             },
         ]
