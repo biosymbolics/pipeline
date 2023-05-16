@@ -4,6 +4,7 @@ Get info about R&D pipelines
 import logging
 from datetime import date, datetime
 from pydash import flatten
+import polars as pl
 
 from common.utils.date import parse_date
 from sources.sec.sec import fetch_quarterly_reports
@@ -36,6 +37,7 @@ def get_pipeline(
     # products = list(
     #     map(lambda table: table.select(pl.col(["product"])), product_tables)
     # )
+    pl.Config.set_tbl_rows(100)
     logging.info("Products: %s", product_tables)
 
     return product_tables
