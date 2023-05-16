@@ -1,0 +1,10 @@
+[MASTER]
+
+disable=
+  # C0114, # missing-module-docstring
+  C0115, # missing-class-docstring
+  E0401, # import-error (temporarily off until figure out imports)
+  W1514, # unspecified-encoding
+  W0102, # dangerous-default-value (only actually dangerous of mutating args?)
+  W0703, # broad-except (maybe re-enable in the future)
+  E0611, # no-name-in-module (false positives like crazy)
