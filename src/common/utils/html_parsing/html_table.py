@@ -1,5 +1,8 @@
 """
 Utils for parsing html tables
+TODO:
+- handling of malformed tables like https://www.sec.gov/ix?doc=/Archives/edgar/data/14272/000001427222000196/bmy-20220930.htm ("Significant Product and Pipeline Approvals")
+- handle of multiple-row column tables like https://www.sec.gov/ix?doc=/Archives/edgar/data/14272/000001427223000104/bmy-20230331.htm ("Product and Pipeline Developments")
 """
 from pydash import compact
 
