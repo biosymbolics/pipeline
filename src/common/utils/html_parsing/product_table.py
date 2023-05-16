@@ -13,26 +13,41 @@ INDICATION_HEADER_STRINGS = ["disease", "indication"]
 
 
 def __is_product_header(header_text: str) -> bool:
+    """
+    Is this specific header for "products"?
+    """
     return any(filter(lambda str: str in header_text.lower(), PRODUCT_HEADER_STRINGS))
 
 
 def __is_indication_header(header_text: str) -> bool:
+    """
+    Is this specific header for "indication"?
+    """
     return any(
         filter(lambda str: str in header_text.lower(), INDICATION_HEADER_STRINGS)
     )
 
 
 def __has_product_header(headers: list[str]) -> bool:
+    """
+    Does this table appear to have a header column for products?
+    """
     return any(map(__is_product_header, headers))
 
 
 def __is_product_table(table) -> bool:
+    """
+    Does this table appear to be a product table?
+    """
     text_headers = get_table_headers(table)
     is_product_table = __has_product_header(text_headers)
     return is_product_table
 
 
 def __normalize_header(text_header: str) -> str:
+    """
+    Normalizes the name of headers in a product table
+    """
     if __is_product_header(text_header):
         return "product"
     if __is_indication_header(text_header):
@@ -50,6 +65,9 @@ def __get_schema(text_headers: list[str]) -> dict:
 
 
 def __table_to_data_frame(table):
+    """
+    Turns a product table into a dataframe
+    """
     text_headers = get_table_headers(table)
     contents = get_table_rows(table, text_headers)
     schema = __get_schema(text_headers)
@@ -60,7 +78,7 @@ def __table_to_data_frame(table):
 
 def parse_product_tables(html):
     """
-    Parse out product tables
+    Parse out product tables (from SEC docs)
     """
     table_contents = []
     soup = BeautifulSoup(html, features="html.parser")
