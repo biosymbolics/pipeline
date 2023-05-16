@@ -3,11 +3,12 @@ Client for talking to Airtable
 """
 import os
 import logging
-import json
 import polars as pl
 from pyairtable import Table
 
 API_KEY = os.environ["AIRTABLE_API_KEY"]
+
+# def create_table(base_id: str, table_name: str, schema):
 
 
 def write_df_to_table(df: pl.DataFrame, base_id: str, table_name: str):

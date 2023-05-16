@@ -11,8 +11,13 @@ entity_map = {"Lorlatinib": "Lorbrena/Lorviqua"}
 RE_PARENS_NAME = r"(.*?)(?:\(.+)\)*"
 
 
+NER_SUPPRESSIONS = ["™", "pfizer"]
+RE_NER_SUPPRESSIONS = "(?i)" + "|".join(NER_SUPPRESSIONS)
+
+
 def __clean_name(name_str: str) -> str:
-    trimmed = name_str.strip()
+    cleaned = re.sub(RE_NER_SUPPRESSIONS, "", name_str)
+    trimmed = cleaned.strip()
     title_cased = title_case(trimmed)
     return title_cased
 

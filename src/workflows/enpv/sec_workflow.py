@@ -26,6 +26,7 @@ def main():
     """
     Main
     """
+    # PFE, JNJ, NVS (Novartis), RHHBY (Roche), APPV, MRK, Bristol Myers Squibb (BMY)
     run_sec_pipeline("PFE")
 
 

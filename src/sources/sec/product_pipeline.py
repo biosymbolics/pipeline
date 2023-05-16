@@ -1,12 +1,10 @@
 """
 Get info about R&D pipelines
 """
-import logging
 from datetime import date, datetime
 from pydash import flatten
 import polars as pl
 
-from common.utils.date import parse_date
 from common.utils.list import diff_lists
 from common.utils.ner import normalize_entity_name
 from sources.sec.sec import fetch_quarterly_reports
@@ -18,12 +16,14 @@ def __get_normalized_products(df: pl.DataFrame) -> list[str]:
     """
     Get products from df and normalize
     """
-    return list(
+    normalized = list(
         map(
             normalize_entity_name,
             df.select(pl.col("product")).to_series().to_list(),
         )
     )
+    valid = list(filter(lambda p: p != "", normalized))
+    return valid
 
 
 def parse_pipeline_by_period(reports: list[SecFiling]) -> pl.DataFrame:
@@ -33,7 +33,7 @@ def parse_pipeline_by_period(reports: list[SecFiling]) -> pl.DataFrame:
     products_by_period = flatten(
         map(
             lambda report: {
-                "period": report.get("periodOfReport"),
+                "period": report.get("periodOfReport"),  # parse_date
                 "products": flatten(
                     map(
                         __get_normalized_products,
