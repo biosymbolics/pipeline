@@ -14,9 +14,11 @@ def run_sec_pipeline(ticker: str):
     """
     Run SEC pipeline
     """
-    start_date = datetime(2018, 1, 1)
+    start_date = datetime(2022, 1, 1)
     try:
-        pipeline = get_pipeline_by_ticker(ticker, start_date)
+        pipeline = get_pipeline_by_ticker(
+            ticker, start_date, datetime.now(), "LLAMA_INDEX"
+        )
         write_df_to_table(pipeline, base_id=DEFAULT_BASE_ID, table_name=ticker.lower())
     except Exception as ex:
         logging.error("Error running pipeline: %s", ex)
@@ -27,7 +29,7 @@ def main():
     Main
     """
     # PFE, JNJ, NVS (Novartis), RHHBY (Roche), APPV, MRK, Bristol Myers Squibb (BMY)
-    run_sec_pipeline("PFE")
+    run_sec_pipeline("BMY")
 
 
 if __name__ == "__main__":

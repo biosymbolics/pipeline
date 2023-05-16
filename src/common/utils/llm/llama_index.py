@@ -16,13 +16,19 @@ def create_index(namespace: str, index_key: str, url: str):
     Create singular llama index from supplied document url
     Skips creation if it already exists
     """
-    if index_key in index_map[namespace]:
+    if index_key in index_map.get(namespace, {}):
         logging.info("Not recreating index %s/%s", namespace, index_key)
         return
 
-    documents = SimpleWebPageReader(html_to_text=True).load_data(url)
-    index = GPTListIndex.from_documents(documents)
-    index_map[namespace][index_key] = index
+    logging.info("Creating index %s/%s", namespace, index_key)
+    try:
+        documents = SimpleWebPageReader(html_to_text=True).load_data([url])
+        index = GPTListIndex.from_documents(documents)
+        if namespace not in index_map:
+            index_map[namespace] = {}
+        index_map[namespace][index_key] = index
+    except Exception as ex:
+        logging.error("Error creating index: %s", ex)
 
 
 def create_and_query_index(query: str, namespace: str, index_key: str, url: str) -> str:

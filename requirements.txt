@@ -1,4 +1,5 @@
 bs4
+html2text
 polars
 pyairtable
 pydash

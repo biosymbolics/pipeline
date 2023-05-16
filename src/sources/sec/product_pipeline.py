@@ -2,16 +2,19 @@
 Get info about R&D pipelines
 """
 from datetime import date, datetime
+import logging
 from pydash import flatten
 import polars as pl
 
 from common.utils.list import diff_lists
+from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
 from sources.sec.sec import fetch_quarterly_reports
 from sources.sec.sec_client import extract_section
 from sources.sec.types import SecFiling
-from src.common.utils.llm.llama_index import create_and_query_index
-from src.sources.sec.types import SecProductQueryStrategy
+from sources.sec.types import SecProductQueryStrategy
+
+logging.basicConfig(level="DEBUG")
 
 
 def __get_products_via_parse(df: pl.DataFrame) -> list[str]:
@@ -40,6 +43,7 @@ def get_normalized_products(
     """
     Get normalized products from report
     """
+    logging.info("Getting normalized products via stategy %s", strategy)
     if strategy == "TABLE_PARSE":
         return flatten(
             map(
@@ -55,7 +59,7 @@ def get_normalized_products(
     )
 
 
-def parse_pipeline_by_period(
+def extract_pipeline_by_period(
     reports: list[SecFiling], strategy: SecProductQueryStrategy = "TABLE_PARSE"
 ) -> pl.DataFrame:
     """
@@ -75,7 +79,7 @@ def parse_pipeline_by_period(
     return df
 
 
-def get_pipeline_diffs(products_by_period) -> list[list[str]]:
+def find_pipeline_diffs(products_by_period) -> list[list[str]]:
     """
     Get diffs of what was dropped from one period to the next
     - do this in polars?
@@ -107,10 +111,14 @@ def get_pipeline_by_ticker(
     - sort by product
     - normalize names (ontology)
     """
+    logging.info("Grabbing quarterly reports for %s", ticker)
     quarterly_reports = fetch_quarterly_reports(ticker, start_date, end_date)
 
-    pipeline_df = parse_pipeline_by_period(quarterly_reports, strategy)
-    diffs = get_pipeline_diffs(pipeline_df)
+    logging.info("Extracting pipeline for %s", ticker)
+    pipeline_df = extract_pipeline_by_period(quarterly_reports, strategy)
+
+    logging.info("Grabbing diffs for %s", ticker)
+    diffs = find_pipeline_diffs(pipeline_df)
     pipeline_df = pipeline_df.with_columns(pl.Series(name="dropped", values=diffs))
 
     # pl.Config.set_tbl_rows(100)
