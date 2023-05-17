@@ -1,11 +1,15 @@
 """
 Class for cached web page reading
 """
+import logging
 import os
 import pathlib
 import requests
 import html2text
+import requests_random_user_agent
 from llama_index.readers.schema.base import Document
+
+from common.utils.url import url_to_filename
 
 
 class CachedWedPageReader:
@@ -24,7 +28,8 @@ class CachedWedPageReader:
         return doc_dir
 
     def __get_file_location(self, url) -> str:
-        return f"{self.__get_doc_dir()}/{url}"
+        file_name = url_to_filename(url)
+        return f"{self.__get_doc_dir()}/{file_name}"
 
     def __cache_page(self, url: str, page_text: str):
         file_location = self.__get_file_location(url)
@@ -55,8 +60,9 @@ class CachedWedPageReader:
 
         documents = []
         for url in urls:
+            logging.debug("Getting url %s", url)
             document = self.__get_document(url)
             documents.append(document)
-            self.__cache_page(url, document)
+            self.__cache_page(url, document.text)
 
         return documents

@@ -3,4 +3,5 @@ html2text
 polars
 pyairtable
 pydash
+requests-random-user-agent 
 sec_api

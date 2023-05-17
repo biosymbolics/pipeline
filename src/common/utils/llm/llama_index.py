@@ -13,7 +13,7 @@ from common.utils.llm.readers.cached_webpage_reader import CachedWedPageReader
 
 API_KEY = os.environ["OPENAI_API_KEY"]
 BASE_STORAGE_DIR = "./storage"
-SEC_DOCS_DIR = "./sec-docs"
+SEC_DOCS_DIR = "./sec_docs"
 
 
 def __get_persist_dir(namespace: str) -> str:
@@ -62,7 +62,7 @@ def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListInde
         return index
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
-        return None
+        raise ex
 
 
 def create_and_query_index(query: str, namespace: str, index_key: str, url: str) -> str:

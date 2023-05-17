@@ -22,6 +22,7 @@ def run_sec_pipeline(ticker: str):
         write_df_to_table(pipeline, base_id=DEFAULT_BASE_ID, table_name=ticker.lower())
     except Exception as ex:
         logging.error("Error running pipeline: %s", ex)
+        raise ex
 
 
 def main():
