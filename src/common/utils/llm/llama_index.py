@@ -29,7 +29,7 @@ def __persist_index(index: GPTListIndex, namespace: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def load_index(namespace: str, index_key: str) -> GPTListIndex:
+def __load_index(namespace: str, index_key: str) -> GPTListIndex:
     """
     Load persisted index
     """
@@ -48,7 +48,7 @@ def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListInde
     Create singular llama index from supplied document url
     Skips creation if it already exists
     """
-    index = load_index(namespace, index_key)
+    index = __load_index(namespace, index_key)
     if index:
         return index
 
@@ -67,8 +67,8 @@ def create_and_query_index(query: str, namespace: str, index_key: str, url: str)
     """
     Creates the index if nx, and queries
     """
-    get_or_create_index(namespace, index_key, url)
-    return query_index(query, namespace, index_key)
+    index = get_or_create_index(namespace, index_key, url)
+    return index.as_query_engine().query(query)
 
 
 def get_query_engine(namespace: str, index_key: str):
@@ -76,7 +76,10 @@ def get_query_engine(namespace: str, index_key: str):
     Get query engine for a given namespace/index
     """
     try:
-        index = load_index(namespace, index_key)
+        index = __load_index(namespace, index_key)
+        if not index:
+            logging.error("Index %s/%s not found", namespace, index_key)
+            raise Exception("Index not found")
         query_engine = index.as_query_engine()
         return query_engine
     except Exception as ex:
