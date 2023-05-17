@@ -2,6 +2,7 @@
 Client for SEC API
 """
 import logging
+import os
 
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
@@ -10,8 +11,7 @@ from sources.sec.types import SecFiling
 
 # logging.getLogger().setLevel(logging.INFO)
 
-# SSM obv
-API_KEY = "093ca4a8aaf5ce274e9651953d4fdf31b73d541c3db3a099adb2172ba39b1fce"
+API_KEY = os.environ["SEC_API_KEY"]
 
 
 class SecApiClient:
@@ -81,12 +81,21 @@ def parse_xbrl(url: str):
     return xbrl_json
 
 
-def extract_section(url: str):
+def extract_section(url: str) -> str:
     """
     Extract section
     """
     extractor_api = ExtractorApi(API_KEY)
     section_html = extractor_api.get_section(url, "part1item2", "html")
+
+    return section_html
+
+
+def extract_product_pipeline(url: str):
+    """
+    Extract section
+    """
+    section_html = extract_section(url)
     product_tables = parse_product_tables(section_html)
 
     return product_tables

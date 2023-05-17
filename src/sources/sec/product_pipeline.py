@@ -10,7 +10,7 @@ from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
 from sources.sec.sec import fetch_quarterly_reports
-from sources.sec.sec_client import extract_section
+from sources.sec.sec_client import extract_product_pipeline
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
 
@@ -39,23 +39,24 @@ def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
 
 def normalize_products(
     report: SecFiling, strategy: SecProductQueryStrategy = "TABLE_PARSE"
-):
+) -> list[str]:
     """
     Get normalized products from report
     """
     logging.info("Getting normalized products via stategy %s", strategy)
+
     if strategy == "TABLE_PARSE":
         return flatten(
             map(
                 __parse_products,
-                extract_section(report.get("linkToHtml")),
+                extract_product_pipeline(report.get("linkToHtml")),
             )
         )
 
     return __search_for_products(
         namespace=report["ticker"],
         period=report.get("periodOfReport"),
-        url=report.get("linkToHtml"),
+        url=report.get("linkToFilingDetails"),
     )
 
 
