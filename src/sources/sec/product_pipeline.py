@@ -5,17 +5,17 @@ from datetime import date, datetime
 import logging
 from pydash import flatten
 import polars as pl
-from jsonschema import validate
 
 
 from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
+from common.utils.validate import validate_or_pickle
+from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 from sources.sec.sec import fetch_quarterly_reports
 from sources.sec.sec_client import extract_product_pipeline, extract_section
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
-from src.sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 
 logging.basicConfig(level="DEBUG")
 
@@ -42,7 +42,8 @@ def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
         period,
         [sec_section],
     )
-    validate(instance=results, schema=JSON_PIPELINE_SCHEMA)  # TODO: handle.
+    for result in results:
+        validate_or_pickle(result, JSON_PIPELINE_SCHEMA)
     return results
 
 

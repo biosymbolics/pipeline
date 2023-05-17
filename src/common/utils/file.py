@@ -3,7 +3,8 @@ Utils related to files
 """
 import json
 import pickle
-from typing import Any, Union
+import uuid
+from typing import Any, Optional, Union
 
 
 def save_as_file(content: Union[str, bytes], filename: str):
@@ -15,13 +16,17 @@ def save_as_file(content: Union[str, bytes], filename: str):
         file.write(content)
 
 
-def save_as_pickle(obj: Any, filename: str):
+def save_as_pickle(obj: Any, filename: Optional[str]) -> str:
     """
     Saves obj as picke
     """
+    if not filename:
+        filename = uuid.uuid4() + ".txt"
     with open(filename, "wb") as file:
         # Pickle the object
         pickle.dump(obj, file)
+
+    return filename
 
 
 def save_json_as_file(serializable_obj: Any, filename: str):
