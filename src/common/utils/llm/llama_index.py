@@ -11,22 +11,39 @@ from llama_index import (
 )
 
 API_KEY = os.environ["OPENAI_API_KEY"]
+BASE_STORAGE_DIR = "./storage"
 
 
-def load_index(namespace: str, index_key: str):
+def __get_persist_dir(namespace: str) -> str:
+    return f"{BASE_STORAGE_DIR}/{namespace}"
+
+
+def __persist_index(index: GPTListIndex, namespace: str):
+    """
+    Persist llama index
+    """
+    try:
+        directory = __get_persist_dir(namespace)
+        index.storage_context.persist(persist_dir=directory)
+    except Exception as ex:
+        logging.error("Error persisting index: %s", ex)
+
+
+def load_index(namespace: str, index_key: str) -> GPTListIndex:
     """
     Load persisted index
     """
     try:
-        storage_context = StorageContext.from_defaults(persist_dir=namespace)
+        directory = __get_persist_dir(namespace)
+        storage_context = StorageContext.from_defaults(persist_dir=directory)
         index = load_index_from_storage(storage_context, index_id=index_key)
         return index
     except Exception as ex:
-        logging.info("Could not load index from disk, perhaps nx? %s", ex)
+        logging.info("Could not load index from disk. nx? %s", ex)
         return None
 
 
-def get_or_create_index(namespace: str, index_key: str, url: str):
+def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListIndex:
     """
     Create singular llama index from supplied document url
     Skips creation if it already exists
@@ -39,9 +56,11 @@ def get_or_create_index(namespace: str, index_key: str, url: str):
     try:
         documents = SimpleWebPageReader(html_to_text=True).load_data([url])
         index = GPTListIndex.from_documents(documents)
+        __persist_index(index, namespace)
         return index
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
+        return None
 
 
 def create_and_query_index(query: str, namespace: str, index_key: str, url: str) -> str:
@@ -50,15 +69,6 @@ def create_and_query_index(query: str, namespace: str, index_key: str, url: str)
     """
     get_or_create_index(namespace, index_key, url)
     return query_index(query, namespace, index_key)
-
-
-def create_indicies(namespace: str, url_map: dict[str, str]):
-    """
-    Create indicies out of the supplied map (key: url)
-    e.g. namespace: pfe-10q, url_map: {"2020-01-01": "https://sec.gov/pfizer-10q.htm"}
-    """
-    for key in url_map.keys():
-        get_or_create_index(namespace, key, url_map[key])
 
 
 def get_query_engine(namespace: str, index_key: str):
