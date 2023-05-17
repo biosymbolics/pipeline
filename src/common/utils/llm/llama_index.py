@@ -5,13 +5,15 @@ import os
 import logging
 from llama_index import (
     GPTListIndex,
-    SimpleWebPageReader,
     StorageContext,
     load_index_from_storage,
 )
 
+from common.utils.llm.readers.cached_webpage_reader import CachedWedPageReader
+
 API_KEY = os.environ["OPENAI_API_KEY"]
 BASE_STORAGE_DIR = "./storage"
+SEC_DOCS_DIR = "./sec-docs"
 
 
 def __get_persist_dir(namespace: str) -> str:
@@ -54,7 +56,7 @@ def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListInde
 
     logging.info("Creating index %s/%s", namespace, index_key)
     try:
-        documents = SimpleWebPageReader(html_to_text=True).load_data([url])
+        documents = CachedWedPageReader(SEC_DOCS_DIR, namespace).load_data([url])
         index = GPTListIndex.from_documents(documents)
         __persist_index(index, namespace)
         return index

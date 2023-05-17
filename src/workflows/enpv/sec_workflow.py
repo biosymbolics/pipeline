@@ -14,7 +14,7 @@ def run_sec_pipeline(ticker: str):
     """
     Run SEC pipeline
     """
-    start_date = datetime(2022, 1, 1)
+    start_date = datetime(2023, 1, 1)
     try:
         pipeline = get_pipeline_by_ticker(
             ticker, start_date, datetime.now(), "LLAMA_INDEX"
