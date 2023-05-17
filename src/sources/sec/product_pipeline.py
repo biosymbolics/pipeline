@@ -2,11 +2,13 @@
 Get info about R&D pipelines
 """
 from datetime import date, datetime
+import json
 import logging
 from pydash import flatten
 import polars as pl
 
 
+from common.utils.file import save_as_pickle
 from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
@@ -35,6 +37,9 @@ def __parse_products(df: pl.DataFrame) -> list[str]:
 
 
 def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
+    """
+    Uses LlamaIndex/GPT to extract product names
+    """
     sec_section = extract_section(url, "text")
     results = create_and_query_index(
         JSON_PIPELINE_PROMPT,
@@ -42,9 +47,21 @@ def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
         period,
         [sec_section],
     )
-    for result in results:
-        validate_or_pickle(result, JSON_PIPELINE_SCHEMA)
-    return results
+    names = []
+    try:
+        save_as_pickle(results, "bigpickle.txt")
+        products = json.loads(results)
+        for product in products:
+            try:
+                validate_or_pickle(product, JSON_PIPELINE_SCHEMA)
+                print(product)
+                names.append(product["brand_name"])
+            except Exception as ex:
+                logging.debug("Ignoring exception %s", ex)
+    except Exception as ex:
+        print("WTF", ex)
+
+    return names
 
 
 def normalize_products(

@@ -10,8 +10,8 @@ JSON_PIPELINE_SCHEMA = {
     "properties": {
         "generic_name": {"type": "string"},
         "brand_name": {"type": "string"},
-        "indication": {"type": "string"},
-        "description": {"type": "string"},
+        # "indication": {"type": "string"},
+        # "description": {"type": "string"},
     },
 }
 
