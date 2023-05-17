@@ -5,6 +5,8 @@ from datetime import date, datetime
 import logging
 from pydash import flatten
 import polars as pl
+from jsonschema import validate
+
 
 from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
@@ -13,6 +15,7 @@ from sources.sec.sec import fetch_quarterly_reports
 from sources.sec.sec_client import extract_product_pipeline, extract_section
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
+from src.sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 
 logging.basicConfig(level="DEBUG")
 
@@ -33,14 +36,14 @@ def __parse_products(df: pl.DataFrame) -> list[str]:
 
 def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
     sec_section = extract_section(url, "text")
-    return create_and_query_index(
-        "What are the products in this pharma company's R&D pipeline? "
-        "Return results as an array of json objects containing "
-        "the keys generic_name, brand_name, indication and description.",
+    results = create_and_query_index(
+        JSON_PIPELINE_PROMPT,
         namespace,
         period,
         [sec_section],
     )
+    validate(instance=results, schema=JSON_PIPELINE_SCHEMA)  # TODO: handle.
+    return results
 
 
 def normalize_products(
@@ -49,20 +52,23 @@ def normalize_products(
     """
     Get normalized products from report
     """
-    logging.info("Getting normalized products via stategy %s", strategy)
+    report_url = report.get("linkToHtml")
+    logging.info(
+        "Getting normalized products via stategy %s (%s)", strategy, report_url
+    )
 
     if strategy == "TABLE_PARSE":
         return flatten(
             map(
                 __parse_products,
-                extract_product_pipeline(report.get("linkToHtml")),
+                extract_product_pipeline(report_url),
             )
         )
 
     return __search_for_products(
         namespace=report["ticker"],
         period=report.get("periodOfReport"),
-        url=report.get("linkToHtml"),
+        url=report_url,
     )
 
 
@@ -86,7 +92,7 @@ def extract_pipeline_by_period(
     return df
 
 
-def find_pipeline_diffs(products_by_period) -> list[list[str]]:
+def diff_pipeline(products_by_period: pl.DataFrame) -> list[list[str]]:
     """
     Get diffs of what was dropped from one period to the next
     - do this in polars?
@@ -125,10 +131,7 @@ def get_pipeline_by_ticker(
     pipeline_df = extract_pipeline_by_period(quarterly_reports, strategy)
 
     logging.info("Grabbing diffs for %s", ticker)
-    diffs = find_pipeline_diffs(pipeline_df)
+    diffs = diff_pipeline(pipeline_df)
     pipeline_df = pipeline_df.with_columns(pl.Series(name="dropped", values=diffs))
-
-    # pl.Config.set_tbl_rows(100)
-    # logging.info("Products: %s", pipeline_df)
 
     return pipeline_df
