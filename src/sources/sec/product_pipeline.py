@@ -17,7 +17,7 @@ from sources.sec.types import SecProductQueryStrategy
 logging.basicConfig(level="DEBUG")
 
 
-def __get_products_via_parse(df: pl.DataFrame) -> list[str]:
+def __parse_products(df: pl.DataFrame) -> list[str]:
     """
     Get products from df and normalize
     """
@@ -31,13 +31,13 @@ def __get_products_via_parse(df: pl.DataFrame) -> list[str]:
     return valid
 
 
-def __get_products_via_llama(namespace: str, period: str, url: str) -> list[str]:
+def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
     return create_and_query_index(
         "what are the products in currently in development?", namespace, period, url
     )
 
 
-def get_normalized_products(
+def normalize_products(
     report: SecFiling, strategy: SecProductQueryStrategy = "TABLE_PARSE"
 ):
     """
@@ -47,12 +47,12 @@ def get_normalized_products(
     if strategy == "TABLE_PARSE":
         return flatten(
             map(
-                __get_products_via_parse,
+                __parse_products,
                 extract_section(report.get("linkToHtml")),
             )
         )
 
-    return __get_products_via_llama(
+    return __search_for_products(
         namespace=report["ticker"],
         period=report.get("periodOfReport"),
         url=report.get("linkToHtml"),
@@ -69,7 +69,7 @@ def extract_pipeline_by_period(
         map(
             lambda report: {
                 "period": report.get("periodOfReport"),  # parse_date
-                "products": get_normalized_products(report, strategy),
+                "products": normalize_products(report, strategy),
             },
             reports,
         )
