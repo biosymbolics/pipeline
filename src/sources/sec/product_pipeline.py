@@ -35,7 +35,8 @@ def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
     sec_section = extract_section(url, "text")
     return create_and_query_index(
         "What are the products in this pharma company's R&D pipeline? "
-        "Return results as a string array.",
+        "Return results as an array of json objects containing "
+        "the keys generic_name, brand_name, indication and description.",
         namespace,
         period,
         [sec_section],
