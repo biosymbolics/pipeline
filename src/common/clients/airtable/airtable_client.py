@@ -6,6 +6,8 @@ import logging
 import polars as pl
 from pyairtable import Table
 
+from common.utils.file import save_as_pickle
+
 API_KEY = os.environ["AIRTABLE_API_KEY"]
 
 # def create_table(base_id: str, table_name: str, schema):
@@ -25,3 +27,5 @@ def write_df_to_table(df: pl.DataFrame, base_id: str, table_name: str):
         table.batch_create(records, typecast=True)
     except Exception as ex:
         logging.error("Error loading airtable: %s", ex)
+        save_as_pickle(records, f"{table_name}.txt")
+        raise ex

@@ -10,7 +10,7 @@ from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
 from sources.sec.sec import fetch_quarterly_reports
-from sources.sec.sec_client import extract_product_pipeline
+from sources.sec.sec_client import extract_product_pipeline, extract_section
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
 
@@ -32,8 +32,13 @@ def __parse_products(df: pl.DataFrame) -> list[str]:
 
 
 def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
+    sec_section = extract_section(url, "text")
     return create_and_query_index(
-        "what are the products in currently in development?", namespace, period, url
+        "What are the products in this pharma company's R&D pipeline? "
+        "Return results as a string array.",
+        namespace,
+        period,
+        [sec_section],
     )
 
 
@@ -56,7 +61,7 @@ def normalize_products(
     return __search_for_products(
         namespace=report["ticker"],
         period=report.get("periodOfReport"),
-        url=report.get("linkToFilingDetails"),
+        url=report.get("linkToHtml"),
     )
 
 

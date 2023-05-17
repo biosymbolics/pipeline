@@ -7,7 +7,7 @@ import os
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
 from common.utils.html_parsing.product_table import parse_product_tables
-from sources.sec.types import SecFiling
+from sources.sec.types import ExtractReturnType, SecFiling
 
 # logging.getLogger().setLevel(logging.INFO)
 
@@ -81,12 +81,12 @@ def parse_xbrl(url: str):
     return xbrl_json
 
 
-def extract_section(url: str) -> str:
+def extract_section(url: str, return_type: ExtractReturnType = "html") -> str:
     """
     Extract section
     """
     extractor_api = ExtractorApi(API_KEY)
-    section_html = extractor_api.get_section(url, "part1item2", "html")
+    section_html = extractor_api.get_section(url, "part1item2", return_type)
 
     return section_html
 

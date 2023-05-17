@@ -4,12 +4,12 @@ Utility for llama indexes
 import os
 import logging
 from llama_index import (
+    Document,
     GPTListIndex,
     StorageContext,
     load_index_from_storage,
 )
 
-from common.utils.llm.readers.cached_webpage_reader import CachedWedPageReader
 
 API_KEY = os.environ["OPENAI_API_KEY"]
 BASE_STORAGE_DIR = "./storage"
@@ -35,6 +35,7 @@ def __load_index(namespace: str, index_key: str) -> GPTListIndex:
     """
     Load persisted index
     """
+    logging.info("Attempting to load index %s/%s from disk", namespace, index_key)
     try:
         directory = __get_persist_dir(namespace)
         storage_context = StorageContext.from_defaults(persist_dir=directory)
@@ -45,19 +46,22 @@ def __load_index(namespace: str, index_key: str) -> GPTListIndex:
         return None
 
 
-def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListIndex:
+def get_or_create_index(
+    namespace: str, index_key: str, documents: list[str]
+) -> GPTListIndex:
     """
     Create singular llama index from supplied document url
     Skips creation if it already exists
     """
+    ll_docs = list(map(Document, documents))
+
     index = __load_index(namespace, index_key)
     if index:
         return index
 
     logging.info("Creating index %s/%s", namespace, index_key)
     try:
-        documents = CachedWedPageReader(SEC_DOCS_DIR, namespace).load_data([url])
-        index = GPTListIndex.from_documents(documents)
+        index = GPTListIndex.from_documents(ll_docs)
         __persist_index(index, namespace)
         return index
     except Exception as ex:
@@ -65,12 +69,15 @@ def get_or_create_index(namespace: str, index_key: str, url: str) -> GPTListInde
         raise ex
 
 
-def create_and_query_index(query: str, namespace: str, index_key: str, url: str) -> str:
+def create_and_query_index(
+    query: str, namespace: str, index_key: str, documents: list[str]
+) -> str:
     """
     Creates the index if nx, and queries
     """
-    index = get_or_create_index(namespace, index_key, url)
-    return index.as_query_engine().query(query)
+    index = get_or_create_index(namespace, index_key, documents)
+    response = index.as_query_engine().query(query)
+    return response.response
 
 
 def get_query_engine(namespace: str, index_key: str):

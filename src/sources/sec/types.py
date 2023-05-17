@@ -35,3 +35,7 @@ class SecFilingResponse(TypedDict):
 
 
 SecProductQueryStrategy = Literal["TABLE_PARSE", "SEARCH"]
+
+
+# there may be others
+ExtractReturnType = Literal["html", "text"]

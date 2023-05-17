@@ -6,16 +6,20 @@ import os
 import pathlib
 import requests
 import html2text
-import requests_random_user_agent
+import requests_random_user_agent  # this is used.
 from llama_index.readers.schema.base import Document
 
 from common.utils.url import url_to_filename
+from src.common.utils.file import save_as_file
 
 
 class CachedWedPageReader:
     """
     like SimpleWebPageReader but with caching
     TODO: implement html_to_text bool
+    example use:
+        documents = CachedWedPageReader("./sec_docs", "pfe").load_data([url])
+        index = GPTListIndex.from_documents(documents)
     """
 
     def __init__(self, storage_dir: str, namespace: str):
@@ -33,8 +37,7 @@ class CachedWedPageReader:
 
     def __cache_page(self, url: str, page_text: str):
         file_location = self.__get_file_location(url)
-        with open(file_location, "w") as file:
-            file.write(page_text)
+        save_as_file(page_text, file_location)
 
     def __get_document(self, url: str):
         file_location = self.__get_file_location(url)
@@ -45,7 +48,6 @@ class CachedWedPageReader:
             return document
 
         # else pull webpage
-        # use requests-random-user-agent ?
         response = requests.get(url, headers=None).text
         response = html2text.html2text(response)
         document = Document(response)
