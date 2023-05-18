@@ -8,7 +8,6 @@ from pydash import flatten
 import polars as pl
 
 
-from common.utils.file import save_as_pickle
 from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.ner import normalize_entity_name
@@ -49,12 +48,10 @@ def __search_for_products(namespace: str, period: str, url: str) -> list[str]:
     )
     names = []
     try:
-        save_as_pickle(results, "bigpickle.txt")
         products = json.loads(results)
         for product in products:
             try:
                 validate_or_pickle(product, JSON_PIPELINE_SCHEMA)
-                print(product)
                 names.append(product["brand_name"])
             except Exception as ex:
                 logging.debug("Ignoring exception %s", ex)
@@ -83,11 +80,14 @@ def normalize_products(
             )
         )
 
-    return __search_for_products(
-        namespace=report["ticker"],
-        period=report.get("periodOfReport"),
-        url=report_url,
-    )
+    if strategy == "SEARCH":
+        return __search_for_products(
+            namespace=report["ticker"],
+            period=report.get("periodOfReport"),
+            url=report_url,
+        )
+
+    raise Exception("Strategy not recognized")
 
 
 def extract_pipeline_by_period(
@@ -99,7 +99,7 @@ def extract_pipeline_by_period(
     products_by_period = flatten(
         map(
             lambda report: {
-                "period": report.get("periodOfReport"),  # parse_date
+                "period": report.get("periodOfReport"),
                 "products": normalize_products(report, strategy),
             },
             reports,

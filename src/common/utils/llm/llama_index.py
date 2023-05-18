@@ -6,9 +6,13 @@ import logging
 from llama_index import (
     Document,
     GPTListIndex,
+    LLMPredictor,
+    PromptHelper,
+    ServiceContext,
     StorageContext,
     load_index_from_storage,
 )
+from langchain import OpenAI
 
 
 API_KEY = os.environ["OPENAI_API_KEY"]
@@ -40,12 +44,36 @@ def __load_index(namespace: str, index_id: str) -> GPTListIndex:
         directory = __get_persist_dir(namespace)
         storage_context = StorageContext.from_defaults(persist_dir=directory)
         index = load_index_from_storage(storage_context, index_id=index_id)
+        index.service_context = get_default_service_context()
 
         logging.info("Returning index %s/%s from disk", namespace, index_id)
         return index
     except Exception as ex:
         logging.info("Failed to load %s/%s from disk: %s", namespace, index_id, ex)
         return None
+
+
+def get_default_service_context():
+    """
+    Get default service context for llllamama index
+    """
+    # define prompt helper
+    # set maximum input size
+    max_input_size = 4096
+    # set number of output tokens
+    num_output = 4096
+    # set maximum chunk overlap
+    max_chunk_overlap = 20
+    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+
+    llm_predictor = LLMPredictor(
+        llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=2048)
+    )
+
+    service_context = ServiceContext.from_defaults(
+        llm_predictor=llm_predictor, prompt_helper=prompt_helper
+    )
+    return service_context
 
 
 def get_or_create_index(
@@ -61,9 +89,10 @@ def get_or_create_index(
         return index
 
     logging.info("Creating index %s/%s", namespace, index_id)
+    service_context = get_default_service_context()
     try:
         ll_docs = list(map(Document, documents))
-        index = GPTListIndex.from_documents(ll_docs)
+        index = GPTListIndex.from_documents(ll_docs, service_context=service_context)
         __persist_index(index, namespace, index_id)
         return index
     except Exception as ex:
@@ -76,6 +105,8 @@ def create_and_query_index(
 ) -> str:
     """
     Creates the index if nx, and queries
+    TODO
+    - response_mode="compact"
     """
     index = get_or_create_index(namespace, index_key, documents)
     response = index.as_query_engine().query(query)
