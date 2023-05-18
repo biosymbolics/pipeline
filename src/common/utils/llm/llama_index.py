@@ -43,8 +43,11 @@ def __load_index(namespace: str, index_id: str) -> GPTListIndex:
     try:
         directory = __get_persist_dir(namespace)
         storage_context = StorageContext.from_defaults(persist_dir=directory)
-        index = load_index_from_storage(storage_context, index_id=index_id)
-        index.service_context = get_default_service_context()
+        index = load_index_from_storage(
+            storage_context,
+            index_id=index_id,
+            service_context=get_default_service_context(),
+        )
 
         logging.info("Returning index %s/%s from disk", namespace, index_id)
         return index
@@ -61,7 +64,7 @@ def get_default_service_context():
     # set maximum input size
     max_input_size = 4096
     # set number of output tokens
-    num_output = 4096
+    num_output = 2048  # error if 4096
     # set maximum chunk overlap
     max_chunk_overlap = 20
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)

@@ -18,6 +18,6 @@ JSON_PIPELINE_SCHEMA = {
 
 JSON_PIPELINE_PROMPT = (
     "What are the products in active research and development (R&D)? "
-    "Return results as an array of json objects containing "
+    "Return the results as an array of json objects containing the "
     "keys: " + ", ".join(JSON_PIPELINE_SCHEMA["properties"].keys()) + "."
 )
