@@ -34,7 +34,7 @@ class SecFilingResponse(TypedDict):
     filings: list[SecFiling]
 
 
-SecProductQueryStrategy = Literal["TABLE_PARSE", "SEARCH"]
+SecProductQueryStrategy = Literal["TABLE", "SEARCH"]
 
 
 # there may be others

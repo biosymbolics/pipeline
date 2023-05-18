@@ -3,10 +3,10 @@ Client for SEC API
 """
 import logging
 import os
-
+import polars as pl
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
-from common.utils.html_parsing.product_table import parse_product_tables
+from common.utils.html_parsing.product_table import extract_product_tables
 from sources.sec.types import ExtractReturnType, SecFiling
 
 # logging.getLogger().setLevel(logging.INFO)
@@ -81,21 +81,23 @@ def parse_xbrl(url: str):
     return xbrl_json
 
 
-def extract_section(url: str, return_type: ExtractReturnType = "html") -> str:
+def extract_section(
+    url: str, section: str = "part1item2", return_type: ExtractReturnType = "html"
+) -> str:
     """
     Extract section
     """
     extractor_api = ExtractorApi(API_KEY)
-    section_html = extractor_api.get_section(url, "part1item2", return_type)
+    section_html = extractor_api.get_section(url, section, return_type)
 
     return section_html
 
 
-def extract_product_pipeline(url: str):
+def extract_rd_pipeline(url: str) -> list[pl.DataFrame]:
     """
-    Extract section
+    Extract R&D pipeline from sec doc section
     """
-    section_html = extract_section(url)
-    product_tables = parse_product_tables(section_html)
+    section_html = extract_section(url, "part1item2", "html")
+    product_tables = extract_product_tables(section_html)
 
     return product_tables

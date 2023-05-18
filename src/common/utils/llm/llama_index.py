@@ -60,7 +60,6 @@ def get_default_service_context():
     """
     Get default service context for llllamama index
     """
-    # define prompt helper
     # set maximum input size
     max_input_size = 4096
     # set number of output tokens
@@ -70,7 +69,7 @@ def get_default_service_context():
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
     llm_predictor = LLMPredictor(
-        llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=2048)
+        llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=1900)
     )
 
     service_context = ServiceContext.from_defaults(
