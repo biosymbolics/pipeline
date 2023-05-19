@@ -1,3 +1,6 @@
 **/__pycache__/**
 .env
 .env.local
+storage
+storage/**
+sec_docs

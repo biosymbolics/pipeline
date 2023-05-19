@@ -2,6 +2,7 @@
 Parsing for tables containing products (SEC)
 """
 import logging
+from typing import Literal
 import polars as pl
 from bs4 import BeautifulSoup
 
@@ -64,7 +65,7 @@ def __get_schema(text_headers: list[str]) -> dict:
     return schema
 
 
-def __table_to_data_frame(table):
+def __table_to_data_frame(table) -> pl.DataFrame:
     """
     Turns a product table into a dataframe
     """
@@ -76,21 +77,21 @@ def __table_to_data_frame(table):
     return df
 
 
-def parse_product_tables(html):
+def extract_product_tables(html: str) -> list[pl.DataFrame]:
     """
-    Parse out product tables (from SEC docs)
+    Extract product tables from SEC docs
     """
-    table_contents = []
+    table_dfs = []
     soup = BeautifulSoup(html, features="html.parser")
     tables = soup.find_all("table")
-    product_tables = [table for table in tables if __is_product_table(table)]
+    product_tables = list(filter(__is_product_table, tables))
+
     for table in product_tables:
-        logging.info("Parsing table")
+        logging.info("Parsing product table")
         try:
             df = __table_to_data_frame(table)
-            table_contents.append(df)
-            print(df)
+            table_dfs.append(df)
         except Exception as ex:
             logging.warning("Error parsing table: %s", ex)  # oops
 
-    return table_contents
+    return table_dfs
