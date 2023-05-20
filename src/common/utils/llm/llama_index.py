@@ -122,7 +122,7 @@ def get_or_create_index(
         index = GPTKnowledgeGraphIndex.from_documents(
             ll_docs,
             service_context=service_context,
-            storage_context=__get_storage_context(namespace)
+            storage_context=__get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
         )
         __persist_index(index, namespace, index_id)
