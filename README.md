@@ -1,3 +1,9 @@
+### Setup
+
+- `. .pythonenv`
+- `source .env` (containing AIRTABLE_API_KEY, OPENAI_API_KEY, SEC_API_KEY)
+- `python3 -m pip install -r requirements.txt`
+
 ### Running
 
 #### SEC Workflow
@@ -10,9 +16,3 @@
 ### Testing
 
 - Run `python3 -m pytest src`
-
-### Environment
-
-#### Set the PYTHONPATH environment variable
-
-- Execute `. .pythonenv`
