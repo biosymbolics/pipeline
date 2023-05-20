@@ -29,7 +29,7 @@ def main():
     Main
     """
     # PFE, JNJ, NVS (Novartis), RHHBY (Roche), APPV, MRK, Bristol Myers Squibb (BMY)
-    # run_sec_pipeline("BMY")
+    run_sec_pipeline("BMY")
     visualize_network("BMY", "2021-12-31")
 
 

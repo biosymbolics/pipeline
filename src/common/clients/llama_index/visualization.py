@@ -15,7 +15,6 @@ def visualize_network(index: GPTKnowledgeGraphIndex):
     g = index.get_networkx_graph()
     net = Network(directed=True)
     net.from_nx(g)
-    print(net)
     net.show("graph.html", notebook=False)
 
 
