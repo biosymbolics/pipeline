@@ -5,13 +5,15 @@ import os
 import logging
 from llama_index import (
     Document,
-    GPTListIndex,
     LLMPredictor,
     PromptHelper,
     ServiceContext,
     StorageContext,
     load_index_from_storage,
 )
+from llama_index.indices.base import BaseGPTIndex
+from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
+from llama_index.indices.query.base import BaseQueryEngine
 from langchain import OpenAI
 
 
@@ -24,7 +26,7 @@ def __get_persist_dir(namespace: str) -> str:
     return f"{BASE_STORAGE_DIR}/{namespace}"
 
 
-def __persist_index(index: GPTListIndex, namespace: str, index_id: str):
+def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
     """
     Persist llama index
     """
@@ -36,7 +38,7 @@ def __persist_index(index: GPTListIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def __load_index(namespace: str, index_id: str) -> GPTListIndex:
+def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
     """
     Load persisted index
     """
@@ -60,16 +62,13 @@ def get_default_service_context():
     """
     Get default service context for llllamama index
     """
-    # set maximum input size
     max_input_size = 4096
-    # set number of output tokens
-    num_output = 2048  # error if 4096
-    # set maximum chunk overlap
+    num_output = 2048
     max_chunk_overlap = 20
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
     llm_predictor = LLMPredictor(
-        llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=1900)
+        llm=OpenAI(temperature=0, model_name="gpt-3.5-turbo", max_tokens=1900)
     )
 
     service_context = ServiceContext.from_defaults(
@@ -80,10 +79,11 @@ def get_default_service_context():
 
 def get_or_create_index(
     namespace: str, index_id: str, documents: list[str]
-) -> GPTListIndex:
+) -> GPTKnowledgeGraphIndex:
     """
-    Create singular llama index from supplied document url
+    Create llama index from supplied document url
     Skips creation if it already exists
+    TODO: specify index type
     """
 
     index = __load_index(namespace, index_id)
@@ -94,7 +94,7 @@ def get_or_create_index(
     service_context = get_default_service_context()
     try:
         ll_docs = list(map(Document, documents))
-        index = GPTListIndex.from_documents(ll_docs, service_context=service_context)
+        index = GPTKnowledgeGraphIndex.from_documents(ll_docs, service_context=service_context)
         __persist_index(index, namespace, index_id)
         return index
     except Exception as ex:
@@ -107,15 +107,13 @@ def create_and_query_index(
 ) -> str:
     """
     Creates the index if nx, and queries
-    TODO
-    - response_mode="compact"
     """
     index = get_or_create_index(namespace, index_key, documents)
     response = index.as_query_engine().query(query)
     return response.response
 
 
-def get_query_engine(namespace: str, index_id: str):
+def get_query_engine(namespace: str, index_id: str) -> BaseQueryEngine:
     """
     Get query engine for a given namespace/index
     """

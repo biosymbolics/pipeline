@@ -13,7 +13,7 @@ from common.utils.list import diff_lists
 from common.utils.llm.llama_index import create_and_query_index
 from common.utils.validate import validate_or_pickle
 from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
-from sources.sec.sec import fetch_quarterly_reports
+from sources.sec.sec import fetch_annual_reports
 from sources.sec import sec_client
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
@@ -130,15 +130,12 @@ def get_pipeline_by_ticker(
 ) -> pl.DataFrame:
     """
     Get the R&D pipeline for a given company
-    TODO
-    - sort by product
-    - normalize names (ontology)
     """
-    logging.info("Grabbing quarterly reports for %s", ticker)
-    quarterly_reports = fetch_quarterly_reports(ticker, start_date, end_date)
+    logging.info("Grabbing annual reports for %s", ticker)
+    annual_reports = fetch_annual_reports(ticker, start_date, end_date)
 
     logging.info("Extracting pipeline for %s", ticker)
-    pipeline_df = extract_pipeline_by_period(quarterly_reports, strategy)
+    pipeline_df = extract_pipeline_by_period(annual_reports, strategy)
 
     logging.info("Grabbing diffs for %s", ticker)
     diffs = diff_pipeline(pipeline_df)
