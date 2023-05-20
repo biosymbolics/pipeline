@@ -10,11 +10,7 @@ from sources.sec.types import SecFiling
 
 def __get_base_criteria(ticker: str, start_date: date, end_date: date) -> list[str]:
     date_range = format_date_range(start_date, end_date)
-    criteria = [
-        f"ticker:{ticker}",
-        "filedAt:{" + date_range + "}",
-        'formType:"10-Q"',
-    ]
+    criteria = [f"ticker:{ticker}", "filedAt:{" + date_range + "}"]
     return criteria    
 
 def fetch_quarterly_reports(
