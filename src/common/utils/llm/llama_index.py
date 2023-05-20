@@ -45,6 +45,17 @@ def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
+def __get_storage_context(namespace: str) -> StorageContext:
+    """
+    Get storage context
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+    """
+    directory = __get_persist_dir(namespace)
+    storage_context = StorageContext.from_defaults(persist_dir=directory)
+    return storage_context
+
 def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
     """
     Load persisted index
@@ -54,8 +65,7 @@ def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         index_id (str): unique id of the index (e.g. 2020-01-1) 
     """
     try:
-        directory = __get_persist_dir(namespace)
-        storage_context = StorageContext.from_defaults(persist_dir=directory)
+        storage_context = __get_storage_context(namespace)
         index = load_index_from_storage(
             storage_context,
             index_id=index_id,
@@ -66,6 +76,7 @@ def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         return index
     except Exception as ex:
         logging.info("Failed to load %s/%s from disk: %s", namespace, index_id, ex)
+        print(ex)
         return None
 
 
@@ -111,6 +122,7 @@ def get_or_create_index(
         index = GPTKnowledgeGraphIndex.from_documents(
             ll_docs,
             service_context=service_context,
+            storage_context=__get_storage_context(namespace)
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
         )
         __persist_index(index, namespace, index_id)
