@@ -5,27 +5,18 @@ import os
 import logging
 from llama_index import (
     Document,
-    LLMPredictor,
-    PromptHelper,
-    ServiceContext,
-    StorageContext,
     load_index_from_storage,
 )
 from llama_index.indices.base import BaseGPTIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from llama_index.indices.query.base import BaseQueryEngine
-from langchain import OpenAI
 
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
 
+from .context import get_service_context, get_storage_context
+from .utils import get_persist_dir
 
 API_KEY = os.environ["OPENAI_API_KEY"]
-BASE_STORAGE_DIR = "./storage"
-SEC_DOCS_DIR = "./sec_docs"
-
-
-def __get_persist_dir(namespace: str) -> str:
-    return f"{BASE_STORAGE_DIR}/{namespace}"
 
 
 def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
@@ -38,23 +29,12 @@ def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
         index_id (str): unique id of the index (e.g. 2020-01-1) 
     """
     try:
-        directory = __get_persist_dir(namespace)
+        directory = get_persist_dir(namespace)
         index.set_index_id(index_id)
         index.storage_context.persist(persist_dir=directory)
     except Exception as ex:
         logging.error("Error persisting index: %s", ex)
 
-
-def __get_storage_context(namespace: str) -> StorageContext:
-    """
-    Get storage context
-
-    Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
-    """
-    directory = __get_persist_dir(namespace)
-    storage_context = StorageContext.from_defaults(persist_dir=directory)
-    return storage_context
 
 def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
     """
@@ -65,11 +45,11 @@ def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         index_id (str): unique id of the index (e.g. 2020-01-1) 
     """
     try:
-        storage_context = __get_storage_context(namespace)
+        storage_context = get_storage_context(namespace)
         index = load_index_from_storage(
             storage_context,
             index_id=index_id,
-            service_context=get_default_service_context(),
+            service_context=get_service_context(),
         )
 
         logging.info("Returning index %s/%s from disk", namespace, index_id)
@@ -80,23 +60,6 @@ def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         return None
 
 
-def __get_default_service_context():
-    """
-    Get default service context for llllamama index
-    """
-    max_input_size = 4096
-    num_output = 2048
-    max_chunk_overlap = 20
-    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-
-    llm_predictor = LLMPredictor(
-        llm=OpenAI(temperature=0, model_name="gpt-3.5-turbo", max_tokens=1900)
-    )
-
-    service_context = ServiceContext.from_defaults(
-        llm_predictor=llm_predictor, prompt_helper=prompt_helper
-    )
-    return service_context
 
 def get_or_create_index(
     namespace: str, index_id: str, documents: list[str]
@@ -116,13 +79,13 @@ def get_or_create_index(
         return index
 
     logging.info("Creating index %s/%s", namespace, index_id)
-    service_context = __get_default_service_context()
+    service_context = get_service_context()
     try:
         ll_docs = list(map(Document, documents))
         index = GPTKnowledgeGraphIndex.from_documents(
             ll_docs,
             service_context=service_context,
-            storage_context=__get_storage_context(namespace),
+            storage_context=get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
             max_knowledge_triplets=20
         )

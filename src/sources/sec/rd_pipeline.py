@@ -18,7 +18,7 @@ from sources.sec import sec_client
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
 
-logging.basicConfig(level="DEBUG")
+logging.basicConfig(level="INFO")
 
 
 def __df_to_products(df: pl.DataFrame) -> list[str]:
