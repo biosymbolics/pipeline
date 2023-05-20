@@ -36,7 +36,7 @@ def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
+def load_index(namespace: str, index_id: str) -> BaseGPTIndex:
     """
     Load persisted index
 
@@ -74,7 +74,7 @@ def get_or_create_index(
         documents (Document): list of llama_index Documents
     """
 
-    index = __load_index(namespace, index_id)
+    index = load_index(namespace, index_id)
     if index:
         return index
 
@@ -87,7 +87,7 @@ def get_or_create_index(
             service_context=service_context,
             storage_context=get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
-            max_knowledge_triplets=20
+            max_knowledge_triplets=50
         )
         __persist_index(index, namespace, index_id)
         return index
@@ -120,7 +120,7 @@ def get_query_engine(namespace: str, index_id: str) -> BaseQueryEngine:
         index_id (str): unique id of the index (e.g. 2020-01-1) 
     """
     try:
-        index = __load_index(namespace, index_id)
+        index = load_index(namespace, index_id)
         if not index:
             logging.error("Index %s/%s not found", namespace, index_id)
             raise Exception("Index not found")
