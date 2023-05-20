@@ -123,7 +123,8 @@ def get_or_create_index(
             ll_docs,
             service_context=service_context,
             storage_context=__get_storage_context(namespace),
-            kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
+            kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
+            max_knowledge_triplets=20
         )
         __persist_index(index, namespace, index_id)
         return index
