@@ -80,7 +80,7 @@ def __load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         return None
 
 
-def get_default_service_context():
+def __get_default_service_context():
     """
     Get default service context for llllamama index
     """
@@ -116,7 +116,7 @@ def get_or_create_index(
         return index
 
     logging.info("Creating index %s/%s", namespace, index_id)
-    service_context = get_default_service_context()
+    service_context = __get_default_service_context()
     try:
         ll_docs = list(map(Document, documents))
         index = GPTKnowledgeGraphIndex.from_documents(

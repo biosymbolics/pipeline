@@ -10,7 +10,7 @@ import polars as pl
 
 from common.utils import ner
 from common.utils.list import diff_lists
-from common.utils.llm.llama_index import create_and_query_index
+from common.clients.llama_index import create_and_query_index
 from common.utils.validate import validate_or_pickle
 from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 from sources.sec.sec import fetch_annual_reports
@@ -42,16 +42,16 @@ def __search_for_products(sec_text: str, namespace: str, period: str) -> list[st
         [sec_text],
     )
     names = []
-    try:
-        products = json.loads(results)
-        for product in products:
-            try:
-                validate_or_pickle(product, JSON_PIPELINE_SCHEMA)
-                names.append(product["brand_name"])
-            except Exception as ex:
-                logging.debug("Ignoring exception %s", ex)
-    except Exception as ex:
-        print("WTF", ex)
+    # try:
+    #     products = json.loads(results)
+    #     for product in products:
+    #         try:
+    #             validate_or_pickle(product, JSON_PIPELINE_SCHEMA)
+    #             names.append(product["brand_name"])
+    #         except Exception as ex:
+    #             logging.debug("Ignoring exception %s", ex)
+    # except Exception as ex:
+    #     print("WTF", ex)
 
     return names
 
