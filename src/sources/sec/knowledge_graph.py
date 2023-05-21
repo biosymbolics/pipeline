@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime
 
 from common.clients.llama_index import get_or_create_index
@@ -6,7 +7,7 @@ from sources.sec.rd_pipeline import fetch_annual_reports
 from . import sec_client
 
 
-async def build_knowledge_graph(
+def build_knowledge_graph(
     ticker: str, start_date: date, end_date: date = datetime.now()
 ):
     """
