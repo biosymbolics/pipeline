@@ -5,7 +5,10 @@ from sources.sec.rd_pipeline import fetch_annual_reports
 
 from . import sec_client
 
-def build_knowledge_graph(ticker: str, start_date: date, end_date: date = datetime.now()) -> list[str]:
+
+def build_knowledge_graph(
+    ticker: str, start_date: date, end_date: date = datetime.now()
+):
     """
     Create knowledge graph from documents
 
@@ -22,5 +25,5 @@ def build_knowledge_graph(ticker: str, start_date: date, end_date: date = dateti
         get_or_create_index(
             namespace=ticker,
             index_id=report.get("periodOfReport"),
-            documents=[sec_section]
+            documents=[sec_section],
         )

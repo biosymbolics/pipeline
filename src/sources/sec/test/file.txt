@@ -31,7 +31,7 @@
     'Bavencio (avelumab)',
     'Bevacizumab Pfizer (bevacizumab)(b)',
     'Braftovi (encorafenib) and Mektovi (binimetinib)',
-    'Braftovi (encorafenib)(d)', 
+    'Braftovi (encorafenib)(d)',
     'Infliximab Pfizer (infliximab)(a)',
     'PF-06881894(g)',
     'Rituximab Pfizer (rituximab)(c)',

@@ -1,5 +1,6 @@
 bs4
 jsonschema==4.17.3
+types-jsonschema
 langchain==0.0.175
 llama-index==0.6.9
 multipledispatch

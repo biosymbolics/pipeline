@@ -5,9 +5,16 @@ TODO:
 - train LLM on validation if it tends to be a problem (or fix)
 """
 
+from typing import Mapping, TypedDict
 from llama_index.prompts.prompts import KnowledgeGraphPrompt
 
-JSON_PIPELINE_SCHEMA = {
+
+class Schema(TypedDict):
+    type: str
+    properties: Mapping[str, dict]
+
+
+JSON_PIPELINE_SCHEMA: Schema = {
     "type": "object",
     "properties": {
         "generic_name": {"type": "string"},

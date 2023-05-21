@@ -38,7 +38,7 @@ class SecApiClient:
 sec_client = SecApiClient()
 
 
-def __get_query(criteria: list[str], take: int = 100, skip: int = 0) -> str:
+def __get_query(criteria: list[str], take: int = 100, skip: int = 0) -> dict:
     """
     Gets SEC query given criteria
     """

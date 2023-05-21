@@ -4,7 +4,8 @@ from multipledispatch import dispatch
 
 from .llama_index import load_index
 
-@dispatch(object)
+
+@dispatch(object)  # type: ignore[no-redef]
 def visualize_network(index: GPTKnowledgeGraphIndex):
     """
     Visualize network
@@ -18,7 +19,7 @@ def visualize_network(index: GPTKnowledgeGraphIndex):
     net.show("graph.html", notebook=False)
 
 
-@dispatch(str, str)
+@dispatch(str, str)  # type: ignore[no-redef]
 def visualize_network(namespace: str, index_id: str):
     """
     Visualize network

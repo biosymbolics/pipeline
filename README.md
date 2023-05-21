@@ -1,5 +1,7 @@
 ### Setup
 
+- `brew install pre-commit`
+- `pre-commit install`
 - `. .pythonenv`
 - `source .env` (containing AIRTABLE_API_KEY, OPENAI_API_KEY, SEC_API_KEY)
 - `python3 -m pip install -r requirements.txt`
@@ -16,3 +18,7 @@
 ### Testing
 
 - Run `python3 -m pytest src`
+
+### Static checks
+
+- `pre-commit run --all-files`

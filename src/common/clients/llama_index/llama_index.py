@@ -3,10 +3,7 @@ Utility for llama indexes
 """
 import os
 import logging
-from llama_index import (
-    Document,
-    load_index_from_storage,
-)
+from llama_index import Document, load_index_from_storage
 from llama_index.indices.base import BaseGPTIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from llama_index.indices.query.base import BaseQueryEngine
@@ -26,7 +23,7 @@ def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
     Args:
         index (BaseGPTIndex): any generic GPT Index
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
         directory = get_persist_dir(namespace)
@@ -42,7 +39,7 @@ def load_index(namespace: str, index_id: str) -> BaseGPTIndex:
 
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
         storage_context = get_storage_context(namespace)
@@ -60,17 +57,16 @@ def load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         return None
 
 
-
 def get_or_create_index(
     namespace: str, index_id: str, documents: list[str]
 ) -> GPTKnowledgeGraphIndex:
     """
     Create llama index from supplied document url
     Skips creation if it already exists
-    
+
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
 
@@ -87,7 +83,7 @@ def get_or_create_index(
             service_context=service_context,
             storage_context=get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
-            max_knowledge_triplets=50
+            max_knowledge_triplets=50,
         )
         __persist_index(index, namespace, index_id)
         return index
@@ -96,14 +92,16 @@ def get_or_create_index(
         raise ex
 
 
-def create_and_query_index(query: str, namespace: str, index_key: str, documents: list[str]) -> str:
+def create_and_query_index(
+    query: str, namespace: str, index_key: str, documents: list[str]
+) -> str:
     """
     Creates the index if nx, and queries
 
     Args:
         query (str): natural language query
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
     index = get_or_create_index(namespace, index_key, documents)
@@ -117,7 +115,7 @@ def get_query_engine(namespace: str, index_id: str) -> BaseQueryEngine:
 
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
         index = load_index(namespace, index_id)
@@ -138,7 +136,7 @@ def query_index(query: str, namespace: str, index_id: str) -> str:
     Args:
         query (str): natural language query
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1) 
+        index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
         query_engine = get_query_engine(namespace, index_id)
