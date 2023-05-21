@@ -36,7 +36,7 @@ def __maybe_build_knowledge_graph(ticker, start_date):
 
 
 async def build_sec():
-    start_date = datetime(2020, 1, 1)
+    start_date = datetime(2018, 1, 1)
     tasks = [
         asyncio.to_thread(__maybe_build_knowledge_graph, ticker, start_date)
         for ticker in PHARMA_TICKERS

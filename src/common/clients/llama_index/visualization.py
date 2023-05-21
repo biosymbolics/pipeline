@@ -2,7 +2,7 @@ from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from multipledispatch import dispatch
 
-from .llama_index import load_index
+from .llama_index import compose_graph, load_index, load_indices
 
 
 @dispatch(object)  # type: ignore[no-redef]
@@ -32,3 +32,19 @@ def visualize_network(namespace: str, index_id: str):
     if not index:
         raise Exception("index not found")
     visualize_network(index)
+
+
+# @dispatch(str)  # type: ignore[no-redef]
+# def visualize_network(namespace: str):
+#     """
+#     Visualize network for composed indices within a namespace
+
+#     Args:
+#         namespace (str): namespace of the index (e.g. SEC-BMY)
+#
+#     TODO: this isn't currently possible
+#     """
+#     composed = compose_graph(namespace)
+#     if not composed:
+#         raise Exception("composed graph not found")
+#     visualize_network(composed)
