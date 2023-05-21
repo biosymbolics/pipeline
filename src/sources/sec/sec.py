@@ -4,8 +4,8 @@ Core SEC methods
 
 from datetime import date, datetime
 
+from common.clients.sec import fetch_sec_docs
 from common.utils.date import format_date_range
-from sources.sec.sec_client import fetch_sec_docs
 from sources.sec.types import SecFiling
 
 

@@ -10,11 +10,11 @@ import polars as pl
 
 from common.utils import ner
 from common.utils.list import diff_lists
-from common.clients.llama_index import query_index
+from common.clients.llama_index import create_and_query_index
+from common.clients.sec import sec_client
 from common.utils.validate import validate_or_pickle
 from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 from sources.sec.sec import fetch_annual_reports
-from sources.sec import sec_client
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
 
@@ -35,10 +35,8 @@ def __search_for_products(sec_text: str, namespace: str, period: str) -> list[st
     """
     Uses LlamaIndex/GPT to extract product names
     """
-    results = query_index(
-        JSON_PIPELINE_PROMPT,
-        namespace,
-        period,
+    results = create_and_query_index(
+        JSON_PIPELINE_PROMPT, namespace, period, [sec_text]
     )
     names = []
     try:
@@ -52,7 +50,7 @@ def __search_for_products(sec_text: str, namespace: str, period: str) -> list[st
     except Exception as ex:
         print("WTF", ex)
 
-    return []
+    return names
 
 
 def __extract_products(
