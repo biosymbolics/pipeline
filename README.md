@@ -54,3 +54,7 @@
 - String formatting
   - f-strings in almost all cases (e.g. `f"{a_variable} and some text"`)
   - ... except of logging, and then `%s` (e.g. `logging.error("Error doing thing: %s", error)`)
+
+
+### On Dependencies
+- polars > pandas

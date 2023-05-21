@@ -48,3 +48,18 @@ def visualize_network(namespace: str, index_id: str):
 #     if not composed:
 #         raise Exception("composed graph not found")
 #     visualize_network(composed)
+
+
+def list_triples(namespace: str, index_id: str):
+    index = load_index(namespace, index_id)
+    graph = index.get_networkx_graph()
+
+    triples = []
+    for edge in graph.edges(data=True):
+        subject = edge[0]
+        object = edge[1]
+        relationship = edge[2]["title"]
+        triples.append((subject, relationship, object))
+
+    for triple in triples:
+        print(triple)
