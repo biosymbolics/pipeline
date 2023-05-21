@@ -6,7 +6,7 @@ from sources.sec.rd_pipeline import fetch_annual_reports
 from . import sec_client
 
 
-def build_knowledge_graph(
+async def build_knowledge_graph(
     ticker: str, start_date: date, end_date: date = datetime.now()
 ):
     """
