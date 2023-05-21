@@ -5,6 +5,7 @@ from datetime import datetime
 import logging
 
 from common.clients.airtable.airtable_client import write_df_to_table
+from common.clients.llama_index.visualization import visualize_network
 from sources.sec.rd_pipeline import get_pipeline_by_ticker
 
 DEFAULT_BASE_ID = "appcXwgAM75mx9sGi"
@@ -28,7 +29,8 @@ def main():
     Main
     """
     # PFE, JNJ, NVS (Novartis), RHHBY (Roche), APPV, MRK, Bristol Myers Squibb (BMY)
-    run_sec_pipeline("BMY")
+    # run_sec_pipeline("BMY")
+    visualize_network("BMY", "2019-12-31")
 
 
 if __name__ == "__main__":

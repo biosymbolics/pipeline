@@ -38,7 +38,7 @@ class SecApiClient:
 sec_client = SecApiClient()
 
 
-def __get_query(criteria: list[str], take: int = 100, skip: int = 0) -> str:
+def __get_query(criteria: list[str], take: int = 100, skip: int = 0) -> dict:
     """
     Gets SEC query given criteria
     """
@@ -59,7 +59,7 @@ def __get_query(criteria: list[str], take: int = 100, skip: int = 0) -> str:
 def fetch_sec_docs(criteria: list[str]) -> list[SecFiling]:
     """
     Fetch SEC docs based on specified criteria
-    e.g. ["ticker:PFE", "filedAt:{2020-01-01 TO 2020-12-31}", "formType:10-Q"] -> docs
+    e.g. ["ticker:PFE", "filedAt:{2020-01-01 TO 2020-12-31}", "formType:10-K"] -> docs
     """
     query = __get_query(criteria)
     logging.info("Getting SEC docs with query %s", query)
@@ -82,7 +82,7 @@ def parse_xbrl(url: str):
 
 
 def extract_section(
-    url: str, section: str = "part1item2", return_type: ExtractReturnType = "html"
+    url: str, section: str = "1", return_type: ExtractReturnType = "html"
 ) -> str:
     """
     Extract section
@@ -97,7 +97,7 @@ def extract_rd_pipeline(url: str) -> list[pl.DataFrame]:
     """
     Extract R&D pipeline from sec doc section
     """
-    section_html = extract_section(url, "part1item2", "html")
+    section_html = extract_section(url, "1", "html")
     product_tables = extract_product_tables(section_html)
 
     return product_tables

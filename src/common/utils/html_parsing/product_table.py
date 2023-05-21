@@ -9,24 +9,30 @@ from bs4 import BeautifulSoup
 from common.utils.html_parsing.html_table import get_table_headers, get_table_rows
 
 
-PRODUCT_HEADER_STRINGS = ["product"]
-INDICATION_HEADER_STRINGS = ["disease", "indication"]
+PRODUCT_HEADER_STRINGS: list[str] = ["product"]
+INDICATION_HEADER_STRINGS: list[str] = ["disease", "indication"]
 
 
 def __is_product_header(header_text: str) -> bool:
     """
     Is this specific header for "products"?
     """
-    return any(filter(lambda str: str in header_text.lower(), PRODUCT_HEADER_STRINGS))
+
+    def __in_header(s):
+        return s in header_text.lower()
+
+    return any(filter(__in_header, PRODUCT_HEADER_STRINGS))
 
 
 def __is_indication_header(header_text: str) -> bool:
     """
     Is this specific header for "indication"?
     """
-    return any(
-        filter(lambda str: str in header_text.lower(), INDICATION_HEADER_STRINGS)
-    )
+
+    def __in_header(s):
+        return s in header_text.lower()
+
+    return any(filter(__in_header, INDICATION_HEADER_STRINGS))
 
 
 def __has_product_header(headers: list[str]) -> bool:
