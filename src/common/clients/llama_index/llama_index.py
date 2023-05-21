@@ -3,8 +3,13 @@ Utility for llama indexes
 """
 import os
 import logging
-from typing import Optional
-from llama_index import ComposableGraph, Document, load_index_from_storage
+from typing import Optional, Union
+from llama_index import (
+    ComposableGraph,
+    Document,
+    load_index_from_storage,
+    load_indices_from_storage,
+)
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from llama_index.indices.query.base import BaseQueryEngine
@@ -34,7 +39,9 @@ def __persist_index(index: LlmIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def load_index(namespace: str, index_id: Optional[str] = None) -> LlmIndex:
+def __load_index_or_indices(
+    namespace: str, index_id: Optional[str] = None
+) -> Union[LlmIndex, list[LlmIndex]]:
     """
     Load persisted index
 
@@ -45,18 +52,36 @@ def load_index(namespace: str, index_id: Optional[str] = None) -> LlmIndex:
     try:
         logging.info("Attempting to load index %s/%s", namespace, index_id)
         storage_context = get_storage_context(namespace)
-        index = load_index_from_storage(
-            storage_context,
-            index_id=index_id,
-            service_context=get_service_context(),
-        )
+        service_context = get_service_context()
 
-        logging.info("Returning index %s/%s from disk", namespace, index_id)
-        return index
+        if index_id:
+            index = load_index_from_storage(
+                storage_context,
+                index_id=index_id,
+                service_context=service_context,
+            )
+            logging.info("Returning index %s/%s from disk", namespace, index_id)
+            return index
+
+        indices = load_indices_from_storage(
+            storage_context,
+            service_context=service_context,
+        )
+        logging.info("Returning indices %s from disk", namespace)
+        return indices
+
     except Exception as ex:
         logging.info("Failed to load %s/%s from disk: %s", namespace, index_id, ex)
         print(ex)
         return None
+
+
+def load_index(namespace: str, index_id: str) -> LlmIndex:
+    return __load_index_or_indices(namespace, index_id)
+
+
+def load_indices(namespace: str) -> list[LlmIndex]:
+    return __load_index_or_indices(namespace)
 
 
 def get_or_create_index(
@@ -101,7 +126,7 @@ def compose_graph(namespace: str) -> ComposableGraph:
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
-    indices = load_index(namespace)
+    indices = load_indices(namespace)
     index_summary = [
         index.as_query_engine().query("Summary this document in 100 words").response
         for index in indices
