@@ -34,8 +34,8 @@ JSON_PIPELINE_PROMPT = (
 BIOMEDICAL_TRIPLET_EXTRACT_TMPL = (
     "Some text is provided below. Given the text, extract up to {max_knowledge_triplets} "
     "of the most relevant knowledge triplets in the form of (subject, predicate, object) "
-    "about in which the subject or predicate is an intervention (compounds, mechanisms of action or drug class). "
-    "Avoid stopwords.\n"
+    "about in which the subject or predicate is an intervention. "
+    "Avoid stopwords and long predicates.\n"
     "---------------------\n"
     "Example 1:\n"
     "Text: Investigational Compounds\n"

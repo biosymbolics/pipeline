@@ -29,4 +29,6 @@ def visualize_network(namespace: str, index_id: str):
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     index = load_index(namespace, index_id)
+    if not index:
+        raise Exception("index not found")
     visualize_network(index)

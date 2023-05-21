@@ -84,7 +84,7 @@ def get_or_create_index(
             service_context=service_context,
             storage_context=get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
-            max_knowledge_triplets=50,
+            max_knowledge_triplets=200,
         )
         __persist_index(index, namespace, index_id)
         return index
