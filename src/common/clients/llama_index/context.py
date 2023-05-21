@@ -4,7 +4,7 @@ from llama_index import (
     ServiceContext,
     StorageContext,
 )
-from langchain import OpenAI
+from langchain.chat_models import ChatOpenAI
 
 from .utils import get_persist_dir
 
@@ -34,7 +34,7 @@ def get_service_context():
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
     llm_predictor = LLMPredictor(
-        llm=OpenAI(temperature=0, model_name="gpt-3.5-turbo", max_tokens=1900)
+        llm=ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", max_tokens=1900)
     )
 
     service_context = ServiceContext.from_defaults(

@@ -1,5 +1,5 @@
-import asyncio
 from datetime import date, datetime
+import logging
 
 from common.clients.llama_index import get_or_create_index
 from sources.sec.rd_pipeline import fetch_annual_reports
@@ -21,10 +21,13 @@ def build_knowledge_graph(
     reports = fetch_annual_reports(ticker, start_date, end_date)
 
     for report in reports:
-        report_url = report.get("linkToHtml")
-        sec_section = sec_client.extract_section(report_url, return_type="text")
-        get_or_create_index(
-            namespace=ticker,
-            index_id=report.get("periodOfReport"),
-            documents=[sec_section],
-        )
+        try:
+            report_url = report.get("linkToHtml")
+            sec_section = sec_client.extract_section(report_url, return_type="text")
+            get_or_create_index(
+                namespace=ticker,
+                index_id=report.get("periodOfReport"),
+                documents=[sec_section],
+            )
+        except Exception as ex:
+            logging.error("Error creating index for %s: %s", ticker, ex)

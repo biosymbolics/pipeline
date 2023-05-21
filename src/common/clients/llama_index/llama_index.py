@@ -4,7 +4,7 @@ Utility for llama indexes
 import os
 import logging
 from llama_index import Document, load_index_from_storage
-from llama_index.indices.base import BaseGPTIndex
+from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from llama_index.indices.query.base import BaseQueryEngine
 
@@ -16,12 +16,12 @@ from .utils import get_persist_dir
 API_KEY = os.environ["OPENAI_API_KEY"]
 
 
-def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
+def __persist_index(index: LlmIndex, namespace: str, index_id: str):
     """
     Persist llama index
 
     Args:
-        index (BaseGPTIndex): any generic GPT Index
+        index (LlmIndex): any generic LLM Index
         namespace (str): namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
@@ -33,7 +33,7 @@ def __persist_index(index: BaseGPTIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def load_index(namespace: str, index_id: str) -> BaseGPTIndex:
+def load_index(namespace: str, index_id: str) -> LlmIndex:
     """
     Load persisted index
 
@@ -42,6 +42,7 @@ def load_index(namespace: str, index_id: str) -> BaseGPTIndex:
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
+        logging.info("Attempting to load index %s/%s", namespace, index_id)
         storage_context = get_storage_context(namespace)
         index = load_index_from_storage(
             storage_context,
