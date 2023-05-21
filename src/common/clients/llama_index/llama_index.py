@@ -3,7 +3,8 @@ Utility for llama indexes
 """
 import os
 import logging
-from llama_index import Document, load_index_from_storage
+from typing import Optional
+from llama_index import ComposableGraph, Document, load_index_from_storage
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from llama_index.indices.query.base import BaseQueryEngine
@@ -33,13 +34,13 @@ def __persist_index(index: LlmIndex, namespace: str, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def load_index(namespace: str, index_id: str) -> LlmIndex:
+def load_index(namespace: str, index_id: Optional[str] = None) -> LlmIndex:
     """
     Load persisted index
 
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_id (optional str): unique id of the index (e.g. 2020-01-1). all indices loaded if unspecified.
     """
     try:
         logging.info("Attempting to load index %s/%s", namespace, index_id)
@@ -91,6 +92,28 @@ def get_or_create_index(
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
         raise ex
+
+
+def compose_graph(namespace: str) -> ComposableGraph:
+    """
+    Composes graph for all indices in namespace
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+    """
+    indices = load_index(namespace)
+    index_summary = [
+        index.as_query_engine().query("Summary this document in 100 words").response
+        for index in indices
+    ]
+    graph = ComposableGraph.from_indices(
+        GPTKnowledgeGraphIndex,
+        indices,
+        index_summaries=index_summary,
+        service_context=get_service_context(),
+        storage_context=get_storage_context(namespace),
+    )
+    return graph
 
 
 def create_and_query_index(
