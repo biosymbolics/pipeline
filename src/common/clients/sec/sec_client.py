@@ -101,6 +101,22 @@ def extract_section(
     return section_html
 
 
+def extract_sections(
+    url: str,
+    sections: list[str] = ["1", "7"],
+    return_type: ExtractReturnType = "html",
+    formatter: Optional[Callable] = None,
+) -> list[str]:
+    """
+    Extract sections
+    """
+    html_sections = [
+        extract_section(url, section, return_type, formatter) for section in sections
+    ]
+
+    return html_sections
+
+
 def extract_rd_pipeline(url: str) -> list[pl.DataFrame]:
     """
     Extract R&D pipeline from sec doc section

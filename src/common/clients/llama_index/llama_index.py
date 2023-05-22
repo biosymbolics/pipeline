@@ -79,10 +79,23 @@ def __load_index_or_indices(
 
 
 def load_index(namespace: str, index_id: str) -> LlmIndex:
+    """
+    Load persisted index
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+        index_id (optional str): unique id of the index (e.g. 2020-01-1). all indices loaded if unspecified.
+    """
     return __load_index_or_indices(namespace, index_id)
 
 
 def load_indices(namespace: str) -> list[LlmIndex]:
+    """
+    Load persisted indices
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+    """
     return __load_index_or_indices(namespace)
 
 

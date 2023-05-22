@@ -28,11 +28,10 @@ def main():
     """
     Main
     """
-    # PFE, JNJ, NVS (Novartis), RHHBY (Roche), APPV, MRK, Bristol Myers Squibb (BMY)
     run_sec_pipeline("LLY")
     # visualize_network("LLY", "2020-12-31")
     # visualize_network("BMY")
-    # list_triples("LLY", "2021-12-31")
+    # list_triples("LLY", "2022-12-31")
 
 
 if __name__ == "__main__":

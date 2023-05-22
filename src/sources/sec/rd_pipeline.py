@@ -70,13 +70,13 @@ def __extract_products(
         return flatten(map(__df_to_products, product_tables))
 
     if strategy == "SEARCH":
-        section = sec_client.extract_section(
+        sections = sec_client.extract_sections(
             report_url, return_type="html", formatter=strip_inline_styles
         )
         return __search_for_products(
             namespace=report["ticker"],
             period=report.get("periodOfReport"),
-            sec_text=section,
+            sec_text="\n".join(sections),
         )
 
     raise Exception("Strategy not recognized")

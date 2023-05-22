@@ -22,7 +22,7 @@ def get_storage_context(namespace: str) -> StorageContext:
     storage_context = (
         StorageContext.from_defaults()
     )  # https://github.com/jerryjliu/llama_index/issues/3734
-    storage_context.persist_dir = directory
+    # storage_context.persist_dir = directory
     return storage_context
 
 
@@ -31,7 +31,7 @@ def get_service_context():
     Get default service context for llllamama index
     """
     max_input_size = 4096
-    num_output = 2048
+    num_output = 3072  # 2048
     max_chunk_overlap = 20
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
