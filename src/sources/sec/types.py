@@ -38,4 +38,4 @@ SecProductQueryStrategy = Literal["TABLE", "SEARCH"]
 
 
 # there may be others
-ExtractReturnType = Literal["html", "text"]
+ExtractReturnType = Literal["html", "text", "stripped-html"]

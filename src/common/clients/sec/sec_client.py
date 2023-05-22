@@ -3,6 +3,7 @@ Client for SEC API
 """
 import logging
 import os
+from typing import Any, Callable, Optional
 import polars as pl
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
@@ -82,13 +83,20 @@ def parse_xbrl(url: str):
 
 
 def extract_section(
-    url: str, section: str = "1", return_type: ExtractReturnType = "html"
+    url: str,
+    section: str = "1",
+    return_type: ExtractReturnType = "html",
+    formatter: Optional[Callable] = None,
 ) -> str:
     """
     Extract section
     """
     extractor_api = ExtractorApi(API_KEY)
     section_html = extractor_api.get_section(url, section, return_type)
+
+    if formatter:
+        formatted = formatter(section_html)
+        return formatted
 
     return section_html
 

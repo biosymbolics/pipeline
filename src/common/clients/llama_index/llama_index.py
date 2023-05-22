@@ -1,5 +1,6 @@
 """
-Utility for llama indexes
+Client for llama indexes
+Currently mostly for GPTKnowledgeGraphIndex (until I do some IoC)
 """
 import os
 import logging
@@ -16,6 +17,7 @@ from llama_index.indices.query.base import BaseQueryEngine
 
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
 
+from .constants import MAX_TRIPLES
 from .context import get_service_context, get_storage_context
 from .utils import get_persist_dir
 
@@ -110,7 +112,8 @@ def get_or_create_index(
             service_context=service_context,
             storage_context=get_storage_context(namespace),
             kg_triple_extract_template=BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
-            max_knowledge_triplets=200,
+            max_knowledge_triplets=MAX_TRIPLES,
+            include_embeddings=True,
         )
         __persist_index(index, namespace, index_id)
         return index

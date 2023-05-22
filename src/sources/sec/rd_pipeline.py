@@ -12,6 +12,7 @@ from common.utils import ner
 from common.utils.list import diff_lists
 from common.clients.llama_index import create_and_query_index
 from common.clients.sec import sec_client
+from common.utils.html_parsing.html import strip_inline_styles
 from common.utils.validate import validate_or_pickle
 from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 from sources.sec.sec import fetch_annual_reports
@@ -69,7 +70,9 @@ def __extract_products(
         return flatten(map(__df_to_products, product_tables))
 
     if strategy == "SEARCH":
-        section = sec_client.extract_section(report_url, return_type="text")
+        section = sec_client.extract_section(
+            report_url, return_type="html", formatter=strip_inline_styles
+        )
         return __search_for_products(
             namespace=report["ticker"],
             period=report.get("periodOfReport"),

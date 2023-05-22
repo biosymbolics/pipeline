@@ -2,9 +2,8 @@ from datetime import date, datetime
 import logging
 
 from common.clients.llama_index import get_or_create_index
+from common.clients.sec import sec_client
 from sources.sec.rd_pipeline import fetch_annual_reports
-
-from . import sec_client
 
 
 def build_knowledge_graph(
