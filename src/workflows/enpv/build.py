@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime
 import logging
 
-from sources.sec.knowledge_graph import build_knowledge_graph
+from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
     "PFE",
@@ -28,17 +28,20 @@ PHARMA_TICKERS = [
 ]
 
 
-def __maybe_build_knowledge_graph(ticker, start_date):
+def __build_indices(ticker, start_date):
     try:
-        build_knowledge_graph(ticker, start_date)
+        build_indices(ticker, start_date)
     except Exception as ex:
         logging.error("failure to build kg for %s: %s", ticker, ex)
 
 
 async def build_sec():
-    start_date = datetime(2018, 1, 1)
+    """
+    Build SEC stuffs
+    """
+    start_date = datetime(2022, 1, 1)
     tasks = [
-        asyncio.to_thread(__maybe_build_knowledge_graph, ticker, start_date)
+        asyncio.to_thread(__build_indices, ticker, start_date)
         for ticker in PHARMA_TICKERS
     ]
 

@@ -1,3 +1,6 @@
+"""
+SEC build
+"""
 from datetime import date, datetime
 import logging
 
@@ -6,9 +9,7 @@ from common.clients.sec import sec_client
 from sources.sec.rd_pipeline import fetch_annual_reports
 
 
-def build_knowledge_graph(
-    ticker: str, start_date: date, end_date: date = datetime.now()
-):
+def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()):
     """
     Create knowledge graph from documents
 
