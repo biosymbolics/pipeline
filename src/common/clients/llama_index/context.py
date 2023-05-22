@@ -1,3 +1,6 @@
+"""
+Functions around llama index context
+"""
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -19,8 +22,8 @@ def get_storage_context(namespace: str) -> StorageContext:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
     directory = get_persist_dir(namespace)
-    storage_context = (
-        StorageContext.from_defaults()
+    storage_context = StorageContext.from_defaults(
+        persist_dir=directory
     )  # https://github.com/jerryjliu/llama_index/issues/3734
     # storage_context.persist_dir = directory
     return storage_context

@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 
 from common.clients.airtable.airtable_client import write_df_to_table
-from common.clients.llama_index.visualization import visualize_network, list_triples
+from common.clients.llama_index.visualization import visualize_network
 from sources.sec.rd_pipeline import get_pipeline_by_ticker
 
 DEFAULT_BASE_ID = "appcXwgAM75mx9sGi"
@@ -28,9 +28,9 @@ def main():
     """
     Main
     """
-    run_sec_pipeline("LLY")
+    # run_sec_pipeline("LLY")
     # visualize_network("LLY", "2020-12-31")
-    # visualize_network("BMY")
+    visualize_network("LLY", "2021-12-31")
     # list_triples("LLY", "2022-12-31")
 
 

@@ -4,7 +4,7 @@ SEC build
 from datetime import date, datetime
 import logging
 
-from common.clients.llama_index import get_or_create_index
+from common.clients.llama_index import get_vector_index
 from common.clients.sec import sec_client
 from sources.sec.rd_pipeline import fetch_annual_reports
 
@@ -24,7 +24,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         try:
             report_url = report.get("linkToHtml")
             sec_section = sec_client.extract_section(report_url, return_type="text")
-            get_or_create_index(
+            get_vector_index(
                 namespace=ticker,
                 index_id=report.get("periodOfReport"),
                 documents=[sec_section],
