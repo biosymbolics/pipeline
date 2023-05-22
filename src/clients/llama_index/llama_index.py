@@ -8,7 +8,7 @@ from llama_index import ComposableGraph
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from llama_index.indices.query.base import BaseQueryEngine
 
-from common.clients.llama_index.persistence import (
+from clients.llama_index.persistence import (
     load_index,
     load_indices,
 )

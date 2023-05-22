@@ -25,7 +25,6 @@ def get_storage_context(namespace: str) -> StorageContext:
     storage_context = StorageContext.from_defaults(
         persist_dir=directory
     )  # https://github.com/jerryjliu/llama_index/issues/3734
-    # storage_context.persist_dir = directory
     return storage_context
 
 

@@ -41,7 +41,7 @@ def get_kg_index(
         namespace,
         index_id,
         documents,
-        LlmIndex=GPTKnowledgeGraphIndex,
+        index_impl=GPTKnowledgeGraphIndex,
         index_args={
             "kg_triple_extract_template": BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
             "max_knowledge_triplets": MAX_TRIPLES,

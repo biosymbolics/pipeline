@@ -38,5 +38,5 @@ def get_vector_index(
         namespace,
         index_id,
         documents,
-        LlmIndex=GPTVectorStoreIndex,
+        index_impl=GPTVectorStoreIndex,
     )

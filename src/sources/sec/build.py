@@ -4,8 +4,8 @@ SEC build
 from datetime import date, datetime
 import logging
 
-from common.clients.llama_index import get_vector_index
-from common.clients.sec import sec_client
+from clients.llama_index import get_vector_index
+from clients.sec import sec_client
 from sources.sec.rd_pipeline import fetch_annual_reports
 
 

@@ -3,7 +3,7 @@ Client for SEC API
 """
 import logging
 import os
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 import polars as pl
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
@@ -103,13 +103,15 @@ def extract_section(
 
 def extract_sections(
     url: str,
-    sections: list[str] = ["1", "7"],
+    sections: Optional[list[str]] = None,
     return_type: ExtractReturnType = "html",
     formatter: Optional[Callable] = None,
 ) -> list[str]:
     """
     Extract sections
     """
+    if sections is None:
+        sections = ["1", "7"]
     html_sections = [
         extract_section(url, section, return_type, formatter) for section in sections
     ]

@@ -6,13 +6,16 @@ import os
 import pathlib
 import requests
 import html2text
-import requests_random_user_agent  # this is used.
+
+# pylint: disable=W0611,E0401
+import requests_random_user_agent
 from llama_index.readers.schema.base import Document
 
 from common.utils.url import url_to_filename
 from src.common.utils.file import save_as_file
 
 
+# pylint: disable=R0903
 class CachedWedPageReader:
     """
     like SimpleWebPageReader but with caching
@@ -43,12 +46,12 @@ class CachedWedPageReader:
         file_location = self.__get_file_location(url)
         if os.path.isfile(file_location):
             # load from the file if present
-            with open(file_location, "r") as file:
+            with open(file_location, "r", encoding="utf-8") as file:
                 document = Document(file.read())
             return document
 
         # else pull webpage
-        response = requests.get(url, headers=None).text
+        response = requests.get(url, headers=None, timeout=10000).text
         response = html2text.html2text(response)
         document = Document(response)
         return document
