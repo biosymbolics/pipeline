@@ -21,9 +21,13 @@ def init_vector_db(index_name: str) -> pinecone.Index:
     pinecone.init(api_key=API_KEY)  # environment/datacenter?
 
     if index_name not in pinecone.list_indexes():
-        return pinecone.create_index(
+        pinecone_index = pinecone.create_index(
             index_name, metric="cosine", shards=1, dimension=1536
         )
+        if not pinecone_index:
+            raise Exception("Could not create index")
+
+        return pinecone_index
 
     return pinecone.Index(f"{index_name}-index")
 
