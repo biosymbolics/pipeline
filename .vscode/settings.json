@@ -1,6 +1,6 @@
 {
   "python.formatting.provider": "black",
-  "python.linting.enabled": true,
+  "python.linting.enabled": false,
   "python.languageServer": "Pylance",
   "python.analysis.typeCheckingMode": "basic",
   "python.linting.pylintEnabled": true,

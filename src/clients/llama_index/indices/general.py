@@ -2,7 +2,7 @@
 Client for llama indexes
 """
 import logging
-from typing import Optional
+from typing import Any, Generic, Optional, TypeVar, cast
 from llama_index import Document
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
@@ -10,13 +10,16 @@ from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import load_index, persist_index
 
 
+IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
+
+
 def get_or_create_index(
     namespace: str,
     index_id: str,
     documents: list[str],
-    index_impl: LlmIndex,
+    index_impl: IndexImpl,
     index_args: Optional[dict] = None,
-) -> LlmIndex:
+) -> IndexImpl:
     """
     Create llama index from supplied document url
     Skips creation if it already exists
@@ -31,7 +34,7 @@ def get_or_create_index(
 
     index = load_index(namespace, index_id)
     if index:
-        return index
+        return cast(IndexImpl, index)
 
     logging.info("Creating index %s/%s", namespace, index_id)
     service_context = get_service_context()

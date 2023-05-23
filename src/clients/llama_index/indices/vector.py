@@ -1,7 +1,7 @@
 """
 Functions specific to vector store indices
 """
-from llama_index import GPTVectorStoreIndex
+from llama_index import GPTVectorStoreIndex, Response
 
 from .general import get_or_create_index
 
@@ -20,6 +20,8 @@ def create_and_query_vector_index(
     """
     index = get_vector_index(namespace, index_key, documents)
     response = index.as_query_engine().query(query)
+    if not isinstance(response, Response) or not response.response:
+        raise Exception("Could not parse response")
     return response.response
 
 
@@ -38,5 +40,5 @@ def get_vector_index(
         namespace,
         index_id,
         documents,
-        index_impl=GPTVectorStoreIndex,
+        index_impl=GPTVectorStoreIndex,  # type: ignore
     )

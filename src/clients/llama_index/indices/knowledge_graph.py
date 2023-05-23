@@ -1,6 +1,7 @@
 """
 Functions specific to knowledge graph indices
 """
+from llama_index import Response
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
@@ -23,6 +24,8 @@ def create_and_query_kg_index(
     """
     index = get_kg_index(namespace, index_key, documents)
     response = index.as_query_engine().query(query)
+    if not isinstance(response, Response) or not response.response:
+        raise Exception("Could not parse response")
     return response.response
 
 
@@ -41,7 +44,7 @@ def get_kg_index(
         namespace,
         index_id,
         documents,
-        index_impl=GPTKnowledgeGraphIndex,
+        index_impl=GPTKnowledgeGraphIndex,  # type: ignore
         index_args={
             "kg_triple_extract_template": BIOMEDICAL_TRIPLET_EXTRACT_PROMPT,
             "max_knowledge_triplets": MAX_TRIPLES,

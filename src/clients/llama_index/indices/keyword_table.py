@@ -1,7 +1,8 @@
 """
 Functions specific to keyword table indices
 """
-from llama_index import GPTKeywordTableIndex
+from typing import cast
+from llama_index import GPTKeywordTableIndex, Response
 
 from .general import get_or_create_index
 
@@ -20,6 +21,8 @@ def create_and_query_keyword_index(
     """
     index = get_keyword_index(namespace, index_key, documents)
     response = index.as_query_engine().query(query)
+    if not isinstance(response, Response) or not response.response:
+        raise Exception("Could not parse response")
     return response.response
 
 
@@ -34,9 +37,10 @@ def get_keyword_index(
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
-    return get_or_create_index(
+    index = get_or_create_index(
         namespace,
         index_id,
         documents,
-        index_impl=GPTKeywordTableIndex,
+        index_impl=GPTKeywordTableIndex,  # type: ignore
     )
+    return index

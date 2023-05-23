@@ -15,7 +15,7 @@ from .utils import get_persist_dir
 
 def __load_index_or_indices(
     namespace: str, index_id: Optional[str] = None
-) -> Union[LlmIndex, list[LlmIndex]]:
+) -> Union[LlmIndex, list[LlmIndex], None]:
     """
     Load persisted index
 
@@ -60,7 +60,12 @@ def load_index(namespace: str, index_id: str) -> LlmIndex:
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
                                  all indices loaded if unspecified.
     """
-    return __load_index_or_indices(namespace, index_id)
+    index = __load_index_or_indices(namespace, index_id)
+    if isinstance(index, list):
+        raise Exception("Expected single index, got list")
+    if isinstance(index, LlmIndex):
+        return index
+    raise Exception("Expected single index, got None")
 
 
 def load_indices(namespace: str) -> list[LlmIndex]:
@@ -70,7 +75,10 @@ def load_indices(namespace: str) -> list[LlmIndex]:
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
-    return __load_index_or_indices(namespace)
+    indices = __load_index_or_indices(namespace)
+    if not isinstance(indices, list):
+        raise Exception("Expected list of indices, got single index")
+    return indices
 
 
 def persist_index(index: LlmIndex, namespace: str, index_id: str):
