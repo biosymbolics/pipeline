@@ -22,8 +22,8 @@ def get_storage_context(namespace: str) -> StorageContext:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
     directory = get_persist_dir(namespace)
-    storage_context = StorageContext.from_defaults(
-        persist_dir=directory
+    storage_context = (
+        StorageContext.from_defaults()
     )  # https://github.com/jerryjliu/llama_index/issues/3734
     return storage_context
 
