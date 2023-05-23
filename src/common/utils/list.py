@@ -3,6 +3,9 @@ Utils for lists/arrays
 """
 
 
+from typing import TypeVar
+
+
 def diff_lists(list_one: list, list_two: list) -> list:
     """
     Returns the items present in list_one but missing in list_two
@@ -12,7 +15,10 @@ def diff_lists(list_one: list, list_two: list) -> list:
     return dropped
 
 
-def dedup(a_list: list) -> list:
+T = TypeVar("T")
+
+
+def dedup(a_list: list[T]) -> list[T]:
     """
     Returns a list with duplicates removed
 

@@ -9,22 +9,22 @@ import logging
 from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
-    "PFE",
-    "JNJ",
-    "NVS",
-    "APPV",
-    "AMGN",
-    "GSK",
-    "GILD",
-    "NVO",
-    "TAK",
+    # "PFE",
+    # "JNJ",
+    # "NVS",
+    # "APPV",
+    # "AMGN",
+    # "GSK",
+    # "GILD",
+    # "NVO",
+    # "TAK",
     "LLY",
-    "AZN",
-    "BAYRY",
-    "RHHBY",
-    "MTZPY",
-    "MRK",
-    "BMY",
+    # "AZN",
+    # "BAYRY",
+    # "RHHBY",
+    # "MTZPY",
+    # "MRK",
+    # "BMY",
 ]
 
 

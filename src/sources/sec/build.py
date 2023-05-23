@@ -5,8 +5,9 @@ from datetime import date, datetime
 import logging
 
 from clients.llama_index import get_keyword_index
-from common.ner import extract_named_entities
 from clients.sec import sec_client
+from common.ner import extract_named_entities
+from common.utils.file import save_json_as_file
 from common.utils.html_parsing.html import strip_inline_styles
 from sources.sec.rd_pipeline import fetch_annual_reports
 
@@ -26,10 +27,12 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         try:
             report_url = report.get("linkToHtml")
             sections = sec_client.extract_sections(
-                report_url, return_type="html", formatter=strip_inline_styles
+                report_url,
+                return_type="text",  # formatter=strip_inline_styles
             )
-            entities = extract_named_entities(sections)
-            print("ENTITITITITTIES", entities)
+            entities = extract_named_entities(sections, "spacy")
+            # print(entities)
+            save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
             if not entities:
                 logging.warning("No entities found for %s", ticker)
