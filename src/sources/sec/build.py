@@ -29,10 +29,14 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
                 report_url, return_type="html", formatter=strip_inline_styles
             )
             entities = extract_named_entities(sections)
-            index = get_keyword_index(
-                namespace=ticker,
-                index_id=report.get("periodOfReport"),
-                documents=sections,
-            )
+            print("ENTITITITITTIES", entities)
+
+            if not entities:
+                logging.warning("No entities found for %s", ticker)
+                index = get_keyword_index(
+                    namespace=ticker,
+                    index_id=report.get("periodOfReport"),
+                    documents=sections,
+                )
         except Exception as ex:
             logging.error("Error creating index for %s: %s", ticker, ex)

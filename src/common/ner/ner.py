@@ -1,17 +1,14 @@
 """
 Model-based NER
 """
-from typing import TypedDict
 import torch
-from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline, Pipeline
-from pydash import flatten
+from pydash import compact
 
 from common.utils.list import dedup
 
-NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity": str})
-
+from .types import is_ner_result
 
 # set device to GPU if available
 DEVICE = torch.cuda.current_device() if torch.cuda.is_available() else None
@@ -43,23 +40,22 @@ def __ner_from_batch(text_batch: str, model_id: str = DEFAULT_MODEL_ID) -> list[
 
     Args:
         text_batch (str): text on which to do NER
+        model_id (str): model to use
     """
-    nlp = __get_pipeline()
-    extracted_batch = nlp(text_batch, model_id)
+    nlp = __get_pipeline(model_id)
+    extracted_batch = nlp(text_batch)
+
+    print(extracted_batch)
 
     if not isinstance(extracted_batch, list):
         raise Exception("Could not parse response")
 
-    entities: list[list[str]] = []
+    entities = [
+        entity.get("word") if is_ner_result(entity) else None
+        for entity in extracted_batch
+    ]
 
-    for result in extracted_batch:
-        if isinstance(result, list):
-            ne = [entity.word for entity in result]
-            entities.append(ne)
-
-        raise Exception("Could not parse response")
-
-    return flatten(entities)
+    return compact(entities)
 
 
 def extract_named_entities(content: list[str]):
