@@ -5,6 +5,7 @@ from datetime import date, datetime
 import logging
 
 from clients.llama_index import get_keyword_index
+from common.ner import extract_named_entities
 from clients.sec import sec_client
 from common.utils.html_parsing.html import strip_inline_styles
 from sources.sec.rd_pipeline import fetch_annual_reports
@@ -27,6 +28,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             sections = sec_client.extract_sections(
                 report_url, return_type="html", formatter=strip_inline_styles
             )
+            entities = extract_named_entities(sections)
             index = get_keyword_index(
                 namespace=ticker,
                 index_id=report.get("periodOfReport"),
