@@ -23,6 +23,10 @@
 
 - `pre-commit run --all-files`
 
+#### Lint
+
+- `python3 -m pylint src/`
+
 
 ### Code Standards
 
