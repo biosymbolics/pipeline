@@ -38,7 +38,9 @@ def get_service_context():
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
     llm_predictor = LLMPredictor(
-        llm=ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", max_tokens=1900)
+        llm=ChatOpenAI(
+            temperature=0, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
+        )
         # llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=1000)
     )
 
