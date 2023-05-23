@@ -23,6 +23,10 @@
 
 - `pre-commit run --all-files`
 
+#### Lint
+
+- `python3 -m pylint src/`
+
 
 ### Code Standards
 
@@ -38,6 +42,7 @@
   - build_xyz: build up something like an index
   - persist_xyz: save it
   - query_xyz: query a thing (esp when fetch_xyz isn't suitable)
+  - extract_xyz: e.g. extract entity xyz from a document
   - format_xyz: presentation-layer formatting of xyz
   - x_to_y: conversion of X to Y
   - run_xyz: execute a workflow

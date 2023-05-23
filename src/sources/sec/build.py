@@ -1,15 +1,16 @@
+"""
+SEC build
+"""
 from datetime import date, datetime
 import logging
 
-from common.clients.llama_index import get_or_create_index
+from clients.llama_index import get_keyword_index
+from clients.sec import sec_client
+from common.utils.html_parsing.html import strip_inline_styles
 from sources.sec.rd_pipeline import fetch_annual_reports
 
-from . import sec_client
 
-
-def build_knowledge_graph(
-    ticker: str, start_date: date, end_date: date = datetime.now()
-):
+def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()):
     """
     Create knowledge graph from documents
 
@@ -23,11 +24,13 @@ def build_knowledge_graph(
     for report in reports:
         try:
             report_url = report.get("linkToHtml")
-            sec_section = sec_client.extract_section(report_url, return_type="text")
-            get_or_create_index(
+            sections = sec_client.extract_sections(
+                report_url, return_type="html", formatter=strip_inline_styles
+            )
+            index = get_keyword_index(
                 namespace=ticker,
                 index_id=report.get("periodOfReport"),
-                documents=[sec_section],
+                documents=sections,
             )
         except Exception as ex:
             logging.error("Error creating index for %s: %s", ticker, ex)

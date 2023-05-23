@@ -1,8 +1,12 @@
+# pylint: disable=E0102
+"""
+Visualizations
+"""
 from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 from multipledispatch import dispatch
 
-from .llama_index import compose_graph, load_index, load_indices
+from .llama_index import load_index
 
 
 @dispatch(object)  # type: ignore[no-redef]
@@ -13,9 +17,9 @@ def visualize_network(index: GPTKnowledgeGraphIndex):
     Args:
         index (GPTKnowledgeGraphIndex): kg index to visualize
     """
-    g = index.get_networkx_graph()
+    graph = index.get_networkx_graph()
     net = Network(directed=True)
-    net.from_nx(g)
+    net.from_nx(graph)
     net.show("graph.html", notebook=False)
 
 
@@ -31,6 +35,7 @@ def visualize_network(namespace: str, index_id: str):
     index = load_index(namespace, index_id)
     if not index:
         raise Exception("index not found")
+    # pylint: disable=E1120
     visualize_network(index)
 
 
@@ -42,7 +47,6 @@ def visualize_network(namespace: str, index_id: str):
 #     Args:
 #         namespace (str): namespace of the index (e.g. SEC-BMY)
 #
-#     TODO: this isn't currently possible
 #     """
 #     composed = compose_graph(namespace)
 #     if not composed:
@@ -51,15 +55,18 @@ def visualize_network(namespace: str, index_id: str):
 
 
 def list_triples(namespace: str, index_id: str):
+    """
+    List triples
+    """
     index = load_index(namespace, index_id)
     graph = index.get_networkx_graph()
 
     triples = []
     for edge in graph.edges(data=True):
         subject = edge[0]
-        object = edge[1]
+        obj = edge[1]
         relationship = edge[2]["title"]
-        triples.append((subject, relationship, object))
+        triples.append((subject, relationship, obj))
 
     for triple in triples:
         print(triple)

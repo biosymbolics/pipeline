@@ -3,6 +3,7 @@ Client for SEC API
 """
 import logging
 import os
+from typing import Callable, Optional
 import polars as pl
 from sec_api import ExtractorApi, QueryApi, XbrlApi
 
@@ -82,7 +83,10 @@ def parse_xbrl(url: str):
 
 
 def extract_section(
-    url: str, section: str = "1", return_type: ExtractReturnType = "html"
+    url: str,
+    section: str = "1",
+    return_type: ExtractReturnType = "html",
+    formatter: Optional[Callable] = None,
 ) -> str:
     """
     Extract section
@@ -90,7 +94,29 @@ def extract_section(
     extractor_api = ExtractorApi(API_KEY)
     section_html = extractor_api.get_section(url, section, return_type)
 
+    if formatter:
+        formatted = formatter(section_html)
+        return formatted
+
     return section_html
+
+
+def extract_sections(
+    url: str,
+    sections: Optional[list[str]] = None,
+    return_type: ExtractReturnType = "html",
+    formatter: Optional[Callable] = None,
+) -> list[str]:
+    """
+    Extract sections
+    """
+    if sections is None:
+        sections = ["1", "7"]
+    html_sections = [
+        extract_section(url, section, return_type, formatter) for section in sections
+    ]
+
+    return html_sections
 
 
 def extract_rd_pipeline(url: str) -> list[pl.DataFrame]:
