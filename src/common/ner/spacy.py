@@ -21,7 +21,7 @@ type_map = {
     # "T025": "Cell",
     # "T028": "Gene or Genome",
     # "T033": "Finding",
-    #  "T037": "Injury or Poisoning",
+    # "T037": "Injury or Poisoning",
     # "T038": "Biologic Function",
     # "T041": "Mental Process",
     # "T044": "Molecular Function",
@@ -35,29 +35,29 @@ type_map = {
     # "T061": "Therapeutic or Preventive Procedure",
     # "T067": "Phenomenon or Process",
     # "T068": "Human-caused Phenomenon or Process",
-    # "T074": "Medical Device",
+    "T074": "Medical Device",
     # "T086": "Nucleotide Sequence",
     # "T087": "Amino Acid Sequence",
-    # "T109": "Organic Chemical",
+    "T109": "Organic Chemical",
     # "T101": "Patient or Disabled Group",
-    # "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
-    # "T116": "Amino Acid, Peptide, or Protein",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
+    "T116": "Amino Acid, Peptide, or Protein",
     "T121": "Pharmacologic Substance",
-    # "T123": "Biologically Active Substance",
-    # "T125": "Hormone",
-    # "T126": "Enzyme",
+    "T123": "Biologically Active Substance",
+    "T125": "Hormone",
+    "T126": "Enzyme",
     # "T127": "Vitamin",
-    # "T129": "Immunologic Factor",
+    "T129": "Immunologic Factor",
     # "T130": "Indicator, Reagent, or Diagnostic Aid",
     # "T131": "Hazardous or Poisonous Substance",
-    # "T167": "Substance",
+    "T167": "Substance",
     # "T184": "Sign or Symptom",
     # "T190": "Anatomical Abnormality",
     # "T191": "Neoplastic Process",
-    # "T195": "Antibiotic",
-    # "T197": "Inorganic Chemical",
+    "T195": "Antibiotic",
+    "T197": "Inorganic Chemical",
     "T200": "Clinical Drug",
-    # "T203": "Drug Delivery Device",
+    "T203": "Drug Delivery Device",
 }
 
 
@@ -84,18 +84,24 @@ def __has_intersection(list_a, list_b):
     return any(elem in list_a for elem in list_b)
 
 
-def __get_kb_entities(entities: list[Span], kb_linker: KbLinker) -> list[str]:
+def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
     """
-    Get mapped KB entities from the entities
+    Get canonical entities from the entities
     """
-    kb_ents: list[Span] = flatten([entity._.kb_ents for entity in entities])
-    linked_ents = [kb_linker.cui_to_entity[umls_ent[0]] for umls_ent in kb_ents]
+    canonical_entity_map = {}
+    for entity in entities:
+        kb_entities = [
+            kb_linker.cui_to_entity[kb_ent[0]] for kb_ent in entity._.kb_ents
+        ]
+        canonical_entities = [
+            ent.canonical_name
+            for ent in kb_entities
+            if __has_intersection(ent.types, type_map.keys())
+        ]
+        if len(canonical_entities) > 0:
+            canonical_entity_map[entity.text] = canonical_entities
 
-    canonical_names = [
-        ent.canonical_name if __has_intersection(ent.types, type_map.keys()) else None
-        for ent in linked_ents
-    ]
-    return compact(canonical_names)
+    return canonical_entity_map
 
 
 def extract_named_entities(content: list[str]) -> list[str]:
@@ -105,20 +111,27 @@ def extract_named_entities(content: list[str]) -> list[str]:
     Args:
         content (list[str]): list of content on which to do NER
     """
-    nlp = spacy.load("en_core_sci_sm")  # en_core_web_trf
+    nlp = spacy.load("en_core_sci_lg")  # en_core_web_trf
     nlp.add_pipe(
-        "scispacy_linker", config={"resolve_abbreviations": True, "linker_name": "umls"}
+        "scispacy_linker",
+        config={
+            "resolve_abbreviations": True,
+            "linker_name": "umls",
+            "threshold": 0.7,
+            "filter_for_definitions": False,
+            "no_definition_threshold": 0.9,
+        },
     )
     entities = flatten([nlp(batch).ents for batch in content])
 
     linker = __get_kb_linker(nlp)
-    kb_entities = __get_kb_entities(entities, linker)
+    canonical_entities = __get_canonical_entities(entities, linker)
 
     # __summarize(entities)
     # __summarize(kb_entities)
-    print(kb_entities)
+    print(canonical_entities)
 
     entity_strings = [
-        entity.text if entity.label_ in ENTITY_TYPES else "" for entity in entities
+        entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     ]
     return entity_strings
