@@ -5,7 +5,9 @@ import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.tokens import Span
 from spacy.language import Language
+from spacy import displacy
 from pydash import flatten
+import logging
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
@@ -48,7 +50,8 @@ def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
                 ent.types, UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
             )
         ]
-        canonical_entity_map[entity.text] = canonical_entities
+        if len(canonical_entities) > 0:
+            canonical_entity_map[entity.text] = canonical_entities
 
     return canonical_entity_map
 
@@ -59,9 +62,16 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     Args:
         content (list[str]): list of content on which to do NER
+
+    TODO:
+    - POS tagging on SciSpacy
+    - handle mutant-selective PI3Kα inhibitor
     """
     # train_ner(content)
-    nlp: Language = spacy.load("en_core_sci_lg")  # en_core_web_trf, en_core_sci_scibert
+    nlp: Language = spacy.load(
+        "en_core_sci_lg"
+    )  # en_core_sci_lg, en_core_web_trf, en_core_sci_scibert
+    nlp.add_pipe("merge_entities")
     ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
     ruler.add_patterns([{"label": "PRODUCT", "pattern": patterns.MOA_PATTERN}])  # type: ignore
 
@@ -72,22 +82,19 @@ def extract_named_entities(content: list[str]) -> list[str]:
             "linker_name": "umls",
             "threshold": 0.7,
             "filter_for_definitions": False,
-            "no_definition_threshold": 0.9,
+            "no_definition_threshold": 0.7,
         },
     )
     analysis = nlp.analyze_pipes(pretty=True)
-    print(analysis)
-    entities = flatten([nlp(batch).ents for batch in content])
-    chunks = flatten([nlp(batch).noun_chunks for batch in content])
+    logging.debug("About the pipeline: %s", analysis)
+    docs = [nlp(batch) for batch in content]
+    entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
     canonical_entities = __get_canonical_entities(entities, linker)
-
-    for chunk in chunks:
-        print(chunk)
-    # __summarize(kb_entities)
-    # print(canonical_entities)
 
     entity_strings = [
         entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     ]
+    print(canonical_entities)
+    displacy.serve(docs, style="ent", options={"fine_grained": True}, port=3333)  # type: ignore
     return entity_strings

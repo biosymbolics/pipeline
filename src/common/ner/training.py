@@ -1,3 +1,6 @@
+"""
+Contains the functions to train the NER model.
+"""
 import spacy
 from skweak import heuristics, aggregation
 import spacy
@@ -16,7 +19,7 @@ def __get_moa_matcher(nlp):
     return matcher
 
 
-def train_ner(content: list[str]):
+def train_with_weak_supervision(content: list[str]):
     nlp: Language = spacy.load("en_core_sci_lg")
     nlp.add_pipe("merge_entities")
 
@@ -26,7 +29,6 @@ def train_ner(content: list[str]):
         matches = matcher(doc)
         for match_id, start, end in matches:
             patterns.append((start, end, "PRODUCT"))
-        print(patterns)
         return patterns
 
     lf1 = heuristics.FunctionAnnotator("moa", moa)
