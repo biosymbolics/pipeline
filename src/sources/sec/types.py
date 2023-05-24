@@ -5,6 +5,10 @@ from typing import Literal, TypedDict
 
 
 class SecFilingSection(TypedDict):
+    """
+    SEC filing section
+    """
+
     sequence: str  # number
     description: str  # e.g. EX-31.2
     documentUrl: str
@@ -13,6 +17,10 @@ class SecFilingSection(TypedDict):
 
 
 class SecFiling(TypedDict):
+    """
+    SEC filing
+    """
+
     id: str
     ticker: str
     companyName: str
@@ -27,11 +35,6 @@ class SecFiling(TypedDict):
     documentFormatFiles: list[SecFilingSection]
     dataFiles: list[SecFilingSection]
     periodOfReport: str  # of date
-
-
-class SecFilingResponse(TypedDict):
-    # ...other stuff
-    filings: list[SecFiling]
 
 
 SecProductQueryStrategy = Literal["TABLE", "SEARCH"]

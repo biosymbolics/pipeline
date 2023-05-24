@@ -1,3 +1,6 @@
+"""
+Llama Index Types
+"""
 from typing import TypeVar
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
