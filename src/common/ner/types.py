@@ -1,12 +1,29 @@
-from typing import Any, Callable, TypeGuard, TypedDict
+"""
+NER types
+"""
+from typing import Any, Callable, Mapping, NamedTuple, Optional, TypeGuard, TypedDict
 
 from spacy.pipeline import Pipe
-from spacy.tokens import Span
+from spacy.tokens import Span, Token
 
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
-KbLinker = TypedDict("KbLinker", {"cui_to_entity": Callable[[Span], list[Span]]})
-SciSpacyLinker = TypedDict("SciSpacyLinker", {"kb": KbLinker})
+
+
+class SciSpacyEntity(NamedTuple):
+    concept_id: str
+    canonical_name: str
+    aliases: list[str]
+    types: list[str]
+    definition: Optional[str]
+
+
+class KbLinker(NamedTuple):
+    cui_to_entity: Mapping[Token, SciSpacyEntity]
+
+
+class SciSpacyLinker(NamedTuple):
+    kb: KbLinker
 
 
 def is_ner_result(entity: Any) -> TypeGuard[NerResult]:
@@ -25,4 +42,4 @@ def is_sci_spacy_linker(linker: Pipe) -> TypeGuard[SciSpacyLinker]:
     """
     Check if entity is a valid SciSpacyLinker
     """
-    return isinstance(linker, dict) and linker.get("kb") is not None
+    return hasattr(linker, "kb") is not None
