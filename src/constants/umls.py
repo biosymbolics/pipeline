@@ -60,6 +60,7 @@ UMLS_CONDITION_TYPES = {
     "T047": "Disease or Syndrome",
     "T048": "Mental or Behavioral Dysfunction",
     "T190": "Anatomical Abnormality",
+    "T191": "Neoplastic Process",  # e.g. 'Mantle cell lymphoma'
 }
 
 UMLS_PHENOTYPE_TYPES = {
@@ -72,7 +73,6 @@ UMLS_PHENOTYPE_TYPES = {
     "T067": "Phenomenon or Process",
     "T101": "Patient or Disabled Group",
     "T184": "Sign or Symptom",
-    "T191": "Neoplastic Process",
 }
 
 UMLS_INDICATION_TYPES = {
