@@ -62,4 +62,5 @@
 
 
 ### On Dependencies
+- using python3.10 due to nmslib (dep of scispacy) along the lines of https://github.com/nmslib/nmslib/issues/476
 - polars > pandas
