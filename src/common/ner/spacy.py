@@ -71,14 +71,10 @@ def extract_named_entities(content: list[str]) -> list[str]:
     nlp: Language = spacy.load(
         "en_core_sci_scibert"
     )  # en_ner_bionlp13cg_md, en_core_sci_lg, en_core_web_trf
-    # tagger = nlp.get_pipe("tagger")
-    # new_parser = nlp.replace_pipe("tagger", "my_custom_parser")
-
-    # tagger.add_label("PHASE")
     nlp.add_pipe("merge_entities", before="ner")
     ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
-    ruler.add_patterns(
-        [  # type: ignore
+    ruler.add_patterns(  # type: ignore
+        [
             {"label": "PRODUCT", "pattern": patterns.MOA_PATTERN},
             {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_1},
             {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_2},
