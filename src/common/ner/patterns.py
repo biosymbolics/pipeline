@@ -17,6 +17,8 @@ from constants.patterns import (
     SMALL_MOLECULE_SUFFIXES,
 )
 
+from common.utils.re import get_or_re
+
 MOA_PATTERNS: list = [
     *[
         [
@@ -46,18 +48,18 @@ MOA_PATTERNS: list = [
 INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
     [
         {
-            "TEXT": {"REGEX": "[A-Z]{2,}[- ]?[0-9]{3,}$"},  # XYZ 123, XYZ-123"
+            "TEXT": {"REGEX": "[A-Z]{2,}[- ]?[0-9]{3,}"},  # XYZ 123, XYZ-123"
         }
     ],
     [
         {
-            "TEXT": {"REGEX": "[a-zA-Z]{2,}[-]?[0-9]{3,}$"},  # XYZ123, XYZ-123, Xyz-123
+            "TEXT": {"REGEX": "[a-zA-Z]{2,}[-]?[0-9]{3,}"},  # XYZ123, XYZ-123, Xyz-123
         }
     ],
     [
         {
             "TEXT": {
-                "REGEX": "[A-Z0-9]{2,8}-[A-Z0-9]{2,8}-[A-Z0-9]{2,8}$"
+                "REGEX": "[A-Z0-9]{2,8}-[A-Z0-9]{2,8}-[A-Z0-9]{2,8}"
             },  # e.g. CAB-AXL-ADC; will miss lower-cased terms
         }
     ],
@@ -70,21 +72,21 @@ TRIAL_PHASE_PATTERNS = [
     },  # phase 1, phase i, phase Ise i, phase I
 ]
 
+TREATMENT_LINE_RE = (
+    "(?:{1-4}[ ]?|{1-4}-{1-4})(?:l|line)+?"  # 1L, 2L, 3L, 4L, 1L+, 2L+, 3L+, 4L+
+)
+
 REGULATORY_DESIGNATION_PATTERN = [
     {"LOWER": {"IN": ["fast track", "accelerated approval"]}}
 ]
 
 
-def __get_or_re(re_strs: list[str]) -> str:
-    return "(?:" + "|".join(re_strs) + ")"
-
-
-BIO_SUFFIX_RE = __get_or_re(list(BIOLOGIC_SUFFIXES.keys()))
-BIO_INFIX_RE = __get_or_re(list(BIOLOGIC_INFIXES.keys()))
+BIO_SUFFIX_RE = get_or_re(list(BIOLOGIC_SUFFIXES.keys()))
+BIO_INFIX_RE = get_or_re(list(BIOLOGIC_INFIXES.keys()))
 
 
 # https://www.fda.gov/media/93218/download
-BIOSIMILAR_SUFFIX = "{[a-z]{4}}"
+BIOSIMILAR_SUFFIX = "[a-z]{4}"
 
 # https://cdn.who.int/media/docs/default-source/international-nonproprietary-names-(inn)/bioreview-2016-final.pdf
 GLYCOSYLATION_MAIN_PATTERNS = ["alfa", "α", "beta", "β", "gamma", "γ", "delta", "δ"]
@@ -96,20 +98,28 @@ GLYCOSYLATION_RE = (
     + f"(?:-{GLYCOSYLATION_SUB_PATTERN})?"
 )
 
+# ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
+# maraleucel)(b, pomalidomide, apixaban, paclitaxel
 BIOLOGIC_REGEXES = [
-    "[a-z]{2,}" + BIO_SUFFIX_RE + "$",
-    "[a-z]{2,}" + BIO_INFIX_RE + "[a-z]{2,}" + "$",
-    "[a-z]{2,}" + BIO_INFIX_RE + "[a-z]{2,}" + " {GLYCOSYLATION_RE}" + "$",
-    "[a-z]{2,}" + BIO_INFIX_RE + "[a-z]{2,}" + " {BIOSIMILAR_SUFFIX}" + "$",
+    "[a-z]{2,}" + BIO_SUFFIX_RE,
+    "[a-z]{2,}" + BIO_INFIX_RE + "[a-zαβγδ]{2,}",
 ]
 
+# Interest expense decreased
 BIOLOGICAL_PATTERNS: list[list[dict]] = [
-    [{"LOWER": {"REGEX": bio_re}}] for bio_re in BIOLOGIC_REGEXES
+    [
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+        {"LOWER": {"REGEX": bio_re}},
+        {"LOWER": {"REGEX": GLYCOSYLATION_RE}, "OP": "?"},
+        {"LOWER": {"REGEX": BIOSIMILAR_SUFFIX}, "OP": "?"},
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+    ]
+    for bio_re in BIOLOGIC_REGEXES
 ]
 
 CORE_SMALL_MOLECULE_REGEXES = [
-    "[a-z]+" + __get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "$",
-    "[a-z]+" + __get_or_re(list(SMALL_MOLECULE_INFIXES.keys())) + "[a-z]+$",
+    "[a-z]+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())),
+    "[a-z]+" + get_or_re(list(SMALL_MOLECULE_INFIXES.keys())) + "[a-zαβγδ]+",
 ]
 
 SMALL_MOLECULE_REGEXES = [
@@ -130,7 +140,7 @@ BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
             "TEXT": {
-                "REGEX": ".+®$",
+                "REGEX": ".+[®ª^]\\b",
             },
         },
     ]

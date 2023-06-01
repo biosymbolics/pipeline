@@ -39,7 +39,7 @@ async def build_sec():
     """
     Build SEC stuffs
     """
-    start_date = datetime(2020, 1, 1)
+    start_date = datetime(2022, 1, 1)
     tasks = [
         asyncio.to_thread(__build_indices, ticker, start_date)
         for ticker in PHARMA_TICKERS

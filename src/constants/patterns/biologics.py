@@ -17,7 +17,6 @@ CELL_THERAPY_PRODUCT_INFIXES = {
     "tusu": "tumour suppression",
 }
 
-
 MONOCLONAL_ANTIBODY_INFIXES = {
     "xizu": "chimeric-humanized",
     "xi": "chimeric",
@@ -50,9 +49,10 @@ TARGET_INFIXES = {
 BIOLOGIC_SUFFIXES = {
     "pressin": "vasocontrictors and vasopressin derivatives",
     "rsen": "antisense nucleotides",
-    "cel": "cell therapies",  # fiercely
+    "cel": "cell therapies",  # FP: fiercely
+    "cept": "indicates a protein that mimics an immunoglobulin",
     "stim": "colony stimulating factors",
-    # 'ase': 'enzymes', # FP: disease
+    "ase": "enzymes",  # FP: disease
     "som": "growht hormone derivatives",
     "cogin": "Blood coagulation cascade inhibitors",
     "cog": "Blood coagulation factors",
@@ -62,13 +62,12 @@ BIOLOGIC_SUFFIXES = {
     "irudin": "Hirudin derivatives",
     "imod": "Immunomodulators",
     "kinra": "Interleukin receptor antagonists ",
-    # 'kin': 'Interleukin type substances', # FP: Hodgkin
+    "kin": "Interleukin type substances",  # FP: Hodgkin
     "mab": "mAb",
-    "nib": "Nucleic Acid-Based Drugs",
     "tocin": "Oxytocin derivatives",
     "relin": "Pituitary hormone-release stimulating peptides",
-    # 'cept': 'Receptor molecules, native or modified',
-    # 'tide': '',
+    "cept": "Receptor molecules, native or modified",
+    "tide": "",
     "actide": "Synthetic polypeptides with a corticotropin-like action",
 }
 

@@ -70,11 +70,11 @@ def extract_named_entities(content: list[str]) -> list[str]:
     - POS tagging on SciSpacy
     """
     # train_ner(content)
-    nlp: Language = spacy.load("en_core_sci_scibert")
+    nlp: Language = spacy.load("en_ner_bc5cdr_md")  # en_core_sci_scibert
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     nlp.add_pipe("merge_entities", before="ner")
-    ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
+    ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, after="ner")
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 
     nlp.add_pipe(
@@ -90,6 +90,7 @@ def extract_named_entities(content: list[str]) -> list[str]:
     analysis = nlp.analyze_pipes(pretty=True)
     logging.debug("About the pipeline: %s", analysis)
     docs = [nlp(batch) for batch in content]
+    print(nlp(content[0]).ents)
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
     canonical_entities = __get_canonical_entities(entities, linker)
@@ -98,5 +99,6 @@ def extract_named_entities(content: list[str]) -> list[str]:
         entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     ]
     # print(canonical_entities)
+    displacy.serve(docs, style="dep", port=3334)  # type: ignore
     displacy.serve(docs, style="ent", options={"fine_grained": True}, port=3333)  # type: ignore
     return entity_strings

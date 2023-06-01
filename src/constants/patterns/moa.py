@@ -1,3 +1,6 @@
+from common.utils.re import get_or_re
+
+
 ACTIONS = [
     "activator",
     "agent",
@@ -9,9 +12,9 @@ ACTIONS = [
     "chaperone",
     "conjugate",
     "degrader",
-    "downregulator",
+    "down-?regulator",
     "engager",
-    "immunomodulator",
+    "immuno-?modulator",
     "inducer",
     "inhibitor",
     "modulator",
@@ -19,7 +22,7 @@ ACTIONS = [
     "pro[-\\s]?drug",
     "stimulator",
     "suppressor",
-    "upregulator",
+    "up-?regulator",
 ]
 
 CONJUGATE_TYPES = [
@@ -30,18 +33,33 @@ CONJUGATE_TYPES = [
     "nanoparticle conjugate",
 ]
 
-BIOLOGIC_TYPES = [
-    "adoptive cell transfer",
-    "antibody",
-    "cell therapy",
+CAR_T_SUFFIXES = [
     "car[-]?t",
     "car[-]?nk",
-    "chimeric antigen receptor t[-\\s]?cell?",
+    "chimeric antigen receptor (?:(car) )?t[-\\s]?cell?",
+    "chimeric antigen receptor (?:(car) )?natural killer cell",
+    "bcma nke",
+    "nke",
+]
+
+CAR_T_INFIXES = [
+    "cd{0-9}{2}",
+    "cd{0-9}{2}xcd{0-9}{2}",
+]
+
+BIOLOGIC_SUFFIXES = [
+    "adoptive cell transfer",
+    "adjuvant",
+    "antibody",
+    "bispecific",
+    "bispecific antibody",
+    "cell therapy",
     "cytokine",
     "enzyme",
     # "factor",
     "factor [ivx]{1-3}",
-    "Fab(?: region)?",
+    "fab(?: region)?",
+    "fc",
     "fc[-\\s]fusion(?: protein)?",
     "fusion protein",
     "gene (?:[a-z]+ )?therapy",
@@ -50,28 +68,28 @@ BIOLOGIC_TYPES = [
     "monoclonal antibody",
     "mab",
     "mrna",
+    "neoadjuvant",
     "peptide",
+    "peri[-\\s]?adjuvant",
     "polypeptide",
     "protein",
     "sirna",
+    "stem cell transplant",
     "tumor[-| ]infiltrating lymphocyte",
     "t[-\\s]?cell engager",
     "tce",
     "transcription factor",
     "vaccine",
+    f"cd{0-9}{2}.+{get_or_re(CAR_T_SUFFIXES)}",
+    *CAR_T_SUFFIXES,
     *CONJUGATE_TYPES,
 ]
 
 DRUG_CLASS_TYPE = [
     "anti[-]?[a-z].+ agent",
     "anti[-]?[a-z].+s",
+    "anti-[a-z0-9]+",
 ]
-
-IMMUNOTHERAPY_TYPES = [
-    "adjuvant",
-    "bispecific",
-]
-
 
 EFFECTS = [
     *ACTIONS,
@@ -82,7 +100,7 @@ EFFECTS = [
 
 MOA_SUFFIXES = [
     *EFFECTS,
-    *BIOLOGIC_TYPES,
+    *BIOLOGIC_SUFFIXES,
 ]
 
-MOA_INFIXES = [*IMMUNOTHERAPY_TYPES, *DRUG_CLASS_TYPE]
+MOA_INFIXES = [*DRUG_CLASS_TYPE, *CAR_T_INFIXES]
