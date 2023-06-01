@@ -1,13 +1,18 @@
 """
 Named-entity recognition using spacy
 """
+import re
+from typing import Literal
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
-from spacy.tokens import Span
+from spacy.tokens import Doc, Span
 from spacy.language import Language
+from spacy.tokenizer import Tokenizer
 from spacy import displacy
+from spacy.util import compile_prefix_regex, compile_suffix_regex
 from pydash import flatten
 import logging
+from spacy_html_tokenizer import create_html_tokenizer
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
@@ -16,6 +21,31 @@ from . import patterns
 from .types import KbLinker
 
 ENTITY_TYPES = ["PRODUCT"]
+UNWRAP_TAGS = ["em", "strong", "b", "i", "span", "a", "code", "kbd", "li"]
+
+
+def __add_tokenization_re(
+    nlp: Language, re_type: Literal["infixes", "prefixes", "suffixes"], new_re: str
+) -> list[str]:
+    """
+    Add regex to the tokenizer suffixes
+    """
+    if hasattr(nlp.Defaults, re_type):
+        tokenizer_re_strs = list(getattr(nlp.Defaults, re_type))
+        tokenizer_re_strs.append(new_re)
+        return tokenizer_re_strs
+
+    logging.warning(f"Could not find {re_type} in nlp.Defaults")
+    return [new_re]
+
+
+def custom_tokenizer(nlp: Language) -> Tokenizer:
+    suffix_re = __add_tokenization_re(nlp, "suffixes", "®")
+    prefix_re = __add_tokenization_re(nlp, "prefixes", "•")
+    tokenizer = nlp.tokenizer
+    tokenizer.suffix_search = compile_suffix_regex(suffix_re).search
+    tokenizer.prefix_search = compile_prefix_regex(prefix_re).search
+    return tokenizer
 
 
 def __get_kb_linker(nlp: Language) -> KbLinker:
@@ -65,23 +95,30 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     TODO:
     - POS tagging on SciSpacy
-    - handle mutant-selective PI3Kα inhibitor
     """
     # train_ner(content)
-    nlp: Language = spacy.load(
-        "en_core_sci_scibert"
-    )  # en_ner_bionlp13cg_md, en_core_sci_lg, en_core_web_trf
+    nlp: Language = spacy.load("en_core_sci_scibert")
+    nlp.tokenizer = custom_tokenizer(nlp)
+    nlp.tokenizer = create_html_tokenizer(unwrap_tags=UNWRAP_TAGS)(
+        nlp
+    )  # improves parsing of HTML
+
     nlp.add_pipe("merge_entities", before="ner")
     ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
-    ruler.add_patterns(  # type: ignore
-        [
-            {"label": "PRODUCT", "pattern": patterns.MOA_PATTERN},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_1},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_2},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_3},
-            # {"label": "PHASE", "pattern": patterns.TRIAL_PHASE_PATTERN}
-        ]
-    )
+    print(patterns.BIOLOGICAL_PATTERNS)
+    entity_patterns = [
+        *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in patterns.MOA_PATTERNS],
+        *[
+            {"label": "PRODUCT", "pattern": id_re}
+            for id_re in patterns.INVESTIGATIONAL_ID_PATTERNS
+        ],
+        *[
+            {"label": "PRODUCT", "pattern": bio_re}
+            for bio_re in patterns.BIOLOGICAL_PATTERNS
+        ],
+    ]
+
+    ruler.add_patterns(entity_patterns)  # type: ignore
 
     nlp.add_pipe(
         "scispacy_linker",

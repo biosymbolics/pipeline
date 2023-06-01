@@ -4,6 +4,7 @@ TODO:
 - handling of malformed tables like https://www.sec.gov/ix?doc=/Archives/edgar/data/14272/000001427222000196/bmy-20220930.htm ("Significant Product and Pipeline Approvals")
 - handle of multiple-row column tables like https://www.sec.gov/ix?doc=/Archives/edgar/data/14272/000001427223000104/bmy-20230331.htm ("Product and Pipeline Developments")
 """
+from bs4 import BeautifulSoup
 from pydash import compact
 
 
@@ -59,3 +60,17 @@ def get_table_rows(table, headers: list[str] = []):
     text_rows = __get_text_rows(table)
     non_empty_rows = list(filter(lambda row: __include_row(row, headers), text_rows))
     return non_empty_rows
+
+
+def get_all_table_elements(html: str):
+    """
+    Gets all table elements and contents (including lonely rows and cells)
+
+    Args:
+        html (str): html to parse
+    """
+    soup = BeautifulSoup(html, features="html.parser")
+    tables = soup.find_all("table")
+    lonely_rows = soup.find_all("tr")
+    lonley_cells = soup.find_all("cells")
+    return tables + lonely_rows + lonley_cells

@@ -1,0 +1,15 @@
+"""
+Pattern constants
+"""
+__all__ = [
+    "BIOLOGIC_INFIXES",
+    "BIOLOGIC_SUFFIXES",
+    "ACTIONS",
+    "EFFECTS_AND_CLASSES",
+    "SMALL_MOLECULE_INFIXES",
+    "SMALL_MOLECULE_SUFFIXES",
+]
+
+from .biologics import BIOLOGIC_INFIXES, BIOLOGIC_SUFFIXES
+from .moa import ACTIONS, EFFECTS_AND_CLASSES
+from .small_molecules import SMALL_MOLECULE_INFIXES, SMALL_MOLECULE_SUFFIXES
