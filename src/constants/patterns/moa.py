@@ -1,10 +1,13 @@
 ACTIONS = [
     "activator",
+    "agent",
     "agonist",
     "analog",
     "antagonist",
     "blocker",
+    "blocking antibody",
     "chaperone",
+    "conjugate",
     "degrader",
     "downregulator",
     "engager",
@@ -13,39 +16,10 @@ ACTIONS = [
     "inhibitor",
     "modulator",
     "potentiator",
+    "pro[-\\s]?drug",
     "stimulator",
     "suppressor",
     "upregulator",
-]
-
-BIOLOGIC_TYPES = [
-    "antibody",
-    "cell therapy",
-    "cytokine",
-    "enzyme",
-    "factor",
-    "factor [ivx]{1-3}",
-    "Fab(?: region)?",
-    "fc[-\\s]fusion(?: protein)?",
-    "fusion protein",
-    "gene (?:[a-z]+ )?therapy",
-    "growth factor",
-    "hormone",
-    "mrna",
-    "peptide",
-    "polypeptide",
-    "protein",
-    "sirna",
-    "transcription factor",
-    "vaccine",
-]
-
-DRUG_CLASS_TYPE = [
-    "agent",
-    "anti[-]?[a-z].+ agent",
-    "anti[-]?[a-z].+s",
-    "conjugate",
-    "pro[-\\s]?drug",
 ]
 
 CONJUGATE_TYPES = [
@@ -56,18 +30,46 @@ CONJUGATE_TYPES = [
     "nanoparticle conjugate",
 ]
 
-IMMUNOTHERAPY_TYPES = [
-    "adjuvant",
-    "bispecific",
+BIOLOGIC_TYPES = [
+    "adoptive cell transfer",
+    "antibody",
+    "cell therapy",
     "car[-]?t",
     "car[-]?nk",
     "chimeric antigen receptor t[-\\s]?cell?",
+    "cytokine",
+    "enzyme",
+    # "factor",
+    "factor [ivx]{1-3}",
+    "Fab(?: region)?",
+    "fc[-\\s]fusion(?: protein)?",
+    "fusion protein",
+    "gene (?:[a-z]+ )?therapy",
+    "growth factor",
+    "hormone",
     "monoclonal antibody",
     "mab",
-    "adoptive cell transfer",
+    "mrna",
+    "peptide",
+    "polypeptide",
+    "protein",
+    "sirna",
     "tumor[-| ]infiltrating lymphocyte",
     "t[-\\s]?cell engager",
     "tce",
+    "transcription factor",
+    "vaccine",
+    *CONJUGATE_TYPES,
+]
+
+DRUG_CLASS_TYPE = [
+    "anti[-]?[a-z].+ agent",
+    "anti[-]?[a-z].+s",
+]
+
+IMMUNOTHERAPY_TYPES = [
+    "adjuvant",
+    "bispecific",
 ]
 
 
@@ -78,10 +80,9 @@ EFFECTS = [
 ]
 
 
-EFFECTS_AND_CLASSES = [
-    *BIOLOGIC_TYPES,
-    *CONJUGATE_TYPES,
+MOA_SUFFIXES = [
     *EFFECTS,
-    *DRUG_CLASS_TYPE,
-    *IMMUNOTHERAPY_TYPES,
+    *BIOLOGIC_TYPES,
 ]
+
+MOA_INFIXES = [*IMMUNOTHERAPY_TYPES, *DRUG_CLASS_TYPE]

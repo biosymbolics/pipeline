@@ -64,6 +64,7 @@ BIOLOGIC_SUFFIXES = {
     "kinra": "Interleukin receptor antagonists ",
     # 'kin': 'Interleukin type substances', # FP: Hodgkin
     "mab": "mAb",
+    "nib": "Nucleic Acid-Based Drugs",
     "tocin": "Oxytocin derivatives",
     "relin": "Pituitary hormone-release stimulating peptides",
     # 'cept': 'Receptor molecules, native or modified',

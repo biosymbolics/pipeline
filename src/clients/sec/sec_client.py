@@ -72,6 +72,7 @@ def fetch_sec_docs(criteria: list[str]) -> list[SecFiling]:
     filings = response.get("filings")
 
     if not filings:
+        logging.error("Response is missing 'filings': %s", response)
         raise KeyError("Response is missing 'filings'")
 
     return filings

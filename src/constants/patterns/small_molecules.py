@@ -1,23 +1,25 @@
 SMALL_MOLECULE_SUFFIXES = {
     "amine": "amine compound",
-    "ide": "compound or drug",
-    "ium": "cation or compound",
+    # "ide": "compound or drug",
+    # "ium": "cation or compound",
     "ol": "alcohol or compound",
-    "ate": "ester or compound",
+    # "ate": "ester or compound",
     "ium": "metal or compound",
     "azole": "azole antifungal",
-    "ine": "alkaloid or compound",
+    # "ine": "alkaloid or compound",
     "one": "ketone or compound",
-    "ide": "compound or drug",
-    "in": "alkaloid or compound",
+    # "ide": "compound or drug",
+    # "in": "alkaloid or compound",
     "ium": "metal or compound",
+    "mib": "Small molecules that work inside cancer cells to slow proliferation and increase apoptosis",
     "oxin": "compound or drug",
+    "nib": "small-molecule inhibitor",
     "rin": "compound or drug",
     # Add more suffixes as needed
 }
 
 SMALL_MOLECULE_INFIXES = {
-    "anti": "antibiotic or compound",
+    # "anti": "antibiotic or compound",
     "barb": "barbiturate or compound",
     "fluoro": "fluorinated compound",
     "statin": "cholesterol-lowering drug",
