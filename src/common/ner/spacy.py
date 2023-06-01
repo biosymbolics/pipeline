@@ -69,11 +69,23 @@ def extract_named_entities(content: list[str]) -> list[str]:
     """
     # train_ner(content)
     nlp: Language = spacy.load(
-        "en_core_sci_lg"
-    )  # en_core_sci_lg, en_core_web_trf, en_core_sci_scibert
-    nlp.add_pipe("merge_entities")
+        "en_core_sci_scibert"
+    )  # en_ner_bionlp13cg_md, en_core_sci_lg, en_core_web_trf
+    # tagger = nlp.get_pipe("tagger")
+    # new_parser = nlp.replace_pipe("tagger", "my_custom_parser")
+
+    # tagger.add_label("PHASE")
+    nlp.add_pipe("merge_entities", before="ner")
     ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
-    ruler.add_patterns([{"label": "PRODUCT", "pattern": patterns.MOA_PATTERN}])  # type: ignore
+    ruler.add_patterns(
+        [  # type: ignore
+            {"label": "PRODUCT", "pattern": patterns.MOA_PATTERN},
+            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_1},
+            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_2},
+            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_3},
+            # {"label": "PHASE", "pattern": patterns.TRIAL_PHASE_PATTERN}
+        ]
+    )
 
     nlp.add_pipe(
         "scispacy_linker",
@@ -95,6 +107,6 @@ def extract_named_entities(content: list[str]) -> list[str]:
     entity_strings = [
         entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     ]
-    print(canonical_entities)
+    # print(canonical_entities)
     displacy.serve(docs, style="ent", options={"fine_grained": True}, port=3333)  # type: ignore
     return entity_strings

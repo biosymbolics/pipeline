@@ -1,10 +1,10 @@
 """
 NER types
 """
-from typing import Any, Callable, Mapping, NamedTuple, Optional, TypeGuard, TypedDict
+from typing import Any, NamedTuple, Optional, TypeGuard, TypedDict
 
 from spacy.pipeline import Pipe
-from spacy.tokens import Span, Token
+from spacy.tokens import Token
 
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
@@ -19,7 +19,7 @@ class SciSpacyEntity(NamedTuple):
 
 
 class KbLinker(NamedTuple):
-    cui_to_entity: Mapping[Token, SciSpacyEntity]
+    cui_to_entity: dict[Token, SciSpacyEntity]
 
 
 class SciSpacyLinker(NamedTuple):
