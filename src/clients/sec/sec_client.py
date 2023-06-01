@@ -94,6 +94,9 @@ def extract_section(
     extractor_api = ExtractorApi(API_KEY)
     section_html = extractor_api.get_section(url, section, return_type)
 
+    if not section_html:
+        raise Exception("No section found")
+
     if formatter:
         formatted = formatter(section_html)
         return formatted

@@ -31,7 +31,6 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
                 return_type="text",  # formatter=strip_inline_styles
             )
             entities = extract_named_entities(sections, "spacy")
-            # print(entities)
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
             if not entities:

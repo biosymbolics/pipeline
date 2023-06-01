@@ -5,6 +5,7 @@ TODO:
 - O-glc-NAcase
 - Epiregulin/TGFα MAB
 - Pirtobrutinib (LOXO-305)
+- LP(a) Inhibitor
 
 """
 MOA_PATTERN = [
@@ -51,6 +52,7 @@ MOA_PATTERN = [
                 "prodrug",
                 "pro-drug",
                 "pro drug",
+                "sirna",
                 "therapeutic",
                 "therapeutic agent",
             ]
@@ -58,4 +60,32 @@ MOA_PATTERN = [
     },
 ]
 
-# pattern3 = [{"MORPH": {"IS_SUBSET": ["Number=Sing", "Gender=Neut"]}}]
+# IN supported with REGEX supported in 3.5+
+INVESTIGATIONAL_ID_PATTERN_1 = [
+    {
+        "TEXT": {"REGEX": "[a-zA-Z]{2,}[-]?[0-9]{3,}"},  # XYZ123, XYZ-123, Xyz-123
+    },
+]
+
+INVESTIGATIONAL_ID_PATTERN_2 = [
+    {
+        "TEXT": {"REGEX": "[A-Z]{2,}[- ]?[0-9]{3,}"},  # XYZ 123, XYZ-123"
+    },
+]
+
+INVESTIGATIONAL_ID_PATTERN_3 = [
+    {
+        "TEXT": {
+            "REGEX": "[A-Z0-9]{2,8}-[A-Z0-9]{2,8}-[A-Z0-9]{2,8}"
+        },  # e.g. CAB-AXL-ADC; will miss lower-cased terms
+    },
+]
+
+# TODO: Preclinical
+TRIAL_PHASE_PATTERN = [
+    {"LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}},  # phase 1, phase i, phase I
+]
+
+REGULATORY_DESIGNATION_PATTERN = [
+    {"LOWER": {"IN": ["fast track", "accelerated approval"]}}
+]
