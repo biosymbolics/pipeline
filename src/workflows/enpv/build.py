@@ -10,21 +10,21 @@ from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
     # "PFE",
-    "JNJ",
+    # "JNJ",
     # "NVS",
     # "APPV",
     # "AMGN",
-    # "GSK",
+    # "GSK", # no 10k?
     # "GILD",
-    # "NVO",
-    # "TAK",
+    # "NVO", # no 10k?
+    # "TAK", # no 10k?
     # "LLY",
     # "AZN",
     # "BAYRY",
-    # "RHHBY",
+    # "RHHBY", # no 10k?
     # "MTZPY",
     # "MRK",
-    # "BMY",
+    "BMY",
 ]
 
 
@@ -33,13 +33,14 @@ def __build_indices(ticker, start_date):
         build_indices(ticker, start_date)
     except Exception as ex:
         logging.error("failure to build kg for %s: %s", ticker, ex)
+        raise ex
 
 
 async def build_sec():
     """
     Build SEC stuffs
     """
-    start_date = datetime(2023, 1, 1)
+    start_date = datetime(2022, 1, 1)
     tasks = [
         asyncio.to_thread(__build_indices, ticker, start_date)
         for ticker in PHARMA_TICKERS

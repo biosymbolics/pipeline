@@ -11,8 +11,11 @@ import logging
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
+from common.ner.utils import get_sec_tokenizer
+from common.utils.list import has_intersection
 
-from . import patterns
+from .debugging import print_tokens
+from .patterns import INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
 ENTITY_TYPES = ["PRODUCT"]
@@ -30,10 +33,6 @@ def __get_kb_linker(nlp: Language) -> KbLinker:
     return linker.kb
 
 
-def __has_intersection(list_a, list_b):
-    return any(elem in list_a for elem in list_b)
-
-
 def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
     """
     Get canonical entities from the entities
@@ -46,8 +45,8 @@ def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
         canonical_entities = [
             ent.canonical_name
             for ent in kb_entities
-            if __has_intersection(
-                ent.types, UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+            if has_intersection(
+                ent.types, list(UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
             )
         ]
         if len(canonical_entities) > 0:
@@ -65,27 +64,23 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     TODO:
     - POS tagging on SciSpacy
-    - handle mutant-selective PI3Kα inhibitor
     """
-    # train_ner(content)
     nlp: Language = spacy.load(
         "en_core_sci_scibert"
-    )  # en_ner_bionlp13cg_md, en_core_sci_lg, en_core_web_trf
-    # tagger = nlp.get_pipe("tagger")
-    # new_parser = nlp.replace_pipe("tagger", "my_custom_parser")
+    )  # en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+    nlp.tokenizer = get_sec_tokenizer(nlp)
 
-    # tagger.add_label("PHASE")
-    nlp.add_pipe("merge_entities", before="ner")
-    ruler = nlp.add_pipe("entity_ruler", config={"validate": True}, before="ner")
-    ruler.add_patterns(
-        [  # type: ignore
-            {"label": "PRODUCT", "pattern": patterns.MOA_PATTERN},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_1},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_2},
-            {"label": "PRODUCT", "pattern": patterns.INVESTIGATIONAL_ID_PATTERN_3},
-            # {"label": "PHASE", "pattern": patterns.TRIAL_PHASE_PATTERN}
-        ]
+    # otherwise "xyz inhibitor" is split into two entities
+    # nlp.add_pipe(
+    #     "merge_entities", after="ner"
+    # )
+
+    ruler = nlp.add_pipe(
+        "entity_ruler",
+        config={"validate": True, "overwrite_ents": True},
+        # after="merge_entities",
     )
+    ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 
     nlp.add_pipe(
         "scispacy_linker",
@@ -100,13 +95,17 @@ def extract_named_entities(content: list[str]) -> list[str]:
     analysis = nlp.analyze_pipes(pretty=True)
     logging.debug("About the pipeline: %s", analysis)
     docs = [nlp(batch) for batch in content]
+
+    print_tokens(docs)
+
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
     canonical_entities = __get_canonical_entities(entities, linker)
 
-    entity_strings = [
-        entity.text for entity in entities if entity.label_ in ENTITY_TYPES
-    ]
+    # entity_strings = [
+    #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
+    # ]
     # print(canonical_entities)
-    displacy.serve(docs, style="ent", options={"fine_grained": True}, port=3333)  # type: ignore
-    return entity_strings
+    # displacy.serve(docs, style="dep", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
+    displacy.serve(docs, style="ent", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
+    return []

@@ -26,3 +26,10 @@ def dedup(a_list: list[T]) -> list[T]:
         a_list (list): list to deduplicate
     """
     return list(set(a_list))
+
+
+def has_intersection(list_a: list[T], list_b: list[T]) -> bool:
+    """
+    Returns True if list_a and list_b have at least one element in common
+    """
+    return any(elem in list_a for elem in list_b)

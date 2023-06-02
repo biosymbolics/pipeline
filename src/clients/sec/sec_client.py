@@ -65,9 +65,14 @@ def fetch_sec_docs(criteria: list[str]) -> list[SecFiling]:
     query = __get_query(criteria)
     logging.info("Getting SEC docs with query %s", query)
     response = sec_client().get_filings(query)
+
+    if not response:
+        raise Exception("No response from SEC API")
+
     filings = response.get("filings")
 
     if not filings:
+        logging.error("Response is missing 'filings': %s", response)
         raise KeyError("Response is missing 'filings'")
 
     return filings

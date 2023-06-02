@@ -6,6 +6,19 @@ import unittest
 from common.utils.ner import normalize_entity_name
 
 
+# CC-90010
+# CK1α Degrader
+# BMS-986158
+# CD3xPSCA Bispecific
+# Anti-CCR8
+# Anti-Fucosyl GM1
+# PKCθ Inhibitor
+# cendakimab
+# CD33 NKE
+# BCMA NKE --Relapsed/Refractory Multiple Myeloma BET Inhibitor
+# eIF2b Activator: Evotec
+
+
 class TestNerUtils(unittest.TestCase):
     def test_normalize_entity_name(self):
         """
