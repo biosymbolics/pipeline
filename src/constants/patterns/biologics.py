@@ -49,13 +49,14 @@ TARGET_INFIXES = {
 BIOLOGIC_SUFFIXES = {
     "pressin": "vasocontrictors and vasopressin derivatives",
     "rsen": "antisense nucleotides",
-    "cel": "cell therapies",  # FP: fiercely
-    "cept": "indicates a protein that mimics an immunoglobulin",
+    "cel": "cell therapies",
+    "cept": "indicates a protein that mimics an immunoglobulin",  # luspatercept-aamt??
     "stim": "colony stimulating factors",
     # "ase": "enzymes",  # FP: disease
     "som": "growht hormone derivatives",
     "cogin": "Blood coagulation cascade inhibitors",
     "cog": "Blood coagulation factors",
+    "gene": "e.g. lisocabtagene maraleucel",
     "relix": "Gonadotropin-releasing hormone (GnRH) inhibiting peptides",
     "ermin": "Growth factors and Tumour necrosis factors (TNF)",  # FP:  # determined, determination
     "parin": "Heparin derivatives",
@@ -67,6 +68,8 @@ BIOLOGIC_SUFFIXES = {
     "tocin": "Oxytocin derivatives",
     "relin": "Pituitary hormone-release stimulating peptides",
     "cept": "Receptor molecules, native or modified",
+    "mide": "e.g. lenalidomide, mezigdomide",
+    "mod": "e.g. ozanimod",
     "tide": "",
     "actide": "Synthetic polypeptides with a corticotropin-like action",
 }

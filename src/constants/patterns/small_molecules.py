@@ -17,6 +17,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "oxin": "compound or drug",
     "nib": "small-molecule inhibitor",
     "rin": "compound or drug",
+    "mten": "e.g. mavacamten",
     # "ten": "e.g. mavacamten" # FP: often
     # Add more suffixes as needed
 }

@@ -1,11 +1,5 @@
 """
 NER Patterns (SpaCy)
-
-TODO:
-- O-glc-NAcase
-- Epiregulin/TGFα MAB
-- Pirtobrutinib (LOXO-305)
-- LP(a) Inhibitor
 """
 
 from constants.patterns import (
@@ -17,20 +11,23 @@ from constants.patterns import (
     SMALL_MOLECULE_SUFFIXES,
 )
 
-from common.utils.re import get_or_re
+from common.utils.re import get_or_re, WORD_DIGIT_CHAR_RE
 
 MOA_PATTERNS: list = [
     *[
         [
-            # {"HEAD": { "IN": ["PROPN", "NOUN", "ADJ"] }, "OP": "+"},
             {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
-                "OP": "+",
-            },  # otherwise, just "inhibitor" of "xyz inhibitor" is matched
+                "OP": "*",
+            },
             {
                 "LOWER": {
-                    "REGEX": "\\b" + f"\\w+{moa_suffix}" + "\\b",
+                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b",
                 },
+            },
+            {
+                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
+                "OP": "*",
             },
         ]
         for moa_suffix in MOA_SUFFIXES
@@ -38,8 +35,9 @@ MOA_PATTERNS: list = [
     *[
         [
             {
-                "LEMMA": {
-                    "REGEX": "\\b" + f"(?i)\\w+{moa_infix}\\w+" + "\\b",
+                "LOWER": {
+                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_infix}{WORD_DIGIT_CHAR_RE}*"
+                    + "\\b",
                 },
             },
         ]
@@ -68,11 +66,10 @@ INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
     ],
 ]
 
+# phase 1, phase i, phase Ise i, phase I
 TRIAL_PHASE_PATTERNS = [
     {"LOWER": "preclinial"},
-    {
-        "LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}
-    },  # phase 1, phase i, phase Ise i, phase I
+    {"LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}},
 ]
 
 TREATMENT_LINE_RE = (
@@ -97,11 +94,15 @@ GLYCOSYLATION_RE = (
     + f"(?:-{GLYCOSYLATION_SUB_PATTERN})?"
 )
 
+
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
 # maraleucel)(b, pomalidomide, apixaban, paclitaxel
 BIOLOGIC_REGEXES = [
-    "\\b" + "\\w{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
-    "\\b" + "\\w{2,}" + get_or_re(list(BIOLOGIC_INFIXES.keys())) + "\\w{2,}" + "\\b",
+    f"{WORD_DIGIT_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
+    f"{WORD_DIGIT_CHAR_RE}{2,}"
+    + get_or_re(list(BIOLOGIC_INFIXES.keys()))
+    + f"{WORD_DIGIT_CHAR_RE}{2,}"
+    + "\\b",
 ]
 
 # Interest expense decreased
@@ -117,8 +118,11 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
 ]
 
 SMALL_MOLECULE_REGEXES = [
-    "\\b" + "\\w+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
-    "\\b" + "\\w+" + get_or_re(list(SMALL_MOLECULE_INFIXES.keys())) + "\\w+" + "\\b",
+    f"{WORD_DIGIT_CHAR_RE}+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
+    f"{WORD_DIGIT_CHAR_RE}+"
+    + get_or_re(list(SMALL_MOLECULE_INFIXES.keys()))
+    + f"{WORD_DIGIT_CHAR_RE}+"
+    + "\\b",
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
@@ -132,9 +136,8 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
 
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
-        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "+"},
         {
-            "TEXT": "®",
+            "TEXT": {"REGEX": f"{WORD_DIGIT_CHAR_RE}{5,}[ ]?®"},
         },
     ]
 ]

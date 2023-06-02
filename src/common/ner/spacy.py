@@ -70,14 +70,15 @@ def extract_named_entities(content: list[str]) -> list[str]:
     )  # en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
-    nlp.add_pipe(
-        "merge_entities", after="ner"
-    )  # otherwise "xyz inhibitor" is split into two entities
+    # otherwise "xyz inhibitor" is split into two entities
+    # nlp.add_pipe(
+    #     "merge_entities", after="ner"
+    # )
 
     ruler = nlp.add_pipe(
         "entity_ruler",
         config={"validate": True, "overwrite_ents": True},
-        after="merge_entities",
+        # after="merge_entities",
     )
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 
@@ -108,7 +109,3 @@ def extract_named_entities(content: list[str]) -> list[str]:
     # displacy.serve(docs, style="dep", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
     displacy.serve(docs, style="ent", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
     return []
-
-
-# Tumors SHP2 Inhibitor Solid Tumors TGFβ Inhibitor
-# Tumors LSD1 Inhibitor Solid Tumors MAGE A4/8 TCER

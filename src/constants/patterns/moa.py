@@ -7,16 +7,19 @@ ACTIONS = [
     "agonist",
     "analog",
     "antagonist",
+    "antigen",  # prostate stem cell antigen (PSCA)
     "blocker",
     "blocking antibody",
     "chaperone",
     "conjugate",
+    "protein degrader",
     "degrader",
     "down-?regulator",
     "engager",
     "immuno-?modulator",
     "inducer",
     "inhibitor",
+    "ligase modulator",
     "modulator",
     "potentiator",
     "pro[-\\s]?drug",
@@ -43,8 +46,10 @@ CAR_T_SUFFIXES = [
 ]
 
 CAR_T_INFIXES = [
-    "cd{0-9}{2}",
-    "cd{0-9}{2}xcd{0-9}{2}",
+    "cd[0-9]{2}",
+    "cd]0-9]{2}-cd[0-9]{2}",
+    "cd[0-9]{2}xcd[0-9]{2}",  # CD47xCD20
+    "il[0-9]{1,2}-cd[0-9]{2}",
 ]
 
 BIOLOGIC_SUFFIXES = [
@@ -54,6 +59,7 @@ BIOLOGIC_SUFFIXES = [
     "bispecific",
     "bispecific antibody",
     "cell therapy",
+    "chemotherapy",
     "cytokine",
     "enzyme",
     # "factor",
@@ -78,6 +84,10 @@ BIOLOGIC_SUFFIXES = [
     "tumor[-| ]infiltrating lymphocyte",
     "t[-\\s]?cell engager",
     "tce",
+    "t[-\\s]?cell receptor",
+    "tcr",
+    "t[-\\s]?cell engaging receptor",
+    "tcer",
     "transcription factor",
     "vaccine",
     f"cd{0-9}{2}.+{get_or_re(CAR_T_SUFFIXES)}",
@@ -101,6 +111,7 @@ EFFECTS = [
 MOA_SUFFIXES = [
     *EFFECTS,
     *BIOLOGIC_SUFFIXES,
+    "regimen",
 ]
 
 MOA_INFIXES = [*DRUG_CLASS_TYPE, *CAR_T_INFIXES]

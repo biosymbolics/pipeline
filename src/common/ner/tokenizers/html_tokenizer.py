@@ -11,31 +11,7 @@ from selectolax.parser import HTMLParser, Node
 from spacy.tokenizer import Tokenizer
 from pydash import compact
 
-
-def __get_span_replacer(node: Node) -> str:
-    if len(node.text(deep=False, strip=True)) <= 1:
-        return ""  # weird rule for <span>®</span>
-    return " "
-
-
-# DEFAULT_UNWRAP_MAP = {
-#     "em": "",
-#     "br": " ",
-#     "strong": " ",
-#     "b": " ",
-#     "i": " ",
-#     "a": " ",
-#     "code": " ",
-#     "kbd": " ",
-#     "span": __get_span_replacer,
-#     "td": ", ",
-#     "div": "\n\n",
-#     # "tr": None,
-# }
-
 DEFAULT_REMOVE_TAGS: list[str] = ["script", "style", "hr", "br"]
-
-UnwrapMap = dict[str, Union[str, Callable[[Node], str]]]
 
 
 def join_strings(texts: list[str], separator: str = " ") -> str:
@@ -64,7 +40,6 @@ def element_to_text(node: Node) -> str:
     texts: list[str] = []
     if node.tag == "table":
         texts = [*texts, table_to_text(node)]
-        print("TABLE", table_to_text(node))
     elif node.tag == "tr":
         texts = [*texts, row_to_text(node)]
     elif node.tag == "div":
@@ -104,7 +79,6 @@ class HTMLTokenizer(Tokenizer):
                 element.decompose()
 
         top_level_nodes = parsed_html.root.css("body > *") if parsed_html.root else []
-        print("NODES", top_level_nodes)
         html_texts = [element_to_text(node) for node in top_level_nodes]
         return html_texts
 
