@@ -22,8 +22,8 @@ MOA_PATTERNS: list = [
             },
             {
                 "LOWER": {
-                    "REGEX": f".*{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b" + ".*",
-                },  # idecabtagene vicleucel, lisocabtagene maraleucel (ENTITY vicleucel, )
+                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b",
+                },  # idecabtagene vicleucel, lisocabtagene maraleucel
             },
             {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},

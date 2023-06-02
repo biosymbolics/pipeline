@@ -32,11 +32,11 @@ def __inner_html_tokenizer(nlp: Language) -> Tokenizer:
     """
     prefix_re = __add_tokenization_re(nlp, "prefixes", ["•", "——"])
     suffix_re = __add_tokenization_re(nlp, "suffixes", [":"])
-    infix_re = __add_tokenization_re(nlp, "infixes", ["\\+"])
+    # infix_re = __add_tokenization_re(nlp, "infixes", ["\\+"])
     tokenizer = nlp.tokenizer
     tokenizer.prefix_search = compile_prefix_regex(prefix_re).search
     tokenizer.suffix_search = compile_suffix_regex(suffix_re).search
-    tokenizer.infix_finditer = compile_infix_regex(infix_re).finditer
+    # tokenizer.infix_finditer = compile_infix_regex(infix_re).finditer
     return tokenizer
 
 
