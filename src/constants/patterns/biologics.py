@@ -52,7 +52,7 @@ BIOLOGIC_SUFFIXES = {
     "cel": "cell therapies",  # FP: fiercely
     "cept": "indicates a protein that mimics an immunoglobulin",
     "stim": "colony stimulating factors",
-    "ase": "enzymes",  # FP: disease
+    # "ase": "enzymes",  # FP: disease
     "som": "growht hormone derivatives",
     "cogin": "Blood coagulation cascade inhibitors",
     "cog": "Blood coagulation factors",
@@ -62,7 +62,7 @@ BIOLOGIC_SUFFIXES = {
     "irudin": "Hirudin derivatives",
     "imod": "Immunomodulators",
     "kinra": "Interleukin receptor antagonists ",
-    "kin": "Interleukin type substances",  # FP: Hodgkin
+    # "kin": "Interleukin type substances",  # FP: Hodgkin
     "mab": "mAb",
     "tocin": "Oxytocin derivatives",
     "relin": "Pituitary hormone-release stimulating peptides",

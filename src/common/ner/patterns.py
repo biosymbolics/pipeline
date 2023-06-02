@@ -23,10 +23,13 @@ MOA_PATTERNS: list = [
     *[
         [
             # {"HEAD": { "IN": ["PROPN", "NOUN", "ADJ"] }, "OP": "+"},
-            {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "+"},
             {
-                "LEMMA": {
-                    "REGEX": f"(?i){moa_suffix}",
+                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
+                "OP": "+",
+            },  # otherwise, just "inhibitor" of "xyz inhibitor" is matched
+            {
+                "LOWER": {
+                    "REGEX": "\\b" + f"\\w+{moa_suffix}" + "\\b",
                 },
             },
         ]
@@ -36,7 +39,7 @@ MOA_PATTERNS: list = [
         [
             {
                 "LEMMA": {
-                    "REGEX": f"(?i){moa_infix}",
+                    "REGEX": "\\b" + f"(?i)\\w+{moa_infix}\\w+" + "\\b",
                 },
             },
         ]
@@ -81,10 +84,6 @@ REGULATORY_DESIGNATION_PATTERN = [
 ]
 
 
-BIO_SUFFIX_RE = get_or_re(list(BIOLOGIC_SUFFIXES.keys()))
-BIO_INFIX_RE = get_or_re(list(BIOLOGIC_INFIXES.keys()))
-
-
 # https://www.fda.gov/media/93218/download
 BIOSIMILAR_SUFFIX = "[a-z]{4}"
 
@@ -101,15 +100,15 @@ GLYCOSYLATION_RE = (
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
 # maraleucel)(b, pomalidomide, apixaban, paclitaxel
 BIOLOGIC_REGEXES = [
-    "[a-z]{2,}" + BIO_SUFFIX_RE,
-    "[a-z]{2,}" + BIO_INFIX_RE + "[a-zαβγδ]{2,}",
+    "\\b" + "\\w{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
+    "\\b" + "\\w{2,}" + get_or_re(list(BIOLOGIC_INFIXES.keys())) + "\\w{2,}" + "\\b",
 ]
 
 # Interest expense decreased
 BIOLOGICAL_PATTERNS: list[list[dict]] = [
     [
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
-        {"LOWER": {"REGEX": bio_re}},
+        {"LOWER": {"REGEX": bio_re}, "POS": {"IN": ["PROPN", "NOUN"]}},
         {"LOWER": {"REGEX": GLYCOSYLATION_RE}, "OP": "?"},
         {"LOWER": {"REGEX": BIOSIMILAR_SUFFIX}, "OP": "?"},
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
@@ -117,39 +116,41 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
     for bio_re in BIOLOGIC_REGEXES
 ]
 
-CORE_SMALL_MOLECULE_REGEXES = [
-    "[a-z]+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())),
-    "[a-z]+" + get_or_re(list(SMALL_MOLECULE_INFIXES.keys())) + "[a-zαβγδ]+",
-]
-
 SMALL_MOLECULE_REGEXES = [
-    *CORE_SMALL_MOLECULE_REGEXES,
-    *[
-        f"{sm_re}-{suffix}"
-        for sm_re in CORE_SMALL_MOLECULE_REGEXES
-        for suffix in SMALL_MOLECULE_SUFFIXES.keys()
-    ],
+    "\\b" + "\\w+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
+    "\\b" + "\\w+" + get_or_re(list(SMALL_MOLECULE_INFIXES.keys())) + "\\w+" + "\\b",
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
-    [{"LOWER": {"REGEX": sm_re}}] for sm_re in SMALL_MOLECULE_REGEXES
+    [
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+        {"LOWER": {"REGEX": sm_re}, "POS": {"IN": ["PROPN", "NOUN"]}},
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+    ]
+    for sm_re in SMALL_MOLECULE_REGEXES
 ]
-
 
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "+"},
         {
-            "TEXT": {
-                "REGEX": ".+[®ª^]\\b",
-            },
+            "TEXT": "®",
         },
     ]
 ]
 
+
+ALL_PATTERNS = [
+    *MOA_PATTERNS,
+    *INVESTIGATIONAL_ID_PATTERNS,
+    *BIOLOGICAL_PATTERNS,
+    *SMALL_MOLECULE_PATTERNS,
+]
+
 INTERVENTION_SPACY_PATTERNS = [
-    *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in MOA_PATTERNS],
     *[{"label": "PRODUCT", "pattern": id_re} for id_re in INVESTIGATIONAL_ID_PATTERNS],
     *[{"label": "PRODUCT", "pattern": bio_re} for bio_re in BIOLOGICAL_PATTERNS],
     *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in SMALL_MOLECULE_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": brand_re} for brand_re in BRAND_NAME_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in BRAND_NAME_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in MOA_PATTERNS],
 ]

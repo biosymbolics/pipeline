@@ -33,6 +33,7 @@ def __build_indices(ticker, start_date):
         build_indices(ticker, start_date)
     except Exception as ex:
         logging.error("failure to build kg for %s: %s", ticker, ex)
+        raise ex
 
 
 async def build_sec():

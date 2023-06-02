@@ -3,10 +3,12 @@ Named-entity recognition using spacy
 """
 from typing import Literal
 from spacy.language import Language
+from spacy.tokens import Doc
 from spacy.tokenizer import Tokenizer
 from spacy.util import compile_prefix_regex, compile_suffix_regex
 import logging
-from spacy_html_tokenizer import create_html_tokenizer
+
+from .tokenizers.html_tokenizer import create_html_tokenizer
 
 
 def __add_tokenization_re(
@@ -29,15 +31,12 @@ def __inner_html_tokenizer(nlp: Language) -> Tokenizer:
     """
     Add custom tokenization rules to the spacy tokenizer
     """
-    prefix_re = __add_tokenization_re(nlp, "prefixes", ["•", "--", "——"])
-    suffix_re = __add_tokenization_re(nlp, "suffixes", ["\\)[)^ª]{1,}", ":"])
+    prefix_re = __add_tokenization_re(nlp, "prefixes", ["•", "——"])
+    suffix_re = __add_tokenization_re(nlp, "suffixes", [":"])
     tokenizer = nlp.tokenizer
     tokenizer.prefix_search = compile_prefix_regex(prefix_re).search
     tokenizer.suffix_search = compile_suffix_regex(suffix_re).search
     return tokenizer
-
-
-UNWRAP_TAGS = ["em", "strong", "b", "i", "a", "code", "kbd", "li", "tr", "span"]
 
 
 def get_sec_tokenizer(nlp: Language) -> Tokenizer:
@@ -49,4 +48,4 @@ def get_sec_tokenizer(nlp: Language) -> Tokenizer:
         nlp (Language): spacy language model
     """
     nlp.tokenizer = __inner_html_tokenizer(nlp)
-    return create_html_tokenizer(unwrap_tags=UNWRAP_TAGS)(nlp)
+    return create_html_tokenizer()(nlp)

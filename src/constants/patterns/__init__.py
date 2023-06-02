@@ -4,6 +4,8 @@ Pattern constants
 __all__ = [
     "BIOLOGIC_INFIXES",
     "BIOLOGIC_SUFFIXES",
+    "EFFECTS",
+    "INDICATION_WORDS",
     "MOA_INFIXES",
     "MOA_SUFFIXES",
     "SMALL_MOLECULE_INFIXES",
@@ -11,5 +13,6 @@ __all__ = [
 ]
 
 from .biologics import BIOLOGIC_INFIXES, BIOLOGIC_SUFFIXES
-from .moa import MOA_INFIXES, MOA_SUFFIXES
+from .indication import INDICATION_WORDS
+from .moa import EFFECTS, MOA_INFIXES, MOA_SUFFIXES
 from .small_molecules import SMALL_MOLECULE_INFIXES, SMALL_MOLECULE_SUFFIXES

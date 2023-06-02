@@ -1,5 +1,7 @@
 SMALL_MOLECULE_SUFFIXES = {
+    "aban": "e.g. apixaban",
     "amine": "amine compound",
+    "axel": "e.g. paclitaxel",
     # "ide": "compound or drug",
     # "ium": "cation or compound",
     "ol": "alcohol or compound",
@@ -7,7 +9,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "ium": "metal or compound",
     "azole": "azole antifungal",
     # "ine": "alkaloid or compound",
-    "one": "ketone or compound",
+    # "one": "ketone or compound", # FP: cornerstone
     # "ide": "compound or drug",
     # "in": "alkaloid or compound",
     "ium": "metal or compound",
@@ -15,6 +17,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "oxin": "compound or drug",
     "nib": "small-molecule inhibitor",
     "rin": "compound or drug",
+    # "ten": "e.g. mavacamten" # FP: often
     # Add more suffixes as needed
 }
 
