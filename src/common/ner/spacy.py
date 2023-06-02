@@ -70,15 +70,12 @@ def extract_named_entities(content: list[str]) -> list[str]:
     )  # en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
-    # otherwise "xyz inhibitor" is split into two entities
-    # nlp.add_pipe(
-    #     "merge_entities", after="ner"
-    # )
+    # choosing not to do this (otherwise patterns will require .*)
+    # nlp.add_pipe("merge_entities", after="ner")
 
     ruler = nlp.add_pipe(
         "entity_ruler",
         config={"validate": True, "overwrite_ents": True},
-        # after="merge_entities",
     )
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 

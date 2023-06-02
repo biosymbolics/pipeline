@@ -36,16 +36,13 @@ CONJUGATE_TYPES = [
     "nanoparticle conjugate",
 ]
 
-CAR_T_SUFFIXES = [
+CAR_T_INFIXES = [
     "car[-]?t",
     "car[-]?nk",
     "chimeric antigen receptor (?:(car) )?t[-\\s]?cell?",
     "chimeric antigen receptor (?:(car) )?natural killer cell",
     "bcma nke",
     "nke",
-]
-
-CAR_T_INFIXES = [
     "cd[0-9]{2}",
     "cd]0-9]{2}-cd[0-9]{2}",
     "cd[0-9]{2}xcd[0-9]{2}",  # CD47xCD20
@@ -90,8 +87,6 @@ BIOLOGIC_SUFFIXES = [
     "tcer",
     "transcription factor",
     "vaccine",
-    f"cd{0-9}{2}.+{get_or_re(CAR_T_SUFFIXES)}",
-    *CAR_T_SUFFIXES,
     *CONJUGATE_TYPES,
 ]
 

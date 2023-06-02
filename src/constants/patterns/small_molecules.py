@@ -8,7 +8,7 @@ SMALL_MOLECULE_SUFFIXES = {
     # "ate": "ester or compound",
     "ium": "metal or compound",
     "azole": "azole antifungal",
-    # "ine": "alkaloid or compound",
+    # "ine": "alkaloid or compound", # azacitidine
     # "one": "ketone or compound", # FP: cornerstone
     # "ide": "compound or drug",
     # "in": "alkaloid or compound",

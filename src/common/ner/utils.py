@@ -3,9 +3,8 @@ Named-entity recognition using spacy
 """
 from typing import Literal
 from spacy.language import Language
-from spacy.tokens import Doc
 from spacy.tokenizer import Tokenizer
-from spacy.util import compile_prefix_regex, compile_suffix_regex
+from spacy.util import compile_infix_regex, compile_prefix_regex, compile_suffix_regex
 import logging
 
 from .tokenizers.html_tokenizer import create_html_tokenizer
@@ -33,9 +32,11 @@ def __inner_html_tokenizer(nlp: Language) -> Tokenizer:
     """
     prefix_re = __add_tokenization_re(nlp, "prefixes", ["•", "——"])
     suffix_re = __add_tokenization_re(nlp, "suffixes", [":"])
+    infix_re = __add_tokenization_re(nlp, "infixes", ["\\+"])
     tokenizer = nlp.tokenizer
     tokenizer.prefix_search = compile_prefix_regex(prefix_re).search
     tokenizer.suffix_search = compile_suffix_regex(suffix_re).search
+    tokenizer.infix_finditer = compile_infix_regex(infix_re).finditer
     return tokenizer
 
 

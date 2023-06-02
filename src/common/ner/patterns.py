@@ -22,8 +22,8 @@ MOA_PATTERNS: list = [
             },
             {
                 "LOWER": {
-                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b",
-                },
+                    "REGEX": f".*{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b" + ".*",
+                },  # idecabtagene vicleucel, lisocabtagene maraleucel (ENTITY vicleucel, )
             },
             {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
@@ -82,7 +82,7 @@ REGULATORY_DESIGNATION_PATTERN = [
 
 
 # https://www.fda.gov/media/93218/download
-BIOSIMILAR_SUFFIX = "[a-z]{4}"
+BIOSIMILAR_SUFFIX = "-?[a-z]{4}"
 
 # https://cdn.who.int/media/docs/default-source/international-nonproprietary-names-(inn)/bioreview-2016-final.pdf
 GLYCOSYLATION_MAIN_PATTERNS = ["alfa", "α", "beta", "β", "gamma", "γ", "delta", "δ"]

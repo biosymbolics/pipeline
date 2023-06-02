@@ -3,7 +3,7 @@ Tokenization based on HTML tags
 
 Loosely based on  https://github.com/pmbaumgartner/spacy-html-tokenizer
 """
-from typing import Callable, List, Union
+from typing import List
 
 from spacy.util import registry
 from spacy.tokens import Doc
@@ -15,15 +15,24 @@ DEFAULT_REMOVE_TAGS: list[str] = ["script", "style", "hr", "br"]
 
 
 def join_strings(texts: list[str], separator: str = " ") -> str:
+    """
+    Join a list of strings with a separator
+    """
     return separator.join(compact(texts))
 
 
 def table_to_text(node: Node) -> str:
+    """
+    Convert a table to text
+    """
     rows = node.css("tr")
     return join_strings([row_to_text(row) for row in rows], ".\n ")
 
 
 def row_to_text(node: Node) -> str:
+    """
+    Convert a row to text
+    """
     cells = node.css("td")
     return join_strings(
         [text_node_to_text(cell, ", ") for cell in cells], ", "
@@ -31,12 +40,18 @@ def row_to_text(node: Node) -> str:
 
 
 def text_node_to_text(node: Node, separator: str = " ") -> str:
+    """
+    Convert a text node to text
+    """
     node_text = node.text(deep=True, strip=False, separator=separator)
     node_text = node_text.strip()
     return node_text
 
 
 def element_to_text(node: Node) -> str:
+    """
+    Convert an element to text
+    """
     texts: list[str] = []
     if node.tag == "table":
         texts = [*texts, table_to_text(node)]
@@ -59,6 +74,10 @@ def element_to_text(node: Node) -> str:
 
 
 class HTMLTokenizer(Tokenizer):
+    """
+    Tokenizer for HTML
+    """
+
     def __init__(self, remove_tags: List[str] = DEFAULT_REMOVE_TAGS, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.remove_tags = remove_tags
