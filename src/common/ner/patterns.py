@@ -68,21 +68,6 @@ INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
     ],
 ]
 
-# phase 1, phase i, phase Ise i, phase I
-TRIAL_PHASE_PATTERNS = [
-    {"LOWER": "preclinial"},
-    {"LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}},
-]
-
-TREATMENT_LINE_RE = (
-    "(?:{1-4}[ ]?|{1-4}-{1-4})(?:l|line)+?"  # 1L, 2L, 3L, 4L, 1L+, 2L+, 3L+, 4L+
-)
-
-REGULATORY_DESIGNATION_PATTERN = [
-    {"LOWER": {"IN": ["fast track", "accelerated approval"]}}
-]
-
-
 # https://www.fda.gov/media/93218/download
 BIOSIMILAR_SUFFIX = "-?[a-z]{4}"
 
@@ -136,6 +121,7 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
     for sm_re in SMALL_MOLECULE_REGEXES
 ]
 
+# Additional: infrequent (tf/idf) PROPN?
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
@@ -158,8 +144,9 @@ INTERVENTION_SPACY_PATTERNS = [
     *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in SMALL_MOLECULE_PATTERNS],
     *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in BRAND_NAME_PATTERNS],
     *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in MOA_PATTERNS],
+    # from en_ner_bc5cdr_md model
     {
         "label": "PRODUCT",
         "pattern": [{"ENT_TYPE": "CHEMICAL"}],
-    },  # from en_ner_bc5cdr_md model
+    },
 ]
