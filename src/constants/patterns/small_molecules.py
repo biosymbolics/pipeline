@@ -4,7 +4,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "axel": "e.g. paclitaxel",
     # "ide": "compound or drug",
     # "ium": "cation or compound",
-    "ol": "alcohol or compound",
+    # "ol": "alcohol or compound", # FP: control
     # "ate": "ester or compound",
     "ium": "metal or compound",
     "azole": "azole antifungal",

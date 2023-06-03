@@ -51,7 +51,7 @@ CAR_T_INFIXES = [
 
 BIOLOGIC_SUFFIXES = [
     "adoptive cell transfer",
-    "adjuvant",
+    # "adjuvant", # more likely to be indication (e.g. Stage IB-IIIA Adjuvant NSCLC)
     "antibody",
     "bispecific",
     "bispecific antibody",

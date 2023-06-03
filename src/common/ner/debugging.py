@@ -30,3 +30,10 @@ def print_tokens(docs: list[Doc]):
                 "span:",
                 [child for child in token.children],
             )
+
+
+def serve_ner_viewer(docs: list[Doc]):
+    """
+    Serves the NER viewer
+    """
+    displacy.serve(docs, style="ent", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore

@@ -14,7 +14,7 @@ from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
-from .debugging import print_tokens
+from .debugging import print_tokens, serve_ner_viewer
 from .patterns import INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
@@ -65,9 +65,9 @@ def extract_named_entities(content: list[str]) -> list[str]:
     TODO:
     - POS tagging on SciSpacy
     """
-    nlp: Language = spacy.load(
-        "en_core_sci_scibert"
-    )  # en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+
+    # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+    nlp: Language = spacy.load("en_ner_bc5cdr_md")
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     # choosing not to do this (otherwise patterns will require .*)
@@ -103,6 +103,5 @@ def extract_named_entities(content: list[str]) -> list[str]:
     #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     # ]
     # print(canonical_entities)
-    # displacy.serve(docs, style="dep", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
-    displacy.serve(docs, style="ent", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
+    serve_ner_viewer(docs)
     return []
