@@ -5,7 +5,6 @@ import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.tokens import Span
 from spacy.language import Language
-from spacy import displacy
 from pydash import flatten
 import logging
 
@@ -14,7 +13,7 @@ from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
-from .debugging import print_tokens, serve_ner_viewer
+from .debugging import debug_pipeline, print_tokens, serve_ner_viewer
 from .patterns import INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
@@ -89,11 +88,11 @@ def extract_named_entities(content: list[str]) -> list[str]:
             "no_definition_threshold": 0.7,
         },
     )
-    analysis = nlp.analyze_pipes(pretty=True)
-    logging.debug("About the pipeline: %s", analysis)
+
+    debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
 
-    print_tokens(docs)
+    print_tokens(docs, ["-aamt"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
@@ -103,5 +102,5 @@ def extract_named_entities(content: list[str]) -> list[str]:
     #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     # ]
     # print(canonical_entities)
-    serve_ner_viewer(docs)
+    serve_ner_viewer(docs, "ent")
     return []
