@@ -14,7 +14,7 @@ from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
 from .debugging import debug_pipeline, print_tokens, serve_ner_viewer
-from .patterns import INTERVENTION_SPACY_PATTERNS
+from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
 ENTITY_TYPES = ["PRODUCT"]
@@ -66,7 +66,7 @@ def extract_named_entities(content: list[str]) -> list[str]:
     """
 
     # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-    nlp: Language = spacy.load("en_ner_bc5cdr_md")
+    nlp: Language = spacy.load("en_ner_bc5cdr_md")  # kinase 2
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     # choosing not to do this (otherwise patterns will require .*)
@@ -76,6 +76,8 @@ def extract_named_entities(content: list[str]) -> list[str]:
         "entity_ruler",
         config={"validate": True, "overwrite_ents": True},
     )
+    # order intentional
+    ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 
     nlp.add_pipe(
@@ -92,7 +94,7 @@ def extract_named_entities(content: list[str]) -> list[str]:
     debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
 
-    print_tokens(docs, ["-aamt"])
+    print_tokens(docs, ["-aamt", "allosteric"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)

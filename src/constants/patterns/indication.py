@@ -2,47 +2,85 @@
 Patterns around indications
 """
 
-ONCOLOGY_WORDS = [
+from pydash import flatten
+
+
+ONCOLOGY_REGEXES: list[str] = [
     "cancer",
-    "carcinoma",
     "hematologic malignancy",
     "leukemia",
-    "lymphoma",
     "malignant",
-    "melanoma",
-    "myeloma",
-    "sarcoma",
+    f"\\w+?oma",  # neuroblastoma, etc
+    "solid tumor",
     "tumor",
 ]
 
-STAGES = ["I", "II", "III", "IV"]
-SUB_STAGES = ["a", "b", "c"]
-STAGE_WORDS = [
+STAGES: list[str] = ["I", "II", "III", "IV", "1", "2", "3", "4"]
+SUB_STAGES: list[str] = ["a", "b", "c"]
+STAGE_WORDS: list[str] = [
     *STAGES,
-    *[[f"{stage}{sub_stage}" for sub_stage in SUB_STAGES] for stage in STAGES],
+    *flatten([[f"{stage}{sub_stage}" for sub_stage in SUB_STAGES] for stage in STAGES]),
 ]
-STAGE_TYPES = ["stage", "grade"]
-SEVERITY_WORDS = [
-    "relapsed",
-    "refactory",
+STAGE_TYPES: list[str] = ["stage", "grade"]
+SEVERITY_REGEXES: list[str] = [
+    "accelerated",
+    "advanced",
+    "blast phase",
+    "brittle",
+    "castration[-\\s]resistant",
+    "end[-\\s]stage",
+    "locally advanced",
     "metastatic",
-    *[[f"{type} {word}" for word in STAGE_WORDS] for type in STAGE_TYPES],
+    "mild",
+    "moderate",
+    "moderate[-\\s]to[-\\s]severe",
+    "newly[-\\s]diagnosed",
+    "progressive",
+    "relapsed",
+    "relapsed(?:\\/| or )refractory",
+    "refactory",
+    "recurrent",
+    "relapsing",
+    "relapsing[-\\s]remitting",
+    "severe",
+    "systemic",
+    "treatment[-\\s]naive",
+    "unresectable",
+    *flatten(
+        [[f"{type} {word}(?:-{word})?" for word in STAGE_WORDS] for type in STAGE_TYPES]
+    ),
 ]
 
+LINE_RE = "(?:[1-4](?:st|nd|rd|th)?|(?:first|second|third|forth))"
+FULL_LINE_RE = LINE_RE + "\\s?" + "(?:l|line)" + "\\+?"
+TREATMENT_LINE_RE: str = f"((?:{FULL_LINE_RE})|(?:(?:{LINE_RE}|{FULL_LINE_RE})-{FULL_LINE_RE}))"  # 1L, 1L+, 1st line, first line, 1L-2L, 1L-2L+
 
-INDICATION_MODIFIERS = ["acute", "chronic"]
+INDICATION_MODIFIER_REGEXES: list[str] = [
+    "acute",
+    "chronic",
+    "primary",
+    "secondary",
+    *SEVERITY_REGEXES,
+    TREATMENT_LINE_RE,
+    "adjuvant",
+]
 
-INDICATION_WORDS = [
+# unused
+THERAPEUTIC_AREAS: list[str] = [
+    "cardiovascular",
+    "hematology",
+    "immunology",
+    "infectious disease",
+    "oncology",
+    "neurodegeneration",
+    "neurology",
+]
+
+INDICATION_REGEXES: list[str] = [
     "disease",
     "disorder",
-    "condition",
     "syndrome",
     "autoimmune",
     "failure",
-    *INDICATION_MODIFIERS,
-    *ONCOLOGY_WORDS,
+    *ONCOLOGY_REGEXES,
 ]
-
-TREATMENT_LINE_RE = (
-    "(?:{1-4}[ ]?|{1-4}-{1-4})(?:l|line)+?"  # 1L, 2L, 3L, 4L, 1L+, 2L+, 3L+, 4L+
-)

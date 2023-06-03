@@ -7,6 +7,8 @@ from constants.patterns import (
     MOA_SUFFIXES,
     BIOLOGIC_INFIXES,
     BIOLOGIC_SUFFIXES,
+    INDICATION_REGEXES,
+    INDICATION_MODIFIER_REGEXES,
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
@@ -83,7 +85,6 @@ GLYCOSYLATION_RE = (
 
 
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
-# maraleucel)(b, pomalidomide, apixaban, paclitaxel
 BIOLOGIC_REGEXES = [
     f"{WD_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
     f"{WD_CHAR_RE}{2,}"
@@ -92,7 +93,6 @@ BIOLOGIC_REGEXES = [
     + "\\b",
 ]
 
-# Interest expense decreased
 BIOLOGICAL_PATTERNS: list[list[dict]] = [
     [
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
@@ -139,14 +139,43 @@ ALL_PATTERNS = [
 ]
 
 INTERVENTION_SPACY_PATTERNS = [
-    *[{"label": "PRODUCT", "pattern": id_re} for id_re in INVESTIGATIONAL_ID_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": bio_re} for bio_re in BIOLOGICAL_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in SMALL_MOLECULE_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in BRAND_NAME_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in MOA_PATTERNS],
+    *[
+        {"label": "PRODUCT", "pattern": pattern}
+        for pattern in INVESTIGATIONAL_ID_PATTERNS
+    ],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in SMALL_MOLECULE_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BRAND_NAME_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
     # from en_ner_bc5cdr_md model
     {
         "label": "PRODUCT",
         "pattern": [{"ENT_TYPE": "CHEMICAL"}],
     },
+]
+
+
+"""
+Indication patterns
+"""
+
+INDICATION_REGEXES = [
+    "(?:{WD_CHAR_RE}*\\s)*"
+    + get_or_re(INDICATION_MODIFIER_REGEXES)
+    + "*"
+    + get_or_re(INDICATION_REGEXES)
+    + "+",
+]
+
+INDICATION_PATTERNS: list[list[dict]] = [
+    [
+        {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
+        {"LOWER": {"REGEX": ind_re}},
+        {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
+    ]
+    for ind_re in INDICATION_REGEXES
+]
+
+INDICATION_SPACY_PATTERNS = [
+    *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
 ]
