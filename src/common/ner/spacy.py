@@ -68,7 +68,6 @@ def extract_named_entities(content: list[str]) -> list[str]:
     nlp: Language = spacy.load("en_core_sci_scibert")  # kinase 2
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
-    # choosing not to do this (otherwise patterns will require .*)
     nlp.add_pipe("merge_entities", after="ner")
 
     ruler = nlp.add_pipe(
@@ -76,6 +75,8 @@ def extract_named_entities(content: list[str]) -> list[str]:
         config={"validate": True, "overwrite_ents": True},
         after="merge_entities",
     )
+
+    print(INTERVENTION_SPACY_PATTERNS)
     # order intentional
     ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
@@ -94,7 +95,7 @@ def extract_named_entities(content: list[str]) -> list[str]:
     debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
 
-    print_tokens(docs, ["-aamt", "allosteric"])
+    print_tokens(docs, ["-aamt", "allosteric", "Yervoy", "mab", "tyrosine", "Opdualag"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)

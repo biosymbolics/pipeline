@@ -67,14 +67,17 @@ def serve_ner_viewer(docs: list[Doc], styles: list[ViewerStyle] = ["ent", "dep"]
 
     Args:
         docs (list[Doc]): list of spacy docs
+
+    TODO: type "dep" does not work with en_ner_bc5cdr_md ("assignment destination is read-only")
     """
     init_port = 3332
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     processes = []
     for idx, style in enumerate(styles):
+        my_docs = docs[:]
         process = multiprocessing.Process(
-            target=__serve_displacy, args=(docs, style, init_port + idx)
+            target=__serve_displacy, args=(my_docs, style, init_port + idx)
         )
         processes.append(process)
         process.start()

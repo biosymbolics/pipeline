@@ -66,17 +66,6 @@ INDICATION_MODIFIER_REGEXES: list[str] = [
     "adjuvant",
 ]
 
-# unused
-THERAPEUTIC_AREAS: list[str] = [
-    "cardiovascular",
-    "hematology",
-    "immunology",
-    "infectious disease",
-    "oncology",
-    "neurodegeneration",
-    "neurology",
-]
-
 INDICATION_REGEXES: list[str] = [
     "disease",
     "disorder",
