@@ -16,7 +16,10 @@ from clients.llama_index.indices.vector import get_vector_index
 from .general import query_index
 
 response_schemas = [
-    ResponseSchema(name="name", description="normalized drug or MoA name"),
+    ResponseSchema(
+        name="name", description="normalized, non-proprietary drug or MoA name"
+    ),
+    ResponseSchema(name="brand_name", description="brand name of drug, if avaialble"),
     ResponseSchema(
         name="details", description="all other information about this intervention"
     ),
@@ -27,11 +30,13 @@ def create_entity_index(
     entity: str, vector_index: GPTVectorStoreIndex, namespace: str, index_id: str
 ) -> GPTVectorStoreIndex:
     """
-    Get (or create) the knowledge graph index for a single entity
+    Summarize entity based on the document and persist in an index
 
     Args:
         entity (str): entity name
         vector_index (GPTVectorStoreIndex): vector index to use for lookups
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     query = (
         f"Is {entity} a pharmaceutical compound or mechanism of action? "
@@ -54,7 +59,7 @@ def create_entity_index(
     logging.info("about entity %s: %s", entity, about_entity)
 
     try:
-        entity_obj = json.loads(about_entity)
+        entity_obj = output_parser.parse(about_entity)
     except Exception as ex:
         logging.error("Could not parse entity %s: %s", entity, ex)
         raise ex
@@ -69,7 +74,7 @@ def get_entity_indices(
     entities: list[str], namespace: str, index_id: str, documents: list[str]
 ):
     """
-    For each entity in the provided list, get (or create) the knowledge graph index
+    For each entity in the provided list, summarize based on the document and persist in an index
 
     Args:
         entities (list[str]): list of entities to get indices for
