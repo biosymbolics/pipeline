@@ -14,9 +14,9 @@ from sources.sec.rd_pipeline import fetch_annual_reports
 from common.utils.file import save_as_file
 
 
-def __format_html(doc: str) -> str:
+def __format_for_ner(doc: str) -> str:
     """
-    Format HTML content
+    Format HTML content for NER processing
     - strip styles
     - remove certain characters
     """
@@ -45,14 +45,16 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         try:
             report_url = report.get("linkToHtml")
             formatted_sections = sec_client.extract_sections(
-                report_url, return_type="html", formatter=__format_html
+                report_url, return_type="html", formatter=__format_for_ner
             )
             save_as_file("\n".join(formatted_sections), "sections.txt")
             entities = extract_named_entities(formatted_sections, "spacy")
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
-            # raw html for llamaindex
-            html_sections = sec_client.extract_sections(report_url, return_type="html")
+            # unadulterated html for llamaindex
+            html_sections = sec_client.extract_sections(
+                report_url, return_type="html", formatter=strip_inline_styles
+            )
             get_entity_indices(
                 entities=entities,
                 namespace=ticker,

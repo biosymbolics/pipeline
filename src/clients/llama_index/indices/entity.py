@@ -1,6 +1,7 @@
 """
 Functions specific to knowledge graph indices
 """
+from typing import Optional
 from llama_index import GPTVectorStoreIndex
 from llama_index.output_parsers import LangchainOutputParser
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
@@ -18,17 +19,15 @@ response_schemas = [
     ResponseSchema(name="name", description="normalized drug or MoA name"),
     ResponseSchema(
         name="details_from_doc",
-        description="all other information about this intervention, extracted from the document",
+        description="information about this drug given the context of the document",
     ),
-    ResponseSchema(
-        name="details", description="everything else you know about this intervention"
-    ),
+    ResponseSchema(name="details", description="everything else you know about it"),
 ]
 
 
 def create_entity_index(
     entity: str, vector_index: GPTVectorStoreIndex, namespace: str, index_id: str
-) -> GPTVectorStoreIndex:
+) -> Optional[GPTVectorStoreIndex]:
     """
     Summarize entity based on the document and persist in an index
 
@@ -39,11 +38,12 @@ def create_entity_index(
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     query = (
-        f"Is {entity} a pharmaceutical compound or mechanism of action? "
+        f"Is {entity} a pharmaceutical compound, mechanism of action or other intervention? "
         "If yes, please return information about this drug, such as: "
         "drug class, mechanism of action, indication(s), status, and clinical trials. "
         "If the drug is commercial, please include details about the revenue it generates, competition and prospects for the future. "
         "If the drug is investigational, please include details about its phase of development and probability of success. "
+        "If the drug is discontinued, please include details about the reason for discontinuation and any other relevant information. "
     )
 
     lc_output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
@@ -60,14 +60,16 @@ def create_entity_index(
 
     try:
         entity_obj = output_parser.parse(about_entity)
+        name = entity_obj.get("name") or entity
+        details = entity_obj.get("details")
+        index = get_vector_index(
+            "entities", index_id + f"{namespace}-{name}", [details]
+        )
+        return index
     except Exception as ex:
         logging.error("Could not parse entity %s: %s", entity, ex)
-        raise ex
 
-    name = entity_obj.get("name") or entity
-    details = entity_obj.get("details")
-    index = get_vector_index("entities", index_id + f"{namespace}-{name}", [details])
-    return index
+    return None
 
 
 def get_entity_indices(
