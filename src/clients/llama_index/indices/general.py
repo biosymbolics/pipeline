@@ -72,7 +72,6 @@ def get_or_create_index(
         LlmIndex (LlmIndex): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
     """
-
     index = load_index(namespace, index_id)
     if index:
         return cast(IndexImpl, index)

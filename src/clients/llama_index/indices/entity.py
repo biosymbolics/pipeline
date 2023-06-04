@@ -23,7 +23,7 @@ response_schemas = [
 ]
 
 
-def get_entity_kg_index(
+def create_entity_index(
     entity: str, vector_index: GPTVectorStoreIndex, namespace: str, index_id: str
 ) -> GPTVectorStoreIndex:
     """
@@ -73,6 +73,6 @@ def get_entity_indices(
     """
     index = get_vector_index(namespace, index_id, documents)
     indices = [
-        get_entity_kg_index(entity, index, namespace, index_id) for entity in entities
+        create_entity_index(entity, index, namespace, index_id) for entity in entities
     ]
     return indices

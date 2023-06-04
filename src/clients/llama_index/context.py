@@ -8,6 +8,7 @@ from llama_index import (
     StorageContext,
 )
 from langchain.chat_models import ChatOpenAI
+import logging
 
 # from langchain import OpenAI
 
@@ -22,9 +23,17 @@ def get_storage_context(namespace: str) -> StorageContext:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
     directory = get_persist_dir(namespace)
-    storage_context = (
-        StorageContext.from_defaults()
-    )  # https://github.com/jerryjliu/llama_index/issues/3734
+
+    try:
+        storage_context = StorageContext.from_defaults(persist_dir=directory)
+    except Exception as ex:
+        # assuming this means the directory does not exist
+        # https://github.com/jerryjliu/llama_index/issues/3734
+        logging.info(
+            "Exception when loading storage context; assuming directory does not exist: %s",
+            ex,
+        )
+        storage_context = StorageContext.from_defaults()
     return storage_context
 
 
