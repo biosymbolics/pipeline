@@ -15,16 +15,12 @@ from constants.patterns import (
 
 from common.utils.re import (
     get_or_re,
-    WORD_DIGIT_CHAR_RE as WD_CHAR_RE,
+    wrap,
+    ALPHA_CHARS,
     COPYRIGHT_SYM,
     REGISTERED_SYM,
 )
-
-# end-of-entity regex
-EOE_RE = "\\b" + ".*"
-
-# start-of-entity regex
-SOE_RE = ".*"
+from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
 
 # also ENTITY Opdualag tag: NNP pos: PROPN dep: nmod lemma: Opdualag morph: Number=Sing prob: -20.0 head: approval span: [of, ,, nivolumab, ,]
 MOA_PATTERNS: list = [
@@ -35,13 +31,10 @@ MOA_PATTERNS: list = [
                 "OP": "*",
             },
             {
-                "LOWER": {
-                    "REGEX": SOE_RE + moa_suffix + EOE_RE,
+                "LEMMA": {
+                    "REGEX": get_entity_re(moa_suffix, is_case_insensitive=True),
                 },
             },
-            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: dep lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: Reblozyl span: [(, )]
-            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: ROOT lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: luspatercept-aamt span: [Reblozyl, ,, (, ), ,, 2031, +, lenalidomide, .]
-            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: dep lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: Reblozyl span: [(, )]
             {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
                 "OP": "*",
@@ -57,7 +50,7 @@ MOA_PATTERNS: list = [
             },
             {
                 "LOWER": {
-                    "REGEX": SOE_RE + f"{moa_infix}{WD_CHAR_RE}*" + EOE_RE,
+                    "REGEX": get_entity_re(moa_infix + ALPHA_CHARS("*")),
                 },
             },
             {
@@ -91,53 +84,40 @@ INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
 ]
 
 # https://www.fda.gov/media/93218/download
-BIOSIMILAR_SUFFIX = "-?[a-z]{4}"
+BIOSIMILAR_SUFFIX = "(?:-?[a-z]{4})"
 
 # https://cdn.who.int/media/docs/default-source/international-nonproprietary-names-(inn)/bioreview-2016-final.pdf
 # e.g. alfa-2b
 GLYCOSYLATION_MAIN_PATTERNS = ["alfa", "α", "beta", "β", "gamma", "γ", "delta", "δ"]
 GLYCOSYLATION_SUB_PATTERN = "[1-4]{1}[a-c]{1}"
-GLYCOSYLATION_RE = (
-    "(?:"
-    + "|".join(GLYCOSYLATION_MAIN_PATTERNS)
-    + ")"
-    + f"(?:-{GLYCOSYLATION_SUB_PATTERN})?"
+GLYCOSYLATION_RE = wrap(
+    "\\s?"
+    + get_or_re(GLYCOSYLATION_MAIN_PATTERNS)
+    + f"(?:[-\\s]{GLYCOSYLATION_SUB_PATTERN})?"
 )
 
-
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
+BIO_SUFFIX = BIOSIMILAR_SUFFIX + "?" + GLYCOSYLATION_RE + "?" + EOE_RE
 BIOLOGIC_REGEXES = [
-    SOE_RE + WD_CHAR_RE + "{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + EOE_RE,
-    SOE_RE
-    + WD_CHAR_RE
-    + "{2,}"
-    + get_or_re(list(BIOLOGIC_INFIXES.keys()))
-    + f"{WD_CHAR_RE}{2,}"
-    + EOE_RE,
+    get_suffix_entitiy_re(
+        list(BIOLOGIC_SUFFIXES.keys()), eoe_re=BIO_SUFFIX, prefix_count=2
+    ),
+    get_infix_entity_re(list(BIOLOGIC_INFIXES.keys())),
 ]
 
-# luspatercept-aamt
 BIOLOGICAL_PATTERNS: list[list[dict]] = [
     [
-        # {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
         {"LOWER": {"REGEX": bio_re}},  # , "POS": {"IN": ["PROPN", "NOUN"]}
-        # {"LOWER": {"REGEX": GLYCOSYLATION_RE}, "OP": "?"},
-        {"LOWER": {"REGEX": BIOSIMILAR_SUFFIX}, "OP": "?"},
-        # {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
+        {"LOWER": {"REGEX": GLYCOSYLATION_RE}, "OP": "?"},
+        {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
     ]
     for bio_re in BIOLOGIC_REGEXES
 ]
 
 SMALL_MOLECULE_REGEXES = [
-    SOE_RE
-    + f"{WD_CHAR_RE}+"
-    + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys()))
-    + EOE_RE,
-    SOE_RE
-    + f"{WD_CHAR_RE}+"
-    + get_or_re(list(SMALL_MOLECULE_INFIXES.keys()))
-    + f"{WD_CHAR_RE}+"
-    + EOE_RE,
+    get_suffix_entitiy_re(list(SMALL_MOLECULE_SUFFIXES.keys()), prefix_count="+"),
+    get_infix_entity_re(list(SMALL_MOLECULE_INFIXES.keys()), count="+"),
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
@@ -150,25 +130,26 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
 ]
 
 # Additional: infrequent (tf/idf) PROPN?
+CR_OR_REG_SYM = f"[ ]?[{COPYRIGHT_SYM}{REGISTERED_SYM}©®]"
+BRAND_NAME_RE = get_entity_re(ALPHA_CHARS(5) + CR_OR_REG_SYM, eoe_re=".*")
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
             "TEXT": {
-                "REGEX": SOE_RE
-                + WD_CHAR_RE
-                + "{5,}[ ]?[{COPYRIGHT_SYM}{REGISTERED_SYM}]"
-                + EOE_RE
-            },
+                "REGEX": BRAND_NAME_RE
+            }  # e.g. "Blenrep® (belantamab mafodotin-blmf)"
         },
-    ]
-]
-
-
-ALL_PATTERNS = [
-    *MOA_PATTERNS,
-    *INVESTIGATIONAL_ID_PATTERNS,
-    *BIOLOGICAL_PATTERNS,
-    *SMALL_MOLECULE_PATTERNS,
+    ],
+    [
+        {
+            "POS": {"IN": ["PROPN", "NOUN"]},
+        },
+        {
+            "TEXT": {
+                "REGEX": CR_OR_REG_SYM + ".*"
+            },  # in "XYZ ® blah", the space after the mark is not recognized as \b
+        },  # e.g. "Blenrep ®" as two different entities
+    ],
 ]
 
 INTERVENTION_SPACY_PATTERNS = [
@@ -193,18 +174,18 @@ Indication patterns
 """
 
 INDICATION_REGEXES = [
-    f"(?:{WD_CHAR_RE}*\\s)*"
-    + get_or_re(INDICATION_MODIFIER_REGEXES)
-    + "*"
-    + get_or_re(INDICATION_REGEXES)
-    + "+"
-    + EOE_RE,
+    get_entity_re(
+        get_or_re(INDICATION_MODIFIER_REGEXES, "*")
+        + get_or_re(INDICATION_REGEXES, "+"),
+        soe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
+        is_case_insensitive=True,
+    ),
 ]
 
 INDICATION_PATTERNS: list[list[dict]] = [
     [
         {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
-        {"LOWER": {"REGEX": ind_re}},
+        {"LEMMA": {"REGEX": ind_re}},
         {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
     ]
     for ind_re in INDICATION_REGEXES
@@ -212,4 +193,16 @@ INDICATION_PATTERNS: list[list[dict]] = [
 
 INDICATION_SPACY_PATTERNS = [
     *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
+]
+
+
+"""
+All patterns
+"""
+
+ALL_PATTERNS = [
+    *MOA_PATTERNS,
+    *INVESTIGATIONAL_ID_PATTERNS,
+    *BIOLOGICAL_PATTERNS,
+    *SMALL_MOLECULE_PATTERNS,
 ]
