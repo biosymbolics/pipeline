@@ -51,6 +51,20 @@ def __load_index_or_indices(
         return None
 
 
+def maybe_load_index(namespace: str, index_id: str) -> Optional[LlmIndex]:
+    """
+    Load index if present, otherwise return none
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+    """
+    try:
+        return load_index(namespace, index_id)
+    except Exception:
+        return None
+
+
 def load_index(namespace: str, index_id: str) -> LlmIndex:
     """
     Load persisted index

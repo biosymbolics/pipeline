@@ -41,14 +41,13 @@ def get_service_context():
     """
     Get default service context for llllamama index
     """
-    max_input_size = 4096
-    num_output = 3072  # 2048
-    max_chunk_overlap = 20
-    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+    prompt_helper = PromptHelper(
+        context_window=4096, num_output=1024, chunk_overlap_ratio=0.1
+    )
 
     llm_predictor = LLMPredictor(
         llm=ChatOpenAI(
-            temperature=0, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
+            temperature=0.3, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
         )
         # llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=1000)
     )

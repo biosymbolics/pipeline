@@ -5,6 +5,7 @@ Workflows for building up sec data
 import asyncio
 from datetime import datetime
 import logging
+import os
 
 from sources.sec.build import build_indices
 
@@ -32,8 +33,7 @@ def __build_indices(ticker, start_date):
     try:
         build_indices(ticker, start_date)
     except Exception as ex:
-        logging.error("failure to build kg for %s: %s", ticker, ex)
-        raise ex
+        logging.error("failure to build index for %s: %s", ticker, ex)
 
 
 async def build_sec():
@@ -57,4 +57,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     asyncio.run(main())

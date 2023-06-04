@@ -53,7 +53,7 @@ def create_entity_index(
     )
     logging.info("about entity %s: %s", entity, about_entity)
 
-    name = about_entity.get("name")
+    name = about_entity.get("name") or entity
     details = about_entity.get("details")
     index = get_vector_index("entities", index_id + f"{namespace}-{name}", [details])
     return index

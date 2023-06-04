@@ -7,7 +7,7 @@ from llama_index import Document, QuestionAnswerPrompt, Response, RefinePrompt
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from clients.llama_index.context import get_service_context, get_storage_context
-from clients.llama_index.persistence import load_index, persist_index
+from clients.llama_index.persistence import maybe_load_index, persist_index
 
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
@@ -24,7 +24,7 @@ def get_index(
         namespace (str): namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    index = load_index(namespace, index_id)
+    index = maybe_load_index(namespace, index_id)
     if index:
         return index
     raise Exception("Index not found")
@@ -42,6 +42,8 @@ def query_index(
     Args:
         index (LlmIndex): llama index
         query (str): natural language query
+        prompt (QuestionAnswerPrompt): prompt to use for query (optional)
+        refine_prompt (RefinePrompt): prompt to use for refine (optional)
     """
     query_engine = index.as_query_engine(
         text_qa_template=prompt,
@@ -72,7 +74,7 @@ def get_or_create_index(
         LlmIndex (LlmIndex): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
     """
-    index = load_index(namespace, index_id)
+    index = maybe_load_index(namespace, index_id)
     if index:
         return cast(IndexImpl, index)
 
