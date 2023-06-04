@@ -1,3 +1,7 @@
+"""
+Constants related to Biologic drugs
+"""
+
 CELL_THERAPY_PRODUCT_INFIXES = {
     "den": "dendritic cells",
     "mio": "myoblasts",
@@ -73,6 +77,7 @@ BIOLOGIC_SUFFIXES = {
     "tide": "",
     "actide": "Synthetic polypeptides with a corticotropin-like action",
 }
+
 BIOLOGIC_INFIXES = {
     "apt": "aptamers",
     "siran": "Small interfering RNA ",

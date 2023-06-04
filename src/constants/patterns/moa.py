@@ -1,4 +1,9 @@
-from common.utils.re import get_or_re
+"""
+Patterns related to generic mechanisms of action
+
+TODO: car-ts belong in biologics
+"""
+from common.utils.re import ALPHA_CHARS
 
 
 ACTIONS = [
@@ -14,9 +19,9 @@ ACTIONS = [
     "conjugate",
     "protein degrader",
     "degrader",
-    "down-?regulator",
+    "down[-\\s]?regulator",
     "engager",
-    "immuno-?modulator",
+    "immuno[-\\s]?modulator",
     "inducer",
     "inhibitor",
     "ligase modulator",
@@ -25,27 +30,28 @@ ACTIONS = [
     "pro[-\\s]?drug",
     "stimulator",
     "suppressor",
-    "up-?regulator",
+    "up[-\\s]?regulator",
 ]
 
 CONJUGATE_TYPES = [
-    "antibody[-]?drug conjugate",
+    "antibody[-\\s]?drug conjugate",
     "adc",
-    "peptide[-]?drug conjugate",
+    "peptide[-\\s]?drug conjugate",
     "prodrug conjugate",
     "nanoparticle conjugate",
 ]
 
 CAR_T_INFIXES = [
-    "car[-]?t",
-    "car[-]?nk",
-    "chimeric antigen receptor (?:(car) )?t[-\\s]?cell?",
-    "chimeric antigen receptor (?:(car) )?natural killer cell",
+    "car[-\\s]?t",
+    "car[-\\s]?nk",
+    "chimeric antigen receptor.*",
     "bcma nke",
     "nke",
-    "cd[0-9]{2}",
-    "cd]0-9]{2}-cd[0-9]{2}",
-    "cd[0-9]{2}xcd[0-9]{2}",  # CD47xCD20
+    "natural killer cells",
+    "cd[0-9]{1,2}",
+    "cd[0-9]{1,2}-cd[0-9]{2}",
+    "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20
+    "cd[0-9]{1,2}x[A-Z]{3,6}",  # CD3xPSCA
     "il[0-9]{1,2}-cd[0-9]{2}",
 ]
 
@@ -65,7 +71,7 @@ BIOLOGIC_SUFFIXES = [
     "fc",
     "fc[-\\s]fusion(?: protein)?",
     "fusion protein",
-    "gene (?:[a-z]+ )?therapy",
+    f"gene (?:{ALPHA_CHARS(4)}\\s?)?therapy",
     "growth factor",
     "hormone",
     "monoclonal antibody",
@@ -78,7 +84,7 @@ BIOLOGIC_SUFFIXES = [
     "protein",
     "sirna",
     "stem cell transplant",
-    "tumor[-| ]infiltrating lymphocyte",
+    "tumor[-\\s]infiltrating lymphocyte",
     "t[-\\s]?cell engager",
     "tce",
     "t[-\\s]?cell receptor",
@@ -91,9 +97,9 @@ BIOLOGIC_SUFFIXES = [
 ]
 
 DRUG_CLASS_TYPE = [
-    "anti[-]?[a-z].+ agent",
-    "anti[-]?[a-z].+s",
-    "anti-[a-z0-9]+",
+    f"anti[-\\s]?{ALPHA_CHARS('+')} agent",
+    f"anti[-\\s]?{ALPHA_CHARS('+')}s",
+    f"anti-{ALPHA_CHARS('+')}",
 ]
 
 EFFECTS = [
