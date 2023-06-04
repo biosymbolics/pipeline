@@ -6,7 +6,6 @@ from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' p
 from spacy.tokens import Span
 from spacy.language import Language
 from pydash import flatten
-import logging
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
@@ -66,15 +65,16 @@ def extract_named_entities(content: list[str]) -> list[str]:
     """
 
     # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-    nlp: Language = spacy.load("en_ner_bc5cdr_md")  # kinase 2
+    nlp: Language = spacy.load("en_core_sci_scibert")  # kinase 2
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     # choosing not to do this (otherwise patterns will require .*)
-    # nlp.add_pipe("merge_entities", after="ner")
+    nlp.add_pipe("merge_entities", after="ner")
 
     ruler = nlp.add_pipe(
         "entity_ruler",
         config={"validate": True, "overwrite_ents": True},
+        after="merge_entities",
     )
     # order intentional
     ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
@@ -104,5 +104,5 @@ def extract_named_entities(content: list[str]) -> list[str]:
     #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     # ]
     # print(canonical_entities)
-    serve_ner_viewer(docs, "ent")
+    serve_ner_viewer(docs)
     return []

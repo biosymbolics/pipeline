@@ -18,13 +18,10 @@ from common.utils.re import get_or_re, WORD_DIGIT_CHAR_RE as WD_CHAR_RE
 MOA_PATTERNS: list = [
     *[
         [
-            {
-                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
-                "OP": "*",
-            },
+            # { "OP": "*" },
             {
                 "LOWER": {
-                    "REGEX": f"{WD_CHAR_RE}*{moa_suffix}" + "\\b",
+                    "REGEX": f".*{moa_suffix}" + "\\b",
                 },  # idecabtagene vicleucel, lisocabtagene maraleucel, luspatercept-aamt
             },
             # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: dep lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: Reblozyl span: [(, )]
@@ -41,8 +38,12 @@ MOA_PATTERNS: list = [
         [
             {
                 "LOWER": {
-                    "REGEX": f"{WD_CHAR_RE}*{moa_infix}{WD_CHAR_RE}*" + "\\b",
+                    "REGEX": f".*{moa_infix}{WD_CHAR_RE}*" + "\\b",
                 },
+            },
+            {
+                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
+                "OP": "*",
             },
         ]
         for moa_infix in MOA_INFIXES
@@ -86,8 +87,8 @@ GLYCOSYLATION_RE = (
 
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
 BIOLOGIC_REGEXES = [
-    f"{WD_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
-    f"{WD_CHAR_RE}{2,}"
+    f".*{WD_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
+    f".*{WD_CHAR_RE}{2,}"
     + get_or_re(list(BIOLOGIC_INFIXES.keys()))
     + f"{WD_CHAR_RE}{2,}"
     + "\\b",
@@ -105,8 +106,8 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
 ]
 
 SMALL_MOLECULE_REGEXES = [
-    f"{WD_CHAR_RE}+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
-    f"{WD_CHAR_RE}+"
+    f".*{WD_CHAR_RE}+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
+    f".*{WD_CHAR_RE}+"
     + get_or_re(list(SMALL_MOLECULE_INFIXES.keys()))
     + f"{WD_CHAR_RE}+"
     + "\\b",
@@ -125,7 +126,7 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
-            "TEXT": {"REGEX": f"{WD_CHAR_RE}{5,}[ ]?®"},
+            "TEXT": {"REGEX": f".*{WD_CHAR_RE}{5,}[ ]?®"},
         },
     ]
 ]

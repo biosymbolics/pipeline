@@ -25,6 +25,7 @@ STAGE_TYPES: list[str] = ["stage", "grade"]
 SEVERITY_REGEXES: list[str] = [
     "accelerated",
     "advanced",
+    "anaplastic",
     "blast phase",
     "brittle",
     "castration[-\\s]resistant",
