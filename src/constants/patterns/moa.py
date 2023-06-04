@@ -47,7 +47,9 @@ CAR_T_INFIXES = [
     "chimeric antigen receptor.*",
     "bcma nke",
     "nke",
-    "natural killer cells",
+    "natural killer(?: cells)?",
+    "nkt(?: cells)?",
+    "nkc",
     "cd[0-9]{1,2}",
     "cd[0-9]{1,2}-cd[0-9]{2}",
     "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20

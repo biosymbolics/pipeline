@@ -31,8 +31,8 @@ MOA_PATTERNS: list = [
                 "OP": "*",
             },
             {
-                "LOWER": {
-                    "REGEX": get_entity_re(moa_suffix),
+                "LEMMA": {
+                    "REGEX": get_entity_re(moa_suffix, is_case_insensitive=True),
                 },
             },
             {
@@ -110,7 +110,6 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
         {"LOWER": {"REGEX": bio_re}},  # , "POS": {"IN": ["PROPN", "NOUN"]}
         {"LOWER": {"REGEX": GLYCOSYLATION_RE}, "OP": "?"},
-        {"LOWER": {"REGEX": BIOSIMILAR_SUFFIX}, "OP": "?"},
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
     ]
     for bio_re in BIOLOGIC_REGEXES
@@ -131,8 +130,8 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
 ]
 
 # Additional: infrequent (tf/idf) PROPN?
-CR_OR_REG_SYM = f"[ ]?[{COPYRIGHT_SYM}{REGISTERED_SYM}]"
-BRAND_NAME_RE = get_entity_re(ALPHA_CHARS(5) + CR_OR_REG_SYM)
+CR_OR_REG_SYM = f"[ ]?[{COPYRIGHT_SYM}{REGISTERED_SYM}©®]"
+BRAND_NAME_RE = get_entity_re(ALPHA_CHARS(5) + CR_OR_REG_SYM, eoe_re=".*")
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
@@ -143,11 +142,13 @@ BRAND_NAME_PATTERNS: list[list[dict]] = [
     ],
     [
         {
-            "POS": {"IN": ["PROPN"]},
+            "POS": {"IN": ["PROPN", "NOUN"]},
         },
         {
-            "TEXT": {"REGEX": CR_OR_REG_SYM + EOE_RE},
-        },  # e.g. "Blenrep ®" (as two different entities)
+            "TEXT": {
+                "REGEX": CR_OR_REG_SYM + ".*"
+            },  # in "XYZ ® blah", the space after the mark is not recognized as \b
+        },  # e.g. "Blenrep ®" as two different entities
     ],
 ]
 
