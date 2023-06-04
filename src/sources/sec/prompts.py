@@ -77,3 +77,24 @@ BIOMEDICAL_TRIPLET_EXTRACT_TMPL = (
 BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
     BIOMEDICAL_TRIPLET_EXTRACT_TMPL
 )
+
+BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
+    BIOMEDICAL_TRIPLET_EXTRACT_TMPL
+)
+
+BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_TMPL = (
+    "Details about a product are provided below. "
+    "Extract related attributes (objects) of interest include:\n"
+    " - status: investigational, commercial, LOE, phase, submitted\n"
+    " - indications\n"
+    " - mechanisms of action\n"
+    " - synonyms\n"
+    " - probability of success\n"
+    "Return a maximum of {max_knowledge_triplets}.\n"
+    "Text: {text}\n"
+    "Triplets:\n"
+)
+
+BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
+    BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_TMPL
+)

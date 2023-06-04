@@ -48,6 +48,11 @@ def print_tokens(docs: list[Doc], lemma_suffixes: list[str] = ["ucel", "mab", "n
 def __serve_displacy(docs: list[Doc], style: ViewerStyle, port: int):
     """
     Serves the displacy viewer
+
+    Args:
+        docs (list[Doc]): list of spacy docs
+        style (ViewerStyle): style of the viewer
+        port (int): port to serve on
     """
     displacy.serve(
         docs,
@@ -82,8 +87,8 @@ def serve_ner_viewer(docs: list[Doc], styles: list[ViewerStyle] = ["ent", "dep"]
         processes.append(process)
         process.start()
 
-    for process in processes:
-        process.join()
+    # for process in processes:
+    #     process.join()
 
 
 def show_pipeline(nlp: Language):

@@ -1,11 +1,12 @@
 """
 Functions specific to knowledge graph indices
 """
-from llama_index import Response
+from llama_index import GPTVectorStoreIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
+from clients.llama_index.indices.vector import get_vector_index
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
-from .general import get_or_create_index
+from .general import get_or_create_index, query_index
 
 MAX_TRIPLES = 400
 
@@ -23,10 +24,8 @@ def create_and_query_kg_index(
         documents (Document): list of llama_index Documents
     """
     index = get_kg_index(namespace, index_key, documents)
-    response = index.as_query_engine().query(query)
-    if not isinstance(response, Response) or not response.response:
-        raise Exception("Could not parse response")
-    return response.response
+    answer = query_index(index, query)
+    return answer
 
 
 def get_kg_index(

@@ -14,9 +14,10 @@ THERAPEUTIC_AREAS: list[str] = [
 ]
 
 # phase 1, phase i, phase I
+PHASE_RE = "phase (?:[0-4]|i{1,3}|iv)+"
 TRIAL_PHASE_PATTERNS = [
     {"LOWER": "preclinial"},
-    {"LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}},
+    {"LOWER": {"REGEX": PHASE_RE}},
 ]
 
 REGULATORY_DESIGNATION_PATTERN = [

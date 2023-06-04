@@ -51,13 +51,11 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             entities = extract_named_entities(sections, "spacy")
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
-            # if not entities:
-            #     logging.warning("No entities found for %s", ticker)
-            #     index = get_keyword_index(
-            #         namespace=ticker,
-            #         index_id=report.get("periodOfReport"),
-            #         documents=sections,
-            #     )
+            index = get_keyword_index(
+                namespace=ticker,
+                index_id=report.get("periodOfReport"),
+                documents=sections,
+            )
         except Exception as ex:
             logging.error("Error creating index for %s: %s", ticker, ex)
             raise ex

@@ -79,6 +79,6 @@ BIOLOGIC_SUFFIXES = {
 }
 
 BIOLOGIC_INFIXES = {
-    "apt": "aptamers",
+    # "apt": "aptamers", # FP: chapters
     "siran": "Small interfering RNA ",
 }

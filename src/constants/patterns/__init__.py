@@ -9,6 +9,7 @@ __all__ = [
     "INDICATION_MODIFIER_REGEXES",
     "MOA_INFIXES",
     "MOA_SUFFIXES",
+    "PHASE_RE",
     "SMALL_MOLECULE_INFIXES",
     "SMALL_MOLECULE_SUFFIXES",
 ]
@@ -16,4 +17,5 @@ __all__ = [
 from .biologics import BIOLOGIC_INFIXES, BIOLOGIC_SUFFIXES
 from .indication import INDICATION_MODIFIER_REGEXES, INDICATION_REGEXES
 from .moa import EFFECTS, MOA_INFIXES, MOA_SUFFIXES
+from .other import PHASE_RE
 from .small_molecules import SMALL_MOLECULE_INFIXES, SMALL_MOLECULE_SUFFIXES
