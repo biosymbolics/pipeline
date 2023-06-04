@@ -86,7 +86,7 @@ def serve_ner_viewer(docs: list[Doc], styles: list[ViewerStyle] = ["ent", "dep"]
         process.join()
 
 
-def debug_pipeline(nlp: Language):
+def show_pipeline(nlp: Language):
     """
     Logs debugging info about the nlp pipeline
 
@@ -95,3 +95,16 @@ def debug_pipeline(nlp: Language):
     """
     analysis = nlp.analyze_pipes(pretty=True)
     logging.debug("About the pipeline: %s", analysis)
+
+
+def debug_pipeline(docs: list[Doc], nlp: Language):
+    """
+    Shows debugging info about the nlp pipeline
+
+    Args:
+        docs (list[Doc]): list of spacy docs
+        nlp (Language): spacy nlp pipeline
+    """
+    show_pipeline(nlp)
+    print_tokens(docs, ["-aamt", "allosteric", "Yervoy", "mab", "tyrosine", "Opdualag"])
+    serve_ner_viewer(docs)

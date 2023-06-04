@@ -12,7 +12,7 @@ from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
-from .debugging import debug_pipeline, print_tokens, serve_ner_viewer
+from .debugging import debug_pipeline
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
@@ -59,13 +59,10 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     Args:
         content (list[str]): list of content on which to do NER
-
-    TODO:
-    - POS tagging on SciSpacy
     """
 
     # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-    nlp: Language = spacy.load("en_core_sci_scibert")  # kinase 2
+    nlp: Language = spacy.load("en_core_sci_scibert")
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     nlp.add_pipe("merge_entities", after="ner")
@@ -76,7 +73,6 @@ def extract_named_entities(content: list[str]) -> list[str]:
         after="merge_entities",
     )
 
-    print(INTERVENTION_SPACY_PATTERNS)
     # order intentional
     ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
@@ -92,18 +88,16 @@ def extract_named_entities(content: list[str]) -> list[str]:
         },
     )
 
-    debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
-
-    print_tokens(docs, ["-aamt", "allosteric", "Yervoy", "mab", "tyrosine", "Opdualag"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
     canonical_entities = __get_canonical_entities(entities, linker)
 
-    # entity_strings = [
-    #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
-    # ]
-    # print(canonical_entities)
-    serve_ner_viewer(docs)
-    return []
+    entity_strings = [
+        entity.text for entity in entities if entity.label_ in ENTITY_TYPES
+    ]
+    print(canonical_entities)
+
+    debug_pipeline(docs, nlp)
+    return entity_strings
