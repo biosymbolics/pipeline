@@ -5,17 +5,15 @@ import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.tokens import Span
 from spacy.language import Language
-from spacy import displacy
 from pydash import flatten
-import logging
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
-from .debugging import print_tokens
-from .patterns import INTERVENTION_SPACY_PATTERNS
+from .debugging import debug_pipeline, print_tokens, serve_ner_viewer
+from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
 ENTITY_TYPES = ["PRODUCT"]
@@ -65,18 +63,21 @@ def extract_named_entities(content: list[str]) -> list[str]:
     TODO:
     - POS tagging on SciSpacy
     """
-    nlp: Language = spacy.load(
-        "en_core_sci_scibert"
-    )  # en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+
+    # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+    nlp: Language = spacy.load("en_core_sci_scibert")  # kinase 2
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     # choosing not to do this (otherwise patterns will require .*)
-    # nlp.add_pipe("merge_entities", after="ner")
+    nlp.add_pipe("merge_entities", after="ner")
 
     ruler = nlp.add_pipe(
         "entity_ruler",
         config={"validate": True, "overwrite_ents": True},
+        after="merge_entities",
     )
+    # order intentional
+    ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
 
     nlp.add_pipe(
@@ -89,11 +90,11 @@ def extract_named_entities(content: list[str]) -> list[str]:
             "no_definition_threshold": 0.7,
         },
     )
-    analysis = nlp.analyze_pipes(pretty=True)
-    logging.debug("About the pipeline: %s", analysis)
+
+    debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
 
-    print_tokens(docs)
+    print_tokens(docs, ["-aamt", "allosteric"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
@@ -103,6 +104,5 @@ def extract_named_entities(content: list[str]) -> list[str]:
     #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
     # ]
     # print(canonical_entities)
-    # displacy.serve(docs, style="dep", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
-    displacy.serve(docs, style="ent", options={"fine_grained": True, "add_lemma": True}, port=3333)  # type: ignore
+    serve_ner_viewer(docs)
     return []

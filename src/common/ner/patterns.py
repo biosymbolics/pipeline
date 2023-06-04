@@ -7,24 +7,26 @@ from constants.patterns import (
     MOA_SUFFIXES,
     BIOLOGIC_INFIXES,
     BIOLOGIC_SUFFIXES,
+    INDICATION_REGEXES,
+    INDICATION_MODIFIER_REGEXES,
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
 
-from common.utils.re import get_or_re, WORD_DIGIT_CHAR_RE
+from common.utils.re import get_or_re, WORD_DIGIT_CHAR_RE as WD_CHAR_RE
 
 MOA_PATTERNS: list = [
     *[
         [
-            {
-                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
-                "OP": "*",
-            },
+            # { "OP": "*" },
             {
                 "LOWER": {
-                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_suffix}" + "\\b",
-                },  # idecabtagene vicleucel, lisocabtagene maraleucel
+                    "REGEX": f".*{moa_suffix}" + "\\b",
+                },  # idecabtagene vicleucel, lisocabtagene maraleucel, luspatercept-aamt
             },
+            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: dep lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: Reblozyl span: [(, )]
+            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: ROOT lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: luspatercept-aamt span: [Reblozyl, ,, (, ), ,, 2031, +, lenalidomide, .]
+            # UNKNOWN luspatercept-aamt tag: JJ pos: ADJ dep: dep lemma: luspatercept-aamt morph: Degree=Pos prob: -20.0 head: Reblozyl span: [(, )]
             {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
                 "OP": "*",
@@ -36,9 +38,12 @@ MOA_PATTERNS: list = [
         [
             {
                 "LOWER": {
-                    "REGEX": f"{WORD_DIGIT_CHAR_RE}*{moa_infix}{WORD_DIGIT_CHAR_RE}*"
-                    + "\\b",
+                    "REGEX": f".*{moa_infix}{WD_CHAR_RE}*" + "\\b",
                 },
+            },
+            {
+                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
+                "OP": "*",
             },
         ]
         for moa_infix in MOA_INFIXES
@@ -66,21 +71,6 @@ INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
     ],
 ]
 
-# phase 1, phase i, phase Ise i, phase I
-TRIAL_PHASE_PATTERNS = [
-    {"LOWER": "preclinial"},
-    {"LOWER": {"REGEX": "phase (?:[0-4]|i{1,3}|iv)+"}},
-]
-
-TREATMENT_LINE_RE = (
-    "(?:{1-4}[ ]?|{1-4}-{1-4})(?:l|line)+?"  # 1L, 2L, 3L, 4L, 1L+, 2L+, 3L+, 4L+
-)
-
-REGULATORY_DESIGNATION_PATTERN = [
-    {"LOWER": {"IN": ["fast track", "accelerated approval"]}}
-]
-
-
 # https://www.fda.gov/media/93218/download
 BIOSIMILAR_SUFFIX = "-?[a-z]{4}"
 
@@ -96,16 +86,14 @@ GLYCOSYLATION_RE = (
 
 
 # ipilimumab, elotuzumab, relatlimab-rmbw (relatlimab), mavacamten, elotuzumab, luspatercept-aamt, deucravacitinib
-# maraleucel)(b, pomalidomide, apixaban, paclitaxel
 BIOLOGIC_REGEXES = [
-    f"{WORD_DIGIT_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
-    f"{WORD_DIGIT_CHAR_RE}{2,}"
+    f".*{WD_CHAR_RE}{2,}" + get_or_re(list(BIOLOGIC_SUFFIXES.keys())) + "\\b",
+    f".*{WD_CHAR_RE}{2,}"
     + get_or_re(list(BIOLOGIC_INFIXES.keys()))
-    + f"{WORD_DIGIT_CHAR_RE}{2,}"
+    + f"{WD_CHAR_RE}{2,}"
     + "\\b",
 ]
 
-# Interest expense decreased
 BIOLOGICAL_PATTERNS: list[list[dict]] = [
     [
         {"POS": {"IN": ["PROPN", "NOUN"]}, "OP": "*"},
@@ -118,10 +106,10 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
 ]
 
 SMALL_MOLECULE_REGEXES = [
-    f"{WORD_DIGIT_CHAR_RE}+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
-    f"{WORD_DIGIT_CHAR_RE}+"
+    f".*{WD_CHAR_RE}+" + get_or_re(list(SMALL_MOLECULE_SUFFIXES.keys())) + "\\b",
+    f".*{WD_CHAR_RE}+"
     + get_or_re(list(SMALL_MOLECULE_INFIXES.keys()))
-    + f"{WORD_DIGIT_CHAR_RE}+"
+    + f"{WD_CHAR_RE}+"
     + "\\b",
 ]
 
@@ -134,10 +122,11 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
     for sm_re in SMALL_MOLECULE_REGEXES
 ]
 
+# Additional: infrequent (tf/idf) PROPN?
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
         {
-            "TEXT": {"REGEX": f"{WORD_DIGIT_CHAR_RE}{5,}[ ]?®"},
+            "TEXT": {"REGEX": f".*{WD_CHAR_RE}{5,}[ ]?®"},
         },
     ]
 ]
@@ -151,9 +140,43 @@ ALL_PATTERNS = [
 ]
 
 INTERVENTION_SPACY_PATTERNS = [
-    *[{"label": "PRODUCT", "pattern": id_re} for id_re in INVESTIGATIONAL_ID_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": bio_re} for bio_re in BIOLOGICAL_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in SMALL_MOLECULE_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": sme_re} for sme_re in BRAND_NAME_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": moa_re} for moa_re in MOA_PATTERNS],
+    *[
+        {"label": "PRODUCT", "pattern": pattern}
+        for pattern in INVESTIGATIONAL_ID_PATTERNS
+    ],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in SMALL_MOLECULE_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BRAND_NAME_PATTERNS],
+    *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
+    # from en_ner_bc5cdr_md model
+    {
+        "label": "PRODUCT",
+        "pattern": [{"ENT_TYPE": "CHEMICAL"}],
+    },
+]
+
+
+"""
+Indication patterns
+"""
+
+INDICATION_REGEXES = [
+    "(?:{WD_CHAR_RE}*\\s)*"
+    + get_or_re(INDICATION_MODIFIER_REGEXES)
+    + "*"
+    + get_or_re(INDICATION_REGEXES)
+    + "+",
+]
+
+INDICATION_PATTERNS: list[list[dict]] = [
+    [
+        {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
+        {"LOWER": {"REGEX": ind_re}},
+        {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
+    ]
+    for ind_re in INDICATION_REGEXES
+]
+
+INDICATION_SPACY_PATTERNS = [
+    *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
 ]

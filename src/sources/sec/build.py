@@ -47,6 +47,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             sections = sec_client.extract_sections(
                 report_url, return_type="html", formatter=__format_html
             )
+            save_as_file("\n".join(sections), "sections.txt")
             entities = extract_named_entities(sections, "spacy")
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
