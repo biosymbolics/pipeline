@@ -10,6 +10,7 @@ from llama_index.prompts.default_prompts import (
     DEFAULT_REFINE_PROMPT_TMPL,
 )
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+import logging
 
 from clients.llama_index.indices.vector import get_vector_index
 from .general import query_index
@@ -50,6 +51,7 @@ def get_entity_kg_index(
     about_entity = json.loads(
         query_index(vector_index, query, prompt=qa_prompt, refine_prompt=refine_prompt)
     )
+    logging.info("about entity %s: %s", entity, about_entity)
 
     name = about_entity.get("name")
     details = about_entity.get("details")
@@ -57,7 +59,7 @@ def get_entity_kg_index(
     return index
 
 
-def get_entity_kg_indices(
+def get_entity_indices(
     entities: list[str], namespace: str, index_id: str, documents: list[str]
 ):
     """

@@ -1,7 +1,6 @@
 """
 Functions specific to knowledge graph indices
 """
-from llama_index import GPTVectorStoreIndex
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
 from clients.llama_index.indices.vector import get_vector_index

@@ -5,7 +5,7 @@ from datetime import date, datetime
 import logging
 import re
 
-from clients.llama_index import get_keyword_index
+from clients.llama_index.indices.entity import get_entity_indices
 from clients.sec import sec_client
 from common.ner import extract_named_entities
 from common.utils.file import save_json_as_file
@@ -51,7 +51,8 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             entities = extract_named_entities(sections, "spacy")
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
-            index = get_keyword_index(
+            get_entity_indices(
+                entities=entities,
                 namespace=ticker,
                 index_id=report.get("periodOfReport"),
                 documents=sections,
