@@ -48,13 +48,19 @@ def create_entity_index(
     qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
     refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
 
-    about_entity = json.loads(
-        query_index(vector_index, query, prompt=qa_prompt, refine_prompt=refine_prompt)
+    about_entity = query_index(
+        vector_index, query, prompt=qa_prompt, refine_prompt=refine_prompt
     )
     logging.info("about entity %s: %s", entity, about_entity)
 
-    name = about_entity.get("name") or entity
-    details = about_entity.get("details")
+    try:
+        entity_obj = json.loads(about_entity)
+    except Exception as ex:
+        logging.error("Could not parse entity %s: %s", entity, ex)
+        raise ex
+
+    name = entity_obj.get("name") or entity
+    details = entity_obj.get("details")
     index = get_vector_index("entities", index_id + f"{namespace}-{name}", [details])
     return index
 
