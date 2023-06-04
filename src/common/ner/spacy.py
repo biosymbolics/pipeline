@@ -73,11 +73,15 @@ def __filter(entity: str) -> bool:
 def __clean_entity_names(entity_map: dict[str, list[str]]) -> list[str]:
     """
     Clean entity name list
+
+    Args:
+        entity_map (dict[str, list[str]]): entity map
     """
-    entity_names = [
-        entity_map[entity][0] if entity_map[entity] else entity
-        for entity in entity_map.keys()
-    ]
+    # entity_names = [
+    #     entity_map[entity][0] if entity_map[entity] else entity
+    #     for entity in entity_map.keys()
+    # ]
+    entity_names = list(entity_map.keys())
     filtered = [entity for entity in entity_names if __filter(entity)]
     return filtered
 

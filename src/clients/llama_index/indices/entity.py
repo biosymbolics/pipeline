@@ -1,7 +1,6 @@
 """
 Functions specific to knowledge graph indices
 """
-import json
 from llama_index import GPTVectorStoreIndex
 from llama_index.output_parsers import LangchainOutputParser
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
@@ -16,12 +15,13 @@ from clients.llama_index.indices.vector import get_vector_index
 from .general import query_index
 
 response_schemas = [
+    ResponseSchema(name="name", description="normalized drug or MoA name"),
     ResponseSchema(
-        name="name", description="normalized, non-proprietary drug or MoA name"
+        name="details_from_doc",
+        description="all other information about this intervention, extracted from the document",
     ),
-    ResponseSchema(name="brand_name", description="brand name of drug, if avaialble"),
     ResponseSchema(
-        name="details", description="all other information about this intervention"
+        name="details", description="everything else you know about this intervention"
     ),
 ]
 
@@ -72,7 +72,7 @@ def create_entity_index(
 
 def get_entity_indices(
     entities: list[str], namespace: str, index_id: str, documents: list[str]
-):
+) -> list[GPTVectorStoreIndex]:
     """
     For each entity in the provided list, summarize based on the document and persist in an index
 
