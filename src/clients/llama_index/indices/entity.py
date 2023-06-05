@@ -15,6 +15,7 @@ from pydash import compact
 
 from clients.llama_index.indices.vector import get_vector_index
 from common.utils.string import get_id
+from sources.sec.prompts import GET_BIOMEDICAL_NER_TEMPLATE
 from .general import query_index
 
 response_schemas = [
@@ -35,14 +36,7 @@ def create_entity_index(
         namespace (str): namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    query = (
-        f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
-        "Return information about this intervention, such as its name, "
-        "drug class, mechanism of action, target(s), indication(s), status, competition, novelty etc. "
-        "- If investigational, include details about its phase of development and probability of success. "
-        "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
-        "- If discontinued, include the reasons for discontinuation. "
-    )
+    prompt = GET_BIOMEDICAL_NER_TEMPLATE(entity)
 
     lc_output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
     output_parser = LangchainOutputParser(lc_output_parser)
@@ -52,7 +46,7 @@ def create_entity_index(
     refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
 
     about_entity = query_index(
-        vector_index, query, prompt=qa_prompt, refine_prompt=refine_prompt
+        vector_index, prompt, prompt=qa_prompt, refine_prompt=refine_prompt
     )
     logging.info("about entity %s: %s", entity, about_entity)
 

@@ -82,19 +82,13 @@ BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
     BIOMEDICAL_TRIPLET_EXTRACT_TMPL
 )
 
-BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_TMPL = (
-    "Details about a product are provided below. "
-    "Extract related attributes (objects) of interest include:\n"
-    " - status: investigational, commercial, LOE, phase, submitted\n"
-    " - indications\n"
-    " - mechanisms of action\n"
-    " - synonyms\n"
-    " - probability of success\n"
-    "Return a maximum of {max_knowledge_triplets}.\n"
-    "Text: {text}\n"
-    "Triplets:\n"
-)
 
-BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
-    BIOMEDICAL_PRODUCT_TRIPLET_EXTRACT_TMPL
-)
+def GET_BIOMEDICAL_NER_TEMPLATE(entity: str) -> str:
+    return (
+        f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
+        "Return information about this intervention, such as its name, "
+        "drug class, mechanism of action, target(s), indication(s), status, competition, novelty etc. "
+        "- If investigational, include details about its phase of development and probability of success. "
+        "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
+        "- If discontinued, include the reasons for discontinuation. "
+    )

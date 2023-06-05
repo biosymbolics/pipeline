@@ -11,7 +11,6 @@ from common.ner import extract_named_entities
 from common.utils.file import save_json_as_file
 from common.utils.html_parsing.html import strip_inline_styles
 from sources.sec.rd_pipeline import fetch_annual_reports
-from common.utils.file import save_as_file
 
 
 def __format_for_ner(doc: str) -> str:
