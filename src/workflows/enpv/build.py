@@ -7,7 +7,9 @@ from datetime import datetime
 import logging
 import os
 import traceback
-from typing import Any, Callable
+from typing import Callable, Coroutine
+
+from pydash import compact
 
 from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
@@ -32,12 +34,18 @@ PHARMA_TICKERS = [
 ]
 
 
-def __build_indices(ticker: str, start_date: datetime) -> Callable[[], Any]:
+def __build_indices(
+    ticker: str, start_date: datetime
+) -> Callable[[], Coroutine[None, None, None]]:
     """
     Build indices closure
+
+    Args:
+        ticker (str): Ticker
+        start_date (datetime): Start date
     """
 
-    def __build():
+    async def __build() -> None:
         try:
             build_indices(ticker, start_date)
         except Exception as ex:
@@ -53,7 +61,7 @@ async def build_sec():
     """
     start_date = datetime(2022, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
-    await execute_async(closures)
+    await execute_async(compact(closures))
 
 
 async def main():
