@@ -6,7 +6,10 @@ import asyncio
 from datetime import datetime
 import logging
 import os
+import traceback
+from typing import Any, Callable
 
+from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
@@ -29,12 +32,19 @@ PHARMA_TICKERS = [
 ]
 
 
-def __build_indices(ticker, start_date):
-    try:
-        build_indices(ticker, start_date)
-    except Exception as ex:
-        logging.error("failure to build index for %s: %s", ticker, ex)
-        raise ex
+def __build_indices(ticker: str, start_date: datetime) -> Callable[[], Any]:
+    """
+    Build indices closure
+    """
+
+    def __build():
+        try:
+            build_indices(ticker, start_date)
+        except Exception as ex:
+            traceback.print_exc()
+            logging.error("failure to build index for %s: %s", ticker, ex)
+
+    return __build
 
 
 async def build_sec():
@@ -42,12 +52,8 @@ async def build_sec():
     Build SEC stuffs
     """
     start_date = datetime(2022, 1, 1)
-    tasks = [
-        asyncio.to_thread(__build_indices, ticker, start_date)
-        for ticker in PHARMA_TICKERS
-    ]
-
-    await asyncio.gather(*tasks)
+    closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
+    await execute_async(closures)
 
 
 async def main():

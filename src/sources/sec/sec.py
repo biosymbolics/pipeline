@@ -3,8 +3,10 @@ Core SEC methods
 """
 
 from datetime import date, datetime
+from typing import Callable, Optional
+import logging
 
-from clients.sec import fetch_sec_docs
+from clients.sec import fetch_sec_docs, sec_client
 from common.utils.date import format_date_range
 from sources.sec.types import SecFiling
 
@@ -38,3 +40,40 @@ def fetch_annual_reports(
     reports = fetch_sec_docs([*criteria, 'formType:"10-K"'])
 
     return reports
+
+
+def fetch_annual_reports_with_sections(
+    ticker: str,
+    start_date: date,
+    end_date: date = datetime.now(),
+    formatter: Optional[Callable] = None,
+) -> dict[str, list[str]]:
+    """
+    Fetch annual SEC reports (10K) with sections
+
+    Args:
+        ticker (str): Ticker
+        start_date (date): Start date
+        end_date (date, optional): End date. Defaults to datetime.now().
+        formatter (Optional[Callable], optional): Formatter. Defaults to None.
+
+    Returns (dict[str, list[SecFiling]]): Map of sections to reports
+    """
+    reports = fetch_annual_reports(ticker, start_date, end_date)
+    section_map = {}
+
+    for report in reports:
+        try:
+            report_url = report.get("linkToHtml")
+            sections = sec_client.extract_sections(
+                report_url,
+                return_type="html",
+                formatter=formatter,
+                sections=["1", "7"],
+            )
+            section_map[report.get("periodOfReport")] = sections
+        except Exception as ex:
+            logging.error("Error creating index for %s: %s", ticker, ex)
+            raise ex
+
+    return section_map
