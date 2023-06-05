@@ -9,12 +9,16 @@ from llama_index import (
 )
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
+from .constants import DEFAULT_MODEL_NAME
 from .context import get_service_context, get_storage_context
+from .types import LlmModel
 from .utils import get_persist_dir
 
 
 def __load_index_or_indices(
-    namespace: str, index_id: Optional[str] = None
+    namespace: str,
+    index_id: Optional[str] = None,
+    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
 ) -> Union[LlmIndex, list[LlmIndex], None]:
     """
     Load persisted index
@@ -23,11 +27,12 @@ def __load_index_or_indices(
         namespace (str): namespace of the index (e.g. SEC-BMY)
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
             all indices loaded if unspecified.
+        model_name (optional str): model name to use for index
     """
     try:
         logging.info("Attempting to load index %s/%s", namespace, index_id)
         storage_context = get_storage_context(namespace)
-        service_context = get_service_context()
+        service_context = get_service_context(model_name)
 
         if index_id:
             index = load_index_from_storage(
@@ -65,7 +70,9 @@ def maybe_load_index(namespace: str, index_id: str) -> Optional[LlmIndex]:
         return None
 
 
-def load_index(namespace: str, index_id: str) -> LlmIndex:
+def load_index(
+    namespace: str, index_id: str, model_name: LlmModel = DEFAULT_MODEL_NAME
+) -> LlmIndex:
     """
     Load persisted index
 
@@ -74,7 +81,7 @@ def load_index(namespace: str, index_id: str) -> LlmIndex:
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
                                  all indices loaded if unspecified.
     """
-    index = __load_index_or_indices(namespace, index_id)
+    index = __load_index_or_indices(namespace, index_id, model_name=model_name)
     if isinstance(index, list):
         raise Exception("Expected single index, got list")
     if isinstance(index, LlmIndex):
@@ -82,14 +89,16 @@ def load_index(namespace: str, index_id: str) -> LlmIndex:
     raise Exception("Expected single index, got None")
 
 
-def load_indices(namespace: str) -> list[LlmIndex]:
+def load_indices(
+    namespace: str, model_name: LlmModel = DEFAULT_MODEL_NAME
+) -> list[LlmIndex]:
     """
     Load persisted indices
 
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
     """
-    indices = __load_index_or_indices(namespace)
+    indices = __load_index_or_indices(namespace, model_name=model_name)
     if not isinstance(indices, list):
         raise Exception("Expected list of indices, got single index")
     return indices

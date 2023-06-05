@@ -1,6 +1,7 @@
 """
 Functions around llama index context
 """
+from typing import Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -8,10 +9,10 @@ from llama_index import (
     StorageContext,
 )
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import VertexAI
 import logging
 
-# from langchain import OpenAI
-
+from .types import LlmModel
 from .utils import get_persist_dir
 
 
@@ -37,20 +38,36 @@ def get_storage_context(namespace: str) -> StorageContext:
     return storage_context
 
 
-def get_service_context():
+def __get_llm(model_name: Optional[LlmModel]):
+    """
+    Get llm based on model_name
+
+    Args:
+        model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
+    """
+    if model_name == "ChatGPT":
+        return ChatOpenAI(
+            temperature=0.3, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
+        )
+    if model_name == "VertexAI":
+        return VertexAI()
+
+    raise Exception(f"Unknown model {model_name}")
+
+
+def get_service_context(model_name: Optional[LlmModel] = "ChatGPT") -> ServiceContext:
     """
     Get default service context for llllamama index
+
+    Args:
+        model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
     """
     prompt_helper = PromptHelper(
         context_window=4096, num_output=1024, chunk_overlap_ratio=0.1
     )
 
-    llm_predictor = LLMPredictor(
-        llm=ChatOpenAI(
-            temperature=0.3, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
-        )
-        # llm=OpenAI(temperature=0, model_name="text-davinci-003", max_tokens=1000)
-    )
+    llm = __get_llm(model_name)
+    llm_predictor = LLMPredictor(llm=llm)
 
     service_context = ServiceContext.from_defaults(
         llm_predictor=llm_predictor, prompt_helper=prompt_helper
