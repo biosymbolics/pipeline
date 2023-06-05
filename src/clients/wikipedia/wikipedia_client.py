@@ -1,3 +1,7 @@
+"""
+Client for wikipedia API
+"""
+
 from typing import Collection, Optional
 from pydash import compact
 import wptools as wikipedia
