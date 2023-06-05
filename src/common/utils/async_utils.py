@@ -3,10 +3,10 @@ Async utilities
 """
 import asyncio
 import os
-from typing import Any, Callable, List
+from typing import Any, Callable, Coroutine, List
 
 
-async def execute_async(functions: List[Callable[[], Any]]) -> None:
+async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
     """
     Execute functions asynchronously
 
