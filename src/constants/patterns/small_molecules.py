@@ -21,6 +21,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "mten": "e.g. mavacamten",
     "xian": "e.g. milvexian",
     "oran": "e.g. afimetoran",
+    "xate": "e.g. methotrexate",
     # "ten": "e.g. mavacamten" # FP: often
     # Add more suffixes as needed
 }

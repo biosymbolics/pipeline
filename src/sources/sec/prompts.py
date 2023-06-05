@@ -77,3 +77,18 @@ BIOMEDICAL_TRIPLET_EXTRACT_TMPL = (
 BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
     BIOMEDICAL_TRIPLET_EXTRACT_TMPL
 )
+
+BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
+    BIOMEDICAL_TRIPLET_EXTRACT_TMPL
+)
+
+
+def GET_BIOMEDICAL_NER_TEMPLATE(entity: str) -> str:
+    return (
+        f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
+        "Return information about this intervention, such as its name, "
+        "drug class, mechanism of action, target(s), indication(s), status, competition, novelty etc. "
+        "- If investigational, include details about its phase of development and probability of success. "
+        "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
+        "- If discontinued, include the reasons for discontinuation. "
+    )

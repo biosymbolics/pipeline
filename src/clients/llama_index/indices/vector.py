@@ -1,16 +1,30 @@
 """
 Functions specific to vector store indices
 """
-from llama_index import GPTVectorStoreIndex, Response
+from llama_index import GPTVectorStoreIndex
 
-from .general import get_or_create_index
+from .general import get_or_create_index, get_index, query_index
+
+
+def query_vector_index(query: str, namespace: str, index_key: str) -> str:
+    """
+    Queries a given vector store index
+
+    Args:
+        query (str): natural language query
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+    """
+    index = get_index(namespace, index_key)
+    answer = query_index(index, query)
+    return answer
 
 
 def create_and_query_vector_index(
     query: str, namespace: str, index_key: str, documents: list[str]
 ) -> str:
     """
-    Creates the vector store index if nx, and queries
+    Gets the vector store index and queries
 
     Args:
         query (str): natural language query
@@ -19,10 +33,8 @@ def create_and_query_vector_index(
         documents (Document): list of llama_index Documents
     """
     index = get_vector_index(namespace, index_key, documents)
-    response = index.as_query_engine().query(query)
-    if not isinstance(response, Response) or not response.response:
-        raise Exception("Could not parse response")
-    return response.response
+    answer = query_index(index, query)
+    return answer
 
 
 def get_vector_index(

@@ -72,7 +72,10 @@ def __extract_products(
 
     if strategy == "SEARCH":
         sections = sec_client.extract_sections(
-            report_url, return_type="html", formatter=strip_inline_styles
+            report_url,
+            return_type="html",
+            formatter=strip_inline_styles,
+            sections=["1", "7"],
         )
         return __search_for_products(
             namespace=report["ticker"],

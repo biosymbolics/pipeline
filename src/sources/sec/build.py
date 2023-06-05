@@ -4,19 +4,18 @@ SEC build
 from datetime import date, datetime
 import logging
 import re
+from pydash import flatten
 
-from clients.llama_index import get_keyword_index
-from clients.sec import sec_client
+from clients.llama_index.indices.entity import get_entity_indices
 from common.ner import extract_named_entities
-from common.utils.file import save_json_as_file
 from common.utils.html_parsing.html import strip_inline_styles
-from sources.sec.rd_pipeline import fetch_annual_reports
-from common.utils.file import save_as_file
+
+from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
 
 
-def __format_html(doc: str) -> str:
+def __format_for_ner(doc: str) -> str:
     """
-    Format HTML content
+    Format HTML content for NER processing
     - strip styles
     - remove certain characters
     """
@@ -39,25 +38,19 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         start_date (date): start date
         end_date (date): end date
     """
-    reports = fetch_annual_reports(ticker, start_date, end_date)
+    section_map = fetch_annual_reports(
+        ticker, start_date, end_date, formatter=__format_for_ner
+    )
 
-    for report in reports:
-        try:
-            report_url = report.get("linkToHtml")
-            sections = sec_client.extract_sections(
-                report_url, return_type="html", formatter=__format_html
-            )
-            save_as_file("\n".join(sections), "sections.txt")
-            entities = extract_named_entities(sections, "spacy")
-            save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
+    all_sections = flatten(section_map.values())
+    entities = extract_named_entities(all_sections, "spacy")
+    print("ENTITIES:", entities)
 
-            # if not entities:
-            #     logging.warning("No entities found for %s", ticker)
-            #     index = get_keyword_index(
-            #         namespace=ticker,
-            #         index_id=report.get("periodOfReport"),
-            #         documents=sections,
-            #     )
-        except Exception as ex:
-            logging.error("Error creating index for %s: %s", ticker, ex)
-            raise ex
+    # this is the slow part
+    for period, sections in section_map.items():
+        get_entity_indices(
+            entities=entities,
+            namespace=ticker,
+            index_id=period,
+            documents=sections,
+        )

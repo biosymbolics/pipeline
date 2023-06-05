@@ -1,7 +1,6 @@
 """
 Functions specific to keyword table indices
 """
-from typing import cast
 from llama_index import GPTKeywordTableIndex, Response
 
 from .general import get_or_create_index
@@ -11,7 +10,7 @@ def create_and_query_keyword_index(
     query: str, namespace: str, index_key: str, documents: list[str]
 ) -> str:
     """
-    Creates the keyword table index if nx, and queries
+    Gets keyword table index and queries
 
     Args:
         query (str): natural language query
@@ -30,7 +29,7 @@ def get_keyword_index(
     namespace: str, index_id: str, documents: list[str]
 ) -> GPTKeywordTableIndex:
     """
-    Creates or returns the vectore store index if nx, and queries
+    Creates or returns the vector store index; queries
 
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)

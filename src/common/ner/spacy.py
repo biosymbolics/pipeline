@@ -12,7 +12,7 @@ from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
 
-from .debugging import debug_pipeline, print_tokens, serve_ner_viewer
+from .debugging import debug_pipeline
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import KbLinker
 
@@ -31,12 +31,22 @@ def __get_kb_linker(nlp: Language) -> KbLinker:
     return linker.kb
 
 
-def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
+def __enrich_with_canonical(
+    entities: list[Span], kb_linker: KbLinker
+) -> dict[str, list[str]]:
     """
-    Get canonical entities from the entities
+    Links canonical entities if possible
+
+    Args:
+        entities (list[Span]): list of entities
+        kb_linker (KbLinker): KB linker
+
+    Currently only for PRODUCT entities
     """
+    product_entities = [entity for entity in entities if entity.label_ in ENTITY_TYPES]
+
     canonical_entity_map = {}
-    for entity in entities:
+    for entity in product_entities:
         kb_entities = [
             kb_linker.cui_to_entity[kb_ent[0]] for kb_ent in entity._.kb_ents
         ]
@@ -47,10 +57,33 @@ def __get_canonical_entities(entities: list[Span], kb_linker: KbLinker) -> dict:
                 ent.types, list(UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
             )
         ]
-        if len(canonical_entities) > 0:
-            canonical_entity_map[entity.text] = canonical_entities
+        canonical_entity_map[entity.text] = canonical_entities
 
     return canonical_entity_map
+
+
+SUPPRESSIONS = ["phase", "trial"]
+
+
+def __filter(entity: str) -> bool:
+    is_suppressed = any([sup in entity.lower() for sup in SUPPRESSIONS])
+    return not is_suppressed
+
+
+def __clean_entity_names(entity_map: dict[str, list[str]]) -> list[str]:
+    """
+    Clean entity name list
+
+    Args:
+        entity_map (dict[str, list[str]]): entity map
+    """
+    # entity_names = [
+    #     entity_map[entity][0] if entity_map[entity] else entity
+    #     for entity in entity_map.keys()
+    # ]
+    entity_names = list(entity_map.keys())
+    filtered = [entity for entity in entity_names if __filter(entity)]
+    return filtered
 
 
 def extract_named_entities(content: list[str]) -> list[str]:
@@ -59,13 +92,10 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     Args:
         content (list[str]): list of content on which to do NER
-
-    TODO:
-    - POS tagging on SciSpacy
     """
 
     # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-    nlp: Language = spacy.load("en_core_sci_scibert")  # kinase 2
+    nlp: Language = spacy.load("en_core_sci_scibert")
     nlp.tokenizer = get_sec_tokenizer(nlp)
 
     nlp.add_pipe("merge_entities", after="ner")
@@ -76,7 +106,6 @@ def extract_named_entities(content: list[str]) -> list[str]:
         after="merge_entities",
     )
 
-    print(INTERVENTION_SPACY_PATTERNS)
     # order intentional
     ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
     ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
@@ -92,18 +121,14 @@ def extract_named_entities(content: list[str]) -> list[str]:
         },
     )
 
-    debug_pipeline(nlp)
     docs = [nlp(batch) for batch in content]
-
-    print_tokens(docs, ["-aamt", "allosteric", "Yervoy", "mab", "tyrosine", "Opdualag"])
 
     entities = flatten([doc.ents for doc in docs])
     linker = __get_kb_linker(nlp)
-    canonical_entities = __get_canonical_entities(entities, linker)
+    enriched = __enrich_with_canonical(entities, linker)
+    entity_names = __clean_entity_names(enriched)
 
-    # entity_strings = [
-    #     entity.text for entity in entities if entity.label_ in ENTITY_TYPES
-    # ]
-    # print(canonical_entities)
-    serve_ner_viewer(docs)
-    return []
+    print(entity_names)
+    # debug_pipeline(docs, nlp)
+
+    return entity_names
