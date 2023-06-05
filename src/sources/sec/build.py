@@ -44,22 +44,21 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
     for report in reports:
         try:
             report_url = report.get("linkToHtml")
-            formatted_sections = sec_client.extract_sections(
-                report_url, return_type="html", formatter=__format_for_ner
+            sections = sec_client.extract_sections(
+                report_url,
+                return_type="html",
+                formatter=__format_for_ner,
+                sections=["1", "7"],
             )
-            save_as_file("\n".join(formatted_sections), "sections.txt")
-            entities = extract_named_entities(formatted_sections, "spacy")
+            # save_as_file("\n".join(sections), "sections.txt")
+            entities = extract_named_entities(sections, "spacy")
             save_json_as_file(entities, f"{ticker}_{report.get('periodOfReport')}.json")
 
-            # unadulterated html for llamaindex
-            html_sections = sec_client.extract_sections(
-                report_url, return_type="html", formatter=strip_inline_styles
-            )
             get_entity_indices(
                 entities=entities,
                 namespace=ticker,
                 index_id=report.get("periodOfReport"),
-                documents=html_sections,
+                documents=sections,
             )
         except Exception as ex:
             logging.error("Error creating index for %s: %s", ticker, ex)

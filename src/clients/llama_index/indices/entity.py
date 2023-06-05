@@ -11,17 +11,15 @@ from llama_index.prompts.default_prompts import (
 )
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 import logging
+from pydash import compact
 
 from clients.llama_index.indices.vector import get_vector_index
+from common.utils.string import get_id
 from .general import query_index
 
 response_schemas = [
-    ResponseSchema(name="name", description="normalized drug or MoA name"),
-    ResponseSchema(
-        name="details_from_doc",
-        description="information about this drug given the context of the document",
-    ),
-    ResponseSchema(name="details", description="everything else you know about it"),
+    ResponseSchema(name="name", description="normalized intervention name"),
+    ResponseSchema(name="details", description="details about this intervention"),
 ]
 
 
@@ -38,12 +36,12 @@ def create_entity_index(
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     query = (
-        f"Is {entity} a pharmaceutical compound, mechanism of action or other intervention? "
-        "If yes, please return information about this drug, such as: "
-        "drug class, mechanism of action, indication(s), status, and clinical trials. "
-        "If the drug is commercial, please include details about the revenue it generates, competition and prospects for the future. "
-        "If the drug is investigational, please include details about its phase of development and probability of success. "
-        "If the drug is discontinued, please include details about the reason for discontinuation and any other relevant information. "
+        f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
+        "Return information about this intervention, such as its name, "
+        "drug class, mechanism of action, target(s), indication(s), status, competition, novelty etc. "
+        "- If investigational, include details about its phase of development and probability of success. "
+        "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
+        "- If discontinued, include the reasons for discontinuation. "
     )
 
     lc_output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
@@ -63,7 +61,7 @@ def create_entity_index(
         name = entity_obj.get("name") or entity
         details = entity_obj.get("details")
         index = get_vector_index(
-            "entities", index_id + f"{namespace}-{name}", [details]
+            "entities", index_id + f"{namespace}-{get_id(name)}", [details]
         )
         return index
     except Exception as ex:
@@ -88,4 +86,4 @@ def get_entity_indices(
     indices = [
         create_entity_index(entity, index, namespace, index_id) for entity in entities
     ]
-    return indices
+    return compact(indices)

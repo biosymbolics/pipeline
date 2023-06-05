@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Callable, Optional
 import polars as pl
-from sec_api import ExtractorApi, QueryApi, XbrlApi
+from sec_api import ExtractorApi, QueryApi, RenderApi, XbrlApi
 
 from common.utils.html_parsing.product_table import extract_product_tables
 from sources.sec.types import ExtractReturnType, SecFiling
@@ -87,6 +87,26 @@ def parse_xbrl(url: str):
     return xbrl_json
 
 
+def extract_document(
+    url: str,
+    formatter: Optional[Callable] = None,
+) -> str:
+    """
+    Extract SEC document
+    """
+    render_api = RenderApi(API_KEY)
+    filing_html = render_api.get_filing(url)
+
+    if not filing_html:
+        raise Exception("No html found")
+
+    if formatter:
+        formatted = formatter(filing_html)
+        return formatted
+
+    return filing_html
+
+
 def extract_section(
     url: str,
     section: str = "1",
@@ -111,15 +131,13 @@ def extract_section(
 
 def extract_sections(
     url: str,
-    sections: Optional[list[str]] = None,
+    sections: list[str],
     return_type: ExtractReturnType = "html",
     formatter: Optional[Callable] = None,
 ) -> list[str]:
     """
     Extract sections
     """
-    if sections is None:
-        sections = ["1", "7"]
     html_sections = [
         extract_section(url, section, return_type, formatter) for section in sections
     ]

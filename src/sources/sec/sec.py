@@ -31,7 +31,10 @@ def fetch_annual_reports(
 ) -> list[SecFiling]:
     """
     Fetch annual SEC reports (10K)
+
+    TODO: 20-F (foreign)
     """
     criteria = __get_base_criteria(ticker, start_date, end_date)
-    annual_reports = fetch_sec_docs([*criteria, 'formType:"10-K"'])
-    return annual_reports
+    reports = fetch_sec_docs([*criteria, 'formType:"10-K"'])
+
+    return reports
