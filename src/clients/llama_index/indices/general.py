@@ -6,9 +6,10 @@ from typing import Optional, TypeVar, cast
 from llama_index import Document, QuestionAnswerPrompt, Response, RefinePrompt
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
+from clients.llama_index.constants import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import maybe_load_index, persist_index
-
+from clients.llama_index.types import LlmModel
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
@@ -62,6 +63,7 @@ def get_or_create_index(
     documents: list[str],
     index_impl: IndexImpl,
     index_args: Optional[dict] = None,
+    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
 ) -> IndexImpl:
     """
     Create llama index from supplied document url
@@ -79,14 +81,13 @@ def get_or_create_index(
         return cast(IndexImpl, index)
 
     logging.info("Creating index %s/%s", namespace, index_id)
-    service_context = get_service_context()
     try:
         ll_docs = list(map(Document, documents))
         index = index_impl.from_documents(
             ll_docs,
-            service_context=service_context,
+            # *(index_args or {}),
+            service_context=get_service_context(model_name),
             storage_context=get_storage_context(namespace),
-            *(index_args or {})
         )
         persist_index(index, namespace, index_id)
         return index

@@ -2,9 +2,9 @@
 SEC build
 """
 from datetime import date, datetime
-import logging
 import re
 from pydash import flatten
+import logging
 
 from clients.llama_index.indices.entity import get_entity_indices
 from common.ner import extract_named_entities
@@ -44,7 +44,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
 
     all_sections = flatten(section_map.values())
     entities = extract_named_entities(all_sections, "spacy")
-    print("ENTITIES:", entities)
+    logging.info("ENTITIES: %s", entities)
 
     # this is the slow part
     for period, sections in section_map.items():
