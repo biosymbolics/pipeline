@@ -9,7 +9,7 @@ from llama_index import (
     StorageContext,
 )
 from langchain.chat_models import ChatOpenAI
-from langchain.llms import VertexAI
+from langchain.llms import Anthropic, VertexAI
 import logging
 
 from .types import LlmModel
@@ -43,7 +43,7 @@ def __get_llm(model_name: Optional[LlmModel]):
     Get llm based on model_name
 
     Args:
-        model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
+        model_name (LlmModel): model to use for llm
     """
     common_args = {"temperature": 0.3}
     if model_name == "ChatGPT":
@@ -52,6 +52,11 @@ def __get_llm(model_name: Optional[LlmModel]):
         )
     if model_name == "VertexAI":
         return VertexAI(**common_args, model_name="text-bison")
+    if model_name == "Anthropic":
+        # untested, but used in https://colab.research.google.com/drive/1uuqvPI2_WNFMd7g-ahFoioSHV7ExB2GR?usp=sharing
+        # benefit is massive input token limit
+        # use with GPTListIndex?
+        return Anthropic(**common_args, model="claude-v1.3-100k")
 
     raise Exception(f"Unknown model {model_name}")
 
