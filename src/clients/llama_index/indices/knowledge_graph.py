@@ -3,6 +3,7 @@ Functions specific to knowledge graph indices
 """
 from typing import Optional
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
+import logging
 
 from clients.llama_index.constants import DEFAULT_MODEL_NAME
 from clients.llama_index.types import LlmModel
@@ -15,7 +16,7 @@ MAX_TRIPLES = 400
 def create_and_query_kg_index(
     query: str,
     namespace: str,
-    index_key: str,
+    index_id: str,
     documents: list[str],
     model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
 ) -> str:
@@ -29,8 +30,9 @@ def create_and_query_kg_index(
         documents (Document): list of llama_index Documents
         model_name (LlmModel): model name
     """
-    index = get_kg_index(namespace, index_key, documents, model_name=model_name)
+    index = get_kg_index(namespace, index_id, documents, model_name=model_name)
     answer = query_index(index, query)
+    logging.info("Answer: %s", answer)
     return answer
 
 

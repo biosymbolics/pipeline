@@ -45,12 +45,13 @@ def __get_llm(model_name: Optional[LlmModel]):
     Args:
         model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
     """
+    common_args = {"temperature": 0.3}
     if model_name == "ChatGPT":
         return ChatOpenAI(
-            temperature=0.3, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
+            **common_args, model="gpt-3.5-turbo", max_tokens=1900, client="chat"
         )
     if model_name == "VertexAI":
-        return VertexAI()
+        return VertexAI(**common_args, model_name="text-bison")
 
     raise Exception(f"Unknown model {model_name}")
 
@@ -63,7 +64,7 @@ def get_service_context(model_name: Optional[LlmModel] = "ChatGPT") -> ServiceCo
         model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
     """
     prompt_helper = PromptHelper(
-        context_window=4096, num_output=1024, chunk_overlap_ratio=0.1
+        context_window=1024, num_output=256, chunk_overlap_ratio=0.1
     )
 
     llm = __get_llm(model_name)

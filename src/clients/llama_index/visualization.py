@@ -1,16 +1,14 @@
-# pylint: disable=E0102
 """
-Visualizations
+KG and other visualizations
 """
+from typing import cast
 from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
-from multipledispatch import dispatch
 
 from .llama_index import load_index
 
 
-@dispatch(object)  # type: ignore[no-redef]
-def visualize_network(index: GPTKnowledgeGraphIndex):
+def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
     """
     Visualize network
 
@@ -23,7 +21,6 @@ def visualize_network(index: GPTKnowledgeGraphIndex):
     net.show("graph.html", notebook=False)
 
 
-@dispatch(str, str)  # type: ignore[no-redef]
 def visualize_network(namespace: str, index_id: str):
     """
     Visualize network
@@ -35,8 +32,7 @@ def visualize_network(namespace: str, index_id: str):
     index = load_index(namespace, index_id)
     if not index:
         raise Exception("index not found")
-    # pylint: disable=E1120
-    visualize_network(index)
+    visualize_network_by_index(cast(GPTKnowledgeGraphIndex, index))
 
 
 # @dispatch(str)  # type: ignore[no-redef]
@@ -54,11 +50,13 @@ def visualize_network(namespace: str, index_id: str):
 #     visualize_network(composed)
 
 
-def list_triples(namespace: str, index_id: str):
+def list_triples_by_index(index: GPTKnowledgeGraphIndex):
     """
     List triples
+
+    Args:
+        index (GPTKnowledgeGraphIndex): kg index to visualize
     """
-    index = load_index(namespace, index_id)
     graph = index.get_networkx_graph()
 
     triples = []
@@ -70,3 +68,16 @@ def list_triples(namespace: str, index_id: str):
 
     for triple in triples:
         print(triple)
+
+
+def list_triples(namespace: str, index_id: str):
+    """
+    List triples
+
+    Args:
+        namespace (str): namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+    """
+    index = load_index(namespace, index_id)
+    kg_index = cast(GPTKnowledgeGraphIndex, index)
+    list_triples_by_index(kg_index)
