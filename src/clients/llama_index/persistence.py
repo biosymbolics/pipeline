@@ -71,7 +71,9 @@ def maybe_load_index(namespace: str, index_id: str) -> Optional[LlmIndex]:
 
 
 def load_index(
-    namespace: str, index_id: str, model_name: LlmModel = DEFAULT_MODEL_NAME
+    namespace: str,
+    index_id: Optional[str] = None,
+    model_name: LlmModel = DEFAULT_MODEL_NAME,
 ) -> LlmIndex:
     """
     Load persisted index
@@ -79,7 +81,6 @@ def load_index(
     Args:
         namespace (str): namespace of the index (e.g. SEC-BMY)
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
-                                 all indices loaded if unspecified.
     """
     index = __load_index_or_indices(namespace, index_id, model_name=model_name)
     if isinstance(index, list):

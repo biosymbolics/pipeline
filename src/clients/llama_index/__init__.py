@@ -1,10 +1,6 @@
 """
 LlamaIndex client module
 """
-from .llama_index import (
-    get_query_engine,
-    query_index,
-)
 from .visualization import visualize_network
 
 from .indices.keyword_table import create_and_query_keyword_index, get_keyword_index
@@ -18,7 +14,5 @@ __all__ = [
     "get_kg_index",
     "get_keyword_index",
     "get_vector_index",
-    "get_query_engine",
-    "query_index",
     "visualize_network",
 ]
