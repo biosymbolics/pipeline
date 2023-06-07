@@ -19,14 +19,14 @@ IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 def get_index(
     namespace_key: NamespaceKey,
-    index_id: str,
+    index_id: Optional[str] = None,
 ) -> LlmIndex:
     """
     Get llama index from the namespace/index_id
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_id (str): unique id of the index (e.g. 2020-01-1) (optional)
     """
     index = maybe_load_index(namespace_key, index_id)
     if index:

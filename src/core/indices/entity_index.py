@@ -17,7 +17,7 @@ from clients.llama_index import (
     get_output_parser,
     parse_answer,
 )
-from clients.llama_index import query_index
+from clients.llama_index import get_index, query_index
 from clients.llama_index.context import get_storage_context
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
@@ -152,7 +152,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        pass
+        index = get_index(self.namespace)
 
     def add_node(
         self,

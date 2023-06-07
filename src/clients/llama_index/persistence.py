@@ -107,7 +107,9 @@ def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def maybe_load_index(namespace_key: NamespaceKey, index_id: str) -> Optional[LlmIndex]:
+def maybe_load_index(
+    namespace_key: NamespaceKey, index_id: Optional[str] = None
+) -> Optional[LlmIndex]:
     """
     Load index if present, otherwise return none
 
