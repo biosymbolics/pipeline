@@ -13,15 +13,16 @@ from langchain.output_parsers import ResponseSchema
 import logging
 
 from clients.llama_index import (
+    create_index,
     get_output_parser,
-    get_vector_index,
     parse_answer,
-    query_index,
 )
+from clients.llama_index.context import get_storage_context
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from types.indices import LlmIndex, NamespaceKey
 
+from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
 ROOT_ENTITY_DIR = "entities"
@@ -42,7 +43,7 @@ def create_entity_indices(
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
-    index = get_vector_index(namespace_key, index_id, documents)
+    index = SourceDocIndex(namespace_key, index_id, documents=documents)
     for entity in entities:
         idx = EntityIndex(entity, namespace_key)
         idx.add_node(index, index_id)
@@ -128,7 +129,7 @@ class EntityIndex:
         """
         return (ROOT_ENTITY_DIR, get_id(self.entity_id), self.type, *self.source)
 
-    def __describe_entity_by_source(self, source_index: LlmIndex) -> EntityObj:
+    def __describe_entity_by_source(self, source_index: SourceDocIndex) -> EntityObj:
         """
         Get the description of an entity by querying the source index
 
@@ -145,8 +146,8 @@ class EntityIndex:
         qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
         refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
 
-        response = query_index(
-            source_index, query, prompt=qa_prompt, refine_prompt=refine_prompt
+        response = source_index.query(
+            query, prompt=qa_prompt, refine_prompt=refine_prompt
         )
 
         logging.debug("Response from query_index: %s", response)
@@ -161,7 +162,7 @@ class EntityIndex:
 
     def add_node(
         self,
-        source_index: LlmIndex,
+        source_index: SourceDocIndex,
         index_id: str,
     ) -> Optional[GPTVectorStoreIndex]:
         """
@@ -182,7 +183,15 @@ class EntityIndex:
         entity_ns = self.__get_entity_namespace()
 
         # create index
-        index = get_vector_index(entity_ns, index_id, [details])
+        index = create_index(
+            entity_ns,
+            index_id,
+            [details],
+            index_impl=GPTVectorStoreIndex,  # type: ignore
+            index_args={
+                "storage_context": get_storage_context(entity_ns, store_type="pinecone")
+            },
+        )
 
         return index
 
@@ -198,5 +207,6 @@ class EntityIndex:
             documents (list[str]): list of documents
             index_id (str): unique id of the index (e.g. 2020-01-1)
         """
-        index = get_vector_index(self.source, index_id, documents)
+        index = SourceDocIndex(self.source, index_id, documents=documents)
+
         return self.add_node(index, index_id)

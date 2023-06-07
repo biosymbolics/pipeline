@@ -1,34 +1,32 @@
 """
 Functions around llama index context
 """
-from typing import Optional
+from typing import Literal, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
     ServiceContext,
     StorageContext,
 )
+from llama_index.vector_stores import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
+from clients.vector_dbs.pinecone import init_vector_db
 from types.indices import LlmModelType, NamespaceKey
 
 from .utils import get_persist_dir
 
 
-def get_storage_context(namespace_key: NamespaceKey) -> StorageContext:
+def __load_storage_context(**kwargs) -> StorageContext:
     """
-    Get storage context
-
-    Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+    Load storage context
     """
-    directory = get_persist_dir(namespace_key)
-
+    storage_context = None
     try:
-        storage_context = StorageContext.from_defaults(persist_dir=directory)
+        storage_context = StorageContext.from_defaults(**kwargs)
     except Exception as ex:
         # assuming this means the directory does not exist
         # https://github.com/jerryjliu/llama_index/issues/3734
@@ -38,6 +36,27 @@ def get_storage_context(namespace_key: NamespaceKey) -> StorageContext:
         )
         storage_context = StorageContext.from_defaults()
     return storage_context
+
+
+def get_storage_context(
+    namespace_key: NamespaceKey,
+    store_type: Literal["directory", "pinecone"] = "directory",
+) -> StorageContext:
+    """
+    Get storage context
+
+    Args:
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+    """
+    if store_type == "directory":
+        directory = get_persist_dir(namespace_key)
+        return __load_storage_context(persist_dir=directory)
+    elif store_type == "pinecone":
+        pinecone_index = init_vector_db(namespace_key)
+        vector_store = PineconeVectorStore(pinecone_index)
+        return __load_storage_context(vector_store=vector_store)
+
+    raise Exception(f"Unknown store type {store_type}")
 
 
 def __get_llm(model_name: Optional[LlmModelType]):

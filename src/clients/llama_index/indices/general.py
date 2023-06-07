@@ -2,7 +2,7 @@
 Client for llama indexes
 """
 import logging
-from typing import Any, Optional, TypeVar, cast
+from typing import Any, Mapping, Optional, TypeVar, cast
 from llama_index import Document, Response
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
@@ -67,8 +67,9 @@ def create_index(
     index_id: str,
     documents: list[str],
     index_impl: IndexImpl,
-    index_args: Optional[dict] = None,
+    index_args: Optional[dict] = {},
     model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+    storage_context_args: Mapping[str, Any] = {},
 ) -> IndexImpl:
     """
     Create llama index from supplied document url
@@ -86,9 +87,9 @@ def create_index(
         ll_docs = list(map(Document, documents))
         index = index_impl.from_documents(
             ll_docs,
-            *(index_args or {}),
             service_context=get_service_context(model_name),
-            storage_context=get_storage_context(namespace_key),
+            storage_context=get_storage_context(namespace_key, **storage_context_args),
+            *index_args,
         )
         persist_index(index, namespace_key, index_id)
         return index

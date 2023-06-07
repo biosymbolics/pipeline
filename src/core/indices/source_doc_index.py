@@ -21,6 +21,7 @@ class SourceDocIndex:
         self,
         source: NamespaceKey,
         index_id: str,
+        documents: Optional[list[str]] = None,
         retrieval_date: datetime = datetime.now(),
         index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
         model_name: LlmModelType = DEFAULT_MODEL_NAME,
@@ -42,9 +43,14 @@ class SourceDocIndex:
         self.model_name = model_name
         self.retrieval_date = retrieval_date
 
-    def __create__(self, documents):
+        # if docs provided, load
+        if documents:
+            self.load(documents)
+
+    def load(self, documents: list[str]):
         """
-        Create index
+        Load docs into index
+        TODO: ability to add docs?
 
         Args:
             documents: list[str]
@@ -56,17 +62,7 @@ class SourceDocIndex:
             index_impl=self.index_impl,
             model_name=self.model_name,  # type: ignore
         )
-        return index
-
-    def load(self, documents: list[str]):
-        """
-        Load docs into index
-        TODO: ability to add docs?
-
-        Args:
-            documents: list[str]
-        """
-        self.index = self.__create__(documents)
+        self.index = index
 
     def query(
         self,
