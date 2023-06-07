@@ -6,7 +6,7 @@ from typing import Type, cast
 from llama_index import ComposableGraph, GPTVectorStoreIndex
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
-from clients.llama_index.constants import DEFAULT_MODEL_NAME
+from constants.core import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import load_indices
 from types.indices import LlmModel, NamespaceKey

@@ -6,7 +6,7 @@ from typing import Optional, TypeVar, cast
 from llama_index import Document, Response
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
-from clients.llama_index.constants import DEFAULT_MODEL_NAME
+from constants.core import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import maybe_load_index, persist_index
 from types.indices import LlmModel, NamespaceKey, Prompt, RefinePrompt
