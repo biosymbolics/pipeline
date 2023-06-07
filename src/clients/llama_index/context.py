@@ -57,6 +57,7 @@ def get_storage_context(
         directory = get_persist_dir(namespace_key)
         return __load_storage_context(persist_dir=directory)
     elif store_type == "pinecone":
+        # namespace must be filtered at query time
         pinecone_index = get_vector_db(DEFAULT_PINECONE_INDEX)
         vector_store = PineconeVectorStore(pinecone_index, **vector_store_kwargs)
         return __load_storage_context(vector_store=vector_store)

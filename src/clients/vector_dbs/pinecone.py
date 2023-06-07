@@ -4,8 +4,26 @@ Client for pinecone vector db
 import os
 from typing import Any, Mapping
 import pinecone
+from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
+
+from types.indices import NamespaceKey
 
 API_KEY = os.environ["PINECONE_API_KEY"]
+
+
+def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
+    """
+    Get metadata filters for namespace
+
+    Args:
+        namespace (NamespaceKey): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
+    """
+    filters = [
+        ExactMatchFilter(key=key, value=value)
+        for key, value in namespace._asdict().items()
+    ]
+    metadata_filters = MetadataFilters(filters=filters)
+    return metadata_filters
 
 
 def get_vector_db(
