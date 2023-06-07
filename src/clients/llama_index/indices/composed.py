@@ -13,7 +13,7 @@ from clients.llama_index.persistence import load_indices
 from .general import query_index
 
 
-def compose_graph(
+def __compose_graph(
     namespace: str,
     index_type: Type[LlmIndex],
     model_name: LlmModel = DEFAULT_MODEL_NAME,
@@ -50,7 +50,7 @@ def get_composed_index(
         namespace (str): namespace of the index (e.g. SEC-BMY)
         model_name (LlmModel): model name to use for index (optional)
     """
-    index = compose_graph(namespace, GPTVectorStoreIndex, model_name)
+    index = __compose_graph(namespace, GPTVectorStoreIndex, model_name)
     return cast(GPTVectorStoreIndex, index)
 
 

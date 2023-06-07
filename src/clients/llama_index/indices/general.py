@@ -46,10 +46,13 @@ def query_index(
         prompt (QuestionAnswerPrompt): prompt to use for query (optional)
         refine_prompt (RefinePrompt): prompt to use for refine (optional)
     """
-    query_engine = index.as_query_engine(
-        text_qa_template=prompt,
-        refine_template=refine_prompt,
-    )
+    if prompt and refine_prompt:
+        query_engine = index.as_query_engine(
+            text_qa_template=prompt,
+            refine_template=refine_prompt,
+        )
+    else:
+        query_engine = index.as_query_engine()
 
     response = query_engine.query(query)
     if not isinstance(response, Response) or not response.response:
@@ -85,7 +88,7 @@ def get_or_create_index(
         ll_docs = list(map(Document, documents))
         index = index_impl.from_documents(
             ll_docs,
-            # *(index_args or {}),
+            *(index_args or {}),
             service_context=get_service_context(model_name),
             storage_context=get_storage_context(namespace),
         )

@@ -5,7 +5,7 @@ from typing import cast
 from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
-from .llama_index import load_index
+from .persistence import load_index
 
 
 def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
