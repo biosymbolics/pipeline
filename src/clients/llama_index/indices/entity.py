@@ -14,7 +14,7 @@ import logging
 from pydash import compact
 
 from clients.llama_index.indices.vector import get_vector_index
-from clients.llama_index.types import NamespaceKey
+from types.indices import NamespaceKey
 from clients.llama_index.utils import get_namespace
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_NER_TEMPLATE
@@ -61,7 +61,7 @@ def create_entity_index(
         details = entity_obj.get("details")
         namespace = get_namespace(namespace_key)
         index = get_vector_index(
-            ["entities"], index_id + f"{namespace}-{get_id(name)}", [details]
+            ("entities",), index_id + f"{namespace}-{get_id(name)}", [details]
         )
         return index
     except Exception as ex:

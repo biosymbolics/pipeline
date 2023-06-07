@@ -11,7 +11,7 @@ from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from .constants import DEFAULT_MODEL_NAME
 from .context import get_service_context, get_storage_context
-from .types import LlmModel, NamespaceKey
+from types.indices import LlmModel, NamespaceKey
 from .utils import get_persist_dir
 
 

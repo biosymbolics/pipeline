@@ -4,7 +4,7 @@ LlamaIndex utils
 import pathlib
 
 from clients.llama_index.constants import BASE_STORAGE_DIR
-from .types import NamespaceKey
+from types.indices import NamespaceKey
 
 
 def get_namespace(namespace_key: NamespaceKey) -> str:

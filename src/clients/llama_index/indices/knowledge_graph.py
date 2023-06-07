@@ -6,7 +6,7 @@ from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 import logging
 
 from clients.llama_index.constants import DEFAULT_MODEL_NAME
-from clients.llama_index.types import LlmModel, NamespaceKey
+from types.indices import LlmModel, NamespaceKey
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
 from .general import get_or_create_index, query_index
 

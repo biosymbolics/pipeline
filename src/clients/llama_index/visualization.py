@@ -6,7 +6,7 @@ from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
 from .persistence import load_index
-from .types import NamespaceKey
+from types.indices import NamespaceKey
 
 
 def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore

@@ -10,7 +10,7 @@ import html2text
 import requests_random_user_agent  # necessary
 from llama_index.readers.schema.base import Document
 
-from clients.llama_index.types import NamespaceKey
+from types.indices import NamespaceKey
 from clients.llama_index.utils import get_namespace
 from common.utils.file import save_as_file
 from common.utils.url import url_to_filename

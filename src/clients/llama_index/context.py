@@ -12,8 +12,9 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 import logging
 
+from types.indices import LlmModel, NamespaceKey
+
 from .constants import DEFAULT_MODEL_NAME
-from .types import LlmModel, NamespaceKey
 from .utils import get_persist_dir
 
 

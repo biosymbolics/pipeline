@@ -10,7 +10,7 @@ from pydash import compact, flatten
 from common.utils.list import dedup
 
 from . import spacy as spacy_ner
-from .types import is_ner_result
+from types.indices import is_ner_result
 
 # set device to GPU if available
 DEVICE = torch.cuda.current_device() if torch.cuda.is_available() else None

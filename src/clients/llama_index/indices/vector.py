@@ -3,7 +3,7 @@ Functions specific to vector store indices
 """
 from llama_index import GPTVectorStoreIndex
 
-from clients.llama_index.types import NamespaceKey
+from types.indices import NamespaceKey
 
 from .general import get_or_create_index, get_index, query_index
 
