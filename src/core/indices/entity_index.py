@@ -30,6 +30,8 @@ from .types import is_entity_obj, EntityObj
 
 ROOT_ENTITY_DIR = "entities"
 
+ENTITY_VECTOR_STORE_TYPE = "pinecone"
+
 
 def create_entity_indices(
     entities: list[str],
@@ -118,11 +120,11 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
-        # **self.source
         ns = {
             "root": ROOT_ENTITY_DIR,
             "entity": get_id(self.entity_id),
             "entity_type": self.type,
+            **self.source._asdict(),
         }
 
         return dict_to_named_tuple(ns)
@@ -201,7 +203,9 @@ class EntityIndex:
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore
             index_args={
-                "storage_context": get_storage_context(entity_ns, store_type="pinecone")
+                "storage_context": get_storage_context(
+                    entity_ns, store_type=ENTITY_VECTOR_STORE_TYPE
+                )
             },
             get_doc_metadata=__get_metadata,
         )

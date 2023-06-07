@@ -50,18 +50,17 @@ class SourceDocIndex:
 
     def from_documents(self, documents: list[str]):
         """
-        Load docs into index
+        Load docs into index with metadata
 
         Args:
             documents: list[str]
         """
 
         def __get_metadata(doc) -> DocMetadata:
-            # TODO: informative names for keys
-            source_info = {
-                f"source{index+1}": value for index, value in enumerate(self.source)
+            return {
+                "retrieval_date": self.retrieval_date.isoformat(),
+                **self.source._asdict(),
             }
-            return {"retrieval_date": self.retrieval_date.isoformat(), **source_info}
 
         index = create_index(
             self.source,
