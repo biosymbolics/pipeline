@@ -9,7 +9,7 @@ from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from constants.core import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import maybe_load_index, persist_index
-from types.indices import LlmModel, NamespaceKey, Prompt, RefinePrompt
+from types.indices import LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
@@ -66,7 +66,7 @@ def get_or_create_index(
     documents: list[str],
     index_impl: IndexImpl,
     index_args: Optional[dict] = None,
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
 ) -> IndexImpl:
     """
     If nx, create llama index from supplied documents. Otherwise return existing index.
@@ -77,7 +77,7 @@ def get_or_create_index(
         documents (Document): list of llama_index Documents
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
-        model_name (LlmModel): llm model to use
+        model_name (LlmModelType): llm model to use
     """
     index = maybe_load_index(namespace_key, index_id)
     if index:
@@ -94,7 +94,7 @@ def create_index(
     documents: list[str],
     index_impl: IndexImpl,
     index_args: Optional[dict] = None,
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
 ) -> IndexImpl:
     """
     Create llama index from supplied document url
@@ -105,7 +105,7 @@ def create_index(
         documents (Document): list of llama_index Documents
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
-        model_name (LlmModel): llm model to use
+        model_name (LlmModelType): llm model to use
     """
     logging.info("Creating index %s/%s", namespace_key, index_id)
     try:

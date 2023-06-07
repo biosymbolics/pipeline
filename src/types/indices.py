@@ -4,7 +4,7 @@ from llama_index.indices.base import BaseGPTIndex
 
 LlmIndex = BaseGPTIndex  # TODO: abstract?
 NamespaceKey = Tuple[str, ...]
-LlmModel = Literal["ChatGPT", "VertexAI", "Anthropic"]
+LlmModelType = Literal["ChatGPT", "VertexAI", "Anthropic"]
 
 
 # adding these here in case we want to abstract 'em

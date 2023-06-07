@@ -13,7 +13,7 @@ from langchain.llms import Anthropic, VertexAI
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
-from types.indices import LlmModel, NamespaceKey
+from types.indices import LlmModelType, NamespaceKey
 
 from .utils import get_persist_dir
 
@@ -40,12 +40,12 @@ def get_storage_context(namespace_key: NamespaceKey) -> StorageContext:
     return storage_context
 
 
-def __get_llm(model_name: Optional[LlmModel]):
+def __get_llm(model_name: Optional[LlmModelType]):
     """
     Get llm based on model_name
 
     Args:
-        model_name (LlmModel): model to use for llm
+        model_name (LlmModelType): model to use for llm
     """
     common_args = {"temperature": 0.3}
     if model_name == "ChatGPT":
@@ -64,7 +64,7 @@ def __get_llm(model_name: Optional[LlmModel]):
 
 
 def get_service_context(
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
 ) -> ServiceContext:
     """
     Get default service context for llllamama index

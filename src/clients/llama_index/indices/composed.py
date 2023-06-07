@@ -9,14 +9,14 @@ from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from constants.core import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import load_indices
-from types.indices import LlmModel, NamespaceKey
+from types.indices import LlmModelType, NamespaceKey
 from .general import query_index
 
 
 def __compose_graph(
     namespace_key: NamespaceKey,
     index_type: Type[LlmIndex],
-    model_name: LlmModel = DEFAULT_MODEL_NAME,
+    model_name: LlmModelType = DEFAULT_MODEL_NAME,
 ) -> ComposableGraph:
     """
     Composes graph for all indices in namespace
@@ -41,21 +41,23 @@ def __compose_graph(
 
 
 def get_composed_index(
-    namespace_key: NamespaceKey, model_name: LlmModel = DEFAULT_MODEL_NAME
+    namespace_key: NamespaceKey, model_name: LlmModelType = DEFAULT_MODEL_NAME
 ) -> GPTVectorStoreIndex:
     """
     Get llama index from the namespace/index_id
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
-        model_name (LlmModel): model name to use for index (optional)
+        model_name (LlmModelType): model name to use for index (optional)
     """
     index = __compose_graph(namespace_key, GPTVectorStoreIndex, model_name)
     return cast(GPTVectorStoreIndex, index)
 
 
 def query_composed_index(
-    query: str, namespace_key: NamespaceKey, model_name: LlmModel = DEFAULT_MODEL_NAME
+    query: str,
+    namespace_key: NamespaceKey,
+    model_name: LlmModelType = DEFAULT_MODEL_NAME,
 ) -> str:
     """
     Forms and queries a composed index
@@ -63,7 +65,7 @@ def query_composed_index(
     Args:
         query (str): natural language query
         namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
-        model_name (LlmModel): model name to use for index (optional)
+        model_name (LlmModelType): model name to use for index (optional)
     """
     index = get_composed_index(namespace_key, model_name)
     return query_index(index, query)

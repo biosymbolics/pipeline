@@ -6,7 +6,7 @@ from llama_index import GPTKeywordTableIndex
 
 from clients.llama_index import create_index, get_composed_index, query_index
 from constants.core import DEFAULT_MODEL_NAME
-from types.indices import LlmIndex, LlmModel, NamespaceKey, Prompt, RefinePrompt
+from types.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 
 class SourceDocIndex:
@@ -21,7 +21,7 @@ class SourceDocIndex:
         source: NamespaceKey,
         index_id: str,
         index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
-        model_name: LlmModel = DEFAULT_MODEL_NAME,
+        model_name: LlmModelType = DEFAULT_MODEL_NAME,
     ):
         """
         initialize
@@ -30,7 +30,7 @@ class SourceDocIndex:
             source: NamespaceKey
             index_id: str
             index_impl: LlmIndex
-            model_name: LlmModel
+            model_name: LlmModelType
         """
         self.index_impl = index_impl
         self.source = source
@@ -105,13 +105,15 @@ class CompositeSourceDocIndex:
     NOTE: can accept a different model_name than the constituent indices (used for composite index formation)
     """
 
-    def __init__(self, source: NamespaceKey, model_name: LlmModel = DEFAULT_MODEL_NAME):
+    def __init__(
+        self, source: NamespaceKey, model_name: LlmModelType = DEFAULT_MODEL_NAME
+    ):
         """
         initialize
 
         Args:
             source: NamespaceKey
-            model_name: LlmModel
+            model_name: LlmModelType
         """
         self.source = source
         self.index = get_composed_index(source, model_name)

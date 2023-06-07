@@ -1,4 +1,4 @@
-from types.indices import LlmModel
+from types.indices import LlmModelType
 
 
-DEFAULT_MODEL_NAME: LlmModel = "ChatGPT"
+DEFAULT_MODEL_NAME: LlmModelType = "ChatGPT"

@@ -10,7 +10,7 @@ from llama_index import (
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from constants.core import DEFAULT_MODEL_NAME
-from types.indices import LlmModel, NamespaceKey
+from types.indices import LlmModelType, NamespaceKey
 from .context import get_service_context, get_storage_context
 from .utils import get_persist_dir
 
@@ -18,7 +18,7 @@ from .utils import get_persist_dir
 def __load_index_or_indices(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
 ) -> Union[LlmIndex, list[LlmIndex], None]:
     """
     Load persisted index
@@ -73,7 +73,7 @@ def maybe_load_index(namespace_key: NamespaceKey, index_id: str) -> Optional[Llm
 def load_index(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
-    model_name: LlmModel = DEFAULT_MODEL_NAME,
+    model_name: LlmModelType = DEFAULT_MODEL_NAME,
 ) -> LlmIndex:
     """
     Load persisted index
@@ -91,7 +91,7 @@ def load_index(
 
 
 def load_indices(
-    namespace_key: NamespaceKey, model_name: LlmModel = DEFAULT_MODEL_NAME
+    namespace_key: NamespaceKey, model_name: LlmModelType = DEFAULT_MODEL_NAME
 ) -> list[LlmIndex]:
     """
     Load persisted indices
