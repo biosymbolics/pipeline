@@ -23,6 +23,15 @@ class SourceDocIndex:
         index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
         model_name: LlmModel = DEFAULT_MODEL_NAME,
     ):
+        """
+        initialize
+
+        Args:
+            source: NamespaceKey
+            index_id: str
+            index_impl: LlmIndex
+            model_name: LlmModel
+        """
         self.index_impl = index_impl
         self.source = source
         self.index_id = index_id
@@ -32,6 +41,9 @@ class SourceDocIndex:
     def __create__(self, documents):
         """
         Create index
+
+        Args:
+            documents: list[str]
         """
         index = create_index(
             self.source,
@@ -46,6 +58,9 @@ class SourceDocIndex:
         """
         Load docs into index
         TODO: ability to add docs?
+
+        Args:
+            documents: list[str]
         """
         self.index = self.__create__(documents)
 
@@ -57,6 +72,11 @@ class SourceDocIndex:
     ) -> str:
         """
         Query the index
+
+        Args:
+            query_string: str
+            prompt: Optional[Prompt]
+            refine_prompt: Optional[RefinePrompt]
         """
         if not self.index:
             raise ValueError("Index not initialized.")
@@ -86,6 +106,13 @@ class CompositeSourceDocIndex:
     """
 
     def __init__(self, source: NamespaceKey, model_name: LlmModel = DEFAULT_MODEL_NAME):
+        """
+        initialize
+
+        Args:
+            source: NamespaceKey
+            model_name: LlmModel
+        """
         self.source = source
         self.index = get_composed_index(source, model_name)
 
@@ -97,6 +124,11 @@ class CompositeSourceDocIndex:
     ) -> str:
         """
         Query the composite index
+
+        Args:
+            query_string: str
+            prompt: Optional[Prompt]
+            refine_prompt: Optional[RefinePrompt]
         """
         if not self.index:
             raise ValueError("No index found.")

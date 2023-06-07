@@ -10,8 +10,8 @@ from llama_index.prompts.default_prompts import (
     DEFAULT_REFINE_PROMPT_TMPL,
 )
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-import logging
 from pydash import compact
+import logging
 
 from clients.llama_index.indices.vector import get_vector_index
 from types.indices import NamespaceKey
