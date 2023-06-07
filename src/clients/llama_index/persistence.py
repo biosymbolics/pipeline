@@ -52,21 +52,6 @@ def __load_index_or_indices(
 
     except Exception as ex:
         logging.info("Failed to load %s/%s from disk: %s", namespace_key, index_id, ex)
-        print(ex)
-        return None
-
-
-def maybe_load_index(namespace_key: NamespaceKey, index_id: str) -> Optional[LlmIndex]:
-    """
-    Load index if present, otherwise return none
-
-    Args:
-        namespace_key (str): namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-    """
-    try:
-        return load_index(namespace_key, index_id)
-    except Exception:
         return None
 
 
@@ -120,3 +105,17 @@ def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
         index.storage_context.persist(persist_dir=directory)
     except Exception as ex:
         logging.error("Error persisting index: %s", ex)
+
+
+def maybe_load_index(namespace_key: NamespaceKey, index_id: str) -> Optional[LlmIndex]:
+    """
+    Load index if present, otherwise return none
+
+    Args:
+        namespace_key (str): namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+    """
+    try:
+        return load_index(namespace_key, index_id)
+    except Exception:
+        return None

@@ -7,6 +7,7 @@ from llama_index import GPTKeywordTableIndex
 
 from clients.llama_index import create_index, get_composed_index, query_index
 from constants.core import DEFAULT_MODEL_NAME
+from clients.llama_index.types import DocMetadata
 from types.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 
@@ -36,31 +37,39 @@ class SourceDocIndex:
             index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
             model_name (LlmModelType): model name. Defaults to DEFAULT_MODEL_NAME
         """
+        self.index = None  # TODO: load
         self.index_impl = index_impl
-        self.source = source
         self.index_id = index_id
-        self.index = None
-        self.model_name = model_name
+        self.source = source
+        self.model_name: LlmModelType = model_name
         self.retrieval_date = retrieval_date
 
         # if docs provided, load
         if documents:
-            self.load(documents)
+            self.from_documents(documents)
 
-    def load(self, documents: list[str]):
+    def from_documents(self, documents: list[str]):
         """
         Load docs into index
-        TODO: ability to add docs?
 
         Args:
             documents: list[str]
         """
+
+        def __get_metadata(doc) -> DocMetadata:
+            # TODO: informative names for keys
+            source_info = {
+                f"source{index+1}": value for index, value in enumerate(self.source)
+            }
+            return {"retrieval_date": self.retrieval_date.isoformat(), **source_info}
+
         index = create_index(
             self.source,
             self.index_id,
             documents,
             index_impl=self.index_impl,
-            model_name=self.model_name,  # type: ignore
+            model_name=self.model_name,
+            get_doc_metadata=__get_metadata,
         )
         self.index = index
 
@@ -87,6 +96,7 @@ class SourceDocIndex:
             prompt=prompt,
             refine_prompt=refine_prompt,
         )
+
         return answer
 
 

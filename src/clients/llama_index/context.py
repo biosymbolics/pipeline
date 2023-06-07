@@ -1,7 +1,7 @@
 """
 Functions around llama index context
 """
-from typing import Literal, Optional
+from typing import Any, Literal, Mapping, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -41,19 +41,22 @@ def __load_storage_context(**kwargs) -> StorageContext:
 def get_storage_context(
     namespace_key: NamespaceKey,
     store_type: Literal["directory", "pinecone"] = "directory",
+    vector_store_kwargs: Mapping[str, Any] = {},
 ) -> StorageContext:
     """
     Get storage context
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        store_type (Literal["directory", "pinecone"]): type of storage to use
+        vector_store_kwargs (Mapping[str, Any]): kwargs for vector store (currently only used if store_type == pinecone)
     """
     if store_type == "directory":
         directory = get_persist_dir(namespace_key)
         return __load_storage_context(persist_dir=directory)
     elif store_type == "pinecone":
         pinecone_index = init_vector_db(namespace_key)
-        vector_store = PineconeVectorStore(pinecone_index)
+        vector_store = PineconeVectorStore(pinecone_index, **vector_store_kwargs)
         return __load_storage_context(vector_store=vector_store)
 
     raise Exception(f"Unknown store type {store_type}")
@@ -83,13 +86,14 @@ def __get_llm(model_name: Optional[LlmModelType]):
 
 
 def get_service_context(
-    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME, **kwargs
 ) -> ServiceContext:
     """
     Get default service context for llllamama index
 
     Args:
         model_name (Literal["ChatGPT", "VertexAI"]): model to use for llm
+        **kwargs: additional kwargs to pass to ServiceContext.from_defaults
     """
     prompt_helper = PromptHelper(
         context_window=1024, num_output=256, chunk_overlap_ratio=0.1
@@ -99,6 +103,6 @@ def get_service_context(
     llm_predictor = LLMPredictor(llm=llm)
 
     service_context = ServiceContext.from_defaults(
-        llm_predictor=llm_predictor, prompt_helper=prompt_helper
+        **kwargs, llm_predictor=llm_predictor, prompt_helper=prompt_helper
     )
     return service_context

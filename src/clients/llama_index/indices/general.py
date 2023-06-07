@@ -2,14 +2,17 @@
 Client for llama indexes
 """
 import logging
-from typing import Any, Mapping, Optional, TypeVar, cast
+from typing import Optional, TypeVar, Union, cast
 from llama_index import Document, Response
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from constants.core import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
+from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import maybe_load_index, persist_index
 from types.indices import LlmModelType, NamespaceKey, Prompt, RefinePrompt
+
+from ..types import GetDocMetadata
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
@@ -36,6 +39,7 @@ def query_index(
     query: str,
     prompt: Optional[Prompt] = None,
     refine_prompt: Optional[RefinePrompt] = None,
+    **kwargs,
 ) -> str:
     """
     Queries a given index
@@ -45,14 +49,20 @@ def query_index(
         query (str): natural language query
         prompt (QuestionAnswerPrompt): prompt to use for query (optional)
         refine_prompt (RefinePrompt): prompt to use for refine (optional)
+        **kwargs: additional args to pass to the query engine
+
+    TODO: filters=MetadataFilters(filters=[
+        ExactMatchFilter(key='name', value='paul graham'),
+    ]),
     """
     if prompt and refine_prompt:
         query_engine = index.as_query_engine(
+            **kwargs,
             text_qa_template=prompt,
             refine_template=refine_prompt,
         )
     else:
-        query_engine = index.as_query_engine()
+        query_engine = index.as_query_engine(**kwargs)
 
     response = query_engine.query(query)
 
@@ -65,11 +75,11 @@ def query_index(
 def create_index(
     namespace_key: NamespaceKey,
     index_id: str,
-    documents: list[str],
+    documents: Union[list[str], list[Document]],
     index_impl: IndexImpl,
     index_args: Optional[dict] = {},
     model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
-    storage_context_args: Mapping[str, Any] = {},
+    get_doc_metadata: Optional[GetDocMetadata] = None,
 ) -> IndexImpl:
     """
     Create llama index from supplied document url
@@ -77,18 +87,19 @@ def create_index(
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
-        documents (Document): list of llama_index Documents
+        documents (Document): list of strings or docs
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
         model_name (LlmModelType): llm model to use
+        get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
     """
     logging.info("Creating index %s/%s", namespace_key, index_id)
     try:
-        ll_docs = list(map(Document, documents))
+        ll_docs = format_documents(documents, get_doc_metadata)
         index = index_impl.from_documents(
             ll_docs,
             service_context=get_service_context(model_name),
-            storage_context=get_storage_context(namespace_key, **storage_context_args),
+            storage_context=get_storage_context(namespace_key),
             *index_args,
         )
         persist_index(index, namespace_key, index_id)

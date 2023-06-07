@@ -160,6 +160,12 @@ class EntityIndex:
             raise Exception(f"Failed to parse entity {self.entity_id}")
         return entity_obj
 
+    def load(self):
+        """
+        Load entity index from disk
+        """
+        pass
+
     def add_node(
         self,
         source_index: SourceDocIndex,
