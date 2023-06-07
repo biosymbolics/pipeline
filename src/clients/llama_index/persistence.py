@@ -24,7 +24,7 @@ def __load_some_indices(
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> Union[LlmIndex, list[LlmIndex], None]:
     """
-    Load persisted index
+    Load persisted index(es)
 
     Args:
         namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
@@ -125,6 +125,7 @@ def maybe_load_index(
     Args:
         namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
+        context_args (ContextArgs): context args for loading index
     """
     try:
         return load_index(namespace_key, index_id, context_args)
