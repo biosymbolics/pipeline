@@ -23,7 +23,7 @@ def get_storage_context(namespace_key: NamespaceKey) -> StorageContext:
     Get storage context
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
     """
     directory = get_persist_dir(namespace_key)
 

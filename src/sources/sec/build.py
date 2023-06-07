@@ -6,9 +6,9 @@ import re
 from pydash import flatten
 import logging
 
-from clients.llama_index.indices.entity import get_entity_indices
 from common.ner import extract_named_entities
 from common.utils.html_parsing.html import strip_inline_styles
+from core.indices.entity_index import create_entity_indices
 
 from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
 
@@ -48,9 +48,9 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
 
     # this is the slow part
     for period, sections in section_map.items():
-        get_entity_indices(
+        create_entity_indices(
             entities=entities,
-            namespace=ticker,
+            namespace_key=(ticker,),
             index_id=period,
             documents=sections,
         )

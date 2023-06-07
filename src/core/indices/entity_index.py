@@ -1,6 +1,7 @@
 """
 EntityIndex
 """
+from datetime import datetime
 from typing import Optional
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
@@ -26,6 +27,27 @@ from .types import is_entity_obj, EntityObj
 ROOT_ENTITY_DIR = "entities"
 
 
+def create_entity_indices(
+    entities: list[str],
+    namespace_key: NamespaceKey,
+    index_id: str,
+    documents: list[str],
+):
+    """
+    For each entity in the provided list, summarize based on the document and persist in an index
+
+    Args:
+        entities (list[str]): list of entities to get indices for
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+        documents (Document): list of llama_index Documents
+    """
+    index = get_vector_index(namespace_key, index_id, documents)
+    for entity in entities:
+        idx = EntityIndex(entity, namespace_key)
+        idx.add_node(index, index_id)
+
+
 class EntityIndex:
     """
     EntityIndex
@@ -34,7 +56,11 @@ class EntityIndex:
     """
 
     def __init__(
-        self, entity_name: str, source: NamespaceKey, canonical_id: Optional[str] = None
+        self,
+        entity_name: str,
+        source: NamespaceKey,
+        canonical_id: Optional[str] = None,
+        retrieval_date: datetime = datetime.now(),
     ):
         """
         Initialize EntityIndex
@@ -43,12 +69,15 @@ class EntityIndex:
             entity_name (str): entity name
             source (NamespaceKey): source of the entity
             canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
+            retrieval_date (datetime, optional): retrieval date of the entity. Defaults to datetime.now().
         """
         self.orig_entity_id = entity_name
         self.parsed_entity_id: Optional[str] = None  # this gets set later
+        self.ids: list[str] = []  # all entity ids
         self.canonical_id = canonical_id
         self.type = "intervention"
         self.source = source
+        self.retrieval_date = retrieval_date
 
     @property
     def entity_id(self) -> str:
@@ -57,12 +86,23 @@ class EntityIndex:
         """
         return self.parsed_entity_id or self.orig_entity_id
 
+    def __add_id(self, new_id: str):
+        """
+        Add new entity id to the list
+
+        Args:
+            new_id (str): new entity id
+        """
+        ids = [*self.ids, new_id]
+        self.ids = ids
+
     def __maybe_set_parsed_id(self, new_parsed_id: str) -> None:
         """
         Set parsed entity name if not set
         """
         if not self.parsed_entity_id:
             self.parsed_entity_id = new_parsed_id
+        self.__add_id(new_parsed_id)
 
     def __get_response_schemas(self) -> list[ResponseSchema]:
         """
@@ -88,7 +128,7 @@ class EntityIndex:
         """
         return (ROOT_ENTITY_DIR, get_id(self.entity_id), self.type, *self.source)
 
-    def __describe_entity_via_source(self, source_index: LlmIndex) -> EntityObj:
+    def __describe_entity_by_source(self, source_index: LlmIndex) -> EntityObj:
         """
         Get the description of an entity by querying the source index
 
@@ -119,28 +159,44 @@ class EntityIndex:
             raise Exception(f"Failed to parse entity {self.entity_id}")
         return entity_obj
 
-    def add_index(
+    def add_node(
         self,
         source_index: LlmIndex,
         index_id: str,
     ) -> Optional[GPTVectorStoreIndex]:
         """
-        Add an index for this entity based on the source index,
+        Create a node for this entity based on the source index,
         for example, an index for intervention BIBB122 based on some SEC 10-K filings
+
+        Args:
+            source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
+            index_id (str): unique id of the index (e.g. 2020-01-1)
         """
         # get entity details by querying the source index
-        entity_obj = self.__describe_entity_via_source(source_index)
-
-        parsed_name = entity_obj["name"]
-        details = entity_obj["details"]
+        entity_obj = self.__describe_entity_by_source(source_index)
+        name, details = dict(entity_obj)
 
         # maybe set parsed name
-        self.__maybe_set_parsed_id(parsed_name)
+        self.__maybe_set_parsed_id(name)
 
-        # btw uses self.parsed_entity_name (sketchy)
         entity_ns = self.__get_entity_namespace()
 
         # create index
         index = get_vector_index(entity_ns, index_id, [details])
 
         return index
+
+    def add_node_from_docs(
+        self,
+        documents: list[str],
+        index_id: str,
+    ) -> Optional[GPTVectorStoreIndex]:
+        """
+        Create a node for this entity based on the supplied documents
+
+        Args:
+            documents (list[str]): list of documents
+            index_id (str): unique id of the index (e.g. 2020-01-1)
+        """
+        index = get_vector_index(self.source, index_id, documents)
+        return self.add_node(index, index_id)

@@ -1,6 +1,7 @@
 """
 SourceDocIndex
 """
+from datetime import datetime
 from typing import Optional
 from llama_index import GPTKeywordTableIndex
 
@@ -20,6 +21,7 @@ class SourceDocIndex:
         self,
         source: NamespaceKey,
         index_id: str,
+        retrieval_date: datetime = datetime.now(),
         index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
         model_name: LlmModelType = DEFAULT_MODEL_NAME,
     ):
@@ -27,16 +29,18 @@ class SourceDocIndex:
         initialize
 
         Args:
-            source: NamespaceKey
-            index_id: str
-            index_impl: LlmIndex
-            model_name: LlmModelType
+            source (NamespaceKey): source of the index
+            index_id (str): id of the index
+            retrieval_date (datetime, optional): retrieval date of source doc
+            index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
+            model_name (LlmModelType): model name. Defaults to DEFAULT_MODEL_NAME
         """
         self.index_impl = index_impl
         self.source = source
         self.index_id = index_id
         self.index = None
         self.model_name = model_name
+        self.retrieval_date = retrieval_date
 
     def __create__(self, documents):
         """
@@ -74,9 +78,9 @@ class SourceDocIndex:
         Query the index
 
         Args:
-            query_string: str
-            prompt: Optional[Prompt]
-            refine_prompt: Optional[RefinePrompt]
+            query_string (str): query string
+            prompt (Prompt, optional): prompt. Defaults to None.
+            refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """
         if not self.index:
             raise ValueError("Index not initialized.")
@@ -96,9 +100,9 @@ class CompositeSourceDocIndex:
 
     Can accept "source" at any level.
     For example:
-      - ["BIBB", "SEC", "10-K"] will query over all years of BIBB (Biogen) 10-K docs (year is index_id)
-      - ["BIBB", "SEC", "8-K"] will query over all years of BIBB 8-K docs
-      - ["BIBB", "SEC"] will query over all years all SEC docs
+      - ("BIBB", "SEC", "10-K") will query over all years of BIBB (Biogen) 10-K docs (year is index_id)
+      - ("BIBB", "SEC", "8-K") will query over all years of BIBB 8-K docs
+      - ("BIBB", "SEC") will query over all years all SEC docs
 
     TODO: ability to pull, for example, "all 10-K docs mentioning X" (regardless of company)
 
@@ -112,8 +116,8 @@ class CompositeSourceDocIndex:
         initialize
 
         Args:
-            source: NamespaceKey
-            model_name: LlmModelType
+            source (NamespaceKey): source of the index
+            model_name (LlmModelType): model name. Defaults to DEFAULT_MODEL_NAME
         """
         self.source = source
         self.index = get_composed_index(source, model_name)
@@ -128,9 +132,9 @@ class CompositeSourceDocIndex:
         Query the composite index
 
         Args:
-            query_string: str
-            prompt: Optional[Prompt]
-            refine_prompt: Optional[RefinePrompt]
+            query_string (str): query string
+            prompt (Prompt, optional): prompt. Defaults to None.
+            refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """
         if not self.index:
             raise ValueError("No index found.")

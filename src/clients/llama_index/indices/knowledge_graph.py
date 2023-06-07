@@ -25,7 +25,7 @@ def create_and_query_kg_index(
 
     Args:
         query (str): natural language query
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
         model_name (LlmModelType): model name
@@ -46,7 +46,7 @@ def get_kg_index(
     Creates the kg index if nx, and returns
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
         model_name (LlmModelType): model name

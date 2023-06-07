@@ -14,7 +14,7 @@ def query_vector_index(query: str, namespace_key: NamespaceKey, index_id: str) -
 
     Args:
         query (str): natural language query
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     index = get_index(namespace_key, index_id)
@@ -30,7 +30,7 @@ def create_and_query_vector_index(
 
     Args:
         query (str): natural language query
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
@@ -46,7 +46,7 @@ def get_vector_index(
     Creates or returns the vectore store index if nx, and queries
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
