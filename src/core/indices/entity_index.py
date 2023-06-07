@@ -1,6 +1,7 @@
 """
 EntityIndex
 """
+from collections import namedtuple
 from datetime import datetime
 from typing import Optional
 from llama_index import GPTVectorStoreIndex
@@ -19,6 +20,7 @@ from clients.llama_index import (
 )
 from clients.llama_index.context import get_storage_context
 from clients.llama_index.types import DocMetadata
+from common.utils.misc import dict_to_named_tuple
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from types.indices import NamespaceKey
@@ -116,7 +118,14 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
-        return (ROOT_ENTITY_DIR, get_id(self.entity_id), self.type, *self.source)
+        # **self.source
+        ns = {
+            "root": ROOT_ENTITY_DIR,
+            "entity": get_id(self.entity_id),
+            "entity_type": self.type,
+        }
+
+        return dict_to_named_tuple(ns)
 
     def __describe_entity_by_source(self, source_index: SourceDocIndex) -> EntityObj:
         """

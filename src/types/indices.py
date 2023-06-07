@@ -1,9 +1,9 @@
-from typing import Literal, Tuple
+from typing import Literal, NamedTuple
 from llama_index import QuestionAnswerPrompt, RefinePrompt
 from llama_index.indices.base import BaseGPTIndex
 
 LlmIndex = BaseGPTIndex  # TODO: abstract?
-NamespaceKey = Tuple[str, ...]
+NamespaceKey = NamedTuple
 LlmModelType = Literal["ChatGPT", "VertexAI", "Anthropic"]
 
 

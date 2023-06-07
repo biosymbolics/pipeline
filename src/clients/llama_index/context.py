@@ -14,10 +14,12 @@ from langchain.llms import Anthropic, VertexAI
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
-from clients.vector_dbs.pinecone import init_vector_db
+from clients.vector_dbs.pinecone import get_vector_db
 from types.indices import LlmModelType, NamespaceKey
 
 from .utils import get_persist_dir
+
+DEFAULT_PINECONE_INDEX = "biosymbolics"
 
 
 def __load_storage_context(**kwargs) -> StorageContext:
@@ -55,7 +57,7 @@ def get_storage_context(
         directory = get_persist_dir(namespace_key)
         return __load_storage_context(persist_dir=directory)
     elif store_type == "pinecone":
-        pinecone_index = init_vector_db(namespace_key)
+        pinecone_index = get_vector_db(DEFAULT_PINECONE_INDEX)
         vector_store = PineconeVectorStore(pinecone_index, **vector_store_kwargs)
         return __load_storage_context(vector_store=vector_store)
 
