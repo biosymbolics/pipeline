@@ -8,7 +8,7 @@ from llama_index import GPTKeywordTableIndex
 from clients.llama_index import create_index, get_composed_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
-from types.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
+from types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 
 class SourceDocIndex:

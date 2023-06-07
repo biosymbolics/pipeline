@@ -184,8 +184,10 @@ class EntityIndex:
         def __get_metadata(doc) -> DocMetadata:
             return {
                 **source._asdict(),
+                "canonical_id": self.canonical_id or "",
+                "entity_name": name
+                or "",  # parsed name; may differ by source and from entity_id
                 "retrieval_date": self.retrieval_date.isoformat(),
-                "entity_name": name,  # parsed name; may differ by source and from entity_id
             }
 
         index = create_index(
