@@ -20,7 +20,7 @@ from clients.llama_index import (
 from clients.llama_index.context import get_storage_context
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
-from types.indices import LlmIndex, NamespaceKey
+from types.indices import NamespaceKey
 
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
