@@ -18,7 +18,11 @@ from clients.llama_index import (
     parse_answer,
 )
 from clients.llama_index import get_index, query_index
-from clients.llama_index.context import get_storage_context
+from clients.llama_index.context import (
+    get_storage_context,
+    DEFAULT_CONTEXT_ARGS,
+    ContextArgs,
+)
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
@@ -67,6 +71,7 @@ class EntityIndex:
         source: NamespaceKey,
         canonical_id: Optional[str] = None,
         retrieval_date: datetime = datetime.now(),
+        context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
     ):
         """
         Initialize EntityIndex
@@ -78,6 +83,7 @@ class EntityIndex:
             retrieval_date (datetime, optional): retrieval date of the entity. Defaults to datetime.now().
         """
         self.canonical_id = canonical_id
+        self.context_args = context_args
         self.index = None
         self.entity_id = entity_name
         self.retrieval_date = retrieval_date
@@ -152,7 +158,8 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = get_index(self.namespace)
+        index = get_index(self.namespace, context_args=self.context_args)
+        self.index = index
 
     def add_node(
         self,

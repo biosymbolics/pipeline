@@ -13,7 +13,7 @@ from clients.llama_index.context import (
     ContextArgs,
 )
 from clients.llama_index.persistence import load_indices
-from types.indices import LlmModelType, NamespaceKey
+from types.indices import NamespaceKey
 from .general import query_index
 
 
