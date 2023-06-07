@@ -69,20 +69,44 @@ def get_or_create_index(
     model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
 ) -> IndexImpl:
     """
-    Create llama index from supplied document url
-    Skips creation if it already exists
+    If nx, create llama index from supplied documents. Otherwise return existing index.
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
-        LlmIndex (LlmIndex): the llama index type to use
+        index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
+        model_name (LlmModel): llm model to use
     """
     index = maybe_load_index(namespace_key, index_id)
     if index:
         return cast(IndexImpl, index)
 
+    return create_index(
+        namespace_key, index_id, documents, index_impl, index_args, model_name
+    )
+
+
+def create_index(
+    namespace_key: NamespaceKey,
+    index_id: str,
+    documents: list[str],
+    index_impl: IndexImpl,
+    index_args: Optional[dict] = None,
+    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+) -> IndexImpl:
+    """
+    Create llama index from supplied document url
+
+    Args:
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+        documents (Document): list of llama_index Documents
+        index_impl (IndexImpl): the llama index type to use
+        index_args (dict): args to pass to the LlmIndex obj
+        model_name (LlmModel): llm model to use
+    """
     logging.info("Creating index %s/%s", namespace_key, index_id)
     try:
         ll_docs = list(map(Document, documents))
