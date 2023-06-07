@@ -110,36 +110,3 @@ def create_index(
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
         raise ex
-
-
-def get_or_create_index(
-    namespace_key: NamespaceKey,
-    index_id: str,
-    documents: list[str],
-    index_impl: IndexImpl,
-    index_args: Optional[dict] = None,
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> IndexImpl:
-    """
-    If nx, create llama index from supplied documents. Otherwise return existing index.
-
-    Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-        documents (Document): list of llama_index Documents
-        index_impl (IndexImpl): the llama index type to use
-        index_args (dict): args to pass to the LlmIndex obj
-        context_args (ContextArgs): context args for loading index
-    """
-    index = maybe_load_index(namespace_key, index_id, context_args)
-    if index:
-        return cast(IndexImpl, index)
-
-    return create_index(
-        namespace_key,
-        index_id,
-        documents,
-        index_impl,
-        index_args,
-        context_args=context_args,
-    )

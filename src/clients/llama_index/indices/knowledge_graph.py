@@ -7,7 +7,7 @@ import logging
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from types.indices import LlmModelType, NamespaceKey
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
-from .general import get_or_create_index, query_index
+from .general import create_index, query_index
 
 MAX_TRIPLES = 400
 
@@ -29,13 +29,13 @@ def create_and_query_kg_index(
         documents (Document): list of llama_index Documents
         context_args (ContextArgs): context args for loading index
     """
-    index = get_kg_index(namespace_key, index_id, documents, context_args)
+    index = create_kg_index(namespace_key, index_id, documents, context_args)
     answer = query_index(index, query)
     logging.info("Answer: %s", answer)
     return answer
 
 
-def get_kg_index(
+def create_kg_index(
     namespace_key: NamespaceKey,
     index_id: str,
     documents: list[str],
@@ -50,7 +50,7 @@ def get_kg_index(
         documents (Document): list of llama_index Documents
         context_args (ContextArgs): context args for loading index
     """
-    return get_or_create_index(
+    return create_index(
         namespace_key,
         index_id,
         documents,
