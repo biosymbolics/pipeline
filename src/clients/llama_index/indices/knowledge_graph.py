@@ -27,7 +27,7 @@ def create_and_query_kg_index(
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
-        model_name (LlmModelType): model name
+        context_args (ContextArgs): context args for loading index
     """
     index = get_kg_index(namespace_key, index_id, documents, context_args)
     answer = query_index(index, query)
@@ -48,7 +48,7 @@ def get_kg_index(
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
-        model_name (LlmModelType): model name
+        context_args (ContextArgs): context args for loading index
     """
     return get_or_create_index(
         namespace_key,

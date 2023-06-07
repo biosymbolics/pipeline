@@ -92,7 +92,7 @@ def create_index(
         documents (Document): list of strings or docs
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
-        model_name (LlmModelType): llm model to use
+        context_args (ContextArgs): context args for loading index
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
     """
     logging.info("Creating index %s/%s", namespace_key, index_id)
@@ -130,7 +130,7 @@ def get_or_create_index(
         documents (Document): list of llama_index Documents
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
-        model_name (LlmModelType): llm model to use
+        context_args (ContextArgs): context args for loading index
     """
     index = maybe_load_index(namespace_key, index_id, context_args)
     if index:
