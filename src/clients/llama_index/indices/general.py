@@ -4,7 +4,6 @@ Client for llama indexes
 import logging
 from typing import Optional, TypeVar, Union, cast
 from llama_index import Document, Response
-from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from clients.llama_index.context import (
     get_service_context,
@@ -14,7 +13,7 @@ from clients.llama_index.context import (
 )
 from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import maybe_load_index, persist_index
-from types.indices import LlmModelType, NamespaceKey, Prompt, RefinePrompt
+from types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
 

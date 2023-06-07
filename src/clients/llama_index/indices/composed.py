@@ -4,7 +4,6 @@ Functions specific to composed indices
 import logging
 from typing import Type, cast
 from llama_index import ComposableGraph, GPTVectorStoreIndex
-from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from clients.llama_index.context import (
     get_service_context,
@@ -13,7 +12,7 @@ from clients.llama_index.context import (
     ContextArgs,
 )
 from clients.llama_index.persistence import load_indices
-from types.indices import NamespaceKey
+from types.indices import LlmIndex, NamespaceKey
 from .general import query_index
 
 

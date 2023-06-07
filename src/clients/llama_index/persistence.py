@@ -7,9 +7,8 @@ from llama_index import (
     load_index_from_storage,
     load_indices_from_storage,
 )
-from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
-from types.indices import NamespaceKey
+from types.indices import LlmIndex, NamespaceKey
 from .context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
