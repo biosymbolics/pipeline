@@ -42,7 +42,7 @@ def create_entity_indices(
 
     Args:
         entities (list[str]): list of entities to get indices for
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
@@ -71,7 +71,7 @@ class EntityIndex:
 
         Args:
             entity_name (str): entity name
-            source (NamespaceKey): source of the entity
+            source (NamespaceKey): source of the entity (named tuple; order and key names matter)
             canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
             retrieval_date (datetime, optional): retrieval date of the entity. Defaults to datetime.now().
         """
@@ -186,15 +186,12 @@ class EntityIndex:
 
         entity_ns = self.__get_entity_namespace()
 
+        # critical retrieval metadata
         def __get_metadata(doc) -> DocMetadata:
-            # TODO: informative names for keys
-            source_info = {
-                f"source{index+1}": value for index, value in enumerate(self.source)
-            }
             return {
+                **self.source._asdict(),
                 "retrieval_date": self.retrieval_date.isoformat(),
                 "name": name,
-                **source_info,
             }
 
         # create index

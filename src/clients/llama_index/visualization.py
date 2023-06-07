@@ -27,7 +27,7 @@ def visualize_network(namespace_key: NamespaceKey, index_id: str):
     Visualize network
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     index = load_index(namespace_key, index_id)
@@ -61,7 +61,7 @@ def list_triples(namespace_key: NamespaceKey, index_id: str):
     List triples
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     index = load_index(namespace_key, index_id)

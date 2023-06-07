@@ -49,7 +49,7 @@ def get_storage_context(
     Get storage context
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         store_type (Literal["directory", "pinecone"]): type of storage to use
         vector_store_kwargs (Mapping[str, Any]): kwargs for vector store (currently only used if store_type == pinecone)
     """

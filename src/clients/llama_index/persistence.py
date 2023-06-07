@@ -24,7 +24,7 @@ def __load_index_or_indices(
     Load persisted index
 
     Args:
-        namespace_key (str): namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
             all indices loaded if unspecified.
         model_name (optional str): model name to use for index
@@ -64,7 +64,7 @@ def load_index(
     Load persisted index
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
     """
     index = __load_index_or_indices(namespace_key, index_id, model_name=model_name)
@@ -82,7 +82,7 @@ def load_indices(
     Load persisted indices
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
     """
     indices = __load_index_or_indices(namespace_key, model_name=model_name)
     if not isinstance(indices, list):
@@ -96,7 +96,7 @@ def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
 
     Args:
         index (LlmIndex): any generic LLM Index
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
@@ -112,7 +112,7 @@ def maybe_load_index(namespace_key: NamespaceKey, index_id: str) -> Optional[Llm
     Load index if present, otherwise return none
 
     Args:
-        namespace_key (str): namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:

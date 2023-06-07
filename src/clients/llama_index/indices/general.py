@@ -25,7 +25,7 @@ def get_index(
     Get llama index from the namespace/index_id
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     index = maybe_load_index(namespace_key, index_id)
@@ -85,7 +85,7 @@ def create_index(
     Create llama index from supplied document url
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of strings or docs
         index_impl (IndexImpl): the llama index type to use
@@ -121,7 +121,7 @@ def get_or_create_index(
     If nx, create llama index from supplied documents. Otherwise return existing index.
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
         index_impl (IndexImpl): the llama index type to use

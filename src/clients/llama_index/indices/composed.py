@@ -22,7 +22,7 @@ def __compose_graph(
     Composes graph for all indices in namespace
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
     """
     indices = load_indices(namespace_key)
     index_summary = [
@@ -47,7 +47,7 @@ def get_composed_index(
     Get llama index from the namespace/index_id
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         model_name (LlmModelType): model name to use for index (optional)
     """
     index = __compose_graph(namespace_key, GPTVectorStoreIndex, model_name)
@@ -64,7 +64,7 @@ def query_composed_index(
 
     Args:
         query (str): natural language query
-        namespace_key (NamespaceKey) namespace of the index (e.g. ("BIBB", "SEC", "10-K"))
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         model_name (LlmModelType): model name to use for index (optional)
     """
     index = get_composed_index(namespace_key, model_name)

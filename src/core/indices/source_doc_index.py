@@ -106,9 +106,9 @@ class CompositeSourceDocIndex:
 
     Can accept "source" at any level.
     For example:
-      - ("BIBB", "SEC", "10-K") will query over all years of BIBB (Biogen) 10-K docs (year is index_id)
-      - ("BIBB", "SEC", "8-K") will query over all years of BIBB 8-K docs
-      - ("BIBB", "SEC") will query over all years all SEC docs
+      - (company="BIBB", doc_source="SEC", doc_type="10-K") will query over all years of BIBB (Biogen) 10-K docs (year is index_id)
+      - (company="BIBB", doc_source="SEC", doc_type="8-K") will query over all years of BIBB 8-K docs
+      - (company="BIBB", doc_type="SEC") will query over all years all SEC docs
 
     TODO: ability to pull, for example, "all 10-K docs mentioning X" (regardless of company)
 
