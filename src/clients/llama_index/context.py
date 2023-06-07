@@ -1,7 +1,7 @@
 """
 Functions around llama index context
 """
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal, Mapping, NamedTuple, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -42,7 +42,7 @@ def __load_storage_context(**kwargs) -> StorageContext:
 
 def get_storage_context(
     namespace_key: NamespaceKey,
-    store_type: Literal["directory", "pinecone"] = "directory",
+    store_type: Optional[Literal["directory", "pinecone"]] = "directory",
     vector_store_kwargs: Mapping[str, Any] = {},
 ) -> StorageContext:
     """
@@ -109,3 +109,11 @@ def get_service_context(
         **kwargs, llm_predictor=llm_predictor, prompt_helper=prompt_helper
     )
     return service_context
+
+
+ContextArgs = NamedTuple(
+    "ContextArgs",
+    [("model_name", Optional[LlmModelType]), ("storage_args", dict[str, Any])],
+)
+
+DEFAULT_CONTEXT_ARGS = ContextArgs(model_name=DEFAULT_MODEL_NAME, storage_args={})

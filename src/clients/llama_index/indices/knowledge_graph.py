@@ -1,11 +1,10 @@
 """
 Functions specific to knowledge graph indices
 """
-from typing import Optional
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 import logging
 
-from constants.core import DEFAULT_MODEL_NAME
+from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from types.indices import LlmModelType, NamespaceKey
 from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
 from .general import get_or_create_index, query_index
@@ -18,7 +17,7 @@ def create_and_query_kg_index(
     namespace_key: NamespaceKey,
     index_id: str,
     documents: list[str],
-    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> str:
     """
     Creates or gets the kg index and queries
@@ -30,7 +29,7 @@ def create_and_query_kg_index(
         documents (Document): list of llama_index Documents
         model_name (LlmModelType): model name
     """
-    index = get_kg_index(namespace_key, index_id, documents, model_name=model_name)
+    index = get_kg_index(namespace_key, index_id, documents, context_args)
     answer = query_index(index, query)
     logging.info("Answer: %s", answer)
     return answer
@@ -40,7 +39,7 @@ def get_kg_index(
     namespace_key: NamespaceKey,
     index_id: str,
     documents: list[str],
-    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> GPTKnowledgeGraphIndex:
     """
     Creates the kg index if nx, and returns
@@ -61,5 +60,5 @@ def get_kg_index(
             "max_knowledge_triplets": MAX_TRIPLES,
             "include_embeddings": True,
         },
-        model_name=model_name,
+        context_args=context_args,
     )

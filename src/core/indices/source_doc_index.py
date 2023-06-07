@@ -6,7 +6,7 @@ from typing import Optional
 from llama_index import GPTKeywordTableIndex
 
 from clients.llama_index import create_index, get_composed_index, query_index
-from constants.core import DEFAULT_MODEL_NAME
+from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
 from types.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
@@ -22,10 +22,10 @@ class SourceDocIndex:
         self,
         source: NamespaceKey,
         index_id: str,
+        context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
         documents: Optional[list[str]] = None,
-        retrieval_date: datetime = datetime.now(),
         index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
-        model_name: LlmModelType = DEFAULT_MODEL_NAME,
+        retrieval_date: datetime = datetime.now(),
     ):
         """
         initialize
@@ -33,15 +33,16 @@ class SourceDocIndex:
         Args:
             source (NamespaceKey): source of the index
             index_id (str): id of the index
-            retrieval_date (datetime, optional): retrieval date of source doc
+            context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
+            documents (list[str], optional): list of documents. Defaults to None. Can be loaded later with from_documents().
             index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
-            model_name (LlmModelType): model name. Defaults to DEFAULT_MODEL_NAME
+            retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
+        self.context_args = context_args
         self.index = None  # TODO: load
         self.index_impl = index_impl
         self.index_id = index_id
         self.source = source
-        self.model_name: LlmModelType = model_name
         self.retrieval_date = retrieval_date
 
         # if docs provided, load
@@ -67,8 +68,8 @@ class SourceDocIndex:
             self.index_id,
             documents,
             index_impl=self.index_impl,
-            model_name=self.model_name,
             get_doc_metadata=__get_metadata,
+            context_args=self.context_args,
         )
         self.index = index
 
@@ -115,17 +116,19 @@ class CompositeSourceDocIndex:
     """
 
     def __init__(
-        self, source: NamespaceKey, model_name: LlmModelType = DEFAULT_MODEL_NAME
+        self,
+        source: NamespaceKey,
+        context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
     ):
         """
         initialize
 
         Args:
             source (NamespaceKey): source of the index
-            model_name (LlmModelType): model name. Defaults to DEFAULT_MODEL_NAME
+            context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
         """
         self.source = source
-        self.index = get_composed_index(source, model_name)
+        self.index = get_composed_index(source, context_args)
 
     def query(
         self,

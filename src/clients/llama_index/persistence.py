@@ -9,16 +9,20 @@ from llama_index import (
 )
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
-from constants.core import DEFAULT_MODEL_NAME
-from types.indices import LlmModelType, NamespaceKey
-from .context import get_service_context, get_storage_context
+from types.indices import NamespaceKey
+from .context import (
+    DEFAULT_CONTEXT_ARGS,
+    ContextArgs,
+    get_service_context,
+    get_storage_context,
+)
 from .utils import get_persist_dir
 
 
-def __load_index_or_indices(
+def __load_some_indices(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
-    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> Union[LlmIndex, list[LlmIndex], None]:
     """
     Load persisted index
@@ -27,12 +31,14 @@ def __load_index_or_indices(
         namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         index_id (optional str): unique id of the index (e.g. 2020-01-1).
             all indices loaded if unspecified.
-        model_name (optional str): model name to use for index
+        context_args (ContextArgs): context args for loading index
     """
     try:
         logging.info("Attempting to load index %s/%s", namespace_key, index_id)
-        storage_context = get_storage_context(namespace_key)
-        service_context = get_service_context(model_name)
+        storage_context = get_storage_context(
+            namespace_key, **context_args.storage_args
+        )
+        service_context = get_service_context(model_name=context_args.model_name)
 
         if index_id:
             index = load_index_from_storage(
@@ -58,16 +64,17 @@ def __load_index_or_indices(
 def load_index(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
-    model_name: LlmModelType = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> LlmIndex:
     """
     Load persisted index
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (optional str): unique id of the index (e.g. 2020-01-1).
+        index_id (str): unique id of the index (e.g. 2020-01-1).
+        context_args (ContextArgs): context args for loading index
     """
-    index = __load_index_or_indices(namespace_key, index_id, model_name=model_name)
+    index = __load_some_indices(namespace_key, index_id, context_args)
     if isinstance(index, list):
         raise Exception("Expected single index, got list")
     if isinstance(index, LlmIndex):
@@ -76,7 +83,8 @@ def load_index(
 
 
 def load_indices(
-    namespace_key: NamespaceKey, model_name: LlmModelType = DEFAULT_MODEL_NAME
+    namespace_key: NamespaceKey,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> list[LlmIndex]:
     """
     Load persisted indices
@@ -84,7 +92,7 @@ def load_indices(
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
     """
-    indices = __load_index_or_indices(namespace_key, model_name=model_name)
+    indices = __load_some_indices(namespace_key, None, context_args)
     if not isinstance(indices, list):
         raise Exception("Expected list of indices, got single index")
     return indices
@@ -108,7 +116,9 @@ def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
 
 
 def maybe_load_index(
-    namespace_key: NamespaceKey, index_id: Optional[str] = None
+    namespace_key: NamespaceKey,
+    index_id: Optional[str] = None,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> Optional[LlmIndex]:
     """
     Load index if present, otherwise return none
@@ -118,6 +128,6 @@ def maybe_load_index(
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     try:
-        return load_index(namespace_key, index_id)
+        return load_index(namespace_key, index_id, context_args)
     except Exception:
         return None
