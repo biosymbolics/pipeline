@@ -44,18 +44,25 @@ class EntityIndex:
             source (NamespaceKey): source of the entity
             canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
         """
-        self.orig_entity_name = entity_name
-        self.parsed_entity_name: Optional[str] = None  # this gets set later
+        self.orig_entity_id = entity_name
+        self.parsed_entity_id: Optional[str] = None  # this gets set later
         self.canonical_id = canonical_id
         self.type = "intervention"
         self.source = source
 
     @property
-    def entity_name(self) -> str:
+    def entity_id(self) -> str:
         """
-        Returns entity name (parsed name if existing, otherwise original)
+        Returns entity id (parsed name if existing, otherwise original)
         """
-        return self.parsed_entity_name or self.orig_entity_name
+        return self.parsed_entity_id or self.orig_entity_id
+
+    def __maybe_set_parsed_id(self, new_parsed_id: str) -> None:
+        """
+        Set parsed entity name if not set
+        """
+        if not self.parsed_entity_id:
+            self.parsed_entity_id = new_parsed_id
 
     def __get_response_schemas(self) -> list[ResponseSchema]:
         """
@@ -79,14 +86,17 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
-        return (ROOT_ENTITY_DIR, get_id(self.entity_name), self.type, *self.source)
+        return (ROOT_ENTITY_DIR, get_id(self.entity_id), self.type, *self.source)
 
-    def __query_source_doc(self, source_index: LlmIndex) -> EntityObj:
+    def __describe_entity_via_source(self, source_index: LlmIndex) -> EntityObj:
         """
-        Query source index for the entity
+        Get the description of an entity by querying the source index
+
+        Args:
+            source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
         """
         # get prompt to get details about entity
-        query = GET_BIOMEDICAL_ENTITY_TEMPLATE(self.entity_name)
+        query = GET_BIOMEDICAL_ENTITY_TEMPLATE(self.entity_id)
 
         # get the answer as json
         output_parser = get_output_parser(self.__get_response_schemas())
@@ -106,25 +116,26 @@ class EntityIndex:
 
         # type check
         if not is_entity_obj(entity_obj):
-            raise Exception(f"Failed to parse entity {self.entity_name}")
+            raise Exception(f"Failed to parse entity {self.entity_id}")
         return entity_obj
 
-    def create(
+    def add_index(
         self,
         source_index: LlmIndex,
         index_id: str,
     ) -> Optional[GPTVectorStoreIndex]:
         """
-        Summarize entity based on a source doc and persist in an index
+        Add an index for this entity based on the source index,
+        for example, an index for intervention BIBB122 based on some SEC 10-K filings
         """
         # get entity details by querying the source index
-        entity_obj = self.__query_source_doc(source_index)
+        entity_obj = self.__describe_entity_via_source(source_index)
 
         parsed_name = entity_obj["name"]
         details = entity_obj["details"]
 
-        # set attribute
-        self.parsed_entity_name = parsed_name
+        # maybe set parsed name
+        self.__maybe_set_parsed_id(parsed_name)
 
         # btw uses self.parsed_entity_name (sketchy)
         entity_ns = self.__get_entity_namespace()
