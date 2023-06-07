@@ -28,7 +28,7 @@ from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
-from types.indices import NamespaceKey
+from local_types.indices import NamespaceKey
 
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
@@ -62,7 +62,7 @@ class EntityIndex:
     """
     EntityIndex
 
-    An index for a single entity (though potentially from different sources/different times)
+    An index for a single entity across different docs/dates
     """
 
     def __init__(

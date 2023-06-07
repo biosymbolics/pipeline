@@ -6,7 +6,7 @@ from typing import Any, Mapping
 import pinecone
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 
-from types.indices import NamespaceKey
+from local_types.indices import NamespaceKey
 
 API_KEY = os.environ["PINECONE_API_KEY"]
 

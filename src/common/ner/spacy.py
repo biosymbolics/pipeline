@@ -14,7 +14,7 @@ from common.utils.list import has_intersection
 
 from .debugging import debug_pipeline
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from types.indices import KbLinker
+from .types import KbLinker
 
 ENTITY_TYPES = ["PRODUCT"]
 

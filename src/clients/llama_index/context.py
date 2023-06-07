@@ -15,7 +15,7 @@ import logging
 
 from constants.core import DEFAULT_MODEL_NAME
 from clients.vector_dbs.pinecone import get_vector_db
-from types.indices import LlmModelType, NamespaceKey
+from local_types.indices import LlmModelType, NamespaceKey
 
 from .utils import get_persist_dir
 

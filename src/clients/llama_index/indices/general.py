@@ -13,7 +13,7 @@ from clients.llama_index.context import (
 )
 from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import maybe_load_index, persist_index
-from types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
+from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
 

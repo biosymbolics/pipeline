@@ -8,7 +8,7 @@ from llama_index import (
     load_indices_from_storage,
 )
 
-from types.indices import LlmIndex, NamespaceKey
+from local_types.indices import LlmIndex, NamespaceKey
 from .context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,

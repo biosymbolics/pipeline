@@ -1,7 +1,7 @@
 """
 Utils for namespace
 """
-from types.indices import NamespaceKey
+from local_types.indices import NamespaceKey
 
 
 def get_namespace(namespace_key: NamespaceKey) -> str:
