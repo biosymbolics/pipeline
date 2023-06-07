@@ -74,7 +74,7 @@ BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
 )
 
 
-def GET_BIOMEDICAL_NER_TEMPLATE(entity: str) -> str:
+def GET_BIOMEDICAL_ENTITY_TEMPLATE(entity: str) -> str:
     return (
         f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
         "Return information about this intervention, such as its name, "

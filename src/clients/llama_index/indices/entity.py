@@ -17,7 +17,7 @@ from clients.llama_index.indices.vector import get_vector_index
 from types.indices import NamespaceKey
 from clients.llama_index.utils import get_namespace
 from common.utils.string import get_id
-from sources.sec.prompts import GET_BIOMEDICAL_NER_TEMPLATE
+from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from .general import query_index
 
 response_schemas = [
@@ -41,7 +41,7 @@ def create_entity_index(
         namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    prompt = GET_BIOMEDICAL_NER_TEMPLATE(entity)
+    prompt = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity)
 
     lc_output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
     output_parser = LangchainOutputParser(lc_output_parser)

@@ -2,7 +2,7 @@
 Client for llama indexes
 """
 import logging
-from typing import Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar, cast
 from llama_index import Document, Response
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
@@ -55,37 +55,11 @@ def query_index(
         query_engine = index.as_query_engine()
 
     response = query_engine.query(query)
+
     if not isinstance(response, Response) or not response.response:
         raise Exception("Could not parse response")
+
     return response.response
-
-
-def get_or_create_index(
-    namespace_key: NamespaceKey,
-    index_id: str,
-    documents: list[str],
-    index_impl: IndexImpl,
-    index_args: Optional[dict] = None,
-    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
-) -> IndexImpl:
-    """
-    If nx, create llama index from supplied documents. Otherwise return existing index.
-
-    Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-        documents (Document): list of llama_index Documents
-        index_impl (IndexImpl): the llama index type to use
-        index_args (dict): args to pass to the LlmIndex obj
-        model_name (LlmModelType): llm model to use
-    """
-    index = maybe_load_index(namespace_key, index_id)
-    if index:
-        return cast(IndexImpl, index)
-
-    return create_index(
-        namespace_key, index_id, documents, index_impl, index_args, model_name
-    )
 
 
 def create_index(
@@ -121,3 +95,31 @@ def create_index(
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
         raise ex
+
+
+def get_or_create_index(
+    namespace_key: NamespaceKey,
+    index_id: str,
+    documents: list[str],
+    index_impl: IndexImpl,
+    index_args: Optional[dict] = None,
+    model_name: Optional[LlmModelType] = DEFAULT_MODEL_NAME,
+) -> IndexImpl:
+    """
+    If nx, create llama index from supplied documents. Otherwise return existing index.
+
+    Args:
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+        documents (Document): list of llama_index Documents
+        index_impl (IndexImpl): the llama index type to use
+        index_args (dict): args to pass to the LlmIndex obj
+        model_name (LlmModelType): llm model to use
+    """
+    index = maybe_load_index(namespace_key, index_id)
+    if index:
+        return cast(IndexImpl, index)
+
+    return create_index(
+        namespace_key, index_id, documents, index_impl, index_args, model_name
+    )

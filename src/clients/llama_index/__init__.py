@@ -3,6 +3,7 @@ LlamaIndex client module
 """
 from .visualization import visualize_network
 
+from .parsing import get_output_parser, parse_answer
 from .indices.composed import get_composed_index, query_composed_index
 from .indices.general import create_index, get_index, query_index, get_or_create_index
 from .indices.knowledge_graph import create_and_query_kg_index, get_kg_index
@@ -16,7 +17,9 @@ __all__ = [
     "get_index",
     "get_or_create_index",
     "get_kg_index",
+    "get_output_parser",
     "get_vector_index",
+    "parse_answer",
     "query_index",
     "query_composed_index",
     "visualize_network",
