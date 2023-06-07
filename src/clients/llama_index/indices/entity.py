@@ -14,6 +14,8 @@ import logging
 from pydash import compact
 
 from clients.llama_index.indices.vector import get_vector_index
+from clients.llama_index.types import NamespaceKey
+from clients.llama_index.utils import get_namespace
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_NER_TEMPLATE
 from .general import query_index
@@ -25,7 +27,10 @@ response_schemas = [
 
 
 def create_entity_index(
-    entity: str, vector_index: GPTVectorStoreIndex, namespace: str, index_id: str
+    entity: str,
+    vector_index: GPTVectorStoreIndex,
+    namespace_key: NamespaceKey,
+    index_id: str,
 ) -> Optional[GPTVectorStoreIndex]:
     """
     Summarize entity based on the document and persist in an index
@@ -33,7 +38,7 @@ def create_entity_index(
     Args:
         entity (str): entity name
         vector_index (GPTVectorStoreIndex): vector index to use for lookups
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
     prompt = GET_BIOMEDICAL_NER_TEMPLATE(entity)
@@ -54,8 +59,9 @@ def create_entity_index(
         entity_obj = output_parser.parse(about_entity)
         name = entity_obj.get("name") or entity
         details = entity_obj.get("details")
+        namespace = get_namespace(namespace_key)
         index = get_vector_index(
-            "entities", index_id + f"{namespace}-{get_id(name)}", [details]
+            ["entities"], index_id + f"{namespace}-{get_id(name)}", [details]
         )
         return index
     except Exception as ex:
@@ -65,19 +71,23 @@ def create_entity_index(
 
 
 def get_entity_indices(
-    entities: list[str], namespace: str, index_id: str, documents: list[str]
+    entities: list[str],
+    namespace_key: NamespaceKey,
+    index_id: str,
+    documents: list[str],
 ) -> list[GPTVectorStoreIndex]:
     """
     For each entity in the provided list, summarize based on the document and persist in an index
 
     Args:
         entities (list[str]): list of entities to get indices for
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
-    index = get_vector_index(namespace, index_id, documents)
+    index = get_vector_index(namespace_key, index_id, documents)
     indices = [
-        create_entity_index(entity, index, namespace, index_id) for entity in entities
+        create_entity_index(entity, index, namespace_key, index_id)
+        for entity in entities
     ]
     return compact(indices)

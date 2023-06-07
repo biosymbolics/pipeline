@@ -12,18 +12,19 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 import logging
 
-from .types import LlmModel
+from .constants import DEFAULT_MODEL_NAME
+from .types import LlmModel, NamespaceKey
 from .utils import get_persist_dir
 
 
-def get_storage_context(namespace: str) -> StorageContext:
+def get_storage_context(namespace_key: NamespaceKey) -> StorageContext:
     """
     Get storage context
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
     """
-    directory = get_persist_dir(namespace)
+    directory = get_persist_dir(namespace_key)
 
     try:
         storage_context = StorageContext.from_defaults(persist_dir=directory)
@@ -61,7 +62,9 @@ def __get_llm(model_name: Optional[LlmModel]):
     raise Exception(f"Unknown model {model_name}")
 
 
-def get_service_context(model_name: Optional[LlmModel] = "ChatGPT") -> ServiceContext:
+def get_service_context(
+    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+) -> ServiceContext:
     """
     Get default service context for llllamama index
 

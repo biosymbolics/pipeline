@@ -9,23 +9,23 @@ from llama_index.indices.base import BaseGPTIndex as LlmIndex
 from clients.llama_index.constants import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import maybe_load_index, persist_index
-from clients.llama_index.types import LlmModel
+from clients.llama_index.types import LlmModel, NamespaceKey
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 
 def get_index(
-    namespace: str,
+    namespace_key: NamespaceKey,
     index_id: str,
 ) -> LlmIndex:
     """
     Get llama index from the namespace/index_id
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    index = maybe_load_index(namespace, index_id)
+    index = maybe_load_index(namespace_key, index_id)
     if index:
         return index
     raise Exception("Index not found")
@@ -61,7 +61,7 @@ def query_index(
 
 
 def get_or_create_index(
-    namespace: str,
+    namespace_key: NamespaceKey,
     index_id: str,
     documents: list[str],
     index_impl: IndexImpl,
@@ -73,26 +73,26 @@ def get_or_create_index(
     Skips creation if it already exists
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
         LlmIndex (LlmIndex): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
     """
-    index = maybe_load_index(namespace, index_id)
+    index = maybe_load_index(namespace_key, index_id)
     if index:
         return cast(IndexImpl, index)
 
-    logging.info("Creating index %s/%s", namespace, index_id)
+    logging.info("Creating index %s/%s", namespace_key, index_id)
     try:
         ll_docs = list(map(Document, documents))
         index = index_impl.from_documents(
             ll_docs,
             *(index_args or {}),
             service_context=get_service_context(model_name),
-            storage_context=get_storage_context(namespace),
+            storage_context=get_storage_context(namespace_key),
         )
-        persist_index(index, namespace, index_id)
+        persist_index(index, namespace_key, index_id)
         return index
     except Exception as ex:
         logging.error("Error creating index: %s", ex)

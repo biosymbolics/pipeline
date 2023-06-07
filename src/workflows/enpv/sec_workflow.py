@@ -18,7 +18,7 @@ def run_sec_pipeline(ticker: str):
     """
     start_date = datetime(2022, 1, 1)
     try:
-        pipeline = get_pipeline_by_ticker(ticker, start_date, datetime.now(), "SEARCH")
+        pipeline = get_pipeline_by_ticker(ticker, start_date, datetime.now(), "TABLE")
         write_df_to_table(pipeline, base_id=DEFAULT_BASE_ID, table_name=ticker.lower())
     except Exception as ex:
         logging.error("Error running pipeline: %s", ex)
@@ -37,7 +37,7 @@ def main():
         "What are ALL the products, interventions, drugs and compounds mentioned? "
         "Return results as a list of JSON objects, like "
         "[{ 'name': 'Mirikizumab' }, { 'name': 'other drug' }, ...]",
-        "entities",
+        ["entities"],
     )
     print(answer)
 

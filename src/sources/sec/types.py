@@ -37,7 +37,7 @@ class SecFiling(TypedDict):
     periodOfReport: str  # of date
 
 
-SecProductQueryStrategy = Literal["TABLE", "SEARCH"]
+SecProductQueryStrategy = Literal["TABLE"]
 
 
 # there may be others

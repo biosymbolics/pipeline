@@ -6,6 +6,7 @@ from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
 from .persistence import load_index
+from .types import NamespaceKey
 
 
 def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
@@ -21,33 +22,18 @@ def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
     net.show("graph.html", notebook=False)
 
 
-def visualize_network(namespace: str, index_id: str):
+def visualize_network(namespace_key: NamespaceKey, index_id: str):
     """
     Visualize network
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    index = load_index(namespace, index_id)
+    index = load_index(namespace_key, index_id)
     if not index:
         raise Exception("index not found")
     visualize_network_by_index(cast(GPTKnowledgeGraphIndex, index))
-
-
-# @dispatch(str)  # type: ignore[no-redef]
-# def visualize_network(namespace: str):
-#     """
-#     Visualize network for composed indices within a namespace
-
-#     Args:
-#         namespace (str): namespace of the index (e.g. SEC-BMY)
-#
-#     """
-#     composed = compose_graph(namespace)
-#     if not composed:
-#         raise Exception("composed graph not found")
-#     visualize_network(composed)
 
 
 def list_triples_by_index(index: GPTKnowledgeGraphIndex):
@@ -70,14 +56,14 @@ def list_triples_by_index(index: GPTKnowledgeGraphIndex):
         print(triple)
 
 
-def list_triples(namespace: str, index_id: str):
+def list_triples(namespace_key: NamespaceKey, index_id: str):
     """
     List triples
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
+        namespace_key (NamespaceKey) namespace of the index (e.g. SEC-BMY)
         index_id (str): unique id of the index (e.g. 2020-01-1)
     """
-    index = load_index(namespace, index_id)
+    index = load_index(namespace_key, index_id)
     kg_index = cast(GPTKnowledgeGraphIndex, index)
     list_triples_by_index(kg_index)
