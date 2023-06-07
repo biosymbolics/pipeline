@@ -185,8 +185,9 @@ class EntityIndex:
             return {
                 **source._asdict(),
                 "canonical_id": self.canonical_id or "",
-                "entity_name": name
-                or "",  # parsed name; may differ by source and from entity_id
+                # parsed name; may differ by source and from entity_id
+                "entity_name": name or "",
+                "index_id": index_id,
                 "retrieval_date": self.retrieval_date.isoformat(),
             }
 

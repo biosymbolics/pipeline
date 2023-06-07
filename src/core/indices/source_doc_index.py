@@ -59,8 +59,9 @@ class SourceDocIndex:
 
         def __get_metadata(doc) -> DocMetadata:
             return {
-                "retrieval_date": self.retrieval_date.isoformat(),
                 **self.source._asdict(),
+                "index_id": self.index_id,
+                "retrieval_date": self.retrieval_date.isoformat(),
             }
 
         index = create_index(
