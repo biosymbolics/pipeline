@@ -3,13 +3,13 @@ Client for llama indexes
 """
 import logging
 from typing import Optional, TypeVar, cast
-from llama_index import Document, QuestionAnswerPrompt, Response, RefinePrompt
+from llama_index import Document, Response
 from llama_index.indices.base import BaseGPTIndex as LlmIndex
 
 from clients.llama_index.constants import DEFAULT_MODEL_NAME
 from clients.llama_index.context import get_service_context, get_storage_context
 from clients.llama_index.persistence import maybe_load_index, persist_index
-from types.indices import LlmModel, NamespaceKey
+from types.indices import LlmModel, NamespaceKey, Prompt, RefinePrompt
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
@@ -34,7 +34,7 @@ def get_index(
 def query_index(
     index: LlmIndex,
     query: str,
-    prompt: Optional[QuestionAnswerPrompt] = None,
+    prompt: Optional[Prompt] = None,
     refine_prompt: Optional[RefinePrompt] = None,
 ) -> str:
     """

@@ -1,10 +1,11 @@
 """
 SourceDocIndex
 """
+from typing import Optional
 from llama_index import GPTKeywordTableIndex
 
 from clients.llama_index import create_index, query_index
-from types.indices import LlmIndex, NamespaceKey
+from types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 
 class SourceDocIndex:
@@ -35,13 +36,20 @@ class SourceDocIndex:
     def load(self, documents: list[str]):
         """
         Load docs into index
-        TODO: add docs
+        TODO: ability to add docs?
         """
         self.index = self.__create__(documents)
 
-    def query(self, query_string: str):
+    def query(
+        self,
+        query_string: str,
+        prompt: Optional[Prompt] = None,
+        refine_prompt: Optional[RefinePrompt] = None,
+    ):
         if not self.index:
             raise ValueError("Index not initialized.")
 
-        answer = query_index(self.index, query_string)
+        answer = query_index(
+            self.index, query_string, prompt=prompt, refine_prompt=refine_prompt
+        )
         return answer
