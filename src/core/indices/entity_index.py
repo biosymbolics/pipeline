@@ -18,6 +18,7 @@ from clients.llama_index import (
     parse_answer,
 )
 from clients.llama_index.context import get_storage_context
+from clients.llama_index.types import DocMetadata
 from common.utils.string import get_id
 from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from types.indices import NamespaceKey
@@ -74,7 +75,6 @@ class EntityIndex:
         """
         self.orig_entity_id = entity_name
         self.parsed_entity_id: Optional[str] = None  # this gets set later
-        self.ids: list[str] = []  # all entity ids
         self.canonical_id = canonical_id
         self.type = "intervention"
         self.source = source
@@ -87,23 +87,12 @@ class EntityIndex:
         """
         return self.parsed_entity_id or self.orig_entity_id
 
-    def __add_id(self, new_id: str):
-        """
-        Add new entity id to the list
-
-        Args:
-            new_id (str): new entity id
-        """
-        ids = [*self.ids, new_id]
-        self.ids = ids
-
     def __maybe_set_parsed_id(self, new_parsed_id: str) -> None:
         """
         Set parsed entity name if not set
         """
         if not self.parsed_entity_id:
             self.parsed_entity_id = new_parsed_id
-        self.__add_id(new_parsed_id)
 
     def __get_response_schemas(self) -> list[ResponseSchema]:
         """
@@ -188,6 +177,17 @@ class EntityIndex:
 
         entity_ns = self.__get_entity_namespace()
 
+        def __get_metadata(doc) -> DocMetadata:
+            # TODO: informative names for keys
+            source_info = {
+                f"source{index+1}": value for index, value in enumerate(self.source)
+            }
+            return {
+                "retrieval_date": self.retrieval_date.isoformat(),
+                "name": name,
+                **source_info,
+            }
+
         # create index
         index = create_index(
             entity_ns,
@@ -197,6 +197,7 @@ class EntityIndex:
             index_args={
                 "storage_context": get_storage_context(entity_ns, store_type="pinecone")
             },
+            get_doc_metadata=__get_metadata,
         )
 
         return index
