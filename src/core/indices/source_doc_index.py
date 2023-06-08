@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 from llama_index import GPTVectorStoreIndex
 
-from clients.llama_index import create_index, query_index
+from clients.llama_index import create_index, get_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
@@ -76,6 +76,13 @@ class SourceDocIndex:
             get_doc_metadata=__get_metadata,
             context_args=self.context_args,
         )
+        self.index = index
+
+    def load(self):
+        """
+        Load entity index from disk
+        """
+        index = get_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
 
     def query(

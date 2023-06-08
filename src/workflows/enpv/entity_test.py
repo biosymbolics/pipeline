@@ -19,6 +19,7 @@ def main(entity_list: list[str]):
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
         si = SourceDocIndex()
         ei = EntityIndex(entity)
+        si.load()
         ei.load()
         prompt = f"Summarize what we know about {entity}."  # GET_SIMPLE_TRIPLE_PROMPT(entity)
         answer1 = ei.query(prompt, source)
