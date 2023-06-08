@@ -7,6 +7,7 @@ import logging
 from clients.airtable.airtable_client import write_df_to_table
 from clients.llama_index.indices.composed import query_composed_index
 from clients.llama_index.visualization import visualize_network
+from common.utils.misc import dict_to_named_tuple
 from sources.sec.rd_pipeline import get_pipeline_by_ticker
 
 DEFAULT_BASE_ID = "appcXwgAM75mx9sGi"
@@ -37,7 +38,9 @@ def main():
         "What are ALL the products, interventions, drugs and compounds mentioned? "
         "Return results as a list of JSON objects, like "
         "[{ 'name': 'Mirikizumab' }, { 'name': 'other drug' }, ...]",
-        ("entities",),
+        dict_to_named_tuple(
+            {"root": "entities", "doc_source": "SEC", "doc_type": "10-K"}
+        ),
     )
     print(answer)
 

@@ -3,6 +3,7 @@ Core SEC methods
 """
 
 from datetime import date, datetime
+import traceback
 from typing import Callable, Optional
 import logging
 
@@ -74,6 +75,6 @@ def fetch_annual_reports_with_sections(
             section_map[report.get("periodOfReport")] = sections
         except Exception as ex:
             logging.error("Error creating index for %s: %s", ticker, ex)
-            raise ex
+            traceback.print_exc()
 
     return section_map

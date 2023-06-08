@@ -2,7 +2,8 @@
 Client for llama indexes
 """
 import logging
-from typing import Optional, TypeVar, Union, cast
+import traceback
+from typing import Optional, TypeVar, Union
 from llama_index import Document, Response
 
 from clients.llama_index.context import (
@@ -109,4 +110,5 @@ def create_index(
         return index
     except Exception as ex:
         logging.error("Error creating index: %s", ex)
+        traceback.print_exc()
         raise ex
