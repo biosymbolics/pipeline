@@ -99,7 +99,7 @@ def get_service_context(
         **kwargs: additional kwargs to pass to ServiceContext.from_defaults
     """
     prompt_helper = PromptHelper(
-        context_window=1024, num_output=256, chunk_overlap_ratio=0.1
+        context_window=4096, num_output=1024, chunk_overlap_ratio=0.1
     )
 
     llm = __get_llm(model_name)

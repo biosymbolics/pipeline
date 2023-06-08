@@ -6,7 +6,7 @@ import logging
 
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from local_types.indices import LlmModelType, NamespaceKey
-from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
+from prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
 from .general import create_index, query_index
 
 MAX_TRIPLES = 400

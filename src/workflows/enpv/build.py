@@ -16,21 +16,21 @@ from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
     "PFE",
-    "JNJ",
+    # "JNJ",
     # "NVS", # 20-F
-    "ABBV",
-    "AMGN",
+    # "ABBV",
+    # "AMGN",
     # "GSK", # 20-F
-    "GILD",
+    # "GILD",
     # "NVO", # 20-F
     # "TAK", # 20-F
-    "LLY",
+    # "LLY",
     # "AZN", # 20-F
     # "BAYRY", # 20-F
     # "RHHBY", # 20-F
     # "MTZPY", # 20-F
-    "MRK",
-    "BMY",
+    # "MRK",
+    # "BMY",
 ]
 
 

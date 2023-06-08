@@ -27,7 +27,7 @@ from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
 from common.utils.string import get_id
-from sources.sec.prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
+from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from local_types.indices import NamespaceKey
 
 from .source_doc_index import SourceDocIndex

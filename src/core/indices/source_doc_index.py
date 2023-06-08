@@ -3,7 +3,7 @@ SourceDocIndex
 """
 from datetime import datetime
 from typing import Optional
-from llama_index import GPTKeywordTableIndex
+from llama_index import GPTVectorStoreIndex
 
 from clients.llama_index import create_index, get_composed_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
@@ -24,7 +24,7 @@ class SourceDocIndex:
         index_id: str,
         context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
         documents: Optional[list[str]] = None,
-        index_impl: LlmIndex = GPTKeywordTableIndex,  # type: ignore
+        index_impl: LlmIndex = GPTVectorStoreIndex,  # type: ignore
         retrieval_date: datetime = datetime.now(),
     ):
         """
