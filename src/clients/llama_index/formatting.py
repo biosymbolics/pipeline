@@ -3,6 +3,7 @@ Utils for formatting related to llama index
 """
 from typing import Any, Optional, TypeGuard, Union, cast
 from llama_index import Document
+from pydash import compact
 
 from .types import GetDocMetadata
 
@@ -29,6 +30,8 @@ def format_documents(
         docs = list(map(Document, documents))
     else:
         docs = cast(list[Document], documents)
+
+    docs = compact(docs)
 
     if get_extra_info:
         for doc in docs:

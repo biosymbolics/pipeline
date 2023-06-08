@@ -19,7 +19,6 @@ from clients.llama_index import (
 )
 from clients.llama_index import get_index, query_index
 from clients.llama_index.context import (
-    get_storage_context,
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
 )
@@ -61,6 +60,11 @@ def create_entity_indices(
             logging.error(f"Error creating entity index for {entity}: {e}")
 
 
+ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS._replace(
+    storage_args={"store_type": ENTITY_VECTOR_STORE_TYPE}
+)
+
+
 class EntityIndex:
     """
     EntityIndex
@@ -72,8 +76,7 @@ class EntityIndex:
         self,
         entity_name: str,
         canonical_id: Optional[str] = None,
-        retrieval_date: datetime = datetime.now(),
-        context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+        context_args: ContextArgs = ENTITY_INDEX_CONTEXT_ARGS,
     ):
         """
         Initialize EntityIndex
@@ -81,13 +84,11 @@ class EntityIndex:
         Args:
             entity_name (str): entity name
             canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
-            retrieval_date (datetime, optional): retrieval date of the entity. Defaults to datetime.now().
         """
         self.canonical_id = canonical_id
         self.context_args = context_args
         self.index = None
         self.entity_id = entity_name
-        self.retrieval_date = retrieval_date
         self.type = "intervention"
 
     @property
@@ -146,20 +147,21 @@ class EntityIndex:
             query, prompt=qa_prompt, refine_prompt=refine_prompt
         )
 
-        logging.debug("Response from query_index: %s", response)
+        logging.info("Response from query_index: %s", response)
 
         # parse response into obj
         entity_obj = parse_answer(response, output_parser, return_orig_on_fail=False)
 
         if not is_entity_obj(entity_obj):
-            raise Exception(f"Failed to parse entity {self.entity_id}")
+            raise Exception(f"Failed to parse entity %s", self.entity_id)
         return entity_obj
 
     def load(self, source: NamespaceKey):
         """
         Load entity index from disk
         """
-        index = get_index(self.__get_namespace(source), context_args=self.context_args)
+        ns = self.__get_namespace(source)
+        index = get_index(ns, context_args=self.context_args)
         self.index = index
 
     def add_node(
@@ -167,6 +169,7 @@ class EntityIndex:
         source: NamespaceKey,
         source_index: SourceDocIndex,
         index_id: str,
+        retrieval_date: datetime = datetime.now(),
     ):
         """
         Create a node for this entity based on the source index,
@@ -181,7 +184,8 @@ class EntityIndex:
 
         # get entity details by querying the source index
         entity_obj = self.__describe_entity_by_source(source_index)
-        name, details = dict(entity_obj)
+        name = entity_obj["name"]
+        details = entity_obj["details"]
 
         # add metadata to the index (in particular, source which acts as namespace)
         def __get_metadata(doc) -> DocMetadata:
@@ -191,7 +195,7 @@ class EntityIndex:
                 # parsed name; may differ by source and from entity_id
                 "entity_name": name or "",
                 "index_id": index_id,
-                "retrieval_date": self.retrieval_date.isoformat(),
+                "retrieval_date": retrieval_date.isoformat(),
             }
 
         index = create_index(
@@ -200,10 +204,8 @@ class EntityIndex:
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore
             get_doc_metadata=__get_metadata,
-            context_args=ContextArgs(
-                **self.context_args._asdict(),
-                storage_args={"store_type": ENTITY_VECTOR_STORE_TYPE},
-            ),
+            context_args=self.context_args,
+            return_if_exists=True,
         )
 
         self.index = index

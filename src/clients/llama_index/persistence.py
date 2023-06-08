@@ -4,6 +4,7 @@ Methods for for llama indexes persistence
 import logging
 from typing import Optional, Union
 from llama_index import (
+    GPTVectorStoreIndex,
     load_index_from_storage,
     load_indices_from_storage,
 )
@@ -18,7 +19,7 @@ from .context import (
 from .utils import get_persist_dir
 
 
-def __load_some_indices(
+def __load_indices(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
@@ -37,26 +38,47 @@ def __load_some_indices(
         storage_context = get_storage_context(
             namespace_key, **context_args.storage_args
         )
-        service_context = get_service_context(model_name=context_args.model_name)
+
+        if context_args.storage_args.get("store_type", "") == "pinecone":
+            # vector dbs: no directory load required
+            index = GPTVectorStoreIndex([], storage_context=storage_context)
+            logging.info("Returning pinecone index %s/%s", namespace_key, index_id)
+            return index
 
         if index_id:
             index = load_index_from_storage(
                 storage_context,
                 index_id=index_id,
-                service_context=service_context,
             )
             logging.info("Returning index %s/%s from disk", namespace_key, index_id)
             return index
 
-        indices = load_indices_from_storage(
-            storage_context,
-            service_context=service_context,
-        )
+        indices = load_indices_from_storage(storage_context)
+
         logging.info("Returning indices %s from disk", namespace_key)
         return indices
 
     except Exception as ex:
         logging.info("Failed to load %s/%s from disk: %s", namespace_key, index_id, ex)
+        return None
+
+
+def maybe_load_index(
+    namespace_key: NamespaceKey,
+    index_id: Optional[str] = None,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+) -> Optional[LlmIndex]:
+    """
+    Load index if present, otherwise return none
+
+    Args:
+        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
+        index_id (str): unique id of the index (e.g. 2020-01-1)
+        context_args (ContextArgs): context args for loading index
+    """
+    try:
+        return load_index(namespace_key, index_id, context_args)
+    except Exception:
         return None
 
 
@@ -73,7 +95,7 @@ def load_index(
         index_id (str): unique id of the index (e.g. 2020-01-1).
         context_args (ContextArgs): context args for loading index
     """
-    index = __load_some_indices(namespace_key, index_id, context_args)
+    index = __load_indices(namespace_key, index_id, context_args)
     if isinstance(index, list):
         raise Exception("Expected single index, got list")
     if isinstance(index, LlmIndex):
@@ -91,7 +113,7 @@ def load_indices(
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
     """
-    indices = __load_some_indices(namespace_key, None, context_args)
+    indices = __load_indices(namespace_key, None, context_args)
     if not isinstance(indices, list):
         raise Exception("Expected list of indices, got single index")
     return indices
@@ -114,13 +136,13 @@ def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
         logging.error("Error persisting index: %s", ex)
 
 
-def maybe_load_index(
+def does_index_exist(
     namespace_key: NamespaceKey,
     index_id: Optional[str] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> Optional[LlmIndex]:
+) -> bool:
     """
-    Load index if present, otherwise return none
+    Check if index exists
 
     Args:
         namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
@@ -128,6 +150,7 @@ def maybe_load_index(
         context_args (ContextArgs): context args for loading index
     """
     try:
-        return load_index(namespace_key, index_id, context_args)
+        load_index(namespace_key, index_id, context_args)
+        return True
     except Exception:
-        return None
+        return False

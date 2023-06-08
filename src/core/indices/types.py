@@ -12,4 +12,4 @@ def is_entity_obj(obj: Any) -> TypeGuard[EntityObj]:
     """
     if not isinstance(obj, dict):
         return False
-    return obj.get("name") is not None and obj.get("details") is not None
+    return "name" in obj and "details" in obj

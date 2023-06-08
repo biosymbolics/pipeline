@@ -3,7 +3,7 @@ Client for llama indexes
 """
 import logging
 import traceback
-from typing import Any, Mapping, Optional, TypeVar, TypedDict, Union
+from typing import Any, Mapping, Optional, TypeVar, TypedDict, Union, cast
 from llama_index import Document, Response
 
 from clients.llama_index.context import (
@@ -13,7 +13,12 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
-from clients.llama_index.persistence import maybe_load_index, persist_index
+from clients.llama_index.persistence import (
+    does_index_exist,
+    maybe_load_index,
+    persist_index,
+)
+from common.utils.namespace import get_namespace
 from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
@@ -82,9 +87,12 @@ def create_index(
     index_args: Mapping[str, Any] = {},
     get_doc_metadata: Optional[GetDocMetadata] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+    return_if_exists: bool = False,
 ) -> IndexImpl:
     """
-    Create llama index from supplied document url
+    Create an index from supplied document url
+
+    Note: this is a bit of a misnomer for pinecone, for which we're just adding new documents to an existing index
 
     Args:
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
@@ -96,6 +104,12 @@ def create_index(
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
     """
     logging.info("Creating index %s/%s", namespace_key, index_id)
+
+    if does_index_exist(namespace_key, index_id, context_args):
+        if return_if_exists:
+            index = get_index(namespace_key, index_id, context_args)
+            return cast(IndexImpl, index)
+        raise Exception("Index already exists")
     try:
         ll_docs = format_documents(documents, get_doc_metadata)
         index = index_impl.from_documents(
@@ -109,6 +123,6 @@ def create_index(
         persist_index(index, namespace_key, index_id)
         return index
     except Exception as ex:
-        logging.error("Error creating index: %s", ex)
+        logging.error("Error creating index %s: %s", get_namespace(namespace_key), ex)
         traceback.print_exc()
         raise ex

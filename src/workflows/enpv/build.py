@@ -14,6 +14,8 @@ from pydash import compact
 from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
 
+logging.getLogger().setLevel(logging.INFO)
+
 PHARMA_TICKERS = [
     "PFE",
     # "JNJ",

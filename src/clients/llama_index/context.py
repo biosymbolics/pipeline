@@ -43,7 +43,7 @@ def __load_storage_context(**kwargs) -> StorageContext:
 def get_storage_context(
     namespace_key: NamespaceKey,
     store_type: Optional[Literal["directory", "pinecone"]] = "directory",
-    vector_store_kwargs: Mapping[str, Any] = {},
+    vector_store_kwargs: Mapping[str, Any] = {"namespace": "biosymbolics"},
 ) -> StorageContext:
     """
     Get storage context
@@ -53,6 +53,9 @@ def get_storage_context(
         store_type (Literal["directory", "pinecone"]): type of storage to use
         vector_store_kwargs (Mapping[str, Any]): kwargs for vector store (currently only used if store_type == pinecone)
     """
+    logging.info(
+        "Loading storage context for %s, store type %s", namespace_key, store_type
+    )
     if store_type == "directory":
         directory = get_persist_dir(namespace_key)
         return __load_storage_context(persist_dir=directory)
