@@ -3,7 +3,7 @@ Client for llama indexes
 """
 import logging
 import traceback
-from typing import Optional, TypeVar, Union
+from typing import Any, Mapping, Optional, TypeVar, TypedDict, Union
 from llama_index import Document, Response
 
 from clients.llama_index.context import (
@@ -79,7 +79,7 @@ def create_index(
     index_id: str,
     documents: Union[list[str], list[Document]],
     index_impl: IndexImpl,
-    index_args: Optional[dict] = {},
+    index_args: Mapping[str, Any] = {},
     get_doc_metadata: Optional[GetDocMetadata] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> IndexImpl:

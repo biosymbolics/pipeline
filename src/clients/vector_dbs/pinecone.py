@@ -2,9 +2,11 @@
 Client for pinecone vector db
 """
 import os
+import time
 from typing import Any, Mapping
 import pinecone
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
+import logging
 
 from local_types.indices import NamespaceKey
 
@@ -39,16 +41,17 @@ def get_vector_db(
     pinecone.init(api_key=API_KEY, environment="us-west4-gcp-free")
 
     if index_name not in pinecone.list_indexes():
-        pinecone_index = pinecone.create_index(
+        pinecone.create_index(
             index_name,
             metric="cosine",
             shards=1,
             dimension=1536,
             **pinecone_args,
         )
-        if not pinecone_index:
-            raise Exception("Could not create index")
 
-        return pinecone_index
+        # Wait until the index becomes available
+        while index_name not in pinecone.list_indexes():
+            logging.info("Waiting for index to be created...")
+            time.sleep(1)  # Wait for 1 second before checking again
 
     return pinecone.Index(f"{index_name}-index")

@@ -54,8 +54,11 @@ def create_entity_indices(
     """
     index = SourceDocIndex(namespace_key, index_id, documents=documents)
     for entity in entities:
-        idx = EntityIndex(entity)
-        idx.add_node(namespace_key, index, index_id)
+        try:
+            idx = EntityIndex(entity)
+            idx.add_node(namespace_key, index, index_id)
+        except Exception as e:
+            logging.error(f"Error creating entity index for {entity}: {e}")
 
 
 class EntityIndex:
@@ -196,12 +199,11 @@ class EntityIndex:
             index_id,
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore
-            index_args={
-                "storage_context": get_storage_context(
-                    namespace, store_type=ENTITY_VECTOR_STORE_TYPE
-                )
-            },
             get_doc_metadata=__get_metadata,
+            context_args=ContextArgs(
+                **self.context_args._asdict(),
+                storage_args={"store_type": ENTITY_VECTOR_STORE_TYPE},
+            ),
         )
 
         self.index = index
