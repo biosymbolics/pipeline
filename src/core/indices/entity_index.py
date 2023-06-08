@@ -13,7 +13,7 @@ from langchain.output_parsers import ResponseSchema
 import logging
 
 from clients.llama_index import (
-    create_index,
+    upsert_index,
     get_output_parser,
     parse_answer,
 )
@@ -187,7 +187,7 @@ class EntityIndex:
                 # "retrieval_date": retrieval_date.isoformat(), # llamaindex gets mad
             }
 
-        index = create_index(
+        index = upsert_index(
             INDEX_NAME,
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore

@@ -7,7 +7,7 @@ import logging
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from local_types.indices import NamespaceKey
 from prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
-from .general import create_index, query_index
+from .general import upsert_index, query_index
 
 MAX_TRIPLES = 400
 
@@ -50,7 +50,7 @@ def create_kg_index(
         documents (Document): list of llama_index Documents
         context_args (ContextArgs): context args for loading index
     """
-    return create_index(
+    return upsert_index(
         index_name,
         documents,
         index_impl=GPTKnowledgeGraphIndex,  # type: ignore

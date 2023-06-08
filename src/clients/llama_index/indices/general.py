@@ -70,7 +70,7 @@ def query_index(
     return response.response
 
 
-def create_index(
+def upsert_index(
     index_name: str,
     documents: Union[list[str], list[Document]],
     index_impl: IndexImpl,

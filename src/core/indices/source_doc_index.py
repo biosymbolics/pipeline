@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 from llama_index import GPTVectorStoreIndex
 
-from clients.llama_index import create_index, get_index, query_index
+from clients.llama_index import upsert_index, get_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
@@ -69,7 +69,7 @@ class SourceDocIndex:
                 # "retrieval_date": retrieval_date.isoformat(),
             }
 
-        index = create_index(
+        index = upsert_index(
             INDEX_NAME,
             documents,
             index_impl=self.index_impl,
@@ -80,7 +80,7 @@ class SourceDocIndex:
 
     def load(self):
         """
-        Load entity index from disk
+        Load source doc index from disk
         """
         index = get_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
