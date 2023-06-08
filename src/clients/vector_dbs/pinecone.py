@@ -54,4 +54,4 @@ def get_vector_db(
             logging.info("Waiting for index to be created...")
             time.sleep(1)  # Wait for 1 second before checking again
 
-    return pinecone.Index(f"{index_name}-index")
+    return pinecone.Index(index_name)
