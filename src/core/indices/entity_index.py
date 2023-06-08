@@ -193,7 +193,6 @@ class EntityIndex:
             index_impl=GPTVectorStoreIndex,  # type: ignore
             get_doc_metadata=__get_metadata,
             context_args=self.context_args,
-            return_if_exists=True,
         )
 
         self.index = index
