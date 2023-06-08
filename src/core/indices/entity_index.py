@@ -32,7 +32,7 @@ from local_types.indices import NamespaceKey
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
-INDEX_NAME = "entity_docs"
+INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
@@ -77,6 +77,7 @@ class EntityIndex:
         Args:
             entity_name (str): entity name
             canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
+            context_args (ContextArgs, optional): context args. Defaults to ENTITY_INDEX_CONTEXT_ARGS.
         """
         self.canonical_id = canonical_id
         self.context_args = context_args
@@ -183,7 +184,7 @@ class EntityIndex:
                 "canonical_id": self.canonical_id or "",
                 # parsed name; may differ by source and from entity_id
                 "entity_name": name or "",
-                "retrieval_date": retrieval_date.isoformat(),
+                # "retrieval_date": retrieval_date.isoformat(), # llamaindex gets mad
             }
 
         index = create_index(
@@ -201,7 +202,6 @@ class EntityIndex:
         self,
         source: NamespaceKey,
         documents: list[str],
-        index_id: str,
     ):
         """
         Create a node for this entity based on the supplied documents
@@ -225,7 +225,6 @@ class EntityIndex:
             query_string (str): query string
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
         """
-        # metadata filters for namespace
         metadata_filters = get_metadata_filters(self.__get_namespace(source))
 
         if not self.index:

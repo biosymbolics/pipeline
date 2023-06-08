@@ -13,10 +13,7 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
-from clients.llama_index.persistence import (
-    does_index_exist,
-    maybe_load_index,
-)
+from clients.llama_index.persistence import does_index_exist, load_index
 from local_types.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
@@ -33,13 +30,9 @@ def get_index(
 
     Args:
         index_name (str): name of the index
-        index_id (str): unique id of the index (e.g. 2020-01-1) (optional)
         context_args (ContextArgs): context args for loading index
     """
-    index = maybe_load_index(index_name, context_args)
-    if index:
-        return index
-    raise Exception("Index not found")
+    return load_index(index_name, context_args)
 
 
 def query_index(

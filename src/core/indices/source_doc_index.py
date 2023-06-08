@@ -8,10 +8,10 @@ from llama_index import GPTVectorStoreIndex
 from clients.llama_index import create_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
+from clients.vector_dbs.pinecone import get_metadata_filters
 from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
-from src.clients.vector_dbs.pinecone import get_metadata_filters
 
-INDEX_NAME = "source_docs"
+INDEX_NAME = "source-docs"
 
 
 class SourceDocIndex:
@@ -33,35 +33,40 @@ class SourceDocIndex:
         initialize
 
         Args:
-            context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
             documents (list[str], optional): list of documents. Defaults to None. Can be loaded later with from_documents().
+            source (NamespaceKey, optional): source namespace. Defaults to None. Can be loaded later with from_documents().
+            context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
             index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
             retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
         self.context_args = context_args
         self.index = None  # TODO: load
         self.index_impl = index_impl
-        self.retrieval_date = retrieval_date
-        self.source = source
 
         if documents and source:
-            self.from_documents(documents, source)
+            self.from_documents(documents, source, retrieval_date)
         elif documents or source:
             raise ValueError("Must provide both documents and source or neither.")
 
-    def from_documents(self, documents: list[str], source: NamespaceKey):
+    def from_documents(
+        self,
+        documents: list[str],
+        source: NamespaceKey,
+        retrieval_date: datetime = datetime.now(),
+    ):
         """
         Load docs into index with metadata
 
         Args:
             documents (list[str]): list of documents
             source (NamespaceKey): source namespace
+            retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
 
         def __get_metadata(doc) -> DocMetadata:
             return {
                 **source._asdict(),
-                "retrieval_date": self.retrieval_date.isoformat(),
+                # "retrieval_date": retrieval_date.isoformat(),
             }
 
         index = create_index(
@@ -85,6 +90,7 @@ class SourceDocIndex:
 
         Args:
             query_string (str): query string
+            source (NamespaceKey): source namespace (acts as filter)
             prompt (Prompt, optional): prompt. Defaults to None.
             refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """

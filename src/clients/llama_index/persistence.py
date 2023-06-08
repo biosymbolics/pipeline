@@ -7,7 +7,7 @@ from llama_index import (
     GPTVectorStoreIndex,
 )
 
-from local_types.indices import LlmIndex, NamespaceKey
+from local_types.indices import LlmIndex
 from .context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
@@ -48,6 +48,9 @@ def load_index(
 
     index = GPTVectorStoreIndex([], storage_context=storage_context)
     logging.info("Returning vector index %s", index_name)
+
+    if not index:
+        raise Exception(f"Index {index_name} not found")
     return index
 
 
