@@ -9,6 +9,7 @@ from clients.llama_index import upsert_index, get_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
+from common.utils.namespace import get_namespace_id
 from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 INDEX_NAME = "source-docs"
@@ -60,11 +61,15 @@ class SourceDocIndex:
                 # "retrieval_date": retrieval_date.isoformat(),
             }
 
+        def __get_doc_id(doc) -> str:
+            return get_namespace_id(source)
+
         index = upsert_index(
             INDEX_NAME,
             documents,
             index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
+            get_doc_id=__get_doc_id,
             context_args=self.context_args,
         )
         self.index = index

@@ -16,7 +16,7 @@ from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import load_index
 from local_types.indices import LlmIndex, Prompt, RefinePrompt
 
-from ..types import GetDocMetadata
+from ..types import GetDocId, GetDocMetadata
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
@@ -76,6 +76,7 @@ def upsert_index(
     index_impl: IndexImpl,
     index_args: Mapping[str, Any] = {},
     get_doc_metadata: Optional[GetDocMetadata] = None,
+    get_doc_id: Optional[GetDocId] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> IndexImpl:
     """
@@ -90,11 +91,12 @@ def upsert_index(
         index_args (dict): args to pass to the LlmIndex obj
         context_args (ContextArgs): context args for loading index
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
+        get_doc_id (GetDocId): function to get doc id from doc
     """
     logging.info("Adding docs to index %s", index_name)
 
     try:
-        ll_docs = format_documents(documents, get_doc_metadata)
+        ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)
         index = index_impl.from_documents(
             ll_docs,
             service_context=get_service_context(model_name=context_args.model_name),

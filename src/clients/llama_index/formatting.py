@@ -5,7 +5,7 @@ from typing import Any, Optional, TypeGuard, Union, cast
 from llama_index import Document
 from pydash import compact
 
-from .types import GetDocMetadata
+from .types import GetDocId, GetDocMetadata
 
 
 def __is_string_doc_list(documents: list[Any]) -> TypeGuard[list[str]]:
@@ -18,6 +18,7 @@ def __is_string_doc_list(documents: list[Any]) -> TypeGuard[list[str]]:
 def format_documents(
     documents: Union[list[str], list[Document]],
     get_extra_info: Optional[GetDocMetadata] = None,
+    get_doc_id: Optional[GetDocId] = None,
 ) -> list[Document]:
     """
     Format documents to list of llama_index Documents
@@ -36,5 +37,9 @@ def format_documents(
     if get_extra_info:
         for doc in docs:
             doc.extra_info = get_extra_info(doc)
+
+    if get_doc_id:
+        for doc in docs:
+            doc.doc_id = get_doc_id(doc)
 
     return docs

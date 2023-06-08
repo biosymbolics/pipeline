@@ -2,6 +2,7 @@
 EntityIndex
 """
 from datetime import datetime
+from typing import cast
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
 from llama_index.prompts.default_prompts import (
@@ -12,9 +13,9 @@ from langchain.output_parsers import ResponseSchema
 import logging
 
 from clients.llama_index import (
-    upsert_index,
     get_output_parser,
     parse_answer,
+    upsert_index,
 )
 from clients.llama_index import get_index, query_index
 from clients.llama_index.context import (
@@ -24,9 +25,10 @@ from clients.llama_index.context import (
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
+from common.utils.namespace import get_namespace_id
 from common.utils.string import get_id
-from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 from local_types.indices import NamespaceKey
+from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
@@ -77,6 +79,7 @@ class EntityIndex:
         """
         self.context_args = context_args
         self.index = None
+        self.index_impl = GPTVectorStoreIndex
         self.type = "intervention"
 
         self.__load()
@@ -190,11 +193,15 @@ class EntityIndex:
                 # "retrieval_date": retrieval_date.isoformat(), # llamaindex gets mad
             }
 
+        def __get_doc_id(doc) -> str:
+            return get_namespace_id(source)
+
         upsert_index(
             INDEX_NAME,
             [details],
-            index_impl=GPTVectorStoreIndex,  # type: ignore
+            index_impl=self.index_impl,  # type: ignore
             get_doc_metadata=__get_metadata,
+            get_doc_id=__get_doc_id,
             context_args=self.context_args,
         )
 
