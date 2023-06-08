@@ -2,25 +2,30 @@
 Test script entity index
 """
 import logging
+import sys
 
 from core.indices.entity_index import EntityIndex
 from common.utils.misc import dict_to_named_tuple
+from prompts import GET_SIMPLE_TRIPLE_PROMPT
 
 logging.getLogger().setLevel(logging.INFO)
 
 
-def main():
+def main(entity_list: list[str]):
     """
     Main
     """
-    source = dict_to_named_tuple(
-        {"company": "PFE", "doc_source": "SEC", "doc_type": "10-K"}
-    )
-    ei = EntityIndex("elranatamab")
-    ei.load(source)
-    answer = ei.query("Tell me all about this drug", source)
-    print(answer)
+    for entity in entity_list:
+        source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
+        ei = EntityIndex(entity)
+        ei.load(source)
+        prompt = f"Summarize what we know about {entity}."  # GET_SIMPLE_TRIPLE_PROMPT(entity)
+        answer = ei.query(prompt, source)
+        print(answer)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 1 or "-h" in sys.argv:
+        print("Usage: python3 entity_test.py entity1 [entity2 ...]")
+        sys.exit()
+    main(sys.argv[1:])
