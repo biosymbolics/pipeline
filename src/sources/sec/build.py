@@ -52,8 +52,12 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         create_entity_indices(
             entities=entities,
             namespace_key=dict_to_named_tuple(
-                {"company": ticker, "doc_source": "SEC", "doc_type": "10-K"}
+                {
+                    "company": ticker,
+                    "doc_source": "SEC",
+                    "doc_type": "10-K",
+                    "period": period,
+                }
             ),
-            index_id=period,
             documents=sections,
         )

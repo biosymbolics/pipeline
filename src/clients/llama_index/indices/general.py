@@ -3,7 +3,7 @@ Client for llama indexes
 """
 import logging
 import traceback
-from typing import Any, Mapping, Optional, TypeVar, TypedDict, Union, cast
+from typing import Any, Mapping, Optional, TypeVar, Union, cast
 from llama_index import Document, Response
 
 from clients.llama_index.context import (
@@ -16,10 +16,8 @@ from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import (
     does_index_exist,
     maybe_load_index,
-    persist_index,
 )
-from common.utils.namespace import get_namespace
-from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
+from local_types.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
 
@@ -27,19 +25,18 @@ IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 
 def get_index(
-    namespace_key: NamespaceKey,
-    index_id: Optional[str] = None,
+    index_name: str,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> LlmIndex:
     """
     Get llama index from the namespace/index_id
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
+        index_name (str): name of the index
         index_id (str): unique id of the index (e.g. 2020-01-1) (optional)
         context_args (ContextArgs): context args for loading index
     """
-    index = maybe_load_index(namespace_key, index_id, context_args)
+    index = maybe_load_index(index_name, context_args)
     if index:
         return index
     raise Exception("Index not found")
@@ -74,14 +71,14 @@ def query_index(
     response = query_engine.query(query)
 
     if not isinstance(response, Response) or not response.response:
+        logging.error("Could not parse response: %s", response)
         raise Exception("Could not parse response")
 
     return response.response
 
 
 def create_index(
-    namespace_key: NamespaceKey,
-    index_id: str,
+    index_name: str,
     documents: Union[list[str], list[Document]],
     index_impl: IndexImpl,
     index_args: Mapping[str, Any] = {},
@@ -95,19 +92,18 @@ def create_index(
     Note: this is a bit of a misnomer for pinecone, for which we're just adding new documents to an existing index
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
         documents (Document): list of strings or docs
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
         context_args (ContextArgs): context args for loading index
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
     """
-    logging.info("Creating index %s/%s", namespace_key, index_id)
+    logging.info("Creating index %s", index_name)
 
-    if does_index_exist(namespace_key, index_id, context_args):
+    if does_index_exist(index_name, context_args):
         if return_if_exists:
-            index = get_index(namespace_key, index_id, context_args)
+            index = get_index(index_name, context_args)
             return cast(IndexImpl, index)
         raise Exception("Index already exists")
     try:
@@ -116,13 +112,12 @@ def create_index(
             ll_docs,
             service_context=get_service_context(model_name=context_args.model_name),
             storage_context=get_storage_context(
-                namespace_key, **context_args.storage_args
+                index_name, **context_args.storage_args
             ),
             *index_args,
         )
-        persist_index(index, namespace_key, index_id)
         return index
     except Exception as ex:
-        logging.error("Error creating index %s: %s", get_namespace(namespace_key), ex)
+        logging.error("Error creating index %s: %s", index_name, ex)
         traceback.print_exc()
         raise ex

@@ -1,7 +1,7 @@
 """
 Functions around llama index context
 """
-from typing import Any, Literal, Mapping, NamedTuple, Optional
+from typing import Any, Mapping, NamedTuple, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -15,11 +15,7 @@ import logging
 
 from constants.core import DEFAULT_MODEL_NAME
 from clients.vector_dbs.pinecone import get_vector_db
-from local_types.indices import LlmModelType, NamespaceKey
-
-from .utils import get_persist_dir
-
-DEFAULT_PINECONE_INDEX = "biosymbolics"
+from local_types.indices import LlmModelType
 
 
 def __load_storage_context(**kwargs) -> StorageContext:
@@ -41,31 +37,20 @@ def __load_storage_context(**kwargs) -> StorageContext:
 
 
 def get_storage_context(
-    namespace_key: NamespaceKey,
-    store_type: Optional[Literal["directory", "pinecone"]] = "directory",
-    vector_store_kwargs: Mapping[str, Any] = {"namespace": "biosymbolics"},
+    index_name: str,
+    **kwargs,
 ) -> StorageContext:
     """
-    Get storage context
+    Get vector store storage context
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        store_type (Literal["directory", "pinecone"]): type of storage to use
-        vector_store_kwargs (Mapping[str, Any]): kwargs for vector store (currently only used if store_type == pinecone)
+        index_name (str): name of the index
+        vector_store_kwargs (Mapping[str, Any]): kwargs for vector store
     """
-    logging.info(
-        "Loading storage context for %s, store type %s", namespace_key, store_type
-    )
-    if store_type == "directory":
-        directory = get_persist_dir(namespace_key)
-        return __load_storage_context(persist_dir=directory)
-    elif store_type == "pinecone":
-        # namespace must be filtered at query time
-        pinecone_index = get_vector_db(DEFAULT_PINECONE_INDEX)
-        vector_store = PineconeVectorStore(pinecone_index, **vector_store_kwargs)
-        return __load_storage_context(vector_store=vector_store)
-
-    raise Exception(f"Unknown store type {store_type}")
+    logging.info("Loading storage context for %s", index_name)
+    pinecone_index = get_vector_db(index_name)
+    vector_store = PineconeVectorStore(pinecone_index, **kwargs)
+    return __load_storage_context(vector_store=vector_store)
 
 
 def __get_llm(model_name: Optional[LlmModelType]):

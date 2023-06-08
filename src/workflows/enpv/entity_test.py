@@ -4,7 +4,7 @@ Test script entity index
 import logging
 import sys
 
-from core.indices.entity_index import EntityIndex
+from core import EntityIndex, SourceDocIndex
 from common.utils.misc import dict_to_named_tuple
 from prompts import GET_SIMPLE_TRIPLE_PROMPT
 
@@ -17,11 +17,14 @@ def main(entity_list: list[str]):
     """
     for entity in entity_list:
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
+        si = SourceDocIndex()
         ei = EntityIndex(entity)
-        ei.load(source)
+        ei.load()
         prompt = f"Summarize what we know about {entity}."  # GET_SIMPLE_TRIPLE_PROMPT(entity)
-        answer = ei.query(prompt, source)
-        print(answer)
+        answer1 = ei.query(prompt, source)
+        answer2 = si.query(prompt, source)
+        print("ANSWER1", answer1)
+        print("ANSWER2", answer2)
 
 
 if __name__ == "__main__":

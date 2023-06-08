@@ -32,14 +32,13 @@ from local_types.indices import NamespaceKey
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
-ROOT_ENTITY_DIR = "entities"
-ENTITY_VECTOR_STORE_TYPE = "pinecone"
+INDEX_NAME = "entity_docs"
+ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
 def create_entity_indices(
     entities: list[str],
     namespace_key: NamespaceKey,
-    index_id: str,
     documents: list[str],
 ):
     """
@@ -48,21 +47,15 @@ def create_entity_indices(
     Args:
         entities (list[str]): list of entities to get indices for
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
     """
-    index = SourceDocIndex(namespace_key, index_id, documents=documents)
+    index = SourceDocIndex(documents, source=namespace_key)
     for entity in entities:
         try:
             idx = EntityIndex(entity)
-            idx.add_node(namespace_key, index, index_id)
+            idx.add_node(index, namespace_key)
         except Exception as e:
             logging.error(f"Error creating entity index for {entity}: {e}")
-
-
-ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS._replace(
-    storage_args={"store_type": ENTITY_VECTOR_STORE_TYPE}
-)
 
 
 class EntityIndex:
@@ -118,15 +111,16 @@ class EntityIndex:
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
         ns = {
-            "root": ROOT_ENTITY_DIR,
+            **source._asdict(),
             "entity": get_id(self.entity_id),
             "entity_type": self.type,
-            **source._asdict(),
         }
 
         return dict_to_named_tuple(ns)
 
-    def __describe_entity_by_source(self, source_index: SourceDocIndex) -> EntityObj:
+    def __describe_entity_by_source(
+        self, source_index: SourceDocIndex, source: NamespaceKey
+    ) -> EntityObj:
         """
         Get the description of an entity by querying the source index
 
@@ -144,7 +138,7 @@ class EntityIndex:
         refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
 
         response = source_index.query(
-            query, prompt=qa_prompt, refine_prompt=refine_prompt
+            query, source, prompt=qa_prompt, refine_prompt=refine_prompt
         )
 
         logging.info("Response from query_index: %s", response)
@@ -156,19 +150,17 @@ class EntityIndex:
             raise Exception(f"Failed to parse entity %s", self.entity_id)
         return entity_obj
 
-    def load(self, source: NamespaceKey):
+    def load(self):
         """
         Load entity index from disk
         """
-        ns = self.__get_namespace(source)
-        index = get_index(ns, context_args=self.context_args)
+        index = get_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
 
     def add_node(
         self,
-        source: NamespaceKey,
         source_index: SourceDocIndex,
-        index_id: str,
+        source: NamespaceKey,
         retrieval_date: datetime = datetime.now(),
     ):
         """
@@ -178,12 +170,9 @@ class EntityIndex:
         Args:
             source (NamespaceKey): namespace of the source
             source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
-            index_id (str): unique id of the index (e.g. 2020-01-1)
         """
-        namespace = self.__get_namespace(source)
-
         # get entity details by querying the source index
-        entity_obj = self.__describe_entity_by_source(source_index)
+        entity_obj = self.__describe_entity_by_source(source_index, source)
         name = entity_obj["name"]
         details = entity_obj["details"]
 
@@ -194,13 +183,11 @@ class EntityIndex:
                 "canonical_id": self.canonical_id or "",
                 # parsed name; may differ by source and from entity_id
                 "entity_name": name or "",
-                "index_id": index_id,
                 "retrieval_date": retrieval_date.isoformat(),
             }
 
         index = create_index(
-            namespace,
-            index_id,
+            INDEX_NAME,
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore
             get_doc_metadata=__get_metadata,
@@ -222,10 +209,9 @@ class EntityIndex:
         Args:
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
             documents (list[str]): list of documents
-            index_id (str): unique id of the index (e.g. 2020-01-1)
         """
-        index = SourceDocIndex(source, index_id, documents=documents)
-        self.add_node(source, index, index_id)
+        index = SourceDocIndex(documents, source=source)
+        self.add_node(index, source)
 
     def query(
         self,

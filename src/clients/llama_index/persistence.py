@@ -2,89 +2,38 @@
 Methods for for llama indexes persistence
 """
 import logging
-from typing import Optional, Union
+from typing import Optional
 from llama_index import (
     GPTVectorStoreIndex,
-    load_index_from_storage,
-    load_indices_from_storage,
 )
 
 from local_types.indices import LlmIndex, NamespaceKey
 from .context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
-    get_service_context,
     get_storage_context,
 )
-from .utils import get_persist_dir
-
-
-def __load_indices(
-    namespace_key: NamespaceKey,
-    index_id: Optional[str] = None,
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> Union[LlmIndex, list[LlmIndex], None]:
-    """
-    Load persisted index(es)
-
-    Args:
-        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (optional str): unique id of the index (e.g. 2020-01-1).
-            all indices loaded if unspecified.
-        context_args (ContextArgs): context args for loading index
-    """
-    try:
-        logging.info("Attempting to load index %s/%s", namespace_key, index_id)
-        storage_context = get_storage_context(
-            namespace_key, **context_args.storage_args
-        )
-
-        if context_args.storage_args.get("store_type", "") == "pinecone":
-            # vector dbs: no directory load required
-            index = GPTVectorStoreIndex([], storage_context=storage_context)
-            logging.info("Returning pinecone index %s/%s", namespace_key, index_id)
-            return index
-
-        if index_id:
-            index = load_index_from_storage(
-                storage_context,
-                index_id=index_id,
-            )
-            logging.info("Returning index %s/%s from disk", namespace_key, index_id)
-            return index
-
-        indices = load_indices_from_storage(storage_context)
-
-        logging.info("Returning indices %s from disk", namespace_key)
-        return indices
-
-    except Exception as ex:
-        logging.info("Failed to load %s/%s from disk: %s", namespace_key, index_id, ex)
-        return None
 
 
 def maybe_load_index(
-    namespace_key: NamespaceKey,
-    index_id: Optional[str] = None,
+    index_name: str,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> Optional[LlmIndex]:
     """
     Load index if present, otherwise return none
 
     Args:
-        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
         context_args (ContextArgs): context args for loading index
     """
     try:
-        return load_index(namespace_key, index_id, context_args)
+        return load_index(index_name, context_args)
     except Exception:
         return None
 
 
 def load_index(
-    namespace_key: NamespaceKey,
-    index_id: Optional[str] = None,
+    index_name: str,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> LlmIndex:
     """
@@ -95,50 +44,15 @@ def load_index(
         index_id (str): unique id of the index (e.g. 2020-01-1).
         context_args (ContextArgs): context args for loading index
     """
-    index = __load_indices(namespace_key, index_id, context_args)
-    if isinstance(index, list):
-        raise Exception("Expected single index, got list")
-    if isinstance(index, LlmIndex):
-        return index
-    raise Exception("Expected single index, got None")
+    storage_context = get_storage_context(index_name, **context_args.storage_args)
 
-
-def load_indices(
-    namespace_key: NamespaceKey,
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> list[LlmIndex]:
-    """
-    Load persisted indices
-
-    Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-    """
-    indices = __load_indices(namespace_key, None, context_args)
-    if not isinstance(indices, list):
-        raise Exception("Expected list of indices, got single index")
-    return indices
-
-
-def persist_index(index: LlmIndex, namespace_key: NamespaceKey, index_id: str):
-    """
-    Persist llama index
-
-    Args:
-        index (LlmIndex): any generic LLM Index
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-    """
-    try:
-        directory = get_persist_dir(namespace_key)
-        index.set_index_id(index_id)
-        index.storage_context.persist(persist_dir=directory)
-    except Exception as ex:
-        logging.error("Error persisting index: %s", ex)
+    index = GPTVectorStoreIndex([], storage_context=storage_context)
+    logging.info("Returning vector index %s", index_name)
+    return index
 
 
 def does_index_exist(
-    namespace_key: NamespaceKey,
-    index_id: Optional[str] = None,
+    index_name: str,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> bool:
     """
@@ -150,7 +64,7 @@ def does_index_exist(
         context_args (ContextArgs): context args for loading index
     """
     try:
-        load_index(namespace_key, index_id, context_args)
+        load_index(index_name, context_args)
         return True
     except Exception:
         return False
