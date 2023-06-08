@@ -23,35 +23,26 @@ class SourceDocIndex:
 
     def __init__(
         self,
-        documents: Optional[list[str]] = None,
-        source: Optional[NamespaceKey] = None,
         context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
         index_impl: LlmIndex = GPTVectorStoreIndex,  # type: ignore
-        retrieval_date: datetime = datetime.now(),
     ):
         """
         initialize
 
         Args:
-            documents (list[str], optional): list of documents. Defaults to None. Can be loaded later with from_documents().
-            source (NamespaceKey, optional): source namespace. Defaults to None. Can be loaded later with from_documents().
             context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
             index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
-            retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
         self.context_args = context_args
-        self.index = None  # TODO: load
+        self.index = None
         self.index_impl = index_impl
 
-        if documents and source:
-            self.from_documents(documents, source, retrieval_date)
-        elif documents or source:
-            raise ValueError("Must provide both documents and source or neither.")
+        self.__load()
 
-    def from_documents(
+    def add_documents(
         self,
-        documents: list[str],
         source: NamespaceKey,
+        documents: list[str],
         retrieval_date: datetime = datetime.now(),
     ):
         """
@@ -78,7 +69,7 @@ class SourceDocIndex:
         )
         self.index = index
 
-    def load(self):
+    def __load(self):
         """
         Load source doc index from disk
         """

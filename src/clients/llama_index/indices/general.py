@@ -91,7 +91,7 @@ def upsert_index(
         context_args (ContextArgs): context args for loading index
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
     """
-    logging.info("Creating index %s", index_name)
+    logging.info("Adding docs to index %s", index_name)
 
     try:
         ll_docs = format_documents(documents, get_doc_metadata)
@@ -105,6 +105,6 @@ def upsert_index(
         )
         return index
     except Exception as ex:
-        logging.error("Error creating index %s: %s", index_name, ex)
+        logging.error("Error upserting index %s: %s", index_name, ex)
         traceback.print_exc()
         raise ex

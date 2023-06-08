@@ -2,7 +2,6 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import Optional
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
 from llama_index.prompts.default_prompts import (
@@ -49,11 +48,12 @@ def create_entity_indices(
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         documents (Document): list of llama_index Documents
     """
-    index = SourceDocIndex(documents, source=namespace_key)
+    index = SourceDocIndex()
+    index.add_documents(namespace_key, documents)
     for entity in entities:
         try:
-            idx = EntityIndex(entity)
-            idx.add_node(index, namespace_key)
+            idx = EntityIndex()
+            idx.add_node(entity, index, namespace_key)
         except Exception as e:
             logging.error(f"Error creating entity index for {entity}: {e}")
 
@@ -67,23 +67,19 @@ class EntityIndex:
 
     def __init__(
         self,
-        entity_name: str,
-        canonical_id: Optional[str] = None,
         context_args: ContextArgs = ENTITY_INDEX_CONTEXT_ARGS,
     ):
         """
         Initialize EntityIndex
 
         Args:
-            entity_name (str): entity name
-            canonical_id (Optional[str], optional): canonical id of the entity. Defaults to None.
             context_args (ContextArgs, optional): context args. Defaults to ENTITY_INDEX_CONTEXT_ARGS.
         """
-        self.canonical_id = canonical_id
         self.context_args = context_args
         self.index = None
-        self.entity_id = entity_name
         self.type = "intervention"
+
+        self.__load()
 
     @property
     def __response_schemas(self) -> list[ResponseSchema]:
@@ -100,6 +96,7 @@ class EntityIndex:
 
     def __get_namespace(
         self,
+        entity_id,
         source: NamespaceKey,
     ) -> NamespaceKey:
         """
@@ -113,14 +110,14 @@ class EntityIndex:
         """
         ns = {
             **source._asdict(),
-            "entity": get_id(self.entity_id),
+            "entity": get_id(entity_id),
             "entity_type": self.type,
         }
 
         return dict_to_named_tuple(ns)
 
     def __describe_entity_by_source(
-        self, source_index: SourceDocIndex, source: NamespaceKey
+        self, entity_id: str, source_index: SourceDocIndex, source: NamespaceKey
     ) -> EntityObj:
         """
         Get the description of an entity by querying the source index
@@ -129,7 +126,7 @@ class EntityIndex:
             source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
         """
         # get prompt to get details about entity
-        query = GET_BIOMEDICAL_ENTITY_TEMPLATE(self.entity_id)
+        query = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity_id)
 
         # get the answer as json
         output_parser = get_output_parser(self.__response_schemas)
@@ -148,10 +145,10 @@ class EntityIndex:
         entity_obj = parse_answer(response, output_parser, return_orig_on_fail=False)
 
         if not is_entity_obj(entity_obj):
-            raise Exception(f"Failed to parse entity %s", self.entity_id)
+            raise Exception(f"Failed to parse entity %s", entity_id)
         return entity_obj
 
-    def load(self):
+    def __load(self):
         """
         Load entity index from disk
         """
@@ -160,20 +157,25 @@ class EntityIndex:
 
     def add_node(
         self,
+        entity_id: str,
         source_index: SourceDocIndex,
         source: NamespaceKey,
         retrieval_date: datetime = datetime.now(),
+        canonical_id: str = "",
     ):
         """
         Create a node for this entity based on the source index,
         for example, an index for intervention BIBB122 based on some SEC 10-K filings
 
         Args:
+            entity_id (str): entity id (e.g. BIBB122)
             source (NamespaceKey): namespace of the source
             source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
+            retrieval_date (datetime, optional): retrieval date. Defaults to datetime.now()
+            canonical_id (str, optional): canonical id. Defaults to "".
         """
         # get entity details by querying the source index
-        entity_obj = self.__describe_entity_by_source(source_index, source)
+        entity_obj = self.__describe_entity_by_source(entity_id, source_index, source)
         name = entity_obj["name"]
         details = entity_obj["details"]
 
@@ -181,13 +183,14 @@ class EntityIndex:
         def __get_metadata(doc) -> DocMetadata:
             return {
                 **source._asdict(),
-                "canonical_id": self.canonical_id or "",
+                entity_id: entity_id,
+                "canonical_id": canonical_id,
                 # parsed name; may differ by source and from entity_id
                 "entity_name": name or "",
                 # "retrieval_date": retrieval_date.isoformat(), # llamaindex gets mad
             }
 
-        index = upsert_index(
+        upsert_index(
             INDEX_NAME,
             [details],
             index_impl=GPTVectorStoreIndex,  # type: ignore
@@ -195,10 +198,9 @@ class EntityIndex:
             context_args=self.context_args,
         )
 
-        self.index = index
-
     def add_node_from_docs(
         self,
+        entity_id: str,
         source: NamespaceKey,
         documents: list[str],
     ):
@@ -206,15 +208,18 @@ class EntityIndex:
         Create a node for this entity based on the supplied documents
 
         Args:
+            entity_id (str): entity id (e.g. BIBB122)
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
             documents (list[str]): list of documents
         """
-        index = SourceDocIndex(documents, source=source)
-        self.add_node(index, source)
+        index = SourceDocIndex()
+        index.add_documents(source, documents)
+        self.add_node(entity_id, index, source)
 
     def query(
         self,
         query_string: str,
+        entity_id: str,
         source: NamespaceKey,
     ) -> str:
         """
@@ -222,9 +227,10 @@ class EntityIndex:
 
         Args:
             query_string (str): query string
+            entity_id (str): entity id (e.g. BIBB122)
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
         """
-        metadata_filters = get_metadata_filters(self.__get_namespace(source))
+        metadata_filters = get_metadata_filters(self.__get_namespace(entity_id, source))
 
         if not self.index:
             raise ValueError("No index found.")
