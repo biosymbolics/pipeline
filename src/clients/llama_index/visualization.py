@@ -22,15 +22,14 @@ def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
     net.show("graph.html", notebook=False)
 
 
-def visualize_network(namespace_key: NamespaceKey, index_id: str):
+def visualize_network(index_name: str):
     """
     Visualize network
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index to visualize
     """
-    index = load_index(namespace_key, index_id)
+    index = load_index(index_name)
     if not index:
         raise Exception("index not found")
     visualize_network_by_index(cast(GPTKnowledgeGraphIndex, index))
@@ -56,14 +55,13 @@ def list_triples_by_index(index: GPTKnowledgeGraphIndex):
         print(triple)
 
 
-def list_triples(namespace_key: NamespaceKey, index_id: str):
+def list_triples(index_name: str):
     """
     List triples
 
     Args:
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index to visualize
     """
-    index = load_index(namespace_key, index_id)
+    index = load_index(index_name)
     kg_index = cast(GPTKnowledgeGraphIndex, index)
     list_triples_by_index(kg_index)

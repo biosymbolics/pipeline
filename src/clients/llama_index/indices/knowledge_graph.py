@@ -14,8 +14,8 @@ MAX_TRIPLES = 400
 
 def create_and_query_kg_index(
     query: str,
+    index_name: str,
     namespace_key: NamespaceKey,
-    index_id: str,
     documents: list[str],
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> str:
@@ -24,20 +24,20 @@ def create_and_query_kg_index(
 
     Args:
         query (str): natural language query
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
+        namespace_key (NamespaceKey): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         documents (Document): list of llama_index Documents
         context_args (ContextArgs): context args for loading index
     """
-    index = create_kg_index(namespace_key, index_id, documents, context_args)
+    index = create_kg_index(index_name, namespace_key, documents, context_args)
     answer = query_index(index, query)
     logging.info("Answer: %s", answer)
     return answer
 
 
 def create_kg_index(
+    index_name: str,
     namespace_key: NamespaceKey,
-    index_id: str,
     documents: list[str],
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> GPTKnowledgeGraphIndex:
@@ -45,14 +45,13 @@ def create_kg_index(
     Creates the kg index if nx, and returns
 
     Args:
+        index_name (str): name of the index
         namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
         documents (Document): list of llama_index Documents
         context_args (ContextArgs): context args for loading index
     """
     return create_index(
-        namespace_key,
-        index_id,
+        index_name,
         documents,
         index_impl=GPTKnowledgeGraphIndex,  # type: ignore
         index_args={

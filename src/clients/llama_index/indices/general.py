@@ -3,7 +3,7 @@ Client for llama indexes
 """
 import logging
 import traceback
-from typing import Any, Mapping, Optional, TypeVar, Union, cast
+from typing import Any, Mapping, Optional, TypeVar, Union
 from llama_index import Document, Response
 
 from clients.llama_index.context import (
@@ -13,7 +13,7 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
-from clients.llama_index.persistence import does_index_exist, load_index
+from clients.llama_index.persistence import load_index
 from local_types.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocMetadata
@@ -77,7 +77,6 @@ def create_index(
     index_args: Mapping[str, Any] = {},
     get_doc_metadata: Optional[GetDocMetadata] = None,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-    return_if_exists: bool = False,
 ) -> IndexImpl:
     """
     Create an index from supplied document url
@@ -94,11 +93,6 @@ def create_index(
     """
     logging.info("Creating index %s", index_name)
 
-    if does_index_exist(index_name, context_args):
-        if return_if_exists:
-            index = get_index(index_name, context_args)
-            return cast(IndexImpl, index)
-        raise Exception("Index already exists")
     try:
         ll_docs = format_documents(documents, get_doc_metadata)
         index = index_impl.from_documents(

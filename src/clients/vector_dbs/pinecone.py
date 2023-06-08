@@ -38,7 +38,7 @@ def get_vector_db(
         index_name (str): name of index.
         pinecone_args (Mapping[str, Any]): additional args to pass to pinecone.create_index. Defaults to {}.
     """
-    pinecone.init(api_key=API_KEY, environment="us-west4-gcp-free")
+    pinecone.init(api_key=API_KEY, environment="us-west4-gcp")
 
     if index_name not in pinecone.list_indexes():
         pinecone.create_index(

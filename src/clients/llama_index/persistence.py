@@ -52,22 +52,3 @@ def load_index(
     if not index:
         raise Exception(f"Index {index_name} not found")
     return index
-
-
-def does_index_exist(
-    index_name: str,
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> bool:
-    """
-    Check if index exists
-
-    Args:
-        namespace_key (str): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-        context_args (ContextArgs): context args for loading index
-    """
-    try:
-        load_index(index_name, context_args)
-        return True
-    except Exception:
-        return False
