@@ -194,7 +194,7 @@ class EntityIndex:
             }
 
         def __get_doc_id(doc) -> str:
-            return get_namespace_id(source)
+            return entity_id + "-" + get_namespace_id(source)
 
         upsert_index(
             INDEX_NAME,
