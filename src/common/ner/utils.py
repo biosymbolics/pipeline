@@ -16,6 +16,7 @@ from common.utils.re import (
     get_or_re,
     ReCount,
     ALPHA_CHARS,
+    LEGAL_SYMBOLS,
 )
 
 from .tokenizers.html_tokenizer import create_html_tokenizer
@@ -180,7 +181,7 @@ def remove_common_terms(
     return list(filter(__is_uncommon, entity_list))
 
 
-CHARACTER_SUPPRESSIONS = [r"\n", "®"]
+CHARACTER_SUPPRESSIONS = [r"\n", *LEGAL_SYMBOLS]
 
 
 def clean_entity(entity: str) -> str:
