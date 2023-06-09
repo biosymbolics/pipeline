@@ -14,7 +14,7 @@ from langchain.llms import Anthropic, VertexAI
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
-from clients.vector_dbs.pinecone import get_vector_db
+from clients.vector_dbs.pinecone import get_vector_store
 from local_types.indices import LlmModelType
 
 
@@ -48,7 +48,7 @@ def get_storage_context(
         vector_store_kwargs (Mapping[str, Any]): kwargs for vector store
     """
     logging.info("Loading storage context for %s", index_name)
-    pinecone_index = get_vector_db(index_name)
+    pinecone_index = get_vector_store(index_name)
     vector_store = PineconeVectorStore(pinecone_index, **kwargs)
     return __load_storage_context(vector_store=vector_store)
 
