@@ -2,7 +2,7 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import cast
+from typing import cast, Callable
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
 from llama_index.prompts.default_prompts import (
@@ -11,13 +11,15 @@ from llama_index.prompts.default_prompts import (
 )
 from langchain.output_parsers import ResponseSchema
 import logging
+from pydash import flatten
 
 from clients.llama_index import (
+    get_index,
+    query_index,
     get_output_parser,
     parse_answer,
     upsert_index,
 )
-from clients.llama_index import get_index, query_index
 from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
@@ -26,6 +28,7 @@ from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
+from common.ner import extract_named_entities
 from common.utils.string import get_id
 from local_types.indices import NamespaceKey
 from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
@@ -35,6 +38,43 @@ from .types import is_entity_obj, EntityObj
 
 INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
+
+
+def create_from_docs(
+    section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
+):
+    """
+    Create entity index from a map of sections
+
+    Args:
+        section_map (dict[str, list[str]]): map of sections
+        get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
+            ``` python
+                def get_namespace_key(key: str) -> NamespaceKey:
+                    return dict_to_named_tuple(
+                        {
+                            "company": "PFE",
+                            "doc_source": "SEC",
+                            "doc_type": "10-K",
+                            "period": key,
+                        }
+                    )
+
+                create_from_docs(section_map, get_namespace_key)
+            ```
+    """
+    all_sections = flatten(section_map.values())
+    entities = extract_named_entities(all_sections, "spacy")
+    logging.info("Entities: %s", entities)
+
+    # this is the slow part
+    for key, sections in section_map.items():
+        ns_key = get_namespace_key(key)
+        create_entity_indices(
+            entities=entities,
+            namespace_key=ns_key,
+            documents=sections,
+        )
 
 
 def create_entity_indices(
