@@ -17,12 +17,9 @@ logging.getLogger().setLevel(logging.INFO)
 st.title("Ask Biosymbolic.ai")
 question = st.text_input("What would you like to ask?", "")
 prefix = (
-    "Below is a question asked by a knowledgeable and technical investor "
-    "looking to gain knowledge to inform investments and IP acquisition. "
-    "Provide a detailed and specific answer to their question. "
-    "Format the answer in markdown. \n\n"
-    "For example, if the user asks 'What compounds are in Pfizer's pipeline?' "
-    "reply with a list of the compounds and salient information about each. \n\n"
+    "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
+    "With that in mind, provide detailed, scientific and comprehensive answer to their question. "
+    "Format the answer in markdown, and include tables and links if appropriate. "
     "Here is the question: \n\n"
 )
 prompt = prefix + question
