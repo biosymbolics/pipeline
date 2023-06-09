@@ -75,7 +75,7 @@ class EntityIndex:
         Initialize EntityIndex
 
         Args:
-            context_args (ContextArgs, optional): context args. Defaults to ENTITY_INDEX_CONTEXT_ARGS.
+            context_args (ContextArgs): context args. Defaults to ENTITY_INDEX_CONTEXT_ARGS.
         """
         self.context_args = context_args
         self.index = None
@@ -126,7 +126,9 @@ class EntityIndex:
         Get the description of an entity by querying the source index
 
         Args:
+            entity_id (str): entity id (e.g. BIBB122)
             source_index (LlmIndex): source index (e.g. an index for an SEC 10-K filing)
+            source (NamespaceKey): namespace of the source
         """
         # get prompt to get details about entity
         query = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity_id)
@@ -193,8 +195,13 @@ class EntityIndex:
                 # "retrieval_date": retrieval_date.isoformat(), # llamaindex gets mad
             }
 
+        # uniq doc id for deduplication/idempotency
         def __get_doc_id(doc) -> str:
             return entity_id + "-" + get_namespace_id(source)
+
+        if name is None or details is None:
+            logging.warning(f"Skipping {entity_id} due to missing name or details")
+            return
 
         upsert_index(
             INDEX_NAME,

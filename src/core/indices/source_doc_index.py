@@ -20,6 +20,12 @@ class SourceDocIndex:
     SourceDocIndex
 
     Simple index over raw-ish source docs
+
+    Pinecone query example:
+    ``` json
+    { "$and": [{ "company": "PFE" }, { "doc_source": "SEC" }, { "doc_type": "10-K" }, { "period": "2020-12-31" }] }
+    ```
+
     """
 
     def __init__(
@@ -51,7 +57,17 @@ class SourceDocIndex:
 
         Args:
             documents (list[str]): list of documents
-            source (NamespaceKey): source namespace
+            source (NamespaceKey): source namespace, e.g.
+                ``` python
+                dict_to_named_tuple(
+                    {
+                        "company": "BIBB",
+                        "doc_source": "SEC",
+                        "doc_type": "10-K",
+                        "period": "2020-12-31",
+                    }
+                )
+                ```
             retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
 
@@ -61,6 +77,7 @@ class SourceDocIndex:
                 # "retrieval_date": retrieval_date.isoformat(),
             }
 
+        # uniq doc id for deduplication/idempotency
         def __get_doc_id(doc) -> str:
             return get_namespace_id(source)
 
@@ -93,7 +110,17 @@ class SourceDocIndex:
 
         Args:
             query_string (str): query string
-            source (NamespaceKey): source namespace (acts as filter)
+            source (NamespaceKey): source namespace that acts as filter, e.g.
+                ``` python
+                dict_to_named_tuple(
+                    {
+                        "company": "BIBB",
+                        "doc_source": "SEC",
+                        "doc_type": "10-K",
+                        "period": "2020-12-31",
+                    }
+                )
+                ```
             prompt (Prompt, optional): prompt. Defaults to None.
             refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """
