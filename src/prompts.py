@@ -74,7 +74,7 @@ BIOMEDICAL_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
 )
 
 
-def GET_BIOMEDICAL_NER_TEMPLATE(entity: str) -> str:
+def GET_BIOMEDICAL_ENTITY_TEMPLATE(entity: str) -> str:
     return (
         f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
         "Return information about this intervention, such as its name, "
@@ -82,4 +82,26 @@ def GET_BIOMEDICAL_NER_TEMPLATE(entity: str) -> str:
         "- If investigational, include details about its phase of development and probability of success. "
         "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
         "- If discontinued, include the reasons for discontinuation. "
+    )
+
+
+def GET_SIMPLE_TRIPLE_PROMPT(text: str) -> str:
+    return (
+        "Extract all information about this entity in the form of "
+        "knowledge triplets (subject, predicate, object). "
+        "Attributes of interest include:\n"
+        " - status: investigational, commercial, LOE, phase, submitted\n"
+        " - indications\n"
+        " - mechanisms of action\n"
+        " - synonyms\n"
+        "---------------------\n"
+        "Example:\n"
+        "Text: Phase III clinical trials are underway for cendakimab in eosinophilic esophagitis.\n"
+        "Triplets:\n"
+        "(cendakimab, has indication, Eosinophilic Esophagitis)\n"
+        "(cendakimab, has status, Phase III)\n"
+        "(cendakimab, has status, investigational)\n"
+        "---------------------\n"
+        f"Text: {text}\n"
+        "Triplets:\n"
     )

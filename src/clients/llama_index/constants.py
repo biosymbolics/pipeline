@@ -1,9 +1,7 @@
 """
 Llama Index constants
 """
-from .types import LlmModel
+from local_types.indices import LlmModelType
 
 BASE_STORAGE_DIR = "./storage"
 SEC_DOCS_DIR = "./sec_docs"
-
-DEFAULT_MODEL_NAME: LlmModel = "ChatGPT"

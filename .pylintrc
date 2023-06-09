@@ -3,5 +3,5 @@
 disable=
   W0703, # broad-except (maybe re-enable in the future)
   E0611, # no-name-in-module (false positives like crazy)
-  E0402, # relative-beyond-top-level (`from .general import get_or_create_index` nice to permit)
+  E0402, # relative-beyond-top-level (`from .general import get_or_upsert_index` nice to permit)
   W0719  # Raising too general exception: Exception (broad-exception-raised) (re-enable in the future)

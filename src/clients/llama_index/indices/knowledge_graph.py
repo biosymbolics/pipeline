@@ -1,59 +1,57 @@
 """
 Functions specific to knowledge graph indices
 """
-from typing import Optional
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 import logging
 
-from clients.llama_index.constants import DEFAULT_MODEL_NAME
-from clients.llama_index.types import LlmModel
-from sources.sec.prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
-from .general import get_or_create_index, query_index
+from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
+from local_types.indices import NamespaceKey
+from prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
+from .general import upsert_index, query_index
 
 MAX_TRIPLES = 400
 
 
 def create_and_query_kg_index(
     query: str,
-    namespace: str,
-    index_id: str,
+    index_name: str,
+    namespace_key: NamespaceKey,
     documents: list[str],
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> str:
     """
     Creates or gets the kg index and queries
 
     Args:
         query (str): natural language query
-        namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
+        namespace_key (NamespaceKey): namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         documents (Document): list of llama_index Documents
-        model_name (LlmModel): model name
+        context_args (ContextArgs): context args for loading index
     """
-    index = get_kg_index(namespace, index_id, documents, model_name=model_name)
+    index = create_kg_index(index_name, namespace_key, documents, context_args)
     answer = query_index(index, query)
     logging.info("Answer: %s", answer)
     return answer
 
 
-def get_kg_index(
-    namespace: str,
-    index_id: str,
+def create_kg_index(
+    index_name: str,
+    namespace_key: NamespaceKey,
     documents: list[str],
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> GPTKnowledgeGraphIndex:
     """
     Creates the kg index if nx, and returns
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
+        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
         documents (Document): list of llama_index Documents
-        model_name (LlmModel): model name
+        context_args (ContextArgs): context args for loading index
     """
-    return get_or_create_index(
-        namespace,
-        index_id,
+    return upsert_index(
+        index_name,
         documents,
         index_impl=GPTKnowledgeGraphIndex,  # type: ignore
         index_args={
@@ -61,5 +59,5 @@ def get_kg_index(
             "max_knowledge_triplets": MAX_TRIPLES,
             "include_embeddings": True,
         },
-        model_name=model_name,
+        context_args=context_args,
     )

@@ -1,9 +1,9 @@
-"""
-Llama Index Types
-"""
-from typing import Literal, TypeVar
-from llama_index.indices.base import BaseGPTIndex as LlmIndex
+from typing import Callable, Union
+from llama_index import Document
 
-LI = TypeVar("LI", bound=LlmIndex)
+DocMetadata = dict[
+    str, Union[str, float, int]
+]  # Pinecone docs say more types are okay?
+GetDocMetadata = Callable[[Document], DocMetadata]
 
-LlmModel = Literal["ChatGPT", "VertexAI", "Anthropic"]
+GetDocId = Callable[[Document], str]

@@ -2,40 +2,45 @@
 Client for llama indexes
 """
 import logging
-from typing import Optional, TypeVar, cast
-from llama_index import Document, QuestionAnswerPrompt, Response, RefinePrompt
-from llama_index.indices.base import BaseGPTIndex as LlmIndex
+import traceback
+from typing import Any, Mapping, Optional, TypeVar, Union
+from llama_index import Document, Response
 
-from clients.llama_index.constants import DEFAULT_MODEL_NAME
-from clients.llama_index.context import get_service_context, get_storage_context
-from clients.llama_index.persistence import maybe_load_index, persist_index
-from clients.llama_index.types import LlmModel
+from clients.llama_index.context import (
+    get_service_context,
+    get_storage_context,
+    ContextArgs,
+    DEFAULT_CONTEXT_ARGS,
+)
+from clients.llama_index.formatting import format_documents
+from clients.llama_index.persistence import load_index
+from local_types.indices import LlmIndex, Prompt, RefinePrompt
+
+from ..types import GetDocId, GetDocMetadata
 
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 
 def get_index(
-    namespace: str,
-    index_id: str,
+    index_name: str,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> LlmIndex:
     """
     Get llama index from the namespace/index_id
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
+        index_name (str): name of the index
+        context_args (ContextArgs): context args for loading index
     """
-    index = maybe_load_index(namespace, index_id)
-    if index:
-        return index
-    raise Exception("Index not found")
+    return load_index(index_name, context_args)
 
 
 def query_index(
     index: LlmIndex,
     query: str,
-    prompt: Optional[QuestionAnswerPrompt] = None,
+    prompt: Optional[Prompt] = None,
     refine_prompt: Optional[RefinePrompt] = None,
+    **kwargs,
 ) -> str:
     """
     Queries a given index
@@ -45,52 +50,63 @@ def query_index(
         query (str): natural language query
         prompt (QuestionAnswerPrompt): prompt to use for query (optional)
         refine_prompt (RefinePrompt): prompt to use for refine (optional)
+        **kwargs: additional args to pass to the query engine
     """
-    query_engine = index.as_query_engine(
-        text_qa_template=prompt,
-        refine_template=refine_prompt,
-    )
+    if prompt and refine_prompt:
+        query_engine = index.as_query_engine(
+            **kwargs,
+            text_qa_template=prompt,
+            refine_template=refine_prompt,
+        )
+    else:
+        query_engine = index.as_query_engine(**kwargs)
 
     response = query_engine.query(query)
+
     if not isinstance(response, Response) or not response.response:
+        logging.error("Could not parse response: %s", response)
         raise Exception("Could not parse response")
+
     return response.response
 
 
-def get_or_create_index(
-    namespace: str,
-    index_id: str,
-    documents: list[str],
+def upsert_index(
+    index_name: str,
+    documents: Union[list[str], list[Document]],
     index_impl: IndexImpl,
-    index_args: Optional[dict] = None,
-    model_name: Optional[LlmModel] = DEFAULT_MODEL_NAME,
+    index_args: Mapping[str, Any] = {},
+    get_doc_metadata: Optional[GetDocMetadata] = None,
+    get_doc_id: Optional[GetDocId] = None,
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> IndexImpl:
     """
-    Create llama index from supplied document url
-    Skips creation if it already exists
+    Create an index from supplied document url
+
+    Note: this is a bit of a misnomer for pinecone, for which we're just adding new documents to an existing index
 
     Args:
-        namespace (str): namespace of the index (e.g. SEC-BMY)
-        index_id (str): unique id of the index (e.g. 2020-01-1)
-        documents (Document): list of llama_index Documents
-        LlmIndex (LlmIndex): the llama index type to use
+        index_name (str): name of the index
+        documents (Document): list of strings or docs
+        index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
+        context_args (ContextArgs): context args for loading index
+        get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
+        get_doc_id (GetDocId): function to get doc id from doc
     """
-    index = maybe_load_index(namespace, index_id)
-    if index:
-        return cast(IndexImpl, index)
+    logging.info("Adding docs to index %s", index_name)
 
-    logging.info("Creating index %s/%s", namespace, index_id)
     try:
-        ll_docs = list(map(Document, documents))
+        ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)
         index = index_impl.from_documents(
             ll_docs,
-            # *(index_args or {}),
-            service_context=get_service_context(model_name),
-            storage_context=get_storage_context(namespace),
+            service_context=get_service_context(model_name=context_args.model_name),
+            storage_context=get_storage_context(
+                index_name, **context_args.storage_args
+            ),
+            *index_args,
         )
-        persist_index(index, namespace, index_id)
         return index
     except Exception as ex:
-        logging.error("Error creating index: %s", ex)
+        logging.error("Error upserting index %s: %s", index_name, ex)
+        traceback.print_exc()
         raise ex

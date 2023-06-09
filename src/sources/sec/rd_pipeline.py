@@ -2,19 +2,14 @@
 Get info about R&D pipelines
 """
 from datetime import date, datetime
-import json
 import logging
 from pydash import flatten
 import polars as pl
 
 
-from common.utils import ner
-from common.utils.html_parsing.html import strip_inline_styles
+import common.utils.ner as ner
 from common.utils.list import diff_lists
-from common.utils.validate import validate_or_pickle
-from clients.llama_index import create_and_query_kg_index
 from clients.sec import sec_client
-from sources.sec.prompts import JSON_PIPELINE_PROMPT, JSON_PIPELINE_SCHEMA
 from sources.sec.sec import fetch_annual_reports
 from sources.sec.types import SecFiling
 from sources.sec.types import SecProductQueryStrategy
@@ -33,28 +28,6 @@ def __df_to_products(df: pl.DataFrame) -> list[str]:
     return valid
 
 
-def __search_for_products(sec_text: str, namespace: str, period: str) -> list[str]:
-    """
-    Uses LlamaIndex/GPT to extract product names
-    """
-    results = create_and_query_kg_index(
-        JSON_PIPELINE_PROMPT, namespace, period, [sec_text]
-    )
-    names = []
-    try:
-        products = json.loads(results)
-        for product in products:
-            try:
-                validate_or_pickle(product, JSON_PIPELINE_SCHEMA)
-                names.append(product["brand_name"])
-            except Exception as ex:
-                logging.debug("Ignoring exception %s", ex)
-    except Exception as ex:
-        print("WTF", ex)
-
-    return names
-
-
 def __extract_products(
     report: SecFiling, strategy: SecProductQueryStrategy = "TABLE"
 ) -> list[str]:
@@ -70,19 +43,6 @@ def __extract_products(
         product_tables = sec_client.extract_rd_pipeline(report_url)
         return flatten(map(__df_to_products, product_tables))
 
-    if strategy == "SEARCH":
-        sections = sec_client.extract_sections(
-            report_url,
-            return_type="html",
-            formatter=strip_inline_styles,
-            sections=["1", "7"],
-        )
-        return __search_for_products(
-            namespace=report["ticker"],
-            period=report.get("periodOfReport"),
-            sec_text="\n".join(sections),
-        )
-
     raise Exception("Strategy not recognized")
 
 
@@ -93,14 +53,15 @@ def extract_pipeline_by_period(
     Extract R&D pipeline by reporting period
     """
     products_by_period = flatten(
-        map(
-            lambda report: {
-                "period": report.get("periodOfReport"),
+        [
+            {
+                "period": report.get("periodOfReport") or "",
                 "products": __extract_products(report, strategy),
-            },
-            reports,
-        )
+            }
+            for report in reports
+        ]
     )
+
     products_by_period = sorted(products_by_period, key=lambda r: r["period"])
     df = pl.DataFrame(products_by_period)  # pylint: disable=C0103
     return df

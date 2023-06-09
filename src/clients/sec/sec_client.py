@@ -10,8 +10,6 @@ from sec_api import ExtractorApi, QueryApi, RenderApi, XbrlApi
 from common.utils.html_parsing.product_table import extract_product_tables
 from sources.sec.types import ExtractReturnType, SecFiling
 
-# logging.getLogger().setLevel(logging.INFO)
-
 API_KEY = os.environ["SEC_API_KEY"]
 
 

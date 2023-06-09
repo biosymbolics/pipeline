@@ -7,15 +7,15 @@ import pathlib
 import requests
 import html2text
 
-# pylint: disable=W0611,E0401
-import requests_random_user_agent
+import requests_random_user_agent  # necessary
 from llama_index.readers.schema.base import Document
 
+from local_types.indices import NamespaceKey
+from common.utils.file import save_as_file
+from common.utils.namespace import get_namespace
 from common.utils.url import url_to_filename
-from src.common.utils.file import save_as_file
 
 
-# pylint: disable=R0903
 class CachedWedPageReader:
     """
     like SimpleWebPageReader but with caching
@@ -25,9 +25,9 @@ class CachedWedPageReader:
         index = GPTListIndex.from_documents(documents)
     """
 
-    def __init__(self, storage_dir: str, namespace: str):
+    def __init__(self, storage_dir: str, namespace_key: NamespaceKey):
         self.storage_dir = storage_dir
-        self.namespace = namespace
+        self.namespace = get_namespace(namespace_key)
 
     def __get_doc_dir(self) -> str:
         doc_dir = f"{self.storage_dir}/{self.namespace}"
@@ -68,6 +68,7 @@ class CachedWedPageReader:
             logging.debug("Getting url %s", url)
             document = self.__get_document(url)
             documents.append(document)
-            self.__cache_page(url, document.text)
+            if document.text:
+                self.__cache_page(url, document.text)
 
         return documents
