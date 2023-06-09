@@ -3,13 +3,10 @@ SEC build
 """
 from datetime import date, datetime
 import re
-from pydash import flatten
-import logging
 
-from common.ner import extract_named_entities
 from common.utils.html_parsing.html import strip_inline_styles
 from common.utils.misc import dict_to_named_tuple
-from core.indices.entity_index import create_from_docs
+from core.indices.entity_index import create_entities_from_docs
 from local_types.indices import NamespaceKey
 
 from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
@@ -54,4 +51,4 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             }
         )
 
-    create_from_docs(section_map, get_namespace_key)
+    create_entities_from_docs(section_map, get_namespace_key)
