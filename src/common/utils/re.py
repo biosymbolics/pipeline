@@ -23,6 +23,9 @@ WORD_DIGIT_CHAR_RE = "[\\d\\w\u0370-\u03FF]"
 
 COPYRIGHT_SYM = "\u00A9"  # ©
 REGISTERED_SYM = "\u00AE"  # ®
+TM_SYM = "\u2122"  # ™
+
+LEGAL_SYMBOLS = [COPYRIGHT_SYM, REGISTERED_SYM, TM_SYM]
 
 
 ReCount = Union[Literal["*", "+", "?"], int]

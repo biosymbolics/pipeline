@@ -3,13 +3,11 @@ SEC build
 """
 from datetime import date, datetime
 import re
-from pydash import flatten
-import logging
 
-from common.ner import extract_named_entities
 from common.utils.html_parsing.html import strip_inline_styles
 from common.utils.misc import dict_to_named_tuple
-from core.indices.entity_index import create_entity_indices
+from core.indices.entity_index import create_entities_from_docs
+from local_types.indices import NamespaceKey
 
 from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
 
@@ -43,21 +41,14 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         ticker, start_date, end_date, formatter=__format_for_ner
     )
 
-    all_sections = flatten(section_map.values())
-    entities = extract_named_entities(all_sections, "spacy")
-    logging.info("ENTITIES: %s", entities)
-
-    # this is the slow part
-    for period, sections in section_map.items():
-        create_entity_indices(
-            entities=entities,
-            namespace_key=dict_to_named_tuple(
-                {
-                    "company": ticker,
-                    "doc_source": "SEC",
-                    "doc_type": "10-K",
-                    "period": period,
-                }
-            ),
-            documents=sections,
+    def get_namespace_key(key: str) -> NamespaceKey:
+        return dict_to_named_tuple(
+            {
+                "company": ticker,
+                "doc_source": "SEC",
+                "doc_type": "10-K",
+                "period": key,
+            }
         )
+
+    create_entities_from_docs(section_map, get_namespace_key)

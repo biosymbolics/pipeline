@@ -13,13 +13,7 @@ from constants.patterns import (
     SMALL_MOLECULE_SUFFIXES,
 )
 
-from common.utils.re import (
-    get_or_re,
-    wrap,
-    ALPHA_CHARS,
-    COPYRIGHT_SYM,
-    REGISTERED_SYM,
-)
+from common.utils.re import get_or_re, wrap, ALPHA_CHARS, LEGAL_SYMBOLS
 from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
 
 # also ENTITY Opdualag tag: NNP pos: PROPN dep: nmod lemma: Opdualag morph: Number=Sing prob: -20.0 head: approval span: [of, ,, nivolumab, ,]
@@ -130,7 +124,7 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
 ]
 
 # Additional: infrequent (tf/idf) PROPN?
-CR_OR_REG_SYM = f"[ ]?[{COPYRIGHT_SYM}{REGISTERED_SYM}©®]"
+CR_OR_REG_SYM = f"[ ]?[{''.join(LEGAL_SYMBOLS)}]"
 BRAND_NAME_RE = get_entity_re(ALPHA_CHARS(5) + CR_OR_REG_SYM, eoe_re=".*")
 BRAND_NAME_PATTERNS: list[list[dict]] = [
     [
