@@ -162,16 +162,16 @@ def remove_common_terms(
         words = item_clean.split()
 
         # check if all words are in the vocab
-        common = set(words).issubset(vocab.strings)
+        is_common = set(words).issubset(vocab.strings)
 
         # check if any words are in the exception list
-        excepted = len(set(words).intersection(set(exception_list))) == 0
+        is_excepted = set(exception_list).issubset(set(words))
 
-        if common and not excepted:
+        if is_common and not is_excepted:
             logging.info(f"Removing common term: {item}")
-        elif excepted:
+        elif is_excepted:
             logging.info(f"Keeping exception term: {item}")
-        return common
+        return is_common
 
     def __is_uncommon(item):
         return not __is_common(item)
@@ -206,7 +206,7 @@ def clean_entity(entity: str) -> str:
     cleaned = reduce(lambda x, func: func(x), cleaning_steps, entity)
 
     if cleaned != entity:
-        logging.debug(f"Cleaned entity: {entity} -> {cleaned}")
+        logging.info(f"Cleaned entity: {entity} -> {cleaned}")
 
     return cleaned
 
