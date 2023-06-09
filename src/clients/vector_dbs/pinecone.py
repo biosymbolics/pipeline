@@ -7,8 +7,11 @@ from typing import Any, Mapping
 import pinecone
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 import logging
+from dotenv import load_dotenv
 
 from local_types.indices import NamespaceKey
+
+load_dotenv()
 
 API_KEY = os.environ["PINECONE_API_KEY"]
 
