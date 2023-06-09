@@ -11,13 +11,13 @@ from spacy.util import compile_infix_regex, compile_prefix_regex, compile_suffix
 import logging
 import string
 
+from common.utils.list import dedup
 from common.utils.re import (
     get_or_re,
     ReCount,
     ALPHA_CHARS,
 )
 from common.utils.string import remove_unmatched_brackets
-from src.common.utils.list import dedup
 
 from .tokenizers.html_tokenizer import create_html_tokenizer
 
