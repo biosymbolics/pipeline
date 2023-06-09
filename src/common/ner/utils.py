@@ -17,7 +17,6 @@ from common.utils.re import (
     ReCount,
     ALPHA_CHARS,
 )
-from common.utils.string import remove_unmatched_brackets
 
 from .tokenizers.html_tokenizer import create_html_tokenizer
 
@@ -165,13 +164,15 @@ def remove_common_terms(
         is_common = set(words).issubset(vocab.strings)
 
         # check if any words are in the exception list
-        is_excepted = set(exception_list).issubset(set(words))
+        is_excepted = len(set(exception_list).intersection(set(words))) > 0
 
-        if is_common and not is_excepted:
+        is_common_not_excepted = is_common and not is_excepted
+
+        if is_common_not_excepted:
             logging.info(f"Removing common term: {item}")
         elif is_excepted:
             logging.info(f"Keeping exception term: {item}")
-        return is_common
+        return is_common_not_excepted
 
     def __is_uncommon(item):
         return not __is_common(item)
@@ -201,7 +202,7 @@ def clean_entity(entity: str) -> str:
         return re.sub(r"\s+", " ", entity.strip())
 
     # List of cleaning functions to apply to entity
-    cleaning_steps = [remove_characters, remove_extra_spaces, remove_unmatched_brackets]
+    cleaning_steps = [remove_characters, remove_extra_spaces]
 
     cleaned = reduce(lambda x, func: func(x), cleaning_steps, entity)
 
@@ -223,6 +224,7 @@ def sanitize_entity_names(entity_map: dict[str, list[str]], nlp: Language) -> li
 
     Args:
         entity_map (dict[str, list[str]]): entity map
+        nlp (Language): spacy language model
     """
 
     def __filter_entities(entity_names: list[str]) -> list[str]:

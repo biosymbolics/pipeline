@@ -61,7 +61,7 @@ async def build_sec():
     """
     Build SEC stuffs
     """
-    start_date = datetime(2022, 1, 1)
+    start_date = datetime(2015, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
     await execute_async(compact(closures))
 
