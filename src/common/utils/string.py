@@ -34,12 +34,18 @@ def remove_unmatched_brackets(
 
     def replace_unmatched(text: str, bracket_pair: tuple[str, str]) -> str:
         open_sym, close_sym = bracket_pair
+        # unmatched opening symbols
         text = re.sub(
-            f"{re.escape(open_sym)}[^{re.escape(close_sym)}]*$", "", text
-        )  # unmatched opening symbols
+            f"{re.escape(open_sym)}[^{re.escape(close_sym)} ]*[{re.escape(close_sym)} ]",
+            "",
+            text,
+        )
+        # unmatched closing symbols
         text = re.sub(
-            f"^[^{re.escape(open_sym)}]*{re.escape(close_sym)}", "", text
-        )  # unmatched closing symbols
+            f"[ {re.escape(open_sym)}][^{re.escape(open_sym)} ]*{re.escape(close_sym)}",
+            "",
+            text,
+        )
         return text
 
     return reduce(replace_unmatched, brackets.items(), text)
