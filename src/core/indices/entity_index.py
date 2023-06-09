@@ -40,7 +40,7 @@ INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
-def create_from_docs(
+def create_entities_from_docs(
     section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
 ):
     """
@@ -64,7 +64,7 @@ def create_from_docs(
             ```
     """
     all_sections = flatten(section_map.values())
-    entities = extract_named_entities(all_sections, "spacy")
+    entities = extract_named_entities(all_sections)
     logging.info("Entities: %s", entities)
 
     # this is the slow part
