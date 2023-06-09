@@ -8,11 +8,13 @@ from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' p
 from spacy.tokens import Span
 from spacy.language import Language
 from pydash import flatten
+import logging
 
 from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.ner.utils import get_sec_tokenizer
 from common.utils.list import has_intersection
+from common.utils.re import get_or_re
 
 from .debugging import debug_pipeline
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
@@ -64,11 +66,18 @@ def __enrich_with_canonical(
     return canonical_entity_map
 
 
-SUPPRESSIONS = ["phase", "trial"]
+INCLUSION_SUPPRESSIONS = ["phase", "trial"]
+CHARACTER_SUPPRESSIONS = ["\n", "®"]
 
 
 def __filter(entity: str) -> bool:
-    is_suppressed = any([sup in entity.lower() for sup in SUPPRESSIONS])
+    """
+    Filter out entities that are not relevant
+
+    Args:
+        entity (str): entity name
+    """
+    is_suppressed = any([sup in entity.lower() for sup in INCLUSION_SUPPRESSIONS])
     return not is_suppressed
 
 
@@ -79,13 +88,22 @@ def __clean_entity_names(entity_map: dict[str, list[str]]) -> list[str]:
     Args:
         entity_map (dict[str, list[str]]): entity map
     """
+
+    def __clean(entity: str) -> str:
+        cleaned = entity.replace(get_or_re(CHARACTER_SUPPRESSIONS), " ")
+        cleaned = cleaned.strip()
+        return cleaned
+
     # entity_names = [
     #     entity_map[entity][0] if entity_map[entity] else entity
     #     for entity in entity_map.keys()
     # ]
+
     entity_names = list(entity_map.keys())
     filtered = [entity for entity in entity_names if __filter(entity)]
-    return filtered
+
+    cleaned = [__clean(entity) for entity in filtered]
+    return cleaned
 
 
 def extract_named_entities(content: list[str]) -> list[str]:
@@ -130,7 +148,7 @@ def extract_named_entities(content: list[str]) -> list[str]:
     enriched = __enrich_with_canonical(entities, linker)
     entity_names = __clean_entity_names(enriched)
 
-    print(entity_names)
+    logging.info("Entity names: %s", entity_names)
     # debug_pipeline(docs, nlp)
 
     return entity_names

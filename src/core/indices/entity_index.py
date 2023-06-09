@@ -65,7 +65,6 @@ def create_entities_from_docs(
     """
     all_sections = flatten(section_map.values())
     entities = extract_named_entities(all_sections)
-    logging.info("Entities: %s", entities)
 
     # this is the slow part
     for key, sections in section_map.items():
