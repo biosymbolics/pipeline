@@ -20,7 +20,7 @@ def main(entity_list: list[str]):
         si = SourceDocIndex()
         ei = EntityIndex()
         prompt = f"Summarize what we know about {entity}."  # GET_SIMPLE_TRIPLE_PROMPT(entity)
-        answer1 = ei.query(prompt, entity, source)
+        answer1 = ei.query(prompt, source, entity)
         answer2 = si.query(prompt, source)
         print("ANSWER1", answer1)
         print("ANSWER2", answer2)

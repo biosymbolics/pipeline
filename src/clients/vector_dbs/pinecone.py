@@ -7,10 +7,14 @@ from typing import Any, Mapping
 import pinecone
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 import logging
+from dotenv import load_dotenv
 
 from local_types.indices import NamespaceKey
 
+load_dotenv()
+
 API_KEY = os.environ["PINECONE_API_KEY"]
+PINECONE_ENVIRONMENT = "us-west4-gcp"
 
 
 def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
@@ -28,7 +32,7 @@ def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
     return metadata_filters
 
 
-def get_vector_db(
+def get_vector_store(
     index_name: str, pinecone_args: Mapping[str, Any] = {}
 ) -> pinecone.Index:
     """
@@ -38,7 +42,7 @@ def get_vector_db(
         index_name (str): name of index.
         pinecone_args (Mapping[str, Any]): additional args to pass to pinecone.create_index. Defaults to {}.
     """
-    pinecone.init(api_key=API_KEY, environment="us-west4-gcp")
+    pinecone.init(api_key=API_KEY, environment=PINECONE_ENVIRONMENT)
 
     if index_name not in pinecone.list_indexes():
         pinecone.create_index(

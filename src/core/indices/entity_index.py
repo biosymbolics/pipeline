@@ -2,7 +2,7 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
 from llama_index.prompts.default_prompts import (
@@ -138,8 +138,8 @@ class EntityIndex:
 
     def __get_namespace(
         self,
-        entity_id,
         source: NamespaceKey,
+        entity_id: Optional[str] = None,
     ) -> NamespaceKey:
         """
         Namespace for the entity, e.g.
@@ -150,10 +150,17 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
+        entity_ns = (
+            {
+                "entity": get_id(entity_id),
+                "entity_type": self.type,
+            }
+            if entity_id
+            else {}
+        )
         ns = {
             **source._asdict(),
-            "entity": get_id(entity_id),
-            "entity_type": self.type,
+            **entity_ns,
         }
 
         return dict_to_named_tuple(ns)
@@ -272,18 +279,18 @@ class EntityIndex:
     def query(
         self,
         query_string: str,
-        entity_id: str,
         source: NamespaceKey,
+        entity_id: Optional[str] = None,
     ) -> str:
         """
         Query the entity index
 
         Args:
             query_string (str): query string
-            entity_id (str): entity id (e.g. BIBB122)
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
+            entity_id (str): entity id (e.g. BIBB122). Optional; defaults to None.
         """
-        metadata_filters = get_metadata_filters(self.__get_namespace(entity_id, source))
+        metadata_filters = get_metadata_filters(self.__get_namespace(source, entity_id))
 
         if not self.index:
             raise ValueError("No index found.")

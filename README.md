@@ -8,6 +8,10 @@
 
 ### Running
 
+#### UI
+
+- `streamlit run src/apps/query_ui.py`
+
 #### SEC Workflow
 
 - Edit ticker in sec_workflow.py
