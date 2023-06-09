@@ -2,7 +2,7 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import cast, Callable
+from typing import Callable
 from llama_index import GPTVectorStoreIndex
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
 from llama_index.prompts.default_prompts import (

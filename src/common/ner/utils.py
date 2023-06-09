@@ -4,8 +4,10 @@ Utils for the NER pipeline
 from typing import Literal
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
+from spacy.vocab import Vocab
 from spacy.util import compile_infix_regex, compile_prefix_regex, compile_suffix_regex
 import logging
+import string
 
 from .tokenizers.html_tokenizer import create_html_tokenizer
 
@@ -131,3 +133,28 @@ def get_suffix_entitiy_re(
         prefix_count (ReCount): number of alpha chars in prefix
     """
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
+
+
+"""
+Other utils
+"""
+
+
+def remove_common_terms(vocab: Vocab, entity_list: list[str]):
+    """
+    Remove common terms from a list of entities
+
+    Args:
+        vocab (Vocab): spacy vocab
+        entity_list (list[str]): list of entities
+    """
+
+    def is_all_common(item):
+        item_clean = item.lower().translate(str.maketrans("", "", string.punctuation))
+        words = item_clean.split()
+        all_common = set(words).issubset(vocab.strings)
+        if all_common:
+            logging.info(f"Removing common term: {item}")
+        return all_common
+
+    return list(filter(is_all_common, entity_list))
