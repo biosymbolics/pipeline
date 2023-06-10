@@ -38,7 +38,7 @@ def get_index(
 def query_index(
     index: LlmIndex,
     query: str,
-    prompt: Optional[Prompt] = None,
+    prompt_template: Optional[Prompt] = None,
     refine_prompt: Optional[RefinePrompt] = None,
     **kwargs,
 ) -> str:
@@ -48,14 +48,14 @@ def query_index(
     Args:
         index (LlmIndex): llama index
         query (str): natural language query
-        prompt (QuestionAnswerPrompt): prompt to use for query (optional)
+        prompt_template (QuestionAnswerPrompt): prompt template to use for query (optional; will be defaulted)
         refine_prompt (RefinePrompt): prompt to use for refine (optional)
         **kwargs: additional args to pass to the query engine
     """
-    if prompt and refine_prompt:
+    if prompt_template and refine_prompt:
         query_engine = index.as_query_engine(
             **kwargs,
-            text_qa_template=prompt,
+            text_qa_template=prompt_template,
             refine_template=refine_prompt,
         )
     else:

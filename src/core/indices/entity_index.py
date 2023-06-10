@@ -123,19 +123,6 @@ class EntityIndex:
 
         self.__load()
 
-    @property
-    def __response_schemas(self) -> list[ResponseSchema]:
-        """
-        Get response schemas for this entity
-        """
-        response_schemas = [
-            ResponseSchema(name="name", description=f"normalized {self.type} name"),
-            ResponseSchema(
-                name="details", description=f"details about this {self.type}"
-            ),
-        ]
-        return response_schemas
-
     def __get_namespace(
         self,
         source: NamespaceKey,
@@ -165,6 +152,19 @@ class EntityIndex:
 
         return dict_to_named_tuple(ns)
 
+    @property
+    def __response_schemas(self) -> list[ResponseSchema]:
+        """
+        Get response schemas for this entity
+        """
+        response_schemas = [
+            ResponseSchema(name="name", description=f"normalized {self.type} name"),
+            ResponseSchema(
+                name="details", description=f"details about this {self.type}"
+            ),
+        ]
+        return response_schemas
+
     def __describe_entity_by_source(
         self, entity_id: str, source_index: SourceDocIndex, source: NamespaceKey
     ) -> EntityObj:
@@ -187,7 +187,7 @@ class EntityIndex:
         refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
 
         response = source_index.query(
-            query, source, prompt=qa_prompt, refine_prompt=refine_prompt
+            query, source, prompt_template=qa_prompt, refine_prompt=refine_prompt
         )
 
         logging.info("Response from query_index: %s", response)

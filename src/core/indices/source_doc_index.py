@@ -102,7 +102,7 @@ class SourceDocIndex:
         self,
         query_string: str,
         source: NamespaceKey,
-        prompt: Optional[Prompt] = None,
+        prompt_template: Optional[Prompt] = None,
         refine_prompt: Optional[RefinePrompt] = None,
     ) -> str:
         """
@@ -121,7 +121,7 @@ class SourceDocIndex:
                     }
                 )
                 ```
-            prompt (Prompt, optional): prompt. Defaults to None.
+            prompt_template (Prompt, optional): prompt. Defaults to None.
             refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """
         if not self.index:
@@ -132,7 +132,7 @@ class SourceDocIndex:
         answer = query_index(
             self.index,
             query_string,
-            prompt=prompt,
+            prompt_template=prompt_template,
             refine_prompt=refine_prompt,
             metadata_filters=metadata_filters,
         )

@@ -29,7 +29,7 @@ def __get_date(dwr: DateWidgetReturn) -> date:
     raise ValueError(f"Invalid date: {dwr}")
 
 
-st.title("Ask Biosymbolic.ai")
+st.title("Ask Biosymbolics.ai")
 ticker = st.text_input("Enter a stock symbol", "PFE")
 start_date = __get_date(st.date_input("Start date", date(2020, 1, 1)))
 end_date = __get_date(st.date_input("End date", date.today()))
@@ -42,8 +42,8 @@ prompt = (
 
 if st.button("Submit"):
     status = st.progress(0)
-    if not prompt.strip():
-        st.error(f"Please provide the search query.")
+    if not ticker.strip() or not start_date or not end_date:
+        st.error(f"Please ticker, start and end date.")
     else:
         try:
             stock_data = fetch_yfinance_data(ticker, start_date, end_date)  # type: ignore

@@ -8,7 +8,7 @@ init()
 
 st.set_page_config(page_title="Query", page_icon="🔎")
 
-st.title("Ask Biosymbolic.ai")
+st.title("Ask Biosymbolics.ai")
 question = st.text_area("What would you like to ask?", "")
 prefix = (
     "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
@@ -20,8 +20,8 @@ prompt = prefix + question
 
 if st.button("Submit"):
     status = st.progress(0)
-    if not prompt.strip():
-        st.error(f"Please provide the search query.")
+    if not question.strip():
+        st.error(f"Please supply a question.")
     else:
         try:
             source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
