@@ -1,3 +1,8 @@
+"""
+Annotations on top of ticker data
+
+TODO: wildly confabulatory. Probably needs Company entity type.
+"""
 import streamlit as st
 from streamlit.elements.time_widgets import DateWidgetReturn
 import plost
@@ -11,6 +16,8 @@ from core import SourceDocIndex
 from system import init
 
 init()
+
+st.set_page_config(page_title="Finance", page_icon="📈")
 
 
 def __get_date(dwr: DateWidgetReturn) -> date:
@@ -28,9 +35,9 @@ start_date = __get_date(st.date_input("Start date", date(2020, 1, 1)))
 end_date = __get_date(st.date_input("End date", date.today()))
 
 prompt = (
-    "Please provide important events that have occurred for the company "
-    f"represented by the ticker symbol {ticker} between dates {format_date(start_date)} and {format_date(end_date)}. "
-    'as json in the form { "YYYY-MM-DD": "what happened" } '
+    "List important events related to the company represented by the ticker symbol {ticker} "
+    f"between dates {format_date(start_date)} and {format_date(end_date)} "
+    'as json in the form { "YYYY-MM-DD": "what happened" }. '
 )
 
 if st.button("Submit"):

@@ -6,6 +6,8 @@ from system import init
 
 init()
 
+st.set_page_config(page_title="Query", page_icon="🔎")
+
 st.title("Ask Biosymbolic.ai")
 question = st.text_area("What would you like to ask?", "")
 prefix = (
