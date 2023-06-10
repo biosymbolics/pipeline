@@ -1,21 +1,13 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
-import logging
 
 from common.utils.misc import dict_to_named_tuple
 from core import EntityIndex, SourceDocIndex
+from system import init
 
-# Load environment variables from .env file
-load_dotenv("/Users/kristinlindquist/development/pipeline/.env")
+init()
 
-api_key = os.environ.get("PINECONE_API_KEY")
-
-logging.getLogger().setLevel(logging.INFO)
-
-# Define a simple Streamlit app
 st.title("Ask Biosymbolic.ai")
-question = st.text_input("What would you like to ask?", "")
+question = st.text_area("What would you like to ask?", "")
 prefix = (
     "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
     "With that in mind, provide detailed, scientific and comprehensive answer to their question. "
@@ -24,7 +16,6 @@ prefix = (
 )
 prompt = prefix + question
 
-# If the 'Submit' button is clicked
 if st.button("Submit"):
     status = st.progress(0)
     if not prompt.strip():
