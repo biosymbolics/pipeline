@@ -3,7 +3,7 @@ Utils related to dates
 """
 
 from datetime import date, datetime
-
+import logging
 
 DEFAULT_FORMATTER = "%Y-%m-%d"
 
@@ -11,12 +11,20 @@ DEFAULT_FORMATTER = "%Y-%m-%d"
 def parse_date(date_str: str, formatter: str = DEFAULT_FORMATTER) -> date:
     """
     Turns date str (YYYY-MM-DD, e.g. 2003-01-01) into date object
+    Will fall back to isoformat if formatter fails
 
     Args:
         date_str (str): date str
         formatter (str, optional): date formatter. Defaults to DEFAULT_FORMATTER.
     """
-    date_obj = datetime.strptime(date_str, formatter)
+    try:
+        date_obj = datetime.strptime(date_str, formatter)
+    except ValueError:
+        try:
+            return datetime.fromisoformat(date_str)
+        except:
+            logging.warn("Could not parse date %s", date_str)
+            raise ValueError(f"Could not parse date {date_str}")
     return date_obj
 
 
