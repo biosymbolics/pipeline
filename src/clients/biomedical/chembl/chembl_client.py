@@ -40,6 +40,6 @@ def fetch_by_id(chembl_id: str) -> ChemblMolecule:
     Returns:
         ChemblMolecule: molecule data
     """
-    response = requests.get(f"{CHEMBL_BASE_URL}/molecule/{chembl_id}")
+    response = requests.get(f"{CHEMBL_BASE_URL}/molecule/{chembl_id}?format=json")
     response.raise_for_status()
     return response.json()
