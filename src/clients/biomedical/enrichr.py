@@ -67,8 +67,7 @@ def __retrieve_list(list_id: str, gene_library: str) -> list[EnrichrEntity]:
     query_params = f"userListId={list_id}&backgroundType={gene_library}"
     response = requests.get(f"{ENRICHR_URL}/enrich?{query_params}")
 
-    if not response.ok:
-        raise Exception(f"Error retrieving gene list {list_id}: {response.reason}")
+    response.raise_for_status()
 
     enriched_df = pl.DataFrame(
         data=json.loads(response.text).get(gene_library),

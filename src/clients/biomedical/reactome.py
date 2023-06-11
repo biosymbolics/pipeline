@@ -74,10 +74,7 @@ def __get_lineage(reactome_id: str) -> Lineage:
     """
     url = __get_url(reactome_id)
     response = requests.get(url)
-
-    if not response:
-        logging.error(f"Error getting lineage for {reactome_id}: {response.reason}")
-        return []
+    response.raise_for_status()
 
     lineage = flatten(json.loads(response.text))
     lineage.reverse()
