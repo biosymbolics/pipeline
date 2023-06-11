@@ -2,9 +2,6 @@ import streamlit as st
 
 from common.utils.misc import dict_to_named_tuple
 from core import EntityIndex, SourceDocIndex
-from system import init
-
-init()
 
 st.set_page_config(page_title="Query", page_icon="🔎")
 

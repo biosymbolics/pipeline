@@ -2,10 +2,12 @@
 Client stub for GPT
 """
 import os
+import json
 from langchain import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Optional
+import logging
 
 from .utils import parse_answer
 
@@ -44,6 +46,7 @@ class GptApiClient:
         """
         output_parser = StructuredOutputParser.from_response_schemas(schemas)
         format_intructions = output_parser.get_format_instructions()
+
         prompt_template = PromptTemplate(
             template="Answer this query as best as possible.\n{format_instructions}\n{query}",
             input_variables=["query"],
@@ -51,13 +54,14 @@ class GptApiClient:
         )
         return (prompt_template, output_parser)
 
-    def __format_answer(self, answer: str) -> Any:
+    def __format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
-            return parse_answer(answer, self.output_parser, True)
+            logging.info("Formatting answer: %s", answer)
+            return parse_answer(answer, self.output_parser, is_array, True)
 
         return answer
 
-    def query(self, query: str) -> Any:
+    def query(self, query: str, is_array: bool = False) -> Any:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
@@ -70,4 +74,4 @@ class GptApiClient:
             openai_api_key=OPENAI_API_KEY,
         )
         output = chat_model(input.to_messages())
-        return self.__format_answer(output.content)
+        return self.__format_answer(output.content, is_array=is_array)

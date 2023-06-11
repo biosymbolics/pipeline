@@ -13,9 +13,6 @@ from common.utils.date import format_date
 from common.utils.misc import dict_to_named_tuple
 from clients import fetch_yfinance_data
 from core import SourceDocIndex
-from system import init
-
-init()
 
 st.set_page_config(page_title="Finance", page_icon="📈")
 
