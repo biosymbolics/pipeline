@@ -3,11 +3,11 @@ Utils for parsing llama index answers
 """
 import logging
 from typing import Any
-from llama_index.output_parsers import LangchainOutputParser as OutputParser
+from llama_index.output_parsers import LangchainOutputParser
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 
 
-def get_output_parser(schemas: list[ResponseSchema]) -> OutputParser:
+def get_output_parser(schemas: list[ResponseSchema]) -> LangchainOutputParser:
     """
     Get output parser for this entity
 
@@ -15,12 +15,12 @@ def get_output_parser(schemas: list[ResponseSchema]) -> OutputParser:
         schemas (list[ResponseSchema]): response schemas
     """
     output_parser = StructuredOutputParser.from_response_schemas(schemas)
-    output_parser = OutputParser(output_parser)
+    output_parser = LangchainOutputParser(output_parser)
     return output_parser
 
 
 def parse_answer(
-    text: str, output_parser: OutputParser, return_orig_on_fail: bool = True
+    text: str, output_parser: LangchainOutputParser, return_orig_on_fail: bool = True
 ) -> Any:
     """
     Parses a text answer from llama index

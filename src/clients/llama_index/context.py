@@ -60,7 +60,7 @@ def __get_llm(model_name: Optional[LlmModelType]):
     Args:
         model_name (LlmModelType): model to use for llm
     """
-    common_args = {"temperature": 0.3}
+    common_args = {"temperature": 0.1}
     if model_name == "ChatGPT":
         return ChatOpenAI(
             **common_args, model="gpt-3.5-turbo", max_tokens=1900, client="chat"

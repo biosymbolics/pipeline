@@ -21,11 +21,12 @@ def format_documents(
     get_doc_id: Optional[GetDocId] = None,
 ) -> list[Document]:
     """
-    Format documents to list of llama_index Documents
+    Format documents to list of llama_index Documents, optionally adding metadata (extra_info) and doc_id
 
     Args:
         documents (list[str] or list[Document]): list of documents
         get_extra_info (GetExtraInfo): function to get extra info for each document
+        get_doc_id (GetDocId): function to get doc id for each document
     """
     if __is_string_doc_list(documents):
         docs = list(map(Document, documents))

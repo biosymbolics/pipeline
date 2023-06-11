@@ -1,21 +1,12 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
-import logging
 
 from common.utils.misc import dict_to_named_tuple
 from core import EntityIndex, SourceDocIndex
 
-# Load environment variables from .env file
-load_dotenv("/Users/kristinlindquist/development/pipeline/.env")
+st.set_page_config(page_title="Query", page_icon="🔎")
 
-api_key = os.environ.get("PINECONE_API_KEY")
-
-logging.getLogger().setLevel(logging.INFO)
-
-# Define a simple Streamlit app
-st.title("Ask Biosymbolic.ai")
-question = st.text_input("What would you like to ask?", "")
+st.title("Ask Biosymbolics.ai")
+question = st.text_area("What would you like to ask?", "")
 prefix = (
     "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
     "With that in mind, provide detailed, scientific and comprehensive answer to their question. "
@@ -24,11 +15,10 @@ prefix = (
 )
 prompt = prefix + question
 
-# If the 'Submit' button is clicked
 if st.button("Submit"):
     status = st.progress(0)
-    if not prompt.strip():
-        st.error(f"Please provide the search query.")
+    if not question.strip():
+        st.error(f"Please supply a question.")
     else:
         try:
             source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
