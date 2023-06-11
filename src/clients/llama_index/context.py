@@ -15,7 +15,7 @@ import logging
 
 from constants.core import DEFAULT_MODEL_NAME
 from clients.vector_dbs.pinecone import get_vector_store
-from local_types.indices import LlmModelType
+from typings.indices import LlmModelType
 
 
 def __load_storage_context(**kwargs) -> StorageContext:

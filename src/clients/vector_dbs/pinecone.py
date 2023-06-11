@@ -9,7 +9,7 @@ from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 import logging
 from dotenv import load_dotenv
 
-from local_types.indices import NamespaceKey
+from typings.indices import NamespaceKey
 
 load_dotenv()
 

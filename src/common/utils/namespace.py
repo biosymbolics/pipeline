@@ -2,7 +2,7 @@
 Utils for namespace
 """
 from common.utils.string import get_id
-from local_types.indices import NamespaceKey
+from typings.indices import NamespaceKey
 
 
 def get_namespace(namespace_key: NamespaceKey) -> str:

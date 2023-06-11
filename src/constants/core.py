@@ -1,4 +1,4 @@
-from local_types.indices import LlmModelType
+from typings.indices import LlmModelType
 
 
 DEFAULT_MODEL_NAME: LlmModelType = "ChatGPT"

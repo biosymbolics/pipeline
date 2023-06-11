@@ -7,7 +7,7 @@ import re
 from common.utils.html_parsing.html import strip_inline_styles
 from common.utils.misc import dict_to_named_tuple
 from core.indices.entity_index import create_entities_from_docs
-from local_types.indices import NamespaceKey
+from typings.indices import NamespaceKey
 
 from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
 

@@ -10,7 +10,7 @@ from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.namespace import get_namespace_id
-from local_types.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
+from typings.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
 INDEX_NAME = "source-docs"
 
