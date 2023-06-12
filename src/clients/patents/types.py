@@ -22,6 +22,7 @@ class PatentBasicInfo(TypedDict):
     ipcs: list[str]
     priority_date: date
     title: str
+    url: str
 
 
 class PatentApplication(PatentBasicInfo):

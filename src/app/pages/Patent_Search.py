@@ -63,7 +63,12 @@ if st.button("Submit"):
                         "year": format_date(patent["priority_date"], "%Y"),
                         "month": format_date(patent["priority_date"], "%m"),
                     },
-                    "text": {"headline": patent["title"], "text": patent["abstract"]},
+                    "text": {
+                        "headline": patent["title"],
+                        "text": patent["abstract"]
+                        + "<br /><br />"
+                        + f"<a href=\"{patent['url']}\">See on Google Patents.</a>",
+                    },
                 }
                 for patent in patents
             ]
