@@ -10,7 +10,7 @@
 
 #### UI
 
-- `streamlit run src/apps/query_ui.py`
+- `streamlit run src/app/Hello.py`
 
 #### SEC Workflow
 

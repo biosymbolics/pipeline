@@ -68,7 +68,7 @@ def __copy_gpr_annotations():
     or from gpr_annotations:
     ``` sql
     DELETE FROM `fair-abbey-386416.patents.gpr_annotations` where domain in
-    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
+    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health", "biological processes and functions")
     ```
     """
     SUPPRESSED_DOMAINS = (
@@ -80,6 +80,7 @@ def __copy_gpr_annotations():
         "methods",  # lots of useless stuff
         "nutrients",
         "nutrition",  # 109,587,438
+        "polymers",
         "toxicity",  # 6,902,999
         "natprod",  # 23,053,704
         "species",  # 179,305,306
