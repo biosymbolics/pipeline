@@ -1,7 +1,17 @@
+from system import init
+
+init()
+
+
 import logging
 
-from .constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
-from clients import execute_bg_query, query_to_bg_table, BQ_DATASET_ID
+from constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
+from clients.low_level.big_query import (
+    execute_bg_query,
+    query_to_bg_table,
+    BQ_DATASET_ID,
+)
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -39,10 +49,35 @@ def __copy_gpr_publications():
 def __copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
+
+    To remove annotations after load:
+    ``` sql
+    UPDATE `patents.entities`
+    SET annotations = ARRAY(
+        SELECT AS STRUCT *
+        FROM UNNEST(annotations) as annotation
+        WHERE annotation.domain NOT IN ('chemClass', 'chemGroup', 'anatomy')
+    )
+    WHERE EXISTS(
+        SELECT 1
+        FROM UNNEST(annotations) AS annotation
+        WHERE annotation.domain IN ('chemClass', 'chemGroup', 'anatomy')
+    )
+    ```
+
+    or from gpr_annotations:
+    ``` sql
+    DELETE FROM `fair-abbey-386416.patents.gpr_annotations` where domain in
+    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
+    ```
     """
     SUPPRESSED_DOMAINS = (
+        "anatomy",
         "chemCompound",  # 961,573,847
+        "chemClass",
+        "chemGroup",
         "inorgmat",
+        "methods",  # lots of useless stuff
         "nutrients",
         "nutrition",  # 109,587,438
         "toxicity",  # 6,902,999
@@ -113,11 +148,6 @@ FIELDS = [
 def __create_query_tables():
     """
     Create tables for use in app queries
-
-    TODO:
-    max_priority_date = get_max_priority_date(min_patent_yrs)
-    patent_life_filter = f"priority_date > {max_priority_date}"
-    global_only_filter = "application_kind='W'"  # patent is global filing, aka "PCT"
     """
     logging.info("Creating patent tables for use in app queries")
     applications = (
@@ -127,22 +157,31 @@ def __create_query_tables():
         f"`{BQ_DATASET_ID}.gpr_publications` as gpr_pubs "
         "WHERE pubs.publication_number = gpr_pubs.publication_number "
     )
-    entities = (
+    entity_query = (
+        "WITH ranked_terms AS ( "
+        "SELECT "
+        "publication_number,  ocid, "
+        "LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term, "
+        "domain, confidence, source, character_offset_start, "
+        "ROW_NUMBER() OVER(PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) ORDER BY character_offset_start) as rank "
+        f"FROM `{BQ_DATASET_ID}.gpr_annotations` a "
+        f"LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym "
+        ") "
         "SELECT "
         "publication_number, "
         "ARRAY_AGG( "
-        "struct(ocid, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term, domain, confidence, source, character_offset_start) "
-        "ORDER BY character_offset_start LIMIT 1 "
-        ")[OFFSET(0)].* "
-        f"FROM `{BQ_DATASET_ID}.gpr_annotations` a "
-        f"LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON a.preferred_name = map.synonym "
+        "struct(ocid, term, domain, confidence, source, character_offset_start) "
+        "ORDER BY character_offset_start "
+        ") as annotations "
+        "FROM ranked_terms "
+        "WHERE rank = 1 "
         "GROUP BY publication_number "
     )
     query_to_bg_table(applications, "applications")
-    query_to_bg_table(entities, "entities")
+    query_to_bg_table(entity_query, "entities")
 
 
-if __name__ == "__main__":
+def main():
     # copy gpr_publications table
     __copy_gpr_publications()
 
@@ -157,3 +196,7 @@ if __name__ == "__main__":
 
     # create the (small) tables against which the app will query
     __create_query_tables()
+
+
+if __name__ == "__main__":
+    main()

@@ -13,3 +13,7 @@ def init():
 
     logging.info("Loading environment variables from .env file")
     load_dotenv("/Users/kristinlindquist/development/pipeline/.env")
+
+
+if __name__ == "__main__":
+    init()

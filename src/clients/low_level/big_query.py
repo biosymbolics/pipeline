@@ -1,9 +1,10 @@
 from google.cloud import bigquery
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 
-PROJECT = "fair-abbey-386416"
+PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 DATASET = "patents"
 BQ_DATASET_ID = PROJECT + "." + DATASET
 
@@ -17,15 +18,23 @@ def execute_bg_query(query: str):
     """
     # Create a client
     client = bigquery.Client()
-
     logging.info("Starting query: %s", query)
+
     query_job = client.query(query)
 
     # Wait for the job to complete
     results = query_job.result()
     logging.info("Query complete")
-
     return results
+
+
+def select_from_bg(query: str) -> list[dict]:
+    """
+    Execute a query and return the results as a list of dicts
+    """
+    results = execute_bg_query(query)
+    rows = [dict(row) for row in results]
+    return rows
 
 
 def query_to_bg_table(query, new_table_name: str):

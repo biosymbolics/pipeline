@@ -26,7 +26,7 @@ MOTOR_NEURON_DISEASE = "Motor Neuron Disease"
 MOOD_DISRDER = "Mood Disorder"
 NEURODEVELOPMENTAL_DISORDER = "Neurodevelopmental Disorder"
 NPD = "Narcissistic Personality Disorder"
-DISSASOCIATIVE_IDENTITY_DISORDER = "Dissasociative Identity Disorder"
+DISSASOCIATIVE_IDENTITY_DISORDER = "Dissociative identity disorder"
 NEUROSIS = "Neurosis"
 OCD = "Obsessive-Compulsive Disorder"
 OPPOSITIONAL_DEFIANT_DISORDER = "Oppositional Defiant Disorder"
@@ -51,6 +51,21 @@ STRESS_DISORDER = "Stress Disorder"
 SUBSTANCE_ABUSE = "Substance Abuse"
 SUBSTANCE_PSYCHOSIS = "Substance-Induced Psychotic Disorder"
 TIC_DISORDER = "Tic Disorder"
+
+# graft versus host disease vs graft-versus-host disease vs vs
+# dysthymic disease
+# panic disease
+# paranoid personality disease
+# schizoid personality disease
+# schizotypal personality disease
+# brief psychotic disease
+# amnestic disease
+# dissociative disease
+# eating disease
+# adjustment disease
+# mania
+# avoidant personality disease
+# cyclothymic disease
 
 SYNONYM_MAP = {
     "acute stress disease": STRESS_DISORDER,
@@ -89,12 +104,14 @@ SYNONYM_MAP = {
     "depressive symptom": DEPRESSION,
     "dependence": SUBSTANCE_ABUSE,
     "diarrhoea": DIARRHEA,
+    "dissociative identity disease": DISSASOCIATIVE_IDENTITY_DISORDER,
     "drug dependence": SUBSTANCE_ABUSE,
     "effect on cardiovascular disease": "Cardiovascular disease",
     "female reproductive system disease": REPRODUCTIVE_DISORDER,
     "gastrooesophageal reflux disease": GERD,
     "haemorrhagic disease": "Hemorrhagic disease",
     "haematological disease": HEMATOLOGICAL_DISORDER,
+    "haemochromatosis": "Hemochromatosis",
     "hypersensitivity reaction disease": HYPERSENSITIVITY,
     "hypomania": BDII,
     "intermittent explosive disease": INTERMITTENT_EXPLOSIVE_DISORDER,
@@ -2257,4 +2274,86 @@ COMMON_ENTITY_NAMES = (
     "drug administration",
     "pulverizing process",
     "quantitative analysis",
+    "carbon",
+    "solvent",
+    "sodium chloride",
+    "cells",
+    "disease",
+    "method",
+    "degradation reaction",
+    "calcium salts",
+    "potassium salts",
+    "lactones",
+    "kidney",
+    "brain",
+    "liver",
+    "heart",
+    "starch",
+    "flushing",
+    "therapeutic",
+    "spinning",
+    "drug development",
+    "drug design",
+    "rare earth metals",
+    "assay method",
+    "sodium",
+    "potassium",
+    "calcium",
+    "magnesium",
+    "manganese",
+    "iron",
+    "ascorbate",
+    "progression",  # disease progress in
+    "grinding",
+    "buffering",
+    "lubricating",
+    "injurious",
+    "oxygen atom",
+    "atom",
+    "dietary",
+    "somatic",
+    "somatic cell",
+    "modified proteins",
+    "guar gum",
+    "maltitol",
+    "masking",
+    "wellbeing",
+    "kidney cell",
+    "inflammatory process",
+    "hydrogen",
+    "antitubercular antibiotics",
+    "ophthalmologic antibiotics",
+    "intestinal antibiotics",
+    "gynecological antibiotics",
+    "topical antifungal antibiotics",
+    "potato starch",
+    "royal jelly",
+    "diagnostic procedure",
+    "mental",
+    "physiological processes and functions",
+    "pattern recognition",
+    "sorbic acid",
+    "soaking",
+    "dimensional analysis",
+    "cluster analysis",
+    "effect on protein",
+    "regression analysis",
+    "natural polymer",
+    "synthetic polymer",
+    "pharmacodynamic",
+    "pharmacogenomic",
+    "animal cell",
+    "drug screening",
+    "mixing",
+    "bile salts",
+    "cell based assay",
+    "muscle cells",
+    "cell function",
+    "water",
+    "aminals",
+    "sodium",
+    "seasonal",
+    "behavioural",
+    "mental health",
+    "biological processes and functions",
 )
