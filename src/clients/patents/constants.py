@@ -5,19 +5,21 @@ ANEMIA = "Anemia"
 ANXIETY = "Anxiety"
 ASPERGERS = "Aspergers"
 AUTISM = "Autism"
-BIPOLAR = "Bipolar Disorder"
 BDI = "Bipolar I Disorder"
 BDII = "Bipolar II Disorder"
+BIPOLAR = "Bipolar Disorder"
+BODY_DYSMORPHIA = "Body Dysmorphic Disorder"
 BPD = "Borderline Personality Disorder"
 CELIAC = "Celiac Disease"
 DEPRESSION = "Depression"
 DEVELOPMENTAL_DISORDER = "Developmental Disorder"
 DELUSION = "Delusion"
-BODY_DYSMORPHIA = "Body Dysmorphic Disorder"
+DIARRHEA = "Diarrhea"
 GERD = "Gastroesophageal Reflux Disease"
 HEMATOLOGICAL_DISORDER = "Hematological Disorder"
 HYPERSENSITIVITY = "Hypersensitivity"
 INTERMITTENT_EXPLOSIVE_DISORDER = "Intermittent Explosive Disorder"
+ISCHEMIA = "Ischemia"
 MENTAL_DISORDER = "Mental Disorder"
 MIGRAINE = "Migraine"
 MOTOR_NEURON_DISEASE = "Motor Neuron Disease"
@@ -86,6 +88,7 @@ SYNONYM_MAP = {
     "depressed mood": DEPRESSION,
     "depressive symptom": DEPRESSION,
     "dependence": SUBSTANCE_ABUSE,
+    "diarrhoea": DIARRHEA,
     "drug dependence": SUBSTANCE_ABUSE,
     "effect on cardiovascular disease": "Cardiovascular disease",
     "female reproductive system disease": REPRODUCTIVE_DISORDER,
@@ -95,6 +98,8 @@ SYNONYM_MAP = {
     "hypersensitivity reaction disease": HYPERSENSITIVITY,
     "hypomania": BDII,
     "intermittent explosive disease": INTERMITTENT_EXPLOSIVE_DISORDER,
+    "ischaemic disease": ISCHEMIA,
+    "ischaemia": ISCHEMIA,
     "major depression": DEPRESSION,
     "major depressive disease": DEPRESSION,
     "mental disease": MENTAL_DISORDER,
@@ -2244,4 +2249,12 @@ COMMON_ENTITY_NAMES = (
     "primary amines",
     "toxicity",
     "drugs",
+    "hydrogen",
+    "method",
+    "machining",
+    "methods",
+    "effects",
+    "drug administration",
+    "pulverizing process",
+    "quantitative analysis",
 )
