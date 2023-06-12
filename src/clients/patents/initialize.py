@@ -1,60 +1,30 @@
-from google.cloud import bigquery
 import logging
 
-from constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
+from .constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
+from clients import execute_bg_query, query_to_bg_table, BQ_DATASET_ID
 
 logging.basicConfig(level=logging.INFO)
 
 BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
 
-PROJECT = "fair-abbey-386416"
-DATASET = "patents"
-DATASET_ID = PROJECT + "." + DATASET
 
-
-def __run_bq_query(query: str):
-    """
-    Query bigquery
-
-    Args:
-        query (str): SQL query
-    """
-    # Create a client
-    client = bigquery.Client()
-
-    logging.info("Starting query: %s", query)
-    query_job = client.query(query)
-
-    # Wait for the job to complete
-    query_job.result()
-    logging.info("Query complete")
-
-
-def query_to_table(query, new_table_name: str):
-    """
-    Create a new table from a query
-    """
-    create_table_query = f"CREATE TABLE `{DATASET_ID}.{new_table_name}` AS {query};"
-    __run_bq_query(create_table_query)
-
-
-def create_synonym_map():
+def __create_synonym_map():
     """
     Create a table of synonyms
     """
     create = "CREATE TABLE patents.synonym_map (term STRING, synonym STRING);"
-    __run_bq_query(create)
+    execute_bg_query(create)
     entries = [
         f"('{entry[0].lower()}', '{entry[1].lower()}')" for entry in SYNONYM_MAP.items()
     ]
     query = "INSERT INTO patents.synonym_map (synonym, term) VALUES " + ",".join(
         entries
     )
-    __run_bq_query(query)
+    execute_bg_query(query)
 
 
-def copy_gpr_publications():
+def __copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
@@ -63,10 +33,10 @@ def copy_gpr_publications():
         "WHERE EXISTS "
         f'(SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))'
     )
-    query_to_table(query, "gpr_publications")
+    query_to_bg_table(query, "gpr_publications")
 
 
-def copy_gpr_annotations():
+def __copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
     """
@@ -82,26 +52,26 @@ def copy_gpr_annotations():
     )
     query = (
         "SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations "
-        f"JOIN `{DATASET_ID}.gpr_publications` AS local_publications "
+        f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications "
         "ON local_publications.publication_number = annotations.publication_number "
         "WHERE annotations.confidence > 0.69 "
         f"AND preferred_name not in {COMMON_ENTITY_NAMES} "
         f"AND domain not in {SUPPRESSED_DOMAINS} "
     )
-    query_to_table(query, "gpr_annotations")
+    query_to_bg_table(query, "gpr_annotations")
 
 
-def copy_publications():
+def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
     """
     query = (
         "SELECT publications.* FROM `patents-public-data.patents.publications` as publications "
-        f"JOIN `{DATASET_ID}.gpr_publications` AS local_gpr "
+        f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr "
         "ON local_gpr.publication_number = publications.publication_number "
         "WHERE application_kind = 'W' "
     )
-    query_to_table(query, "publications")
+    query_to_bg_table(query, "publications")
 
 
 FIELDS = [
@@ -140,7 +110,7 @@ FIELDS = [
 ]
 
 
-def create_query_tables():
+def __create_query_tables():
     """
     Create tables for use in app queries
 
@@ -153,8 +123,8 @@ def create_query_tables():
     applications = (
         "SELECT "
         f"{','.join(FIELDS)} "
-        f"FROM `{DATASET_ID}.publications` as pubs, "
-        f"`{DATASET_ID}.gpr_publications` as gpr_pubs "
+        f"FROM `{BQ_DATASET_ID}.publications` as pubs, "
+        f"`{BQ_DATASET_ID}.gpr_publications` as gpr_pubs "
         "WHERE pubs.publication_number = gpr_pubs.publication_number "
     )
     entities = (
@@ -164,26 +134,26 @@ def create_query_tables():
         "struct(ocid, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term, domain, confidence, source, character_offset_start) "
         "ORDER BY character_offset_start LIMIT 1 "
         ")[OFFSET(0)].* "
-        f"FROM `{DATASET_ID}.gpr_annotations` a "
-        f"LEFT JOIN `{DATASET_ID}.synonym_map` map ON a.preferred_name = map.synonym "
+        f"FROM `{BQ_DATASET_ID}.gpr_annotations` a "
+        f"LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON a.preferred_name = map.synonym "
         "GROUP BY publication_number "
     )
-    # query_to_table(applications, "applications")
-    query_to_table(entities, "entities")
+    query_to_bg_table(applications, "applications")
+    query_to_bg_table(entities, "entities")
 
 
 if __name__ == "__main__":
     # copy gpr_publications table
-    copy_gpr_publications()
+    __copy_gpr_publications()
 
     # copy publications table
-    copy_publications()
+    __copy_publications()
 
     # copy gpr_annotations table
-    copy_gpr_annotations()  # depends on publications
+    __copy_gpr_annotations()  # depends on publications
 
     # create synonym_map table (for final entity names)
-    create_synonym_map()
+    __create_synonym_map()
 
     # create the (small) tables against which the app will query
-    create_query_tables()
+    __create_query_tables()
