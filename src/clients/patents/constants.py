@@ -23,6 +23,59 @@ METHOD_OF_USE_IPC_CODES = [
     "H04R",  # Methods of using audio or acoustic systems
 ]
 
+COMPANY_NAME_SUPPRESSIONS = [
+    "AB",
+    "AG",
+    "BIOSCIENCE",
+    "BIOTEC",
+    "BIOTECH",
+    "CHEM",
+    "CO",
+    "COMPANY",
+    "COOP",
+    "CORP",
+    "CORPORATION",
+    "DEV",
+    "DIAGNOSTIC",
+    "FARM",
+    "FARMA",
+    "GROUP",
+    "GMBH",
+    "HEALTHCARE",
+    "INC",
+    "INSTITUTE",
+    "INT",
+    "IP",
+    "KG",
+    "LLC",
+    "LP",
+    "LTD",
+    "MEDICAL",
+    "NETWORK",
+    "NV",
+    "PATENT",
+    "PHARM",
+    "PHARMA",
+    "PHARMACEUTICA",
+    "PHARMACEUTICAL",
+    "PHARAMACEUTICAL",
+    "PTY",
+    "SCIENCE",
+    "SA",
+    "SPA",
+    "SYSTEM",
+    "THE",
+    "THERAPEUTIC",
+]
+
+COUNTRIES = [
+    "DEUTSCHLAND",
+    "EU",
+    "IRELAND",
+    "UK",
+    "USA",
+]
+
 ADHD = "Attention Deficit Hyperactivity Disorder"
 ARTICULATION_DISORDER = "Articulation Disorder"
 ANAESTHESIA = "Anaesthesia"

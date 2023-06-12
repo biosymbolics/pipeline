@@ -2,29 +2,34 @@
 Patent client
 """
 from typing import cast
-import polars as pl
 
 from clients import select_from_bg
 from common.utils.date import parse_date
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
-from .utils import get_max_priority_date
-from .types import PatentApplication
+from .utils import (
+    clean_assignee,
+    get_max_priority_date,
+    get_patent_years,
+    get_patent_attributes,
+)
+from .types import PatentBasicInfo
 
 SEARCH_RETURN_FIELDS = [
     "applications.publication_number",
+    "priority_date",
     "title",
     "abstract",
-    "priority_date",
-    "application_kind",
+    # "application_kind",
     "application_number",
     "assignees",
     # "cited_by",
     "country",
+    "family_id",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
-    "filing_date",
-    "grant_date",
+    # "filing_date",
+    # "grant_date",
     "inventors",
     "ipc_codes",
     "publication_date",
@@ -52,19 +57,22 @@ MOU_FILTER = (
 )
 
 
-def __format_search_result(result: dict) -> PatentApplication:
+def __format_search_result(result: dict) -> PatentBasicInfo:
     """
     Format a search result
     """
-    dates = ["priority_date", "filing_date", "publication_date", "grant_date"]
+    dates = ["priority_date"]
     for date in dates:
         result[date] = (
             parse_date(str(result[date]), "%Y%m%d") if result.get(date) else None
         )
-    return cast(PatentApplication, result)
+    result["patent_years_left"] = get_patent_years(result["priority_date"])
+    result["attributes"] = get_patent_attributes(result["title"])
+    result["assignees"] = [clean_assignee(assignee) for assignee in result["assignees"]]
+    return cast(PatentBasicInfo, result)
 
 
-def search(terms: list[str]) -> list[PatentApplication]:
+def search(terms: list[str]) -> list[PatentBasicInfo]:
     """
     Search patents by terms
     Filters on
@@ -99,7 +107,8 @@ def search(terms: list[str]) -> list[PatentApplication]:
         f"priority_date > {max_priority_date} "  # min patent life
         f"AND {COM_FILTER} "
         f"AND {MOU_FILTER} "
-        "limit 100"
+        "ORDER BY priority_date DESC "
+        "limit 1000"
     )
     results = select_from_bg(query)
     return [__format_search_result(result) for result in results]

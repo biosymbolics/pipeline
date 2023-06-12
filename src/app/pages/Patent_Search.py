@@ -12,7 +12,14 @@ st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
 st.title("Search for patents")
 patent_terms = st.multiselect(
     "Enter in terms for patent search",
-    ["asthma", "depression", "anxiety", "bipolar", "bipolar II"],
+    [
+        "asthma",
+        "depression",
+        "anxiety",
+        "bipolar disorder",
+        "bipolar II disorder",
+        "b-cell lymphoma",
+    ],
     ["asthma"],
 )
 
@@ -23,12 +30,19 @@ if st.button("Submit"):
         try:
             patents = patent_client.search(patent_terms)
             df = pl.from_dicts(cast(list[dict], patents)).to_pandas()
+            st.metric(label="Results", value=len(df))
+
             st.dataframe(
                 df,
                 column_config={
                     "priority_date": st.column_config.DateColumn(
-                        "Priority date",
+                        "priority date",
                         format="YYYY.MM.DD",
+                    ),
+                    "patent_years_left": st.column_config.NumberColumn(
+                        "patent life",
+                        help="Number of years left on patent",
+                        format="%d years",
                     ),
                     "url": st.column_config.LinkColumn(
                         "Patent",
@@ -37,7 +51,7 @@ if st.button("Submit"):
                     ),
                 },
                 hide_index=True,
-                height=500,
+                height=600,
             )
         except Exception as e:
             st.error(f"An error occurred: {e}")

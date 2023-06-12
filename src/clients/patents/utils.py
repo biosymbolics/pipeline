@@ -1,12 +1,15 @@
 """
 Utility functions for the patents client
 """
+import re
 from typing import Optional, cast
 from datetime import date
 
-MAX_PATENT_LIFE = 20
-
+from common.utils.re import get_or_re
+from .constants import COMPANY_NAME_SUPPRESSIONS, COUNTRIES
 from .types import PatentAttribute
+
+MAX_PATENT_LIFE = 20
 
 
 def get_max_priority_date(min_patent_years: Optional[int] = 0) -> int:
@@ -25,6 +28,29 @@ def get_max_priority_date(min_patent_years: Optional[int] = 0) -> int:
     # e.g. 2001 -> 20010000
     as_number = max_priority_year * 10000
     return as_number
+
+
+def get_patent_years(priority_date: date) -> int:
+    """
+    Get the number of years remaining on a patent
+
+    Args:
+        priority_date (date): priority date of the patent
+    """
+    if not priority_date:
+        return 0
+    return max(0, MAX_PATENT_LIFE - (date.today().year - priority_date.year))
+
+
+def clean_assignee(assignee: str) -> str:
+    """
+    Clean an assignee name
+
+    Args:
+        assignee (str): assignee name
+    """
+    suppress_re = "\\b" + get_or_re([*COMPANY_NAME_SUPPRESSIONS, *COUNTRIES]) + "\\b"
+    return re.sub("(?i)" + suppress_re, "", assignee).strip().title()
 
 
 def get_patent_attributes(title: str) -> list[PatentAttribute]:
