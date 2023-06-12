@@ -32,7 +32,7 @@ SEARCH_RETURN_FIELDS = [
     # "grant_date",
     "inventors",
     "ipc_codes",
-    "publication_date",
+    # "publication_date",
     # "similar",
     "top_terms",
     "url",

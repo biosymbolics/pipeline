@@ -14,6 +14,7 @@ class PatentBasicInfo(TypedDict):
     Patent basic info object as per Google Patents API / local modifications
     """
 
+    abstract: str
     application_number: str
     assignees: list[str]
     attributes: list[PatentAttribute]
@@ -28,7 +29,6 @@ class PatentApplication(PatentBasicInfo):
     Patent application object as per Google Patents API / local modifications
     """
 
-    abstract: str
     application_kind: str
     compounds: list[str]
     country: str

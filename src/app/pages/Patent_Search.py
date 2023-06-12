@@ -1,10 +1,13 @@
 """
 Patent lookup
 """
+import json
 import streamlit as st
 import polars as pl
 from typing import cast
+from streamlit_timeline import timeline
 
+from common.utils.date import format_date
 from clients import patent_client
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
@@ -53,5 +56,17 @@ if st.button("Submit"):
                 hide_index=True,
                 height=600,
             )
+
+            timeline_patents = [
+                {
+                    "start_date": {
+                        "year": format_date(patent["priority_date"], "%Y"),
+                        "month": format_date(patent["priority_date"], "%m"),
+                    },
+                    "text": {"headline": patent["title"], "text": patent["abstract"]},
+                }
+                for patent in patents
+            ]
+            timeline({"events": timeline_patents}, height=600)
         except Exception as e:
             st.error(f"An error occurred: {e}")
