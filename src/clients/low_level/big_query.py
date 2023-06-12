@@ -34,6 +34,8 @@ def select_from_bg(query: str) -> list[dict]:
     """
     results = execute_bg_query(query)
     rows = [dict(row) for row in results]
+
+    logging.info("Rows returned: %s", len(rows))
     return rows
 
 

@@ -2,8 +2,10 @@
 Patent client
 """
 from typing import cast
+import polars as pl
 
 from clients import select_from_bg
+from common.utils.date import parse_date
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
 from .utils import get_max_priority_date
@@ -11,7 +13,9 @@ from .types import PatentApplication
 
 SEARCH_RETURN_FIELDS = [
     "applications.publication_number",
+    "title",
     "abstract",
+    "priority_date",
     "application_kind",
     "application_number",
     "assignees",
@@ -19,11 +23,12 @@ SEARCH_RETURN_FIELDS = [
     "country",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
+    "filing_date",
+    "grant_date",
     "inventors",
     "ipc_codes",
     "publication_date",
     # "similar",
-    "title",
     "top_terms",
     "url",
 ]
@@ -47,10 +52,23 @@ MOU_FILTER = (
 )
 
 
-def search_patents(terms: list[str]) -> list[PatentApplication]:
+def __format_search_result(result: dict) -> PatentApplication:
+    """
+    Format a search result
+    """
+    dates = ["priority_date", "filing_date", "publication_date", "grant_date"]
+    for date in dates:
+        result[date] = (
+            parse_date(str(result[date]), "%Y%m%d") if result.get(date) else None
+        )
+    return cast(PatentApplication, result)
+
+
+def search(terms: list[str]) -> list[PatentApplication]:
     """
     Search patents by terms
     Filters on
+    - lower'd terms
     - priority date
     - at least one composition of matter, no method of use (TODO: too stringent?)
 
@@ -62,15 +80,16 @@ def search_patents(terms: list[str]) -> list[PatentApplication]:
     TODO: doesn't actually match typing - in particular, need to aggregate annotations.
 
     Example:
-        >>> search_patents(['asthma', 'astrocytoma'])
+        >>> search(['asthma', 'astrocytoma'])
     """
+    lower_terms = [term.lower() for term in terms]
     max_priority_date = get_max_priority_date(10)
     fields = ",".join(SEARCH_RETURN_FIELDS)
     query = (
         "WITH filtered_entities AS ( "
         "SELECT * "
         "FROM patents.entities, UNNEST(annotations) as annotation "
-        f"WHERE annotation.term IN UNNEST({terms}) "
+        f"WHERE annotation.term IN UNNEST({lower_terms}) "
         ") "
         f"SELECT {fields} "
         "FROM patents.applications AS applications "
@@ -80,7 +99,7 @@ def search_patents(terms: list[str]) -> list[PatentApplication]:
         f"priority_date > {max_priority_date} "  # min patent life
         f"AND {COM_FILTER} "
         f"AND {MOU_FILTER} "
-        "limit 1000"
+        "limit 100"
     )
     results = select_from_bg(query)
-    return cast(list[PatentApplication], results)
+    return [__format_search_result(result) for result in results]

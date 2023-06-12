@@ -91,7 +91,8 @@ TIC_DISORDER = "Tic Disorder"
 # mania
 # avoidant personality disease
 # cyclothymic disease
-
+# leukaemia
+# leukemia, myeloid, acute vs acute myeloid leukaemia
 SYNONYM_MAP = {
     "acute stress disease": STRESS_DISORDER,
     "alcohol use disease": SUBSTANCE_ABUSE,
