@@ -30,7 +30,7 @@ from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
 from common.ner import extract_named_entities
 from common.utils.string import get_id
-from local_types.indices import NamespaceKey
+from typings.indices import NamespaceKey
 from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 
 from .source_doc_index import SourceDocIndex

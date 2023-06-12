@@ -7,7 +7,7 @@ from llama_index import (
     GPTVectorStoreIndex,
 )
 
-from local_types.indices import LlmIndex
+from typings.indices import LlmIndex
 from .context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,

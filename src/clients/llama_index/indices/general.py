@@ -14,7 +14,7 @@ from clients.llama_index.context import (
 )
 from clients.llama_index.formatting import format_documents
 from clients.llama_index.persistence import load_index
-from local_types.indices import LlmIndex, Prompt, RefinePrompt
+from typings.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocId, GetDocMetadata
 

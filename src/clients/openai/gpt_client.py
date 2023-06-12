@@ -11,7 +11,7 @@ import logging
 
 from .utils import parse_answer
 
-OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DEFAULT_GPT_MODEL = "gpt-3.5-turbo"
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
