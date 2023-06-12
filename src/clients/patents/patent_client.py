@@ -37,6 +37,8 @@ def search_patents(terms: list[str]) -> list[PatentApplication]:
         terms (list[str]): list of terms to search for
 
     Returns: a list of matching patent applications
+
+    TODO: doesn't actually match typing - in particular, need to aggregate annotations.
     """
     max_priority_date = get_max_priority_date(10)
     query = (
