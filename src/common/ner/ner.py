@@ -7,6 +7,7 @@ from typing import cast
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
+from spacy.tokens import Span
 from spacy.pipeline.entityruler import EntityRuler, PatternType
 from pydash import flatten
 import logging
@@ -27,16 +28,20 @@ sci_nlp: Language = spacy.load("en_core_sci_scibert")
 
 def extract_named_entities(
     content: list[str],
-    pattern_sets: list[SpacyPatterns] = [
+    rule_sets: list[SpacyPatterns] = [
         INDICATION_SPACY_PATTERNS,
         INTERVENTION_SPACY_PATTERNS,
     ],
 ) -> list[str]:
     """
     Extract named entities from a list of content
+    - basic SpaCy pipeline
+    - applies rule_sets
+    - applies scispacy_linker (canonical mapping to UMLS)
 
     Args:
         content (list[str]): list of content on which to do NER
+        rule_sets (list[SpacyPatterns]): list of rule sets to apply
     """
     sci_nlp.tokenizer = get_sec_tokenizer(sci_nlp)
 
@@ -51,8 +56,8 @@ def extract_named_entities(
         ),
     )
 
-    for set in pattern_sets:
-        ruler.add_patterns(set)
+    for set in rule_sets:
+        ruler.add_patterns(set)  # type: ignore
 
     sci_nlp.add_pipe(
         "scispacy_linker",
@@ -69,7 +74,7 @@ def extract_named_entities(
 
     entities = flatten([doc.ents for doc in docs])
     enriched = enrich_with_canonical(entities, nlp=sci_nlp)
-    entity_names = clean_entities(enriched, common_nlp)
+    entity_names = clean_entities(list(enriched.keys()), common_nlp)
 
     logging.info("Entity names: %s", entity_names)
     # debug_pipeline(docs, nlp)

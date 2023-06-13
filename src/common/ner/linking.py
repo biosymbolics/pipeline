@@ -39,10 +39,10 @@ def enrich_with_canonical(entities: list[Span], nlp: Language) -> dict[str, list
     """
     linker = __get_kb_linker(nlp)
 
-    product_entities = [entity for entity in entities if entity.label_ in ENTITY_TYPES]
+    _entities = [entity for entity in entities if entity.label_ in ENTITY_TYPES]
 
     canonical_entity_map = {}
-    for entity in product_entities:
+    for entity in _entities:
         kb_entities = [linker.cui_to_entity[kb_ent[0]] for kb_ent in entity._.kb_ents]
         canonical_entities = [
             ent.canonical_name

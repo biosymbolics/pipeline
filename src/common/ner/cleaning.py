@@ -84,7 +84,7 @@ def clean_entity(entity: str, char_suppressions: list[str] = CHAR_SUPPRESSIONS) 
     return cleaned
 
 
-def clean_entities(entity_map: dict[str, list[str]], nlp: Language) -> list[str]:
+def clean_entities(entities: list[str], nlp: Language) -> list[str]:
     """
     Clean entity name list
     - filters out (some) excessively general entities
@@ -92,7 +92,7 @@ def clean_entities(entity_map: dict[str, list[str]], nlp: Language) -> list[str]
     - cleans entity names
 
     Args:
-        entity_map (dict[str, list[str]]): entity map
+        entities (list[str]): entities map
         nlp (Language): spacy language model
     """
 
@@ -128,8 +128,7 @@ def clean_entities(entity_map: dict[str, list[str]], nlp: Language) -> list[str]
         dedup,
         __clean_entities,
     ]
-    entity_names = list(entity_map.keys())
 
-    sanitized = reduce(lambda x, func: func(x), cleaning_steps, entity_names)
+    sanitized = reduce(lambda x, func: func(x), cleaning_steps, entities)
 
     return sanitized
