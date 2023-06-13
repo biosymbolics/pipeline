@@ -2,6 +2,7 @@
 NER Patterns (SpaCy)
 """
 
+from typing import cast
 from constants.patterns import (
     MOA_INFIXES,
     MOA_SUFFIXES,
@@ -14,6 +15,7 @@ from constants.patterns import (
 )
 
 from common.utils.re import get_or_re, wrap, ALPHA_CHARS, LEGAL_SYMBOLS
+from .types import SpacyPatterns
 from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
 
 # also ENTITY Opdualag tag: NNP pos: PROPN dep: nmod lemma: Opdualag morph: Number=Sing prob: -20.0 head: approval span: [of, ,, nivolumab, ,]
@@ -146,21 +148,27 @@ BRAND_NAME_PATTERNS: list[list[dict]] = [
     ],
 ]
 
-INTERVENTION_SPACY_PATTERNS = [
-    *[
-        {"label": "PRODUCT", "pattern": pattern}
-        for pattern in INVESTIGATIONAL_ID_PATTERNS
+INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
+    SpacyPatterns,
+    [
+        *[
+            {"label": "PRODUCT", "pattern": pattern}
+            for pattern in INVESTIGATIONAL_ID_PATTERNS
+        ],
+        *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
+        *[
+            {"label": "PRODUCT", "pattern": pattern}
+            for pattern in SMALL_MOLECULE_PATTERNS
+        ],
+        *[{"label": "PRODUCT", "pattern": pattern} for pattern in BRAND_NAME_PATTERNS],
+        *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
+        # from en_ner_bc5cdr_md model
+        {
+            "label": "PRODUCT",
+            "pattern": [{"ENT_TYPE": "CHEMICAL"}],
+        },
     ],
-    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": pattern} for pattern in SMALL_MOLECULE_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": pattern} for pattern in BRAND_NAME_PATTERNS],
-    *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
-    # from en_ner_bc5cdr_md model
-    {
-        "label": "PRODUCT",
-        "pattern": [{"ENT_TYPE": "CHEMICAL"}],
-    },
-]
+)
 
 
 """
@@ -176,7 +184,7 @@ INDICATION_REGEXES = [
     ),
 ]
 
-INDICATION_PATTERNS: list[list[dict]] = [
+INDICATION_PATTERNS = [
     [
         {"POS": {"IN": ["PROPN", "NOUN", "ADJ"]}, "OP": "*"},
         {"LEMMA": {"REGEX": ind_re}},
@@ -185,9 +193,12 @@ INDICATION_PATTERNS: list[list[dict]] = [
     for ind_re in INDICATION_REGEXES
 ]
 
-INDICATION_SPACY_PATTERNS = [
-    *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
-]
+INDICATION_SPACY_PATTERNS: SpacyPatterns = cast(
+    SpacyPatterns,
+    [
+        *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
+    ],
+)
 
 
 """

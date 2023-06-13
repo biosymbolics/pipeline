@@ -1,7 +1,16 @@
 """
 NER types
 """
-from typing import Any, NamedTuple, Optional, TypeGuard, TypedDict
+from typing import (
+    Any,
+    Collection,
+    Mapping,
+    NamedTuple,
+    Optional,
+    TypeGuard,
+    TypedDict,
+    Union,
+)
 
 from spacy.pipeline import Pipe
 from spacy.tokens import Token
@@ -24,6 +33,10 @@ class KbLinker(NamedTuple):
 
 class SciSpacyLinker(NamedTuple):
     kb: KbLinker
+
+
+SpacyPattern = Mapping[str, Union[str, Collection[Mapping[str, Any]]]]
+SpacyPatterns = Collection[SpacyPattern]
 
 
 def is_ner_result(entity: Any) -> TypeGuard[NerResult]:

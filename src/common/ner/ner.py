@@ -3,18 +3,20 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
+from typing import cast
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
+from spacy.pipeline.entityruler import EntityRuler, PatternType
 from pydash import flatten
 import logging
 
-from common.ner.utils import get_sec_tokenizer
-
+from .cleaning import clean_entities
 from .debugging import debug_pipeline
 from .linking import enrich_with_canonical
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .cleaning import clean_entities
+from .tokenizers.sec_tokenizer import get_sec_tokenizer
+from .types import SpacyPatterns
 
 common_nlp = spacy.load("en_core_web_sm")
 
@@ -23,7 +25,13 @@ common_nlp = spacy.load("en_core_web_sm")
 sci_nlp: Language = spacy.load("en_core_sci_scibert")
 
 
-def extract_named_entities(content: list[str]) -> list[str]:
+def extract_named_entities(
+    content: list[str],
+    pattern_sets: list[SpacyPatterns] = [
+        INDICATION_SPACY_PATTERNS,
+        INTERVENTION_SPACY_PATTERNS,
+    ],
+) -> list[str]:
     """
     Extract named entities from a list of content
 
@@ -34,15 +42,17 @@ def extract_named_entities(content: list[str]) -> list[str]:
 
     sci_nlp.add_pipe("merge_entities", after="ner")
 
-    ruler = sci_nlp.add_pipe(
-        "entity_ruler",
-        config={"validate": True, "overwrite_ents": True},
-        after="merge_entities",
+    ruler: EntityRuler = cast(
+        EntityRuler,
+        sci_nlp.add_pipe(
+            "entity_ruler",
+            config={"validate": True, "overwrite_ents": True},
+            after="merge_entities",
+        ),
     )
 
-    # order intentional
-    ruler.add_patterns(INDICATION_SPACY_PATTERNS)  # type: ignore
-    ruler.add_patterns(INTERVENTION_SPACY_PATTERNS)  # type: ignore
+    for set in pattern_sets:
+        ruler.add_patterns(set)
 
     sci_nlp.add_pipe(
         "scispacy_linker",

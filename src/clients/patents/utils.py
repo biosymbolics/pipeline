@@ -55,6 +55,23 @@ def clean_assignee(assignee: str) -> str:
     return re.sub("(?i)" + suppress_re, "", assignee).strip().title()
 
 
+DIAGNOSIS_TERMS = [
+    "diagnosis",
+    "diagnostic",
+    "diagnosing",
+    "biomarker",
+    "biomarkers",
+    "detection",
+    "marker",
+    "markers",
+    "monitoring",
+    "risk score",
+    "sensor",
+    "sensors",
+    "testing",
+]
+
+
 def get_patent_attributes(title: str) -> list[PatentAttribute]:
     title_words = set(title.lower().split(" "))
     attributes = []
@@ -64,23 +81,7 @@ def get_patent_attributes(title: str) -> list[PatentAttribute]:
         attributes.append("Combination")
     if set(["method", "methods", "system", "systems"]).intersection(title_words):
         attributes.append("Method")
-    if set(
-        [
-            "diagnosis",
-            "diagnostic",
-            "diagnosing",
-            "biomarker",
-            "biomarkers",
-            "detection",
-            "marker",
-            "markers",
-            "monitoring",
-            "risk score",
-            "sensor",
-            "sensors",
-            "testing",
-        ]
-    ).intersection(title_words):
+    if set([]).intersection(title_words):
         attributes.append("Diagnostic")
     if set(
         [
