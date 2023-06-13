@@ -10,26 +10,28 @@ import polars as pl
 
 from common.utils.list import dedup
 
-nlp = spacy.load("en_core_web_sm", disable=["ner"])
+nlp = spacy.load("en_core_web_sm")
 
 
 def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]:
     """
     Create a lookup map from a keyword map, with keywords lemmatized.
 
-    Example:
-    ``` python
-    keyword_map = {
-        "INDICATION": ["indication", "diseases"],
-        "INTERVENTION": ["intervention", "drug", "compounds"],
-    }
-    yields lemmatized keyword to category mapping:
-    {
-        'indication': 'INDICATION',
-        'disease': 'INDICATION',
-        'drug': 'INTERVENTION',
-        'compound': 'INTERVENTION',
-    }
+    Usage:
+    ```
+        >>> keyword_map = {
+            "INDICATION": ["indication", "diseases"],
+            "INTERVENTION": ["drug", "compounds"],
+        }
+        >>> create_lookup_map(keyword_map)
+        # yields lemmatized keyword to category mapping:
+        {
+            'indication': 'INDICATION',
+            'disease': 'INDICATION',
+            'drug': 'INTERVENTION',
+            'compound': 'INTERVENTION',
+        }
+        >>>
     ```
     """
     cat_key_tups = [
@@ -40,6 +42,7 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
     lookup_tups = [
         (kw_tok.lemma_, tup[1]) for tup in cat_key_tups for kw_tok in nlp(tup[0])
     ]
+    print([(kw_tok.ents, tup[1]) for tup in cat_key_tups for kw_tok in nlp(tup[0])])
     lookup_map = dict(lookup_tups)
     logging.debug(f"Created lookup map: %s", lookup_map)
     return lookup_map
