@@ -23,7 +23,7 @@ patent_terms = st.multiselect(
         "bipolar II disorder",
         "b-cell lymphoma",
     ],
-    ["asthma"],
+    [],
 )
 
 if st.button("Submit"):
