@@ -118,6 +118,7 @@ PATENT_ATTRIBUTE_MAP = {
         *ACTIONS,
     ],
     "DIAGNOSTIC": [
+        "analysis",
         "diagnosis",
         "diagnostic",
         "biomarker",

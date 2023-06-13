@@ -32,11 +32,11 @@ if st.button("Submit"):
     else:
         try:
             patents = patent_client.search(patent_terms)
-            df = pl.from_dicts(cast(list[dict], patents)).to_pandas()
+            df = pl.from_dicts(cast(list[dict], patents))
             st.metric(label="Results", value=len(df))
 
             st.dataframe(
-                df,
+                df.to_pandas(),
                 column_config={
                     "priority_date": st.column_config.DateColumn(
                         "priority date",
@@ -65,14 +65,18 @@ if st.button("Submit"):
                     },
                     "text": {
                         "headline": patent["title"],
-                        "text": patent["abstract"]
-                        + "<br /><br />"
-                        + ", ".join(patent["ipc_codes"])
-                        + "<br /><br />"
-                        + f"<a href=\"{patent['url']}\">See on Google Patents.</a>",
+                        "text": (
+                            f"{patent['abstract']}"
+                            "<br /><br />"
+                            f"{', '.join(patent['ipc_codes'])}"
+                            f" (score: {round(patent['score'], 2)})"
+                            "<br /><br />"
+                            f"<a href=\"{patent['url']}\">See on Google Patents.</a>"
+                        ),
                     },
                 }
-                for patent in patents
+                for patent in df.to_dicts()
+                if patent["score"] > 0.1
             ]
             timeline({"events": timeline_patents}, height=600)
         except Exception as e:
