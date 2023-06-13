@@ -1,3 +1,6 @@
+"""
+Functions to initialize the patents database
+"""
 from google.cloud import bigquery
 import logging
 
@@ -13,6 +16,7 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermNormalizer
+from common.utils.list import dedup
 from scripts.local_constants import (
     COMMON_ENTITY_NAMES,
     SYNONYM_MAP,
@@ -55,7 +59,7 @@ def __create_entity_list():
     new_table.schema = [bigquery.SchemaField("term", "STRING")]
     new_table = client.create_table(new_table)
 
-    batched = __batch(normalized_terms)
+    batched = __batch(dedup(normalized_terms))
     for batch in batched:
         rows_to_insert = [{"term": term} for term in batch]
         client.insert_rows(new_table, rows_to_insert)
