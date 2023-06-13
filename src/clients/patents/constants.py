@@ -112,6 +112,8 @@ PATENT_ATTRIBUTE_MAP = {
         "compound",
         "composition",
         "derivative",
+        "drug",
+        "receptor",
         "substitute",
         *ACTIONS,
     ],

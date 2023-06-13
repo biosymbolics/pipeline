@@ -4,19 +4,19 @@ import math
 
 from .constants import MAX_PATENT_LIFE
 
-ScoreMap = dict[str, int]
+ScoreMap = dict[str, float]
 
 ExplainedScore = TypedDict("ExplainedScore", {"score": float, "explanation": str})
 
-SUITABILITY_SCORE_MAP = {
+SUITABILITY_SCORE_MAP: ScoreMap = {
     "COMBINATION": 0,
     "COMPOUND_OR_MECHANISM": 2,
     "DIAGNOSTIC": -1,
-    "FORMULATION": 0,
-    "NOVEL": 1,
+    "FORMULATION": -0.5,
+    "NOVEL": 1.5,
     "PREPARATION": -1,
     "PROCESS": -1,
-    "METHOD": -1,
+    "METHOD": -1.5,
 }
 
 
