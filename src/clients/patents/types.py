@@ -5,7 +5,15 @@ from datetime import date
 from typing import Literal, TypedDict
 
 PatentAttribute = Literal[
-    "Combination", "Compound", "Diagnostic", "Formulation", "Method", "Novel"
+    "Combination",
+    "Composition",
+    "Compound",
+    "Diagnostic",
+    "Formulation",
+    "Method",
+    "Novel",
+    "Preparation",
+    "Process",
 ]
 
 
@@ -19,7 +27,7 @@ class PatentBasicInfo(TypedDict):
     assignees: list[str]
     attributes: list[PatentAttribute]
     family_id: str
-    ipcs: list[str]
+    ipc_codes: list[str]
     priority_date: date
     title: str
     url: str

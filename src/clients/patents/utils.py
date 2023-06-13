@@ -45,6 +45,8 @@ def get_patent_years(priority_date: date) -> int:
 def clean_assignee(assignee: str) -> str:
     """
     Clean an assignee name
+    - removes suppressions
+    - title cases
 
     Args:
         assignee (str): assignee name
@@ -109,4 +111,11 @@ def get_patent_attributes(title: str) -> list[PatentAttribute]:
         attributes.append("Compound")
     if set(["formulation", "formulations", "preparation"]).intersection(title_words):
         attributes.append("Formulation")
+    if set(["composition"]).intersection(title_words):
+        attributes.append("Composition")  # PHARMACEUTICAL COMPOSITIONS
+    if set(["preparation", "routes of synthesis"]).intersection(title_words):
+        # process for preparing, methods of preparing
+        attributes.append("Preparation")
+    if set(["process", "process for"]):
+        attributes.append("Process")
     return cast(list[PatentAttribute], attributes)
