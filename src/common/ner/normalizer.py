@@ -15,7 +15,7 @@ class TermNormalizer:
     Example:
         >>> normalizer = TermNormalizer()
         >>> normalizer(["APP", "haemorrage", "MEGFII", "anaemia"])
-        {'APP': 'APP gene', 'haemorrage': None, 'MEGFII': None, 'anaemia': 'Anemia'}
+        ('APP gene', 'haemorrage', 'MEGFII', 'Anemia')
     """
 
     def __init__(self):
@@ -37,7 +37,7 @@ class TermNormalizer:
 
         return None
 
-    def __normalize(self, terms: list[str]) -> dict[str, str]:
+    def generate_map(self, terms: list[str]) -> dict[str, str]:
         """
         Normalize a list of terms
 
@@ -52,5 +52,9 @@ class TermNormalizer:
         result_map = dict(zip(terms, canonical_names))
         return result_map
 
-    def __call__(self, terms: list[str]) -> dict[str, str]:
-        return self.__normalize(terms)
+    def __call__(self, terms: list[str]) -> list[str]:
+        """
+        Normalize a list of terms
+        """
+        term_map = self.generate_map(terms)
+        return [term_map[term] or term for term in terms]

@@ -4,9 +4,9 @@ import os
 
 logging.basicConfig(level=logging.INFO)
 
-PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
-DATASET = "patents"
-BQ_DATASET_ID = PROJECT + "." + DATASET
+BQ_PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
+BQ_DATASET = "patents"
+BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET
 
 
 def execute_bg_query(query: str):
