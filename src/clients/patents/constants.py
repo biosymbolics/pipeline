@@ -132,8 +132,7 @@ PATENT_ATTRIBUTE_MAP = {
     "FORMULATION": ["formulation", "form"],
     "METHOD": ["method", "procedure", "use"],
     "NOVEL": ["novel"],
-    "PREPARATION": ["preparation"],
-    "PROCESS": ["process", "sythesis", "system"],
+    "PROCESS": ["preparation", "process", "sythesis", "system"],
 }
 
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
