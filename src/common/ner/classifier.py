@@ -8,6 +8,8 @@ from typing import Mapping, Union
 import logging
 import polars as pl
 
+from common.utils.list import dedup
+
 nlp = spacy.load("en_core_web_sm", disable=["ner"])
 
 
@@ -39,7 +41,6 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
         (kw_tok.lemma_, tup[1]) for tup in cat_key_tups for kw_tok in nlp(tup[0])
     ]
     lookup_map = dict(lookup_tups)
-
     logging.debug(f"Created lookup map: %s", lookup_map)
     return lookup_map
 
@@ -56,9 +57,9 @@ def classify_string(
         lookup_map (Mapping[str, str]): mapping of lemmatized keywords to categories
         nx_name (str): name to use for non-matches
     """
-    tokens = nlp(string)
+    tokens = nlp(string.lower())
     categories = [lookup_map.get(token.lemma_, nx_name) for token in tokens]
-    return compact(categories)
+    return dedup(compact(categories))
 
 
 def classify_by_keywords(
@@ -76,6 +77,9 @@ def classify_by_keywords(
         nx_name (str): name to use for non-matches
 
     Returns: a list of categories
+
+    Example:
+        >>> classify_by_keywords(pl.Series(["Method of treatment by tryptamine alkaloids"]), PATENT_ATTRIBUTE_MAP)
     """
     lookup = create_lookup_map(keyword_map)
 

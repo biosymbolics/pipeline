@@ -5,7 +5,6 @@ TODO: car-ts belong in biologics
 """
 from common.utils.re import ALPHA_CHARS
 
-
 ACTIONS = [
     "activator",
     "agent",
@@ -19,18 +18,26 @@ ACTIONS = [
     "conjugate",
     "protein degrader",
     "degrader",
-    "down[-\\s]?regulator",
+    "down regulator",
+    "down-regulator",
+    "downregulator",
     "engager",
-    "immuno[-\\s]?modulator",
+    "immunomodulator",
+    "immuno-modulator",
+    "immuno modulator",
     "inducer",
     "inhibitor",
     "ligase modulator",
     "modulator",
     "potentiator",
-    "pro[-\\s]?drug",
+    "prodrug",
+    "pro-drug",
+    "pro drug",
     "stimulator",
     "suppressor",
-    "up[-\\s]?regulator",
+    "up regulator",
+    "up-regulator",
+    "upregulator",
 ]
 
 CONJUGATE_TYPES = [

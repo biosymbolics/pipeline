@@ -1,14 +1,13 @@
 """
 Patent client
 """
-import json
-from typing import Any, Mapping, Sequence, cast
+from typing import Any, Sequence, cast
 import polars as pl
-import logging
 
 from clients import select_from_bg
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
+from .score import calculate_score
 from .utils import (
     clean_assignee,
     get_max_priority_date,
@@ -79,6 +78,7 @@ def __format_search_result(
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
+    df = calculate_score(df).sort("score").reverse()
 
     return cast(Sequence[PatentBasicInfo], df.to_dicts())
 
@@ -119,7 +119,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
         f"AND {COM_FILTER} "
         f"AND {MOU_FILTER} "
         "ORDER BY priority_date DESC "
-        "limit 1000"
+        "limit 2000"
     )
     results = select_from_bg(query)
     return __format_search_result(results)

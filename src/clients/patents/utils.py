@@ -8,9 +8,12 @@ import polars as pl
 
 from common.utils.re import get_or_re
 from common.ner import classify_by_keywords
-from .constants import COMPANY_NAME_SUPPRESSIONS, COUNTRIES
-
-MAX_PATENT_LIFE = 20
+from .constants import (
+    COMPANY_NAME_SUPPRESSIONS,
+    COUNTRIES,
+    PATENT_ATTRIBUTE_MAP,
+    MAX_PATENT_LIFE,
+)
 
 
 def get_max_priority_date(min_patent_years: Optional[int] = 0) -> int:
@@ -57,41 +60,6 @@ def clean_assignee(assignee: str) -> str:
     """
     suppress_re = "\\b" + get_or_re([*COMPANY_NAME_SUPPRESSIONS, *COUNTRIES]) + "\\b"
     return re.sub("(?i)" + suppress_re, "", assignee).strip().title()
-
-
-PATENT_ATTRIBUTE_MAP = {
-    "NOVEL": ["novel"],
-    "COMBINATION": ["combination"],
-    "METHOD": ["method", "methods", "system", "systems"],
-    "DIAGNOSTIC": [
-        "diagnosis",
-        "biomarker",
-        "detection",
-        "marker",
-        "monitoring",
-        "risk score",
-        "sensor",
-        "testing",
-    ],
-    "COMPOUND": [
-        "analog",
-        "antibody",
-        "compound",
-        "composition",
-        "derivative",
-        "ligand",
-        "substitute",
-        "modulator",
-        "inhibitor",
-        "agonist",
-        "antagonist",
-        "prodrug",
-    ],
-    "COMPOSITION": ["composition"],
-    "FORMULATION": ["formulation"],
-    "PREPARATION": ["preparation"],
-    "PROCESS": ["process"],
-}
 
 
 def get_patent_attributes(titles: pl.Series) -> pl.Series:
