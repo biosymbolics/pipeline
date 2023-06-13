@@ -76,7 +76,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     fields = ",".join(SEARCH_RETURN_FIELDS)
     query = (
         "WITH filtered_entities AS ( "
-        "SELECT * FROM patents.entities, UNNEST(annotations) as annotation "
+        "SELECT * FROM patents.annotations a, UNNEST(a.annotations) as annotation "
         f"WHERE annotation.term IN UNNEST({lower_terms}) "
         ") "
         f"SELECT {fields} "
