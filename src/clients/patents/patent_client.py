@@ -1,19 +1,14 @@
 """
 Patent client
 """
-from typing import Any, Sequence, cast
-import polars as pl
+from typing import Sequence
+import logging
 
 from clients import select_from_bg
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
-from .score import calculate_score
-from .utils import (
-    clean_assignee,
-    get_max_priority_date,
-    get_patent_years,
-    get_patent_attributes,
-)
+from .formatting import format_search_result
+from .utils import get_max_priority_date
 from .types import PatentBasicInfo
 
 SEARCH_RETURN_FIELDS = [
@@ -58,31 +53,6 @@ MOU_FILTER = (
 )
 
 
-def __format_search_result(
-    results: Sequence[dict[str, Any]]
-) -> Sequence[PatentBasicInfo]:
-    """
-    Format a search result
-    """
-    df = pl.from_dicts(results)
-
-    df = df.with_columns(
-        pl.col("priority_date")
-        .cast(str)
-        .str.strptime(pl.Date, "%Y%m%d")
-        .alias("priority_date"),
-        pl.col("assignees").apply(
-            lambda r: [clean_assignee(assignee) for assignee in r]
-        ),
-        pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
-    )
-
-    df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
-    df = calculate_score(df).sort("score").reverse()
-
-    return cast(Sequence[PatentBasicInfo], df.to_dicts())
-
-
 def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     """
     Search patents by terms
@@ -106,8 +76,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     fields = ",".join(SEARCH_RETURN_FIELDS)
     query = (
         "WITH filtered_entities AS ( "
-        "SELECT * "
-        "FROM patents.entities, UNNEST(annotations) as annotation "
+        "SELECT * FROM patents.entities, UNNEST(annotations) as annotation "
         f"WHERE annotation.term IN UNNEST({lower_terms}) "
         ") "
         f"SELECT {fields} "
@@ -116,10 +85,24 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
         "ON applications.publication_number = entities.publication_number "
         "WHERE "
         f"priority_date > {max_priority_date} "  # min patent life
-        f"AND {COM_FILTER} "
-        f"AND {MOU_FILTER} "
+        f"AND {COM_FILTER} AND {MOU_FILTER} "  # composition of matter, no method of use
         "ORDER BY priority_date DESC "
         "limit 2000"
     )
     results = select_from_bg(query)
-    return __format_search_result(results)
+    return format_search_result(results)
+
+
+def autocomplete_terms(string: str) -> list[str]:
+    """
+    Fetch all entities from patents.entity_list
+    Used to update the entity list in the app
+
+    Args:
+        string (str): string to search for
+
+    Returns: a list of matching terms
+    """
+    query = f"SELECT term from patents.entity_list where term like '%{string}%'"
+    results = select_from_bg(query)
+    return [result["term"] for result in results]

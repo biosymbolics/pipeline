@@ -6,25 +6,26 @@ import streamlit as st
 import polars as pl
 from typing import cast
 from streamlit_timeline import timeline
+import logging
 
 from common.utils.date import format_date
 from clients import patent_client
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
 
+
+@st.cache_resource
+def get_options():
+    return patent_client.autocomplete_terms("")
+
+
+options = get_options()
+
 st.title("Search for patents")
-patent_terms = st.multiselect(
-    "Enter in terms for patent search",
-    [
-        "asthma",
-        "depression",
-        "anxiety",
-        "bipolar disorder",
-        "bipolar II disorder",
-        "b-cell lymphoma",
-    ],
-    [],
-)
+patent_terms = st.multiselect("Enter in terms for patent search", options=options)
+
+
+# with st.expander("See explanation"):
 
 if st.button("Submit"):
     if not patent_terms:

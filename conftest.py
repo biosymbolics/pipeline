@@ -1,8 +1,8 @@
-from src.system import init
+from src.system import initialize
 
 
 def pytest_configure():
-    init()
+    initialize()
 
 
 def pytest_unconfigure():

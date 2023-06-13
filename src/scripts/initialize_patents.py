@@ -1,17 +1,19 @@
-from system import init
+from system import initialize
 
-init()
-
+initialize()
 
 import logging
 
-from constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
 from clients.low_level.big_query import (
     execute_bg_query,
     query_to_bg_table,
     BQ_DATASET_ID,
 )
 
+from scripts.local_constants import (
+    COMMON_ENTITY_NAMES,
+    SYNONYM_MAP,
+)  # local_constants???
 
 logging.basicConfig(level=logging.INFO)
 
@@ -178,22 +180,26 @@ def __create_query_tables():
         "WHERE rank = 1 "
         "GROUP BY publication_number "
     )
-    query_to_bg_table(applications, "applications")
-    query_to_bg_table(entity_query, "entities")
+    entity_list_query = (
+        f"SELECT distinct preferred_name as term FROM `{BQ_DATASET_ID}.gpr_annotations`"
+    )
+    # query_to_bg_table(applications, "applications")
+    # query_to_bg_table(entity_query, "entities") # TODO: rename to annotations
+    query_to_bg_table(entity_list_query, "entity_list")
 
 
 def main():
     # copy gpr_publications table
-    __copy_gpr_publications()
+    # __copy_gpr_publications()
 
     # copy publications table
-    __copy_publications()
+    # __copy_publications()
 
     # copy gpr_annotations table
-    __copy_gpr_annotations()  # depends on publications
+    # __copy_gpr_annotations()  # depends on publications
 
     # create synonym_map table (for final entity names)
-    __create_synonym_map()
+    # __create_synonym_map()
 
     # create the (small) tables against which the app will query
     __create_query_tables()
