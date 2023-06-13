@@ -67,6 +67,8 @@ if st.button("Submit"):
                         "headline": patent["title"],
                         "text": patent["abstract"]
                         + "<br /><br />"
+                        + ", ".join(patent["ipc_codes"])
+                        + "<br /><br />"
                         + f"<a href=\"{patent['url']}\">See on Google Patents.</a>",
                     },
                 }

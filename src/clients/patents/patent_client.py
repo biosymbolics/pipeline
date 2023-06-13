@@ -1,10 +1,12 @@
 """
 Patent client
 """
-from typing import cast
+import json
+from typing import Any, Mapping, Sequence, cast
+import polars as pl
+import logging
 
 from clients import select_from_bg
-from common.utils.date import parse_date
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
 from .utils import (
@@ -57,22 +59,31 @@ MOU_FILTER = (
 )
 
 
-def __format_search_result(result: dict) -> PatentBasicInfo:
+def __format_search_result(
+    results: Sequence[dict[str, Any]]
+) -> Sequence[PatentBasicInfo]:
     """
     Format a search result
     """
-    dates = ["priority_date"]
-    for date in dates:
-        result[date] = (
-            parse_date(str(result[date]), "%Y%m%d") if result.get(date) else None
-        )
-    result["patent_years_left"] = get_patent_years(result["priority_date"])
-    result["attributes"] = get_patent_attributes(result["title"])
-    result["assignees"] = [clean_assignee(assignee) for assignee in result["assignees"]]
-    return cast(PatentBasicInfo, result)
+    df = pl.from_dicts(results)
+
+    df = df.with_columns(
+        pl.col("priority_date")
+        .cast(str)
+        .str.strptime(pl.Date, "%Y%m%d")
+        .alias("priority_date"),
+        pl.col("assignees").apply(
+            lambda r: [clean_assignee(assignee) for assignee in r]
+        ),
+        pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
+    )
+
+    df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
+
+    return cast(Sequence[PatentBasicInfo], df.to_dicts())
 
 
-def search(terms: list[str]) -> list[PatentBasicInfo]:
+def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     """
     Search patents by terms
     Filters on
@@ -111,4 +122,4 @@ def search(terms: list[str]) -> list[PatentBasicInfo]:
         "limit 1000"
     )
     results = select_from_bg(query)
-    return [__format_search_result(result) for result in results]
+    return __format_search_result(results)
