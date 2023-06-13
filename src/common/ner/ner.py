@@ -7,8 +7,7 @@ from typing import cast
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
-from spacy.tokens import Span
-from spacy.pipeline.entityruler import EntityRuler, PatternType
+from spacy.pipeline.entityruler import EntityRuler
 from pydash import flatten
 import logging
 

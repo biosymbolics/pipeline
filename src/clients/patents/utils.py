@@ -2,12 +2,13 @@
 Utility functions for the patents client
 """
 import re
-from typing import Optional, cast
+from typing import Optional
 from datetime import date
+import polars as pl
 
 from common.utils.re import get_or_re
+from common.ner import classify_by_keywords
 from .constants import COMPANY_NAME_SUPPRESSIONS, COUNTRIES
-from .types import PatentAttribute
 
 MAX_PATENT_LIFE = 20
 
@@ -30,16 +31,19 @@ def get_max_priority_date(min_patent_years: Optional[int] = 0) -> int:
     return as_number
 
 
-def get_patent_years(priority_date: date) -> int:
+def get_patent_years(priority_dates_column: str) -> pl.Expr:
     """
-    Get the number of years remaining on a patent
+    Get the number of years remaining on a patent for a Series of dates
 
     Args:
-        priority_date (date): priority date of the patent
+        priority_dates_column (str): Column name of priority dates of the patents
     """
-    if not priority_date:
-        return 0
-    return max(0, MAX_PATENT_LIFE - (date.today().year - priority_date.year))
+    current_year = date.today().year
+    expr = (
+        pl.lit(MAX_PATENT_LIFE)
+        - (pl.lit(current_year) - pl.col(priority_dates_column).dt.year())
+    ).clip(lower_bound=0, upper_bound=MAX_PATENT_LIFE)
+    return expr
 
 
 def clean_assignee(assignee: str) -> str:
@@ -55,68 +59,43 @@ def clean_assignee(assignee: str) -> str:
     return re.sub("(?i)" + suppress_re, "", assignee).strip().title()
 
 
-DIAGNOSIS_TERMS = [
-    "diagnosis",
-    "diagnostic",
-    "diagnosing",
-    "biomarker",
-    "biomarkers",
-    "detection",
-    "marker",
-    "markers",
-    "monitoring",
-    "risk score",
-    "sensor",
-    "sensors",
-    "testing",
-]
+PATENT_ATTRIBUTE_MAP = {
+    "NOVEL": ["novel"],
+    "COMBINATION": ["combination"],
+    "METHOD": ["method", "methods", "system", "systems"],
+    "DIAGNOSTIC": [
+        "diagnosis",
+        "biomarker",
+        "detection",
+        "marker",
+        "monitoring",
+        "risk score",
+        "sensor",
+        "testing",
+    ],
+    "COMPOUND": [
+        "analog",
+        "antibody",
+        "compound",
+        "composition",
+        "derivative",
+        "ligand",
+        "substitute",
+        "modulator",
+        "inhibitor",
+        "agonist",
+        "antagonist",
+        "prodrug",
+    ],
+    "COMPOSITION": ["composition"],
+    "FORMULATION": ["formulation"],
+    "PREPARATION": ["preparation"],
+    "PROCESS": ["process"],
+}
 
 
-def get_patent_attributes(title: str) -> list[PatentAttribute]:
-    title_words = set(title.lower().split(" "))
-    attributes = []
-    if set(["novel"]).intersection(title_words):
-        attributes.append("Novel")
-    if set(["combination", "combinations", "combined"]).intersection(title_words):
-        attributes.append("Combination")
-    if set(["method", "methods", "system", "systems"]).intersection(title_words):
-        attributes.append("Method")
-    if set([]).intersection(title_words):
-        attributes.append("Diagnostic")
-    if set(
-        [
-            "analogue",
-            "analog",
-            "antibody",
-            "antibodies",  # may be more biomarker
-            "compound",
-            "compounds",
-            "compositions",
-            "derivative",
-            "derivatives",
-            "ligand",
-            "ligands",
-            "substituted",
-            "substitute",
-            "substitutes",
-            "modulator",
-            "modulators",
-            "inhibitor",
-            "inhibitors",
-            "agonist",
-            "antagonist",
-            "prodrug",
-            "prodrugs",
-        ]
-    ).intersection(title_words):
-        attributes.append("Compound")
-    if set(["formulation", "formulations", "preparation"]).intersection(title_words):
-        attributes.append("Formulation")
-    if set(["composition"]).intersection(title_words):
-        attributes.append("Composition")  # PHARMACEUTICAL COMPOSITIONS
-    if set(["preparation", "routes of synthesis"]).intersection(title_words):
-        # process for preparing, methods of preparing
-        attributes.append("Preparation")
-    if set(["process", "process for"]):
-        attributes.append("Process")
-    return cast(list[PatentAttribute], attributes)
+def get_patent_attributes(titles: pl.Series) -> pl.Series:
+    """
+    Get patent attributes from a title
+    """
+    return classify_by_keywords(titles, PATENT_ATTRIBUTE_MAP, None)
