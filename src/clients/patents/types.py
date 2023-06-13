@@ -4,18 +4,6 @@ Patent types
 from datetime import date
 from typing import Literal, TypedDict
 
-PatentAttribute = Literal[
-    "Combination",
-    "Composition",
-    "Compound",
-    "Diagnostic",
-    "Formulation",
-    "Method",
-    "Novel",
-    "Preparation",
-    "Process",
-]
-
 
 class PatentBasicInfo(TypedDict):
     """
@@ -25,7 +13,7 @@ class PatentBasicInfo(TypedDict):
     abstract: str
     application_number: str
     assignees: list[str]
-    attributes: list[PatentAttribute]
+    attributes: list[str]  # keyof typeof PATENT_ATTRIBUTE_MAP
     family_id: str
     ipc_codes: list[str]
     priority_date: date

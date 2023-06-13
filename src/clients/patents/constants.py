@@ -1,13 +1,20 @@
-# less likely
-# "C09",  # dyes; paints; polishes; natural resins; adhesives; compositions not otherwise provided for
-# "C10",  # petroleum, gas or coke industries; technical gases containing carbon monoxide; fuels; lubricants; peat
-# "C11",  # ANIMAL OR VEGETABLE OILS, FATS, FATTY SUBSTANCES OR WAXES; FATTY ACIDS THEREFROM; DETERGENTS; CANDLES
+"""
+Constants for the patents client.
+"""
+from constants.patterns.moa import ACTIONS
+
+
 COMPOSITION_OF_MATTER_IPC_CODES = [
     "C01",  # inorganic chemistry
     "C07",  # organic chemistry
     "C08",  # organic macromolecular compounds
     "C12",  # biochemistry; beer; spirits; wine; vinegar; microbiology; enzymology; mutation or genetic engineering
 ]
+
+# less likely
+# "C09",  # dyes; paints; polishes; natural resins; adhesives; compositions not otherwise provided for
+# "C10",  # petroleum, gas or coke industries; technical gases containing carbon monoxide; fuels; lubricants; peat
+# "C11",  # ANIMAL OR VEGETABLE OILS, FATS, FATTY SUBSTANCES OR WAXES; FATTY ACIDS THEREFROM; DETERGENTS; CANDLES
 
 # C07D217/04 - process for preparing
 # C07C317/44 - method of use and making
@@ -95,6 +102,40 @@ COUNTRIES = [
     "UK",
     "USA",
 ]
+
+MAX_PATENT_LIFE = 20
+
+PATENT_ATTRIBUTE_MAP = {
+    "COMBINATION": ["combination"],
+    "COMPOUND_OR_MECHANISM": [
+        "composition",
+        "compound",
+        "composition",
+        "derivative",
+        "drug",
+        "receptor",
+        "substitute",
+        *ACTIONS,
+    ],
+    "DIAGNOSTIC": [
+        "diagnosis",
+        "diagnostic",
+        "biomarker",
+        "detection",
+        "imaging",
+        "marker",
+        "monitoring",
+        "risk score",
+        "sensor",
+        "testing",
+    ],
+    "FORMULATION": ["formulation", "form"],
+    "METHOD": ["method", "procedure", "use"],
+    "NOVEL": ["novel"],
+    "PROCESS": ["preparation", "process", "sythesis", "system"],
+}
+
+PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 
 ADHD = "Attention Deficit Hyperactivity Disorder"
 ARTICULATION_DISORDER = "Articulation Disorder"
