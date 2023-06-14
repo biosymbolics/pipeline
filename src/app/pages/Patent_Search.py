@@ -47,20 +47,15 @@ def dataframe_with_selections(pl_df: pl.DataFrame):
                 "priority date",
                 format="YYYY.MM.DD",
             ),
-            "patent_years_left": st.column_config.NumberColumn(
-                "patent life",
+            "patent_years": st.column_config.NumberColumn(
+                "patent yrs",
                 help="Number of years left on patent",
                 format="%d years",
             ),
             "all_scores": st.column_config.BarChartColumn(
-                "Scores",
+                "scores",
                 help="Left: suitability; right: term relevancy",
                 width="small",
-            ),
-            "url": st.column_config.LinkColumn(
-                "Patent",
-                help="Link to the patent",
-                width="medium",
             ),
         },
         column_order=[
