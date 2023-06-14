@@ -6,7 +6,7 @@ import logging
 
 from clients import select_from_bg
 
-from .constants import COMPOSITION_OF_MATTER_IPC_CODES, METHOD_OF_USE_IPC_CODES
+from .constants import COMPOSITION_OF_MATTER_IPC_CODES
 from .formatting import format_search_result
 from .utils import get_max_priority_date
 from .types import PatentBasicInfo
@@ -67,8 +67,8 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     fields = ",".join(SEARCH_RETURN_FIELDS)
     query = (
         "WITH filtered_entities AS ( "
-        "SELECT * FROM patents.annotations a, UNNEST(a.annotations) as annotation "
-        f"WHERE annotation.term IN UNNEST({lower_terms}) "
+        "    SELECT * FROM patents.annotations a, UNNEST(a.annotations) as annotation "
+        f"   WHERE annotation.term IN UNNEST({lower_terms}) "
         ") "
         f"SELECT {fields} "
         "FROM patents.applications AS applications "
@@ -94,6 +94,6 @@ def autocomplete_terms(string: str) -> list[str]:
 
     Returns: a list of matching terms
     """
-    query = f"SELECT term from patents.entity_list where term like '%{string}%' order by term asc"
+    query = f"SELECT term from patents.entity_list where term like '%{string}%' order by term asc, count desc"
     results = select_from_bg(query)
     return [result["term"] for result in results]
