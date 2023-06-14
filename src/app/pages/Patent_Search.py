@@ -119,8 +119,11 @@ try:
     with main_tab:
         selection = dataframe_with_selections(patents)
 
-        if selection is not None:
-            render_detail(selection.to_records()[0])
+        if selection is not None and len(selection) > 0:
+            columns = st.columns(len(selection))
+            for idx, selection in enumerate(selection.to_records()):
+                with columns[idx]:
+                    render_detail(selection)
 
     with timeline_tab:
         render_timeline(patents)
