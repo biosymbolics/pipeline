@@ -22,8 +22,20 @@ def get_options():
 options = get_options()
 
 st.title("Search for patents")
-patent_terms = st.multiselect("Enter in terms for patent search", options=options)
 
+# increase the max width of chips
+st.markdown(
+    """
+    <style>
+        .stMultiSelect [data-baseweb=select] span{
+            max-width: 500px;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+patent_terms = st.multiselect("Enter in terms for patent search", options=options)
 
 # with st.expander("See explanation"):
 

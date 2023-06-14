@@ -153,7 +153,7 @@ def __copy_gpr_annotations():
         f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications "
         "ON local_publications.publication_number = annotations.publication_number "
         "WHERE annotations.confidence > 0.69 "
-        f"AND preferred_name not in {COMMON_ENTITY_NAMES} "
+        f"AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES} "
         f"AND domain not in {SUPPRESSED_DOMAINS} "
     )
     query_to_bg_table(query, "gpr_annotations")

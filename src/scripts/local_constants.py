@@ -165,9 +165,8 @@ SYNONYM_MAP = {
     "transient tic disease": TIC_DISORDER,
 }
 
-
 # TO suppress
-COMMON_ENTITY_NAMES = (
+_COMMON_ENTITY_NAMES = (
     "compounds",
     "",
     "antibodies",
@@ -1068,11 +1067,11 @@ COMMON_ENTITY_NAMES = (
     "Tris buffer",
     "installation",
     "body fluid",
-    "Hip",
-    "L-alanine",
+    "hip",
+    "l-alanine",
     "oxane",
-    "Dexamethasone",
-    "Crystalline Lens",
+    "dexamethasone",
+    "crystalline Lens",
     "recombination",
     "oligosaccharide",
     "core material",
@@ -1089,7 +1088,7 @@ COMMON_ENTITY_NAMES = (
     "biodegradation reaction",
     "radiotherapy",
     "Luciferase",
-    "Glucose",
+    "glucose",
     "agar",
     "denaturation",
     "Luciferase family",
@@ -2358,3 +2357,5 @@ COMMON_ENTITY_NAMES = (
     "mental health",
     "biological processes and functions",
 )
+
+COMMON_ENTITY_NAMES = [name.lower() for name in _COMMON_ENTITY_NAMES]

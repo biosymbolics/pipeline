@@ -92,6 +92,7 @@ PATENT_ATTRIBUTE_MAP = {
         "composition",
         "derivative",
         "drug",
+        "molecule",
         "receptor",
         "substitute",
         *MOA_ACTIONS,

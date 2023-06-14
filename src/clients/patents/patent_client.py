@@ -43,15 +43,6 @@ COM_FILTER = (
     ") > 0"
 )
 
-# method of use filter
-MOU_FILTER = (
-    "("
-    "SELECT COUNT(1) FROM UNNEST(ipc_codes) AS ipc "
-    f"JOIN UNNEST({METHOD_OF_USE_IPC_CODES}) AS mou_code "  # method of use
-    "ON starts_with(ipc, mou_code)"
-    ") = 0"
-)
-
 
 def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     """
@@ -59,7 +50,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     Filters on
     - lower'd terms
     - priority date
-    - at least one composition of matter, no method of use (TODO: too stringent?)
+    - at least one composition of matter
 
     Args:
         terms (list[str]): list of terms to search for
@@ -85,7 +76,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
         "ON applications.publication_number = entities.publication_number "
         "WHERE "
         f"priority_date > {max_priority_date} "  # min patent life
-        f"AND {COM_FILTER} AND {MOU_FILTER} "  # composition of matter, no method of use
+        f"AND {COM_FILTER} "  # composition of matter, no method of use
         "ORDER BY priority_date DESC "
         "limit 2000"
     )
@@ -103,6 +94,6 @@ def autocomplete_terms(string: str) -> list[str]:
 
     Returns: a list of matching terms
     """
-    query = f"SELECT term from patents.entity_list where term like '%{string}%'"
+    query = f"SELECT term from patents.entity_list where term like '%{string}%' order by term asc"
     results = select_from_bg(query)
     return [result["term"] for result in results]
