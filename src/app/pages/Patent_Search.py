@@ -97,7 +97,7 @@ if st.button("Submit"):
                         ),
                     },
                 }
-                for patent in df.to_dicts()
+                for patent in df.to_dicts()[0:100]
                 if patent["score"] > 0.1
             ]
             timeline({"events": timeline_patents}, height=600)
