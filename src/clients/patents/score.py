@@ -32,7 +32,9 @@ def score_patents(
         """
         score: float = sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
         total_possible: float = sum(map(math.exp, score_map.values()))
-        score = score / total_possible
+        score = (
+            score / total_possible if len(attributes) > 0 else 0.1
+        )  # if no attributes, let's give it a small non-zero score
 
         return score
 
@@ -55,16 +57,15 @@ def score_patents(
 
     # multiply score by pct patent life remaining
     df = df.with_columns(
-        pl.col("score").mul(df[years_column] / MAX_PATENT_LIFE).alias("score")
+        pl.col("score")
+        .mul(df[years_column] / MAX_PATENT_LIFE)
+        .alias("suitability_score"),
+        pl.concat_list(pl.col(["score", "search_rank"])).alias("all_scores"),
     )
 
     # multiply score by search rank
     df = df.with_columns(
         pl.col("score").mul(df["search_rank"]).alias("search_score"),
-    )
-
-    df = df.with_columns(
-        pl.concat_list(pl.col(["score", "search_rank"])).alias("all_scores")
     )
 
     return df

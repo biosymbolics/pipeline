@@ -93,9 +93,12 @@ PATENT_ATTRIBUTE_MAP = {
         "composition",
         "derivative",
         "drug",
+        "inhibiting",  # not the same stem as inhibitor
         "molecule",
         "receptor",
         "substitute",
+        "therapy",  # TODO: will probably over-match
+        "therapeutic",  # TODO: will probably over-match
     ],
     "DIAGNOSTIC": [
         "analysis",
@@ -106,8 +109,9 @@ PATENT_ATTRIBUTE_MAP = {
         "imaging",
         "marker",
         "monitoring",
+        "mouse",  # in vivo models
         "prognosis",
-        "risk score",
+        # "risk score",
         "scan",
         "sensor",
         "testing",
@@ -116,11 +120,11 @@ PATENT_ATTRIBUTE_MAP = {
         # "disease modifying",
         # "disease-modifying",
     ],
-    "FORMULATION": ["formulation", "form"],
-    "METHOD": ["method", "procedure", "use"],
+    "FORMULATION": ["formulation", "form", "salt"],
+    "METHOD": ["method", "procedure"],
     "NOVEL": ["novel"],
     "PREVENTATIVE": ["prevention"],
-    "PROCESS": ["preparation", "process", "sythesis", "system"],
+    "PROCESS": ["preparation", "process", "synthesis", "system"],
     "PALLIATIVE": [
         "palliative",
         # "reduction in symptoms",
