@@ -46,6 +46,16 @@ def render_timeline(patents: pl.DataFrame):
     timeline({"events": timeline_patents}, height=600)
 
 
+def get_google_patent_url(publication_number: str) -> str:
+    """
+    Get the Google Patent URL for a given publication number
+
+    Args:
+        publication_number (str): publication number
+    """
+    return "https://patents.google.com/patent/" + publication_number.replace("-", "")
+
+
 def render_detail(patent: PatentApplication):
     """
     Render a patent detail in streamlit app
@@ -68,3 +78,14 @@ def render_detail(patent: PatentApplication):
     mcol1.metric(label="Patent Years Left", value=patent["patent_years"])
     mcol2.metric(label="Suitability", value=round(patent["score"], 2))
     mcol3.metric(label="Relevancy", value=round(patent["search_rank"], 2))
+
+    st.divider()
+    st.subheader("Similar Patents")
+    st.markdown(
+        "\n".join(
+            [
+                "- " + get_markdown_link(get_google_patent_url(similar), similar)
+                for similar in patent["similar"]
+            ]
+        )
+    )
