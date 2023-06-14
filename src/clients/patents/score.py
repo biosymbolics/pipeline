@@ -1,6 +1,7 @@
 from typing import TypedDict
 import polars as pl
 import math
+import logging
 
 from .constants import MAX_PATENT_LIFE
 
@@ -60,6 +61,10 @@ def score_patents(
     # multiply score by search rank
     df = df.with_columns(
         pl.col("score").mul(df["search_rank"]).alias("search_score"),
+    )
+
+    df = df.with_columns(
+        pl.concat_list(pl.col(["score", "search_rank"])).alias("all_scores")
     )
 
     return df
