@@ -1,6 +1,7 @@
 """
 Functions to initialize the patents database
 """
+from itertools import groupby
 from google.cloud import bigquery
 import logging
 
@@ -16,7 +17,6 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermNormalizer
-from common.utils.list import dedup
 from scripts.local_constants import (
     COMMON_ENTITY_NAMES,
     SYNONYM_MAP,
@@ -44,26 +44,36 @@ def __create_entity_list():
     """
     client = bigquery.Client()
 
-    entity_list_query = (
-        f"SELECT distinct preferred_name as term FROM `{BQ_DATASET_ID}.gpr_annotations`"
-    )
+    entity_list_query = f"SELECT preferred_name as term, count(*) as count FROM `{BQ_DATASET_ID}.gpr_annotations` group by preferred_name"
     rows = select_from_bg(entity_list_query)
 
-    terms = [row["term"] for row in rows]
     normalizer = TermNormalizer()
-    normalization_map = normalizer.generate_map(terms)
-    normalized_terms = [normalization_map[term] or term for term in terms]
+    normalization_map = normalizer.generate_map([row["term"] for row in rows])
+
+    # Deduplicate and aggregate counts
+    grouped_terms = groupby(
+        [(row["term"], row["count"]) for row in rows], key=lambda term: term[0]
+    )
+    normalized_terms = [
+        {
+            "term": normalization_map.get(term, term),
+            "count": sum(count for _, count in counts),
+        }
+        for term, counts in grouped_terms
+    ]
 
     # Create a new table to hold the modified records
     new_table = bigquery.Table(f"{BQ_DATASET_ID}.entity_list")
-    new_table.schema = [bigquery.SchemaField("term", "STRING")]
+    new_table.schema = [
+        bigquery.SchemaField("term", "STRING"),
+        bigquery.SchemaField("count", "INTEGER"),
+    ]
     new_table = client.create_table(new_table)
 
-    batched = __batch(dedup(normalized_terms))
+    batched = __batch(normalized_terms)
     for batch in batched:
-        rows_to_insert = [{"term": term} for term in batch]
-        client.insert_rows(new_table, rows_to_insert)
-        logging.info(f"Inserted {len(rows_to_insert)} rows")
+        client.insert_rows(new_table, batch)
+        logging.info(f"Inserted {len(batch)} rows")
 
     __add_to_synonym_map(normalization_map)
 
@@ -208,11 +218,11 @@ FIELDS = [
 ]
 
 
-def __create_query_tables():
+def __create_applications_table():
     """
-    Create tables for use in app queries
+    Create a table of patent applications for use in app queries
     """
-    logging.info("Creating patent tables for use in app queries")
+    logging.info("Create a table of patent applications for use in app queries")
     applications = (
         "SELECT "
         f"{','.join(FIELDS)} "
@@ -220,6 +230,15 @@ def __create_query_tables():
         f"`{BQ_DATASET_ID}.gpr_publications` as gpr_pubs "
         "WHERE pubs.publication_number = gpr_pubs.publication_number "
     )
+    query_to_bg_table(applications, "applications")
+
+
+def __create_annotations_table():
+    """
+    Create a table of annotations for use in app queries
+    """
+    logging.info("Create a table of annotations for use in app queries")
+
     entity_query = (
         "WITH ranked_terms AS ( "
         "SELECT "
@@ -240,28 +259,33 @@ def __create_query_tables():
         "WHERE rank = 1 "
         "GROUP BY publication_number "
     )
-    # query_to_bg_table(applications, "applications")
-    query_to_bg_table(entity_query, "annotations")  # TODO: rename to annotations
+    query_to_bg_table(entity_query, "annotations")
 
 
 def main():
+    """
+    Copy tables from patents-public-data to a local dataset
+
+    Order matters. Non-idempotent.
+    """
     # copy gpr_publications table
-    # __copy_gpr_publications()
+    __copy_gpr_publications()
 
     # copy publications table
-    # __copy_publications()
+    __copy_publications()
 
     # copy gpr_annotations table
-    # __copy_gpr_annotations()  # depends on publications
+    __copy_gpr_annotations()
 
     # create synonym_map table (for final entity names)
-    # __create_synonym_map(SYNONYM_MAP)
+    __create_synonym_map(SYNONYM_MAP)
 
     # create entity_list table and update synonym map
-    # __create_entity_list()
+    __create_entity_list()
 
     # create the (small) tables against which the app will query
-    __create_query_tables()
+    __create_applications_table
+    __create_annotations_table
 
 
 if __name__ == "__main__":
