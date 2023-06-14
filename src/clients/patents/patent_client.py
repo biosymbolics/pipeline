@@ -5,11 +5,12 @@ from typing import Sequence
 import logging
 
 from clients import select_from_bg
+from typings import PatentBasicInfo
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES
 from .formatting import format_search_result
 from .utils import get_max_priority_date
-from .types import PatentBasicInfo, TermResult
+from .types import TermResult
 
 MIN_TERM_FREQUENCY = 100
 MAX_SEARCH_RESULTS = 2000
@@ -34,18 +35,19 @@ SEARCH_RETURN_FIELDS = [
     "search_rank",  # search rank
     # "publication_date",
     # "similar",
+    "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
     "url",
 ]
 
 # composition of matter filter
-COM_FILTER = (
-    "("
-    "SELECT COUNT(1) FROM UNNEST(ipc_codes) AS ipc "
-    f"JOIN UNNEST({COMPOSITION_OF_MATTER_IPC_CODES}) AS com_code "  # composition of matter
-    "ON starts_with(ipc, com_code)"
-    ") > 0"
-)
+COM_FILTER = f"""
+    (
+        SELECT COUNT(1) FROM UNNEST(ipc_codes) AS ipc
+        JOIN UNNEST({COMPOSITION_OF_MATTER_IPC_CODES}) AS com_code
+        ON starts_with(ipc, com_code)
+    ) > 0
+"""
 
 
 def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:

@@ -1,28 +1,16 @@
 """
 Patent lookup
 """
-import json
 import streamlit as st
 import polars as pl
 from typing import cast
-from streamlit_timeline import timeline
 import logging
 import re
 
-from common.utils.date import format_date
 from clients import patent_client
+from ui.patents import render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
-
-
-@st.cache_resource
-def get_options():
-    return patent_client.autocomplete_terms("")
-
-
-options = get_options()
-
-st.title("Search for patents")
 
 # increase the max width of chips
 st.markdown(
@@ -36,8 +24,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-patent_terms = st.multiselect("Enter in terms for patent search", options=options)
-
 
 def __format_terms(terms: list[str]) -> list[str]:
     """
@@ -47,77 +33,92 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\([0-9]{1,}\)$", "", term).strip() for term in terms]
 
 
-# try with st.expander("See explanation"):
-if st.button("Submit"):
-    if not patent_terms:
+def dataframe_with_selections(pl_df: pl.DataFrame):
+    if pl_df is None:
+        st.info("No results")
+        return
+    df = pl_df.to_pandas()
+    df.insert(0, "selected", False)
+    edited_df = st.data_editor(
+        df,
+        column_config={
+            "selected": st.column_config.CheckboxColumn(required=True),
+            "priority_date": st.column_config.DateColumn(
+                "priority date",
+                format="YYYY.MM.DD",
+            ),
+            "patent_years": st.column_config.NumberColumn(
+                "patent yrs",
+                help="Number of years left on patent",
+                format="%d years",
+            ),
+            "all_scores": st.column_config.BarChartColumn(
+                "scores",
+                help="Left: suitability; right: term relevancy",
+                width="small",
+            ),
+        },
+        column_order=[
+            "selected",
+            "publication_number",
+            "patent_years",
+            "all_scores",
+            "title",
+            "assignees",
+            "attributes",
+            "priority_date",
+            "ipc_codes",
+            "search_score",
+        ],
+        hide_index=True,
+        height=450,
+    )
+    selected_rows = df[edited_df.selected]
+    return selected_rows
+
+
+@st.cache_resource
+def get_options():
+    return patent_client.autocomplete_terms("")
+
+
+@st.cache_resource(experimental_allow_widgets=True)
+def get_data(options):
+    terms = st.multiselect("Enter in terms for patent search", options=options)
+    if not terms:
         st.error(f"Please enter patent terms.")
-    else:
-        try:
-            patents = patent_client.search(__format_terms(patent_terms))
-            df = pl.from_dicts(cast(list[dict], patents))
+        return
+    df = patent_client.search(__format_terms(terms))
+    return pl.from_dicts(cast(list[dict], df))
 
-            st.metric(label="Results", value=len(df))
-            st.dataframe(
-                df.to_pandas(),
-                column_config={
-                    "priority_date": st.column_config.DateColumn(
-                        "priority date",
-                        format="YYYY.MM.DD",
-                    ),
-                    "patent_years_left": st.column_config.NumberColumn(
-                        "patent life",
-                        help="Number of years left on patent",
-                        format="%d years",
-                    ),
-                    "all_scores": st.column_config.BarChartColumn(
-                        "Scores",
-                        help="Left: suitability; right: term relevancy",
-                        width="small",
-                    ),
-                    "url": st.column_config.LinkColumn(
-                        "Patent",
-                        help="Link to the patent",
-                        width="medium",
-                    ),
-                },
-                column_order=[
-                    "publication_number",
-                    "patent_years",
-                    "all_scores",
-                    "title",
-                    "url",
-                    "assignees",
-                    "abstract",
-                    "attributes",
-                    "priority_date",
-                    "ipc_codes",
-                    "search_score",
-                ],
-                hide_index=True,
-                height=600,
-            )
 
-            timeline_patents = [
-                {
-                    "start_date": {
-                        "year": format_date(patent["priority_date"], "%Y"),
-                        "month": format_date(patent["priority_date"], "%m"),
-                    },
-                    "text": {
-                        "headline": patent["title"],
-                        "text": (
-                            f"{patent['abstract']}"
-                            "<br /><br />"
-                            f"{', '.join(patent['ipc_codes'])}"
-                            f" (score: {round(patent['score'], 2)})"
-                            "<br /><br />"
-                            f"<a href=\"{patent['url']}\">See on Google Patents.</a>"
-                        ),
-                    },
-                }
-                for patent in df.to_dicts()[0:100]
-                if patent["score"] > 0.1
-            ]
-            timeline({"events": timeline_patents}, height=600)
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+def render_selector():
+    col1, col2 = st.columns([10, 1])
+    with col1:
+        options = get_options()
+        patents = get_data(options)
+    with col2:
+        st.metric(label="Results", value=len(patents) if patents is not None else 0)
+
+    return patents
+
+
+st.title("Search for patents")
+
+try:
+    patents = render_selector()
+    main_tab, timeline_tab = st.tabs(["Main", "Timeline"])
+
+    with main_tab:
+        selection = dataframe_with_selections(patents)
+
+        if selection is not None and len(selection) > 0:
+            columns = st.columns(len(selection))
+            for idx, selection in enumerate(selection.to_records()):
+                with columns[idx]:
+                    render_detail(selection)
+
+    with timeline_tab:
+        render_timeline(patents)
+except Exception as e:
+    st.error(f"An error occurred: {e}")
