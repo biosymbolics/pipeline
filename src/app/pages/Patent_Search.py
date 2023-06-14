@@ -69,12 +69,30 @@ if st.button("Submit"):
                         help="Number of years left on patent",
                         format="%d years",
                     ),
+                    "all_scores": st.column_config.BarChartColumn(
+                        "Scores",
+                        help="Left: suitability; right: term relevancy",
+                        width="small",
+                    ),
                     "url": st.column_config.LinkColumn(
                         "Patent",
                         help="Link to the patent",
-                        max_chars=25,
+                        width="medium",
                     ),
                 },
+                column_order=[
+                    "publication_number",
+                    "patent_years",
+                    "all_scores",
+                    "title",
+                    "url",
+                    "assignees",
+                    "abstract",
+                    "attributes",
+                    "priority_date",
+                    "ipc_codes",
+                    "search_score",
+                ],
                 hide_index=True,
                 height=600,
             )
@@ -97,7 +115,7 @@ if st.button("Submit"):
                         ),
                     },
                 }
-                for patent in df.to_dicts()
+                for patent in df.to_dicts()[0:100]
                 if patent["score"] > 0.1
             ]
             timeline({"events": timeline_patents}, height=600)

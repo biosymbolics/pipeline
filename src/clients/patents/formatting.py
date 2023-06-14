@@ -17,7 +17,7 @@ def format_search_result(
     results: Sequence[dict[str, Any]]
 ) -> Sequence[PatentBasicInfo]:
     """
-    Format BigQuery patent search results
+    Format BigQuery patent search results and adds scores
 
     Args:
         results (list[dict]): list of search results
@@ -36,6 +36,6 @@ def format_search_result(
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
-    df = calculate_score(df).sort("score").reverse()
+    df = calculate_score(df).sort("search_score").reverse()
 
     return cast(Sequence[PatentBasicInfo], df.to_dicts())

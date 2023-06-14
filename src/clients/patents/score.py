@@ -1,64 +1,12 @@
 from typing import TypedDict
 import polars as pl
 import math
+import logging
 
 from .constants import MAX_PATENT_LIFE
 
+ExplainedScore = TypedDict("ExplainedScore", {"explanation": str, "score": float})
 ScoreMap = dict[str, float]
-
-ExplainedScore = TypedDict("ExplainedScore", {"score": float, "explanation": str})
-
-SUITABILITY_SCORE_MAP: ScoreMap = {
-    "COMBINATION": 0,
-    "COMPOUND_OR_MECHANISM": 2,
-    "DIAGNOSTIC": -1,
-    "FORMULATION": -0.5,
-    "NOVEL": 1.5,
-    "PREPARATION": -1,
-    "PROCESS": -1,
-    "METHOD": -1.5,
-}
-
-
-def __calc_score(attributes: list[str], score_map: ScoreMap) -> float:
-    """
-    Calculate the patent score based on the provided attributes and score map.
-    Apply a softmax-like function to each score to ensure it's greater than 0.
-
-    Args:
-        attributes (list[str]): The patent attributes.
-        score_map (ScoreMap): The map with the scores for each attribute.
-
-    Returns:
-        tuple[float, str]: The patent score and explanation.
-    """
-    score: float = sum([score_map.get(attr, 0) for attr in attributes])
-    total_possible: float = sum(map(math.exp, score_map.values()))
-    score = math.exp(score) / total_possible
-
-    return score
-
-
-def __score_and_explain(attributes: list[str], score_map: ScoreMap) -> ExplainedScore:
-    """
-    Calculate the patent score based on the provided attributes and score map.
-    Apply the exponential function to each score to ensure it's greater than 0.
-
-    Args:
-        attributes (list[str]): The patent attributes.
-        score_map (ScoreMap): The map with the scores for each attribute.
-
-    Returns:
-        tuple[float, str]: The patent score and explanation.
-    """
-    # calc score
-    score = __calc_score(attributes, score_map)
-
-    # format simple score explanation
-    explanations = [
-        f"{attr}: {score_map.get(attr, 0)}" for attr in attributes if attr in score_map
-    ]
-    return {"score": score, "explanation": ", ".join(explanations)}
 
 
 def score_patents(
@@ -76,14 +24,62 @@ def score_patents(
     Returns:
         pl.DataFrame: The DataFrame with the patent scores and explanations.
     """
-    scores = pl.col(attributes_column).apply(lambda a: __score_and_explain(a, score_map))  # type: ignore
 
+    def __calc_score(attributes: list[str]) -> float:
+        """
+        Calculate the patent score based on its attributes.
+        Uses softmax-like normalization.
+        """
+        score: float = sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
+        total_possible: float = sum(map(math.exp, score_map.values()))
+        score = score / total_possible
+
+        return score
+
+    def __score_and_explain(attributes: list[str]) -> ExplainedScore:
+        """
+        Calculate the patent score & generate explanation
+        """
+        score = __calc_score(attributes)
+        explanations = [
+            f"{attr}: {score_map.get(attr, 0)}"
+            for attr in attributes
+            if attr in score_map
+        ]
+        return {"score": score, "explanation": ", ".join(explanations)}
+
+    scores = pl.col(attributes_column).apply(__score_and_explain)
+
+    # score and explanation are in the same column, so we need to unnest
     df = df.with_columns(scores.alias("result")).unnest("result")
+
+    # multiply score by pct patent life remaining
     df = df.with_columns(
         pl.col("score").mul(df[years_column] / MAX_PATENT_LIFE).alias("score")
     )
 
+    # multiply score by search rank
+    df = df.with_columns(
+        pl.col("score").mul(df["search_rank"]).alias("search_score"),
+    )
+
+    df = df.with_columns(
+        pl.concat_list(pl.col(["score", "search_rank"])).alias("all_scores")
+    )
+
     return df
+
+
+SUITABILITY_SCORE_MAP: ScoreMap = {
+    "COMBINATION": 0,
+    "COMPOUND_OR_MECHANISM": 2,
+    "DIAGNOSTIC": -1,
+    "FORMULATION": -0.5,
+    "NOVEL": 1.5,
+    "PREPARATION": -1,
+    "PROCESS": -1,
+    "METHOD": -1.5,
+}
 
 
 def calculate_score(df: pl.DataFrame) -> pl.DataFrame:

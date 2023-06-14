@@ -31,6 +31,7 @@ SEARCH_RETURN_FIELDS = [
     # "grant_date",
     "inventors",
     "ipc_codes",
+    "search_rank",  # search rank
     # "publication_date",
     # "similar",
     "top_terms",
@@ -69,18 +70,23 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     max_priority_date = get_max_priority_date(10)
     fields = ",".join(SEARCH_RETURN_FIELDS)
     query = f"""
-        WITH filtered_entities AS (
-            SELECT * FROM patents.annotations a, UNNEST(a.annotations) as annotation
-           WHERE annotation.term IN UNNEST({lower_terms})
+        WITH matches AS (
+            SELECT
+                *,
+                annotation.term as term,
+                EXP(-annotation.character_offset_start / 2000) as search_rank --- exp decay scaling; higher is better
+            FROM patents.annotations a,
+            UNNEST(a.annotations) as annotation
+            WHERE annotation.term IN UNNEST({lower_terms})
         )
         SELECT {fields}
         FROM patents.applications AS applications
-        JOIN filtered_entities AS entities
-        ON applications.publication_number = entities.publication_number
+        JOIN matches
+        ON applications.publication_number = matches.publication_number
         WHERE
         priority_date > {max_priority_date} --- min patent life
         AND {COM_FILTER} --- composition of matter IPC codes
-        ORDER BY priority_date DESC
+        ORDER BY search_rank DESC --- higher better; TODO: priority_date DESC
         limit {MAX_SEARCH_RESULTS}
     """
     results = select_from_bg(query)
@@ -94,7 +100,6 @@ def __format_term(entity: TermResult) -> str:
     Args:
         entity (TermResult): entity to format
     """
-    logging.info(entity)
     return f"{entity['term']} ({entity['count']})"
 
 
