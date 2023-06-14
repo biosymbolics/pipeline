@@ -2,7 +2,9 @@
 Patent types
 """
 from datetime import date
-from typing import Literal, TypedDict
+from typing import TypedDict
+
+TermResult = TypedDict("TermResult", {"term": str, "count": int})
 
 
 class PatentBasicInfo(TypedDict):

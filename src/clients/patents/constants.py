@@ -87,6 +87,7 @@ MAX_PATENT_LIFE = 20
 PATENT_ATTRIBUTE_MAP = {
     "COMBINATION": ["combination"],
     "COMPOUND_OR_MECHANISM": [
+        *MOA_ACTIONS,
         "composition",
         "compound",
         "composition",
@@ -95,7 +96,6 @@ PATENT_ATTRIBUTE_MAP = {
         "molecule",
         "receptor",
         "substitute",
-        *MOA_ACTIONS,
     ],
     "DIAGNOSTIC": [
         "analysis",
@@ -106,14 +106,29 @@ PATENT_ATTRIBUTE_MAP = {
         "imaging",
         "marker",
         "monitoring",
+        "prognosis",
         "risk score",
+        "scan",
         "sensor",
         "testing",
+    ],
+    "DISEASE_MODIFYING": [
+        # "disease modifying",
+        # "disease-modifying",
     ],
     "FORMULATION": ["formulation", "form"],
     "METHOD": ["method", "procedure", "use"],
     "NOVEL": ["novel"],
+    "PREVENTATIVE": ["prevention"],
     "PROCESS": ["preparation", "process", "sythesis", "system"],
+    "PALLIATIVE": [
+        "palliative",
+        # "reduction in symptoms",
+        "supportive",
+        # "symptom management",
+        # "symptom relief",
+        # "symptom relief"
+    ],
 }
 
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])

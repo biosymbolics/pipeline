@@ -7,6 +7,7 @@ import polars as pl
 from typing import cast
 from streamlit_timeline import timeline
 import logging
+import re
 
 from common.utils.date import format_date
 from clients import patent_client
@@ -37,17 +38,25 @@ st.markdown(
 
 patent_terms = st.multiselect("Enter in terms for patent search", options=options)
 
-# with st.expander("See explanation"):
 
+def __format_terms(terms: list[str]) -> list[str]:
+    """
+    Removes trailing counts
+    Example: "asthma (100)" -> "asthma"
+    """
+    return [re.sub("\([0-9]{1,}\)$", "", term).strip() for term in terms]
+
+
+# try with st.expander("See explanation"):
 if st.button("Submit"):
     if not patent_terms:
         st.error(f"Please enter patent terms.")
     else:
         try:
-            patents = patent_client.search(patent_terms)
+            patents = patent_client.search(__format_terms(patent_terms))
             df = pl.from_dicts(cast(list[dict], patents))
-            st.metric(label="Results", value=len(df))
 
+            st.metric(label="Results", value=len(df))
             st.dataframe(
                 df.to_pandas(),
                 column_config={
