@@ -10,7 +10,7 @@ from core import SOURCE_DOC_INDEX_NAME
 import logging
 from collections import defaultdict
 
-from system import init
+from system import initialize
 
 PERIODS = [
     "2015-12-31",
@@ -92,5 +92,5 @@ if __name__ == "__main__":
             "Usage: python3 dedup_vector_store.py\nDeletes duplicate documents from the vector store."
         )
         sys.exit()
-    init()
+    initialize()
     dedup_documents()

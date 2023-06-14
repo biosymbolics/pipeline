@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import logging
 
 
-def init():
+def initialize():
     """
     Initialize stuff
     """
@@ -16,4 +16,4 @@ def init():
 
 
 if __name__ == "__main__":
-    init()
+    initialize()

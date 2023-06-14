@@ -1,17 +1,28 @@
-from system import init
-
-init()
-
-
+"""
+Functions to initialize the patents database
+"""
+from itertools import groupby
+from google.cloud import bigquery
 import logging
 
-from constants import COMMON_ENTITY_NAMES, SYNONYM_MAP
+from system import initialize
+
+initialize()
+
+from clients.low_level.big_query import select_from_bg
 from clients.low_level.big_query import (
     execute_bg_query,
     query_to_bg_table,
     BQ_DATASET_ID,
+    BQ_DATASET,
+)
+from common.ner import TermNormalizer
+from scripts.local_constants import (
+    COMMON_ENTITY_NAMES,
+    SYNONYM_MAP,
 )
 
+BATCH_SIZE = 1000
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,19 +30,93 @@ BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
 
 
-def __create_synonym_map():
+def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
+    return [a_list[i : i + batch_size] for i in range(0, len(a_list), batch_size)]
+
+
+def __get_normalized_terms(rows, normalization_map):
+    normalized_terms = [
+        {
+            "term": normalization_map.get(row["term"]) or row["term"],
+            "count": row["count"] or 0,
+        }
+        for row in rows
+    ]
+    sorted_terms = sorted(
+        normalized_terms, key=lambda row: row["term"]
+    )  # required for groupby
+    grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
+    deduped_terms = [
+        {
+            "term": key,
+            "count": sum(row["count"] for row in group),
+        }
+        for key, group in grouped_terms
+    ]
+    return deduped_terms
+
+
+def __create_entity_list():
+    """
+    Create a table of entities
+
+    - pulls distinct from the gpr_annotations table
+    - normalizes the terms
+    - inserts them into a new table
+    """
+    client = bigquery.Client()
+
+    entity_list_query = f"SELECT preferred_name as term, count(*) as count FROM `{BQ_DATASET_ID}.gpr_annotations` group by preferred_name"
+    rows = select_from_bg(entity_list_query)
+
+    normalizer = TermNormalizer()
+    normalization_map = normalizer.generate_map([row["term"] for row in rows])
+
+    # Normalize, dedupe, and count the terms
+    normalized_terms = __get_normalized_terms(rows, normalization_map)
+
+    # Create a new table to hold the modified records
+    new_table = bigquery.Table(f"{BQ_DATASET_ID}.entity_list")
+    new_table.schema = [
+        bigquery.SchemaField("term", "STRING"),
+        bigquery.SchemaField("count", "INTEGER"),
+    ]
+    new_table = client.create_table(new_table)
+
+    batched = __batch(normalized_terms)
+    for batch in batched:
+        client.insert_rows(new_table, batch)
+        logging.info(f"Inserted {len(batch)} rows")
+
+    __add_to_synonym_map(normalization_map)
+
+
+def __create_synonym_map(synonym_map: dict[str, str]):
     """
     Create a table of synonyms
     """
-    create = "CREATE TABLE patents.synonym_map (term STRING, synonym STRING);"
+    create = "CREATE TABLE patents.synonym_map (synonym STRING, term STRING);"
     execute_bg_query(create)
-    entries = [
-        f"('{entry[0].lower()}', '{entry[1].lower()}')" for entry in SYNONYM_MAP.items()
+    __add_to_synonym_map(synonym_map)
+
+
+def __add_to_synonym_map(synonym_map: dict[str, str]):
+    """
+    Add common entity names to the synonym map
+    """
+    client = bigquery.Client()
+
+    data = [
+        {"synonym": entry[0].lower(), "term": entry[1].lower()}
+        for entry in synonym_map.items()
+        if entry[1] is not None and entry[0] != entry[1]
     ]
-    query = "INSERT INTO patents.synonym_map (synonym, term) VALUES " + ",".join(
-        entries
-    )
-    execute_bg_query(query)
+    batched = __batch(data)
+
+    for batch in batched:
+        table_ref = client.dataset(BQ_DATASET).table("synonym_map")
+        errors = client.insert_rows_json(table_ref, batch)
+        logging.info("Inserted %s rows (errors: %s)", len(batch), errors)
 
 
 def __copy_gpr_publications():
@@ -91,7 +176,7 @@ def __copy_gpr_annotations():
         f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications "
         "ON local_publications.publication_number = annotations.publication_number "
         "WHERE annotations.confidence > 0.69 "
-        f"AND preferred_name not in {COMMON_ENTITY_NAMES} "
+        f"AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES} "
         f"AND domain not in {SUPPRESSED_DOMAINS} "
     )
     query_to_bg_table(query, "gpr_annotations")
@@ -146,11 +231,11 @@ FIELDS = [
 ]
 
 
-def __create_query_tables():
+def __create_applications_table():
     """
-    Create tables for use in app queries
+    Create a table of patent applications for use in app queries
     """
-    logging.info("Creating patent tables for use in app queries")
+    logging.info("Create a table of patent applications for use in app queries")
     applications = (
         "SELECT "
         f"{','.join(FIELDS)} "
@@ -158,6 +243,15 @@ def __create_query_tables():
         f"`{BQ_DATASET_ID}.gpr_publications` as gpr_pubs "
         "WHERE pubs.publication_number = gpr_pubs.publication_number "
     )
+    query_to_bg_table(applications, "applications")
+
+
+def __create_annotations_table():
+    """
+    Create a table of annotations for use in app queries
+    """
+    logging.info("Create a table of annotations for use in app queries")
+
     entity_query = (
         "WITH ranked_terms AS ( "
         "SELECT "
@@ -178,25 +272,33 @@ def __create_query_tables():
         "WHERE rank = 1 "
         "GROUP BY publication_number "
     )
-    query_to_bg_table(applications, "applications")
-    query_to_bg_table(entity_query, "entities")
+    query_to_bg_table(entity_query, "annotations")
 
 
 def main():
+    """
+    Copy tables from patents-public-data to a local dataset
+
+    Order matters. Non-idempotent.
+    """
     # copy gpr_publications table
-    __copy_gpr_publications()
+    # __copy_gpr_publications()
 
     # copy publications table
-    __copy_publications()
+    # __copy_publications()
 
     # copy gpr_annotations table
-    __copy_gpr_annotations()  # depends on publications
+    # __copy_gpr_annotations()
 
     # create synonym_map table (for final entity names)
-    __create_synonym_map()
+    # __create_synonym_map(SYNONYM_MAP)
+
+    # create entity_list table and update synonym map
+    __create_entity_list()
 
     # create the (small) tables against which the app will query
-    __create_query_tables()
+    # __create_applications_table
+    # __create_annotations_table
 
 
 if __name__ == "__main__":

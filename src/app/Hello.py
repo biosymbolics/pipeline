@@ -1,8 +1,8 @@
 import streamlit as st
 
-from system import init
+from system import initialize
 
-init()
+initialize()
 
 st.set_page_config(
     page_title="Hello",
