@@ -10,7 +10,7 @@ from .utils import (
     get_patent_years,
     get_patent_attributes,
 )
-from .types import PatentBasicInfo
+from typings import PatentBasicInfo
 
 
 def format_search_result(

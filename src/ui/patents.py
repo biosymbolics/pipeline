@@ -4,9 +4,10 @@ UI components for patents
 import streamlit as st
 from streamlit_timeline import timeline
 import polars as pl
-from annotated_text import annotated_text, annotation, parameters
 
 from common.utils.date import format_date
+from typings import PatentApplication
+
 from .common import get_markdown_link
 
 
@@ -45,12 +46,12 @@ def render_timeline(patents: pl.DataFrame):
     timeline({"events": timeline_patents}, height=600)
 
 
-def render_detail(patent: dict):
+def render_detail(patent: PatentApplication):
     """
     Render a patent detail in streamlit app
 
     Args:
-        patent (dict): patent to render
+        patent (PatentApplication): patent to render
     """
     st.header(patent["title"])
     st.markdown(get_markdown_link(patent["url"], patent["publication_number"]))
