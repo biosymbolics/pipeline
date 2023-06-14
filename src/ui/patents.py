@@ -8,7 +8,7 @@ import polars as pl
 from common.utils.date import format_date
 from typings import PatentApplication
 
-from .common import get_markdown_link
+from .common import get_horizontal_list, get_markdown_link
 
 
 def render_timeline(patents: pl.DataFrame):
@@ -65,12 +65,9 @@ def render_detail(patent: PatentApplication):
     """
     st.header(patent["title"])
     st.markdown(get_markdown_link(patent["url"], patent["publication_number"]))
-    st.markdown(
-        "**Attributes**: " + " ".join([f"`{attr}`" for attr in patent["attributes"]])
-    )
-    st.markdown(
-        "**Assignees**: " + " ".join([f"`{attr}`" for attr in patent["assignees"]])
-    )
+    st.markdown(get_horizontal_list(patent["attributes"], "Attributes"))
+    st.markdown(get_horizontal_list(patent["assignees"], "Assignees"))
+    st.markdown(get_horizontal_list(patent["ipc_codes"], "IPC Codes"))
     st.write(patent["abstract"])
     st.divider()
 
