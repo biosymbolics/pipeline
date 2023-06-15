@@ -74,4 +74,14 @@ class GptApiClient:
             openai_api_key=OPENAI_API_KEY,
         )
         output = chat_model(input.to_messages())
-        return self.__format_answer(output.content, is_array=is_array)
+        try:
+            self.__format_answer(output.content, is_array=is_array)
+        except Exception as e:
+            return output.content
+
+    def describe_terms(self, terms: list[str]) -> str:
+        """
+        Simple query to describe terms
+        """
+        query = "Describe the following terms and how they relate:\n" + "\n".join(terms)
+        return self.query(query)

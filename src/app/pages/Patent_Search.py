@@ -8,6 +8,7 @@ import logging
 import re
 
 from clients import patent_client
+from clients import GptApiClient
 from ui.patents import render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
@@ -88,26 +89,27 @@ def get_data(options):
     if not terms:
         st.error(f"Please enter patent terms.")
         return
-    df = patent_client.search(__format_terms(terms))
-    return pl.from_dicts(cast(list[dict], df))
+    terms = __format_terms(terms)
+    df = patent_client.search(terms)
+    return pl.from_dicts(cast(list[dict], df)), terms
 
 
 def render_selector():
     col1, col2 = st.columns([10, 1])
     with col1:
         options = get_options()
-        patents = get_data(options)
+        patents, terms = get_data(options)
     with col2:
         st.metric(label="Results", value=len(patents) if patents is not None else 0)
 
-    return patents
+    return patents, terms
 
 
 st.title("Search for patents")
 
 try:
-    patents = render_selector()
-    main_tab, timeline_tab = st.tabs(["Main", "Timeline"])
+    patents, terms = render_selector()
+    main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
 
     with main_tab:
         selection = dataframe_with_selections(patents)
@@ -120,5 +122,20 @@ try:
 
     with timeline_tab:
         render_timeline(patents)
+
+    with overview_tab:
+        gpt_client = GptApiClient()
+        st.write(
+            """
+            Ideas:
+            - What are the commonalities in these patents? (e.g. commonly co-occurring terms)
+            - What are the changing themes over time?
+            - What are the most common assignees, inventors, diseases, compounds, etc?
+            - Summarize the search term(s) with GPT
+            """
+        )
+        if terms is not None:
+            st.subheader(f"About these terms ({str(len(terms))})")
+            st.write(gpt_client.describe_terms(terms))
 except Exception as e:
     st.error(f"An error occurred: {e}")

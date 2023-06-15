@@ -105,13 +105,16 @@ PATENT_ATTRIBUTE_MAP = {
         "analysis",
         "diagnosis",
         "diagnostic",
+        "diagnose",
         "biomarker",
         "detection",
         "imaging",
         "marker",
         "monitoring",
         "mouse",  # in vivo models
+        "predict",
         "prognosis",
+        "prognostic",  # needed?
         # "risk score",
         "scan",
         "sensor",
@@ -124,8 +127,14 @@ PATENT_ATTRIBUTE_MAP = {
     "FORMULATION": ["formulation", "form", "salt"],
     "METHOD": ["method", "procedure"],  # preparation method, method of use
     "NOVEL": ["novel"],
-    "PREVENTATIVE": ["prevention"],
-    "PROCESS": ["preparation", "process", "synthesis", "system"],
+    "PREVENTATIVE": ["prevention", "prophylaxis"],
+    "PROCESS": [
+        "preparation",
+        "process",
+        "synthesis",
+        "system",
+        "produce",
+    ],  # method of making, method for producing
     "PALLIATIVE": [
         "palliative",
         # "reduction in symptoms",

@@ -74,7 +74,7 @@ def score_patents(
 SUITABILITY_SCORE_MAP: ScoreMap = {
     "COMBINATION": 0,
     "COMPOUND_OR_MECHANISM": 2,
-    "DIAGNOSTIC": -1,
+    "DIAGNOSTIC": -1.5,
     "FORMULATION": -0.5,
     "NOVEL": 1.5,
     "PREPARATION": -1,
