@@ -14,13 +14,14 @@ BPD = "Borderline Personality Disorder"
 BRIEF_PSYCHOTIC_DISORDER = "Brief Psychotic Disorder"
 CELIAC = "Celiac Disease"
 CYCLOTHYMIA = "Cyclothymia"
-DEPRESSION = "Depression"
+DEPRESSION = "Mental Depression"  # mental depression due to UMLS
 DEVELOPMENTAL_DISORDER = "Developmental Disorder"
 DELUSION = "Delusion"
 DIARRHEA = "Diarrhea"
 DYSTHYMIA = "Dysthymia"
 EATING_DISORDER = "Eating Disorder"
 GERD = "Gastroesophageal Reflux Disease"
+GENERALIZED_ANXIETY_DISORDER = "Generalized Anxiety Disorder"
 HEMATOLOGICAL_DISORDER = "Hematological Disorder"
 HYPERSENSITIVITY = "Hypersensitivity"
 INTERMITTENT_EXPLOSIVE_DISORDER = "Intermittent Explosive Disorder"
@@ -79,7 +80,7 @@ SYNONYM_MAP = {
     "attention deficit/hyperactivity disease": ADHD,
     "attention deficit disorder with hyperactivity": ADHD,
     "anxiety": ANXIETY,
-    "anxiety disease": ANXIETY,
+    "anxiety disease": GENERALIZED_ANXIETY_DISORDER,
     "bipolar disease": BIPOLAR,
     "bipolar i disease": BDI,
     "bipolar ii disease": BDII,
@@ -90,12 +91,13 @@ SYNONYM_MAP = {
     "combat disease": PTSD,  # ??
     "communication disease": "communication disorder",
     "cyclothymic disease": CYCLOTHYMIA,
-    "generalised anxiety disease": ANXIETY,
-    "generalized anxiety disease": ANXIETY,
+    "generalised anxiety disease": GENERALIZED_ANXIETY_DISORDER,
+    "generalized anxiety disease": GENERALIZED_ANXIETY_DISORDER,
     "delusional disease": DELUSION,
     "depressive disease": DEPRESSION,
     "depressed mood": DEPRESSION,
     "depressive symptom": DEPRESSION,
+    "depressive": DEPRESSION,
     "dependence": SUBSTANCE_ABUSE,
     "diarrhoea": DIARRHEA,
     "dysthymic disease": DYSTHYMIA,
@@ -114,6 +116,7 @@ SYNONYM_MAP = {
     "intermittent explosive disease": INTERMITTENT_EXPLOSIVE_DISORDER,
     "ischaemic disease": ISCHEMIA,
     "ischaemia": ISCHEMIA,
+    "manic and bipolar mood disorders and disturbance": BIPOLAR,
     "major depression": DEPRESSION,
     "major depressive disease": DEPRESSION,
     "mental disease": MENTAL_DISORDER,

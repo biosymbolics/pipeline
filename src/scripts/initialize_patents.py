@@ -56,20 +56,20 @@ def __get_normalized_terms(rows, normalization_map: NormalizationMap):
         for row in rows
     ]
     # sort required for groupby
-    sorted_terms = sorted(normalized_terms, key=lambda row: row["term"])
-    grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
+    sorted_terms = sorted(normalized_terms, key=lambda row: row["term"].lower())
+    grouped_terms = groupby(sorted_terms, key=lambda row: row["term"].lower())
 
-    def __get_term_obj(key, _group):
+    def __get_term_obj(_group):
         group = list(_group)
         return {
-            "term": key,
+            "term": [row["term"] for row in group][0],  # non-lowered-term
             "count": sum(row["count"] for row in group),
             "canonical_id": dedup([row["canonical_id"] for row in group]),
             "original_terms": dedup([row["original_term"] for row in group]),
             "original_ids": dedup([row["original_id"] for row in group]),
         }
 
-    terms = [__get_term_obj(key, group) for key, group in grouped_terms]
+    terms = [__get_term_obj(group) for _, group in grouped_terms]
     return terms
 
 
@@ -98,21 +98,21 @@ def __create_terms():
 
     # Create a new table to hold the modified records
     # TODO: wait after create??
-    # new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
-    # new_table.schema = [
-    #     bigquery.SchemaField("term", "STRING"),
-    #     bigquery.SchemaField("count", "INTEGER"),
-    #     bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
-    #     bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
-    #     bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
-    # ]
-    # new_table = client.create_table(new_table, exists_ok=True)
+    new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
+    new_table.schema = [
+        bigquery.SchemaField("term", "STRING"),
+        bigquery.SchemaField("count", "INTEGER"),
+        bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
+    ]
+    new_table = client.create_table(new_table, exists_ok=True)
 
-    # batched = __batch(normalized_terms)
-    # for batch in batched:
-    #     logging.info(batch)
-    #     client.insert_rows(new_table, batch)
-    #     logging.info(f"Inserted {len(batch)} rows")
+    batched = __batch(normalized_terms)
+    for batch in batched:
+        logging.info(batch)
+        client.insert_rows(new_table, batch)
+        logging.info(f"Inserted {len(batch)} rows")
 
     syn_map = {row["term"]: row.get("canonical_name") for row in normalized_terms}
     __add_to_synonym_map(syn_map)
