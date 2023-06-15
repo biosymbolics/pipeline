@@ -37,19 +37,26 @@ def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
 def __get_normalized_terms(rows, normalization_map):
     normalized_terms = [
         {
-            "term": normalization_map.get(row["term"]) or row["term"],
+            "term": normalization_map.get(row["term"], {}).get("canonical_name")
+            or SYNONYM_MAP[row["term"].lower()]
+            or row["term"],
             "count": row["count"] or 0,
+            "canonical_id": normalization_map.get(row["term"], {}).get("canonical_id"),
+            "original_term": row["term"],
+            "original_id": row["ocid"],
         }
         for row in rows
     ]
-    sorted_terms = sorted(
-        normalized_terms, key=lambda row: row["term"]
-    )  # required for groupby
+    # sort required for groupby
+    sorted_terms = sorted(normalized_terms, key=lambda row: row["term"])
     grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
     deduped_terms = [
         {
             "term": key,
             "count": sum(row["count"] for row in group),
+            "canonical_id": group[0]["canonical_id"],
+            "original_terms": [row["original_term"] for row in group],
+            "original_ids": [row["original_id"] for row in group],
         }
         for key, group in grouped_terms
     ]
@@ -66,7 +73,11 @@ def __create_entity_list():
     """
     client = bigquery.Client()
 
-    entity_list_query = f"SELECT preferred_name as term, count(*) as count FROM `{BQ_DATASET_ID}.gpr_annotations` group by preferred_name"
+    entity_list_query = f"""
+        SELECT preferred_name as term, count(*) as count
+        FROM `{BQ_DATASET_ID}.gpr_annotations`
+        group by preferred_name
+    """
     rows = select_from_bg(entity_list_query)
 
     normalizer = TermNormalizer()
@@ -76,10 +87,13 @@ def __create_entity_list():
     normalized_terms = __get_normalized_terms(rows, normalization_map)
 
     # Create a new table to hold the modified records
-    new_table = bigquery.Table(f"{BQ_DATASET_ID}.entity_list")
+    new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
     new_table.schema = [
         bigquery.SchemaField("term", "STRING"),
         bigquery.SchemaField("count", "INTEGER"),
+        bigquery.SchemaField("canonical_id", "INTEGER"),
+        bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("original_ids", "INTEGER", mode="REPEATED"),
     ]
     new_table = client.create_table(new_table)
 
@@ -123,11 +137,11 @@ def __copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
-    query = (
-        "SELECT * FROM `patents-public-data.google_patents_research.publications` "
-        "WHERE EXISTS "
-        f'(SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))'
-    )
+    query = f"""
+        SELECT * FROM `patents-public-data.google_patents_research.publications`
+        WHERE EXISTS
+        (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
+    """
     query_to_bg_table(query, "gpr_publications")
 
 
@@ -153,7 +167,7 @@ def __copy_gpr_annotations():
     or from gpr_annotations:
     ``` sql
     DELETE FROM `fair-abbey-386416.patents.gpr_annotations` where domain in
-    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health", "biological processes and functions")
+    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
     ```
     """
     SUPPRESSED_DOMAINS = (
@@ -171,14 +185,14 @@ def __copy_gpr_annotations():
         "species",  # 179,305,306
         "substances",  # 1,712,732,614
     )
-    query = (
-        "SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations "
-        f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications "
-        "ON local_publications.publication_number = annotations.publication_number "
-        "WHERE annotations.confidence > 0.69 "
-        f"AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES} "
-        f"AND domain not in {SUPPRESSED_DOMAINS} "
-    )
+    query = f"""
+        SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
+        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications
+        ON local_publications.publication_number = annotations.publication_number
+        WHERE annotations.confidence > 0.69
+        AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
+        AND domain not in {SUPPRESSED_DOMAINS}
+    """
     query_to_bg_table(query, "gpr_annotations")
 
 
@@ -186,12 +200,12 @@ def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
     """
-    query = (
-        "SELECT publications.* FROM `patents-public-data.patents.publications` as publications "
-        f"JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr "
-        "ON local_gpr.publication_number = publications.publication_number "
-        "WHERE application_kind = 'W' "
-    )
+    query = f"""
+        SELECT publications.* FROM `patents-public-data.patents.publications` as publications
+        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
+        ON local_gpr.publication_number = publications.publication_number
+        WHERE application_kind = 'W'
+    """
     query_to_bg_table(query, "publications")
 
 
@@ -236,13 +250,13 @@ def __create_applications_table():
     Create a table of patent applications for use in app queries
     """
     logging.info("Create a table of patent applications for use in app queries")
-    applications = (
-        "SELECT "
-        f"{','.join(FIELDS)} "
-        f"FROM `{BQ_DATASET_ID}.publications` as pubs, "
-        f"`{BQ_DATASET_ID}.gpr_publications` as gpr_pubs "
-        "WHERE pubs.publication_number = gpr_pubs.publication_number "
-    )
+    applications = f"""
+        SELECT "
+        {','.join(FIELDS)}
+        FROM `{BQ_DATASET_ID}.publications` as pubs,
+        `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
+        WHERE pubs.publication_number = gpr_pubs.publication_number
+    """
     query_to_bg_table(applications, "applications")
 
 
@@ -252,26 +266,30 @@ def __create_annotations_table():
     """
     logging.info("Create a table of annotations for use in app queries")
 
-    entity_query = (
-        "WITH ranked_terms AS ( "
-        "SELECT "
-        "publication_number,  ocid, "
-        "LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term, "
-        "domain, confidence, source, character_offset_start, "
-        "ROW_NUMBER() OVER(PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) ORDER BY character_offset_start) as rank "
-        f"FROM `{BQ_DATASET_ID}.gpr_annotations` a "
-        f"LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym "
-        ") "
-        "SELECT "
-        "publication_number, "
-        "ARRAY_AGG( "
-        "struct(ocid, term, domain, confidence, source, character_offset_start) "
-        "ORDER BY character_offset_start "
-        ") as annotations "
-        "FROM ranked_terms "
-        "WHERE rank = 1 "
-        "GROUP BY publication_number "
-    )
+    entity_query = f"""
+        WITH ranked_terms AS (
+            SELECT
+                publication_number,
+                ocid,
+                LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term,
+                domain,
+                confidence,
+                source,
+                character_offset_start,
+                ROW_NUMBER() OVER(PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) ORDER BY character_offset_start) as rank
+            FROM `{BQ_DATASET_ID}.gpr_annotations` a
+            LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym
+        )
+        SELECT
+            publication_number,
+            ARRAY_AGG(
+                struct(ocid, term, domain, confidence, source, character_offset_start)
+                ORDER BY character_offset_start
+            ) as annotations
+        FROM ranked_terms
+        WHERE rank = 1
+        GROUP BY publication_number
+    """
     query_to_bg_table(entity_query, "annotations")
 
 

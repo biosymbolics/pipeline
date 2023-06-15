@@ -1,5 +1,6 @@
 ADHD = "Attention Deficit Hyperactivity Disorder"
 ARTICULATION_DISORDER = "Articulation Disorder"
+AMNESTIC_DISORDER = "Amnestic Disorder"
 ANAESTHESIA = "Anaesthesia"
 ANEMIA = "Anemia"
 ANXIETY = "Anxiety"
@@ -10,11 +11,15 @@ BDII = "Bipolar II Disorder"
 BIPOLAR = "Bipolar Disorder"
 BODY_DYSMORPHIA = "Body Dysmorphic Disorder"
 BPD = "Borderline Personality Disorder"
+BRIEF_PSYCHOTIC_DISORDER = "Brief Psychotic Disorder"
 CELIAC = "Celiac Disease"
+CYCLOTHYMIA = "Cyclothymia"
 DEPRESSION = "Depression"
 DEVELOPMENTAL_DISORDER = "Developmental Disorder"
 DELUSION = "Delusion"
 DIARRHEA = "Diarrhea"
+DYSTHYMIA = "Dysthymia"
+EATING_DISORDER = "Eating Disorder"
 GERD = "Gastroesophageal Reflux Disease"
 HEMATOLOGICAL_DISORDER = "Hematological Disorder"
 HYPERSENSITIVITY = "Hypersensitivity"
@@ -31,6 +36,7 @@ NEUROSIS = "Neurosis"
 OCD = "Obsessive-Compulsive Disorder"
 OPPOSITIONAL_DEFIANT_DISORDER = "Oppositional Defiant Disorder"
 PAIN_DISORDER = "Pain Disorder"
+PANIC = "Panic Disorder"
 PATHOGENIC_PAIN = "Pathogenic Pain"
 PDD = "Premenstrual Dysphoric Disorder"
 PERSONALITY_DISORDER = "Personality Disorder"
@@ -42,6 +48,7 @@ PTSD = "Post-Traumatic Stress Disorder"
 REPRODUCTIVE_DISORDER = "Reproductive Disorder"
 SAD = "Seasonal Affective Disorder"
 SCHIZOPHRENIA = "Schizophrenia"
+SCHIZOPHRENIFORM_DISORDER = "Schizophreniform Disorder"
 SCHIZOAFFECTIVE_DISORDER = "Schizoaffective Disorder"
 SEXUAL_DISORDER = "Sexual Disorder"
 SLEEP_APNEA = "Sleep Apnea"
@@ -52,25 +59,10 @@ SUBSTANCE_ABUSE = "Substance Abuse"
 SUBSTANCE_PSYCHOSIS = "Substance-Induced Psychotic Disorder"
 TIC_DISORDER = "Tic Disorder"
 
-# graft versus host disease vs graft-versus-host disease vs vs
-# dysthymic disease
-# panic disease
-# paranoid personality disease
-# schizoid personality disease
-# schizotypal personality disease
-# brief psychotic disease
-# amnestic disease
-# dissociative disease
-# eating disease
-# adjustment disease
-# mania
-# avoidant personality disease
-# cyclothymic disease
-# leukaemia
-# leukemia, myeloid, acute vs acute myeloid leukaemia
 SYNONYM_MAP = {
     "acute stress disease": STRESS_DISORDER,
     "alcohol use disease": SUBSTANCE_ABUSE,
+    "amnestic disease": AMNESTIC_DISORDER,
     "anaemia of chronic disease": ANEMIA,
     "anaesthetic": ANAESTHESIA,
     "anaesthesia": ANAESTHESIA,
@@ -97,6 +89,7 @@ SYNONYM_MAP = {
     "coeliac disease": CELIAC,
     "combat disease": PTSD,  # ??
     "communication disease": "communication disorder",
+    "cyclothymic disease": CYCLOTHYMIA,
     "generalised anxiety disease": ANXIETY,
     "generalized anxiety disease": ANXIETY,
     "delusional disease": DELUSION,
@@ -105,8 +98,11 @@ SYNONYM_MAP = {
     "depressive symptom": DEPRESSION,
     "dependence": SUBSTANCE_ABUSE,
     "diarrhoea": DIARRHEA,
+    "dysthymic disease": DYSTHYMIA,
     "dissociative identity disease": DISSASOCIATIVE_IDENTITY_DISORDER,
+    "dissociative disease": DISSASOCIATIVE_IDENTITY_DISORDER,
     "drug dependence": SUBSTANCE_ABUSE,
+    "eating disease": EATING_DISORDER,
     "effect on cardiovascular disease": "Cardiovascular disease",
     "female reproductive system disease": REPRODUCTIVE_DISORDER,
     "gastrooesophageal reflux disease": GERD,
@@ -133,6 +129,8 @@ SYNONYM_MAP = {
     "neurodevelopmental disease": NEURODEVELOPMENTAL_DISORDER,
     "obsessive-compulsive disease": OCD,
     "pain disease": PAIN_DISORDER,
+    "panic disease": PANIC,
+    "panic attacks and disease": PANIC,
     "pathogenic pain disease": PATHOGENIC_PAIN,
     "penicillins": "penicillin",
     "pervasive developmental disease": DEVELOPMENTAL_DISORDER,
@@ -147,6 +145,8 @@ SYNONYM_MAP = {
     "oppositional defiant disease": OPPOSITIONAL_DEFIANT_DISORDER,
     "reading disease": "Reading disorder",
     "schizoaffective disease": SCHIZOAFFECTIVE_DISORDER,
+    "schizophreniform disease": SCHIZOPHRENIFORM_DISORDER,
+    "brief psychotic disease": BRIEF_PSYCHOTIC_DISORDER,
     "schizophrenia and other psychotic disease": PSYCHOTIC_DISORDER,
     "seasonal affective disease": SAD,
     "sexual arousal disease": SEXUAL_DISORDER,
