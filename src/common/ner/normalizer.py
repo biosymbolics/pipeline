@@ -11,10 +11,14 @@ from scispacy.linking_utils import Entity as SpacyEntity
 
 MIN_SIMILARITY = 0.85
 
+NormalizationMap = dict[str, SpacyEntity]
+
+ONTOLOGY = "umls"
+
 
 class TermNormalizer:
     """
-    TermNormalizer
+    TermNormalizer - normalizes terms using scispacy's UMLS candidate generator
 
     Example:
         >>> normalizer = TermNormalizer()
@@ -26,22 +30,25 @@ class TermNormalizer:
         """
         Initialize term normalizer using existing model
         """
-        self.candidate_generator = CandidateGenerator(name="umls")
+        self.candidate_generator = CandidateGenerator(name=ONTOLOGY)
         self.kb = UmlsKnowledgeBase()
 
     def __get_normalized_entity(
         self, candidate: MentionCandidate
-    ) -> Union[dict[str, SpacyEntity], None]:
+    ) -> Union[SpacyEntity, None]:
         """
         Get normalized name from candidate if suggestions exceed min similarity
+
+        Args:
+            candidate (MentionCandidate): candidate
         """
         if len(candidate) > 0 and candidate[0].similarities[0] > MIN_SIMILARITY:
-            canonical_name = self.kb.cui_to_entity[candidate[0].concept_id]
-            return canonical_name
+            entity = self.kb.cui_to_entity[candidate[0].concept_id]
+            return entity
 
         return None
 
-    def generate_map(self, terms: list[str]) -> dict[str, SpacyEntity]:
+    def generate_map(self, terms: list[str]) -> NormalizationMap:
         """
         Generate a map of terms to normalized/canonical entities (containing name and id)
 
@@ -49,7 +56,7 @@ class TermNormalizer:
             terms (list[str]): list of terms to normalize
 
         Returns:
-            dict[str, SpacyEntity]: mapping of terms to canonical entities
+            NormalizationMap: mapping of terms to canonical entities
         """
         candidates = self.candidate_generator(terms, 1)
         canonical_entities = [self.__get_normalized_entity(c) for c in candidates]

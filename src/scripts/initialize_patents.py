@@ -16,7 +16,7 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
 )
-from common.ner import TermNormalizer
+from common.ner import TermNormalizer, NormalizationMap
 from scripts.local_constants import (
     COMMON_ENTITY_NAMES,
     SYNONYM_MAP,
@@ -34,19 +34,24 @@ def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
     return [a_list[i : i + batch_size] for i in range(0, len(a_list), batch_size)]
 
 
-def __get_normalized_terms(rows, normalization_map):
+# {'term': 'drug candidates', 'count': 28493, 'ocid': 229940000406}
+def __get_normalized_terms(rows, normalization_map: NormalizationMap):
     def __get_term(row):
-        entry = normalization_map.get(row["term"])
-        if not entry:
-            SYNONYM_MAP.get(row["term"].lower()) or row["term"]
-        return entry.canonical_name
+        try:
+            entry = normalization_map.get(row["term"])
+            if not entry:
+                return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
+            return entry.canonical_name
+        except Exception as e:
+            logging.error(f"Error getting term for {row}, {entry}")
+            raise e
 
     normalized_terms = [
         {
             "term": __get_term(row),
             "count": row["count"] or 0,
             "canonical_id": getattr(
-                normalization_map.get(row["term"]) or (), "canonical_id", None
+                normalization_map.get(row["term"]) or (), "concept_id", None
             ),
             "original_term": row["term"],
             "original_id": row["ocid"],
@@ -60,7 +65,7 @@ def __get_normalized_terms(rows, normalization_map):
         {
             "term": key,
             "count": sum(row["count"] for row in group),
-            "canonical_id": group[0]["canonical_id"],
+            "canonical_id": list(group)[0]["canonical_id"],
             "original_terms": [row["original_term"] for row in group],
             "original_ids": [row["original_id"] for row in group],
         }
