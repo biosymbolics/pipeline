@@ -8,6 +8,7 @@ import logging
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
 
+from .labeling import get_labels
 from .utils import prep_data_for_umap
 
 
@@ -67,5 +68,7 @@ def render_umap(df: pl.DataFrame):
         name="df",
     )
     p.add_tools(hover)
+
+    labels = get_labels(df)
 
     st.bokeh_chart(p, use_container_width=True)
