@@ -1,6 +1,7 @@
 """
 Term Normalizer
 """
+import logging
 from typing import Union
 from scispacy.candidate_generation import (
     CandidateGenerator,
@@ -61,6 +62,7 @@ class TermNormalizer:
         candidates = self.candidate_generator(terms, 1)
         canonical_entities = [self.__get_normalized_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
+        logging.info(entity_map)
         return {key: value for key, value in entity_map.items() if value is not None}
 
     def __call__(self, terms: list[str]) -> list[str]:
@@ -68,4 +70,6 @@ class TermNormalizer:
         Normalize a list of terms
         """
         term_map = self.generate_map(terms)
-        return [term_map["term"]["canonical_name"] or term for term in terms]
+        return [
+            getattr(term_map.get(term, ()), "canonical_name", term) for term in terms
+        ]

@@ -17,6 +17,7 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermNormalizer, NormalizationMap
+from common.utils.list import dedup
 from scripts.local_constants import (
     COMMON_ENTITY_NAMES,
     SYNONYM_MAP,
@@ -37,14 +38,10 @@ def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
 # {'term': 'drug candidates', 'count': 28493, 'ocid': 229940000406}
 def __get_normalized_terms(rows, normalization_map: NormalizationMap):
     def __get_term(row):
-        try:
-            entry = normalization_map.get(row["term"])
-            if not entry:
-                return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
-            return entry.canonical_name
-        except Exception as e:
-            logging.error(f"Error getting term for {row}, {entry}")
-            raise e
+        entry = normalization_map.get(row["term"])
+        if not entry:
+            return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
+        return entry.canonical_name
 
     normalized_terms = [
         {
@@ -61,16 +58,18 @@ def __get_normalized_terms(rows, normalization_map: NormalizationMap):
     # sort required for groupby
     sorted_terms = sorted(normalized_terms, key=lambda row: row["term"])
     grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
-    deduped_terms = [
-        {
+
+    def __get_deduped_terms(key, _group):
+        group = list(_group)
+        return {
             "term": key,
             "count": sum(row["count"] for row in group),
-            "canonical_id": list(group)[0]["canonical_id"],
-            "original_terms": [row["original_term"] for row in group],
-            "original_ids": [row["original_id"] for row in group],
+            "canonical_id": dedup([row["canonical_id"] for row in group]),
+            "original_terms": dedup([row["original_term"] for row in group]),
+            "original_ids": dedup([row["original_id"] for row in group]),
         }
-        for key, group in grouped_terms
-    ]
+
+    deduped_terms = [__get_deduped_terms(key, group) for key, group in grouped_terms]
     return deduped_terms
 
 
@@ -85,7 +84,7 @@ def __create_terms():
     client = bigquery.Client()
 
     terms_query = f"""
-        SELECT preferred_name as term, count(*) as count, ocid
+        SELECT preferred_name as term, ocid, count(*) as count
         FROM `{BQ_DATASET_ID}.gpr_annotations`
         group by preferred_name, ocid
     """
@@ -102,18 +101,20 @@ def __create_terms():
     new_table.schema = [
         bigquery.SchemaField("term", "STRING"),
         bigquery.SchemaField("count", "INTEGER"),
-        bigquery.SchemaField("canonical_id", "INTEGER"),
+        bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
         bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_ids", "INTEGER", mode="REPEATED"),
+        bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
     ]
     new_table = client.create_table(new_table)
 
     batched = __batch(normalized_terms)
     for batch in batched:
+        logging.info(batch)
         client.insert_rows(new_table, batch)
         logging.info(f"Inserted {len(batch)} rows")
 
-    __add_to_synonym_map(normalization_map)
+    syn_map = {row["term"]: row["canonical_name"] for row in normalized_terms}
+    __add_to_synonym_map(syn_map)
 
 
 def __create_synonym_map(synonym_map: dict[str, str]):
@@ -132,7 +133,10 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
     client = bigquery.Client()
 
     data = [
-        {"synonym": entry[0].lower(), "term": entry[1].lower()}
+        {
+            "synonym": entry[0].lower() if entry[0] is not None else None,
+            "term": entry[1].lower(),
+        }
         for entry in synonym_map.items()
         if entry[1] is not None and entry[0] != entry[1]
     ]
