@@ -119,7 +119,7 @@ def __format_term(entity: TermResult) -> str:
 
 def autocomplete_terms(string: str) -> list[str]:
     """
-    Fetch all terms from patents.entity_list
+    Fetch all terms from patents.terms
     Sort by term, then by count. Terms must have a count > MIN_TERM_FREQUENCY
 
     Args:
@@ -129,7 +129,7 @@ def autocomplete_terms(string: str) -> list[str]:
     """
     query = f"""
         SELECT *
-        FROM patents.entity_list
+        FROM patents.terms
         WHERE term LIKE '%{string}%'
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC

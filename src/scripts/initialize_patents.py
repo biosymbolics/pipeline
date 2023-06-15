@@ -35,13 +35,19 @@ def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
 
 
 def __get_normalized_terms(rows, normalization_map):
+    def __get_term(row):
+        entry = normalization_map.get(row["term"])
+        if not entry:
+            SYNONYM_MAP[row["term"].lower()] or row["term"]
+        return entry.canonical_name
+
     normalized_terms = [
         {
-            "term": normalization_map.get(row["term"], {}).get("canonical_name")
-            or SYNONYM_MAP[row["term"].lower()]
-            or row["term"],
+            "term": __get_term(row),
             "count": row["count"] or 0,
-            "canonical_id": normalization_map.get(row["term"], {}).get("canonical_id"),
+            "canonical_id": getattr(
+                normalization_map.get(row["term"]) or (), "canonical_id", None
+            ),
             "original_term": row["term"],
             "original_id": row["ocid"],
         }
@@ -63,7 +69,7 @@ def __get_normalized_terms(rows, normalization_map):
     return deduped_terms
 
 
-def __create_entity_list():
+def __create_terms():
     """
     Create a table of entities
 
@@ -73,12 +79,12 @@ def __create_entity_list():
     """
     client = bigquery.Client()
 
-    entity_list_query = f"""
-        SELECT preferred_name as term, count(*) as count
+    terms_query = f"""
+        SELECT preferred_name as term, count(*) as count, ocid
         FROM `{BQ_DATASET_ID}.gpr_annotations`
-        group by preferred_name
+        group by preferred_name, ocid
     """
-    rows = select_from_bg(entity_list_query)
+    rows = select_from_bg(terms_query)
 
     normalizer = TermNormalizer()
     normalization_map = normalizer.generate_map([row["term"] for row in rows])
@@ -311,12 +317,12 @@ def main():
     # create synonym_map table (for final entity names)
     # __create_synonym_map(SYNONYM_MAP)
 
-    # create entity_list table and update synonym map
-    __create_entity_list()
+    # create terms table and update synonym map
+    __create_terms()
 
     # create the (small) tables against which the app will query
-    # __create_applications_table
-    # __create_annotations_table
+    # __create_applications_table()
+    __create_annotations_table()
 
 
 if __name__ == "__main__":
