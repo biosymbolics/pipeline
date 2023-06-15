@@ -1,16 +1,25 @@
 """
 Term Normalizer
 """
+import logging
+from typing import Union
 from scispacy.candidate_generation import (
     CandidateGenerator,
     UmlsKnowledgeBase,
     MentionCandidate,
 )
+from scispacy.linking_utils import Entity as SpacyEntity
+
+MIN_SIMILARITY = 0.85
+
+NormalizationMap = dict[str, SpacyEntity]
+
+ONTOLOGY = "umls"
 
 
 class TermNormalizer:
     """
-    TermNormalizer
+    TermNormalizer - normalizes terms using scispacy's UMLS candidate generator
 
     Example:
         >>> normalizer = TermNormalizer()
@@ -22,39 +31,44 @@ class TermNormalizer:
         """
         Initialize term normalizer using existing model
         """
-        self.candidate_generator = CandidateGenerator(name="umls")
+        self.candidate_generator = CandidateGenerator(name=ONTOLOGY)
         self.kb = UmlsKnowledgeBase()
 
-    def __get_normalized_name(self, candidate: MentionCandidate):
+    def __get_normalized_entity(
+        self, candidate: MentionCandidate
+    ) -> Union[SpacyEntity, None]:
         """
-        Get normalized name from candidate
+        Get normalized name from candidate if suggestions exceed min similarity
+
+        Args:
+            candidate (MentionCandidate): candidate
         """
-        if len(candidate) > 0 and candidate[0].similarities[0] > 0.85:
-            canonical_name = self.kb.cui_to_entity[
-                candidate[0].concept_id
-            ].canonical_name
-            return canonical_name
+        if len(candidate) > 0 and candidate[0].similarities[0] > MIN_SIMILARITY:
+            entity = self.kb.cui_to_entity[candidate[0].concept_id]
+            return entity
 
         return None
 
-    def generate_map(self, terms: list[str]) -> dict[str, str]:
+    def generate_map(self, terms: list[str]) -> NormalizationMap:
         """
-        Normalize a list of terms
+        Generate a map of terms to normalized/canonical entities (containing name and id)
 
         Args:
             terms (list[str]): list of terms to normalize
 
         Returns:
-            dict[str, str]: mapping of terms to normalized names
+            NormalizationMap: mapping of terms to canonical entities
         """
         candidates = self.candidate_generator(terms, 1)
-        canonical_names = [self.__get_normalized_name(c) for c in candidates]
-        result_map = dict(zip(terms, canonical_names))
-        return result_map
+        canonical_entities = [self.__get_normalized_entity(c) for c in candidates]
+        entity_map = dict(zip(terms, canonical_entities))
+        return {key: value for key, value in entity_map.items() if value is not None}
 
     def __call__(self, terms: list[str]) -> list[str]:
         """
         Normalize a list of terms
         """
         term_map = self.generate_map(terms)
-        return [term_map[term] or term for term in terms]
+        return [
+            getattr(term_map.get(term, ()), "canonical_name", term) for term in terms
+        ]

@@ -23,18 +23,24 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     "assignees",
+    "compounds",
     # "cited_by",
     "country",
+    "diseases",
+    "effects",
     "family_id",
+    "genes",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
     # "filing_date",
     # "grant_date",
     "inventors",
     "ipc_codes",
+    "matched_term",
+    "matched_domain",
+    "proteins",
     "search_rank",  # search rank
     # "publication_date",
-    # "similar",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
     "url",
@@ -74,9 +80,15 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     query = f"""
         WITH matches AS (
             SELECT
-                *,
-                annotation.term as term,
-                EXP(-annotation.character_offset_start / 2000) as search_rank --- exp decay scaling; higher is better
+                a.publication_number as publication_number,
+                annotation.term as matched_term,
+                annotation.domain as matched_domain,
+                EXP(-annotation.character_offset_start / 2000) as search_rank, --- exp decay scaling; higher is better
+                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'drugs') as compounds,
+                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'diseases') as diseases,
+                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'effects') as effects,
+                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'humangenes') as genes,
+                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'proteins') as proteins,
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
@@ -107,7 +119,7 @@ def __format_term(entity: TermResult) -> str:
 
 def autocomplete_terms(string: str) -> list[str]:
     """
-    Fetch all terms from patents.entity_list
+    Fetch all terms from patents.terms
     Sort by term, then by count. Terms must have a count > MIN_TERM_FREQUENCY
 
     Args:
@@ -117,7 +129,7 @@ def autocomplete_terms(string: str) -> list[str]:
     """
     query = f"""
         SELECT *
-        FROM patents.entity_list
+        FROM patents.terms
         WHERE term LIKE '%{string}%'
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC

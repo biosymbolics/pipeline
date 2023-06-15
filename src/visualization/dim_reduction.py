@@ -1,23 +1,16 @@
 """
 Viz of dimensional reductions
 """
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
+import umap
 
 
-def render_tsne():
+def render_umap(df):
     """
-    Create tSNE projection; visualize it.
+    Render a UMAP plot of a dataframe
     """
-    # Load the embeddings
-    embeddings = np.load("embeddings.npy")
-
-    tsne = TSNE(n_components=2)
-
-    # Project the embeddings
-    tsne_embeddings = tsne.fit_transform(embeddings)
-
-    # Plot the embeddings
-    plt.scatter(tsne_embeddings[:, 0], tsne_embeddings[:, 1], c=embeddings, s=100)
+    embedding = umap.UMAP(
+        n_neighbors=5, min_dist=0.3, metric="correlation"
+    ).fit_transform(df)
+    plt.scatter(embedding[:, 0], embedding[:, 1], c=embedding, s=100)
     plt.show()

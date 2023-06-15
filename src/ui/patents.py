@@ -67,7 +67,6 @@ def render_detail(patent: PatentApplication):
     st.markdown(get_markdown_link(patent["url"], patent["publication_number"]))
     st.markdown(get_horizontal_list(patent["attributes"], "Attributes"))
     st.markdown(get_horizontal_list(patent["assignees"], "Assignees"))
-    st.markdown(get_horizontal_list(patent["ipc_codes"], "IPC Codes"))
     st.write(patent["abstract"] + " " + get_markdown_link(patent["url"], "Read more →"))
     st.divider()
 
@@ -76,6 +75,13 @@ def render_detail(patent: PatentApplication):
     mcol2.metric(label="Suitability", value=round(patent["score"], 2))
     mcol3.metric(label="Relevancy", value=round(patent["search_rank"], 2))
 
+    st.divider()
+    st.markdown(get_horizontal_list(patent["compounds"], "Compounds"))
+    st.markdown(get_horizontal_list(patent["diseases"], "Diseases"))
+    st.markdown(get_horizontal_list(patent["genes"], "Genes"))
+    st.markdown(get_horizontal_list(patent["proteins"], "Proteins"))
+    st.markdown(get_horizontal_list(patent["effects"], "Effects"))
+    st.markdown(get_horizontal_list(patent["ipc_codes"], "IPC Codes"))
     st.divider()
     if len(patent["similar"]) > 0:
         st.subheader("Similar Patents")

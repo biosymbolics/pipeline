@@ -93,6 +93,7 @@ PATENT_ATTRIBUTE_MAP = {
         "composition",
         "derivative",
         "drug",
+        "enzyme",
         "inhibiting",  # not the same stem as inhibitor
         "molecule",
         "receptor",
@@ -121,7 +122,7 @@ PATENT_ATTRIBUTE_MAP = {
         # "disease-modifying",
     ],
     "FORMULATION": ["formulation", "form", "salt"],
-    "METHOD": ["method", "procedure"],
+    "METHOD": ["method", "procedure"],  # preparation method, method of use
     "NOVEL": ["novel"],
     "PREVENTATIVE": ["prevention"],
     "PROCESS": ["preparation", "process", "synthesis", "system"],

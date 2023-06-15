@@ -1,5 +1,6 @@
 ADHD = "Attention Deficit Hyperactivity Disorder"
 ARTICULATION_DISORDER = "Articulation Disorder"
+AMNESTIC_DISORDER = "Amnestic Disorder"
 ANAESTHESIA = "Anaesthesia"
 ANEMIA = "Anemia"
 ANXIETY = "Anxiety"
@@ -10,12 +11,17 @@ BDII = "Bipolar II Disorder"
 BIPOLAR = "Bipolar Disorder"
 BODY_DYSMORPHIA = "Body Dysmorphic Disorder"
 BPD = "Borderline Personality Disorder"
+BRIEF_PSYCHOTIC_DISORDER = "Brief Psychotic Disorder"
 CELIAC = "Celiac Disease"
-DEPRESSION = "Depression"
+CYCLOTHYMIA = "Cyclothymia"
+DEPRESSION = "Mental Depression"  # mental depression due to UMLS
 DEVELOPMENTAL_DISORDER = "Developmental Disorder"
 DELUSION = "Delusion"
 DIARRHEA = "Diarrhea"
+DYSTHYMIA = "Dysthymia"
+EATING_DISORDER = "Eating Disorder"
 GERD = "Gastroesophageal Reflux Disease"
+GENERALIZED_ANXIETY_DISORDER = "Generalized Anxiety Disorder"
 HEMATOLOGICAL_DISORDER = "Hematological Disorder"
 HYPERSENSITIVITY = "Hypersensitivity"
 INTERMITTENT_EXPLOSIVE_DISORDER = "Intermittent Explosive Disorder"
@@ -31,6 +37,7 @@ NEUROSIS = "Neurosis"
 OCD = "Obsessive-Compulsive Disorder"
 OPPOSITIONAL_DEFIANT_DISORDER = "Oppositional Defiant Disorder"
 PAIN_DISORDER = "Pain Disorder"
+PANIC = "Panic Disorder"
 PATHOGENIC_PAIN = "Pathogenic Pain"
 PDD = "Premenstrual Dysphoric Disorder"
 PERSONALITY_DISORDER = "Personality Disorder"
@@ -42,6 +49,7 @@ PTSD = "Post-Traumatic Stress Disorder"
 REPRODUCTIVE_DISORDER = "Reproductive Disorder"
 SAD = "Seasonal Affective Disorder"
 SCHIZOPHRENIA = "Schizophrenia"
+SCHIZOPHRENIFORM_DISORDER = "Schizophreniform Disorder"
 SCHIZOAFFECTIVE_DISORDER = "Schizoaffective Disorder"
 SEXUAL_DISORDER = "Sexual Disorder"
 SLEEP_APNEA = "Sleep Apnea"
@@ -52,25 +60,10 @@ SUBSTANCE_ABUSE = "Substance Abuse"
 SUBSTANCE_PSYCHOSIS = "Substance-Induced Psychotic Disorder"
 TIC_DISORDER = "Tic Disorder"
 
-# graft versus host disease vs graft-versus-host disease vs vs
-# dysthymic disease
-# panic disease
-# paranoid personality disease
-# schizoid personality disease
-# schizotypal personality disease
-# brief psychotic disease
-# amnestic disease
-# dissociative disease
-# eating disease
-# adjustment disease
-# mania
-# avoidant personality disease
-# cyclothymic disease
-# leukaemia
-# leukemia, myeloid, acute vs acute myeloid leukaemia
 SYNONYM_MAP = {
     "acute stress disease": STRESS_DISORDER,
     "alcohol use disease": SUBSTANCE_ABUSE,
+    "amnestic disease": AMNESTIC_DISORDER,
     "anaemia of chronic disease": ANEMIA,
     "anaesthetic": ANAESTHESIA,
     "anaesthesia": ANAESTHESIA,
@@ -87,7 +80,7 @@ SYNONYM_MAP = {
     "attention deficit/hyperactivity disease": ADHD,
     "attention deficit disorder with hyperactivity": ADHD,
     "anxiety": ANXIETY,
-    "anxiety disease": ANXIETY,
+    "anxiety disease": GENERALIZED_ANXIETY_DISORDER,
     "bipolar disease": BIPOLAR,
     "bipolar i disease": BDI,
     "bipolar ii disease": BDII,
@@ -97,16 +90,21 @@ SYNONYM_MAP = {
     "coeliac disease": CELIAC,
     "combat disease": PTSD,  # ??
     "communication disease": "communication disorder",
-    "generalised anxiety disease": ANXIETY,
-    "generalized anxiety disease": ANXIETY,
+    "cyclothymic disease": CYCLOTHYMIA,
+    "generalised anxiety disease": GENERALIZED_ANXIETY_DISORDER,
+    "generalized anxiety disease": GENERALIZED_ANXIETY_DISORDER,
     "delusional disease": DELUSION,
     "depressive disease": DEPRESSION,
     "depressed mood": DEPRESSION,
     "depressive symptom": DEPRESSION,
+    "depressive": DEPRESSION,
     "dependence": SUBSTANCE_ABUSE,
     "diarrhoea": DIARRHEA,
+    "dysthymic disease": DYSTHYMIA,
     "dissociative identity disease": DISSASOCIATIVE_IDENTITY_DISORDER,
+    "dissociative disease": DISSASOCIATIVE_IDENTITY_DISORDER,
     "drug dependence": SUBSTANCE_ABUSE,
+    "eating disease": EATING_DISORDER,
     "effect on cardiovascular disease": "Cardiovascular disease",
     "female reproductive system disease": REPRODUCTIVE_DISORDER,
     "gastrooesophageal reflux disease": GERD,
@@ -118,6 +116,7 @@ SYNONYM_MAP = {
     "intermittent explosive disease": INTERMITTENT_EXPLOSIVE_DISORDER,
     "ischaemic disease": ISCHEMIA,
     "ischaemia": ISCHEMIA,
+    "manic and bipolar mood disorders and disturbance": BIPOLAR,
     "major depression": DEPRESSION,
     "major depressive disease": DEPRESSION,
     "mental disease": MENTAL_DISORDER,
@@ -133,6 +132,8 @@ SYNONYM_MAP = {
     "neurodevelopmental disease": NEURODEVELOPMENTAL_DISORDER,
     "obsessive-compulsive disease": OCD,
     "pain disease": PAIN_DISORDER,
+    "panic disease": PANIC,
+    "panic attacks and disease": PANIC,
     "pathogenic pain disease": PATHOGENIC_PAIN,
     "penicillins": "penicillin",
     "pervasive developmental disease": DEVELOPMENTAL_DISORDER,
@@ -147,6 +148,8 @@ SYNONYM_MAP = {
     "oppositional defiant disease": OPPOSITIONAL_DEFIANT_DISORDER,
     "reading disease": "Reading disorder",
     "schizoaffective disease": SCHIZOAFFECTIVE_DISORDER,
+    "schizophreniform disease": SCHIZOPHRENIFORM_DISORDER,
+    "brief psychotic disease": BRIEF_PSYCHOTIC_DISORDER,
     "schizophrenia and other psychotic disease": PSYCHOTIC_DISORDER,
     "seasonal affective disease": SAD,
     "sexual arousal disease": SEXUAL_DISORDER,
@@ -2322,9 +2325,13 @@ _COMMON_ENTITY_NAMES = (
     "inflammatory process",
     "hydrogen",
     "antitubercular antibiotics",
+    "antibiotics, antitubercular",
     "ophthalmologic antibiotics",
     "intestinal antibiotics",
     "gynecological antibiotics",
+    "antibiotics, gynecological",
+    "antibiotics, antifungal",
+    "antibiotics, ophthalmologic",
     "topical antifungal antibiotics",
     "potato starch",
     "royal jelly",
@@ -2356,6 +2363,39 @@ _COMMON_ENTITY_NAMES = (
     "behavioural",
     "mental health",
     "biological processes and functions",
+    ##
+    "persistent",
+    "sodium",
+    "physiological effects",
+    "sodium starch",
+    "anti-anti-diuretic",  # corresponds almost 100% to diuretic (and i guess it should?? lol.)
+    "organic acids, gynecological",
+    "organic acids, ophthalmologic",
+    "organic acids, antifungal",
+    "organic acids, antitubercular",
+    "organic acids, intestinal",
+    "organic acids, ophthalmologic",
+    "oxalic acid",
+    "succinic acid",
+    "mandelic acid",
+    "Stimulation (motivation)",
+    "increased",
+    "persistent",
+    "decreased",
+    "drug inn",
+    "lasting",
+    "physiological effects, processes and functions",
+    "augmentation procedure",
+    "silicone oils",
+    "physiological effects",
+    "noise biological effect",
+    "repressing",
+    "citrate carrier",
+    "arkansas",
+    "replicative",
+    "biological processes and functions",
+    "propylene glycol",
+    "low-density polyethylene",
 )
 
 COMMON_ENTITY_NAMES = [name.lower() for name in _COMMON_ENTITY_NAMES]
