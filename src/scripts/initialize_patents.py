@@ -38,7 +38,7 @@ def __get_normalized_terms(rows, normalization_map):
     def __get_term(row):
         entry = normalization_map.get(row["term"])
         if not entry:
-            SYNONYM_MAP[row["term"].lower()] or row["term"]
+            SYNONYM_MAP.get(row["term"].lower()) or row["term"]
         return entry.canonical_name
 
     normalized_terms = [
