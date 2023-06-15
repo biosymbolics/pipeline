@@ -62,7 +62,6 @@ class TermNormalizer:
         candidates = self.candidate_generator(terms, 1)
         canonical_entities = [self.__get_normalized_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
-        logging.info(entity_map)
         return {key: value for key, value in entity_map.items() if value is not None}
 
     def __call__(self, terms: list[str]) -> list[str]:

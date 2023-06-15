@@ -59,7 +59,7 @@ def __get_normalized_terms(rows, normalization_map: NormalizationMap):
     sorted_terms = sorted(normalized_terms, key=lambda row: row["term"])
     grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
 
-    def __get_deduped_terms(key, _group):
+    def __get_term_obj(key, _group):
         group = list(_group)
         return {
             "term": key,
@@ -69,8 +69,8 @@ def __get_normalized_terms(rows, normalization_map: NormalizationMap):
             "original_ids": dedup([row["original_id"] for row in group]),
         }
 
-    deduped_terms = [__get_deduped_terms(key, group) for key, group in grouped_terms]
-    return deduped_terms
+    terms = [__get_term_obj(key, group) for key, group in grouped_terms]
+    return terms
 
 
 def __create_terms():
@@ -97,23 +97,24 @@ def __create_terms():
     normalized_terms = __get_normalized_terms(rows, normalization_map)
 
     # Create a new table to hold the modified records
-    new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
-    new_table.schema = [
-        bigquery.SchemaField("term", "STRING"),
-        bigquery.SchemaField("count", "INTEGER"),
-        bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
-    ]
-    new_table = client.create_table(new_table)
+    # TODO: wait after create??
+    # new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
+    # new_table.schema = [
+    #     bigquery.SchemaField("term", "STRING"),
+    #     bigquery.SchemaField("count", "INTEGER"),
+    #     bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
+    #     bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
+    #     bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
+    # ]
+    # new_table = client.create_table(new_table, exists_ok=True)
 
-    batched = __batch(normalized_terms)
-    for batch in batched:
-        logging.info(batch)
-        client.insert_rows(new_table, batch)
-        logging.info(f"Inserted {len(batch)} rows")
+    # batched = __batch(normalized_terms)
+    # for batch in batched:
+    #     logging.info(batch)
+    #     client.insert_rows(new_table, batch)
+    #     logging.info(f"Inserted {len(batch)} rows")
 
-    syn_map = {row["term"]: row["canonical_name"] for row in normalized_terms}
+    syn_map = {row["term"]: row.get("canonical_name") for row in normalized_terms}
     __add_to_synonym_map(syn_map)
 
 
