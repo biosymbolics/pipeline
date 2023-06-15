@@ -77,4 +77,4 @@ def prep_data_for_umap(df: pl.DataFrame):
     scaled_features = [
         (column, __flatten_features(series)) for column, series in preprocessed.items()
     ]
-    return pl.DataFrame(dict(scaled_features))
+    df = pl.DataFrame(dict(scaled_features))
