@@ -2,6 +2,7 @@
 Functions to initialize the patents database
 """
 from itertools import groupby
+import time
 from google.cloud import bigquery
 import logging
 
@@ -107,20 +108,27 @@ def __create_terms():
         bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
     ]
     new_table = client.create_table(new_table, exists_ok=True)
+    time.sleep(15)  # wait. silly.
 
     batched = __batch(normalized_terms)
     for batch in batched:
-        logging.info(batch)
         client.insert_rows(new_table, batch)
         logging.info(f"Inserted {len(batch)} rows")
 
-    syn_map = {row["term"]: row.get("canonical_name") for row in normalized_terms}
+    syn_map = {
+        og_term: row.get("term")
+        for row in normalized_terms
+        for og_term in row["original_terms"]
+    }
     __add_to_synonym_map(syn_map)
 
 
 def __create_synonym_map(synonym_map: dict[str, str]):
     """
     Create a table of synonyms
+
+    Args:
+        synonym_map: a map of synonyms to canonical names
     """
     create = "CREATE TABLE patents.synonym_map (synonym STRING, term STRING);"
     execute_bg_query(create)
@@ -325,7 +333,7 @@ def main():
     # __copy_gpr_annotations()
 
     # create synonym_map table (for final entity names)
-    # __create_synonym_map(SYNONYM_MAP)
+    __create_synonym_map(SYNONYM_MAP)
 
     # create terms table and update synonym map
     __create_terms()
