@@ -9,6 +9,7 @@ import re
 
 from clients import patent_client
 from clients import GptApiClient
+from visualization.dim_reduction import render_umap
 from ui.patents import render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
@@ -131,11 +132,13 @@ try:
             - What are the commonalities in these patents? (e.g. commonly co-occurring terms)
             - What are the changing themes over time?
             - What are the most common assignees, inventors, diseases, compounds, etc?
-            - Summarize the search term(s) with GPT
             """
         )
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
             st.write(gpt_client.describe_terms(terms))
+
+        if patents is not None:
+            render_umap(patents)
 except Exception as e:
     st.error(f"An error occurred: {e}")
