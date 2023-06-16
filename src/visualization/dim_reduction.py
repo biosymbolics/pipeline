@@ -23,16 +23,15 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
         df (pl.DataFrame): Dataframe
         n_topics (int, optional): Number of topics. Defaults to N_TOPICS.
 
-    TODO:
-        - generalize
+    TODO: generalize
     """
     logging.info("Prepping data for UMAP")
-    _, tfidf, tfidf_vectorizer, _ = preprocess_with_tfidf(df)
+    _, fitted_model, vectorizer, _ = preprocess_with_tfidf(df)
 
-    embedding = calculate_umap_embedding(tfidf)
+    embedding = calculate_umap_embedding(fitted_model)
 
     topics, topic_embedding = get_topics(
-        tfidf, tfidf_vectorizer.get_feature_names_out().tolist(), n_topics, N_TOP_WORDS
+        fitted_model, vectorizer.get_feature_names_out().tolist(), n_topics, N_TOP_WORDS
     )
     embedding = embedding.with_columns(
         pl.lit(topic_embedding.argmax(axis=1)).alias("hue")

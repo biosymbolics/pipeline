@@ -14,8 +14,12 @@ def __remove_comment_syntax(text: str) -> str:
     """
     Remove leading ```json and trailing ``` (and anything after it)
     """
-    cleaned = re.sub("```json|```.*", "", text, flags=re.DOTALL)
-    return cleaned
+    json_blocks = re.findall(r"```json(.*?)```", text, re.DOTALL)
+    if len(json_blocks) == 0:
+        return text
+    elif len(json_blocks) > 1:
+        return json_blocks[-1]  # return the last
+    return json_blocks[0]
 
 
 def __load_json(text: str) -> str:

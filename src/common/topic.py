@@ -5,12 +5,15 @@ from typing import NamedTuple
 from langchain.output_parsers import ResponseSchema
 from scipy.sparse import spmatrix  # type: ignore
 from sklearn.decomposition import NMF
+from sklearn.feature_extraction.text import CountVectorizer
+from bertopic import BERTopic
 import umap
 import numpy as np
 import polars as pl
 import logging
 
 from clients.openai.gpt_client import GptApiClient
+from common.utils.dataframe import find_string_columns
 
 RANDOM_STATE = 42
 KNN = 5
@@ -115,3 +118,29 @@ def calculate_umap_embedding(
         raise TypeError("UMAP embedding is not a numpy array")
     embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
     return embedding
+
+
+def get_topics_with_bert(df: pl.DataFrame):
+    """
+    Get topics based on BERTopic
+
+    Args:
+        df: dataframe
+    """
+    vectorizer_model = CountVectorizer(ngram_range=(1, 2), stop_words="english")
+
+    logging.info("BERT")
+    all_strings: list[list[str]] = (
+        df.select(pl.concat_list(find_string_columns(df))).to_series().to_list()
+    )
+    docs = [" ".join(s) for s in all_strings]
+    model = BERTopic(
+        vectorizer_model=vectorizer_model,
+        language="english",
+        calculate_probabilities=True,
+        verbose=True,
+    )
+    topics = model.fit_transform(docs)
+    freq = model.get_topic_info()
+    logging.info("Frequency of topics: %s", freq)
+    return topics

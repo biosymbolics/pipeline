@@ -80,13 +80,23 @@ class GptApiClient:
             logging.warning("Error formatting answer: %s", e)
             return output.content
 
-    def describe_terms(self, terms: list[str]) -> str:
+    def describe_terms(
+        self, terms: list[str], context_terms: Optional[list[str]] = None
+    ) -> str:
         """
         Simple query to describe terms
+
+        Args:
+            terms (list[str]): list of terms to describe
+            context_terms (list[str], optional): list of terms to provide context for the query
         """
-        query = "Provide a technical explanation of the following terms:\n" + "\n".join(
-            terms
+        context_query = (
+            " in the context of: " + ", ".join(context_terms) if context_terms else ""
         )
+        query = f"""
+            Provide detailed, technical information about the following{context_query}:
+            {", ".join(terms)}
+        """
         return self.query(query)
 
     def describe_topic(self, topic_features: list[str]) -> str:

@@ -138,8 +138,16 @@ if patents is not None:
         )
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
-            st.write(gpt_client.describe_terms(terms))
+            st.write(
+                gpt_client.describe_terms(
+                    terms, ["patents", "IP", "biomedicine", "investment"]
+                )
+            )
 
-        if patents is not None:
-            st.subheader(f"About these patents ({str(len(patents))})")
-            render_umap(patents)
+        try:
+            if patents is not None:
+                st.subheader(f"About these patents ({str(len(patents))})")
+                render_umap(patents)
+        except Exception as e:
+            logging.error(e)
+            st.error("Failed to render UMAP")
