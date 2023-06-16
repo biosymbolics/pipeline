@@ -11,7 +11,8 @@ from sklearn.decomposition import NMF
 import numpy as np
 import umap
 
-from common.utils.dataframe import find_string_columns, find_string_array_columns
+from common.utils.dataframe import find_string_columns
+from common.topic import describe_topics
 
 MAX_FEATURES = 10000
 KNN = 5
@@ -29,13 +30,16 @@ TfidfObjects = NamedTuple(
 
 NmfObjects = NamedTuple(
     "NmfObjects",
-    [("nmf_embedding", np.ndarray), ("nmf", NMF), ("feature_names", list[str])],
+    [("topics", list[str]), ("nmf_embedding", np.ndarray), ("nmf", NMF)],
 )
 
 
 def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObjects:
     """
     Process the DataFrame to prepare it for dimensionality reduction.
+    - Extract all strings and string arrays from the DataFrame (that's it, right now!!)
+
+    TODO: try DictVectorizer
 
     Usage:
     ``` python
@@ -48,7 +52,7 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
             'diseases': [["asthma", "COPD"], ["PAH"], ["ALZ"], ["PD", "hypertension"], ["asthma"]],
         }
         df = pl.DataFrame(data)
-        prep_data_for_umap(df)
+        preprocess_with_tfidf(df)
     ```
     """
     all_strings: list[str] = (
@@ -56,24 +60,25 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
         .to_series()
         .to_list()
     )
-    all_tags: list[str] = (
-        df.select(pl.concat_list(find_string_array_columns(df)).flatten())
-        .to_series()
-        .to_list()
-    )
-    content = [*all_strings, *all_tags]
+    # all_tags: list[str] = (
+    #     df.select(pl.concat_list(find_string_array_columns(df)).flatten())
+    #     .to_series()
+    #     .to_list()
+    # )
+    content = [*all_strings]  # , *all_tags]
+    logging.info(content)
     split_content = [doc.split(" ") for doc in content]
 
     logging.info("Extracting tf-idf features for NMF...")
     tfidf_vectorizer = TfidfVectorizer(
-        max_df=5,
-        min_df=2,
+        max_df=50,
+        min_df=3,
         max_features=n_features,
         ngram_range=(1, 2),
         stop_words="english",
     )
     tfidf = tfidf_vectorizer.fit_transform(content)  # join content?
-    dictionary = corpora.Dictionary(split_content, prune_at=2000)
+    dictionary = corpora.Dictionary(split_content, prune_at=20000)
     corpus = [dictionary.doc2bow(text) for text in split_content]
 
     return TfidfObjects(
@@ -102,10 +107,21 @@ def get_topics(
     nmf = NMF(n_components=n_topics, random_state=RANDOM_STATE, l1_ratio=0.5).fit(tfidf)
 
     nmf_embedding = nmf.transform(tfidf)
-    feature_names = tfidf_vectorizer.get_feature_names_out()
+    feature_names = list(tfidf_vectorizer.get_feature_names_out())
+
+    N_TOP_WORDS = 15
+
+    def __get_feature_names(feature_set: np.ndarray) -> list[str]:
+        top_features = feature_set.argsort()[: -N_TOP_WORDS - 1 : -1]
+        return [feature_names[i] for i in top_features]
+
+    topic_map = dict(
+        [(idx, __get_feature_names(topic)) for idx, topic in enumerate(nmf.components_)]
+    )
+    topic_name_map = describe_topics(topic_map)
 
     return NmfObjects(
-        nmf_embedding=nmf_embedding, nmf=nmf, feature_names=list(feature_names)
+        topics=list(topic_name_map.values()), nmf_embedding=nmf_embedding, nmf=nmf
     )
 
 

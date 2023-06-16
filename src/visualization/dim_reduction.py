@@ -1,8 +1,6 @@
 """
 Viz of dimensional reductions
 """
-import numpy as np
-import umap
 import polars as pl
 import streamlit as st
 import logging
@@ -29,13 +27,11 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
 
     embedding = caculate_umap_embedding(tfidf)
 
-    nmf_embedding, nmf, feature_names = get_topics(tfidf, tfidf_vectorizer, n_topics)
+    topics, nmf_embedding, nmf = get_topics(tfidf, tfidf_vectorizer, n_topics)
     embedding = embedding.with_columns(
         pl.lit(nmf_embedding.argmax(axis=1)).alias("hue")
     )
     my_colors = [all_palettes["Category20"][N_TOPICS][i] for i in embedding["hue"]]
-
-    topics = feature_names
 
     logging.info("Rendering UMAP")
     source = ColumnDataSource(
@@ -80,16 +76,9 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
     )
     p.add_tools(hover)  # type: ignore
 
-    st.subheader("Topics:")
-    for topic_idx, topic in enumerate(nmf.components_):
-        st.write("\nTopic {}:".format(topic_idx))
-        st.write(
-            " ".join(
-                [
-                    "[{}]".format(feature_names[i])
-                    for i in topic.argsort()[: -N_TOP_WORDS - 1 : -1]
-                ]
-            )
-        )
-
     st.bokeh_chart(p, use_container_width=True)
+
+    st.subheader("Topics:")
+    for topic_idx, topic in enumerate(topics):
+        st.write(f"\nTopic {topic_idx}:")
+        st.write(topic)

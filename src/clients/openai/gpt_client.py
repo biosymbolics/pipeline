@@ -75,8 +75,9 @@ class GptApiClient:
         )
         output = chat_model(input.to_messages())
         try:
-            self.__format_answer(output.content, is_array=is_array)
+            return self.__format_answer(output.content, is_array=is_array)
         except Exception as e:
+            logging.warning("Error formatting answer: %s", e)
             return output.content
 
     def describe_terms(self, terms: list[str]) -> str:
@@ -84,4 +85,14 @@ class GptApiClient:
         Simple query to describe terms
         """
         query = "Describe the following terms and how they relate:\n" + "\n".join(terms)
+        return self.query(query)
+
+    def describe_topic(self, topic_features: list[str]) -> str:
+        """
+        Simple query to describe a topic
+        """
+        query = (
+            "Return a good, succinct name for the topic described by the following words:\n"
+            + "\n".join(topic_features)
+        )
         return self.query(query)
