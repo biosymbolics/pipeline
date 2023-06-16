@@ -17,36 +17,34 @@ def __remove_comment_syntax(text: str) -> str:
     Example:
         >>> obj_str = __remove_comment_syntax('```json\n{"k01":"t1","k02":"t2"}``` ```json\n{"k11":"t1","k12":"t2"},{"k21":"t1","k22":"t2"}```')
         >>> json.loads(obj_str)
-        [{'k11': 't1', 'k12': 't2'}]
+        {'k11': 't1', 'k12': 't2'}, {'k21': 't1', 'k22': 't2'}
     """
-
-    def __wrap_array(array: str) -> str:
-        if not array.startswith("["):
-            return "[" + array + "]"
-        return array
-
     json_blocks = re.findall(r"```json(.*?)```", text, re.DOTALL)
     if len(json_blocks) == 0:
-        return __wrap_array(text)
+        return text
     elif len(json_blocks) > 1:
-        return __wrap_array(json_blocks[-1])  # return the last
+        return json_blocks[-1]  # return the last
 
-    return __wrap_array(json_blocks[0])
+    return json_blocks[0]
 
 
-def __load_json(text: str) -> str:
+def __load_json_array(text: str) -> list[str]:
     """
     (For typing)
     """
-    return json.loads(text)
+    array = json.loads(text)
+    if not isinstance(array, list):
+        raise Exception("Answer is not an array")
+    return array
 
 
 def __parse_answer_array(text: str, output_parser):
     # https://github.com/hwchase17/langchain/issues/1976
     logging.info("Naively parsing answer as array")
     try:
-        parse_pipeline = [__remove_comment_syntax, __load_json]
-        array = reduce(lambda x, f: f(x), parse_pipeline, text)
+        parse_pipeline = [__remove_comment_syntax, __load_json_array]
+        array = reduce(lambda x, f: f(x), parse_pipeline, text)  # type: ignore
+        logging.info("ARRAY? %s", array)
         final: list[dict] = [
             output_parser.parse("```json" + json.dumps(item) + "```") for item in array
         ]

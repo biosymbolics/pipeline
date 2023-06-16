@@ -2,53 +2,56 @@
 Utility functions for visualization.
 """
 from typing import NamedTuple
+from sklearn import pipeline
+from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 import polars as pl
 import logging
 from scipy.sparse import spmatrix  # type: ignore
+from sklearn.pipeline import Pipeline
 import spacy
+import numpy as np
+from sklearn.base import TransformerMixin
 
-from common.utils.dataframe import find_string_columns
+from common.utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000
 RANDOM_STATE = 42
-
-TfidfObjects = NamedTuple(
-    "TfidfObjects",
-    [
-        ("vectorized_data", spmatrix),
-        ("vectorizer", TfidfVectorizer),
-    ],
-)
-
-nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-
-
-def __keep_token(token) -> bool:
-    """
-    -PRON- is special lemma for pronouns
-    """
-    return token.lemma_ != "-PRON-" and token.pos_ in {
-        "NOUN",
-        "PROPN",
-        "VERB",
-        "ADJ",
-        "ADV",
-    }
-
-
 MAX_DOC_FREQ = 25
 MIN_DOC_FREQ = 2
 MAX_NGRAM_LENGTH = 3
 
+VectorizationObjects = NamedTuple(
+    "VectorizationObjects",
+    [
+        ("vectorized_data", spmatrix),
+        ("feature_names", np.ndarray),
+    ],
+)
 
-def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObjects:
+
+class SpacyLemmatizer(TransformerMixin):
+    def __init__(self):
+        self.nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        return [self.lemmatize(doc) for doc in X]
+
+    def lemmatize(self, doc):
+        return " ".join([token.lemma_ for token in self.nlp(doc)])
+
+    def get_feature_names_out(self, input_features=None):
+        return input_features
+
+
+def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationObjects:
     """
     Process the DataFrame to prepare it for dimensionality reduction.
     - Extract all strings and string arrays from the DataFrame (that's it, right now!!)
     - Lemmatize with SpaCy
-
-    TODO: try DictVectorizer
 
     Usage:
     ``` python
@@ -65,26 +68,47 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
         preprocess_with_tfidf(df)
     ```
     """
-    all_strings: list[list[str]] = (
-        df.select(pl.concat_list(find_string_columns(df))).to_series().to_list()
+    text_columns = find_text_columns(df)
+    text_df = df.select(pl.col(text_columns))
+
+    if len(text_columns) == 0:
+        raise ValueError("No text columns found in the DataFrame")
+
+    # Use ColumnTransformer to apply these different preprocessing steps
+    vectorizer = ColumnTransformer(
+        transformers=[
+            *[
+                (
+                    f"{col}_vect",
+                    Pipeline(
+                        [
+                            ("lemmatizer", SpacyLemmatizer()),
+                            (
+                                "vectorizer",
+                                TfidfVectorizer(
+                                    max_df=MAX_DOC_FREQ,
+                                    min_df=MIN_DOC_FREQ,
+                                    max_features=n_features,
+                                    stop_words="english",
+                                ),
+                            ),
+                        ]
+                    ),
+                    col,
+                )
+                for col in text_columns
+            ],
+        ]
     )
+    logging.info("Fitting vectorizer...")
 
-    docs = [nlp(" ".join(s)) for s in all_strings]
-    content = [
-        " ".join([token.lemma_ for token in doc if __keep_token(token)]) for doc in docs
-    ]
-
-    logging.info("Extracting tf-idf features for NMF...")
-    tfidf_vectorizer = TfidfVectorizer(
-        max_df=MAX_DOC_FREQ,
-        min_df=MIN_DOC_FREQ,
-        max_features=n_features,
-        ngram_range=(1, MAX_NGRAM_LENGTH),
-        stop_words="english",
+    pipe = pipeline.Pipeline(
+        [
+            ("transform", vectorizer),
+        ]
     )
-    tfidf = tfidf_vectorizer.fit_transform(content)
+    data = pipe.fit_transform(text_df.to_pandas())
 
-    return TfidfObjects(
-        vectorized_data=tfidf,
-        vectorizer=tfidf_vectorizer,
+    return VectorizationObjects(
+        vectorized_data=data, feature_names=pipe.get_feature_names_out()
     )

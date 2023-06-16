@@ -16,7 +16,7 @@ from clients.openai.gpt_client import GptApiClient
 from common.utils.dataframe import find_string_columns
 
 RANDOM_STATE = 42
-KNN = 5
+KNN = 10
 
 
 class TopicObjects(NamedTuple):
@@ -52,7 +52,9 @@ def describe_topics(
         )
         query = f"""
             Return a descriptive, succinct name (4 words or fewer) for each topic below{context_query},
-            maximizing orthagonality and semantic meaningfulness of the labels:
+            maximizing orthagonality and semantic meaningfulness of the labels. Return a list of json objects.
+
+            Topics:
             {topic_map_desc}
         """
         logging.debug("Label description prompt: %s", query)
@@ -72,7 +74,7 @@ def describe_topics(
 
 def get_topics(
     vectorized_data: spmatrix,
-    feature_names: list[str],
+    feature_names: np.ndarray,
     n_topics: int,
     n_top_words: int,
     context_terms: Optional[list[str]] = None,
@@ -82,20 +84,26 @@ def get_topics(
 
     Args:
         vectorized_data (spmatrix): vectorized data
-        feature_names: vectorizer
-        n_topics: number of topics
-        n_top_words: number of top words to use in description
+        n_topics (int): number of topics
+        n_top_words (int): number of top words to use in description
+        context_terms (Optional[list[str]]): context terms
     """
 
     logging.info("Fitting the NMF model with tf-idf features")
     nmf = NMF(n_components=n_topics, random_state=RANDOM_STATE, l1_ratio=0.5)
+
+    logging.info("Fitting now")
     nmf = nmf.fit(vectorized_data)
+    logging.info("Transforming now")
     embedding = nmf.transform(vectorized_data)
     dictionary = nmf.components_  # aka factorization matrix
 
+    logging.info("Creating topic map")
+
     def __get_feat_names(feature_set: np.ndarray) -> list[str]:
         top_features = feature_set.argsort()[: -n_top_words - 1 : -1]
-        return [feature_names[i] for i in top_features]
+        logging.info("Top features: %s", top_features)
+        return [str(feature_names[i]) for i in top_features]
 
     topic_map = dict(
         [(idx, __get_feat_names(topic)) for idx, topic in enumerate(dictionary)]
@@ -113,7 +121,7 @@ def calculate_umap_embedding(
     vectorized_data: spmatrix,
     dictionary: np.ndarray,
     knn: int = KNN,
-    min_dist: float = 0.01,
+    min_dist: float = 0.2,
 ) -> tuple[pl.DataFrame, np.ndarray]:
     """
     Calculate the UMAP embedding
@@ -140,7 +148,7 @@ def calculate_umap_embedding(
 
     embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
 
-    centroids: np.ndarray = umap_embr.transform(dictionary)
+    centroids = umap_embr.transform(dictionary)
 
     return embedding, centroids
 
