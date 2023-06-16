@@ -8,7 +8,7 @@ import logging
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
 
-from .labeling import get_labels
+from .labeling import get_labels_for_patents
 from .utils import prep_data_for_umap
 
 
@@ -19,7 +19,7 @@ def render_umap(df: pl.DataFrame):
     Args:
         df (pl.DataFrame): Dataframe
     """
-    logging.info("prepping data for UMAP")
+    logging.info("Prepping data for UMAP")
     prepped_df = prep_data_for_umap(df)
 
     combined_df = prepped_df.select(pl.concat_list(pl.col("*")).alias("combined"))
@@ -34,8 +34,8 @@ def render_umap(df: pl.DataFrame):
 
     source = ColumnDataSource(
         data=dict(
-            x=umap_embedding[:, 0],
-            y=umap_embedding[:, 1],
+            x=umap_embedding[:, 0],  # type: ignore
+            y=umap_embedding[:, 1],  # type: ignore
             publication_number=df.select(pl.col("publication_number"))
             .to_series()
             .to_list(),
@@ -53,7 +53,7 @@ def render_umap(df: pl.DataFrame):
             </div>
         </div>
         """,
-    )
+    )  # type: ignore
 
     p = figure(plot_width=600, plot_height=600, title="Patents")
     p.circle(
@@ -67,8 +67,8 @@ def render_umap(df: pl.DataFrame):
         source=source,
         name="df",
     )
-    p.add_tools(hover)
+    p.add_tools(hover)  # type: ignore
 
-    labels = get_labels(df)
+    labels = get_labels_for_patents(df)
 
     st.bokeh_chart(p, use_container_width=True)

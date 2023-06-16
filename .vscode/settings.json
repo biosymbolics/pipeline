@@ -1,4 +1,11 @@
 {
+  "files.exclude": {
+      "**/__pycache__": true,
+      "**/__pycache__/**": true,
+      "**/.venv": true,
+      "**/.git": true,
+      "**/node_modules": true,
+  },
   "python.formatting.provider": "black",
   "python.linting.enabled": false,
   "python.languageServer": "Pylance",
