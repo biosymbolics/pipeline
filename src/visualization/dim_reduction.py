@@ -4,6 +4,7 @@ Viz of dimensional reductions
 import polars as pl
 import streamlit as st
 import logging
+from typing import Optional
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.palettes import all_palettes
@@ -11,27 +12,36 @@ from bokeh.palettes import all_palettes
 from common.topic import calculate_umap_embedding, get_topics
 from .utils import preprocess_with_tfidf
 
-N_TOPICS = 10  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
-N_TOP_WORDS = 15
+N_TOPICS = 15  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
+N_TOP_WORDS = 25
 
 
-def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
+def render_umap(
+    df: pl.DataFrame,
+    context_terms: Optional[list[str]] = None,
+    n_topics: int = N_TOPICS,
+):
     """
     Render a UMAP plot of a dataframe
 
     Args:
         df (pl.DataFrame): Dataframe
+        context_terms (Optional[list[str]], optional): Context terms. Defaults to None.
         n_topics (int, optional): Number of topics. Defaults to N_TOPICS.
 
     TODO: generalize
     """
     logging.info("Prepping data for UMAP")
-    _, fitted_model, vectorizer, _ = preprocess_with_tfidf(df)
+    vectorization_model, vectorizer = preprocess_with_tfidf(df)
 
-    embedding = calculate_umap_embedding(fitted_model)
+    embedding = calculate_umap_embedding(vectorization_model)
 
     topics, topic_embedding = get_topics(
-        fitted_model, vectorizer.get_feature_names_out().tolist(), n_topics, N_TOP_WORDS
+        vectorization_model,
+        vectorizer.get_feature_names_out().tolist(),
+        n_topics,
+        N_TOP_WORDS,
+        context_terms,
     )
     embedding = embedding.with_columns(
         pl.lit(topic_embedding.argmax(axis=1)).alias("hue")
@@ -82,8 +92,3 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
     p.add_tools(hover)  # type: ignore
 
     st.bokeh_chart(p, use_container_width=True)
-
-    st.subheader("Topics:")
-    for topic_idx, topic in enumerate(topics):
-        st.write(f"\nTopic {topic_idx}:")
-        st.write(topic)

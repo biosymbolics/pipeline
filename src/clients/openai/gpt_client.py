@@ -56,7 +56,7 @@ class GptApiClient:
 
     def __format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
-            logging.info("Formatting answer: %s", answer)
+            logging.debug("Formatting answer: %s", answer)
             return parse_answer(answer, self.output_parser, is_array, True)
 
         return answer
@@ -93,8 +93,9 @@ class GptApiClient:
         context_query = (
             " in the context of: " + ", ".join(context_terms) if context_terms else ""
         )
+        multiple_query = " and how they relate" if len(terms) > 1 else ""
         query = f"""
-            Provide detailed, technical information about the following{context_query}:
+            Provide succinct, technical information about the following{context_query}{multiple_query}:
             {", ".join(terms)}
         """
         return self.query(query)

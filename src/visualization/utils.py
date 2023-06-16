@@ -1,13 +1,11 @@
 """
 Utility functions for visualization.
 """
-from typing import Any, NamedTuple
+from typing import NamedTuple
 from sklearn.feature_extraction.text import TfidfVectorizer
-from gensim import corpora
 import polars as pl
 import logging
 from scipy.sparse import spmatrix  # type: ignore
-import numpy as np
 import spacy
 
 from common.utils.dataframe import find_string_columns
@@ -18,10 +16,10 @@ RANDOM_STATE = 42
 TfidfObjects = NamedTuple(
     "TfidfObjects",
     [
-        ("corpus", Any),
-        ("tfidf", spmatrix),
-        ("tfidf_vectorizer", TfidfVectorizer),
-        ("dictionary", corpora.Dictionary),
+        ("vectorization_model", spmatrix),
+        ("vectorizer", TfidfVectorizer),
+        # ("corpus", Any),
+        # ("dictionary", corpora.Dictionary),
     ],
 )
 
@@ -72,24 +70,20 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
     content = [
         " ".join([token.lemma_ for token in doc if __keep_token(token)]) for doc in docs
     ]
-    # logging.info(content)
-    split_content = [doc.split(" ") for doc in content]
 
     logging.info("Extracting tf-idf features for NMF...")
     tfidf_vectorizer = TfidfVectorizer(
-        max_df=50,
+        max_df=45,
         min_df=3,
         max_features=n_features,
-        ngram_range=(1, 2),
+        ngram_range=(1, 3),
         stop_words="english",
     )
-    tfidf = tfidf_vectorizer.fit_transform(content)  # join content?
-    dictionary = corpora.Dictionary(split_content, prune_at=20000)
-    corpus = [dictionary.doc2bow(text) for text in split_content]
+    tfidf = tfidf_vectorizer.fit_transform(content)
+    # dictionary = corpora.Dictionary(split_content, prune_at=20000)
+    # corpus = [dictionary.doc2bow(text) for text in split_content]
 
     return TfidfObjects(
-        corpus=corpus,
-        tfidf=tfidf,
-        tfidf_vectorizer=tfidf_vectorizer,
-        dictionary=dictionary,
+        vectorization_model=tfidf,
+        vectorizer=tfidf_vectorizer,
     )

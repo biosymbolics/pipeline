@@ -1,7 +1,7 @@
 """
 Topic modeling utilities
 """
-from typing import NamedTuple
+from typing import Optional, NamedTuple
 from langchain.output_parsers import ResponseSchema
 from scipy.sparse import spmatrix  # type: ignore
 from sklearn.decomposition import NMF
@@ -24,7 +24,9 @@ TopicObjects = NamedTuple(
 )
 
 
-def describe_topics(topic_features: dict[int, list[str]]) -> dict[int, str]:
+def describe_topics(
+    topic_features: dict[int, list[str]], context_terms: Optional[list[str]] = None
+) -> dict[int, str]:
     """
     Ask GPT to guess at good topic labels given a matrix of topic features
 
@@ -36,10 +38,10 @@ def describe_topics(topic_features: dict[int, list[str]]) -> dict[int, str]:
     response_schemas = [
         ResponseSchema(name="id", description="the original topic id (int)"),
         ResponseSchema(name="label", description="the label (str)"),
-        ResponseSchema(
-            name="description",
-            description="a detailed, technical description of what documents this topic contains (str)",
-        ),
+        # ResponseSchema(
+        #     name="description",
+        #     description="a detailed, technical description of what documents this topic contains (str)",
+        # ),
     ]
 
     client = GptApiClient(response_schemas)
@@ -47,8 +49,12 @@ def describe_topics(topic_features: dict[int, list[str]]) -> dict[int, str]:
         f"Topic {idx}: {', '.join(features)}"
         for idx, features in topic_features.items()
     ]
+    context_query = (
+        " given the context of " + ", ".join(context_terms) if context_terms else ""
+    )
     query = f"""
-        Return a good, succinct name (4 words or fewer) for each topic below, maximizing the contrast between topics:
+        Return a descriptive, succinct name (4 words or fewer) for each topic below{context_query},
+        maximizing orthagonality:
         {topic_map_desc}
     """
 
@@ -63,7 +69,11 @@ def describe_topics(topic_features: dict[int, list[str]]) -> dict[int, str]:
 
 
 def get_topics(
-    fitted_matrix: spmatrix, feature_names: list[str], n_topics: int, n_top_words: int
+    fitted_matrix: spmatrix,
+    feature_names: list[str],
+    n_topics: int,
+    n_top_words: int,
+    context_terms: Optional[list[str]] = None,
 ) -> TopicObjects:
     """
     Get topics based on NMF
@@ -88,7 +98,7 @@ def get_topics(
     topic_map = dict(
         [(idx, __get_feature_names(topic)) for idx, topic in enumerate(nmf.components_)]
     )
-    topic_name_map = describe_topics(topic_map)
+    topic_name_map = describe_topics(topic_map, context_terms)
 
     return TopicObjects(
         topics=list(topic_name_map.values()), topic_embedding=nmf_embedding
