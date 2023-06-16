@@ -1,15 +1,24 @@
 {
   "files.exclude": {
       "**/__pycache__": true,
-      "**/__pycache__/**": true,
       "**/.venv": true,
       "**/.git": true,
       "**/node_modules": true,
+      "storage": true,
+      "**/*.pyc": true,
+      "**/*.pyo": true,
+      "**/*.pyd": true,
+      "**/.cache": true
+  },
+  "files.watcherExclude": {
+    "**/__pycache__": true,
+    "**/node_modules": true,
+    "storage": true,
   },
   "python.formatting.provider": "black",
   "python.linting.enabled": false,
   "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.typeCheckingMode": "basic", // too slow on 'basic'
   "python.linting.pylintEnabled": true,
   "terminal.integrated.defaultProfile.osx": "bash",
   "terminal.integrated.profiles.osx": {

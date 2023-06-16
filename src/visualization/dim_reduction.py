@@ -1,46 +1,56 @@
 """
 Viz of dimensional reductions
 """
+import numpy as np
 import umap
 import polars as pl
 import streamlit as st
 import logging
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
+from bokeh.palettes import all_palettes
 
-from .labeling import get_labels_for_patents
-from .utils import prep_data_for_umap
+from .utils import caculate_umap_embedding, get_topics, preprocess_with_tfidf
+
+N_TOPICS = 10  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
+N_TOP_WORDS = 15
 
 
-def render_umap(df: pl.DataFrame):
+def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
     """
     Render a UMAP plot of a dataframe
 
     Args:
         df (pl.DataFrame): Dataframe
+        n_topics (int, optional): Number of topics. Defaults to N_TOPICS.
     """
     logging.info("Prepping data for UMAP")
-    prepped_df = prep_data_for_umap(df)
+    _, tfidf, tfidf_vectorizer, _ = preprocess_with_tfidf(df)
 
-    combined_df = prepped_df.select(pl.concat_list(pl.col("*")).alias("combined"))
-    combined = combined_df.to_series().to_list()
+    embedding = caculate_umap_embedding(tfidf)
 
-    logging.info("Attempting UMAP")
-    umap_embedding = umap.UMAP(
-        n_neighbors=5, min_dist=0.3, random_state=42
-    ).fit_transform(combined)
+    nmf_embedding, nmf, feature_names = get_topics(tfidf, tfidf_vectorizer, n_topics)
+    embedding = embedding.with_columns(
+        pl.lit(nmf_embedding.argmax(axis=1)).alias("hue")
+    )
+    my_colors = [all_palettes["Category20"][N_TOPICS][i] for i in embedding["hue"]]
+
+    topics = feature_names
 
     logging.info("Rendering UMAP")
-
     source = ColumnDataSource(
         data=dict(
-            x=umap_embedding[:, 0],  # type: ignore
-            y=umap_embedding[:, 1],  # type: ignore
+            x=embedding.select(pl.col("x")).to_series().to_list(),
+            y=embedding.select(pl.col("y")).to_series().to_list(),
             publication_number=df.select(pl.col("publication_number"))
             .to_series()
             .to_list(),
             title=df.select(pl.col("title")).to_series().to_list(),
-        )
+            colors=my_colors,
+            topic=[topics[i] for i in embedding["hue"]],
+            alpha=[0.7] * embedding.shape[0],
+            size=[7] * embedding.shape[0],
+        ),
     )
 
     hover = HoverTool(
@@ -59,16 +69,27 @@ def render_umap(df: pl.DataFrame):
     p.circle(
         "x",
         "y",
-        size=5,
-        fill_color="green",
-        alpha=0.7,
+        size="size",
+        fill_color="colors",
+        alpha="alpha",
         line_alpha=0,
         line_width=0.01,
         source=source,
         name="df",
+        legend_field="topic",
     )
     p.add_tools(hover)  # type: ignore
 
-    labels = get_labels_for_patents(df)
+    st.subheader("Topics:")
+    for topic_idx, topic in enumerate(nmf.components_):
+        st.write("\nTopic {}:".format(topic_idx))
+        st.write(
+            " ".join(
+                [
+                    "[{}]".format(feature_names[i])
+                    for i in topic.argsort()[: -N_TOP_WORDS - 1 : -1]
+                ]
+            )
+        )
 
     st.bokeh_chart(p, use_container_width=True)

@@ -110,39 +110,36 @@ def render_selector():
 
 st.title("Search for patents")
 
-try:
-    patents, terms = render_selector()
-    main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
+patents, terms = render_selector()
+main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
 
-    if patents is not None:
-        with main_tab:
-            selection = dataframe_with_selections(patents)
+if patents is not None:
+    with main_tab:
+        selection = dataframe_with_selections(patents)
 
-            if selection is not None and len(selection) > 0:
-                columns = st.columns(len(selection))
-                for idx, selection in enumerate(selection.to_records()):
-                    with columns[idx]:
-                        render_detail(selection)
+        if selection is not None and len(selection) > 0:
+            columns = st.columns(len(selection))
+            for idx, selection in enumerate(selection.to_records()):
+                with columns[idx]:
+                    render_detail(selection)
 
-        with timeline_tab:
-            render_timeline(patents)
+    with timeline_tab:
+        render_timeline(patents)
 
-        with overview_tab:
-            gpt_client = GptApiClient()
-            st.write(
-                """
-                Ideas:
-                - What are the commonalities in these patents? (e.g. commonly co-occurring terms)
-                - What are the changing themes over time?
-                - What are the most common assignees, inventors, diseases, compounds, etc?
-                """
-            )
-            if terms is not None:
-                st.subheader(f"About these terms ({str(len(terms))})")
-                st.write(gpt_client.describe_terms(terms))
+    with overview_tab:
+        gpt_client = GptApiClient()
+        st.write(
+            """
+            Ideas:
+            - What are the commonalities in these patents? (e.g. commonly co-occurring terms)
+            - What are the changing themes over time?
+            - What are the most common assignees, inventors, diseases, compounds, etc?
+            """
+        )
+        if terms is not None:
+            st.subheader(f"About these terms ({str(len(terms))})")
+            st.write(gpt_client.describe_terms(terms))
 
-            if patents is not None:
-                st.subheader(f"About these patents ({str(len(patents))})")
-                render_umap(patents)
-except Exception as e:
-    st.error(f"An error occurred: {e}")
+        if patents is not None:
+            st.subheader(f"About these patents ({str(len(patents))})")
+            render_umap(patents)
