@@ -8,8 +8,8 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.palettes import all_palettes
 
-from common.topic import get_topics
-from .utils import caculate_umap_embedding, preprocess_with_tfidf
+from common.topic import calculate_umap_embedding, get_topics
+from .utils import preprocess_with_tfidf
 
 N_TOPICS = 10  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
 N_TOP_WORDS = 25
@@ -29,7 +29,7 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
     logging.info("Prepping data for UMAP")
     _, tfidf, tfidf_vectorizer, _ = preprocess_with_tfidf(df)
 
-    embedding = caculate_umap_embedding(tfidf)
+    embedding = calculate_umap_embedding(tfidf)
 
     topics, topic_embedding = get_topics(
         tfidf, tfidf_vectorizer.get_feature_names_out().tolist(), n_topics, N_TOP_WORDS

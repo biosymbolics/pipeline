@@ -5,12 +5,15 @@ from typing import NamedTuple
 from langchain.output_parsers import ResponseSchema
 from scipy.sparse import spmatrix  # type: ignore
 from sklearn.decomposition import NMF
+import umap
 import numpy as np
+import polars as pl
 import logging
 
 from clients.openai.gpt_client import GptApiClient
 
 RANDOM_STATE = 42
+KNN = 5
 
 TopicObjects = NamedTuple(
     "TopicObjects",
@@ -87,3 +90,28 @@ def get_topics(
     return TopicObjects(
         topics=list(topic_name_map.values()), topic_embedding=nmf_embedding
     )
+
+
+def calculate_umap_embedding(
+    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.1
+) -> pl.DataFrame:
+    """
+    Calculate the UMAP embedding
+
+    Args:
+        tfidf: tfidf matrix
+        knn: number of nearest neighbors
+        min_dist: minimum distance
+
+    Returns: UMAP embedding in a DataFrame (x, y)
+    """
+    logging.info("Attempting UMAP")
+    umap_embr = umap.UMAP(
+        n_neighbors=knn, metric="cosine", min_dist=min_dist, random_state=RANDOM_STATE
+    )
+    embedding = umap_embr.fit_transform(tfidf.toarray())
+
+    if not isinstance(embedding, np.ndarray):
+        raise TypeError("UMAP embedding is not a numpy array")
+    embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
+    return embedding

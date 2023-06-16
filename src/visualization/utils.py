@@ -81,18 +81,22 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
     )
 
 
-def caculate_umap_embedding(tfidf: spmatrix) -> pl.DataFrame:
+def caculate_umap_embedding(
+    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.1
+) -> pl.DataFrame:
     """
     Calculate the UMAP embedding
 
     Args:
         tfidf: tfidf matrix
+        knn: number of nearest neighbors
+        min_dist: minimum distance
 
     Returns: UMAP embedding in a DataFrame (x, y)
     """
     logging.info("Attempting UMAP")
     umap_embr = umap.UMAP(
-        n_neighbors=KNN, metric="cosine", min_dist=0.1, random_state=RANDOM_STATE
+        n_neighbors=knn, metric="cosine", min_dist=min_dist, random_state=RANDOM_STATE
     )
     embedding = umap_embr.fit_transform(tfidf.toarray())
 
