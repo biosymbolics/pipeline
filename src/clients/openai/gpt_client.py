@@ -84,7 +84,9 @@ class GptApiClient:
         """
         Simple query to describe terms
         """
-        query = "Describe the following terms and how they relate:\n" + "\n".join(terms)
+        query = "Provide a technical explanation of the following terms:\n" + "\n".join(
+            terms
+        )
         return self.query(query)
 
     def describe_topic(self, topic_features: list[str]) -> str:

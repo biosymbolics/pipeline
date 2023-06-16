@@ -8,12 +8,11 @@ import polars as pl
 import logging
 from scipy.sparse import spmatrix  # type: ignore
 import numpy as np
-import umap
+import spacy
 
 from common.utils.dataframe import find_string_columns
 
 MAX_FEATURES = 10000
-KNN = 5
 RANDOM_STATE = 42
 
 TfidfObjects = NamedTuple(
@@ -26,11 +25,21 @@ TfidfObjects = NamedTuple(
     ],
 )
 
+nlp = spacy.load("en_core_web_sm")
+
+
+def __keep_token(token) -> bool:
+    """
+    -PRON- is special lemma for pronouns
+    """
+    return token.lemma_ != "-PRON-" and token.pos_ in {"NOUN", "VERB", "ADJ", "ADV"}
+
 
 def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObjects:
     """
     Process the DataFrame to prepare it for dimensionality reduction.
     - Extract all strings and string arrays from the DataFrame (that's it, right now!!)
+    - Lemmatize with SpaCy
 
     TODO: try DictVectorizer
 
@@ -53,12 +62,12 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
         .to_series()
         .to_list()
     )
-    # all_tags: list[str] = (
-    #     df.select(pl.concat_list(find_string_array_columns(df)).flatten())
-    #     .to_series()
-    #     .to_list()
-    # )
-    content = [*all_strings]  # , *all_tags]
+
+    docs = [nlp(s) for s in all_strings]
+    content = [
+        " ".join([token.lemma_ for token in doc if __keep_token(token)]) for doc in docs
+    ]
+    logging.info(content)
     split_content = [doc.split(" ") for doc in content]
 
     logging.info("Extracting tf-idf features for NMF...")
@@ -79,28 +88,3 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
         tfidf_vectorizer=tfidf_vectorizer,
         dictionary=dictionary,
     )
-
-
-def caculate_umap_embedding(
-    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.1
-) -> pl.DataFrame:
-    """
-    Calculate the UMAP embedding
-
-    Args:
-        tfidf: tfidf matrix
-        knn: number of nearest neighbors
-        min_dist: minimum distance
-
-    Returns: UMAP embedding in a DataFrame (x, y)
-    """
-    logging.info("Attempting UMAP")
-    umap_embr = umap.UMAP(
-        n_neighbors=knn, metric="cosine", min_dist=min_dist, random_state=RANDOM_STATE
-    )
-    embedding = umap_embr.fit_transform(tfidf.toarray())
-
-    if not isinstance(embedding, np.ndarray):
-        raise TypeError("UMAP embedding is not a numpy array")
-    embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
-    return embedding

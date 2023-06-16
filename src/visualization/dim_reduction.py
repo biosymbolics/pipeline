@@ -12,7 +12,7 @@ from common.topic import calculate_umap_embedding, get_topics
 from .utils import preprocess_with_tfidf
 
 N_TOPICS = 10  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
-N_TOP_WORDS = 25
+N_TOP_WORDS = 15
 
 
 def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):

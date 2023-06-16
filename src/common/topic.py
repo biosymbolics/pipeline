@@ -93,7 +93,7 @@ def get_topics(
 
 
 def calculate_umap_embedding(
-    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.1
+    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.001
 ) -> pl.DataFrame:
     """
     Calculate the UMAP embedding
