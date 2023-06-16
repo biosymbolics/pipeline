@@ -93,3 +93,54 @@ def render_detail(patent: PatentApplication):
                 ]
             )
         )
+
+
+def render_dataframe(pl_df: pl.DataFrame):
+    """
+    Render a dataframe in streamlit app
+    (patent-specific; supports selection)
+
+    Args:
+        pl_df (pl.DataFrame): dataframe to render
+    """
+    if pl_df is None:
+        st.info("No results")
+        return
+    df = pl_df.to_pandas()
+    df.insert(0, "selected", False)
+    edited_df = st.data_editor(
+        df,
+        column_config={
+            "selected": st.column_config.CheckboxColumn(required=True),
+            "priority_date": st.column_config.DateColumn(
+                "priority date",
+                format="YYYY.MM.DD",
+            ),
+            "patent_years": st.column_config.NumberColumn(
+                "patent yrs",
+                help="Number of years left on patent",
+                format="%d years",
+            ),
+            "all_scores": st.column_config.BarChartColumn(
+                "scores",
+                help="Left: suitability; right: term relevancy",
+                width="small",
+            ),
+        },
+        column_order=[
+            "selected",
+            "publication_number",
+            "patent_years",
+            "all_scores",
+            "title",
+            "assignees",
+            "attributes",
+            "priority_date",
+            "ipc_codes",
+            "search_score",
+        ],
+        hide_index=True,
+        height=450,
+    )
+    selected_rows = df[edited_df.selected]
+    return selected_rows

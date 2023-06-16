@@ -32,17 +32,17 @@ def render_umap(
     TODO: generalize
     """
     logging.info("Prepping data for UMAP")
-    vectorization_model, vectorizer = preprocess_with_tfidf(df)
+    vectorized_data, vectorizer = preprocess_with_tfidf(df)
 
-    embedding = calculate_umap_embedding(vectorization_model)
-
-    topics, topic_embedding = get_topics(
-        vectorization_model,
+    topics, topic_embedding, dictionary = get_topics(
+        vectorized_data,
         vectorizer.get_feature_names_out().tolist(),
         n_topics,
         N_TOP_WORDS,
         context_terms,
     )
+
+    embedding, centroids = calculate_umap_embedding(vectorized_data, dictionary)
     embedding = embedding.with_columns(
         pl.lit(topic_embedding.argmax(axis=1)).alias("hue")
     )
@@ -89,6 +89,16 @@ def render_umap(
         name="df",
         legend_field="topic",
     )
+    for i in range(n_topics):
+        p.cross(
+            x=centroids[i, 0],
+            y=centroids[i, 1],
+            size=15,
+            color="grey",
+            line_width=1,
+            angle=0.79,
+        )
     p.add_tools(hover)  # type: ignore
+    p.legend.location = "bottom_left"
 
     st.bokeh_chart(p, use_container_width=True)

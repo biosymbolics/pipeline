@@ -10,7 +10,7 @@ import re
 from clients import patent_client
 from clients import GptApiClient
 from visualization.dim_reduction import render_umap
-from ui.patents import render_detail, render_timeline
+from ui.patent_components import render_dataframe, render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
 
@@ -33,50 +33,6 @@ def __format_terms(terms: list[str]) -> list[str]:
     Example: "asthma (100)" -> "asthma"
     """
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
-
-
-def dataframe_with_selections(pl_df: pl.DataFrame):
-    if pl_df is None:
-        st.info("No results")
-        return
-    df = pl_df.to_pandas()
-    df.insert(0, "selected", False)
-    edited_df = st.data_editor(
-        df,
-        column_config={
-            "selected": st.column_config.CheckboxColumn(required=True),
-            "priority_date": st.column_config.DateColumn(
-                "priority date",
-                format="YYYY.MM.DD",
-            ),
-            "patent_years": st.column_config.NumberColumn(
-                "patent yrs",
-                help="Number of years left on patent",
-                format="%d years",
-            ),
-            "all_scores": st.column_config.BarChartColumn(
-                "scores",
-                help="Left: suitability; right: term relevancy",
-                width="small",
-            ),
-        },
-        column_order=[
-            "selected",
-            "publication_number",
-            "patent_years",
-            "all_scores",
-            "title",
-            "assignees",
-            "attributes",
-            "priority_date",
-            "ipc_codes",
-            "search_score",
-        ],
-        hide_index=True,
-        height=450,
-    )
-    selected_rows = df[edited_df.selected]
-    return selected_rows
 
 
 @st.cache_resource
@@ -115,7 +71,7 @@ main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
 
 if patents is not None:
     with main_tab:
-        selection = dataframe_with_selections(patents)
+        selection = render_dataframe(patents)
 
         if selection is not None and len(selection) > 0:
             columns = st.columns(len(selection))

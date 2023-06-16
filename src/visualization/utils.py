@@ -16,10 +16,8 @@ RANDOM_STATE = 42
 TfidfObjects = NamedTuple(
     "TfidfObjects",
     [
-        ("vectorization_model", spmatrix),
+        ("vectorized_data", spmatrix),
         ("vectorizer", TfidfVectorizer),
-        # ("corpus", Any),
-        # ("dictionary", corpora.Dictionary),
     ],
 )
 
@@ -37,6 +35,11 @@ def __keep_token(token) -> bool:
         "ADJ",
         "ADV",
     }
+
+
+MAX_DOC_FREQ = 25
+MIN_DOC_FREQ = 2
+MAX_NGRAM_LENGTH = 3
 
 
 def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObjects:
@@ -73,17 +76,15 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
 
     logging.info("Extracting tf-idf features for NMF...")
     tfidf_vectorizer = TfidfVectorizer(
-        max_df=45,
-        min_df=3,
+        max_df=MAX_DOC_FREQ,
+        min_df=MIN_DOC_FREQ,
         max_features=n_features,
-        ngram_range=(1, 3),
+        ngram_range=(1, MAX_NGRAM_LENGTH),
         stop_words="english",
     )
     tfidf = tfidf_vectorizer.fit_transform(content)
-    # dictionary = corpora.Dictionary(split_content, prune_at=20000)
-    # corpus = [dictionary.doc2bow(text) for text in split_content]
 
     return TfidfObjects(
-        vectorization_model=tfidf,
+        vectorized_data=tfidf,
         vectorizer=tfidf_vectorizer,
     )

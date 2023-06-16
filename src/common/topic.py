@@ -18,10 +18,11 @@ from common.utils.dataframe import find_string_columns
 RANDOM_STATE = 42
 KNN = 5
 
-TopicObjects = NamedTuple(
-    "TopicObjects",
-    [("topics", list[str]), ("topic_embedding", np.ndarray)],
-)
+
+class TopicObjects(NamedTuple):
+    topics: list[str]
+    topic_embedding: np.ndarray
+    dictionary: np.ndarray  # would like to type this more specifically... i think (int, float) but not sure
 
 
 def describe_topics(
@@ -32,32 +33,33 @@ def describe_topics(
 
     Args:
         topic_features: a dictionary of topic id to list of features
+        context_terms: a list of context terms
 
     Returns: a dictionary of topic id to label
     """
     response_schemas = [
         ResponseSchema(name="id", description="the original topic id (int)"),
         ResponseSchema(name="label", description="the label (str)"),
-        # ResponseSchema(
-        #     name="description",
-        #     description="a detailed, technical description of what documents this topic contains (str)",
-        # ),
     ]
+
+    def __get_topic_prompt():
+        topic_map_desc = [
+            f"Topic {idx}: {', '.join(features)}\n"
+            for idx, features in topic_features.items()
+        ]
+        context_query = (
+            " given the context of " + ", ".join(context_terms) if context_terms else ""
+        )
+        query = f"""
+            Return a descriptive, succinct name (4 words or fewer) for each topic below{context_query},
+            maximizing orthagonality and semantic meaningfulness of the labels:
+            {topic_map_desc}
+        """
+        logging.debug("Label description prompt: %s", query)
+        return query
 
     client = GptApiClient(response_schemas)
-    topic_map_desc = [
-        f"Topic {idx}: {', '.join(features)}"
-        for idx, features in topic_features.items()
-    ]
-    context_query = (
-        " given the context of " + ", ".join(context_terms) if context_terms else ""
-    )
-    query = f"""
-        Return a descriptive, succinct name (4 words or fewer) for each topic below{context_query},
-        maximizing orthagonality:
-        {topic_map_desc}
-    """
-
+    query = __get_topic_prompt()
     results = client.query(query, is_array=True)
 
     if not isinstance(results, list):
@@ -69,7 +71,7 @@ def describe_topics(
 
 
 def get_topics(
-    fitted_matrix: spmatrix,
+    vectorized_data: spmatrix,
     feature_names: list[str],
     n_topics: int,
     n_top_words: int,
@@ -79,55 +81,68 @@ def get_topics(
     Get topics based on NMF
 
     Args:
-        fitted_matrix: fitted matrix
+        vectorized_data (spmatrix): vectorized data
         feature_names: vectorizer
         n_topics: number of topics
         n_top_words: number of top words to use in description
     """
 
     logging.info("Fitting the NMF model with tf-idf features")
-    nmf = NMF(n_components=n_topics, random_state=RANDOM_STATE, l1_ratio=0.5).fit(
-        fitted_matrix
-    )
-    nmf_embedding = nmf.transform(fitted_matrix)
+    nmf = NMF(n_components=n_topics, random_state=RANDOM_STATE, l1_ratio=0.5)
+    nmf = nmf.fit(vectorized_data)
+    embedding = nmf.transform(vectorized_data)
+    dictionary = nmf.components_  # aka factorization matrix
 
-    def __get_feature_names(feature_set: np.ndarray) -> list[str]:
+    def __get_feat_names(feature_set: np.ndarray) -> list[str]:
         top_features = feature_set.argsort()[: -n_top_words - 1 : -1]
         return [feature_names[i] for i in top_features]
 
     topic_map = dict(
-        [(idx, __get_feature_names(topic)) for idx, topic in enumerate(nmf.components_)]
+        [(idx, __get_feat_names(topic)) for idx, topic in enumerate(dictionary)]
     )
-    topic_name_map = describe_topics(topic_map, context_terms)
+    topic_name_map = describe_topics(topic_map, context_terms=context_terms)
 
     return TopicObjects(
-        topics=list(topic_name_map.values()), topic_embedding=nmf_embedding
+        topics=list(topic_name_map.values()),
+        topic_embedding=embedding,
+        dictionary=dictionary,
     )
 
 
 def calculate_umap_embedding(
-    tfidf: spmatrix, knn: int = KNN, min_dist: float = 0.001
-) -> pl.DataFrame:
+    vectorized_data: spmatrix,
+    dictionary: np.ndarray,
+    knn: int = KNN,
+    min_dist: float = 0.01,
+) -> tuple[pl.DataFrame, np.ndarray]:
     """
     Calculate the UMAP embedding
 
     Args:
-        tfidf: tfidf matrix
-        knn: number of nearest neighbors
-        min_dist: minimum distance
+        vectorized_data: vectorized data (tfidf matrix)
+        dictionary (np.ndarray): factorization matrix (aka dictionary)
+        knn (int): number of nearest neighbors
+        min_dist (float): minimum distance
 
     Returns: UMAP embedding in a DataFrame (x, y)
     """
-    logging.info("Attempting UMAP")
+    logging.info("Starting UMAP")
     umap_embr = umap.UMAP(
-        n_neighbors=knn, metric="cosine", min_dist=min_dist, random_state=RANDOM_STATE
+        n_neighbors=knn,
+        metric="euclidean",
+        min_dist=min_dist,
+        random_state=RANDOM_STATE,
     )
-    embedding = umap_embr.fit_transform(tfidf.toarray())
+    embedding = umap_embr.fit_transform(vectorized_data.toarray())
 
     if not isinstance(embedding, np.ndarray):
         raise TypeError("UMAP embedding is not a numpy array")
+
     embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
-    return embedding
+
+    centroids: np.ndarray = umap_embr.transform(dictionary)
+
+    return embedding, centroids
 
 
 def get_topics_with_bert(df: pl.DataFrame):
