@@ -14,7 +14,7 @@ RANDOM_STATE = 42
 
 TopicObjects = NamedTuple(
     "TopicObjects",
-    [("topics", list[str]), ("nmf_embedding", np.ndarray), ("nmf", NMF)],
+    [("topics", list[str]), ("topic_embedding", np.ndarray)],
 )
 
 
@@ -85,5 +85,5 @@ def get_topics(
     topic_name_map = describe_topics(topic_map)
 
     return TopicObjects(
-        topics=list(topic_name_map.values()), nmf_embedding=nmf_embedding, nmf=nmf
+        topics=list(topic_name_map.values()), topic_embedding=nmf_embedding
     )

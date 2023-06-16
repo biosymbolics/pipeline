@@ -31,11 +31,11 @@ def render_umap(df: pl.DataFrame, n_topics: int = N_TOPICS):
 
     embedding = caculate_umap_embedding(tfidf)
 
-    topics, nmf_embedding, _ = get_topics(
+    topics, topic_embedding = get_topics(
         tfidf, tfidf_vectorizer.get_feature_names_out().tolist(), n_topics, N_TOP_WORDS
     )
     embedding = embedding.with_columns(
-        pl.lit(nmf_embedding.argmax(axis=1)).alias("hue")
+        pl.lit(topic_embedding.argmax(axis=1)).alias("hue")
     )
     my_colors = [all_palettes["Category20"][N_TOPICS][i] for i in embedding["hue"]]
 
