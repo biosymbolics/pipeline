@@ -7,12 +7,10 @@ from gensim import corpora
 import polars as pl
 import logging
 from scipy.sparse import spmatrix  # type: ignore
-from sklearn.decomposition import NMF
 import numpy as np
 import umap
 
 from common.utils.dataframe import find_string_columns
-from common.topic import describe_topics
 
 MAX_FEATURES = 10000
 KNN = 5
@@ -26,11 +24,6 @@ TfidfObjects = NamedTuple(
         ("tfidf_vectorizer", TfidfVectorizer),
         ("dictionary", corpora.Dictionary),
     ],
-)
-
-NmfObjects = NamedTuple(
-    "NmfObjects",
-    [("topics", list[str]), ("nmf_embedding", np.ndarray), ("nmf", NMF)],
 )
 
 
@@ -66,7 +59,6 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
     #     .to_list()
     # )
     content = [*all_strings]  # , *all_tags]
-    logging.info(content)
     split_content = [doc.split(" ") for doc in content]
 
     logging.info("Extracting tf-idf features for NMF...")
@@ -86,42 +78,6 @@ def preprocess_with_tfidf(df: pl.DataFrame, n_features=MAX_FEATURES) -> TfidfObj
         tfidf=tfidf,
         tfidf_vectorizer=tfidf_vectorizer,
         dictionary=dictionary,
-    )
-
-
-def get_topics(
-    tfidf: spmatrix, tfidf_vectorizer: TfidfVectorizer, n_topics: int
-) -> NmfObjects:
-    """
-    Get topics based on NMF
-
-    Feed tfidf stuff from preprocess_with_tfidf()
-
-    Args:
-        tfidf: tfidf matrix
-        tfidf_vectorizer: tfidf vectorizer
-        n_topics: number of topics
-    """
-
-    logging.info("Fitting the NMF model with tf-idf features")
-    nmf = NMF(n_components=n_topics, random_state=RANDOM_STATE, l1_ratio=0.5).fit(tfidf)
-
-    nmf_embedding = nmf.transform(tfidf)
-    feature_names = list(tfidf_vectorizer.get_feature_names_out())
-
-    N_TOP_WORDS = 15
-
-    def __get_feature_names(feature_set: np.ndarray) -> list[str]:
-        top_features = feature_set.argsort()[: -N_TOP_WORDS - 1 : -1]
-        return [feature_names[i] for i in top_features]
-
-    topic_map = dict(
-        [(idx, __get_feature_names(topic)) for idx, topic in enumerate(nmf.components_)]
-    )
-    topic_name_map = describe_topics(topic_map)
-
-    return NmfObjects(
-        topics=list(topic_name_map.values()), nmf_embedding=nmf_embedding, nmf=nmf
     )
 
 
