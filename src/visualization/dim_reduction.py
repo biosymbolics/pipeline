@@ -12,8 +12,8 @@ from bokeh.palettes import all_palettes
 from common.topic import calculate_umap_embedding, get_topics
 from .utils import vectorize_data
 
-N_TOPICS = 15  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
-N_TOP_WORDS = 20
+N_TOPICS = 20  # TODO: coherence model - https://www.kaggle.com/code/yohanb/nmf-visualized-using-umap-and-bokeh/notebook
+N_TOP_WORDS = 15
 
 
 def render_umap(
@@ -93,7 +93,7 @@ def render_umap(
         p.cross(
             x=centroids[i, 0],
             y=centroids[i, 1],
-            size=15,
+            size=20,
             color="black",
             line_width=1,
             angle=0.79,

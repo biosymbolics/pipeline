@@ -17,7 +17,7 @@ from common.utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000
 RANDOM_STATE = 42
-MAX_DOC_FREQ = 100
+MAX_DOC_FREQ = 60
 MIN_DOC_FREQ = 2
 
 VectorizationObjects = NamedTuple(
@@ -31,7 +31,8 @@ VectorizationObjects = NamedTuple(
 
 class SpacyLemmatizer(TransformerMixin):
     def __init__(self):
-        self.nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+        self.nlp = spacy.load("en_core_web_sm", disable=["ner"])
+        self.nlp.add_pipe("merge_noun_chunks")
 
     def fit(self, X, y=None):
         return self

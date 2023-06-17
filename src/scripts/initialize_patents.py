@@ -251,6 +251,7 @@ FIELDS = [
     "assignee_harmonized",
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
     "citation",
+    # TODO: claims
     "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
     "family_id",
     "filing_date",

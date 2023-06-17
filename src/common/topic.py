@@ -16,7 +16,6 @@ from clients.openai.gpt_client import GptApiClient
 from common.utils.dataframe import find_string_columns
 
 RANDOM_STATE = 42
-KNN = 10
 
 
 class TopicObjects(NamedTuple):
@@ -119,15 +118,15 @@ def get_topics(
 def calculate_umap_embedding(
     vectorized_data: spmatrix,
     dictionary: np.ndarray,
-    knn: int = KNN,
-    min_dist: float = 0.05,
+    knn: int = 10,
+    min_dist: float = 0.75,
 ) -> tuple[pl.DataFrame, np.ndarray]:
     """
     Calculate the UMAP embedding
 
     Args:
         vectorized_data: vectorized data (tfidf matrix)
-        dictionary (np.ndarray): factorization matrix (aka dictionary)
+        dictionary (np.ndarray): factorization matrix
         knn (int): number of nearest neighbors
         min_dist (float): minimum distance
 
