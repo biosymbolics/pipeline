@@ -17,9 +17,8 @@ from common.utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000
 RANDOM_STATE = 42
-MAX_DOC_FREQ = 25
+MAX_DOC_FREQ = 35
 MIN_DOC_FREQ = 2
-MAX_NGRAM_LENGTH = 3
 
 VectorizationObjects = NamedTuple(
     "VectorizationObjects",
@@ -77,27 +76,25 @@ def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationOb
     # Use ColumnTransformer to apply these different preprocessing steps
     vectorizer = ColumnTransformer(
         transformers=[
-            *[
-                (
-                    f"{col}_vect",
-                    Pipeline(
-                        [
-                            ("lemmatizer", SpacyLemmatizer()),
-                            (
-                                "vectorizer",
-                                TfidfVectorizer(
-                                    max_df=MAX_DOC_FREQ,
-                                    min_df=MIN_DOC_FREQ,
-                                    max_features=n_features,
-                                    stop_words="english",
-                                ),
+            (
+                f"{col}_vect",
+                Pipeline(
+                    [
+                        ("lemmatizer", SpacyLemmatizer()),
+                        (
+                            "vectorizer",
+                            TfidfVectorizer(
+                                max_df=MAX_DOC_FREQ,
+                                min_df=MIN_DOC_FREQ,
+                                max_features=n_features,
+                                stop_words="english",
                             ),
-                        ]
-                    ),
-                    col,
-                )
-                for col in text_columns
-            ],
+                        ),
+                    ]
+                ),
+                col,
+            )
+            for col in text_columns
         ]
     )
     logging.info("Fitting vectorizer...")

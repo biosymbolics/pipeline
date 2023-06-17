@@ -102,7 +102,6 @@ def get_topics(
 
     def __get_feat_names(feature_set: np.ndarray) -> list[str]:
         top_features = feature_set.argsort()[: -n_top_words - 1 : -1]
-        logging.info("Top features: %s", top_features)
         return [str(feature_names[i]) for i in top_features]
 
     topic_map = dict(

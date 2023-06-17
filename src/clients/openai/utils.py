@@ -44,7 +44,6 @@ def __parse_answer_array(text: str, output_parser):
     try:
         parse_pipeline = [__remove_comment_syntax, __load_json_array]
         array = reduce(lambda x, f: f(x), parse_pipeline, text)  # type: ignore
-        logging.info("ARRAY? %s", array)
         final: list[dict] = [
             output_parser.parse("```json" + json.dumps(item) + "```") for item in array
         ]
