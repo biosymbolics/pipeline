@@ -120,7 +120,7 @@ def calculate_umap_embedding(
     vectorized_data: spmatrix,
     dictionary: np.ndarray,
     knn: int = KNN,
-    min_dist: float = 0.2,
+    min_dist: float = 0.05,
 ) -> tuple[pl.DataFrame, np.ndarray]:
     """
     Calculate the UMAP embedding
@@ -145,7 +145,7 @@ def calculate_umap_embedding(
     if not isinstance(embedding, np.ndarray):
         raise TypeError("UMAP embedding is not a numpy array")
 
-    embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Int64})
+    embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Float32})
 
     centroids = umap_embr.transform(dictionary)
 

@@ -17,7 +17,7 @@ from common.utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000
 RANDOM_STATE = 42
-MAX_DOC_FREQ = 35
+MAX_DOC_FREQ = 100
 MIN_DOC_FREQ = 2
 
 VectorizationObjects = NamedTuple(
@@ -69,6 +69,8 @@ def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationOb
     """
     text_columns = find_text_columns(df)
     text_df = df.select(pl.col(text_columns))
+
+    logging.info("Some rows: %s", text_df[0:8])
 
     if len(text_columns) == 0:
         raise ValueError("No text columns found in the DataFrame")

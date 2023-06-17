@@ -46,7 +46,7 @@ def render_umap(
     embedding = embedding.with_columns(
         pl.lit(topic_embedding.argmax(axis=1)).alias("hue")
     )
-    my_colors = [all_palettes["Category20"][N_TOPICS][i] for i in embedding["hue"]]
+    my_colors = [all_palettes["Category20"][n_topics][i] for i in embedding["hue"]]
 
     logging.info("Rendering UMAP")
     source = ColumnDataSource(
@@ -94,7 +94,7 @@ def render_umap(
             x=centroids[i, 0],
             y=centroids[i, 1],
             size=15,
-            color="grey",
+            color="black",
             line_width=1,
             angle=0.79,
         )
