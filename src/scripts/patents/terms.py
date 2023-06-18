@@ -2,7 +2,7 @@
 Functions to initialize the terms and synonym tables
 """
 from itertools import groupby
-from typing import TypedDict
+from typing import Optional, TypedDict
 import time
 from google.cloud import bigquery
 import logging
@@ -12,32 +12,70 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
 )
-from common.ner import TermNormalizer, NormalizationMap
+from common.ner import TermNormalizer
 from common.utils.list import batch, dedup
+from src.clients.patents.utils import clean_assignee
 
 from .local_constants import SYNONYM_MAP
 
-TermRecord = TypedDict(
-    "TermRecord",
-    {
-        "term": str,
-        "count": int,
-        "canonical_id": str,
-        "domains": list[str],
-        "original_terms": list[str],
-        "original_ids": list[str],
-    },
+BaseTermRecord = TypedDict(
+    "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
 )
 
 
-def __get_normalized_terms(rows):
+class TermRecord(BaseTermRecord):
+    domain: str
+    original_term: str
+    original_id: Optional[str]
+
+
+class AggregatedTermRecord(BaseTermRecord):
+    domains: list[str]
+    original_terms: list[str]
+    original_ids: list[str]
+
+
+def __aggregate_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
     """
-    Normalizes terms based on canonical matches; dedups.
+    Aggregates terms by term and canonical id
+
+    Args:
+        terms (list[TermRecord]): list of normalized term records (potentially with dup names)
+    """
+    # sort required for groupby
+    sorted_terms = sorted(terms, key=lambda row: row["term"].lower())
+    grouped_terms = groupby(sorted_terms, key=lambda row: row["term"].lower())
+
+    def __get_term_record(_group) -> AggregatedTermRecord:
+        group = list(_group)
+        return {
+            "term": group[0]["term"],  # non-lowered-term
+            "count": sum(row["count"] for row in group),
+            "canonical_id": group[0].get("canonical_id") or "",
+            "domains": dedup([row["domain"] for row in group]),
+            "original_terms": dedup([row["original_term"] for row in group]),
+            "original_ids": dedup([row["id"] for row in group]),
+        }
+
+    agg_terms = [__get_term_record(group) for _, group in grouped_terms]
+    return agg_terms
+
+
+def __get_entity_terms() -> list[AggregatedTermRecord]:
+    """
+    Creates entity terms from the annotations table
+    Normalizes terms and associates to canonical ids
 
     Args:
         rows: list of rows from the terms query
-        normalization_map: map of term to canonical term
     """
+    terms_query = f"""
+        SELECT preferred_name as term, ocid as id, count(*) as count, domain
+        FROM `{BQ_DATASET_ID}.gpr_annotations`
+        group by preferred_name, ocid, domain
+    """
+    rows = select_from_bg(terms_query)
+
     normalizer = TermNormalizer()
     normalization_map = normalizer.generate_map([row["term"] for row in rows])
 
@@ -47,18 +85,7 @@ def __get_normalized_terms(rows):
             return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
         return entry.canonical_name
 
-    def __get_term_record(_group) -> TermRecord:
-        group = list(_group)
-        return {
-            "term": [row["term"] for row in group][0],  # non-lowered-term
-            "count": sum(row["count"] for row in group),
-            "canonical_id": group[0].get("canonical_id") or "",
-            "domains": dedup([row["domain"] for row in group]),
-            "original_terms": dedup([row["original_term"] for row in group]),
-            "original_ids": dedup([row["original_id"] for row in group]),
-        }
-
-    normalized_terms = [
+    terms: list[TermRecord] = [
         {
             "term": __get_term(row),
             "count": row["count"] or 0,
@@ -67,15 +94,38 @@ def __get_normalized_terms(rows):
             ),
             "domain": row["domain"],
             "original_term": row["term"],
-            "original_id": row["ocid"],
+            "original_id": row["id"],
         }
         for row in rows
     ]
-    # sort required for groupby
-    sorted_terms = sorted(normalized_terms, key=lambda row: row["term"].lower())
-    grouped_terms = groupby(sorted_terms, key=lambda row: row["term"].lower())
 
-    terms = [__get_term_record(group) for _, group in grouped_terms]
+    return __aggregate_terms(terms)
+
+
+def __get_assignee_terms() -> list[AggregatedTermRecord]:
+    """
+    Creates assignee terms from the publications table
+    """
+    assignees_query = f"""
+        SELECT assignee.name as assignee, count(*) as count, "assignee" as domain
+        FROM `{BQ_DATASET_ID}.publications` p,
+        unnest(p.assignee_harmonized) as assignee
+        group by assignee
+    """
+    rows = select_from_bg(assignees_query)
+    normalized: list[TermRecord] = [
+        {
+            "term": clean_assignee(row["assignee"]),  # normalized assignee name
+            "count": row["count"] or 0,
+            "domain": row["domain"],
+            "canonical_id": None,
+            "original_term": row["term"],
+            "original_id": None,
+        }
+        for row in rows
+    ]
+
+    terms = __aggregate_terms(normalized)
     return terms
 
 
@@ -89,15 +139,11 @@ def __create_terms():
     """
     client = bigquery.Client()
 
-    terms_query = f"""
-        SELECT preferred_name as term, ocid, count(*) as count
-        FROM `{BQ_DATASET_ID}.gpr_annotations`
-        group by preferred_name, ocid
-    """
-    rows = select_from_bg(terms_query)
-
     # Normalize, dedupe, and count the terms
-    normalized_terms = __get_normalized_terms(rows)
+    entity_terms = __get_entity_terms()
+    assignee_terms = __get_assignee_terms()
+
+    terms = assignee_terms + entity_terms
 
     # Create a new table to hold the modified records
     new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
@@ -112,18 +158,17 @@ def __create_terms():
     new_table = client.create_table(new_table, exists_ok=True)
     time.sleep(15)  # wait. (TODO: should check for existence instead)
 
-    batched = batch(normalized_terms)
+    batched = batch(terms)
     for b in batched:
         client.insert_rows(new_table, b)
         logging.info(f"Inserted %s rows into terms table", len(b))
 
-    syn_map = {
-        og_term: row["term"]
-        for row in normalized_terms
-        for og_term in row["original_terms"]
+    # Persist term -> original_terms as synonyms
+    synonym_map = {
+        og_term: row["term"] for row in terms for og_term in row["original_terms"]
     }
 
-    __add_to_synonym_map(syn_map)
+    __add_to_synonym_map(synonym_map)
 
 
 def __create_synonym_map(synonym_map: dict[str, str]):
