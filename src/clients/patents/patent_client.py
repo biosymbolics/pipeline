@@ -39,7 +39,7 @@ SEARCH_RETURN_FIELDS = [
     "matched_term",
     "matched_domain",
     "matches.proteins as proteins",
-    "search_rank",  # search rank
+    "matched_publications.search_rank",  # search rank
     # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
@@ -96,7 +96,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
         SELECT {fields}
         FROM patents.applications AS applications
         JOIN (
-            SELECT publication_number
+            SELECT publication_number, AVG(search_rank) as search_rank
             FROM matches
             GROUP BY publication_number
             HAVING COUNT(DISTINCT matched_term) = ARRAY_LENGTH({lower_terms})  -- All terms must match
