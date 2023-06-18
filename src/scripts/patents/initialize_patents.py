@@ -18,26 +18,20 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermNormalizer, NormalizationMap
-from common.utils.list import dedup
-from scripts.local_constants import (
-    COMMON_ENTITY_NAMES,
-    SYNONYM_MAP,
-)
+from common.utils.list import batch, dedup
 
-BATCH_SIZE = 1000
+from .copy import copy_patent_tables
+from .local_constants import SYNONYM_MAP
+
 
 logging.basicConfig(level=logging.INFO)
 
-BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
-IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
 
-
-def __batch(a_list: list, batch_size=BATCH_SIZE) -> list:
-    return [a_list[i : i + batch_size] for i in range(0, len(a_list), batch_size)]
-
-
-# {'term': 'drug candidates', 'count': 28493, 'ocid': 229940000406}
 def __get_normalized_terms(rows, normalization_map: NormalizationMap):
+    """
+    Normalizes terms based on canonical matches; dedups.
+    """
+
     def __get_term(row):
         entry = normalization_map.get(row["term"])
         if not entry:
@@ -103,6 +97,7 @@ def __create_terms():
     new_table.schema = [
         bigquery.SchemaField("term", "STRING"),
         bigquery.SchemaField("count", "INTEGER"),
+        bigquery.SchemaField("domain", "STRING"),
         bigquery.SchemaField("canonical_id", "STRING", mode="REPEATED"),
         bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
         bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
@@ -110,16 +105,17 @@ def __create_terms():
     new_table = client.create_table(new_table, exists_ok=True)
     time.sleep(15)  # wait. silly.
 
-    batched = __batch(normalized_terms)
-    for batch in batched:
-        client.insert_rows(new_table, batch)
-        logging.info(f"Inserted {len(batch)} rows")
+    batched = batch(normalized_terms)
+    for b in batched:
+        client.insert_rows(new_table, b)
+        logging.info(f"Inserted {len(b)} rows")
 
     syn_map = {
-        og_term: row.get("term")
+        og_term: row["term"]
         for row in normalized_terms
         for og_term in row["original_terms"]
     }
+
     __add_to_synonym_map(syn_map)
 
 
@@ -149,88 +145,12 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
         for entry in synonym_map.items()
         if entry[1] is not None and entry[0] != entry[1]
     ]
-    batched = __batch(data)
+    batched = batch(data)
 
-    for batch in batched:
+    for b in batched:
         table_ref = client.dataset(BQ_DATASET).table("synonym_map")
-        errors = client.insert_rows_json(table_ref, batch)
-        logging.info("Inserted %s rows (errors: %s)", len(batch), errors)
-
-
-def __copy_gpr_publications():
-    """
-    Copy publications from GPR to a local table
-    """
-    query = f"""
-        SELECT * FROM `patents-public-data.google_patents_research.publications`
-        WHERE EXISTS
-        (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
-    """
-    query_to_bg_table(query, "gpr_publications")
-
-
-def __copy_gpr_annotations():
-    """
-    Copy annotations from GPR to a local table
-
-    To remove annotations after load:
-    ``` sql
-    UPDATE `patents.entities`
-    SET annotations = ARRAY(
-        SELECT AS STRUCT *
-        FROM UNNEST(annotations) as annotation
-        WHERE annotation.domain NOT IN ('chemClass', 'chemGroup', 'anatomy')
-    )
-    WHERE EXISTS(
-        SELECT 1
-        FROM UNNEST(annotations) AS annotation
-        WHERE annotation.domain IN ('chemClass', 'chemGroup', 'anatomy')
-    )
-    ```
-
-    or from gpr_annotations:
-    ``` sql
-    DELETE FROM `fair-abbey-386416.patents.gpr_annotations` where domain in
-    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
-    ```
-    """
-    SUPPRESSED_DOMAINS = (
-        "anatomy",
-        "chemCompound",  # 961,573,847
-        "chemClass",
-        "chemGroup",
-        "inorgmat",
-        "methods",  # lots of useless stuff
-        "nutrients",
-        "nutrition",  # 109,587,438
-        "polymers",
-        "toxicity",  # 6,902,999
-        "natprod",  # 23,053,704
-        "species",  # 179,305,306
-        "substances",  # 1,712,732,614
-    )
-    query = f"""
-        SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
-        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications
-        ON local_publications.publication_number = annotations.publication_number
-        WHERE annotations.confidence > 0.69
-        AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
-        AND domain not in {SUPPRESSED_DOMAINS}
-    """
-    query_to_bg_table(query, "gpr_annotations")
-
-
-def __copy_publications():
-    """
-    Copy publications from patents-public-data to a local table
-    """
-    query = f"""
-        SELECT publications.* FROM `patents-public-data.patents.publications` as publications
-        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
-        ON local_gpr.publication_number = publications.publication_number
-        WHERE application_kind = 'W'
-    """
-    query_to_bg_table(query, "publications")
+        errors = client.insert_rows_json(table_ref, b)
+        logging.info("Inserted %s rows (errors: %s)", len(b), errors)
 
 
 FIELDS = [
@@ -251,7 +171,7 @@ FIELDS = [
     "assignee_harmonized",
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
     "citation",
-    # TODO: claims
+    "claims_localized as claims",
     "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
     "family_id",
     "filing_date",
@@ -324,14 +244,8 @@ def main():
 
     Order matters. Non-idempotent.
     """
-    # copy gpr_publications table
-    # __copy_gpr_publications()
-
-    # copy publications table
-    # __copy_publications()
-
-    # copy gpr_annotations table
-    # __copy_gpr_annotations()
+    # copy gpr_publications, publications, gpr_annotations tables
+    # copy_patent_tables()
 
     # create synonym_map table (for final entity names)
     __create_synonym_map(SYNONYM_MAP)
