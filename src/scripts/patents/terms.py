@@ -70,16 +70,16 @@ def __get_entity_terms() -> list[AggregatedTermRecord]:
         rows: list of rows from the terms query
     """
     terms_query = f"""
-        SELECT preferred_name as term, ocid as id, count(*) as count, domain
+        SELECT preferred_name as term, ocid as original_id, domain, count(*) as count
         FROM `{BQ_DATASET_ID}.gpr_annotations`
-        group by preferred_name, ocid, domain
+        group by preferred_name, id, domain
     """
     rows = select_from_bg(terms_query)
 
     normalizer = TermNormalizer()
     normalization_map = normalizer.generate_map([row["term"] for row in rows])
 
-    def __get_term(row):
+    def __normalize(row):
         entry = normalization_map.get(row["term"])
         if not entry:
             return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
@@ -87,14 +87,14 @@ def __get_entity_terms() -> list[AggregatedTermRecord]:
 
     terms: list[TermRecord] = [
         {
-            "term": __get_term(row),
+            "term": __normalize(row),
             "count": row["count"] or 0,
             "canonical_id": getattr(
                 normalization_map.get(row["term"]) or (), "concept_id", None
             ),
             "domain": row["domain"],
             "original_term": row["term"],
-            "original_id": row["id"],
+            "original_id": row["original_id"],
         }
         for row in rows
     ]
@@ -107,7 +107,7 @@ def __get_assignee_terms() -> list[AggregatedTermRecord]:
     Creates assignee terms from the publications table
     """
     assignees_query = f"""
-        SELECT assignee.name as assignee, count(*) as count, "assignee" as domain
+        SELECT assignee.name as assignee, "assignee" as domain, count(*) as count
         FROM `{BQ_DATASET_ID}.publications` p,
         unnest(p.assignee_harmonized) as assignee
         group by assignee
@@ -119,7 +119,7 @@ def __get_assignee_terms() -> list[AggregatedTermRecord]:
             "count": row["count"] or 0,
             "domain": row["domain"],
             "canonical_id": None,
-            "original_term": row["term"],
+            "original_term": row["assignee"],
             "original_id": None,
         }
         for row in rows
