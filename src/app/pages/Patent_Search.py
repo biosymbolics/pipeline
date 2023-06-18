@@ -8,7 +8,11 @@ import logging
 import re
 
 from clients import patent_client
-from ui.patents import render_detail, render_timeline
+from clients import GptApiClient
+
+# from visualization.dim_reduction import render_umap
+from visualization.summary import render_summary
+from ui.patent_components import render_dataframe, render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
 
@@ -30,51 +34,7 @@ def __format_terms(terms: list[str]) -> list[str]:
     Removes trailing counts
     Example: "asthma (100)" -> "asthma"
     """
-    return [re.sub("\([0-9]{1,}\)$", "", term).strip() for term in terms]
-
-
-def dataframe_with_selections(pl_df: pl.DataFrame):
-    if pl_df is None:
-        st.info("No results")
-        return
-    df = pl_df.to_pandas()
-    df.insert(0, "selected", False)
-    edited_df = st.data_editor(
-        df,
-        column_config={
-            "selected": st.column_config.CheckboxColumn(required=True),
-            "priority_date": st.column_config.DateColumn(
-                "priority date",
-                format="YYYY.MM.DD",
-            ),
-            "patent_years": st.column_config.NumberColumn(
-                "patent yrs",
-                help="Number of years left on patent",
-                format="%d years",
-            ),
-            "all_scores": st.column_config.BarChartColumn(
-                "scores",
-                help="Left: suitability; right: term relevancy",
-                width="small",
-            ),
-        },
-        column_order=[
-            "selected",
-            "publication_number",
-            "patent_years",
-            "all_scores",
-            "title",
-            "assignees",
-            "attributes",
-            "priority_date",
-            "ipc_codes",
-            "search_score",
-        ],
-        hide_index=True,
-        height=450,
-    )
-    selected_rows = df[edited_df.selected]
-    return selected_rows
+    return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
 @st.cache_resource
@@ -84,33 +44,36 @@ def get_options():
 
 @st.cache_resource(experimental_allow_widgets=True)
 def get_data(options):
+    if not options:
+        return None
     terms = st.multiselect("Enter in terms for patent search", options=options)
     if not terms:
         st.error(f"Please enter patent terms.")
-        return
-    df = patent_client.search(__format_terms(terms))
-    return pl.from_dicts(cast(list[dict], df))
+        return None
+    terms = __format_terms(terms)
+    df = patent_client.search(terms)
+    return pl.from_dicts(cast(list[dict], df)), terms
 
 
 def render_selector():
     col1, col2 = st.columns([10, 1])
     with col1:
         options = get_options()
-        patents = get_data(options)
+        patents, terms = get_data(options) or (None, None)
     with col2:
         st.metric(label="Results", value=len(patents) if patents is not None else 0)
 
-    return patents
+    return patents, terms
 
 
 st.title("Search for patents")
 
-try:
-    patents = render_selector()
-    main_tab, timeline_tab = st.tabs(["Main", "Timeline"])
+patents, terms = render_selector()
+main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
 
+if patents is not None:
     with main_tab:
-        selection = dataframe_with_selections(patents)
+        selection = render_dataframe(patents)
 
         if selection is not None and len(selection) > 0:
             columns = st.columns(len(selection))
@@ -120,5 +83,18 @@ try:
 
     with timeline_tab:
         render_timeline(patents)
-except Exception as e:
-    st.error(f"An error occurred: {e}")
+
+    with overview_tab:
+        gpt_client = GptApiClient()
+        if terms is not None:
+            st.subheader(f"About these terms ({str(len(terms))})")
+            st.write(gpt_client.describe_terms(terms, ["biomedical research"]))
+
+        try:
+            if patents is not None:
+                st.subheader(f"About these patents ({str(len(patents))})")
+                render_summary(patents)
+                # render_umap(patents, terms)
+        except Exception as e:
+            logging.error(e)
+            st.error("Failed to render UMAP")

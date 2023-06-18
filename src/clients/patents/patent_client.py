@@ -1,7 +1,7 @@
 """
 Patent client
 """
-from typing import Sequence
+from typing import Sequence, cast
 import logging
 
 from clients import select_from_bg
@@ -135,4 +135,4 @@ def autocomplete_terms(string: str) -> list[str]:
         ORDER BY term ASC, count DESC
     """
     results = select_from_bg(query)
-    return [__format_term(result) for result in results]
+    return [__format_term(cast(TermResult, result)) for result in results]

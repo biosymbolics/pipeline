@@ -56,7 +56,7 @@ class GptApiClient:
 
     def __format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
-            logging.info("Formatting answer: %s", answer)
+            logging.debug("Formatting answer: %s", answer)
             return parse_answer(answer, self.output_parser, is_array, True)
 
         return answer
@@ -74,4 +74,38 @@ class GptApiClient:
             openai_api_key=OPENAI_API_KEY,
         )
         output = chat_model(input.to_messages())
-        return self.__format_answer(output.content, is_array=is_array)
+        try:
+            return self.__format_answer(output.content, is_array=is_array)
+        except Exception as e:
+            logging.warning("Error formatting answer: %s", e)
+            return output.content
+
+    def describe_terms(
+        self, terms: list[str], context_terms: Optional[list[str]] = None
+    ) -> str:
+        """
+        Simple query to describe terms
+
+        Args:
+            terms (list[str]): list of terms to describe
+            context_terms (list[str], optional): list of terms to provide context for the query
+        """
+        context_query = (
+            " in the context of: " + ", ".join(context_terms) if context_terms else ""
+        )
+        multiple_query = " and how they relate" if len(terms) > 1 else ""
+        query = f"""
+            Provide succinct, technical information about the following{context_query}{multiple_query}:
+            {", ".join(terms)}
+        """
+        return self.query(query)
+
+    def describe_topic(self, topic_features: list[str]) -> str:
+        """
+        Simple query to describe a topic
+        """
+        query = (
+            "Return a good, succinct name for the topic described by the following words:\n"
+            + "\n".join(topic_features)
+        )
+        return self.query(query)

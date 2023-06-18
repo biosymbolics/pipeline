@@ -13,21 +13,37 @@ import logging
 def __remove_comment_syntax(text: str) -> str:
     """
     Remove leading ```json and trailing ``` (and anything after it)
+
+    Example:
+        >>> obj_str = __remove_comment_syntax('```json\n{"k01":"t1","k02":"t2"}``` ```json\n{"k11":"t1","k12":"t2"},{"k21":"t1","k22":"t2"}```')
+        >>> json.loads(obj_str)
+        {'k11': 't1', 'k12': 't2'}, {'k21': 't1', 'k22': 't2'}
     """
-    cleaned = re.sub("```json|```.*", "", text, flags=re.DOTALL)
-    return cleaned
+    json_blocks = re.findall(r"```json(.*?)```", text, re.DOTALL)
+    if len(json_blocks) == 0:
+        return text
+    elif len(json_blocks) > 1:
+        return json_blocks[-1]  # return the last
+
+    return json_blocks[0]
 
 
-def __load_json(text: str) -> str:
-    return json.loads(text)
+def __load_json_array(text: str) -> list[str]:
+    """
+    (For typing)
+    """
+    array = json.loads(text)
+    if not isinstance(array, list):
+        raise Exception("Answer is not an array")
+    return array
 
 
 def __parse_answer_array(text: str, output_parser):
     # https://github.com/hwchase17/langchain/issues/1976
     logging.info("Naively parsing answer as array")
     try:
-        parse_pipeline = [__remove_comment_syntax, __load_json]
-        array = reduce(lambda x, f: f(x), parse_pipeline, text)
+        parse_pipeline = [__remove_comment_syntax, __load_json_array]
+        array = reduce(lambda x, f: f(x), parse_pipeline, text)  # type: ignore
         final: list[dict] = [
             output_parser.parse("```json" + json.dumps(item) + "```") for item in array
         ]
@@ -48,6 +64,8 @@ def parse_answer(
     Args:
         text (str): text to parse
         output_parser (OutputParser): output parser to use (optional)
+        is_array (bool): whether to parse as array (special handling required)
+        return_orig_on_fail (bool): whether to return original text on failure
     """
     try:
         if is_array:
