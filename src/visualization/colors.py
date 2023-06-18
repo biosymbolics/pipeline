@@ -1,3 +1,6 @@
+"""
+Color palettes for visualizations.
+"""
 # from bokeh.palettes
 Bokeh8 = (
     "#EC1557",
