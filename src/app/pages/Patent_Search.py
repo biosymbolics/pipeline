@@ -86,17 +86,9 @@ if patents is not None:
 
     with overview_tab:
         gpt_client = GptApiClient()
-        st.write(
-            """
-            Ideas:
-            - What are the commonalities in these patents? (e.g. commonly co-occurring terms)
-            - What are the changing themes over time?
-            - What are the most common assignees, inventors, diseases, compounds, etc?
-            """
-        )
-        # if terms is not None:
-        #     st.subheader(f"About these terms ({str(len(terms))})")
-        #     st.write(gpt_client.describe_terms(terms, ["biomedical research"]))
+        if terms is not None:
+            st.subheader(f"About these terms ({str(len(terms))})")
+            st.write(gpt_client.describe_terms(terms, ["biomedical research"]))
 
         try:
             if patents is not None:
