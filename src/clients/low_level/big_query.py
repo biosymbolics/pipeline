@@ -1,4 +1,5 @@
 from google.cloud import bigquery
+from google.cloud.bigquery.table import RowIterator
 import logging
 import os
 
@@ -9,14 +10,13 @@ BQ_DATASET = "patents"
 BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET
 
 
-def execute_bg_query(query: str):
+def execute_bg_query(query: str) -> RowIterator:
     """
     Execute BigQuery query
 
     Args:
         query (str): SQL query
     """
-    # Create a client
     client = bigquery.Client()
     logging.info("Starting query: %s", query)
 
@@ -39,9 +39,13 @@ def select_from_bg(query: str) -> list[dict]:
     return rows
 
 
-def query_to_bg_table(query, new_table_name: str):
+def query_to_bg_table(query: str, new_table_name: str):
     """
     Create a new table from a query
+
+    Args:
+        query (str): SQL query
+        new_table_name (str): name of the new table
     """
     logging.info("Creating table %s", new_table_name)
     create_table_query = f"CREATE TABLE `{BQ_DATASET_ID}.{new_table_name}` AS {query};"

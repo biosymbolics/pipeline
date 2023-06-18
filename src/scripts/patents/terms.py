@@ -14,7 +14,8 @@ from clients.low_level.big_query import (
 )
 from common.ner import TermNormalizer
 from common.utils.list import batch, dedup
-from src.clients.patents.utils import clean_assignee
+from clients.low_level.big_query import execute_bg_query
+from clients.patents.utils import clean_assignee
 
 from .local_constants import SYNONYM_MAP
 
@@ -133,9 +134,10 @@ def __create_terms():
     """
     Create a table of entities
 
-    - pulls distinct from the gpr_annotations table
+    - pulls distinct annotation and assigee values
     - normalizes the terms
     - inserts them into a new table
+    - adds synonym entries for the original terms
     """
     client = bigquery.Client()
 
@@ -180,13 +182,18 @@ def __create_synonym_map(synonym_map: dict[str, str]):
     """
     logging.info("Creating synonym map")
     client = bigquery.Client()
-    new_table = bigquery.Table(f"{BQ_DATASET_ID}.synonym_map")
-    new_table.schema = [
+    table_id = f"{BQ_DATASET_ID}.synonym_map"
+    table = bigquery.Table(table_id)
+    table.schema = [
         bigquery.SchemaField("synonym", "STRING"),
-        bigquery.SchemaField("term", "INTEGER"),
+        bigquery.SchemaField("term", "STRING"),
     ]
-    new_table = client.create_table(new_table, exists_ok=True)
-    time.sleep(15)  # wait. (TODO: should check for existence instead)
+    table = client.create_table(table, exists_ok=True)
+
+    # remove contents of synonym_map table if exists
+    logging.info("Truncating synonym map table")
+    truncate_query = f"TRUNCATE TABLE `{table_id}`"
+    execute_bg_query(truncate_query)
 
     logging.info("Adding default synonym map entries")
     __add_to_synonym_map(synonym_map)
