@@ -23,13 +23,13 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     "assignees",
-    "compounds",
+    "matches.compounds as compounds",
     # "cited_by",
     "country",
-    "diseases",
-    "effects",
+    "matches.diseases as diseases",
+    "matches.effects as effects",
     "family_id",
-    "genes",
+    "matches.genes as genes",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
     # "filing_date",
@@ -38,8 +38,8 @@ SEARCH_RETURN_FIELDS = [
     "ipc_codes",
     "matched_term",
     "matched_domain",
-    "proteins",
-    "search_rank",  # search rank
+    "matches.proteins as proteins",
+    "matched_publications.search_rank",  # search rank
     # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
@@ -95,8 +95,15 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
         )
         SELECT {fields}
         FROM patents.applications AS applications
+        JOIN (
+            SELECT publication_number, AVG(search_rank) as search_rank
+            FROM matches
+            GROUP BY publication_number
+            HAVING COUNT(DISTINCT matched_term) = ARRAY_LENGTH({lower_terms})  -- All terms must match
+        ) AS matched_publications
+        ON applications.publication_number = matched_publications.publication_number
         JOIN matches
-        ON applications.publication_number = matches.publication_number
+        ON matched_publications.publication_number = matches.publication_number
         WHERE
         priority_date > {max_priority_date} --- min patent life
         AND {COM_FILTER} --- composition of matter IPC codes
@@ -105,16 +112,6 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     """
     results = select_from_bg(query)
     return format_search_result(results)
-
-
-def __format_term(entity: TermResult) -> str:
-    """
-    Format an entity for autocomplete
-
-    Args:
-        entity (TermResult): entity to format
-    """
-    return f"{entity['term']} ({entity['count']})"
 
 
 def autocomplete_terms(string: str) -> list[str]:
@@ -127,6 +124,10 @@ def autocomplete_terms(string: str) -> list[str]:
 
     Returns: a list of matching terms
     """
+
+    def format_term(entity: TermResult) -> str:
+        return f"{entity['term']} ({entity['count']})"
+
     query = f"""
         SELECT *
         FROM patents.terms
@@ -135,4 +136,4 @@ def autocomplete_terms(string: str) -> list[str]:
         ORDER BY term ASC, count DESC
     """
     results = select_from_bg(query)
-    return [__format_term(cast(TermResult, result)) for result in results]
+    return [format_term(cast(TermResult, result)) for result in results]
