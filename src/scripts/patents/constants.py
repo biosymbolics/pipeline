@@ -2398,4 +2398,4 @@ _COMMON_ENTITY_NAMES = (
     "low-density polyethylene",
 )
 
-COMMON_ENTITY_NAMES = [name.lower() for name in _COMMON_ENTITY_NAMES]
+COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])

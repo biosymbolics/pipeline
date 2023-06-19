@@ -60,6 +60,8 @@ COMPANY_SUPPRESSIONS_DEFINITE = [
     "PATENTS",
     "THE",
     "OF$",
+    "^\\s*-",
+    "^\\s*&",
 ]
 
 COMPANY_SUPPRESSIONS_MAYBE = [

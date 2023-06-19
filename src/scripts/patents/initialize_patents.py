@@ -7,7 +7,11 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import query_to_bg_table, BQ_DATASET_ID
+from clients.low_level.big_query import (
+    delete_bg_table,
+    query_to_bg_table,
+    BQ_DATASET_ID,
+)
 
 from .copy_tables import copy_patent_tables
 from .terms import create_patent_terms
@@ -57,7 +61,7 @@ def __create_applications_table():
     """
     logging.info("Create a table of patent applications for use in app queries")
     applications = f"""
-        SELECT "
+        SELECT
         {','.join(FIELDS)}
         FROM `{BQ_DATASET_ID}.publications` as pubs,
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
@@ -71,20 +75,39 @@ def __create_annotations_table():
     Create a table of annotations for use in app queries
     """
     logging.info("Create a table of annotations for use in app queries")
+    table_id = "annotations"
+    delete_bg_table(table_id)
 
     entity_query = f"""
         WITH ranked_terms AS (
-            SELECT
-                publication_number,
-                ocid,
-                LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term,
-                domain,
-                confidence,
-                source,
-                character_offset_start,
-                ROW_NUMBER() OVER(PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) ORDER BY character_offset_start) as rank
-            FROM `{BQ_DATASET_ID}.gpr_annotations` a
-            LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym
+                --- existing annotations
+                SELECT
+                    publication_number,
+                    ocid,
+                    LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term,
+                    domain,
+                    confidence,
+                    source,
+                    character_offset_start,
+                    ROW_NUMBER() OVER(PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) ORDER BY character_offset_start) as rank
+                FROM `{BQ_DATASET_ID}.gpr_annotations` a
+                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym
+
+                UNION ALL
+
+                --- assignees as annotations
+                SELECT
+                    publication_number,
+                    0 as ocid,
+                    LOWER(IF(map.term IS NOT NULL, map.term, assignee.name)) as term,
+                    "assignee" as domain,
+                    1.0 as confidence,
+                    "record" as source,
+                    1 as character_offset_start,
+                    1 as rank
+                FROM `{BQ_DATASET_ID}.publications` p,
+                unnest(p.assignee_harmonized) as assignee
+                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(assignee.name) = map.synonym
         )
         SELECT
             publication_number,
@@ -96,7 +119,7 @@ def __create_annotations_table():
         WHERE rank = 1
         GROUP BY publication_number
     """
-    query_to_bg_table(entity_query, "annotations")
+    query_to_bg_table(entity_query, table_id)
 
 
 def main():
@@ -111,11 +134,11 @@ def main():
     # copy_patent_tables()
 
     # create terms and synonym map tables
-    create_patent_terms()
+    # create_patent_terms()
 
     # create the (small) tables against which the app will query
-    # __create_applications_table()
-    # __create_annotations_table()
+    __create_applications_table()
+    __create_annotations_table()
 
 
 if __name__ == "__main__":

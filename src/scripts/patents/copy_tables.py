@@ -63,7 +63,7 @@ def __copy_gpr_annotations():
     )
     query = f"""
         SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
-        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_publications
+        JOIN `{BQ_DATASET_ID}.publications` AS local_publications
         ON local_publications.publication_number = annotations.publication_number
         WHERE annotations.confidence > 0.69
         AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}

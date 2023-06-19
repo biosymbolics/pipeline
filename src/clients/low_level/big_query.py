@@ -74,3 +74,15 @@ def query_to_bg_table(query: str, new_table_name: str):
     logging.info("Creating table %s", new_table_name)
     create_table_query = f"CREATE TABLE `{BQ_DATASET_ID}.{new_table_name}` AS {query};"
     execute_bg_query(create_table_query)
+
+
+def delete_bg_table(table_name: str):
+    """
+    Delete a table
+
+    Args:
+        table_name (str): name of the table
+    """
+    logging.info("Deleting table %s", table_name)
+    delete_table_query = f"DROP TABLE IF EXISTS `{BQ_DATASET_ID}.{table_name}`;"
+    execute_bg_query(delete_table_query)
