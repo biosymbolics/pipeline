@@ -7,12 +7,9 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import (
-    query_to_bg_table,
-    BQ_DATASET_ID,
-)
+from clients.low_level.big_query import query_to_bg_table, BQ_DATASET_ID
 
-from .copy import copy_patent_tables
+from .copy_tables import copy_patent_tables
 from .terms import create_patent_terms
 
 logging.basicConfig(level=logging.INFO)
@@ -104,9 +101,11 @@ def __create_annotations_table():
 
 def main():
     """
-    Copy tables from patents-public-data to a local dataset
-
+    Copy tables from patents-public-data to a local dataset.
     Order matters. Non-idempotent.
+
+    Usage:
+        >>> python3 -m scripts.patents.initialize_patents
     """
     # copy gpr_publications, publications, gpr_annotations tables
     # copy_patent_tables()
@@ -116,7 +115,7 @@ def main():
 
     # create the (small) tables against which the app will query
     # __create_applications_table()
-    __create_annotations_table()
+    # __create_annotations_table()
 
 
 if __name__ == "__main__":

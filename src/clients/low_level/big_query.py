@@ -1,5 +1,8 @@
+from typing import Any, Callable
 from google.cloud import bigquery
 from google.cloud.bigquery.table import RowIterator
+from google.api_core.exceptions import NotFound
+import time
 import logging
 import os
 
@@ -26,6 +29,27 @@ def execute_bg_query(query: str) -> RowIterator:
     results = query_job.result()
     logging.info("Query complete")
     return results
+
+
+def execute_with_retries(db_func: Callable[[], Any]):
+    """
+    Retry a function that interacts with BigQuery if it fails with a NotFound error
+
+    Args:
+        db_func (function): function that interacts with BigQuery
+    """
+    retries = 0
+    max_retries = 5
+    while retries < max_retries:
+        try:
+            db_func()
+            break
+        except NotFound as e:
+            if retries < max_retries - 1:  # don't wait on last iteration
+                time.sleep(1 * retries + 1)  # backoff
+            retries += 1
+        except Exception as e:
+            raise e
 
 
 def select_from_bg(query: str) -> list[dict]:

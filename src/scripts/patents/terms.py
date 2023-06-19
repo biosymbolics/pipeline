@@ -14,10 +14,12 @@ from clients.low_level.big_query import (
 )
 from common.ner import TermNormalizer
 from common.utils.list import batch, dedup
-from clients.low_level.big_query import execute_bg_query
+from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
 
-from .local_constants import SYNONYM_MAP
+from .constants import SYNONYM_MAP
+
+MIN_ASSIGNEE_COUNT = 10
 
 BaseTermRecord = TypedDict(
     "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
@@ -55,7 +57,7 @@ def __aggregate_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
             "canonical_id": group[0].get("canonical_id") or "",
             "domains": dedup([row["domain"] for row in group]),
             "original_terms": dedup([row["original_term"] for row in group]),
-            "original_ids": dedup([row["id"] for row in group]),
+            "original_ids": dedup([row.get("original_id") for row in group]),
         }
 
     agg_terms = [__get_term_record(group) for _, group in grouped_terms]
@@ -73,7 +75,7 @@ def __get_entity_terms() -> list[AggregatedTermRecord]:
     terms_query = f"""
         SELECT preferred_name as term, ocid as original_id, domain, count(*) as count
         FROM `{BQ_DATASET_ID}.gpr_annotations`
-        group by preferred_name, id, domain
+        group by preferred_name, original_id, domain
     """
     rows = select_from_bg(terms_query)
 
@@ -127,7 +129,7 @@ def __get_assignee_terms() -> list[AggregatedTermRecord]:
     ]
 
     terms = __aggregate_terms(normalized)
-    return terms
+    return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
 
 
 def __create_terms():
@@ -148,7 +150,8 @@ def __create_terms():
     terms = assignee_terms + entity_terms
 
     # Create a new table to hold the modified records
-    new_table = bigquery.Table(f"{BQ_DATASET_ID}.terms")
+    table_id = f"{BQ_DATASET_ID}.terms"
+    new_table = bigquery.Table(table_id)
     new_table.schema = [
         bigquery.SchemaField("term", "STRING"),
         bigquery.SchemaField("canonical_id", "STRING"),
@@ -157,12 +160,12 @@ def __create_terms():
         bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
         bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
     ]
-    new_table = client.create_table(new_table, exists_ok=True)
-    time.sleep(15)  # wait. (TODO: should check for existence instead)
+    client.delete_table(table_id, not_found_ok=True)
+    new_table = client.create_table(new_table)
 
     batched = batch(terms)
     for b in batched:
-        client.insert_rows(new_table, b)
+        execute_with_retries(lambda: client.insert_rows(new_table, b))
         logging.info(f"Inserted %s rows into terms table", len(b))
 
     # Persist term -> original_terms as synonyms
@@ -170,7 +173,7 @@ def __create_terms():
         og_term: row["term"] for row in terms for og_term in row["original_terms"]
     }
 
-    __add_to_synonym_map(synonym_map)
+    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
 def __create_synonym_map(synonym_map: dict[str, str]):
@@ -188,15 +191,13 @@ def __create_synonym_map(synonym_map: dict[str, str]):
         bigquery.SchemaField("synonym", "STRING"),
         bigquery.SchemaField("term", "STRING"),
     ]
-    table = client.create_table(table, exists_ok=True)
 
-    # remove contents of synonym_map table if exists
-    logging.info("Truncating synonym map table")
-    truncate_query = f"TRUNCATE TABLE `{table_id}`"
-    execute_bg_query(truncate_query)
+    # remove and (re)create the table
+    client.delete_table(table_id, not_found_ok=True)
+    table = client.create_table(table)
 
     logging.info("Adding default synonym map entries")
-    __add_to_synonym_map(synonym_map)
+    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
 def __add_to_synonym_map(synonym_map: dict[str, str]):
