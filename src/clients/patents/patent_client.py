@@ -62,14 +62,16 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     Filters on
     - lower'd terms
     - priority date
-    - at least one composition of matter
+    - at least one composition of matter IPC code
 
     Args:
         terms (list[str]): list of terms to search for
 
     Returns: a list of matching patent applications
 
-    TODO: doesn't actually match typing - in particular, need to aggregate annotations.
+    TODO:
+        - search assignee?
+        - decay on returned entities
 
     Example:
         >>> search(['asthma', 'astrocytoma'])

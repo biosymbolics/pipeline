@@ -86,6 +86,8 @@ ASSIGNEE_MAP = {
     "koninklijke philips": "Philips",
     "max planck": "Max Planck",
     "novartis": "Novartis",
+    "gilead": "Gilead",
+    "dow": "Dow",
 }
 
 
@@ -111,9 +113,7 @@ def clean_assignee(assignee: str) -> str:
             COMPANY_SUPPRESSIONS_DEFINITE if only_definite else COMPANY_SUPPRESSIONS
         )
         suppress_re = "\\b" + get_or_re(suppressions) + "\\b"
-        return (
-            re.sub("(?i)" + suppress_re, "", string).rstrip("&[ ]*").strip("o|Of[ ]*")
-        )
+        return re.sub("(?i)" + suppress_re, "", string).rstrip("&[ ]*")
 
     def get_mapping(string, key):
         """
