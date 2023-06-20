@@ -47,13 +47,12 @@ def get_data(options):
     if not options:
         return None
     terms = st.multiselect("Enter in terms for patent search", options=options)
-    if st.button("Submit"):
-        if not terms:
-            st.error(f"Please enter patent terms.")
-            return None
-        terms = __format_terms(terms)
-        df = patent_client.search(terms)
-        return pl.from_dicts(cast(list[dict], df)), terms
+    if not terms:
+        st.error(f"Please enter patent terms.")
+        return None
+    terms = __format_terms(terms)
+    df = patent_client.search(terms)
+    return pl.from_dicts(cast(list[dict], df)), terms
 
 
 def render_selector():
