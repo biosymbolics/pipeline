@@ -130,7 +130,7 @@ def clean_assignee(assignee: str) -> str:
     def handle_mapping(string):
         mappings = [key for key in ASSIGNEE_MAP.keys() if get_mapping(string, key)]
         if len(mappings) > 0:
-            logging.info("Found mapping for assignee: %s -> %s", string, mappings[0])
+            logging.debug("Found mapping for assignee: %s -> %s", string, mappings[0])
             return ASSIGNEE_MAP[mappings[0]]
         return string
 

@@ -16,30 +16,30 @@ MIN_TERM_FREQUENCY = 100
 MAX_SEARCH_RESULTS = 2000
 
 SEARCH_RETURN_FIELDS = [
-    "applications.publication_number",
+    "apps.publication_number",
     "priority_date",
     "title",
     "abstract",
     # "application_kind",
     "application_number",
     "assignees",
-    "matches.compounds as compounds",
+    "compounds",
     # "cited_by",
     "country",
-    "matches.diseases as diseases",
-    "matches.effects as effects",
+    "diseases",
+    "effects",
     "family_id",
-    "matches.genes as genes",
+    "genes",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
     # "filing_date",
     # "grant_date",
     "inventors",
     "ipc_codes",
-    "matched_term",
-    "matched_domain",
-    "matches.proteins as proteins",
-    "matched_publications.search_rank",  # search rank
+    "matched_terms",
+    "matched_domains",
+    "proteins",
+    "search_rank",
     # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
@@ -94,22 +94,33 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
-        )
-        SELECT {fields}
-        FROM patents.applications AS applications
-        JOIN (
-            SELECT publication_number, AVG(search_rank) as search_rank
+        ),
+        grouped_matches AS (
+            SELECT
+                publication_number,
+                ARRAY_AGG(matched_term) as matched_terms,
+                ARRAY_AGG(matched_domain) as matched_domains,
+                AVG(search_rank) as search_rank,
+                ANY_VALUE(compounds) as compounds,
+                ANY_VALUE(diseases) as diseases,
+                ANY_VALUE(effects) as effects,
+                ANY_VALUE(genes) as genes,
+                ANY_VALUE(proteins) as proteins
             FROM matches
             GROUP BY publication_number
-            HAVING COUNT(DISTINCT matched_term) = ARRAY_LENGTH({lower_terms})  -- All terms must match
-        ) AS matched_publications
-        ON applications.publication_number = matched_publications.publication_number
-        JOIN matches
-        ON matched_publications.publication_number = matches.publication_number
+        )
+        SELECT {fields}
+        FROM patents.applications AS apps
+        JOIN (
+            SELECT *
+            FROM grouped_matches
+            WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms})
+        ) AS matched_pubs
+        ON apps.publication_number = matched_pubs.publication_number
         WHERE
-        priority_date > {max_priority_date} --- min patent life
-        AND {COM_FILTER} --- composition of matter IPC codes
-        ORDER BY search_rank DESC --- higher better; TODO: priority_date DESC
+        priority_date > {max_priority_date}
+        AND {COM_FILTER}
+        ORDER BY search_rank DESC
         limit {MAX_SEARCH_RESULTS}
     """
     results = select_from_bg(query)
