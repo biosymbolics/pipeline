@@ -7,6 +7,7 @@ __all__ = [
     "EFFECTS",
     "INDICATION_REGEXES",
     "INDICATION_MODIFIER_REGEXES",
+    "IUPAC_RE",
     "MOA_ACTIONS",
     "MOA_INFIXES",
     "MOA_SUFFIXES",
@@ -20,3 +21,4 @@ from .indication import INDICATION_MODIFIER_REGEXES, INDICATION_REGEXES
 from .moa import ACTIONS as MOA_ACTIONS, EFFECTS, MOA_INFIXES, MOA_SUFFIXES
 from .other import PHASE_RE
 from .small_molecules import SMALL_MOLECULE_INFIXES, SMALL_MOLECULE_SUFFIXES
+from .iupac import IUPAC_RE

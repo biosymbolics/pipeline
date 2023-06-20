@@ -3,11 +3,10 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
-from typing import Any, Optional, cast
+from typing import Any, Optional
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
-from spacy.pipeline.entityruler import EntityRuler
 from spacy.tokenizer import Tokenizer
 from pydash import flatten
 import logging

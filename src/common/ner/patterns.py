@@ -10,6 +10,7 @@ from constants.patterns import (
     BIOLOGIC_SUFFIXES,
     INDICATION_REGEXES,
     INDICATION_MODIFIER_REGEXES,
+    IUPAC_RE,
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
@@ -114,6 +115,7 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
 SMALL_MOLECULE_REGEXES = [
     get_suffix_entitiy_re(list(SMALL_MOLECULE_SUFFIXES.keys()), prefix_count="+"),
     get_infix_entity_re(list(SMALL_MOLECULE_INFIXES.keys()), count="+"),
+    IUPAC_RE,
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [

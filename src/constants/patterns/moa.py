@@ -12,12 +12,19 @@ ACTIONS = [
     "analog",
     "antagonist",
     "antigen",  # prostate stem cell antigen (PSCA)
+    "antibody",
+    "antibody constructs",
+    "binding molecule",
     "blocker",
     "blocking antibody",
     "chaperone",
+    "chemotherapy",
+    "compound",
     "conjugate",
     "protein degrader",
     "degrader",
+    "degradation",
+    "derivative",
     "down regulator",
     "down-regulator",
     "downregulator",
@@ -67,11 +74,10 @@ CAR_T_INFIXES = [
 BIOLOGIC_SUFFIXES = [
     "adoptive cell transfer",
     # "adjuvant", # more likely to be indication (e.g. Stage IB-IIIA Adjuvant NSCLC)
-    "antibody",
     "bispecific",
     "bispecific antibody",
     "cell therapy",
-    "chemotherapy",
+    "cell transfer therapy",
     "cytokine",
     "enzyme",
     # "factor",
@@ -122,6 +128,9 @@ MOA_SUFFIXES = [
     *EFFECTS,
     *BIOLOGIC_SUFFIXES,
     "regimen",
+    "therapy",
 ]
 
 MOA_INFIXES = [*DRUG_CLASS_TYPE, *CAR_T_INFIXES]
+
+MOA_PREFIXES = ["therapeutic", *[f"{action} of" for action in ACTIONS]]
