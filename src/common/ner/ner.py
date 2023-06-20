@@ -46,7 +46,9 @@ class NerTagger:
             get_default_tokenizer if get_tokenizer is None else get_tokenizer
         )
 
-    def __create_tagger(self):
+        self.__init_tagger()
+
+    def __init_tagger(self):
         nlp: Language = spacy.load(self.model)
         nlp.tokenizer = self.get_tokenizer(nlp)
 
@@ -70,21 +72,17 @@ class NerTagger:
             },
         )
 
-        self.nlp: Language = nlp
-
-    def init(self):
-        self.__create_tagger()
+        logging.info("Setting NER pipeline: %s", nlp)
+        self.nlp = nlp
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-        if not self.nlp:
-            self.__create_tagger()
-        self.nlp(*args, **kwds)
+        if self.nlp:
+            return self.nlp(*args, **kwds)
 
 
 def extract_named_entities(
     content: list[str],
-    get_tokenizer: Optional[GetTokenizer] = None,
-    rule_sets: Optional[list[SpacyPatterns]] = None,
+    tagger: NerTagger,
 ) -> list[str]:
     """
     Extract named entities from a list of content
@@ -94,12 +92,15 @@ def extract_named_entities(
 
     Args:
         content (list[str]): list of content on which to do NER
+        get_tokenizer (function): function to get tokenizer
         rule_sets (list[SpacyPatterns]): list of rule sets to apply
     """
-    tagger = NerTagger(rule_sets=rule_sets, get_tokenizer=get_tokenizer)
-
     docs = [tagger(batch) for batch in content]
     entities = flatten([doc.ents for doc in docs])
+
+    if not tagger.nlp:
+        logging.error("NER tagger not initialized")
+        return []
     enriched = enrich_with_canonical(entities, nlp=tagger.nlp)
     entity_names = clean_entities(list(enriched.keys()), common_nlp)
 
