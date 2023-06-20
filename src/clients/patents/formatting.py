@@ -3,6 +3,10 @@ Patent client
 """
 from typing import Any, Sequence, cast
 import polars as pl
+import logging
+
+from common.ner.ner import extract_named_entities
+from typings import PatentApplication
 
 from .score import calculate_score
 from .utils import (
@@ -10,18 +14,25 @@ from .utils import (
     get_patent_years,
     get_patent_attributes,
 )
-from typings import PatentBasicInfo
 
 
 def format_search_result(
     results: Sequence[dict[str, Any]]
-) -> Sequence[PatentBasicInfo]:
+) -> Sequence[PatentApplication]:
     """
     Format BigQuery patent search results and adds scores
 
     Args:
         results (list[dict]): list of search results
     """
+
+    def maybe_extract_ner(t):
+        try:
+            return extract_named_entities([str(t or "")])
+        except Exception as e:
+            logging.error("NER failure %s", e)
+            return []
+
     df = pl.from_dicts(results)
 
     df = df.with_columns(
@@ -33,9 +44,10 @@ def format_search_result(
             lambda r: [clean_assignee(assignee) for assignee in r]
         ),
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
+        pl.col("title").apply(maybe_extract_ner).alias("ner"),
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
 
-    return cast(Sequence[PatentBasicInfo], df.to_dicts())
+    return cast(Sequence[PatentApplication], df.to_dicts())

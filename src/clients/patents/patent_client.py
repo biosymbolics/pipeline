@@ -5,7 +5,7 @@ from typing import Sequence, cast
 import logging
 
 from clients import select_from_bg
-from typings import PatentBasicInfo
+from typings import PatentApplication
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES
 from .formatting import format_search_result
@@ -56,7 +56,7 @@ COM_FILTER = f"""
 """
 
 
-def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
+def search(terms: Sequence[str]) -> Sequence[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -65,12 +65,11 @@ def search(terms: Sequence[str]) -> Sequence[PatentBasicInfo]:
     - at least one composition of matter IPC code
 
     Args:
-        terms (list[str]): list of terms to search for
+        terms (Sequence[str]): list of terms to search for
 
     Returns: a list of matching patent applications
 
     TODO:
-        - search assignee?
         - decay on returned entities
 
     Example:

@@ -3,6 +3,7 @@ NER types
 """
 from typing import (
     Any,
+    Callable,
     Collection,
     Mapping,
     NamedTuple,
@@ -11,9 +12,10 @@ from typing import (
     TypedDict,
     Union,
 )
-
+from spacy.language import Language
 from spacy.pipeline import Pipe
 from spacy.tokens import Token
+from spacy.tokenizer import Tokenizer
 
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
@@ -56,3 +58,6 @@ def is_sci_spacy_linker(linker: Pipe) -> TypeGuard[SciSpacyLinker]:
     Check if entity is a valid SciSpacyLinker
     """
     return hasattr(linker, "kb") is not None
+
+
+GetTokenizer = Callable[[Language], Tokenizer]
