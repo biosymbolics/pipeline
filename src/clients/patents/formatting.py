@@ -4,6 +4,7 @@ Patent client
 from typing import Any, Sequence, cast
 import polars as pl
 import logging
+import concurrent.futures
 
 from common.ner.ner import NerTagger, extract_named_entities
 from typings import PatentApplication
@@ -27,13 +28,6 @@ def format_search_result(
     """
     tagger = NerTagger()
 
-    def maybe_extract_ner(t):
-        try:
-            return extract_named_entities([str(t or "")], tagger)
-        except Exception as e:
-            logging.error("NER failure %s", e)
-            return []
-
     df = pl.from_dicts(results)
 
     df = df.with_columns(
@@ -45,8 +39,15 @@ def format_search_result(
             lambda r: [clean_assignee(assignee) for assignee in r]
         ),
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
-        pl.col("title").apply(maybe_extract_ner).alias("ner"),
     )
+
+    # Parallelize NER task
+    titles = df.select(pl.col("title")).to_series()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        ners = pl.Series(
+            executor.map(lambda t: extract_named_entities([str(t)], tagger), titles)
+        ).alias("ner")
+        df = df.with_columns(ners)
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
