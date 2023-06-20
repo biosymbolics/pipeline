@@ -69,7 +69,7 @@ def render_selector():
 st.title("Search for patents")
 
 patents, terms = render_selector()
-main_tab, overview_tab, timeline_tab = st.tabs(["Main", "Overview", "Timeline"])
+main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])
 
 if patents is not None:
     with main_tab:
@@ -84,7 +84,7 @@ if patents is not None:
     with timeline_tab:
         render_timeline(patents)
 
-    with overview_tab:
+    with landscape_tab:
         gpt_client = GptApiClient()
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
