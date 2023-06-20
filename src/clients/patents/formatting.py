@@ -44,7 +44,7 @@ def format_search_result(
             lambda r: [clean_assignee(assignee) for assignee in r]
         ),
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
-        pl.col("title").apply(maybe_extract_ner).alias("ner"),
+        # pl.col("title").apply(maybe_extract_ner).alias("ner"),
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))

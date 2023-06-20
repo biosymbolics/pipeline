@@ -133,6 +133,7 @@ def render_dataframe(pl_df: pl.DataFrame):
             "patent_years",
             "all_scores",
             "title",
+            "ner",
             "assignees",
             "attributes",
             "priority_date",
