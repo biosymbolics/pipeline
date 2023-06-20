@@ -10,7 +10,7 @@ import logging
 import string
 
 from common.utils.list import dedup
-from common.utils.re import get_or_re, LEGAL_SYMBOLS
+from common.utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS
 
 CHAR_SUPPRESSIONS = [r"\n", *LEGAL_SYMBOLS]
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
@@ -69,9 +69,6 @@ def clean_entity(entity: str, char_suppressions: list[str] = CHAR_SUPPRESSIONS) 
 
     def remove_characters(entity: str) -> str:
         return re.sub(removal_pattern, " ", entity)
-
-    def remove_extra_spaces(entity: str) -> str:
-        return re.sub(r"\s+", " ", entity.strip())
 
     # List of cleaning functions to apply to entity
     cleaning_steps = [remove_characters, remove_extra_spaces]

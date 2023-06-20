@@ -2327,11 +2327,11 @@ _COMMON_ENTITY_NAMES = (
     "antitubercular antibiotics",
     "antibiotics, antitubercular",
     "ophthalmologic antibiotics",
+    "antibiotics, ophthalmologic",
     "intestinal antibiotics",
     "gynecological antibiotics",
     "antibiotics, gynecological",
     "antibiotics, antifungal",
-    "antibiotics, ophthalmologic",
     "topical antifungal antibiotics",
     "potato starch",
     "royal jelly",
@@ -2398,4 +2398,4 @@ _COMMON_ENTITY_NAMES = (
     "low-density polyethylene",
 )
 
-COMMON_ENTITY_NAMES = [name.lower() for name in _COMMON_ENTITY_NAMES]
+COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])

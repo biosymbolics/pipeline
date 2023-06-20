@@ -2,6 +2,7 @@
 Regex utilities
 """
 
+import re
 from typing import Literal, Optional, Union
 
 
@@ -51,3 +52,14 @@ def wrap(core_re: str) -> str:
     Returns a regex wrapped in a non-matching group
     """
     return "(?:" + core_re + ")"
+
+
+def remove_extra_spaces(string: str) -> str:
+    """
+    Removes extra spaces from a string
+    (also strips)
+
+    Args:
+        string (str): string to remove extra spaces from
+    """
+    return re.sub(r"\s+", " ", string).strip()

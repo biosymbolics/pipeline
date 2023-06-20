@@ -35,7 +35,7 @@ class TermNormalizer:
         self.kb = UmlsKnowledgeBase()
 
     def __get_normalized_entity(
-        self, candidate: MentionCandidate
+        self, candidates: list[MentionCandidate]
     ) -> Union[SpacyEntity, None]:
         """
         Get normalized name from candidate if suggestions exceed min similarity
@@ -43,8 +43,8 @@ class TermNormalizer:
         Args:
             candidate (MentionCandidate): candidate
         """
-        if len(candidate) > 0 and candidate[0].similarities[0] > MIN_SIMILARITY:
-            entity = self.kb.cui_to_entity[candidate[0].concept_id]
+        if len(candidates) > 0 and candidates[0].similarities[0] > MIN_SIMILARITY:
+            entity = self.kb.cui_to_entity[candidates[0].concept_id]
             return entity
 
         return None
