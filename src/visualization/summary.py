@@ -20,7 +20,7 @@ def __get_summary_chart(df: pl.DataFrame, column: str, idx: int) -> alt.Chart:
     Get a summary chart for a column
     """
     counts_by_column = (
-        df.select(pl.col(column).explode())
+        df.select(pl.col(column).explode().drop_nulls())
         .groupby(column)
         .agg(pl.count())
         .sort("count")
