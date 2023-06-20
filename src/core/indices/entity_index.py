@@ -28,7 +28,7 @@ from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
-from common.ner import extract_named_entities, NerTagger
+from common.ner import NerTagger
 from common.ner.tokenizers.sec_tokenizer import get_sec_tokenizer
 from common.utils.string import get_id
 from typings.indices import NamespaceKey
@@ -66,7 +66,7 @@ def create_entities_from_docs(
     """
     all_sections = flatten(section_map.values())
     tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
-    entities = extract_named_entities(all_sections, tagger)
+    entities = tagger.extract(all_sections)
 
     # this is the slow part
     for key, sections in section_map.items():

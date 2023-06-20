@@ -16,7 +16,7 @@ SMALL_MOLECULE_SUFFIXES = {
     "ium": "metal or compound",
     "mib": "Small molecules that work inside cancer cells to slow proliferation and increase apoptosis",
     "oxin": "compound or drug",
-    "nib": "small-molecule inhibitor",
+    "nib": "small-molecule inhibitor",  # e.g. lorlatinib maleate
     "rin": "compound or drug",
     "mten": "e.g. mavacamten",
     "xian": "e.g. milvexian",

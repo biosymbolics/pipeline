@@ -111,8 +111,8 @@ def clean_entities(entities: list[str], nlp: Language) -> list[str]:
             return not is_suppressed
 
         filtered = [entity for entity in entity_names if __filter(entity)]
-        without_common = remove_common_terms(nlp.vocab, filtered)
-        return dedup(without_common)
+        # without_common = remove_common_terms(nlp.vocab, filtered) # disabling for now
+        return dedup(filtered)
 
     def __clean_entities(entity_names: list[str]) -> list[str]:
         """

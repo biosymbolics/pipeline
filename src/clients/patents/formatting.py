@@ -6,7 +6,7 @@ import polars as pl
 import logging
 import concurrent.futures
 
-from common.ner.ner import NerTagger, extract_named_entities
+from common.ner.ner import NerTagger
 from typings import PatentApplication
 
 from .score import calculate_score
@@ -45,7 +45,7 @@ def format_search_result(
     titles = df.select(pl.col("title")).to_series()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         ners = pl.Series(
-            executor.map(lambda t: extract_named_entities([str(t)], tagger), titles)
+            executor.map(lambda t: tagger.extract([str(t)]), titles)
         ).alias("ner")
         df = df.with_columns(ners)
 

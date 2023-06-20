@@ -19,12 +19,12 @@ def compose_iupac_re() -> str:
         "ingenols",
         "tetr",
         "meth",
-        "prop",
+        # "prop",
         "pent",
         "hept",
-        "hect",
+        # "hect",
         "benz",
-        "phen",
+        # "phen",
         "acet",
         "oxol",
         "oxoc",
@@ -33,7 +33,7 @@ def compose_iupac_re() -> str:
         "sila",
         "bora",
         "oate",
-        "urea",
+        # "urea",
         "furo",
         "oxaz",
         "oxan",
@@ -43,8 +43,8 @@ def compose_iupac_re() -> str:
         "neon",
         "iron",
         "zinc",
-        "gold",
-        "lead",
+        # "gold",
+        # "lead",
         "hydro",
         "cyclo",
         "spiro",
@@ -369,7 +369,7 @@ def compose_iupac_re() -> str:
         + iupac_substr
         + get_or_re(strings, 1)
         + iupac_substr
-        + r"){2,})(?:[ \n]|$)"
+        + r"){1,})(?:[ \n]|$)"
     )
     return regex
 
