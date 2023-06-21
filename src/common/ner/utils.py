@@ -1,26 +1,11 @@
 """
 Utils for the NER pipeline
 """
-from typing import Callable, Literal
-import re
-from functools import reduce
-from spacy.language import Language
-from spacy.tokenizer import Tokenizer
-from spacy.vocab import Vocab
-from spacy.util import compile_infix_regex, compile_prefix_regex, compile_suffix_regex
-import logging
-import string
-
-from common.utils.list import dedup
 from common.utils.re import (
     get_or_re,
     ReCount,
     ALPHA_CHARS,
-    LEGAL_SYMBOLS,
 )
-
-from .tokenizers.html_tokenizer import create_html_tokenizer
-
 
 """
 Re utils
@@ -95,8 +80,3 @@ def get_suffix_entitiy_re(
         prefix_count (ReCount): number of alpha chars in prefix
     """
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
-
-
-"""
-Other utils
-"""

@@ -87,9 +87,6 @@ def serve_ner_viewer(docs: list[Doc], styles: list[ViewerStyle] = ["ent", "dep"]
         processes.append(process)
         process.start()
 
-    # for process in processes:
-    #     process.join()
-
 
 def show_pipeline(nlp: Language):
     """

@@ -93,8 +93,8 @@ if patents is not None:
         try:
             if patents is not None:
                 st.subheader(f"About these patents ({str(len(patents))})")
-                render_summary(patents)
+                render_summary(patents, None, ["top_terms"])
                 # render_umap(patents, terms)
         except Exception as e:
             logging.error(e)
-            st.error("Failed to render UMAP")
+            st.error("Failed to render")

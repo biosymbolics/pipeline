@@ -3,79 +3,137 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
-from typing import cast
+from typing import Any, Optional
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
-from spacy.pipeline.entityruler import EntityRuler
+from spacy.tokenizer import Tokenizer
 from pydash import flatten
 import logging
+import warnings
 
 from .cleaning import clean_entities
 from .debugging import debug_pipeline
 from .linking import enrich_with_canonical
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .tokenizers.sec_tokenizer import get_sec_tokenizer
-from .types import SpacyPatterns
+from .types import GetTokenizer, SpacyPatterns
+
+
+warnings.filterwarnings(
+    "ignore", category=UserWarning, module="torch.amp.autocast_mode"
+)
 
 common_nlp = spacy.load("en_core_web_sm")
 
-# loading here because this takes about 6 seconds per invocation
-# alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-sci_nlp: Language = spacy.load("en_core_sci_scibert")
+
+def get_default_tokenizer(nlp: Language):
+    return Tokenizer(nlp.vocab)
 
 
-def extract_named_entities(
-    content: list[str],
-    rule_sets: list[SpacyPatterns] = [
-        INDICATION_SPACY_PATTERNS,
-        INTERVENTION_SPACY_PATTERNS,
-    ],
-) -> list[str]:
-    """
-    Extract named entities from a list of content
-    - basic SpaCy pipeline
-    - applies rule_sets
-    - applies scispacy_linker (canonical mapping to UMLS)
+LINKER_CONFIG = {
+    "resolve_abbreviations": True,
+    "linker_name": "umls",
+    "threshold": 0.7,
+    "filter_for_definitions": False,
+    "no_definition_threshold": 0.7,
+}
 
-    Args:
-        content (list[str]): list of content on which to do NER
-        rule_sets (list[SpacyPatterns]): list of rule sets to apply
-    """
-    sci_nlp.tokenizer = get_sec_tokenizer(sci_nlp)
 
-    sci_nlp.add_pipe("merge_entities", after="ner")
+class NerTagger:
+    def __init__(
+        self,
+        model: str = "en_core_sci_scibert",  # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        rule_sets: Optional[list[SpacyPatterns]] = None,
+        get_tokenizer: Optional[GetTokenizer] = None,
+    ):
+        """
+        Named-entity recognition using spacy
 
-    ruler: EntityRuler = cast(
-        EntityRuler,
-        sci_nlp.add_pipe(
+        Args:
+            model (str, optional): SpaCy model. Defaults to "en_core_sci_scibert".
+            rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
+            get_tokenizer (Optional[GetTokenizer], optional): SpaCy tokenizer. Defaults to None.
+
+        Example:
+            >>> from src.common.ner.ner import NerTagger
+            >>> ner = NerTagger()
+            >>> ner("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
+        """
+        self.model = model
+        self.rule_sets = (
+            [
+                INDICATION_SPACY_PATTERNS,
+                INTERVENTION_SPACY_PATTERNS,
+            ]
+            if rule_sets is None
+            else rule_sets
+        )
+
+        self.get_tokenizer = (
+            get_default_tokenizer if get_tokenizer is None else get_tokenizer
+        )
+
+        self.__init_tagger()
+
+    def __init_tagger(self):
+        nlp: Language = spacy.load(self.model)
+        nlp.tokenizer = self.get_tokenizer(nlp)
+
+        nlp.add_pipe("merge_entities", after="ner")
+        ruler = nlp.add_pipe(
             "entity_ruler",
             config={"validate": True, "overwrite_ents": True},
             after="merge_entities",
-        ),
-    )
+        )
+        for set in self.rule_sets:
+            ruler.add_patterns(set)  # type: ignore
 
-    for set in rule_sets:
-        ruler.add_patterns(set)  # type: ignore
+        nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
-    sci_nlp.add_pipe(
-        "scispacy_linker",
-        config={
-            "resolve_abbreviations": True,
-            "linker_name": "umls",
-            "threshold": 0.7,
-            "filter_for_definitions": False,
-            "no_definition_threshold": 0.7,
-        },
-    )
+        logging.info("Setting NER pipeline: %s", nlp)
+        self.nlp = nlp
 
-    docs = [sci_nlp(batch) for batch in content]
+    def extract(self, content: list[str]):
+        """
+        Extract named entities from a list of content
+        - basic SpaCy pipeline
+        - applies rule_sets
+        - applies scispacy_linker (canonical mapping to UMLS)
 
-    entities = flatten([doc.ents for doc in docs])
-    enriched = enrich_with_canonical(entities, nlp=sci_nlp)
-    entity_names = clean_entities(list(enriched.keys()), common_nlp)
+        Args:
+            content (list[str]): list of content on which to do NER
 
-    logging.info("Entity names: %s", entity_names)
-    # debug_pipeline(docs, nlp)
+        Examples:
+            >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
+            >>> tagger.extract("Interferon alpha and omega antibody antagonists")
+            >>> tagger.extract("Inhibitors of beta secretase")
+            >>> tagger.extract("Antibodies specifically binding hla-dr/colii_259 complex and their uses")
+            >>> tagger.extract("Use of small molecules to enhance mafa expression in pancreatic endocrine cells")
+            >>> tagger.extract("Macrocyclic 2-amino-3-fluoro-but-3-enamides as inhibitors of mcl-1")
+            >>> tagger.extract("Inhibitors of antigen presentation by hla-dr")
+            >>> tagger.extract("Antibodies specifically binding tim-3 and their uses")
+            >>> tagger.extract("Antibodies and antigen binding peptides for factor xia inhibitors and uses thereof")
+            >>> tagger.extract("P2x7 modulating n-acyl-triazolopyrazines")
+            >>> tagger.extract("Small molecule inhibitors of the jak family of kinases")
+            >>> tagger.extract("Inhibitors of keap1-nrf2 protein-protein interaction")
+        """
+        if not isinstance(content, list):
+            content = [content]
 
-    return entity_names
+        docs = [self.nlp(batch) for batch in content]
+        entities = flatten([doc.ents for doc in docs])
+
+        if not self.nlp:
+            logging.error("NER tagger not initialized")
+            return []
+        enriched = enrich_with_canonical(entities, nlp=self.nlp)
+        entity_names = clean_entities(list(enriched.keys()), common_nlp)
+
+        logging.info("Entity names: %s", entity_names)
+        # debug_pipeline(docs, nlp)
+
+        return entity_names, [ent.lemma_ for ent in entities], enriched
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        if self.nlp:
+            return self.extract(*args, **kwds)

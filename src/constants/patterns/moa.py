@@ -12,12 +12,19 @@ ACTIONS = [
     "analog",
     "antagonist",
     "antigen",  # prostate stem cell antigen (PSCA)
+    "antibody",
+    "antibody constructs",
+    "binding molecule",
     "blocker",
     "blocking antibody",
     "chaperone",
+    "chemotherapy",
+    "compound",
     "conjugate",
     "protein degrader",
     "degrader",
+    "degradation",
+    "derivative",
     "down regulator",
     "down-regulator",
     "downregulator",
@@ -27,6 +34,7 @@ ACTIONS = [
     "immuno modulator",
     "inducer",
     "inhibitor",
+    "inhibition",
     "ligase modulator",
     "modulator",
     "potentiator",
@@ -48,30 +56,15 @@ CONJUGATE_TYPES = [
     "nanoparticle conjugate",
 ]
 
-CAR_T_INFIXES = [
-    "car[-\\s]?t",
-    "car[-\\s]?nk",
-    "chimeric antigen receptor.*",
-    "bcma nke",
-    "nke",
-    "natural killer(?: cells)?",
-    "nkt(?: cells)?",
-    "nkc",
-    "cd[0-9]{1,2}",
-    "cd[0-9]{1,2}-cd[0-9]{2}",
-    "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20
-    "cd[0-9]{1,2}x[A-Z]{3,6}",  # CD3xPSCA
-    "il[0-9]{1,2}-cd[0-9]{2}",
-]
-
 BIOLOGIC_SUFFIXES = [
     "adoptive cell transfer",
     # "adjuvant", # more likely to be indication (e.g. Stage IB-IIIA Adjuvant NSCLC)
-    "antibody",
     "bispecific",
     "bispecific antibody",
+    "blockade",
+    "cells",
     "cell therapy",
-    "chemotherapy",
+    "cell transfer therapy",
     "cytokine",
     "enzyme",
     # "factor",
@@ -79,10 +72,13 @@ BIOLOGIC_SUFFIXES = [
     "fab(?: region)?",
     "fc",
     "fc[-\\s]fusion(?: protein)?",
+    "fragment",
     "fusion protein",
     f"gene (?:{ALPHA_CHARS(4)}\\s?)?therapy",
     "growth factor",
     "hormone",
+    "isoform",
+    "ligand",
     "monoclonal antibody",
     "mab",
     "mrna",
@@ -93,6 +89,7 @@ BIOLOGIC_SUFFIXES = [
     "protein",
     "sirna",
     "stem cell transplant",
+    "substitute",
     "tumor[-\\s]infiltrating lymphocyte",
     "t[-\\s]?cell engager",
     "tce",
@@ -105,23 +102,50 @@ BIOLOGIC_SUFFIXES = [
     *CONJUGATE_TYPES,
 ]
 
-DRUG_CLASS_TYPE = [
-    f"anti[-\\s]?{ALPHA_CHARS('+')} agent",
-    f"anti[-\\s]?{ALPHA_CHARS('+')}s",
-    f"anti-{ALPHA_CHARS('+')}",
-]
-
 EFFECTS = [
     *ACTIONS,
     *["dual[-\\s]?" + effect for effect in ACTIONS],
     *["tri[-\\s]?" + effect for effect in ACTIONS],
 ]
 
+DRUG_CLASS_TYPE = [
+    f"anti[-\\s]?{ALPHA_CHARS('+')} agent",
+    f"anti[-\\s]?{ALPHA_CHARS('+')}s",
+    f"anti-{ALPHA_CHARS('+')}",
+]
+
+CAR_T_INFIXES = [
+    "car[-\\s]?t",
+    "car[-\\s]?nk",
+    "(?:targeting )?chimeric antigen receptor.*",
+    "bcma nke",
+    "nke",
+    "natural killer(?: cells)?",
+    "nkt(?: cells)?",
+    "nkc",
+    "cd[0-9]{1,2}",
+    "cd[0-9]{1,2}-cd[0-9]{2}",
+    "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20
+    "cd[0-9]{1,2}x[A-Z]{3,6}",  # CD3xPSCA
+    "il[0-9]{1,2}-cd[0-9]{2}",
+]
+
+MOA_INFIXES = [
+    *DRUG_CLASS_TYPE,
+    *CAR_T_INFIXES,
+    ".+-targeted",
+    ".+-based",
+    ".+-binding",
+]
 
 MOA_SUFFIXES = [
     *EFFECTS,
     *BIOLOGIC_SUFFIXES,
+    "composition",
     "regimen",
+    "therapy",
+    "variants",
 ]
 
-MOA_INFIXES = [*DRUG_CLASS_TYPE, *CAR_T_INFIXES]
+
+MOA_PREFIXES = ["recombinant", "therapeutic", *ACTIONS]

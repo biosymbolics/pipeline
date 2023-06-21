@@ -5,11 +5,13 @@ NER Patterns (SpaCy)
 from typing import cast
 from constants.patterns import (
     MOA_INFIXES,
+    MOA_PREFIXES,
     MOA_SUFFIXES,
     BIOLOGIC_INFIXES,
     BIOLOGIC_SUFFIXES,
     INDICATION_REGEXES,
     INDICATION_MODIFIER_REGEXES,
+    IUPAC_RE,
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
@@ -45,8 +47,10 @@ MOA_PATTERNS: list = [
                 "OP": "*",
             },
             {
-                "LOWER": {
-                    "REGEX": get_entity_re(moa_infix + ALPHA_CHARS("*")),
+                "LEMMA": {
+                    "REGEX": get_entity_re(
+                        moa_infix + ALPHA_CHARS("*"), is_case_insensitive=True
+                    ),
                 },
             },
             {
@@ -55,6 +59,22 @@ MOA_PATTERNS: list = [
             },
         ]
         for moa_infix in MOA_INFIXES
+    ],
+    *[
+        [
+            {
+                "LEMMA": {
+                    "REGEX": get_entity_re(
+                        moa_prefix + ALPHA_CHARS("*"), is_case_insensitive=True
+                    ),
+                },
+            },
+            {
+                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
+                "OP": "*",
+            },
+        ]
+        for moa_prefix in MOA_PREFIXES
     ],
 ]
 
@@ -114,6 +134,7 @@ BIOLOGICAL_PATTERNS: list[list[dict]] = [
 SMALL_MOLECULE_REGEXES = [
     get_suffix_entitiy_re(list(SMALL_MOLECULE_SUFFIXES.keys()), prefix_count="+"),
     get_infix_entity_re(list(SMALL_MOLECULE_INFIXES.keys()), count="+"),
+    IUPAC_RE,
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
