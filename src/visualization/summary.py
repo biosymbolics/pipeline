@@ -29,11 +29,11 @@ def __get_summary_chart(df: pl.DataFrame, column: str, idx: int) -> alt.Chart:
         .to_pandas()
     )
     chart = (
-        alt.Chart(counts_by_column, title=column)
+        alt.Chart(counts_by_column, title=column, width=150)
         .mark_bar()
         .encode(
             x=alt.X("count", axis=alt.Axis(title="")),
-            y=alt.X(column, axis=alt.Axis(labelLimit=200, title=""), sort="-x"),
+            y=alt.X(column, axis=alt.Axis(labelLimit=300, title=""), sort="-x"),
             color=alt.value(Bokeh8[idx % len(Bokeh8)]),
         )
     )

@@ -26,39 +26,6 @@ SMALL_MOLECULE_SUFFIXES = {
     # Add more suffixes as needed
 }
 
-suffixes_examples = {
-    "acid": "Acetic acid",
-    "al": "Ethanal",
-    "aldo": "Aldohexose",
-    "aldoxime": "Aldoxime",
-    "amide": "Acetamide",
-    "amine": "Ethanamine",
-    "aminium": "Aminium ion",
-    "anide": "Acetanilide",
-    "arine": "Benzothiophene",
-    "ate": "Nitrate",
-    "azo": "Azobenzene",
-    "azole": "Benzoxazole",
-    "carbonyl": "Acetone (propanone)",
-    "dithiol": "Ethanedithiol",
-    "ene": "Ethene",
-    "ide": "Chloride",
-    "idine": "Cytidine",
-    "ium": "Ammonium",
-    "ketoxime": "Acetoxime",
-    "oate": "Acetoate",
-    "ol": "Ethanol",
-    "one": "Propanone",
-    "oic acid": "Ethanoic acid",
-    "oxy": "Ethoxyethane",
-    "oxyl": "Methoxyl",
-    "selenal": "Selenal",
-    "tellural": "Tellural",
-    "thiol": "Ethanethiol",
-    "yne": "Ethyne",
-    "yl": "Methyl",
-}
-
 SMALL_MOLECULE_INFIXES = {
     # "anti": "antibiotic or compound",
     "barb": "barbiturate or compound",
