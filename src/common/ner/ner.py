@@ -8,9 +8,11 @@ import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
+from spacy_llm.util import assemble
 from pydash import flatten
 import logging
 import warnings
+import spacy_llm
 
 from .cleaning import clean_entities
 from .debugging import debug_pipeline
@@ -22,6 +24,8 @@ from .types import GetTokenizer, SpacyPatterns
 warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
+spacy_llm.logger.addHandler(logging.StreamHandler())
+spacy_llm.logger.setLevel(logging.DEBUG)
 
 common_nlp = spacy.load("en_core_web_sm")
 
@@ -42,7 +46,10 @@ LINKER_CONFIG = {
 class NerTagger:
     def __init__(
         self,
-        model: str = "en_core_sci_scibert",  # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        use_llm: Optional[bool] = False,
+        model: Optional[
+            str
+        ] = "en_core_sci_scibert",  # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
     ):
@@ -50,16 +57,13 @@ class NerTagger:
         Named-entity recognition using spacy
 
         Args:
+            use_llm (Optional[bool], optional): Use LLM model. Defaults to False. if true, nothing below is used.
             model (str, optional): SpaCy model. Defaults to "en_core_sci_scibert".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
             get_tokenizer (Optional[GetTokenizer], optional): SpaCy tokenizer. Defaults to None.
-
-        Example:
-            >>> from src.common.ner.ner import NerTagger
-            >>> ner = NerTagger()
-            >>> ner("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
         """
         self.model = model
+        self.use_llm = use_llm
         self.rule_sets = (
             [
                 INDICATION_SPACY_PATTERNS,
@@ -76,17 +80,24 @@ class NerTagger:
         self.__init_tagger()
 
     def __init_tagger(self):
-        nlp: Language = spacy.load(self.model)
-        nlp.tokenizer = self.get_tokenizer(nlp)
-
-        nlp.add_pipe("merge_entities", after="ner")
-        ruler = nlp.add_pipe(
-            "entity_ruler",
-            config={"validate": True, "overwrite_ents": True},
-            after="merge_entities",
+        nlp: Language = (
+            spacy.blank("en")
+            if self.use_llm or not self.model
+            else spacy.load(self.model)
         )
-        for set in self.rule_sets:
-            ruler.add_patterns(set)  # type: ignore
+
+        if self.use_llm:
+            nlp = assemble("configs/config.cfg")
+        else:
+            nlp.tokenizer = self.get_tokenizer(nlp)
+            nlp.add_pipe("merge_entities", after="ner")
+            ruler = nlp.add_pipe(
+                "entity_ruler",
+                config={"validate": True, "overwrite_ents": True},
+                after="merge_entities",
+            )
+            for set in self.rule_sets:
+                ruler.add_patterns(set)  # type: ignore
 
         nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
@@ -132,7 +143,7 @@ class NerTagger:
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
 
-        return entity_names, [ent.lemma_ for ent in entities], enriched
+        return entity_names, entities, enriched
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
