@@ -1,0 +1,35 @@
+- text: Safe and effective method of treating ulcerative colitis with anti-il-12/il23 antibody
+  entities:
+    MECHANISM:
+      - anti-il-12/il23 antibody
+    DISEASE:
+      - ulcerative colitis
+- text: Improved synthetic methods of making (2h-1,2,3-triazol-2-yl)phenyl compounds as orexin receptor modulators
+  entities:
+    CLASS:
+      - (2h-1,2,3-triazol-2-yl)phenyl compounds
+    MECHANISM:
+      - orexin receptor modulator
+- text: Compositions and methods related to antibodies that neutralize coagulase activity during staphylococcus aureus disease
+  entities:
+    MECHANISM:
+      - coagulase-neutralizing antibodies
+    DISEASE:
+      - staphylococcus aureus
+- text: Methods of treating multiple myeloma with a triplet therapy of carfilzomib, dexamethasone, and an antibody that specifically recognizes cd38.
+  entities:
+    COMPOUND:
+      - carfilzomib
+      - dexamethasone
+    MECHANISM:
+      - cd38 antibody
+    DISEASE:
+      - multiple myeloma
+- text: GBA1 Gene Therapy (PR001)  Parkinson's disease  Phase II Phase II trial is ongoing.
+  entities:
+    MECHANISM:
+      - GBA1 Gene Therapy
+    COMPOUND:
+      - PR001
+    DISEASE:
+      - Parkinson's disease
