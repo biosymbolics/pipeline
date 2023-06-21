@@ -2,7 +2,7 @@
 Contains the functions to train the NER model.
 """
 from functools import partial
-from skweak import base, heuristics, generative, aggregation
+from skweak import base, heuristics, generative, aggregation, utils
 from spacy.matcher import Matcher
 from spacy.language import Language
 from spacy.tokens import Doc
@@ -55,11 +55,19 @@ def train_ner(nlp: Language, content: list[str]):
 
     # create and fit the HMM aggregation model
     hmm = generative.HMM("hmm", ["INTERVENTION", "INDICATION"])
-    hmm.fit(docs)
-    logging.info("Aggregation complete")
 
-    hmm.fit_and_aggregate(docs)
+    # hmm.fit(docs)
+
+    docs = hmm.fit_and_aggregate(docs)
     logging.info("Fit and aggregate complete")
 
     # save/load/return
-    hmm.save("hmm-inter-inda.pkl")
+    for doc in docs:
+        doc.ents = doc.spans["hmm"]
+        utils.docbin_writer(docs, "../data/patent-sci.spacy")
+
+    """
+    !spacy init config - --lang en --pipeline ner --optimize accuracy | \
+    spacy train - --paths.train ../data/patent-sci.spacy  --paths.dev ../data/patent-sci.spacy \
+    --initialize.vectors en_core_sci_scibert --output ../data/patent-sci
+    """
