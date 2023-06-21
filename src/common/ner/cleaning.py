@@ -39,7 +39,9 @@ def remove_common_terms(
         is_common = set(words).issubset(vocab.strings)
 
         # check if any words are in the exception list
-        is_excepted = len(set(exception_list).intersection(set(words))) > 0
+        is_excepted = (
+            len(set(exception_list).intersection(set(words))) > 0 or len(words) > 1
+        )  # HACK!
 
         is_common_not_excepted = is_common and not is_excepted
 
@@ -111,8 +113,8 @@ def clean_entities(entities: list[str], nlp: Language) -> list[str]:
             return not is_suppressed
 
         filtered = [entity for entity in entity_names if __filter(entity)]
-        # without_common = remove_common_terms(nlp.vocab, filtered) # disabling for now
-        return dedup(filtered)
+        without_common = remove_common_terms(nlp.vocab, filtered)  # disabling for now
+        return dedup(without_common)
 
     def __clean_entities(entity_names: list[str]) -> list[str]:
         """

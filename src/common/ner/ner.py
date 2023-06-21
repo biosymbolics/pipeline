@@ -138,9 +138,8 @@ class NerTagger:
         if not self.nlp:
             logging.error("NER tagger not initialized")
             return []
-        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = [ent.text for ent in entities]
-        entity_names = clean_entities(entity_names, common_nlp)
+        enriched = enrich_with_canonical(entities, nlp=self.nlp)
+        entity_names = clean_entities(list(enriched.keys()), common_nlp)
 
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
