@@ -1,12 +1,12 @@
 """
 Utils for linking canonical entities
 """
-import spacy
-from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
+from scispacy.umls_linking import (
+    UmlsEntityLinker,
+)  # required to use 'scispacy_linker' pipeline
 from spacy.tokens import Span
 from spacy.language import Language
 
-from common.ner.types import is_sci_spacy_linker
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
 from common.utils.list import has_intersection
 

@@ -5,7 +5,9 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from typing import Any, Optional
 import spacy
-from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
+from scispacy.umls_linking import (
+    UmlsEntityLinker,
+)  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy_llm.util import assemble
@@ -47,9 +49,8 @@ class NerTagger:
     def __init__(
         self,
         use_llm: Optional[bool] = False,
-        model: Optional[
-            str
-        ] = "en_core_sci_scibert",  # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        model: Optional[str] = "en_core_sci_scibert",
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
     ):
@@ -99,7 +100,7 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
+        # nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
         logging.info("Setting NER pipeline: %s", nlp)
         self.nlp = nlp
@@ -137,13 +138,14 @@ class NerTagger:
         if not self.nlp:
             logging.error("NER tagger not initialized")
             return []
-        enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = clean_entities(list(enriched.keys()), common_nlp)
+        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
+        entity_names = [ent.text for ent in entities]
+        entity_names = clean_entities(entity_names, common_nlp)
 
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
 
-        return entity_names, entities, enriched
+        return entity_names
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
