@@ -10,58 +10,74 @@ import logging
 
 from . import patterns
 
+ENTITITES = {
+    "INDICATION": patterns.INDICATION_PATTERNS,
+    "INTERVENTION": patterns.ALL_INTERVENTION_PATTERNS,
+}
 
-def annotate(doc: Doc, label: str, patterns: list[list[dict]], nlp):
+
+def annotate(doc: Doc, nlp: Language):
+    """
+    Annotate a document with a label and patterns
+
+    Args:
+        doc (Doc): SpaCy document
+        nlp (Language): SpaCy language model
+    """
     matcher = Matcher(nlp.vocab)
-    matcher.add(label, patterns)
-    matches = matcher(doc)
-    for match_id, start, end in matches:
-        yield start, end, label
+
+    for label, patterns in ENTITITES.items():
+        matcher.add(label, patterns)
+
+    matches = matcher(doc, as_spans=True)
+
+    for span in matches:
+        yield span.start, span.end, span.label_
 
 
-def train_ner(nlp: Language, content: list[str]):
+def weakly_train_ner(nlp: Language, content: list[str]):
+    """
+    Train the NER model using weak supervision
+
+    Args:
+        nlp (Language): SpaCy language model
+        content (list[str]): List of strings to train on
+
+    TODO:
+        - specificity patterns?
+        - majority voter - least common denominator isn't useful.
+    """
     docs = list(nlp.pipe(content))
 
-    annotate_indication = partial(
-        annotate, label="INDICATION", patterns=patterns.INDICATION_PATTERNS, nlp=nlp
-    )
-    annotate_intervention = partial(
-        annotate,
-        label="INTERVENTION",
-        patterns=patterns.ALL_INTERVENTION_PATTERNS,
-        nlp=nlp,
-    )
-
     logging.info("Creating FunctionAnnotator")
-    lf1 = heuristics.FunctionAnnotator("intervention", annotate_intervention)
-    lf2 = heuristics.FunctionAnnotator("indication", annotate_indication)
+    lf1 = heuristics.FunctionAnnotator(
+        "entities",
+        partial(
+            annotate,
+            nlp=nlp,
+        ),
+    )
 
     maj_voter = aggregation.MajorityVoter(
         "doclevel_voter",
-        ["INTERVENTION", "INDICATION"],
+        list(ENTITITES.keys()),
         initial_weights={"doc_majority": 0.0},
     )  # We do not want to include doc_majority itself in the vote
 
     combined = base.CombinedAnnotator()
     combined.add_annotator(lf1)
-    combined.add_annotator(lf2)
     docs = list(combined.pipe(docs))
     docs = list(maj_voter.pipe(docs))
 
-    print("INTERVENTION", docs[0].spans["intervention"])
-    print("VOTER", docs[0].spans["doclevel_voter"])
+    logging.info("Entities on doc 0: %s", docs[0].spans["entities"])
+    logging.info("Entities on doc 0 (VOTER): %s", docs[0].spans["doclevel_voter"])
 
     logging.info("Aggregation started")
-
-    # create and fit the HMM aggregation model
-    hmm = generative.HMM("hmm", ["INTERVENTION", "INDICATION"])
-
-    # hmm.fit(docs)
-
+    hmm = generative.HMM("hmm", list(ENTITITES.keys()))
     docs = hmm.fit_and_aggregate(docs)
+
     logging.info("Fit and aggregate complete")
 
-    # save/load/return
     for doc in docs:
         doc.ents = doc.spans["hmm"]
 
