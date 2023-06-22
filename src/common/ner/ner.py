@@ -100,7 +100,7 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        # nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
+        nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
         logging.info("Setting NER pipeline: %s", nlp)
         self.nlp = nlp

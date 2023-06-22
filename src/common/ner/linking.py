@@ -1,9 +1,7 @@
 """
 Utils for linking canonical entities
 """
-from scispacy.umls_linking import (
-    UmlsEntityLinker,
-)  # required to use 'scispacy_linker' pipeline
+from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.tokens import Span
 from spacy.language import Language
 

@@ -8,7 +8,7 @@ from scispacy.candidate_generation import (
     UmlsKnowledgeBase,
     MentionCandidate,
 )
-from scispacy.umls_utils import UmlsEntity as SpacyEntity
+from scispacy.linking_utils import Entity as SpacyEntity
 
 MIN_SIMILARITY = 0.85
 
