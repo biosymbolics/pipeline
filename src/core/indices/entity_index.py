@@ -49,6 +49,12 @@ def create_entity_indices(
 ):
     """
     For each entity in the provided list, summarize based on the document and persist in an index
+
+    Args:
+        entities (list[str]): list of entities
+        namespace_key (NamespaceKey): namespace key
+        documents (list[str]): list of documents
+        confirm_entities (bool, optional): whether to confirm entities. Defaults to True.
     """
     index = SourceDocIndex()
     index.add_documents(namespace_key, documents)
@@ -120,7 +126,6 @@ class EntityIndex:
     def __init__(
         self,
         context_args: ContextArgs = ENTITY_INDEX_CONTEXT_ARGS,
-        type: str = "intervention",
     ):
         """
         Initialize EntityIndex
@@ -131,13 +136,13 @@ class EntityIndex:
         self.context_args = context_args
         self.index = None
         self.index_impl = GPTVectorStoreIndex
-        self.type = type
         self.__load()
 
     def __get_namespace(
         self,
         source: NamespaceKey,
         entity_id: Optional[str] = None,
+        entity_type: Optional[str] = "intervention",
     ) -> NamespaceKey:
         """
         Namespace for the entity, e.g.
@@ -149,27 +154,34 @@ class EntityIndex:
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
         ns = (
-            {**source._asdict(), "entity": get_id(entity_id), "entity_type": self.type}
+            {
+                **source._asdict(),
+                "entity": get_id(entity_id),
+                "entity_type": entity_type,
+            }
             if entity_id
             else source._asdict()
         )
         return dict_to_named_tuple(ns)
 
-    @property
-    def __response_schemas(self) -> list[ResponseSchema]:
+    def __get_response_schemas(self, entity_type: str) -> list[ResponseSchema]:
         """
         Get response schemas for this entity
         """
         response_schemas = [
-            ResponseSchema(name="name", description=f"normalized {self.type} name"),
+            ResponseSchema(name="name", description=f"normalized {entity_type} name"),
             ResponseSchema(
-                name="details", description=f"details about this {self.type}"
+                name="details", description=f"details about this {entity_type}"
             ),
         ]
         return response_schemas
 
     def __describe_entity_by_source(
-        self, entity_id: str, source_index: SourceDocIndex, source: NamespaceKey
+        self,
+        entity_id: str,
+        source_index: SourceDocIndex,
+        source: NamespaceKey,
+        entity_type: str = "intervention",
     ) -> EntityObj:
         """
         Get the description of an entity by querying the source index
@@ -183,7 +195,7 @@ class EntityIndex:
         query = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity_id)
 
         # get the answer as json
-        output_parser = get_output_parser(self.__response_schemas)
+        output_parser = get_output_parser(self.__get_response_schemas(entity_type))
         fmt_qa_tmpl = output_parser.format(DEFAULT_TEXT_QA_PROMPT_TMPL)
         fmt_refine_tmpl = output_parser.format(DEFAULT_REFINE_PROMPT_TMPL)
         qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
