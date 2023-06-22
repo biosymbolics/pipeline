@@ -6,7 +6,7 @@ import re
 
 from common.utils.html_parsing.html import strip_inline_styles
 from common.utils.misc import dict_to_named_tuple
-from core.indices.entity_index import create_entities_from_docs
+from core.indices import entity_index
 from typings.indices import NamespaceKey
 
 from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
@@ -17,6 +17,9 @@ def __format_for_ner(doc: str) -> str:
     Format HTML content for NER processing
     - strip styles
     - remove certain characters
+
+    Args:
+        doc (str): HTML content
     """
     stop_words = ["^", "ª", "*", "--"]
     escaped_stop_words = [re.escape(word) for word in stop_words]
@@ -35,7 +38,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
     Args:
         ticker: stock ticker for company (e.g. BMY, PFE)
         start_date (date): start date
-        end_date (date): end date
+        end_date (date, optional): end date, defaults to now
     """
     section_map = fetch_annual_reports(
         ticker, start_date, end_date, formatter=__format_for_ner
@@ -51,4 +54,4 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             }
         )
 
-    create_entities_from_docs(section_map, get_namespace_key)
+    entity_index.create_from_docs(section_map, get_namespace_key)

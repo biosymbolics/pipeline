@@ -41,7 +41,7 @@ INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
-def create_entities_from_docs(
+def create_from_docs(
     section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
 ):
     """
@@ -64,6 +64,24 @@ def create_entities_from_docs(
                 create_from_docs(section_map, get_namespace_key)
             ```
     """
+
+    def __create_indices(
+        entities: list[str],
+        namespace_key: NamespaceKey,
+        documents: list[str],
+    ):
+        """
+        For each entity in the provided list, summarize based on the document and persist in an index
+        """
+        index = SourceDocIndex()
+        index.add_documents(namespace_key, documents)
+        for entity in entities:
+            try:
+                idx = EntityIndex()
+                idx.add_node(entity, index, namespace_key)
+            except Exception as e:
+                logging.error(f"Error creating entity index for {entity}: {e}")
+
     all_sections = flatten(section_map.values())
     tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
     entities = tagger.extract(all_sections)
@@ -71,34 +89,11 @@ def create_entities_from_docs(
     # this is the slow part
     for key, sections in section_map.items():
         ns_key = get_namespace_key(key)
-        create_entity_indices(
+        __create_indices(
             entities=entities,
             namespace_key=ns_key,
             documents=sections,
         )
-
-
-def create_entity_indices(
-    entities: list[str],
-    namespace_key: NamespaceKey,
-    documents: list[str],
-):
-    """
-    For each entity in the provided list, summarize based on the document and persist in an index
-
-    Args:
-        entities (list[str]): list of entities to get indices for
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        documents (Document): list of llama_index Documents
-    """
-    index = SourceDocIndex()
-    index.add_documents(namespace_key, documents)
-    for entity in entities:
-        try:
-            idx = EntityIndex()
-            idx.add_node(entity, index, namespace_key)
-        except Exception as e:
-            logging.error(f"Error creating entity index for {entity}: {e}")
 
 
 class EntityIndex:
@@ -111,6 +106,7 @@ class EntityIndex:
     def __init__(
         self,
         context_args: ContextArgs = ENTITY_INDEX_CONTEXT_ARGS,
+        type: str = "intervention",
     ):
         """
         Initialize EntityIndex
@@ -121,8 +117,7 @@ class EntityIndex:
         self.context_args = context_args
         self.index = None
         self.index_impl = GPTVectorStoreIndex
-        self.type = "intervention"
-
+        self.type = type
         self.__load()
 
     def __get_namespace(
@@ -139,18 +134,15 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
-        entity_ns = (
+        ns = (
             {
+                **source._asdict(),
                 "entity": get_id(entity_id),
                 "entity_type": self.type,
             }
             if entity_id
-            else {}
+            else source._asdict()
         )
-        ns = {
-            **source._asdict(),
-            **entity_ns,
-        }
 
         return dict_to_named_tuple(ns)
 
@@ -292,10 +284,11 @@ class EntityIndex:
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
             entity_id (str): entity id (e.g. BIBB122). Optional; defaults to None.
         """
-        metadata_filters = get_metadata_filters(self.__get_namespace(source, entity_id))
-
         if not self.index:
             raise ValueError("No index found.")
+
+        # filtering on namespace for precise and efficient retrieval
+        metadata_filters = get_metadata_filters(self.__get_namespace(source, entity_id))
 
         answer = query_index(
             self.index, query_string, metadata_filters=metadata_filters

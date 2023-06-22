@@ -80,9 +80,7 @@ def upsert_index(
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> IndexImpl:
     """
-    Create an index from supplied document url
-
-    Note: this is a bit of a misnomer for pinecone, for which we're just adding new documents to an existing index
+    Create or add to an index from supplied document url
 
     Args:
         index_name (str): name of the index

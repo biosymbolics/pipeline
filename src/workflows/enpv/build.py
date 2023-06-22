@@ -9,8 +9,6 @@ import os
 import traceback
 from typing import Callable, Coroutine
 
-from pydash import compact
-
 from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
 
@@ -57,20 +55,13 @@ def __build_indices(
     return __build
 
 
-async def build_sec():
+async def main():
     """
     Build SEC stuffs
     """
     start_date = datetime(2015, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
-    await execute_async(compact(closures))
-
-
-async def main():
-    """
-    Main
-    """
-    await build_sec()
+    await execute_async(closures)
 
 
 if __name__ == "__main__":
