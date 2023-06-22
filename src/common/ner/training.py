@@ -35,13 +35,14 @@ def annotate(doc: Doc, nlp: Language):
         yield span.start, span.end, span.label_
 
 
-def weakly_train_ner(nlp: Language, content: list[str]):
+def weakly_train_ner(nlp: Language, content: list[str], filename: str):
     """
     Train the NER model using weak supervision
 
     Args:
         nlp (Language): SpaCy language model
         content (list[str]): List of strings to train on
+        filename (str): where to save the output (labeled training set)
 
     TODO:
         - specificity patterns?
@@ -81,10 +82,4 @@ def weakly_train_ner(nlp: Language, content: list[str]):
     for doc in docs:
         doc.ents = doc.spans["hmm"]
 
-    utils.docbin_writer(docs, "data/patent-sci.spacy")
-
-    """
-    !spacy init config - --lang en --pipeline ner --optimize accuracy | \
-    spacy train - --paths.train ../data/patent-sci.spacy  --paths.dev ../data/patent-sci.spacy \
-    --initialize.vectors en_core_sci_scibert --output ../data/patent-sci
-    """
+    utils.docbin_writer(docs, filename)
