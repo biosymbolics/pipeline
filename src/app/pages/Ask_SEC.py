@@ -3,20 +3,19 @@ import streamlit as st
 from common.utils.misc import dict_to_named_tuple
 from core import EntityIndex, SourceDocIndex
 
-st.set_page_config(page_title="Query", page_icon="🔎")
+st.set_page_config(page_title="Ask SEC", page_icon="🔎")
 
-st.title("Ask Biosymbolics.ai")
+st.title("Ask SEC")
 question = st.text_area("What would you like to ask?", "")
 prefix = (
     "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
-    "With that in mind, provide detailed, scientific and comprehensive answer to their question. "
+    "With that in mind, provide detailed and scientific answer to their question. "
     "Format the answer in markdown, and include tables and links if appropriate. "
     "Here is the question: \n\n"
 )
 prompt = prefix + question
 
 if st.button("Submit"):
-    status = st.progress(0)
     if not question.strip():
         st.error(f"Please supply a question.")
     else:
@@ -24,13 +23,14 @@ if st.button("Submit"):
             source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
             st.subheader("Answer from source doc index:")
             si = SourceDocIndex()
-            si_answer = si.query(prompt, source)
-            st.markdown(si_answer)
+            with st.spinner("Please wait..."):
+                si_answer = si.query(prompt, source)
+                st.markdown(si_answer)
+
             st.subheader("Answer from entity doc index:")
-            status.progress(50)
             ei = EntityIndex()
-            ei_answer = ei.query(prompt, source)
-            st.markdown(ei_answer)
-            status.progress(50)
+            with st.spinner("Please wait..."):
+                ei_answer = ei.query(prompt, source)
+                st.markdown(ei_answer)
         except Exception as e:
             st.error(f"An error occurred: {e}")
