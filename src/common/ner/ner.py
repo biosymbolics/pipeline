@@ -5,9 +5,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from typing import Any, Optional
 import spacy
-from scispacy.umls_linking import (
-    UmlsEntityLinker,
-)  # required to use 'scispacy_linker' pipeline
+from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy_llm.util import assemble

@@ -53,4 +53,11 @@ def is_ner_result(entity: Any) -> TypeGuard[NerResult]:
     )
 
 
+def is_sci_spacy_linker(linker: Pipe) -> TypeGuard[SciSpacyLinker]:
+    """
+    Check if entity is a valid SciSpacyLinker
+    """
+    return hasattr(linker, "kb") is not None
+
+
 GetTokenizer = Callable[[Language], Tokenizer]

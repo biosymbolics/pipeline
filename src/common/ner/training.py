@@ -64,7 +64,8 @@ def train_ner(nlp: Language, content: list[str]):
     # save/load/return
     for doc in docs:
         doc.ents = doc.spans["hmm"]
-        utils.docbin_writer(docs, "../data/patent-sci.spacy")
+
+    utils.docbin_writer(docs, "data/patent-sci.spacy")
 
     """
     !spacy init config - --lang en --pipeline ner --optimize accuracy | \

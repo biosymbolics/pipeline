@@ -39,11 +39,10 @@ def remove_common_terms(
         is_common = set(words).issubset(vocab.strings)
 
         # check if any words are in the exception list
-        is_excepted = (
-            len(set(exception_list).intersection(set(words))) > 0 or len(words) > 1
-        )  # HACK!
+        is_excepted = len(set(exception_list).intersection(set(words))) > 0
 
-        is_common_not_excepted = is_common and not is_excepted
+        # TODO: len(words) == 1 is a hack
+        is_common_not_excepted = is_common and not is_excepted and len(words) == 1
 
         if is_common_not_excepted:
             logging.info(f"Removing common term: {item}")

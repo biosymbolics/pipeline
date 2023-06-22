@@ -6,6 +6,7 @@ from spacy.tokens import Span
 from spacy.language import Language
 
 from constants.umls import UMLS_PHARMACOLOGIC_INTERVENTION_TYPES
+from common.ner.types import is_sci_spacy_linker
 from common.utils.list import has_intersection
 
 from .types import KbLinker
@@ -18,6 +19,9 @@ def __get_kb_linker(nlp: Language) -> KbLinker:
     Get the KB linker from the nlp pipeline
     """
     linker = nlp.get_pipe("scispacy_linker")
+
+    if not is_sci_spacy_linker(linker):
+        raise ValueError("linker is not a SciSpacyLinker")
 
     return linker.kb
 
