@@ -31,7 +31,7 @@ class TermNormalizer:
         """
         Initialize term normalizer using existing model
         """
-        self.candidate_generator = CandidateGenerator(name=ONTOLOGY)
+        self.candidate_generator = CandidateGenerator()
         self.kb = UmlsKnowledgeBase()
 
     def __get_normalized_entity(

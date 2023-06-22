@@ -85,6 +85,6 @@ def classify_by_keywords(
     """
     lookup = create_lookup_map(keyword_map)
 
-    __classify_string = partial(classify_string, lookup_map=lookup, nx_name=nx_name)
+    __classify = partial(classify_string, lookup_map=lookup, nx_name=nx_name)
 
-    return strings.apply(__classify_string)
+    return strings.apply(__classify)

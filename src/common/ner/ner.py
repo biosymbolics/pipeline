@@ -47,9 +47,8 @@ class NerTagger:
     def __init__(
         self,
         use_llm: Optional[bool] = False,
-        model: Optional[
-            str
-        ] = "en_core_sci_scibert",  # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
+        model: Optional[str] = "en_core_sci_scibert",
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
     ):
@@ -143,7 +142,7 @@ class NerTagger:
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
 
-        return entity_names, entities, enriched
+        return entity_names
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
