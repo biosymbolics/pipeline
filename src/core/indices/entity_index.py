@@ -41,6 +41,37 @@ INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
+def create_entity_indices(
+    entities: list[str],
+    namespace_key: NamespaceKey,
+    documents: list[str],
+    confirm_entities: bool = True,
+):
+    """
+    For each entity in the provided list, summarize based on the document and persist in an index
+    """
+    index = SourceDocIndex()
+    index.add_documents(namespace_key, documents)
+
+    if confirm_entities:
+        confirmed_entities = index.confirm_entities(entities, namespace_key)
+
+        if len(confirmed_entities) != len(entities):
+            removed = set(entities) - set(confirmed_entities)
+            added = set(confirmed_entities) - set(entities)
+            logging.info(
+                f"Delta in confirmed entities. Removed: %s, Added: %s", removed, added
+            )
+        entities = confirmed_entities
+
+    for entity in entities:
+        try:
+            idx = EntityIndex()
+            idx.add_node(entity, index, namespace_key)
+        except Exception as e:
+            logging.error(f"Error creating entity index for {entity}: {e}")
+
+
 def create_from_docs(
     section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
 ):
@@ -64,32 +95,15 @@ def create_from_docs(
                 create_from_docs(section_map, get_namespace_key)
             ```
     """
-
-    def __create_indices(
-        entities: list[str],
-        namespace_key: NamespaceKey,
-        documents: list[str],
-    ):
-        """
-        For each entity in the provided list, summarize based on the document and persist in an index
-        """
-        index = SourceDocIndex()
-        index.add_documents(namespace_key, documents)
-        for entity in entities:
-            try:
-                idx = EntityIndex()
-                idx.add_node(entity, index, namespace_key)
-            except Exception as e:
-                logging.error(f"Error creating entity index for {entity}: {e}")
-
     all_sections = flatten(section_map.values())
     tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
+
     entities = tagger.extract(all_sections)
 
     # this is the slow part
     for key, sections in section_map.items():
         ns_key = get_namespace_key(key)
-        __create_indices(
+        create_entity_indices(
             entities=entities,
             namespace_key=ns_key,
             documents=sections,
@@ -135,15 +149,10 @@ class EntityIndex:
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
         ns = (
-            {
-                **source._asdict(),
-                "entity": get_id(entity_id),
-                "entity_type": self.type,
-            }
+            {**source._asdict(), "entity": get_id(entity_id), "entity_type": self.type}
             if entity_id
             else source._asdict()
         )
-
         return dict_to_named_tuple(ns)
 
     @property

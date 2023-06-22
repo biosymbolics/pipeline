@@ -1,7 +1,6 @@
 """
 Workflows for building up sec data
 """
-
 import asyncio
 from datetime import datetime
 import logging
@@ -9,10 +8,12 @@ import os
 import traceback
 from typing import Callable, Coroutine
 
+from system import initialize
+
+initialize()
+
 from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
-
-logging.getLogger().setLevel(logging.INFO)
 
 PHARMA_TICKERS = [
     "PFE",

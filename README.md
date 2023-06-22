@@ -68,3 +68,33 @@
 ### On Dependencies
 - using python3.10 due to nmslib (dep of scispacy) along the lines of https://github.com/nmslib/nmslib/issues/476
 - polars > pandas
+
+### Misc
+
+#### Debug Logging in REPL
+```
+import logging
+import sys
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+```
+
+#### Reloading module in REPL
+```
+from system import initialize
+initialize()
+import importlib
+importlib.reload(core)
+```
+
+#### Other
+```
+ns = dict_to_named_tuple({
+    "company": "PFE",
+    "doc_source": "SEC",
+    "doc_type": "10-K",
+    "period": "2020-12-31",
+})
+si = core.indices.source_doc_index.SourceDocIndex()
+```

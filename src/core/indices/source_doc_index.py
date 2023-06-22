@@ -2,11 +2,13 @@
 SourceDocIndex
 """
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from llama_index import GPTVectorStoreIndex
+from langchain.output_parsers import ResponseSchema
 
 from clients.llama_index import upsert_index, get_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
+from clients.llama_index.parsing import get_prompts_and_parser, parse_answer
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.namespace import get_namespace_id
@@ -38,7 +40,7 @@ class SourceDocIndex:
 
         Args:
             context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
-            index_impl (LlmIndex, optional): index implementation. Defaults to GPTKeywordTableIndex.
+            index_impl (LlmIndex, optional): index implementation. Defaults to GPTVectorStoreIndex.
         """
         self.context_args = context_args
         self.index = None
@@ -61,7 +63,7 @@ class SourceDocIndex:
                 ``` python
                 dict_to_named_tuple(
                     {
-                        "company": "BIBB",
+                        "company": "PFE",
                         "doc_source": "SEC",
                         "doc_type": "10-K",
                         "period": "2020-12-31",
@@ -104,7 +106,7 @@ class SourceDocIndex:
         source: NamespaceKey,
         prompt_template: Optional[Prompt] = None,
         refine_prompt: Optional[RefinePrompt] = None,
-    ) -> str:
+    ) -> Any:
         """
         Query the index
 
@@ -138,3 +140,58 @@ class SourceDocIndex:
         )
 
         return answer
+
+    def query_for_entities(self, source: NamespaceKey) -> list[str]:
+        """
+        Query for entities
+        """
+        prompt = f"""
+            What compounds, drugs and MoAs is this company working on?
+        """
+        response_schemas = [
+            ResponseSchema(
+                name="products",
+                description="all products as a string array, e.g. ['drug1', 'drug2']",
+            ),
+        ]
+
+        prompts, parser = get_prompts_and_parser(response_schemas)
+        response = self.query(prompt, source, *prompts)
+
+        result = parse_answer(response, parser, return_orig_on_fail=False)
+
+        return result["products"]
+
+    def confirm_entities(
+        self, possible_entities: list[str], source: NamespaceKey
+    ) -> list[str]:
+        """
+        Confirm a list of entities
+        """
+        prompt = f"""
+            Using NER (named entity recognition), we found a list of interventions in the source document.
+            However, we are not sure if they are correct.
+            There may be false positives (not actually intervention names, e.g. "collaborations"),
+            entries that are too generic (e.g. "anti-infective products"),
+            entries that contain too much additional information (e.g. "oral anti-coagulant market share gains"),
+            and missing interventions (entities not recognized by the NER model).
+            Please confirm the list of interventions, correcting, removing and adding as necessary.
+            Deduplicate before returning the list. The list of NER-detected interventions is:
+            {possible_entities}.
+        """
+        response_schemas = [
+            ResponseSchema(
+                name="products",
+                description="all products as a string array, e.g. ['drug1', 'drug2']",
+            ),
+        ]
+
+        prompts, parser = get_prompts_and_parser(response_schemas)
+        response = self.query(prompt, source, *prompts)
+
+        result = parse_answer(response, parser, return_orig_on_fail=False)
+
+        if "products" not in result:
+            raise ValueError("No products found in result %s", result)
+
+        return result["products"]
