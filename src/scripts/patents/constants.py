@@ -2380,7 +2380,6 @@ _COMMON_ENTITY_NAMES = (
     "mandelic acid",
     "Stimulation (motivation)",
     "increased",
-    "persistent",
     "decreased",
     "drug inn",
     "lasting",

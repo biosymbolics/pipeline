@@ -65,27 +65,30 @@ def create_entity_indices(
         removed = set(entities) - set(confirmed_entities)
         added = set(confirmed_entities) - set(entities)
         logging.info(
-            f"Delta in confirmed entities. Removed: %s, Added: %s", removed, added
+            f"Delta in confirmed entities. Removed: %s, Added: %s, Remaining: %s",
+            removed,
+            added,
+            confirmed_entities,
         )
 
         entities = confirmed_entities
 
-    # for entity in entities:
-    #     try:
-    #         idx = EntityIndex()
-    #         idx.add_node(entity, index, namespace_key)
-    #     except Exception as e:
-    #         logging.error(f"Error creating entity index for {entity}: {e}")
+    for entity in entities:
+        try:
+            idx = EntityIndex()
+            idx.add_node(entity, index, namespace_key)
+        except Exception as e:
+            logging.error(f"Error creating entity index for {entity}: {e}")
 
 
 def create_from_docs(
-    section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
+    doc_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
 ):
     """
-    Create entity index from a map of sections
+    Create entity index from a map of docs
 
     Args:
-        section_map (dict[str, list[str]]): map of sections
+        doc_map (dict[str, list[str]]): map of docs
         get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
             ``` python
                 def get_namespace_key(key: str) -> NamespaceKey:
@@ -98,21 +101,17 @@ def create_from_docs(
                         }
                     )
 
-                create_from_docs(section_map, get_namespace_key)
+                create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    all_sections = flatten(section_map.values())
     tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
-
-    entities = tagger.extract(all_sections)
-
-    # this is the slow part
-    for key, sections in section_map.items():
+    for key, docs in doc_map.items():
+        entities = tagger.extract(docs)
         ns_key = get_namespace_key(key)
         create_entity_indices(
             entities=entities,
             namespace_key=ns_key,
-            documents=sections,
+            documents=docs,
         )
 
 

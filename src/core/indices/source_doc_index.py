@@ -157,6 +157,14 @@ class SourceDocIndex:
             entries that are too generic (e.g. "anti-infective products"),
             entries that contain too much additional information (e.g. "oral anti-coagulant market share gains"),
             and missing interventions (entities not recognized by the NER model).
+            Correct names can be a
+            brand name (e.g. "Darzalex"),
+            generic name (e.g. "daratumumab"),
+            investigational id (e.g. "AGN-190584"),
+            chemical class (e.g. "benzodiazepines"),
+            mode of action (e.g. "antithrombotics"),
+            therapeutic class (e.g. "anticoagulants"),
+            or mechanism of action (e.g. "5-HT1A receptor partial agonist", "anti-CD14 monoclonal antibodies").
             Please confirm the list of interventions, correcting, removing and adding as necessary.
             Deduplicate before returning the list. The list of NER-detected interventions is:
             {possible_entities}.

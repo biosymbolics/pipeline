@@ -113,8 +113,7 @@ def upsert_index(
 
     try:
         ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)
-        for doc in ll_docs:
-            index.update_ref_doc(doc)
+        index.refresh_ref_docs(ll_docs)  # adds if nx, updates if hash is different
     except Exception as ex:
         logging.error("Error upserting index %s: %s", index_name, ex)
         traceback.print_exc()

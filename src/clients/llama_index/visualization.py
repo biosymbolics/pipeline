@@ -5,7 +5,7 @@ from typing import cast
 from pyvis.network import Network
 from llama_index.indices.knowledge_graph import GPTKnowledgeGraphIndex
 
-from .persistence import load_index
+from .indices.llama_index_client import load_index
 
 
 def visualize_network_by_index(index: GPTKnowledgeGraphIndex):  # type: ignore
@@ -28,10 +28,10 @@ def visualize_network(index_name: str):
     Args:
         index_name (str): name of the index to visualize
     """
-    index = load_index(index_name)
+    index = load_index(index_name, index_impl=GPTKnowledgeGraphIndex)
     if not index:
         raise Exception("index not found")
-    visualize_network_by_index(cast(GPTKnowledgeGraphIndex, index))
+    visualize_network_by_index(index)
 
 
 def list_triples_by_index(index: GPTKnowledgeGraphIndex):
@@ -61,6 +61,5 @@ def list_triples(index_name: str):
     Args:
         index_name (str): name of the index to visualize
     """
-    index = load_index(index_name)
-    kg_index = cast(GPTKnowledgeGraphIndex, index)
-    list_triples_by_index(kg_index)
+    index = load_index(index_name, index_impl=GPTKnowledgeGraphIndex)
+    list_triples_by_index(index)

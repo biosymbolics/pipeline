@@ -40,7 +40,7 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
         start_date (date): start date
         end_date (date, optional): end date, defaults to now
     """
-    section_map = fetch_annual_reports(
+    doc_map = fetch_annual_reports(
         ticker, start_date, end_date, formatter=__format_for_ner
     )
 
@@ -54,4 +54,4 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             }
         )
 
-    entity_index.create_from_docs(section_map, get_namespace_key)
+    entity_index.create_from_docs(doc_map, get_namespace_key)
