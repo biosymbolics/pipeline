@@ -2,11 +2,12 @@
 SourceDocIndex
 """
 from datetime import datetime
-from typing import Any, Optional
+import logging
+from typing import Any, Optional, Type
 from llama_index import GPTVectorStoreIndex
 from langchain.output_parsers import ResponseSchema
 
-from clients.llama_index import upsert_index, get_index, query_index
+from clients.llama_index import upsert_index, load_index, query_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.parsing import get_prompts_and_parser, parse_answer
 from clients.llama_index.types import DocMetadata
@@ -33,7 +34,7 @@ class SourceDocIndex:
     def __init__(
         self,
         context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-        index_impl: LlmIndex = GPTVectorStoreIndex,  # type: ignore
+        index_impl: Type[LlmIndex] = GPTVectorStoreIndex,
     ):
         """
         initialize
@@ -97,7 +98,7 @@ class SourceDocIndex:
         """
         Load source doc index from disk
         """
-        index = get_index(INDEX_NAME, **self.context_args.storage_args)
+        index = load_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
 
     def query(
@@ -131,6 +132,8 @@ class SourceDocIndex:
 
         metadata_filters = get_metadata_filters(source)
 
+        logging.info("Querying with filters %s", metadata_filters.__dict__.items())
+
         answer = query_index(
             self.index,
             query_string,
@@ -140,27 +143,6 @@ class SourceDocIndex:
         )
 
         return answer
-
-    def query_for_entities(self, source: NamespaceKey) -> list[str]:
-        """
-        Query for entities
-        """
-        prompt = f"""
-            What compounds, drugs and MoAs is this company working on?
-        """
-        response_schemas = [
-            ResponseSchema(
-                name="products",
-                description="all products as a string array, e.g. ['drug1', 'drug2']",
-            ),
-        ]
-
-        prompts, parser = get_prompts_and_parser(response_schemas)
-        response = self.query(prompt, source, *prompts)
-
-        result = parse_answer(response, parser, return_orig_on_fail=False)
-
-        return result["products"]
 
     def confirm_entities(
         self, possible_entities: list[str], source: NamespaceKey

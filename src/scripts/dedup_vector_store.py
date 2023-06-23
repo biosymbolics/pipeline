@@ -24,7 +24,7 @@ PERIODS = [
     "2021-12-31",
     "2022-12-31",
 ]
-TICKERS = ["pfe"]
+TICKERS = ["jnj"]
 
 NULL_VECTOR: list[float] = [0 for _ in range(1536)]
 

@@ -14,7 +14,7 @@ import logging
 from pydash import flatten
 
 from clients.llama_index import (
-    get_index,
+    load_index,
     query_index,
     get_output_parser,
     parse_answer,
@@ -62,20 +62,20 @@ def create_entity_indices(
     if confirm_entities:
         confirmed_entities = index.confirm_entities(entities, namespace_key)
 
-        if len(confirmed_entities) != len(entities):
-            removed = set(entities) - set(confirmed_entities)
-            added = set(confirmed_entities) - set(entities)
-            logging.info(
-                f"Delta in confirmed entities. Removed: %s, Added: %s", removed, added
-            )
+        removed = set(entities) - set(confirmed_entities)
+        added = set(confirmed_entities) - set(entities)
+        logging.info(
+            f"Delta in confirmed entities. Removed: %s, Added: %s", removed, added
+        )
+
         entities = confirmed_entities
 
-    for entity in entities:
-        try:
-            idx = EntityIndex()
-            idx.add_node(entity, index, namespace_key)
-        except Exception as e:
-            logging.error(f"Error creating entity index for {entity}: {e}")
+    # for entity in entities:
+    #     try:
+    #         idx = EntityIndex()
+    #         idx.add_node(entity, index, namespace_key)
+    #     except Exception as e:
+    #         logging.error(f"Error creating entity index for {entity}: {e}")
 
 
 def create_from_docs(
@@ -218,7 +218,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = get_index(INDEX_NAME, **self.context_args.storage_args)
+        index = load_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
 
     def add_node(

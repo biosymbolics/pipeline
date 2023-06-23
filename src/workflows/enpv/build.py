@@ -16,22 +16,22 @@ from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
-    "PFE",
-    # "JNJ",
+    # "PFE",
+    "JNJ",
     # "NVS", # 20-F
-    # "ABBV",
-    # "AMGN",
+    "ABBV",
+    "AMGN",
     # "GSK", # 20-F
-    # "GILD",
+    "GILD",
     # "NVO", # 20-F
     # "TAK", # 20-F
-    # "LLY",
+    "LLY",
     # "AZN", # 20-F
     # "BAYRY", # 20-F
     # "RHHBY", # 20-F
     # "MTZPY", # 20-F
-    # "MRK",
-    # "BMY",
+    "MRK",
+    "BMY",
 ]
 
 
@@ -66,5 +66,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     asyncio.run(main())
