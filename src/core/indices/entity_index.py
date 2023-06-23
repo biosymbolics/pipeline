@@ -11,7 +11,6 @@ from llama_index.prompts.default_prompts import (
 )
 from langchain.output_parsers import ResponseSchema
 import logging
-from pydash import flatten
 
 from clients.llama_index import (
     load_index,
@@ -24,6 +23,7 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
 )
+from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
@@ -194,20 +194,15 @@ class EntityIndex:
         query = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity_id)
 
         # get the answer as json
-        output_parser = get_output_parser(self.__get_response_schemas(entity_type))
-        fmt_qa_tmpl = output_parser.format(DEFAULT_TEXT_QA_PROMPT_TMPL)
-        fmt_refine_tmpl = output_parser.format(DEFAULT_REFINE_PROMPT_TMPL)
-        qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
-        refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
-
-        response = source_index.query(
-            query, source, prompt_template=qa_prompt, refine_prompt=refine_prompt
+        prompts, parser = get_prompts_and_parser(
+            self.__get_response_schemas(entity_type)
         )
+        response = source_index.query(query, source, *prompts)
 
         logging.info("Response from query_index: %s", response)
 
         # parse response into obj
-        entity_obj = parse_answer(response, output_parser, return_orig_on_fail=False)
+        entity_obj = parse_answer(response, parser, return_orig_on_fail=False)
 
         if not is_entity_obj(entity_obj):
             raise Exception(f"Failed to parse entity %s", entity_id)
