@@ -150,24 +150,27 @@ class SourceDocIndex:
         """
         Confirm a list of entities
         """
-        prompt = f"""
-            Using NER (named entity recognition), we found a list of interventions in the source document.
-            However, we are not sure if they are correct.
-            There may be false positives (not actually intervention names, e.g. "collaborations"),
-            entries that are too generic (e.g. "anti-infective products"),
-            entries that contain too much additional information (e.g. "oral anti-coagulant market share gains"),
-            and missing interventions (entities not recognized by the NER model).
-            Correct names can be a
-            brand name (e.g. "Darzalex"),
-            generic name (e.g. "daratumumab"),
-            investigational id (e.g. "AGN-190584"),
-            chemical class (e.g. "benzodiazepines"),
-            mode of action (e.g. "antithrombotics"),
-            therapeutic class (e.g. "anticoagulants"),
-            or mechanism of action (e.g. "5-HT1A receptor partial agonist", "anti-CD14 monoclonal antibodies").
-            Please confirm the list of interventions, correcting, removing and adding as necessary.
-            Deduplicate before returning the list. The list of NER-detected interventions is:
-            {possible_entities}.
+        query = f"""
+        Our Named Entity Recognition (NER) model has identified a list of potential pharmacological products
+        (drugs, compounds, drug class, mechanism of action, etc) from the source document.
+        However, it contains errors such as:
+
+        - False positives: terms that are not pharmacological products, such as "collaborations" or "anti-corruption"
+        - False negatives: valid products that were not recognized
+        - Over-inclusion: entries containing unnecessary additional information, like "oral anti-coagulant market share gains"
+        - Non-specificity: vague terms such as "second line therapy", "important new therapies" or "innovative vaccines"
+
+        Valid products can be in any of the following forms:
+
+        - Brand names (e.g. "Darzalex", "Advair Diskus")
+        - Generic names (e.g. "daratumumab", "norethindrone acetate")
+        - Investigational IDs (e.g. "AGN-190584", "PF-07321332")
+        - Chemical classes (e.g. "polypeptides", "monoclonal antibodies")
+        - Modes of action (e.g. "antithrombotics", "antidepressants")
+        - Mechanisms of action (e.g. "5-HT1A receptor partial agonist", "anti-CD14 monoclonal antibodies")
+
+        Please correct the following list by removing non-products, adding missing products and normalizing terms:
+        {possible_entities}
         """
         response_schemas = [
             ResponseSchema(
@@ -177,7 +180,7 @@ class SourceDocIndex:
         ]
 
         prompts, parser = get_prompts_and_parser(response_schemas)
-        response = self.query(prompt, source, *prompts)
+        response = self.query(query, source, *prompts)
 
         result = parse_answer(response, parser, return_orig_on_fail=False)
 

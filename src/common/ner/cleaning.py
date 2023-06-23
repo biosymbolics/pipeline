@@ -4,6 +4,7 @@ Utils for the NER pipeline
 from typing import Callable
 import re
 from functools import reduce
+import spacy
 from spacy.language import Language
 from spacy.vocab import Vocab
 import logging
@@ -17,32 +18,34 @@ INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 
 CleaningFunction = Callable[[list[str]], list[str]]
 
+with open("10000words.txt", "r") as file:
+    vocab_words = file.read().splitlines()
+
 
 def remove_common_terms(
-    vocab: Vocab, entity_list: list[str], exception_list: list[str] = []
+    entity_list: list[str], nlp: Language, exception_list: list[str] = []
 ):
     """
     Remove common terms from a list of entities, e.g. "vaccine candidates"
 
     Args:
-        vocab (Vocab): spacy vocab
         entity_list (list[str]): list of entities
+        nlp (Language): spacy language model
         exception_list (list[str]): list of exceptions to the common terms
     """
 
     def __is_common(item):
         # remove punctuation and make lowercase
-        item_clean = item.lower().translate(str.maketrans("", "", string.punctuation))
-        words = item_clean.split()
+        words = [token.lemma_ for token in nlp(item)]
+        matchy = [string for string in vocab_words if "covid" in string]
 
         # check if all words are in the vocab
-        is_common = set(words).issubset(vocab.strings)
+        is_common = set(words).issubset(vocab_words)
 
         # check if any words are in the exception list
         is_excepted = len(set(exception_list).intersection(set(words))) > 0
 
-        # TODO: len(words) == 1 is a hack
-        is_common_not_excepted = is_common and not is_excepted and len(words) == 1
+        is_common_not_excepted = is_common and not is_excepted
 
         if is_common_not_excepted:
             logging.info(f"Removing common term: {item}")
@@ -112,7 +115,7 @@ def clean_entities(entities: list[str], nlp: Language) -> list[str]:
             return not is_suppressed
 
         filtered = [entity for entity in entity_names if __filter(entity)]
-        without_common = remove_common_terms(nlp.vocab, filtered)  # disabling for now
+        without_common = remove_common_terms(filtered, nlp)
         return dedup(without_common)
 
     def __clean_entities(entity_names: list[str]) -> list[str]:

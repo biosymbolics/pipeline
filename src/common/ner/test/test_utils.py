@@ -1,7 +1,8 @@
 import unittest
 
 import spacy
-from common.ner.utils import remove_common_terms
+
+from common.ner.cleaning import remove_common_terms
 
 
 class TestNerUtils(unittest.TestCase):
@@ -19,33 +20,36 @@ class TestNerUtils(unittest.TestCase):
     #         self.assertEqual(result, expected_output)
 
     def test_remove_common_terms(self):
-        vocab = spacy.load("en_core_web_sm").vocab
+        nlp = spacy.load("en_core_web_sm", disable=["ner"])
         test_conditions = [
             {
                 "terms": [
                     "vaccine candidates",
                     "PF-06863135",
                     "therapeutic options",
-                    "COVID-19 treatments",
+                    "COVID-19 mRNA vaccine",
                     "exception term",
                     "common term",
                 ],
                 "exception_list": ["exception"],
                 "expected_output": [
                     "PF-06863135",
-                    "COVID-19 treatments",
+                    "COVID-19 mRNA vaccine",
                     "exception term",
                 ],
             },
             {
                 "terms": [
+                    "vaccine candidate",
                     "vaccine candidates",
                     "therapeutic options",
-                    "COVID-19 treatments",
+                    "therapeutic option",
+                    "therapeutics option",
+                    "COVID-19 mRNA vaccine",
                     "common term",
                 ],
                 "exception_list": [],
-                "expected_output": ["COVID-19 treatments"],
+                "expected_output": ["COVID-19 mRNA vaccine"],
             },
             # Add more test conditions as needed
         ]
@@ -55,7 +59,7 @@ class TestNerUtils(unittest.TestCase):
             exception_list = condition["exception_list"]
             expected_output = condition["expected_output"]
 
-            result = remove_common_terms(vocab, terms, exception_list)
+            result = remove_common_terms(terms, nlp, exception_list)
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
