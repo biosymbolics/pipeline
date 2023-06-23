@@ -3,8 +3,8 @@ Client for llama indexes
 """
 import logging
 import traceback
-from typing import Any, Mapping, Optional, TypeVar, Union
-from llama_index import Document, Response
+from typing import Any, Mapping, Optional, Type, TypeVar, Union
+from llama_index import Document, GPTVectorStoreIndex, Response
 
 from clients.llama_index.context import (
     get_service_context,
@@ -13,7 +13,6 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
-from clients.llama_index.persistence import load_index
 from typings.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocId, GetDocMetadata
@@ -21,18 +20,35 @@ from ..types import GetDocId, GetDocMetadata
 IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 
-def get_index(
+def load_index(
     index_name: str,
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-) -> LlmIndex:
+    index_impl: Type[IndexImpl] = GPTVectorStoreIndex,
+    index_args: Mapping[str, Any] = {},
+) -> IndexImpl:
     """
-    Get llama index from the namespace/index_id
+    Load persisted index. Creates new index if not found.
 
     Args:
         index_name (str): name of the index
         context_args (ContextArgs): context args for loading index
+        index_impl (Type[IndexImpl]): index implementation, defaults to GPTVectorStoreIndex
+        index_args (Mapping[str, Any]): args to pass to the index implementation
     """
-    return load_index(index_name, context_args)
+    storage_context = get_storage_context(index_name, **context_args.storage_args)
+    service_context = get_service_context(model_name=context_args.model_name)
+
+    index = index_impl(
+        [],
+        storage_context=storage_context,
+        service_context=service_context,
+        **index_args,
+    )
+    logging.info("Returning vector index %s", index_name)
+
+    if not index:
+        raise Exception(f"Index {index_name} not found")
+    return index
 
 
 def query_index(
@@ -73,16 +89,14 @@ def query_index(
 def upsert_index(
     index_name: str,
     documents: Union[list[str], list[Document]],
-    index_impl: IndexImpl,
+    index_impl: Type[IndexImpl],
     index_args: Mapping[str, Any] = {},
+    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
     get_doc_metadata: Optional[GetDocMetadata] = None,
     get_doc_id: Optional[GetDocId] = None,
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
 ) -> IndexImpl:
     """
-    Create an index from supplied document url
-
-    Note: this is a bit of a misnomer for pinecone, for which we're just adding new documents to an existing index
+    Create or add to an index from supplied document url
 
     Args:
         index_name (str): name of the index
@@ -95,18 +109,14 @@ def upsert_index(
     """
     logging.info("Adding docs to index %s", index_name)
 
+    index = load_index(index_name, context_args, index_impl, index_args)
+
     try:
         ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)
-        index = index_impl.from_documents(
-            ll_docs,
-            service_context=get_service_context(model_name=context_args.model_name),
-            storage_context=get_storage_context(
-                index_name, **context_args.storage_args
-            ),
-            *index_args,
-        )
-        return index
+        index.refresh_ref_docs(ll_docs)  # adds if nx, updates if hash is different
     except Exception as ex:
         logging.error("Error upserting index %s: %s", index_name, ex)
         traceback.print_exc()
         raise ex
+
+    return index

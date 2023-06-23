@@ -33,7 +33,7 @@ def format_documents(
     else:
         docs = cast(list[Document], documents)
 
-    docs = compact(docs)
+    docs = compact(docs)  # why?
 
     if get_extra_info:
         for doc in docs:

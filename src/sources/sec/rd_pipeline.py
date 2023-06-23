@@ -7,7 +7,6 @@ from pydash import flatten
 import polars as pl
 
 
-import common.utils.ner as ner
 from common.utils.list import diff_lists
 from clients.sec import sec_client
 from sources.sec.sec import fetch_annual_reports
@@ -23,8 +22,7 @@ def __df_to_products(df: pl.DataFrame) -> list[str]:
     Get products from df and normalize
     """
     products = df.select(pl.col("product")).to_series().to_list()
-    normalized = list(map(ner.normalize_entity_name, products))
-    valid = list(filter(lambda p: p != "", normalized))
+    valid = list(filter(lambda p: p != "", products))
     return valid
 
 
@@ -52,15 +50,13 @@ def extract_pipeline_by_period(
     """
     Extract R&D pipeline by reporting period
     """
-    products_by_period = flatten(
-        [
-            {
-                "period": report.get("periodOfReport") or "",
-                "products": __extract_products(report, strategy),
-            }
-            for report in reports
-        ]
-    )
+    products_by_period = [
+        {
+            "period": report.get("periodOfReport") or "",
+            "products": __extract_products(report, strategy),
+        }
+        for report in reports
+    ]
 
     products_by_period = sorted(products_by_period, key=lambda r: r["period"])
     df = pl.DataFrame(products_by_period)  # pylint: disable=C0103

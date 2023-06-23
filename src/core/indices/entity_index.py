@@ -11,10 +11,9 @@ from llama_index.prompts.default_prompts import (
 )
 from langchain.output_parsers import ResponseSchema
 import logging
-from pydash import flatten
 
 from clients.llama_index import (
-    get_index,
+    load_index,
     query_index,
     get_output_parser,
     parse_answer,
@@ -24,6 +23,7 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
     ContextArgs,
 )
+from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.misc import dict_to_named_tuple
@@ -41,14 +41,54 @@ INDEX_NAME = "entity-docs"
 ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
 
 
-def create_entities_from_docs(
-    section_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
+def create_entity_indices(
+    entities: list[str],
+    namespace_key: NamespaceKey,
+    documents: list[str],
+    confirm_entities: bool = True,
 ):
     """
-    Create entity index from a map of sections
+    For each entity in the provided list, summarize based on the document and persist in an index
 
     Args:
-        section_map (dict[str, list[str]]): map of sections
+        entities (list[str]): list of entities
+        namespace_key (NamespaceKey): namespace key
+        documents (list[str]): list of documents
+        confirm_entities (bool, optional): whether to confirm entities. Defaults to True.
+    """
+    index = SourceDocIndex()
+    index.add_documents(namespace_key, documents)
+
+    if confirm_entities:
+        confirmed_entities = index.confirm_entities(entities, namespace_key)
+
+        removed = set(entities) - set(confirmed_entities)
+        added = set(confirmed_entities) - set(entities)
+        logging.info(
+            f"Delta in confirmed entities. Removed: %s, Added: %s, Remaining: %s",
+            removed,
+            added,
+            confirmed_entities,
+        )
+
+        entities = confirmed_entities
+
+    for entity in entities:
+        try:
+            idx = EntityIndex()
+            idx.add_node(entity, index, namespace_key)
+        except Exception as e:
+            logging.error(f"Error creating entity index for {entity}: {e}")
+
+
+def create_from_docs(
+    doc_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
+):
+    """
+    Create entity index from a map of docs
+
+    Args:
+        doc_map (dict[str, list[str]]): map of docs
         get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
             ``` python
                 def get_namespace_key(key: str) -> NamespaceKey:
@@ -61,44 +101,18 @@ def create_entities_from_docs(
                         }
                     )
 
-                create_from_docs(section_map, get_namespace_key)
+                create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    all_sections = flatten(section_map.values())
     tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
-    entities = tagger.extract(all_sections)
-
-    # this is the slow part
-    for key, sections in section_map.items():
+    for key, docs in doc_map.items():
+        entities = tagger.extract(docs)
         ns_key = get_namespace_key(key)
         create_entity_indices(
             entities=entities,
             namespace_key=ns_key,
-            documents=sections,
+            documents=docs,
         )
-
-
-def create_entity_indices(
-    entities: list[str],
-    namespace_key: NamespaceKey,
-    documents: list[str],
-):
-    """
-    For each entity in the provided list, summarize based on the document and persist in an index
-
-    Args:
-        entities (list[str]): list of entities to get indices for
-        namespace_key (NamespaceKey) namespace of the index (e.g. (company="BIBB", doc_source="SEC", doc_type="10-K"))
-        documents (Document): list of llama_index Documents
-    """
-    index = SourceDocIndex()
-    index.add_documents(namespace_key, documents)
-    for entity in entities:
-        try:
-            idx = EntityIndex()
-            idx.add_node(entity, index, namespace_key)
-        except Exception as e:
-            logging.error(f"Error creating entity index for {entity}: {e}")
 
 
 class EntityIndex:
@@ -121,14 +135,13 @@ class EntityIndex:
         self.context_args = context_args
         self.index = None
         self.index_impl = GPTVectorStoreIndex
-        self.type = "intervention"
-
         self.__load()
 
     def __get_namespace(
         self,
         source: NamespaceKey,
         entity_id: Optional[str] = None,
+        entity_type: Optional[str] = "intervention",
     ) -> NamespaceKey:
         """
         Namespace for the entity, e.g.
@@ -139,36 +152,35 @@ class EntityIndex:
 
         would have namespace: ("entities", "intervention", "BIIB122", "BIBB", "SEC", "10-K")
         """
-        entity_ns = (
+        ns = (
             {
+                **source._asdict(),
                 "entity": get_id(entity_id),
-                "entity_type": self.type,
+                "entity_type": entity_type,
             }
             if entity_id
-            else {}
+            else source._asdict()
         )
-        ns = {
-            **source._asdict(),
-            **entity_ns,
-        }
-
         return dict_to_named_tuple(ns)
 
-    @property
-    def __response_schemas(self) -> list[ResponseSchema]:
+    def __get_response_schemas(self, entity_type: str) -> list[ResponseSchema]:
         """
         Get response schemas for this entity
         """
         response_schemas = [
-            ResponseSchema(name="name", description=f"normalized {self.type} name"),
+            ResponseSchema(name="name", description=f"normalized {entity_type} name"),
             ResponseSchema(
-                name="details", description=f"details about this {self.type}"
+                name="details", description=f"details about this {entity_type}"
             ),
         ]
         return response_schemas
 
     def __describe_entity_by_source(
-        self, entity_id: str, source_index: SourceDocIndex, source: NamespaceKey
+        self,
+        entity_id: str,
+        source_index: SourceDocIndex,
+        source: NamespaceKey,
+        entity_type: str = "intervention",
     ) -> EntityObj:
         """
         Get the description of an entity by querying the source index
@@ -182,20 +194,15 @@ class EntityIndex:
         query = GET_BIOMEDICAL_ENTITY_TEMPLATE(entity_id)
 
         # get the answer as json
-        output_parser = get_output_parser(self.__response_schemas)
-        fmt_qa_tmpl = output_parser.format(DEFAULT_TEXT_QA_PROMPT_TMPL)
-        fmt_refine_tmpl = output_parser.format(DEFAULT_REFINE_PROMPT_TMPL)
-        qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
-        refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
-
-        response = source_index.query(
-            query, source, prompt_template=qa_prompt, refine_prompt=refine_prompt
+        prompts, parser = get_prompts_and_parser(
+            self.__get_response_schemas(entity_type)
         )
+        response = source_index.query(query, source, *prompts)
 
         logging.info("Response from query_index: %s", response)
 
         # parse response into obj
-        entity_obj = parse_answer(response, output_parser, return_orig_on_fail=False)
+        entity_obj = parse_answer(response, parser, return_orig_on_fail=False)
 
         if not is_entity_obj(entity_obj):
             raise Exception(f"Failed to parse entity %s", entity_id)
@@ -205,7 +212,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = get_index(INDEX_NAME, **self.context_args.storage_args)
+        index = load_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
 
     def add_node(
@@ -292,10 +299,11 @@ class EntityIndex:
             source (NamespaceKey): source of the entity (named tuple; order and key names matter)
             entity_id (str): entity id (e.g. BIBB122). Optional; defaults to None.
         """
-        metadata_filters = get_metadata_filters(self.__get_namespace(source, entity_id))
-
         if not self.index:
             raise ValueError("No index found.")
+
+        # filtering on namespace for precise and efficient retrieval
+        metadata_filters = get_metadata_filters(self.__get_namespace(source, entity_id))
 
         answer = query_index(
             self.index, query_string, metadata_filters=metadata_filters

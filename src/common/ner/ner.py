@@ -27,7 +27,7 @@ warnings.filterwarnings(
 spacy_llm.logger.addHandler(logging.StreamHandler())
 spacy_llm.logger.setLevel(logging.DEBUG)
 
-common_nlp = spacy.load("en_core_web_sm")
+common_nlp = spacy.load("en_core_web_sm", disable=["ner"])
 
 
 def get_default_tokenizer(nlp: Language):

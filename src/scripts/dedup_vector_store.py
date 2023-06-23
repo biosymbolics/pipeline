@@ -3,14 +3,16 @@ Dedup vector store
 """
 import json
 import sys
-
 from pydash import flatten
-from clients.vector_dbs.pinecone import get_vector_store
-from core import SOURCE_DOC_INDEX_NAME
-import logging
 from collections import defaultdict
+import logging
 
 from system import initialize
+
+initialize()
+
+from clients.vector_dbs.pinecone import get_vector_store
+from core import SOURCE_DOC_INDEX_NAME
 
 PERIODS = [
     "2015-12-31",
@@ -22,7 +24,7 @@ PERIODS = [
     "2021-12-31",
     "2022-12-31",
 ]
-TICKERS = ["pfe"]
+TICKERS = ["jnj"]
 
 NULL_VECTOR: list[float] = [0 for _ in range(1536)]
 
@@ -92,5 +94,4 @@ if __name__ == "__main__":
             "Usage: python3 dedup_vector_store.py\nDeletes duplicate documents from the vector store."
         )
         sys.exit()
-    initialize()
     dedup_documents()

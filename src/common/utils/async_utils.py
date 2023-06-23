@@ -2,8 +2,7 @@
 Async utilities
 """
 import asyncio
-import os
-from typing import Any, Callable, Coroutine, List
+from typing import Callable, Coroutine, List
 
 
 async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
@@ -21,6 +20,5 @@ async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
     asyncio.run(do_async_stuff())
     ```
     """
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     tasks = [asyncio.create_task(func()) for func in functions]
     await asyncio.gather(*tasks)

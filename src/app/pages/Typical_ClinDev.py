@@ -9,9 +9,9 @@ import logging
 
 from clients import GptApiClient
 
-st.set_page_config(page_title="ClinDev", page_icon="📈")
+st.set_page_config(page_title="Typical ClinDev", page_icon="📈")
 
-st.title("Ask Biosymbolics.ai")
+st.title("Typical ClinDev Pipeline by Indication")
 indication = st.text_input("Enter in a disease or indication", "asthma")
 
 prompt = (
@@ -50,21 +50,24 @@ if st.button("Submit"):
         st.error(f"Please provide an indication.")
     else:
         try:
-            answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
-            st.code(answer_as_array, "json")
-            df = pl.from_dicts(answer_as_array, schema=df_schema).reverse()
-            st.dataframe(
-                df.reverse(),
-                column_config={
-                    "_index": "",
-                    "0": "phase",
-                    "1": "offset",
-                    "2": "median_duration",
-                    "3": "iqr",
-                },
-            )
-            fig, ax = plt.subplots()
-            plt.barh(y=df["stage"], width=df["median_duration"], left=df["offset"] + 1)
-            st.pyplot(fig)
+            with st.spinner("Please wait..."):
+                answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
+                st.code(answer_as_array, "json")
+                df = pl.from_dicts(answer_as_array, schema=df_schema).reverse()
+                st.dataframe(
+                    df.reverse(),
+                    column_config={
+                        "_index": "",
+                        "0": "phase",
+                        "1": "offset",
+                        "2": "median_duration",
+                        "3": "iqr",
+                    },
+                )
+                fig, ax = plt.subplots()
+                plt.barh(
+                    y=df["stage"], width=df["median_duration"], left=df["offset"] + 1
+                )
+                st.pyplot(fig)
         except Exception as e:
             st.error(f"An error occurred: {e}")

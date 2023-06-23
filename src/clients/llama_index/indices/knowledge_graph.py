@@ -7,7 +7,7 @@ import logging
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from typings.indices import NamespaceKey
 from prompts import BIOMEDICAL_TRIPLET_EXTRACT_PROMPT
-from .general import upsert_index, query_index
+from .llama_index_client import upsert_index, query_index
 
 MAX_TRIPLES = 400
 

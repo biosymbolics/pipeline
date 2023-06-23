@@ -2380,7 +2380,6 @@ _COMMON_ENTITY_NAMES = (
     "mandelic acid",
     "Stimulation (motivation)",
     "increased",
-    "persistent",
     "decreased",
     "drug inn",
     "lasting",
@@ -2396,6 +2395,7 @@ _COMMON_ENTITY_NAMES = (
     "biological processes and functions",
     "propylene glycol",
     "low-density polyethylene",
+    "chewing gum (food)",
 )
 
 COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])
