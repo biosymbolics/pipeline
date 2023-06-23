@@ -2,7 +2,7 @@ import unittest
 
 import spacy
 
-from common.ner.cleaning import remove_common_terms
+from common.ner.cleaning import remove_common_terms, clean_entity
 
 
 class TestNerUtils(unittest.TestCase):
@@ -62,6 +62,34 @@ class TestNerUtils(unittest.TestCase):
             result = remove_common_terms(terms, nlp, exception_list)
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
+
+    def test_clean_entities(self):
+        test_conditions = [
+            {
+                "input": "OPSUMIT ®",
+                "expected": "OPSUMIT",
+            },
+            {
+                "input": "OPSUMIT®",
+                "expected": "OPSUMIT",
+            },
+            {
+                "input": "OPSUMIT®, other product",
+                "expected": "OPSUMIT, other product",
+            },
+            {
+                "input": "/OPSUMIT ®",
+                "expected": "OPSUMIT",
+            },
+        ]
+
+        for condition in test_conditions:
+            input = condition["input"]
+            expected = condition["expected"]
+
+            result = clean_entity(input)
+            print("Actual", result, "expected", expected)
+            self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":

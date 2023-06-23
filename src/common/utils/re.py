@@ -32,16 +32,14 @@ def get_or_re(
         re_strs (list[str]): list of regexes
         count (Optional[ReCount]): count to apply to regex
     """
-    return (
-        "(?:"
-        + "|".join(re_strs)
-        + ")"
-        + "{"
-        + str(count)
-        + ","
-        + str(upper or "100")
-        + "}"
-    )
+    base_re = f"(?:{'|'.join(re_strs)})"
+
+    if count is None:
+        return base_re
+    if isinstance(count, int):
+        return base_re + f"{{{str(count)}, {str(upper or '100')}}}"
+
+    return base_re + count
 
 
 def ALPHA_CHARS(
@@ -55,14 +53,7 @@ def ALPHA_CHARS(
         upper (Optional[int]): upper bound for number of alpha chars (default: 100)
     """
     if isinstance(count, int):
-        return (
-            WORD_CHAR_RE(additional_chars)
-            + "{"
-            + str(count)
-            + ","
-            + str(upper or "100")
-            + "}"
-        )
+        return f"{WORD_CHAR_RE(additional_chars)}{{{count},{upper or '100'}}}"
     elif upper is not None:
         raise Exception("Cannot specify upper bound unless count is int")
     return WORD_CHAR_RE(additional_chars) + count
@@ -83,4 +74,4 @@ def remove_extra_spaces(string: str) -> str:
     Args:
         string (str): string to remove extra spaces from
     """
-    return re.sub(r"\s+", " ", string).strip()
+    return re.sub(r"\s{2,}", " ", string).strip()

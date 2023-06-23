@@ -4,16 +4,17 @@ Utils for the NER pipeline
 from typing import Callable
 import re
 from functools import reduce
-import spacy
 from spacy.language import Language
-from spacy.vocab import Vocab
 import logging
-import string
 
 from common.utils.list import dedup
-from common.utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS
+from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 
-CHAR_SUPPRESSIONS = [r"\n", *LEGAL_SYMBOLS]
+CHAR_SUPPRESSIONS = {
+    r"\n": " ",
+    "/": " ",
+    **{symbol: "" for symbol in LEGAL_SYMBOLS},
+}
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 
 CleaningFunction = Callable[[list[str]], list[str]]
@@ -37,7 +38,6 @@ def remove_common_terms(
     def __is_common(item):
         # remove punctuation and make lowercase
         words = [token.lemma_ for token in nlp(item)]
-        matchy = [string for string in vocab_words if "covid" in string]
 
         # check if all words are in the vocab
         is_common = set(words).issubset(vocab_words)
@@ -59,28 +59,30 @@ def remove_common_terms(
     return list(filter(__is_uncommon, entity_list))
 
 
-def clean_entity(entity: str, char_suppressions: list[str] = CHAR_SUPPRESSIONS) -> str:
+def clean_entity(
+    name: str, char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
+) -> str:
     """
     Clean entity name
     - remove certain characters
     - removes double+ spaces
-    - removed unmatched () [] {} <>
 
     Args:
         entity (str): entity name
     """
-    removal_pattern = get_or_re(char_suppressions)
 
     def remove_characters(entity: str) -> str:
-        return re.sub(removal_pattern, " ", entity)
+        for pattern, replacement in char_suppressions.items():
+            entity = re.sub(pattern, replacement, entity)
+        return entity
 
     # List of cleaning functions to apply to entity
     cleaning_steps = [remove_characters, remove_extra_spaces]
 
-    cleaned = reduce(lambda x, func: func(x), cleaning_steps, entity)
+    cleaned = reduce(lambda x, func: func(x), cleaning_steps, name)
 
-    if cleaned != entity:
-        logging.info(f"Cleaned entity: {entity} -> {cleaned}")
+    if cleaned != name:
+        logging.info(f"Cleaned entity: {name} -> {cleaned}")
 
     return cleaned
 
