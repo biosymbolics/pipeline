@@ -2,11 +2,10 @@
 Parsing for tables containing products (SEC)
 """
 import logging
-from typing import Literal
 import polars as pl
 from bs4 import BeautifulSoup
 
-from common.utils.html_parsing.html_table import get_table_headers, get_table_rows
+from .html_table import get_table_headers, get_table_rows
 
 
 PRODUCT_HEADER_STRINGS: list[str] = ["product"]

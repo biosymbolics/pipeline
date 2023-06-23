@@ -4,7 +4,7 @@ SEC build
 from datetime import date, datetime
 import re
 
-from common.utils.html_parsing.html import strip_inline_styles
+from common.utils.extraction.html import strip_inline_styles
 from common.utils.misc import dict_to_named_tuple
 from core.indices import entity_index
 from typings.indices import NamespaceKey
