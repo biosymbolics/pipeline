@@ -47,6 +47,9 @@ class SpacyLemmatizer(TransformerMixin):
         return input_features
 
 
+lemmatizer = SpacyLemmatizer()
+
+
 def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationObjects:
     """
     Process the DataFrame to prepare it for dimensionality reduction.
@@ -83,7 +86,7 @@ def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationOb
                 f"{col}_vect",
                 Pipeline(
                     [
-                        ("lemmatizer", SpacyLemmatizer()),
+                        ("lemmatizer", lemmatizer),
                         (
                             "vectorizer",
                             TfidfVectorizer(

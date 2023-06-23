@@ -147,3 +147,7 @@ class NerTagger:
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
             return self.extract(*args, **kwds)
+
+
+# default tagger
+tagger = NerTagger()

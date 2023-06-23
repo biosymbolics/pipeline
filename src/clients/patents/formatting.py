@@ -6,7 +6,7 @@ import polars as pl
 import logging
 import concurrent.futures
 
-from common.ner.ner import NerTagger
+from common.ner import tagger
 from typings import PatentApplication
 
 from .score import calculate_score
@@ -26,8 +26,6 @@ def format_search_result(
     Args:
         results (list[dict]): list of search results
     """
-    tagger = NerTagger()
-
     df = pl.from_dicts(results)
 
     df = df.with_columns(

@@ -7,10 +7,10 @@ import logging
 from clients import select_from_bg
 from typings import PatentApplication
 
-from .constants import COMPOSITION_OF_MATTER_IPC_CODES
+from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
 from .utils import get_max_priority_date
-from .types import TermResult
+from .types import RelevancyThreshold, TermResult
 
 MIN_TERM_FREQUENCY = 100
 MAX_SEARCH_RESULTS = 2000
@@ -56,7 +56,11 @@ COM_FILTER = f"""
 """
 
 
-def search(terms: Sequence[str]) -> Sequence[PatentApplication]:
+def search(
+    terms: Sequence[str],
+    min_patent_years: int = 10,
+    relevancy_threshold: RelevancyThreshold = "high",
+) -> Sequence[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -76,8 +80,11 @@ def search(terms: Sequence[str]) -> Sequence[PatentApplication]:
         >>> search(['asthma', 'astrocytoma'])
     """
     lower_terms = [term.lower() for term in terms]
-    max_priority_date = get_max_priority_date(10)
     fields = ",".join(SEARCH_RETURN_FIELDS)
+
+    max_priority_date = get_max_priority_date(min_patent_years)
+    threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
+
     query = f"""
         WITH matches AS (
             SELECT
@@ -119,6 +126,7 @@ def search(terms: Sequence[str]) -> Sequence[PatentApplication]:
         WHERE
         priority_date > {max_priority_date}
         AND {COM_FILTER}
+        AND search_rank > {threshold}
         ORDER BY search_rank DESC
         limit {MAX_SEARCH_RESULTS}
     """

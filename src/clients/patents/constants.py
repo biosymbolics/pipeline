@@ -3,6 +3,17 @@ Constants for the patents client.
 """
 from constants.patterns import MOA_ACTIONS
 
+from .types import RelevancyThreshold
+
+
+RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
+    "very low": 0.0,
+    "low": 0.05,
+    "medium": 0.20,
+    "high": 0.50,
+    "very high": 0.75,
+}
+
 COMPOSITION_OF_MATTER_IPC_CODES = [
     "C01",  # inorganic chemistry
     "C07",  # organic chemistry
