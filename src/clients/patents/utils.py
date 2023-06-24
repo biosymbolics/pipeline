@@ -9,7 +9,7 @@ from datetime import date
 import polars as pl
 
 from common.utils.re import get_or_re, remove_extra_spaces
-from common.ner import classify_by_keywords
+from common.ner.classifier import classify_by_keywords
 from .constants import (
     COMPANY_SUPPRESSIONS,
     COMPANY_SUPPRESSIONS_DEFINITE,

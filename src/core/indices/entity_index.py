@@ -20,7 +20,7 @@ from clients.llama_index.context import (
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
-from common.ner import NerTagger
+from common.ner.ner import NerTagger
 from common.ner.tokenizers.sec_tokenizer import get_sec_tokenizer
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id

@@ -7,8 +7,8 @@ from typing import cast
 import logging
 import re
 
-from clients import patent_client
-from clients import GptApiClient
+from clients.patents import patent_client
+from clients.openai.gpt_client import GptApiClient
 from clients.patents.types import is_relevancy_threshold
 
 # from visualization.dim_reduction import render_umap
@@ -72,8 +72,8 @@ def render_selector():
 
 
 @st.cache_resource
-def get_description(_terms: list[str]) -> str:
-    description = gpt_client.describe_terms(_terms, ["biomedical research"])
+def get_description(terms: list[str]) -> str:
+    description = gpt_client.describe_terms(terms, ["biomedical research"])
     return description
 
 

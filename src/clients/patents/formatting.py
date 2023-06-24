@@ -6,7 +6,7 @@ import polars as pl
 import logging
 import concurrent.futures
 
-from common.ner import tagger
+from common.ner.ner import tagger
 from typings import PatentApplication
 
 from .score import calculate_score
