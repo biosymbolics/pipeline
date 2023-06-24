@@ -44,20 +44,20 @@ def get_options():
 
 
 @st.cache_resource(experimental_allow_widgets=True)
-def get_data(_terms, _min_patent_years, _relevancy_threshold):
+def get_data(terms, min_patent_years, relevancy_threshold):
     if st.button("Search"):
-        if not _terms:
+        if not terms:
             st.error(f"Please enter patent terms.")
             return pl.DataFrame()
 
-        if not is_relevancy_threshold(_relevancy_threshold):
-            st.error(f"Invalid relevancy decay: {_relevancy_threshold}")
+        if not is_relevancy_threshold(relevancy_threshold):
+            st.error(f"Invalid relevancy threshold: {relevancy_threshold}")
             return pl.DataFrame()
 
         st.info(
-            f"Searching for patents with terms: {_terms}, min_patent_years: {_min_patent_years}, relevancy_threshold: {relevancy_threshold}"
+            f"Searching for patents with terms: {terms}, min_patent_years: {min_patent_years}, relevancy_threshold: {relevancy_threshold}"
         )
-        df = patent_client.search(_terms, _min_patent_years, _relevancy_threshold)
+        df = patent_client.search(terms, min_patent_years, relevancy_threshold)
         return pl.from_dicts(cast(list[dict], df))
 
 
@@ -109,7 +109,8 @@ if patents is not None:
         gpt_client = GptApiClient()
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
-            st.write(get_description(terms))
+            with st.spinner("Please wait..."):
+                st.write(get_description(terms))
 
         try:
             st.subheader(f"About these patents ({str(len(patents))})")
