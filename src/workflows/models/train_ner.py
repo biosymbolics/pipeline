@@ -7,7 +7,7 @@ from system import initialize
 
 initialize()
 
-from clients import patent_client
+from clients.patents import patent_client
 from common.ner.training import weakly_train_ner
 
 

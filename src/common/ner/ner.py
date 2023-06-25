@@ -14,6 +14,8 @@ import logging
 import warnings
 import spacy_llm
 
+from clients.spacy import Spacy
+
 from .cleaning import clean_entities
 from .debugging import debug_pipeline
 from .linking import enrich_with_canonical
@@ -26,8 +28,6 @@ warnings.filterwarnings(
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
 spacy_llm.logger.setLevel(logging.DEBUG)
-
-common_nlp = spacy.load("en_core_web_sm", disable=["ner"])
 
 
 def get_default_tokenizer(nlp: Language):
@@ -44,6 +44,8 @@ LINKER_CONFIG = {
 
 
 class NerTagger:
+    _instances: dict[str, Any] = {}
+
     def __init__(
         self,
         use_llm: Optional[bool] = False,
@@ -75,6 +77,8 @@ class NerTagger:
         self.get_tokenizer = (
             get_default_tokenizer if get_tokenizer is None else get_tokenizer
         )
+
+        self.common_nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
 
         self.__init_tagger()
 
@@ -130,14 +134,15 @@ class NerTagger:
         if not isinstance(content, list):
             content = [content]
 
-        docs = [self.nlp(batch) for batch in content]
+        # docs = self.nlp.pipe(content, n_process=16, batch_size=10000) # type: ignore
+        docs = self.nlp.pipe(content)
         entities = flatten([doc.ents for doc in docs])
 
         if not self.nlp:
             logging.error("NER tagger not initialized")
             return []
         enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = clean_entities(list(enriched.keys()), common_nlp)
+        entity_names = clean_entities(list(enriched.keys()), self.common_nlp)
 
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
@@ -148,6 +153,11 @@ class NerTagger:
         if self.nlp:
             return self.extract(*args, **kwds)
 
-
-# default tagger
-tagger = NerTagger()
+    @classmethod
+    def get_instance(cls, **kwargs):
+        kwargs_tuple = tuple(
+            sorted(kwargs.items())
+        )  # Convert kwargs to a hashable type
+        if kwargs_tuple not in cls._instances:
+            cls._instances[kwargs_tuple] = cls(**kwargs)
+        return cls._instances[kwargs_tuple]

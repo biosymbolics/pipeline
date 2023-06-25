@@ -7,7 +7,7 @@ from typing import Any, Optional, Type
 from llama_index import GPTVectorStoreIndex
 from langchain.output_parsers import ResponseSchema
 
-from clients.llama_index import upsert_index, load_index, query_index
+from clients.llama_index import load_index, query_index, upsert_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.parsing import get_prompts_and_parser, parse_answer
 from clients.llama_index.types import DocMetadata

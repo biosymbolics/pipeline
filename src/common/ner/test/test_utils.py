@@ -1,6 +1,7 @@
 import unittest
 
 import spacy
+from clients.spacy import Spacy
 
 from common.ner.cleaning import remove_common_terms, clean_entity
 
@@ -20,7 +21,7 @@ class TestNerUtils(unittest.TestCase):
     #         self.assertEqual(result, expected_output)
 
     def test_remove_common_terms(self):
-        nlp = spacy.load("en_core_web_sm", disable=["ner"])
+        nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
         test_conditions = [
             {
                 "terms": [

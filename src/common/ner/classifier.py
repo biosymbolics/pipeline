@@ -7,10 +7,9 @@ import spacy
 from typing import Mapping, Union
 import logging
 import polars as pl
+from clients.spacy import Spacy
 
 from common.utils.list import dedup
-
-nlp = spacy.load("en_core_web_sm")
 
 
 def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]:
@@ -40,7 +39,7 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
         for keyword in keywords
     ]
     lookup_tups = [
-        (kw_tok.lemma_, tup[1]) for tup in cat_key_tups for kw_tok in nlp(tup[0])
+        (kw_tok.lemma_, tup[1]) for tup in cat_key_tups for kw_tok in Spacy.nlp(tup[0])
     ]
     lookup_map = dict(lookup_tups)
     logging.debug(f"Created lookup map: %s", lookup_map)
@@ -59,7 +58,7 @@ def classify_string(
         lookup_map (Mapping[str, str]): mapping of lemmatized keywords to categories
         nx_name (str): name to use for non-matches
     """
-    tokens = nlp(string.lower())
+    tokens = Spacy.nlp(string.lower())
     categories = [lookup_map.get(token.lemma_, nx_name) for token in tokens]
     return dedup(compact(categories))
 

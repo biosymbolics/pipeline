@@ -98,7 +98,7 @@ def create_from_docs(
                 create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
+    tagger = NerTagger.get_instance(get_tokenizer=get_sec_tokenizer)
     for key, docs in doc_map.items():
         entities = tagger.extract(docs)
         ns_key = get_namespace_key(key)
