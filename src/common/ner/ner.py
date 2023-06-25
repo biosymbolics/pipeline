@@ -44,7 +44,7 @@ LINKER_CONFIG = {
 
 
 class NerTagger:
-    _instances: dict[str, Any] = {}
+    _instances: dict[tuple, Any] = {}
 
     def __init__(
         self,
