@@ -3,6 +3,7 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
+import time
 from typing import Any, Optional
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
@@ -50,7 +51,7 @@ class NerTagger:
         self,
         use_llm: Optional[bool] = False,
         # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
-        model: Optional[str] = "en_core_sci_scibert",
+        model: Optional[str] = "en_core_sci_lg",
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
     ):
@@ -83,6 +84,7 @@ class NerTagger:
         self.__init_tagger()
 
     def __init_tagger(self):
+        start_time = time.time()
         nlp: Language = (
             spacy.blank("en")
             if self.use_llm or not self.model
@@ -102,9 +104,13 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
+        # nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
-        logging.info("Setting NER pipeline: %s", nlp)
+        logging.info(
+            "Setting NER pipeline: %s, took %s seconds",
+            nlp,
+            round(time.time() - start_time, 2),
+        )
         self.nlp = nlp
 
     def extract(self, content: list[str]):
@@ -141,8 +147,9 @@ class NerTagger:
         if not self.nlp:
             logging.error("NER tagger not initialized")
             return []
-        enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = clean_entities(list(enriched.keys()), self.common_nlp)
+        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
+        entity_names = clean_entities([e.lemma_ for e in entities], self.common_nlp)
+        # entity_names = clean_entities(list(enriched.keys()), self.common_nlp)
 
         logging.info("Entity names: %s", entity_names)
         # debug_pipeline(docs, nlp)
@@ -154,10 +161,9 @@ class NerTagger:
             return self.extract(*args, **kwds)
 
     @classmethod
-    def get_instance(cls, **kwargs):
-        kwargs_tuple = tuple(
-            sorted(kwargs.items())
-        )  # Convert kwargs to a hashable type
+    def get_instance(cls, **kwargs) -> "NerTagger":
+        # Convert kwargs to a hashable type
+        kwargs_tuple = tuple(sorted(kwargs.items()))
         if kwargs_tuple not in cls._instances:
             cls._instances[kwargs_tuple] = cls(**kwargs)
         return cls._instances[kwargs_tuple]

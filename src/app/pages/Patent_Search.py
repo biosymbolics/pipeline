@@ -3,7 +3,7 @@ Patent lookup
 """
 import streamlit as st
 import polars as pl
-from typing import cast
+from typing import Optional, cast
 import logging
 import re
 
@@ -38,13 +38,23 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
+def __get_default_option(options, params) -> Optional[str]:
+    """
+    Get the default option from the query params
+    """
+    search = params.get("search", [None]).pop()
+
+    if not search:
+        return None
+
+    default = [opt for opt in options if opt.lower().startswith(search.lower())]
+    return default[0] if default else None
+
+
 @st.cache_data
 def get_options():
-    return patent_client.autocomplete_terms("")
-
-
-if "patents" not in st.session_state:
-    st.session_state.patents = None
+    options = patent_client.autocomplete_terms("")
+    return options
 
 
 @st.cache_data
@@ -65,7 +75,7 @@ def get_data(terms, min_patent_years, relevancy_threshold):
     """
     )
     df = patent_client.search(terms, min_patent_years, relevancy_threshold)
-    st.session_state.patents = pl.from_dicts(cast(list[dict], df))
+    return pl.from_dicts(cast(list[dict], df))
 
 
 @st.cache_data
@@ -75,10 +85,13 @@ def get_description(terms: list[str]) -> str:
     return description
 
 
-st.title("Search for patents")
+query_params = st.experimental_get_query_params()
+if "patents" not in st.session_state:
+    logging.info("Initializing patents")
+    st.session_state.patents = None
 
 
-def render_selector():
+def render_selector(patents):
     with st.sidebar:
         min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
         relevancy_threshold = st.select_slider(
@@ -90,23 +103,28 @@ def render_selector():
     select_col, metric_col = st.columns([10, 1])
     with select_col:
         options = get_options()
-        terms = st.multiselect("Enter in terms for patent search", options=options)
+        default_option = __get_default_option(options, query_params)
+        terms = st.multiselect(
+            "Enter in terms for patent search", options=options, default=default_option
+        )
         terms = __format_terms(terms)
     with metric_col:
         st.metric(
             label="Results",
-            value=len(st.session_state.patents)
-            if st.session_state.patents is not None
-            else 0,
+            value=len(patents) if patents is not None else 0,
         )
 
     if st.button("Search"):
-        get_data(terms, min_patent_years, relevancy_threshold)
+        new_patents = get_data(terms, min_patent_years, relevancy_threshold)
+        if new_patents is not None:
+            st.session_state.patents = new_patents
 
     return terms
 
 
-terms = render_selector()
+st.title("Search for patents")
+
+terms = render_selector(st.session_state.patents)
 
 if st.session_state.patents is not None:
     main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])

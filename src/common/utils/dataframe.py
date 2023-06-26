@@ -13,17 +13,12 @@ def find_string_array_columns(df: pl.DataFrame) -> list[str]:
 
     Args:
         df (pl.DataFrame): DataFrame
+        allow_empty (bool, optional): Allow empty string arrays. Defaults to True.
     """
     string_array_columns = [
         column
         for column in df.columns
-        if df.select(pl.col(column))
-        .to_series()
-        .apply(
-            lambda x: isinstance(x, pl.Series)
-            and (len(x) == 0 or isinstance(x[0], str))
-        )
-        .all()
+        if str(df.select(pl.col(column)).to_series().dtype) == "List(Utf8)"
     ]
     return string_array_columns
 
