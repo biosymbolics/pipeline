@@ -150,7 +150,7 @@ class NerTagger:
         else:
             entities = [doc.ents for doc in docs]
             entity_names = [
-                clean_entities([e.lemma_ or e.text for e in ent], self.common_nlp)  # type: ignore
+                clean_entities([(e.lemma_ or e.text, e.label_) for e in ent], self.common_nlp)  # type: ignore
                 for ent in entities
             ]
 

@@ -53,7 +53,7 @@ while rows:
         chunk = chunk.with_columns(
             pl.concat_list(["title", "abstract"])
             .apply(
-                lambda x: [(ent.text, ent.label_) for ent in tagger(x).ents],
+                lambda x: [ent for ent in tagger(x.to_list())],
                 return_dtype=pl.Object,
             )
             .alias("entities")
