@@ -2400,6 +2400,8 @@ _COMMON_ENTITY_NAMES = (
     "physiological effects",
     "preventative intent",
     "suppress",
+    "deferred",
+    "decreased",
 )
 
 COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])

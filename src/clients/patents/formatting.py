@@ -39,18 +39,12 @@ def format_search_result(
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
     )
 
-    titles = df.select(pl.col("title")).to_series()
+    titles = df.select(pl.col("title")).to_series().to_list()
 
-    ners = pl.Series(titles.apply(lambda t: NerTagger.get_instance().extract(t))).alias(
-        "ner"
-    )
-    df = df.with_columns(ners)
-    # with concurrent.futures.ThreadPoolExecutor() as executor:
-    #     ners = pl.Series(
-    #         executor.map(lambda t: NerTagger.get_instance().extract([str(t)]), titles)
-    #     ).alias("ner")
-    #     df = df.with_columns(ners)
-    #
+    # ners = pl.Series(titles.apply(lambda t: NerTagger.get_instance().extract(t))).alias("ner")
+    ners = NerTagger.get_instance().extract(titles, flatten_results=False)
+    logging.info("GOT HERESFSF %s", ners)
+    df = df.with_columns(pl.Series(ners).alias("ner"))
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()

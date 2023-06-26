@@ -2,7 +2,7 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 from llama_index import GPTVectorStoreIndex
 from langchain.output_parsers import ResponseSchema
 import logging
@@ -100,10 +100,10 @@ def create_from_docs(
     """
     tagger = NerTagger.get_instance(get_tokenizer=get_sec_tokenizer)
     for key, docs in doc_map.items():
-        entities = tagger.extract(docs)
+        entities = tagger.extract(docs, flatten_results=True)
         ns_key = get_namespace_key(key)
         create_entity_indices(
-            entities=entities,
+            entities=cast(list[str], entities),
             namespace_key=ns_key,
             documents=docs,
         )

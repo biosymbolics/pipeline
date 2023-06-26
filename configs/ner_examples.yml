@@ -72,3 +72,18 @@
   entities:
     MECHANISM:
       - anti-claudin 18.2 antibody
+- text: Peptides inhibiting cold-inducible rna binding protein activity
+  entities:
+    MECHANISM:
+      - cold-inducible rna binding protein inhibitor
+    CLASS:
+      - peptide
+- text: METHODS AND PHARMACEUTICAL COMPOSITIONS FOR MODULATION OF MONOCYTOPOISIS
+  entities:
+    MECHANISM:
+      - monocytopoiesis modulator
+- text: Covalent inhibitors of pad4
+  entities:
+    MECHANISM:
+      - pad4 inhibitor
+      - covalent pad4 inhibitor

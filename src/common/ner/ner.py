@@ -4,7 +4,7 @@ Named-entity recognition using spacy
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
 import time
-from typing import Any, Optional
+from typing import Any, Optional, Union
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
@@ -85,7 +85,7 @@ class NerTagger:
 
     def __init_tagger(self):
         start_time = time.time()
-        nlp: Language = (
+        nlp = (
             spacy.blank("en")
             if self.use_llm or not self.model
             else spacy.load(self.model)
@@ -112,7 +112,9 @@ class NerTagger:
         )
         self.nlp = nlp
 
-    def extract(self, content: list[str]):
+    def extract(
+        self, content: list[str], flatten_results: bool = True
+    ) -> Union[list[str], list[list[str]]]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -121,38 +123,39 @@ class NerTagger:
 
         Args:
             content (list[str]): list of content on which to do NER
+            flatten (bool, optional): flatten results.
+                Defaults to True, which means result is list[str].
+                Otherwise, returns list[list[str]].
 
         Examples:
             >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
             >>> tagger.extract("Interferon alpha and omega antibody antagonists")
             >>> tagger.extract("Inhibitors of beta secretase")
-            >>> tagger.extract("Antibodies specifically binding hla-dr/colii_259 complex and their uses")
-            >>> tagger.extract("Use of small molecules to enhance mafa expression in pancreatic endocrine cells")
-            >>> tagger.extract("Macrocyclic 2-amino-3-fluoro-but-3-enamides as inhibitors of mcl-1")
-            >>> tagger.extract("Inhibitors of antigen presentation by hla-dr")
-            >>> tagger.extract("Antibodies specifically binding tim-3 and their uses")
-            >>> tagger.extract("Antibodies and antigen binding peptides for factor xia inhibitors and uses thereof")
-            >>> tagger.extract("P2x7 modulating n-acyl-triazolopyrazines")
-            >>> tagger.extract("Small molecule inhibitors of the jak family of kinases")
-            >>> tagger.extract("Inhibitors of keap1-nrf2 protein-protein interaction")
         """
         if not isinstance(content, list):
             content = [content]
 
-        # docs = self.nlp.pipe(content, n_process=16, batch_size=10000) # type: ignore
-        docs = self.nlp.pipe(content)
-        entities = flatten([doc.ents for doc in docs])
-
         if not self.nlp:
             logging.error("NER tagger not initialized")
-            return []
-        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = clean_entities(
-            [e.lemma_ or e.text for e in entities], self.common_nlp
-        )
-        # entity_names = clean_entities(list(enriched.keys()), self.common_nlp)
+            raise Exception("NER tagger not initialized")
 
-        logging.info("Entity names: %s", entity_names)
+        docs = self.nlp.pipe(content)
+
+        if flatten_results:
+            entities = flatten([doc.ents for doc in docs])
+            entity_names = clean_entities(
+                [e.lemma_ or e.text for e in entities], self.common_nlp
+            )
+        else:
+            entities = [doc.ents for doc in docs]
+            entity_names = [
+                clean_entities([e.lemma_ or e.text for e in ent], self.common_nlp)  # type: ignore
+                for ent in entities
+            ]
+
+        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
+
+        logging.info("Entity names: %s", flatten(entity_names))
         # debug_pipeline(docs, nlp)
 
         return entity_names
