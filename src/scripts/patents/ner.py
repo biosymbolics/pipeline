@@ -24,14 +24,14 @@ def get_rows(last_id: Optional[str]):
     """
     where = f"WHERE {ID_FIELD} > {last_id}" if last_id else ""
     sql = f"""
-    SELECT text
+    SELECT {ID_FIELD}, title, abstract
     FROM `{BQ_DATASET_ID}.gpr_publications`
     {where}
-    ORDER BY id_field ASC
+    ORDER BY {ID_FIELD} ASC
     LIMIT 5000
     """
     rows = execute_bg_query(sql)
-    return rows
+    return list(rows)
 
 
 tagger = NerTagger.get_instance(use_llm=True)
@@ -51,12 +51,12 @@ while rows:
     for i, chunk in enumerate(chunks):
         # Apply NER
         chunk = chunk.with_columns(
-            pl.col(["title", "abstract"])
+            pl.concat_list(["title", "abstract"])
             .apply(
                 lambda x: [(ent.text, ent.label_) for ent in tagger(x).ents],
                 return_dtype=pl.Object,
             )
-            .alias("ner")
+            .alias("entities")
         )
 
         # Save chunk to a temporary location

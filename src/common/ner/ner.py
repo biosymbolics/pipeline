@@ -19,7 +19,8 @@ from clients.spacy import Spacy
 
 from .cleaning import clean_entities
 from .debugging import debug_pipeline
-from .linking import enrich_with_canonical
+
+# from .linking import enrich_with_canonical
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import GetTokenizer, SpacyPatterns
 

@@ -17,7 +17,7 @@ from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
 
-from .constants import SYNONYM_MAP
+from ._constants import SYNONYM_MAP
 
 MIN_ASSIGNEE_COUNT = 10
 
