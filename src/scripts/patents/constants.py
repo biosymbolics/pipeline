@@ -2396,6 +2396,7 @@ _COMMON_ENTITY_NAMES = (
     "propylene glycol",
     "low-density polyethylene",
     "chewing gum (food)",
+    "id personality component",
 )
 
 COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])

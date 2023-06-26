@@ -26,8 +26,9 @@ class GptApiClient:
 
         if schemas:
             prompt_template, output_parser = self.__get_schema_things(schemas)
-            self.output_parser: StructuredOutputParser = output_parser
+            self.output_parser: Optional[StructuredOutputParser] = output_parser
         else:
+            self.output_parser = None
             prompt_template = PromptTemplate(
                 template="Answer this query as best as possible.\n{query}",
                 input_variables=["query"],
