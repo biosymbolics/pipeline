@@ -1,6 +1,7 @@
 """
 Patent client
 """
+from functools import partial
 from typing import Sequence, cast
 import logging
 
@@ -14,6 +15,14 @@ from .types import RelevancyThreshold, TermResult
 
 MIN_TERM_FREQUENCY = 100
 MAX_SEARCH_RESULTS = 2000
+
+"""
+Larger decay rates will result in more matches
+
+Usage:
+    EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
+"""
+DECAY_RATE = 1 / 2000
 
 SEARCH_RETURN_FIELDS = [
     "apps.publication_number",
@@ -56,6 +65,20 @@ COM_FILTER = f"""
 """
 
 
+def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
+    """
+    Returns a query for a given domain
+    """
+    # relaxed threshold relative to search rank
+    term_threshold = threshold / 2
+    return f"""
+        ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a
+        where a.domain = '{domain}'
+        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {term_threshold})
+        as {new_domain}
+    """
+
+
 def search(
     terms: Sequence[str],
     min_patent_years: int = 10,
@@ -73,9 +96,6 @@ def search(
 
     Returns: a list of matching patent applications
 
-    TODO:
-        - decay on returned entities
-
     Example:
         >>> search(['asthma', 'astrocytoma'])
     """
@@ -85,18 +105,20 @@ def search(
     max_priority_date = get_max_priority_date(min_patent_years)
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
 
+    _get_term_query = partial(get_term_query, threshold=threshold)
+
     query = f"""
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
                 annotation.term as matched_term,
                 annotation.domain as matched_domain,
-                EXP(-annotation.character_offset_start / 2000) as search_rank, --- exp decay scaling; higher is better
-                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'drugs') as compounds,
-                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'diseases') as diseases,
-                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'effects') as effects,
-                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'humangenes') as genes,
-                ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a where a.domain = 'proteins') as proteins,
+                EXP(-annotation.character_offset_start * {DECAY_RATE}) as search_rank, --- exp decay scaling; higher is better
+                {_get_term_query('drugs', 'compounds')},
+                {_get_term_query('diseases', 'diseases')},
+                {_get_term_query('effects', 'effects')},
+                {_get_term_query('humangenes', 'genes')},
+                {_get_term_query('proteins', 'proteins')}
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
