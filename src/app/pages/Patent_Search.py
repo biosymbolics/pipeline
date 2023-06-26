@@ -3,7 +3,7 @@ Patent lookup
 """
 import streamlit as st
 import polars as pl
-from typing import cast
+from typing import Optional, cast
 import logging
 import re
 
@@ -40,7 +40,8 @@ def __format_terms(terms: list[str]) -> list[str]:
 
 @st.cache_data
 def get_options():
-    return patent_client.autocomplete_terms("")
+    options = patent_client.autocomplete_terms("")
+    return options
 
 
 if "patents" not in st.session_state:
@@ -75,10 +76,20 @@ def get_description(terms: list[str]) -> str:
     return description
 
 
-st.title("Search for patents")
+query_params = st.experimental_get_query_params()
 
 
-def render_selector():
+def __get_default_option(options, params) -> Optional[str]:
+    search = params.get("search", []).pop()
+
+    if not search:
+        return None
+
+    default = [opt for opt in options if opt.lower().startswith(search.lower())]
+    return default[0] if default else None
+
+
+def render_selector(patents):
     with st.sidebar:
         min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
         relevancy_threshold = st.select_slider(
@@ -90,14 +101,15 @@ def render_selector():
     select_col, metric_col = st.columns([10, 1])
     with select_col:
         options = get_options()
-        terms = st.multiselect("Enter in terms for patent search", options=options)
+        default_option = __get_default_option(options, query_params)
+        terms = st.multiselect(
+            "Enter in terms for patent search", options=options, default=default_option
+        )
         terms = __format_terms(terms)
     with metric_col:
         st.metric(
             label="Results",
-            value=len(st.session_state.patents)
-            if st.session_state.patents is not None
-            else 0,
+            value=len(patents) if patents is not None else 0,
         )
 
     if st.button("Search"):
@@ -106,7 +118,9 @@ def render_selector():
     return terms
 
 
-terms = render_selector()
+st.title("Search for patents")
+
+terms = render_selector(st.session_state.patents)
 
 if st.session_state.patents is not None:
     main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])

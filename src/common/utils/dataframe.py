@@ -7,12 +7,13 @@ import polars as pl
 THRESHOLD = 0.5
 
 
-def find_string_array_columns(df: pl.DataFrame) -> list[str]:
+def find_string_array_columns(df: pl.DataFrame, allow_empty: bool = True) -> list[str]:
     """
     Extracts columns that are string arrays
 
     Args:
         df (pl.DataFrame): DataFrame
+        allow_empty (bool, optional): Allow empty string arrays. Defaults to True.
     """
     string_array_columns = [
         column
@@ -21,7 +22,7 @@ def find_string_array_columns(df: pl.DataFrame) -> list[str]:
         .to_series()
         .apply(
             lambda x: isinstance(x, pl.Series)
-            and (len(x) == 0 or isinstance(x[0], str))
+            and (allow_empty or (len(x) > 0 and isinstance(x[0], str)))
         )
         .all()
     ]
