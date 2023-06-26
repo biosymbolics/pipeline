@@ -1,18 +1,27 @@
+"""
+This script applies NER to the patent dataset and saves the results to a temporary location.
+"""
 from typing import Optional
-from google.cloud import bigquery
 import polars as pl
-from clients.low_level.big_query import execute_bg_query, BQ_DATASET_ID
 
+from system import initialize
+
+initialize()
+
+from clients.low_level.big_query import execute_bg_query, BQ_DATASET_ID
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
 CHUNK_SIZE = 1000
 
-# Initialize BigQuery client
-client = bigquery.Client()
-
 
 def get_rows(last_id: Optional[str]):
+    """
+    Get rows from the patent dataset
+
+    Args:
+        last_id (str): last id from previous query
+    """
     where = f"WHERE {ID_FIELD} > {last_id}" if last_id else ""
     sql = f"""
     SELECT text
