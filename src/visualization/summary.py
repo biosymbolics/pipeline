@@ -71,11 +71,7 @@ def render_summary(
         suppressions (list[str], optional): Columns to suppress. Defaults to [].
     """
     columns = (
-        [
-            col
-            for col in find_string_array_columns(df, allow_empty=False)
-            if col not in suppressions
-        ]
+        [col for col in find_string_array_columns(df) if col not in suppressions]
         if not columns
         else columns
     )
