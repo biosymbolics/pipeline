@@ -33,3 +33,42 @@
       - PR001
     DISEASE:
       - Parkinson's disease
+- text: Cross-reactive epitope for multiple sclerosis
+  entities:
+    MECHANISM:
+      - Cross-reactive epitope
+    DISEASE:
+      - multiple sclerosis
+- text: Cross-reactive epitope for multiple sclerosis
+  entities:
+    MECHANISM:
+      - Cross-reactive epitope
+    DISEASE:
+      - multiple sclerosis
+- text: Chimeric antigen receptors targeting cd-19
+  entities:
+    MECHANISM:
+      - cd-19 chimeric antigen receptors
+- text: ANTIBODY TARGETING CELL SURFACE DEPOSITED COMPLEMENT PROTEIN C3d AND USE THEREOF
+  entities:
+    MECHANISM:
+      - C3d Complement Protein Antibody
+- text: Tumor necrosis factor (tnf) superfamily receptor binding molecules and uses thereof
+  entities:
+    MECHANISM:
+      - TNF receptor binding molecules
+- text: Anti-h7n9 fully-human monoclonal antibody 5j13, preparation method therefor, and application thereof
+  entities:
+    MECHANISM:
+      - Anti-h7n9 fully-human monoclonal antibody 5j13
+- text: Indazole and azaindazole btk inhibitors
+  entities:
+    MECHANISM:
+      - btk inhibitor
+    COMPOUND:
+      - indazole
+      - azaindazole
+- text: Antibodies targeting human claudin 18.2 and uses thereof
+  entities:
+    MECHANISM:
+      - anti-claudin 18.2 antibody

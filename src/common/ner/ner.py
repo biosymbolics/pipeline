@@ -49,7 +49,7 @@ class NerTagger:
 
     def __init__(
         self,
-        use_llm: Optional[bool] = False,
+        use_llm: Optional[bool] = True,
         # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
         model: Optional[str] = "en_core_sci_lg",
         rule_sets: Optional[list[SpacyPatterns]] = None,
@@ -107,8 +107,7 @@ class NerTagger:
         # nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
 
         logging.info(
-            "Setting NER pipeline: %s, took %s seconds",
-            nlp,
+            "Init NER pipeline took %s seconds",
             round(time.time() - start_time, 2),
         )
         self.nlp = nlp
@@ -148,7 +147,9 @@ class NerTagger:
             logging.error("NER tagger not initialized")
             return []
         # enriched = enrich_with_canonical(entities, nlp=self.nlp)
-        entity_names = clean_entities([e.lemma_ for e in entities], self.common_nlp)
+        entity_names = clean_entities(
+            [e.lemma_ or e.text for e in entities], self.common_nlp
+        )
         # entity_names = clean_entities(list(enriched.keys()), self.common_nlp)
 
         logging.info("Entity names: %s", entity_names)
