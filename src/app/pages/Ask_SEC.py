@@ -7,13 +7,17 @@ st.set_page_config(page_title="Ask SEC", page_icon="🔎")
 
 st.title("Ask SEC")
 question = st.text_area("What would you like to ask?", "")
-prefix = (
-    "Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy. "
-    "With that in mind, provide detailed and scientific answer to their question. "
-    "Format the answer in markdown, and include tables and links if appropriate. "
-    "Here is the question: \n\n"
-)
-prompt = prefix + question
+prompt = f"""
+    Below is a question from a technical expert in biomedicine looking to inform their drug discovery or investment strategy.
+    With that in mind, provide detailed and scientific answer to their question.
+    Format the answer in markdown, and include tables, lists and links where appropriate.
+    Here is the question:
+    {question}
+"""
+
+with st.spinner("Initializing..."):
+    ei = EntityIndex()
+    si = SourceDocIndex()
 
 if st.button("Submit"):
     if not question.strip():
@@ -22,13 +26,11 @@ if st.button("Submit"):
         try:
             source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
             st.subheader("Answer from source doc index:")
-            si = SourceDocIndex()
             with st.spinner("Please wait..."):
                 si_answer = si.query(prompt, source)
                 st.markdown(si_answer)
 
             st.subheader("Answer from entity doc index:")
-            ei = EntityIndex()
             with st.spinner("Please wait..."):
                 ei_answer = ei.query(prompt, source)
                 st.markdown(ei_answer)

@@ -7,7 +7,7 @@ import polars as pl
 from langchain.output_parsers import ResponseSchema
 import logging
 
-from clients import GptApiClient
+from clients.openai.gpt_client import GptApiClient
 
 st.set_page_config(page_title="Typical ClinDev", page_icon="📈")
 

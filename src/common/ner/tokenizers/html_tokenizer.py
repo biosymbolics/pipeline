@@ -3,7 +3,6 @@ Tokenization based on HTML tags
 
 Loosely based on  https://github.com/pmbaumgartner/spacy-html-tokenizer
 """
-from functools import partial
 from typing import List
 
 from spacy.util import registry

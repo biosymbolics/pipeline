@@ -9,10 +9,10 @@ import polars as pl
 import logging
 from scipy.sparse import spmatrix  # type: ignore
 from sklearn.pipeline import Pipeline
-import spacy
 import numpy as np
 from sklearn.base import TransformerMixin
 
+from clients.spacy import Spacy
 from common.utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000
@@ -31,7 +31,7 @@ VectorizationObjects = NamedTuple(
 
 class SpacyLemmatizer(TransformerMixin):
     def __init__(self):
-        self.nlp = spacy.load("en_core_web_sm", disable=["ner"])
+        self.nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
         self.nlp.add_pipe("merge_noun_chunks")
 
     def fit(self, X, y=None):
@@ -45,6 +45,9 @@ class SpacyLemmatizer(TransformerMixin):
 
     def get_feature_names_out(self, input_features=None):
         return input_features
+
+
+lemmatizer = SpacyLemmatizer()
 
 
 def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationObjects:
@@ -83,7 +86,7 @@ def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationOb
                 f"{col}_vect",
                 Pipeline(
                     [
-                        ("lemmatizer", SpacyLemmatizer()),
+                        ("lemmatizer", lemmatizer),
                         (
                             "vectorizer",
                             TfidfVectorizer(

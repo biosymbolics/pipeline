@@ -4,18 +4,12 @@ EntityIndex
 from datetime import datetime
 from typing import Callable, Optional
 from llama_index import GPTVectorStoreIndex
-from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
-from llama_index.prompts.default_prompts import (
-    DEFAULT_TEXT_QA_PROMPT_TMPL,
-    DEFAULT_REFINE_PROMPT_TMPL,
-)
 from langchain.output_parsers import ResponseSchema
 import logging
 
 from clients.llama_index import (
     load_index,
     query_index,
-    get_output_parser,
     parse_answer,
     upsert_index,
 )
@@ -26,10 +20,10 @@ from clients.llama_index.context import (
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
+from common.ner.ner import NerTagger
+from common.ner.tokenizers.sec_tokenizer import get_sec_tokenizer
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
-from common.ner import NerTagger
-from common.ner.tokenizers.sec_tokenizer import get_sec_tokenizer
 from common.utils.string import get_id
 from typings.indices import NamespaceKey
 from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
@@ -104,7 +98,7 @@ def create_from_docs(
                 create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    tagger = NerTagger(get_tokenizer=get_sec_tokenizer)
+    tagger = NerTagger.get_instance(get_tokenizer=get_sec_tokenizer)
     for key, docs in doc_map.items():
         entities = tagger.extract(docs)
         ns_key = get_namespace_key(key)

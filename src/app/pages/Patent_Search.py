@@ -7,8 +7,9 @@ from typing import cast
 import logging
 import re
 
-from clients import patent_client
-from clients import GptApiClient
+from clients.patents import patent_client
+from clients.openai.gpt_client import GptApiClient
+from clients.patents.types import is_relevancy_threshold
 
 # from visualization.dim_reduction import render_umap
 from visualization.summary import render_summary
@@ -37,43 +38,81 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
-@st.cache_resource
+@st.cache_data
 def get_options():
     return patent_client.autocomplete_terms("")
 
 
-@st.cache_resource(experimental_allow_widgets=True)
-def get_data(options):
-    if not options:
-        return None
-    terms = st.multiselect("Enter in terms for patent search", options=options)
+if "patents" not in st.session_state:
+    st.session_state.patents = None
+
+
+@st.cache_data
+def get_data(terms, min_patent_years, relevancy_threshold):
     if not terms:
         st.error(f"Please enter patent terms.")
         return None
-    terms = __format_terms(terms)
-    df = patent_client.search(terms)
-    return pl.from_dicts(cast(list[dict], df)), terms
+
+    if not is_relevancy_threshold(relevancy_threshold):
+        st.error(f"Invalid relevancy threshold: {relevancy_threshold}")
+        return None
+
+    st.info(
+        f"""
+            Searching for patents with terms: {terms},
+            min_patent_years: {min_patent_years},
+            relevancy_threshold: {relevancy_threshold}
+    """
+    )
+    df = patent_client.search(terms, min_patent_years, relevancy_threshold)
+    st.session_state.patents = pl.from_dicts(cast(list[dict], df))
 
 
-def render_selector():
-    col1, col2 = st.columns([10, 1])
-    with col1:
-        options = get_options()
-        patents, terms = get_data(options) or (None, None)
-    with col2:
-        st.metric(label="Results", value=len(patents) if patents is not None else 0)
-
-    return patents, terms
+@st.cache_data
+def get_description(terms: list[str]) -> str:
+    logging.info(f"Getting description for terms: {terms}")
+    description = gpt_client.describe_terms(terms, ["biomedical research"])
+    return description
 
 
 st.title("Search for patents")
 
-patents, terms = render_selector()
-main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])
 
-if patents is not None:
+def render_selector():
+    with st.sidebar:
+        min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
+        relevancy_threshold = st.select_slider(
+            "Term Relevance Threshold",
+            options=["very low", "low", "medium", "high", "very high"],
+            value="high",
+        )
+
+    select_col, metric_col = st.columns([10, 1])
+    with select_col:
+        options = get_options()
+        terms = st.multiselect("Enter in terms for patent search", options=options)
+        terms = __format_terms(terms)
+    with metric_col:
+        st.metric(
+            label="Results",
+            value=len(st.session_state.patents)
+            if st.session_state.patents is not None
+            else 0,
+        )
+
+    if st.button("Search"):
+        get_data(terms, min_patent_years, relevancy_threshold)
+
+    return terms
+
+
+terms = render_selector()
+
+if st.session_state.patents is not None:
+    main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])
+
     with main_tab:
-        selection = render_dataframe(patents)
+        selection = render_dataframe(st.session_state.patents)
 
         if selection is not None and len(selection) > 0:
             columns = st.columns(len(selection))
@@ -82,19 +121,19 @@ if patents is not None:
                     render_detail(selection)
 
     with timeline_tab:
-        render_timeline(patents)
+        render_timeline(st.session_state.patents)
 
     with landscape_tab:
         gpt_client = GptApiClient()
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
-            st.write(gpt_client.describe_terms(terms, ["biomedical research"]))
+            with st.spinner("Please wait..."):
+                st.write(get_description(terms))
 
         try:
-            if patents is not None:
-                st.subheader(f"About these patents ({str(len(patents))})")
-                render_summary(patents, None, ["top_terms"])
-                # render_umap(patents, terms)
+            st.subheader(f"About these patents")
+            render_summary(st.session_state.patents, None, ["top_terms"])
+            # render_umap(patents, terms)
         except Exception as e:
             logging.error(e)
             st.error("Failed to render")

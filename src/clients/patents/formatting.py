@@ -26,8 +26,6 @@ def format_search_result(
     Args:
         results (list[dict]): list of search results
     """
-    tagger = NerTagger()
-
     df = pl.from_dicts(results)
 
     df = df.with_columns(
@@ -41,13 +39,12 @@ def format_search_result(
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
     )
 
-    # Parallelize NER task
     titles = df.select(pl.col("title")).to_series()
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        ners = pl.Series(
-            executor.map(lambda t: tagger.extract([str(t)]), titles)
-        ).alias("ner")
-        df = df.with_columns(ners)
+
+    ners = pl.Series(titles.apply(lambda t: NerTagger.get_instance().extract(t))).alias(
+        "ner"
+    )
+    df = df.with_columns(ners)
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
