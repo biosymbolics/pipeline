@@ -11,6 +11,9 @@ from typings import PatentApplication
 from .common import get_horizontal_list, get_markdown_link
 
 
+URL_BASE = "/Patent_Search?search="
+
+
 def render_timeline(patents: pl.DataFrame):
     """
     Render a timeline of patents in streamlit app
@@ -76,11 +79,11 @@ def render_detail(patent: PatentApplication):
     mcol3.metric(label="Relevancy", value=round(patent["search_rank"], 2))
 
     st.divider()
-    st.markdown(get_horizontal_list(patent["compounds"], "Compounds"))
-    st.markdown(get_horizontal_list(patent["diseases"], "Diseases"))
-    st.markdown(get_horizontal_list(patent["genes"], "Genes"))
-    st.markdown(get_horizontal_list(patent["proteins"], "Proteins"))
-    st.markdown(get_horizontal_list(patent["effects"], "Effects"))
+    st.markdown(get_horizontal_list(patent["compounds"], "Compounds", URL_BASE))
+    st.markdown(get_horizontal_list(patent["diseases"], "Diseases", URL_BASE))
+    st.markdown(get_horizontal_list(patent["genes"], "Genes", URL_BASE))
+    st.markdown(get_horizontal_list(patent["proteins"], "Proteins", URL_BASE))
+    st.markdown(get_horizontal_list(patent["effects"], "Effects", URL_BASE))
     st.markdown(get_horizontal_list(patent["ipc_codes"], "IPC Codes"))
     st.divider()
     if len(patent["similar"]) > 0:

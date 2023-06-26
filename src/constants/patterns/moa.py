@@ -148,4 +148,4 @@ MOA_SUFFIXES = [
 ]
 
 
-MOA_PREFIXES = ["recombinant", "therapeutic", *ACTIONS]
+MOA_PREFIXES = ["recombinant", "therapeutic", *[f"{action} of" for action in ACTIONS]]

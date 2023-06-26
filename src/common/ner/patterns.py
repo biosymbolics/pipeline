@@ -25,6 +25,18 @@ MOA_PATTERNS: list = [
     *[
         [
             {
+                "LEMMA": {
+                    "REGEX": get_entity_re(
+                        moa_prefix + ALPHA_CHARS("*") + ".*", is_case_insensitive=True
+                    ),
+                },
+            }
+        ]
+        for moa_prefix in MOA_PREFIXES
+    ],
+    *[
+        [
+            {
                 "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
                 "OP": "*",
             },
@@ -59,22 +71,6 @@ MOA_PATTERNS: list = [
             },
         ]
         for moa_infix in MOA_INFIXES
-    ],
-    *[
-        [
-            {
-                "LEMMA": {
-                    "REGEX": get_entity_re(
-                        moa_prefix + ALPHA_CHARS("*"), is_case_insensitive=True
-                    ),
-                },
-            },
-            {
-                "POS": {"IN": ["PROPN", "NOUN", "ADJ"]},
-                "OP": "*",
-            },
-        ]
-        for moa_prefix in MOA_PREFIXES
     ],
 ]
 

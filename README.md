@@ -71,6 +71,11 @@
 
 ### Misc
 
+#### Dependencies
+```
+python3 -m pip freeze | grep -v @ | awk -F'==' '{print $1}' | xargs python3 -m pip install --upgrade
+```
+
 #### Debug Logging in REPL
 ```
 import logging

@@ -38,14 +38,23 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
+def __get_default_option(options, params) -> Optional[str]:
+    """
+    Get the default option from the query params
+    """
+    search = params.get("search", [None]).pop()
+
+    if not search:
+        return None
+
+    default = [opt for opt in options if opt.lower().startswith(search.lower())]
+    return default[0] if default else None
+
+
 @st.cache_data
 def get_options():
     options = patent_client.autocomplete_terms("")
     return options
-
-
-if "patents" not in st.session_state:
-    st.session_state.patents = None
 
 
 @st.cache_data
@@ -77,16 +86,9 @@ def get_description(terms: list[str]) -> str:
 
 
 query_params = st.experimental_get_query_params()
-
-
-def __get_default_option(options, params) -> Optional[str]:
-    search = params.get("search", []).pop()
-
-    if not search:
-        return None
-
-    default = [opt for opt in options if opt.lower().startswith(search.lower())]
-    return default[0] if default else None
+if "patents" not in st.session_state:
+    logging.info("Initializing patents")
+    st.session_state.patents = None
 
 
 def render_selector(patents):
@@ -113,9 +115,9 @@ def render_selector(patents):
         )
 
     if st.button("Search"):
-        st.session_state.patents = get_data(
-            terms, min_patent_years, relevancy_threshold
-        )
+        new_patents = get_data(terms, min_patent_years, relevancy_threshold)
+        if new_patents is not None:
+            st.session_state.patents = new_patents
 
     return terms
 
