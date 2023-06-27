@@ -1,9 +1,16 @@
 """
 This script applies NER to the patent dataset and saves the results to a temporary location.
 """
+import asyncio
+import json
+import logging
 import sys
-from typing import Optional
+from typing import Callable, Coroutine, Optional
 import polars as pl
+from common.utils.async_utils import execute_async
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import json
+import multiprocessing
 
 from system import initialize
 
@@ -13,7 +20,7 @@ from clients.low_level.big_query import execute_bg_query, BQ_DATASET_ID
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 100
+CHUNK_SIZE = 500
 
 
 def get_rows(last_id: Optional[str]):
@@ -29,15 +36,29 @@ def get_rows(last_id: Optional[str]):
     FROM `{BQ_DATASET_ID}.gpr_publications`
     {where}
     ORDER BY {ID_FIELD} ASC
-    LIMIT 1000
+    LIMIT 5000
     """
     rows = execute_bg_query(sql)
     return list(rows)
 
 
-def generate_ner():
+def process_chunk(chunk, i, last_id) -> None:
+    logging.info("Processing chunk %s-%s", i, last_id)
     tagger = NerTagger.get_instance(use_llm=True)
+    try:
+        chunk_ner = chunk.with_columns(
+            pl.concat_list(["title", "abstract"])
+            .apply(
+                lambda x: json.dumps([ent for ent in tagger.extract(x.to_list())]),
+            )
+            .alias("entities")
+        )
+        chunk_ner.write_parquet(f"data/ner_output/chunk_{last_id}_{i}.parquet")
+    except Exception as e:
+        logging.error("Error processing chunk: %s", e)
 
+
+def generate_ner():
     # Execute the query
     rows = get_rows(last_id=None)
     last_id = max(row["publication_number"] for row in rows)
@@ -50,19 +71,13 @@ def generate_ner():
         chunks = [df.slice(i, CHUNK_SIZE) for i in range(0, df.shape[0], CHUNK_SIZE)]
 
         # Process chunks
-        for i, chunk in enumerate(chunks):
-            # Apply NER
-            chunk = chunk.with_columns(
-                pl.concat_list(["title", "abstract"])
-                .apply(
-                    lambda x: [ent for ent in tagger.extract(x.to_list())],
-                    return_dtype=pl.Object,
-                )
-                .alias("entities")
-            )
-
-            # Save chunk to a temporary location
-            chunk.write_csv(f"chunk_{i}.csv")
+        with ProcessPoolExecutor(max_workers=8) as executor:
+            futures = [
+                executor.submit(process_chunk, chunk, i, last_id)
+                for i, chunk in enumerate(chunks)
+            ]
+            for future in as_completed(futures):
+                future.result()
 
         rows = get_rows(last_id=last_id)
         if rows:

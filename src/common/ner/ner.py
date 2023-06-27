@@ -30,7 +30,7 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.DEBUG)
+spacy_llm.logger.setLevel(logging.INFO)
 
 
 def get_default_tokenizer(nlp: Language):
@@ -142,7 +142,7 @@ class NerTagger:
             raise Exception("NER tagger not initialized")
 
         docs = self.nlp.pipe(
-            content, n_process=16 if self.use_llm else 1, batch_size=1000
+            content,  # n_process=-1 if self.use_llm else 1, batch_size=50
         )
 
         entities = [doc.ents for doc in docs]
@@ -173,5 +173,8 @@ class NerTagger:
         # Convert kwargs to a hashable type
         kwargs_tuple = tuple(sorted(kwargs.items()))
         if kwargs_tuple not in cls._instances:
+            logging.info("Creating new instance of %s", cls)
             cls._instances[kwargs_tuple] = cls(**kwargs)
+        else:
+            logging.info("Using existing instance of %s", cls)
         return cls._instances[kwargs_tuple]

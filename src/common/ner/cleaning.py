@@ -24,9 +24,29 @@ CleanFunction = Callable[[list[T]], list[T]]
 with open("10000words.txt", "r") as file:
     vocab_words = file.read().splitlines()
 
+DEFAULT_EXCEPTION_LIST: list[str] = [
+    "hiv",
+    "asthma",
+    "obesity",
+    "covid",
+    "diabetes",
+    "kidney",
+    "liver",
+    "heart",
+    "lung",
+    "cancer",
+    "arthritis",
+    "stroke",
+    "dementia",
+    "trauma",
+    "insulin",
+]
+
 
 def remove_common(
-    entity_list: list[T], nlp: Language, exception_list: list[str] = []
+    entity_list: list[T],
+    nlp: Language,
+    exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
 ) -> list[T]:
     """
     Remove common terms from a list of entities, e.g. "vaccine candidates"
