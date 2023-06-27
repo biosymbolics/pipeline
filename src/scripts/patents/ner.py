@@ -13,7 +13,7 @@ from clients.low_level.big_query import execute_bg_query, BQ_DATASET_ID
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 100
 
 
 def get_rows(last_id: Optional[str]):
@@ -29,7 +29,7 @@ def get_rows(last_id: Optional[str]):
     FROM `{BQ_DATASET_ID}.gpr_publications`
     {where}
     ORDER BY {ID_FIELD} ASC
-    LIMIT 5000
+    LIMIT 1000
     """
     rows = execute_bg_query(sql)
     return list(rows)

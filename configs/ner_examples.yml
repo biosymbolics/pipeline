@@ -39,12 +39,6 @@
       - Cross-reactive epitope
     DISEASE:
       - multiple sclerosis
-- text: Cross-reactive epitope for multiple sclerosis
-  entities:
-    MECHANISM:
-      - Cross-reactive epitope
-    DISEASE:
-      - multiple sclerosis
 - text: Chimeric antigen receptors targeting cd-19
   entities:
     MECHANISM:
@@ -53,10 +47,6 @@
   entities:
     MECHANISM:
       - C3d Complement Protein Antibody
-- text: Tumor necrosis factor (tnf) superfamily receptor binding molecules and uses thereof
-  entities:
-    MECHANISM:
-      - TNF receptor binding molecules
 - text: Anti-h7n9 fully-human monoclonal antibody 5j13, preparation method therefor, and application thereof
   entities:
     MECHANISM:
@@ -87,3 +77,24 @@
     MECHANISM:
       - pad4 inhibitor
       - covalent pad4 inhibitor
+- text: Compounds are useful as tachykinin inhibitors which act at the NK1, NK2 and NK3 receptors
+  entities:
+    MECHANISM:
+      - tachykinin inhibitor
+      - NK1 receptor antagonist
+      - NK2 receptor antagonist
+      - NK3 receptor antagonist
+- text: The compounds are well suited for inhibiting ice activity and may be advantageously used as agents against il-1-, apoptosis-, igif-, and ifn-y-mediated diseases
+  entities:
+    MECHANISM:
+      - ice inhibitor
+    DISEASE:
+      - il-1-mediated diseases
+      - apoptosis-mediated diseases
+      - igif-mediated diseases
+      - ifn-y-mediated diseases
+- text: Comprises assaying the said sample for the presence of a compound selected from 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one (compound a)and n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide (compound b).
+  entities:
+    COMPOUND:
+      - 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one
+      - n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide

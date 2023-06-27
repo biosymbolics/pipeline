@@ -141,16 +141,17 @@ class NerTagger:
             logging.error("NER tagger not initialized")
             raise Exception("NER tagger not initialized")
 
-        docs = self.nlp.pipe(content)
+        docs = self.nlp.pipe(
+            content, n_process=16 if self.use_llm else 1, batch_size=1000
+        )
 
         entities = [doc.ents for doc in docs]
-        print("SPPPSPS", [(e.text, e.lemma_, e.label_) for s in entities for e in s])
-        entity_spans = [
+        sanitized = [
             sanitize_entities([span for span in ent], self.common_nlp)
             for ent in entities
         ]
         entity_tups = [
-            (e.lemma_ or e.text, e.label_) for span in entity_spans for e in span
+            (e.lemma_ or e.text, e.label_) for span in sanitized for e in span
         ]
 
         # enriched = enrich_with_canonical(entities, nlp=self.nlp)
