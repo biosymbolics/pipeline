@@ -1,16 +1,13 @@
 """
 This script applies NER to the patent dataset and saves the results to a temporary location.
 """
-import asyncio
 import json
 import logging
 import sys
-from typing import Callable, Coroutine, Optional
+from typing import Optional
 import polars as pl
-from common.utils.async_utils import execute_async
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import json
-import multiprocessing
 
 from system import initialize
 
@@ -47,11 +44,21 @@ def process_chunk(chunk, i, last_id) -> None:
     tagger = NerTagger.get_instance(use_llm=True)
     try:
         chunk_ner = chunk.with_columns(
-            pl.concat_list(["title", "abstract"])
-            .apply(
-                lambda x: json.dumps([ent for ent in tagger.extract(x.to_list())]),
+            pl.concat_str(["title", "abstract"], separator="\n").alias("string"),
+        )
+        chunk_ner = chunk_ner.with_columns(
+            pl.when(pl.col("string").str.lengths() >= 500)
+            .then(pl.col("string").str.slice(0, 500))
+            .otherwise(pl.col("string"))
+            .map(
+                lambda s: json.dumps(
+                    [ent for ent in tagger.extract(s.to_list(), flatten_results=False)]
+                ),
             )
             .alias("entities")
+        )
+        chunk_ner = chunk_ner.select(
+            pl.col([ID_FIELD, "title", "abstract", "entities"])
         )
         chunk_ner.write_parquet(f"data/ner_output/chunk_{last_id}_{i}.parquet")
     except Exception as e:
