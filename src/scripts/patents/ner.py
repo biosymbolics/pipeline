@@ -27,7 +27,7 @@ def get_rows(last_id: Optional[str]):
     Args:
         last_id (str): last id from previous query
     """
-    where = f"WHERE {ID_FIELD} > {last_id}" if last_id else ""
+    where = f"WHERE {ID_FIELD} > '{last_id}'" if last_id else ""
     sql = f"""
     SELECT {ID_FIELD}, title, abstract
     FROM `{BQ_DATASET_ID}.gpr_publications`
@@ -78,7 +78,7 @@ def generate_ner():
         chunks = [df.slice(i, CHUNK_SIZE) for i in range(0, df.shape[0], CHUNK_SIZE)]
 
         # Process chunks
-        with ProcessPoolExecutor(max_workers=8) as executor:
+        with ProcessPoolExecutor(max_workers=2) as executor:
             futures = [
                 executor.submit(process_chunk, chunk, i, last_id)
                 for i, chunk in enumerate(chunks)

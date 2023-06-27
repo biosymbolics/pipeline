@@ -30,7 +30,7 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.INFO)
+spacy_llm.logger.setLevel(logging.DEBUG)
 
 
 def get_default_tokenizer(nlp: Language):
@@ -141,11 +141,14 @@ class NerTagger:
             logging.error("NER tagger not initialized")
             raise Exception("NER tagger not initialized")
 
+        logging.info("Starting NER pipeline with %s docs", len(content))
         docs = self.nlp.pipe(
             content,  # n_process=-1 if self.use_llm else 1, batch_size=50
         )
 
         entities = [doc.ents for doc in docs]
+        logging.info("%s entity sets for %s content", len(entities), len(content))
+
         sanitized = [
             sanitize_entities([span for span in ent], self.common_nlp)
             for ent in entities
