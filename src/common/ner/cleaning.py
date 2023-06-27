@@ -1,10 +1,11 @@
 """
 Utils for the NER pipeline
 """
-from typing import Callable
+from typing import Callable, Optional, Type, TypeVar, Union, cast
 import re
-from functools import reduce
+from functools import partial, reduce
 from spacy.language import Language
+from spacy.tokens import Span
 import logging
 
 from common.utils.list import dedup
@@ -17,33 +18,36 @@ CHAR_SUPPRESSIONS = {
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 
-CleaningFunction = Callable[[list[str]], list[str]]
+T = TypeVar("T", bound=Union[Span, str])
+CleanFunction = Callable[[list[T]], list[T]]
 
 with open("10000words.txt", "r") as file:
     vocab_words = file.read().splitlines()
 
 
-def remove_common_terms(
-    entity_list: list[str], nlp: Language, exception_list: list[str] = []
-):
+def remove_common(
+    entity_list: list[T], nlp: Language, exception_list: list[str] = []
+) -> list[T]:
     """
     Remove common terms from a list of entities, e.g. "vaccine candidates"
 
     Args:
-        entity_list (list[str]): list of entities
+        entity_list (list[T]): list of entities
         nlp (Language): spacy language model
         exception_list (list[str]): list of exceptions to the common terms
     """
 
-    def __is_common(item):
+    def __is_common(item: T):
+        name = item.text if isinstance(item, Span) else item
+
         # remove punctuation and make lowercase
-        words = [token.lemma_ for token in nlp(item)]
+        words = [token.lemma_ for token in nlp(name)]
 
         # check if all words are in the vocab
         is_common = set(words).issubset(vocab_words)
 
         # check if any words are in the exception list
-        is_excepted = len(set(exception_list).intersection(set(words))) > 0
+        is_excepted = bool(set(exception_list) & set(words))
 
         is_common_not_excepted = is_common and not is_excepted
 
@@ -59,77 +63,76 @@ def remove_common_terms(
     return list(filter(__is_uncommon, entity_list))
 
 
-def clean_entity(
-    name: str, char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
-) -> str:
+def normalize_entity(
+    entity: T, char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
+) -> T:
     """
-    Clean entity name
+    Normalize entity name
     - remove certain characters
     - removes double+ spaces
 
     Args:
-        entity (str): entity name
+        entity (T): entity
     """
+    name = entity.text if isinstance(entity, Span) else entity
 
-    def remove_characters(entity: str) -> str:
+    def remove_chars(entity_name: str) -> str:
         for pattern, replacement in char_suppressions.items():
-            entity = re.sub(pattern, replacement, entity)
-        return entity
+            entity_name = re.sub(pattern, replacement, entity_name)
+        return entity_name
 
-    # List of cleaning functions to apply to entity
-    cleaning_steps = [remove_characters, remove_extra_spaces]
+    cleaning_steps = [remove_chars, remove_extra_spaces]
 
-    cleaned = reduce(lambda x, func: func(x), cleaning_steps, name)
+    normalized = reduce(lambda x, func: func(x), cleaning_steps, name)
 
-    if cleaned != name:
-        logging.info(f"Cleaned entity: {name} -> {cleaned}")
+    if normalized != name:
+        logging.info(f"Normalized entity: {name} -> {normalized}")
 
-    return cleaned
+    if isinstance(entity, Span):
+        return cast(T, Span(entity.doc, entity.start, entity.end, label=entity.label))
+
+    return normalized
 
 
-def clean_entities(entities: list[str], nlp: Language) -> list[str]:
+def normalize_entities(entities: list[T]) -> list[T]:
     """
-    Clean entity name list
-    - filters out (some) excessively general entities
-    - dedups
-    - cleans entity names
+    normalize entity names
 
     Args:
-        entities (list[str]): entities map
+        entities (list[T]): entities
+    """
+    return [normalize_entity(entity) for entity in entities]
+
+
+def sanitize_entities(entities: list[T], nlp: Language) -> list[T]:
+    """
+    Sanitize entity list
+    - filters out (some) excessively general entities
+    - dedups
+    - normalizes entity names
+
+    Args:
+        entities (list[T]): entities
         nlp (Language): spacy language model
     """
 
-    def __filter_entities(entity_names: list[str]) -> list[str]:
+    def suppress(entities: list[T]) -> list[T]:
         """
-        Filter out entities that are not relevant
+        Filter out irrelevant entities
         """
 
-        def __filter(entity: str) -> bool:
-            """
-            Filter out entities that are not relevant
-
-            Args:
-                entity (str): entity name
-            """
-            is_suppressed = any(
-                [sup in entity.lower() for sup in INCLUSION_SUPPRESSIONS]
-            )
+        def should_keep(entity: T) -> bool:
+            name = entity.text if isinstance(entity, Span) else entity
+            is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
             return not is_suppressed
 
-        filtered = [entity for entity in entity_names if __filter(entity)]
-        without_common = remove_common_terms(filtered, nlp)
-        return dedup(without_common)
+        return [entity for entity in entities if should_keep(entity)]
 
-    def __clean_entities(entity_names: list[str]) -> list[str]:
-        """
-        Clean entity name list
-        """
-        return [clean_entity(entity) for entity in entity_names]
-
-    cleaning_steps: list[CleaningFunction] = [
-        __filter_entities,
+    cleaning_steps: list[CleanFunction] = [
+        suppress,
+        partial(remove_common, nlp=nlp),
+        normalize_entities,
         dedup,
-        __clean_entities,
     ]
 
     sanitized = reduce(lambda x, func: func(x), cleaning_steps, entities)

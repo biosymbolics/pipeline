@@ -1,6 +1,7 @@
 """
 This script applies NER to the patent dataset and saves the results to a temporary location.
 """
+import sys
 from typing import Optional
 import polars as pl
 
@@ -34,34 +35,44 @@ def get_rows(last_id: Optional[str]):
     return list(rows)
 
 
-tagger = NerTagger.get_instance(use_llm=True)
+def generate_ner():
+    tagger = NerTagger.get_instance(use_llm=True)
 
-# Execute the query
-rows = get_rows(last_id=None)
-last_id = max(row["publication_number"] for row in rows)
+    # Execute the query
+    rows = get_rows(last_id=None)
+    last_id = max(row["publication_number"] for row in rows)
 
-while rows:
-    # Convert rows to polars DataFrame
-    df = pl.DataFrame([dict(row) for row in rows])
+    while rows:
+        # Convert rows to polars DataFrame
+        df = pl.DataFrame([dict(row) for row in rows])
 
-    # Split DataFrame into chunks
-    chunks = [df.slice(i, CHUNK_SIZE) for i in range(0, df.shape[0], CHUNK_SIZE)]
+        # Split DataFrame into chunks
+        chunks = [df.slice(i, CHUNK_SIZE) for i in range(0, df.shape[0], CHUNK_SIZE)]
 
-    # Process chunks
-    for i, chunk in enumerate(chunks):
-        # Apply NER
-        chunk = chunk.with_columns(
-            pl.concat_list(["title", "abstract"])
-            .apply(
-                lambda x: [ent for ent in tagger(x.to_list())],
-                return_dtype=pl.Object,
+        # Process chunks
+        for i, chunk in enumerate(chunks):
+            # Apply NER
+            chunk = chunk.with_columns(
+                pl.concat_list(["title", "abstract"])
+                .apply(
+                    lambda x: [ent for ent in tagger.extract(x.to_list())],
+                    return_dtype=pl.Object,
+                )
+                .alias("entities")
             )
-            .alias("entities")
+
+            # Save chunk to a temporary location
+            chunk.write_csv(f"chunk_{i}.csv")
+
+        rows = get_rows(last_id=last_id)
+        if rows:
+            last_id = max(row[ID_FIELD] for row in rows)
+
+
+if __name__ == "__main__":
+    if "-h" in sys.argv:
+        print(
+            "Usage: python3 ner.py\nLoads NER data for patents and saves it to a temporary location"
         )
-
-        # Save chunk to a temporary location
-        chunk.write_csv(f"chunk_{i}.csv")
-
-    rows = get_rows(last_id=last_id)
-    if rows:
-        last_id = max(row[ID_FIELD] for row in rows)
+        sys.exit()
+    generate_ner()

@@ -4,26 +4,27 @@ Named-entity recognition using spacy
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
 import time
-from typing import Any, Optional, Union
+from typing import Any, Optional, TypeVar, Union
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
+from spacy.tokens import Span
 from spacy.tokenizer import Tokenizer
+import spacy_llm
 from spacy_llm.util import assemble
-from pydash import flatten
 import logging
 import warnings
-import spacy_llm
 
 from clients.spacy import Spacy
 
-from .cleaning import clean_entities
+from .cleaning import sanitize_entities
 from .debugging import debug_pipeline
 
 # from .linking import enrich_with_canonical
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import GetTokenizer, SpacyPatterns
 
+T = TypeVar("T", bound=Union[Span, str])
 
 warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
@@ -115,7 +116,7 @@ class NerTagger:
 
     def extract(
         self, content: list[str], flatten_results: bool = True
-    ) -> Union[list[str], list[list[str]]]:
+    ) -> Union[list[str], list[tuple[str, str]]]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -126,7 +127,7 @@ class NerTagger:
             content (list[str]): list of content on which to do NER
             flatten (bool, optional): flatten results.
                 Defaults to True, which means result is list[str].
-                Otherwise, returns list[list[str]].
+                Otherwise, returns list[tuple[str, str]] (entity and its type/label).
 
         Examples:
             >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
@@ -142,24 +143,25 @@ class NerTagger:
 
         docs = self.nlp.pipe(content)
 
-        if flatten_results:
-            entities = flatten([doc.ents for doc in docs])
-            entity_names = clean_entities(
-                [e.lemma_ or e.text for e in entities], self.common_nlp
-            )
-        else:
-            entities = [doc.ents for doc in docs]
-            entity_names = [
-                clean_entities([(e.lemma_ or e.text, e.label_) for e in ent], self.common_nlp)  # type: ignore
-                for ent in entities
-            ]
+        entities = [doc.ents for doc in docs]
+        print("SPPPSPS", [(e.text, e.lemma_, e.label_) for s in entities for e in s])
+        entity_spans = [
+            sanitize_entities([span for span in ent], self.common_nlp)
+            for ent in entities
+        ]
+        entity_tups = [
+            (e.lemma_ or e.text, e.label_) for span in entity_spans for e in span
+        ]
 
         # enriched = enrich_with_canonical(entities, nlp=self.nlp)
 
-        logging.info("Entity names: %s", flatten(entity_names))
+        logging.info("Entities: %s", entity_tups)
         # debug_pipeline(docs, nlp)
 
-        return entity_names
+        if flatten_results:
+            return [e[0] for e in entity_tups]
+
+        return entity_tups
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
