@@ -34,7 +34,7 @@ def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]
     """
     lower_terms = [term.lower() for term in terms]
 
-    pagination_where = f"AND apps.{ID_FIELD} < '{last_id}'" if last_id else ""
+    pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
 
     query = f"""
         WITH matches AS (
@@ -51,7 +51,7 @@ def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]
         WHERE apps.publication_number = matches.publication_number
         AND search_rank > {MIN_SEARCH_RANK}
         {pagination_where}
-        ORDER BY apps.{ID_FIELD} DESC
+        ORDER BY apps.{ID_FIELD} ASC
         limit {CHUNK_SIZE}
     """
     patents = select_from_bg(query)
@@ -165,11 +165,13 @@ def __upsert_terms(df: pl.DataFrame):
     """
     Upserts `terms` to BigQuery
     """
-    terms_df = df.groupby(by=["term"]).agg(
-        pl.col("domain")
-        .apply(lambda ds: list(set([d for d in ds if isinstance(d, str)])))
-        .alias("domains"),
-        pl.count().alias("count"),
+    terms_df = (
+        df.filter(pl.col("term").is_not_null())
+        .groupby(by=["term"])
+        .agg(
+            pl.col("domain").unique().alias("domains"),
+            pl.count().alias("count"),
+        )
     )
 
     logging.info(f"Upserting terms to BigQuery, %s", terms_df)

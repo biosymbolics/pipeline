@@ -1,7 +1,7 @@
 """
 Utils for the NER pipeline
 """
-from typing import Callable, Optional, Type, TypeVar, Union, cast
+from typing import Callable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
 from spacy.language import Language
@@ -21,9 +21,6 @@ INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 T = TypeVar("T", bound=Union[Span, str])
 CleanFunction = Callable[[list[T]], list[T]]
 
-with open("10000words.txt", "r") as file:
-    vocab_words = file.read().splitlines()
-
 DEFAULT_EXCEPTION_LIST: list[str] = [
     "hiv",
     "asthma",
@@ -40,13 +37,34 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
     "dementia",
     "trauma",
     "insulin",
+    "depression",
+    "anxiety",
+    "g",  # g protein coupled receptor
+    "pain",
+    "cardiovascular",
+    "respiratory",
+    "aging",
 ]
+
+DEFAULT_ADDITIONAL_COMMON_WORDS = [
+    "(i)",  # so common in patents, e.g. "general formula (I)"
+]
+
+
+def get_common_words(additional_words):
+    """
+    Get common words from a file + additional common words
+    """
+    with open("10000words.txt", "r") as file:
+        vocab_words = file.read().splitlines()
+    return [*vocab_words, *additional_words]
 
 
 def remove_common(
     entity_list: list[T],
     nlp: Language,
     exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
+    additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
 ) -> list[T]:
     """
     Remove common terms from a list of entities, e.g. "vaccine candidates"
@@ -57,6 +75,8 @@ def remove_common(
         exception_list (list[str]): list of exceptions to the common terms
     """
 
+    common_words = get_common_words(additional_common_words)
+
     def __is_common(item: T):
         name = item.text if isinstance(item, Span) else item
 
@@ -64,7 +84,7 @@ def remove_common(
         words = [token.lemma_ for token in nlp(name)]
 
         # check if all words are in the vocab
-        is_common = set(words).issubset(vocab_words)
+        is_common = set(words).issubset(common_words)
 
         # check if any words are in the exception list
         is_excepted = bool(set(exception_list) & set(words))
