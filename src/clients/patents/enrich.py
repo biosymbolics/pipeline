@@ -34,7 +34,7 @@ def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]
     """
     lower_terms = [term.lower() for term in terms]
 
-    pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
+    pagination_where = f"AND apps.{ID_FIELD} < '{last_id}'" if last_id else ""
 
     query = f"""
         WITH matches AS (
@@ -76,7 +76,7 @@ def __get_patent_descriptions(patents: pl.DataFrame) -> list[str]:
     return [text[0:MAX_TEXT_LENGTH] for text in df["text"].to_list()]
 
 
-def __enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
+def __enrich_patents(patents: pl.DataFrame) -> Optional[pl.DataFrame]:
     """
     Enriches patents with entities
 
@@ -112,6 +112,10 @@ def __enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
 
     # remove already processed patents
     filtered = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
+
+    if len(filtered) == 0:
+        logging.info("No patents to process")
+        return None
 
     if len(filtered) < len(patents):
         logging.info(
@@ -162,7 +166,9 @@ def __upsert_terms(df: pl.DataFrame):
     Upserts `terms` to BigQuery
     """
     terms_df = df.groupby(by=["term"]).agg(
-        pl.col("domain").apply(lambda d: list(set(d))).alias("domains"),
+        pl.col("domain")
+        .apply(lambda ds: list(set([d for d in ds if isinstance(d, str)])))
+        .alias("domains"),
         pl.count().alias("count"),
     )
 
@@ -214,9 +220,10 @@ def enrich_with_ner(terms: list[str]) -> None:
     while patents:
         df = __enrich_patents(pl.DataFrame(patents))
 
-        __upsert_annotations(df)
-        __upsert_terms(df)
-        __checkpoint(df, get_id([*terms, last_id]))
+        if df is not None:
+            __upsert_annotations(df)
+            __upsert_terms(df)
+            __checkpoint(df, get_id([*terms, last_id]))
 
         patents = __get_patents(terms, last_id=last_id)
         if patents:
