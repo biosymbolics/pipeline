@@ -8,7 +8,6 @@ import time
 from typing import Any, Optional, TypeVar, Union
 from pydash import flatten
 import spacy
-from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
 from spacy.tokens import Span
 from spacy.tokenizer import Tokenizer
@@ -18,6 +17,7 @@ import logging
 import warnings
 
 from clients.spacy import Spacy
+from common.ner.normalizer import TermNormalizer
 from common.utils.functional import compose
 
 from .cleaning import sanitize_entities
@@ -33,18 +33,11 @@ warnings.filterwarnings(
 spacy_llm.logger.addHandler(logging.StreamHandler())
 spacy_llm.logger.setLevel(logging.INFO)
 
+DocEntities = list[tuple[str, str]]
+
 
 def get_default_tokenizer(nlp: Language):
     return Tokenizer(nlp.vocab)
-
-
-LINKER_CONFIG = {
-    "resolve_abbreviations": True,
-    "linker_name": "umls",
-    "threshold": 0.7,
-    "filter_for_definitions": False,
-    "no_definition_threshold": 0.7,
-}
 
 
 class NerTagger:
@@ -62,7 +55,7 @@ class NerTagger:
         Named-entity recognition using spacy
 
         Args:
-            use_llm (Optional[bool], optional): Use LLM model. Defaults to False. if true, nothing below is used.
+            use_llm (Optional[bool], optional): Use LLM model. Defaults to False. If true, no rules or anything are used.
             model (str, optional): SpaCy model. Defaults to "en_core_sci_scibert".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
             get_tokenizer (Optional[GetTokenizer], optional): SpaCy tokenizer. Defaults to None.
@@ -77,6 +70,7 @@ class NerTagger:
             if rule_sets is None
             else rule_sets
         )
+        self.normalizer = TermNormalizer()
 
         self.get_tokenizer = (
             get_default_tokenizer if get_tokenizer is None else get_tokenizer
@@ -107,22 +101,43 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        # nlp.add_pipe("scispacy_linker", config=LINKER_CONFIG)
-
         logging.info(
             "Init NER pipeline took %s seconds",
             round(time.time() - start_time, 2),
         )
         self.nlp = nlp
 
+    def __get_entities(self, docs) -> list[DocEntities]:
+        """
+        Get normalized entities from a list of docs
+        """
+        entity_names = [e.lemma_ or e.text for doc in docs for e in doc.ents]
+        normalization_map = self.normalizer.generate_map(entity_names)
+
+        def __get_canonical(e):
+            term = e.lemma_ or e.text
+            entry = normalization_map[term] or None
+            return entry.canonical_name if entry else term
+
+        get_entities = compose(
+            lambda span: [(__get_canonical(e), e.label_) for e in span],
+            partial(sanitize_entities, nlp=self.common_nlp),
+        )
+
+        ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
+
+        logging.info("Entities: %s", ents_by_doc)
+
+        return ents_by_doc
+
     def extract(
         self, content: list[str], flatten_results: bool = True
-    ) -> Union[list[str], list[list[tuple[str, str]]]]:
+    ) -> Union[list[str], list[DocEntities]]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
         - applies rule_sets
-        - applies scispacy_linker (canonical mapping to UMLS)
+        - normalizes terms
 
         Args:
             content (list[str]): list of content on which to do NER
@@ -143,19 +158,9 @@ class NerTagger:
             raise Exception("NER tagger not initialized")
 
         logging.info("Starting NER pipeline with %s docs", len(content))
-        docs = self.nlp.pipe(content)
+        docs = list(self.nlp.pipe(content))
 
-        get_entities = compose(
-            lambda span: [(e.lemma_ or e.text, e.label_) for e in span],
-            partial(sanitize_entities, nlp=self.common_nlp),
-        )
-
-        ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
-
-        # enriched = enrich_with_canonical(entities, nlp=self.nlp)
-
-        logging.info("Entities: %s", ents_by_doc)
-        # debug_pipeline(docs, nlp)
+        ents_by_doc = self.__get_entities(docs)
 
         if flatten_results:
             return [e[0] for e in flatten(ents_by_doc)]
