@@ -4,15 +4,19 @@ String utilities
 
 
 import re
+from typing import Union
 
 
-def get_id(string: str) -> str:
+def get_id(string: Union[str, list[str]]) -> str:
     """
     Returns the id of a string
 
     Args:
-        string (str): string to get id of
+        string (str or list[str]): string to get id of
     """
+    if isinstance(string, list):
+        string = "_".join(string)
+
     return string.replace(" ", "_").lower()
 
 
