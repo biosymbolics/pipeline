@@ -3,7 +3,7 @@ Functions for copying around subsets of the patents database
 """
 from clients.low_level.big_query import query_to_bg_table, BQ_DATASET_ID
 
-from .constants import COMMON_ENTITY_NAMES
+from ._constants import COMMON_ENTITY_NAMES
 
 BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))

@@ -41,9 +41,7 @@ def format_search_result(
 
     titles = df.select(pl.col("title")).to_series().to_list()
 
-    # ners = pl.Series(titles.apply(lambda t: NerTagger.get_instance().extract(t))).alias("ner")
     ners = NerTagger.get_instance().extract(titles, flatten_results=False)
-    logging.info("GOT HERESFSF %s", ners)
     df = df.with_columns(pl.Series(ners).alias("ner"))
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))

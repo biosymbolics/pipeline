@@ -90,7 +90,7 @@ logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 from system import initialize
 initialize()
 import importlib
-importlib.reload(core)
+importlib.reload(common.ner.ner)
 ```
 
 #### Other

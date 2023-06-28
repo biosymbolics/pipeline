@@ -60,12 +60,13 @@ def vectorize_data(df: pl.DataFrame, n_features=MAX_FEATURES) -> VectorizationOb
     ``` python
         data = {
             'id': [1, 2, 3, 4, 5],
-            'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve'],
+            'name': ['Alice', 'Bob', 'Bob', 'David', 'Eve'],
             'age': [25, 32, 41, 28, 36],
             'description': ['A nice PA', 'An accountant', 'A stay at home father', 'Lives in Tokyo', 'Ate the fruit'],
             'education': ['Has a PhD from Harvard', 'finished high school', 'some college', 'dropped out of grade school', 'no education'],
             'score': [8.5, 7.2, 6.8, 9.1, 8.0],
             'diseases': [["asthma", "COPD"], ["PAH"], ["ALZ"], ["PD", "hypertension"], ["asthma"]],
+            'ents': [[{ "id": 1, "value": "swimmer" }], [], [], [], []]
         }
         df = pl.DataFrame(data)
         preprocess_with_tfidf(df)
