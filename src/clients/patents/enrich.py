@@ -1,4 +1,3 @@
-import glob
 import json
 import logging
 from typing import List, Optional
@@ -24,6 +23,7 @@ def get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]:
 
     Args:
         terms (list[str]): terms on which to search for patents
+        last_id (Optional[str], optional): last id to paginate from. Defaults to None.
     """
     lower_terms = [term.lower() for term in terms]
 
@@ -50,72 +50,27 @@ def get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]:
     return patents
 
 
-def preprocess_patents(patents: pl.DataFrame) -> pl.DataFrame:
+def get_patent_descriptions(patents: pl.DataFrame) -> list[str]:
     """
-    Preprocesses patents for annotation
+    Get patent descriptions (title + abstract)
 
-    - Filters out patents that have already been processed
     - Concatenates title and abstract into `text` column
+    - Truncates `text` column to MAX_TEXT_LENGTH
+    - Returns list of text (one line per patent)
 
     Args:
         patents (pl.DataFrame): patents to preprocess
     """
-    processed_pubs = get_processed_pubs()
-
-    df = patents.filter(
-        ~pl.col("publication_number").is_in(processed_pubs)
-    ).with_columns(
+    df = patents.with_columns(
         pl.concat_str(["title", "abstract"], separator="\n").alias("text"),
-    )
-    df = df.with_columns(
+    ).with_columns(
         pl.when(pl.col("text").str.lengths() >= MAX_TEXT_LENGTH)
         .then(pl.col("text").str.slice(0, MAX_TEXT_LENGTH))
         .otherwise(pl.col("text"))
         .alias("text")
     )
-    return df
 
-
-def unroll_entities(df: pl.DataFrame):
-    """
-    Formats annotations - explodes; entity tuple -> dicts with term/domain
-    """
-    exploded = df.with_columns(
-        pl.col("entities").apply(json.loads).explode().alias("entities")
-    )
-
-    annotation_df = (
-        exploded.lazy()
-        .select(
-            pl.col("publication_number"),
-            pl.col("entities").apply(lambda e: e[0]).alias("term"),
-            pl.col("entities").apply(lambda e: e[1]).alias("domain"),
-        )
-        .collect()
-    )
-
-    return annotation_df
-
-
-def format_annotations(df: pl.DataFrame):
-    exploded = df.with_columns(
-        pl.col("entities").apply(json.loads).alias("entities")
-    ).explode("entities")
-    annotation_df = exploded.select(
-        pl.col("publication_number"),
-        pl.col("entities")
-        .apply(
-            lambda e: {
-                "term": e[0],
-                "domain": e[1],
-                "character_offset_start": 10,
-                "confidence": 0.9,
-                "source": "title+abstract",
-            }
-        )
-        .alias("annotations"),
-    )
-    return annotation_df
+    return df["text"].to_list()
 
 
 def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
@@ -127,16 +82,43 @@ def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
 
     Returns:
         pl.DataFrame: enriched patents
-            e.g. `[{publication_number: 'AP-123', term: 'asthma', domain: 'diseases', ...}, ...]`
     """
+
+    def format(df: pl.DataFrame):
+        """
+        Unpacks entities into separate rows
+        """
+        flattened_df = (
+            df.explode("entities")
+            .lazy()
+            .select(
+                pl.col("publication_number"),
+                pl.col("entities").apply(lambda e: e[0]).alias("term"),
+                pl.col("entities").apply(lambda e: e[1]).alias("domain"),
+                pl.lit("title+abstract").alias("source"),
+                pl.lit(0.9).alias("confidence"),
+                pl.lit(10).alias("character_offset_start"),
+            )
+            .collect()
+        )
+        return flattened_df
+
     tagger = NerTagger.get_instance(use_llm=True)
+    processed_pubs = get_processed_pubs()
 
-    entities = [
-        es for es in tagger.extract(patents["text"].to_list(), flatten_results=False)
-    ]
-    enriched = patents.with_columns(pl.Series("entities", entities))
+    # remove already processed patents
+    filtered = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
 
-    return enriched
+    # get patent descriptions
+    patent_texts = get_patent_descriptions(filtered)
+
+    # extract entities
+    entities = tagger.extract(patent_texts, flatten_results=False)
+
+    # add back to orig df
+    enriched = filtered.with_columns(pl.Series("entities", entities))
+
+    return format(enriched)
 
 
 def upsert_annotations(df: pl.DataFrame):
@@ -147,33 +129,39 @@ def upsert_annotations(df: pl.DataFrame):
         df (pl.DataFrame): DataFrame with columns `publication_number` and `text`
     """
     logging.info(f"Upserting %s", df)
+
     annotation_df = df.groupby("publication_number").agg(
-        pl.col("*").apply(lambda x: x.to_list()).alias("annotations")
+        pl.struct(
+            *[pl.col(name) for name in df.columns if name != "publication_number"]
+        ).alias("annotations")
     )
 
     logging.info(f"Upserting annotations to BigQuery, %s", annotation_df)
 
-    # upsert_into_bg_table(
-    #     annotation_df, "patents.annotations",
-    #     id_fields=["publication_number"],
-    #     insert_fields=["publication_number", "annotations"],
-    #     on_conflict="target.annotations = ARRAY_CONCAT(target.annotations, source.annotations)"
-    # )
+    upsert_into_bg_table(
+        annotation_df,
+        "patents.annotations",
+        id_fields=["publication_number"],
+        insert_fields=["publication_number", "annotations"],
+        on_conflict="target.annotations = ARRAY_CONCAT(target.annotations, source.annotations)",
+    )
 
 
 def upsert_terms(df: pl.DataFrame):
     """
     Upserts `terms` to BigQuery
     """
+
     terms_df = df.groupby(by=["term", "domain"]).count()
 
     logging.info(f"Upserting terms to BigQuery, %s", terms_df)
-    # upsert_into_bg_table(
-    #     terms_df, "patents.terms",
-    #     id_fields=["term", "domain"],
-    #     insert_fields=["term", "domain", "count"],
-    #     on_conflict="target.count = target.count + source.count"
-    # )
+    upsert_into_bg_table(
+        terms_df,
+        "patents.terms",
+        id_fields=["term", "domain"],
+        insert_fields=["term", "domain", "count"],
+        on_conflict="target.count = target.count + source.count",
+    )
 
 
 def get_processed_pubs() -> list[str]:
@@ -217,12 +205,11 @@ def enrich_with_ner(terms: list[str]) -> None:
     last_id = max(patent["publication_number"] for patent in patents)
 
     while patents:
-        df = preprocess_patents(pl.DataFrame(patents))
-        enriched_df = enrich_patents(df)
+        df = enrich_patents(pl.DataFrame(patents))
 
-        upsert_annotations(enriched_df)
-        upsert_terms(enriched_df)
-        checkpoint(enriched_df, get_id([*terms, last_id]))
+        upsert_annotations(df)
+        upsert_terms(df)
+        checkpoint(df, get_id([*terms, last_id]))
 
         patents = get_patents(terms, last_id=last_id)
         if patents:

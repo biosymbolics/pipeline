@@ -3,8 +3,10 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
+from functools import partial
 import time
 from typing import Any, Optional, TypeVar, Union
+from pydash import flatten
 import spacy
 from scispacy.linking import EntityLinker  # required to use 'scispacy_linker' pipeline
 from spacy.language import Language
@@ -16,11 +18,10 @@ import logging
 import warnings
 
 from clients.spacy import Spacy
+from common.utils.functional import compose
 
 from .cleaning import sanitize_entities
 from .debugging import debug_pipeline
-
-# from .linking import enrich_with_canonical
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import GetTokenizer, SpacyPatterns
 
@@ -116,7 +117,7 @@ class NerTagger:
 
     def extract(
         self, content: list[str], flatten_results: bool = True
-    ) -> Union[list[str], list[tuple[str, str]]]:
+    ) -> Union[list[str], list[list[tuple[str, str]]]]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -126,8 +127,8 @@ class NerTagger:
         Args:
             content (list[str]): list of content on which to do NER
             flatten (bool, optional): flatten results.
-                Defaults to True, which means result is list[str].
-                Otherwise, returns list[tuple[str, str]] (entity and its type/label).
+                Defaults to True and result is returned as list[str].
+                Otherwise, returns list[list[tuple[str, str]]] (entity and its type/label per doc).
 
         Examples:
             >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
@@ -142,30 +143,27 @@ class NerTagger:
             raise Exception("NER tagger not initialized")
 
         logging.info("Starting NER pipeline with %s docs", len(content))
-        docs = self.nlp.pipe(
-            content,  # n_process=-1 if self.use_llm else 1, batch_size=50
+        docs = self.nlp.pipe(content)
+
+        # entities = [doc.ents for doc in docs]
+        # logging.info("%s entity sets for %s content", len(entities), len(content))
+
+        get_entities = compose(
+            lambda span: [(e.lemma_ or e.text, e.label_) for e in span],
+            partial(sanitize_entities, nlp=self.common_nlp),
         )
 
-        entities = [doc.ents for doc in docs]
-        logging.info("%s entity sets for %s content", len(entities), len(content))
-
-        sanitized = [
-            sanitize_entities([span for span in ent], self.common_nlp)
-            for ent in entities
-        ]
-        entity_tups = [
-            (e.lemma_ or e.text, e.label_) for span in sanitized for e in span
-        ]
+        ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
 
         # enriched = enrich_with_canonical(entities, nlp=self.nlp)
 
-        logging.info("Entities: %s", entity_tups)
+        logging.info("Entities: %s", ents_by_doc)
         # debug_pipeline(docs, nlp)
 
         if flatten_results:
-            return [e[0] for e in entity_tups]
+            return [e[0] for e in flatten(ents_by_doc)]
 
-        return entity_tups
+        return ents_by_doc
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:
