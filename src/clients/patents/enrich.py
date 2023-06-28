@@ -1,6 +1,5 @@
-import json
 import logging
-from typing import List, Optional
+from typing import Optional
 import polars as pl
 from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 
@@ -17,7 +16,15 @@ BASE_DIR = "data/ner_enriched"
 MIN_SEARCH_RANK = 0.1
 
 
-def get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]:
+def __get_processed_pubs() -> list[str]:
+    """
+    Returns a list of already processed publication numbers
+    """
+    with open(PROCESSED_PUBS_FILE, "r") as f:
+        return f.read().splitlines()
+
+
+def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]:
     """
     Get patents from BigQuery
 
@@ -43,14 +50,14 @@ def get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]:
         WHERE apps.publication_number = matches.publication_number
         AND search_rank > {MIN_SEARCH_RANK}
         {pagination_where}
-        ORDER BY {ID_FIELD} DESC
+        ORDER BY apps.{ID_FIELD} DESC
         limit {CHUNK_SIZE}
     """
     patents = select_from_bg(query)
     return patents
 
 
-def get_patent_descriptions(patents: pl.DataFrame) -> list[str]:
+def __get_patent_descriptions(patents: pl.DataFrame) -> list[str]:
     """
     Get patent descriptions (title + abstract)
 
@@ -63,17 +70,12 @@ def get_patent_descriptions(patents: pl.DataFrame) -> list[str]:
     """
     df = patents.with_columns(
         pl.concat_str(["title", "abstract"], separator="\n").alias("text"),
-    ).with_columns(
-        pl.when(pl.col("text").str.lengths() >= MAX_TEXT_LENGTH)
-        .then(pl.col("text").str.slice(0, MAX_TEXT_LENGTH))
-        .otherwise(pl.col("text"))
-        .alias("text")
     )
 
-    return df["text"].to_list()
+    return [text[0:MAX_TEXT_LENGTH] for text in df["text"].to_list()]
 
 
-def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
+def __enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
     """
     Enriches patents with entities
 
@@ -93,10 +95,11 @@ def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
             .lazy()
             .select(
                 pl.col("publication_number"),
+                pl.lit(0).alias("ocid"),
                 pl.col("entities").apply(lambda e: e[0]).alias("term"),
                 pl.col("entities").apply(lambda e: e[1]).alias("domain"),
+                pl.lit(0.90000001).alias("confidence"),
                 pl.lit("title+abstract").alias("source"),
-                pl.lit(0.9).alias("confidence"),
                 pl.lit(10).alias("character_offset_start"),
             )
             .collect()
@@ -104,13 +107,13 @@ def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
         return flattened_df
 
     tagger = NerTagger.get_instance(use_llm=True)
-    processed_pubs = get_processed_pubs()
+    processed_pubs = __get_processed_pubs()
 
     # remove already processed patents
     filtered = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
 
     # get patent descriptions
-    patent_texts = get_patent_descriptions(filtered)
+    patent_texts = __get_patent_descriptions(filtered)
 
     # extract entities
     entities = tagger.extract(patent_texts, flatten_results=False)
@@ -121,7 +124,7 @@ def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
     return format(enriched)
 
 
-def upsert_annotations(df: pl.DataFrame):
+def __upsert_annotations(df: pl.DataFrame):
     """
     Inserts annotations into BigQuery table `patents.annotations`
 
@@ -130,49 +133,43 @@ def upsert_annotations(df: pl.DataFrame):
     """
     logging.info(f"Upserting %s", df)
 
-    annotation_df = df.groupby("publication_number").agg(
-        pl.struct(
-            *[pl.col(name) for name in df.columns if name != "publication_number"]
-        ).alias("annotations")
+    annotation_df = df.groupby(ID_FIELD).agg(
+        pl.struct(*[pl.col(name) for name in df.columns if name != ID_FIELD]).alias(
+            "annotations"
+        )
     )
 
     logging.info(f"Upserting annotations to BigQuery, %s", annotation_df)
 
     upsert_into_bg_table(
         annotation_df,
-        "patents.annotations",
-        id_fields=["publication_number"],
-        insert_fields=["publication_number", "annotations"],
+        "annotations",
+        id_fields=[ID_FIELD],
+        insert_fields=[ID_FIELD, "annotations"],
         on_conflict="target.annotations = ARRAY_CONCAT(target.annotations, source.annotations)",
     )
 
 
-def upsert_terms(df: pl.DataFrame):
+def __upsert_terms(df: pl.DataFrame):
     """
     Upserts `terms` to BigQuery
     """
-
-    terms_df = df.groupby(by=["term", "domain"]).count()
+    terms_df = df.groupby(by=["term"]).agg(
+        pl.col("domain").apply(list).alias("domains"),
+        pl.count().alias("count"),
+    )
 
     logging.info(f"Upserting terms to BigQuery, %s", terms_df)
     upsert_into_bg_table(
         terms_df,
-        "patents.terms",
-        id_fields=["term", "domain"],
-        insert_fields=["term", "domain", "count"],
+        "terms",
+        id_fields=["term"],
+        insert_fields=["term", "domains", "count"],
         on_conflict="target.count = target.count + source.count",
     )
 
 
-def get_processed_pubs() -> list[str]:
-    """
-    Returns a list of already processed publication numbers
-    """
-    with open(PROCESSED_PUBS_FILE, "r") as f:
-        return f.read().splitlines()
-
-
-def checkpoint(df: pl.DataFrame, id: Optional[str] = None) -> None:
+def __checkpoint(df: pl.DataFrame, id: Optional[str] = None) -> None:
     """
     Persists processing state
     - processed publication numbers added to a file
@@ -181,8 +178,11 @@ def checkpoint(df: pl.DataFrame, id: Optional[str] = None) -> None:
 
     if id:
         filename = f"{BASE_DIR}/chunk_{id}.parquet"
-        logging.info(f"Writing df chunk to {filename}")
-        df.write_parquet(filename)
+        try:
+            logging.info(f"Writing df chunk to {filename}")
+            df.write_parquet(filename)
+        except Exception as e:
+            logging.error(f"Error writing df chunk to {filename}: {e}")
 
     logging.info(f"Persisting processed publication_numbers")
     with open(PROCESSED_PUBS_FILE, "a") as f:
@@ -201,16 +201,16 @@ def enrich_with_ner(terms: list[str]) -> None:
     Args:
         terms: list of terms for which to pull and enrich patents
     """
-    patents = get_patents(terms, last_id=None)
+    patents = __get_patents(terms, last_id=None)
     last_id = max(patent["publication_number"] for patent in patents)
 
     while patents:
-        df = enrich_patents(pl.DataFrame(patents))
+        df = __enrich_patents(pl.DataFrame(patents))
 
-        upsert_annotations(df)
-        upsert_terms(df)
-        checkpoint(df, get_id([*terms, last_id]))
+        # __upsert_annotations(df)
+        __upsert_terms(df)
+        __checkpoint(df, get_id([*terms, last_id]))
 
-        patents = get_patents(terms, last_id=last_id)
+        patents = __get_patents(terms, last_id=last_id)
         if patents:
             last_id = max(patent["publication_number"] for patent in patents)

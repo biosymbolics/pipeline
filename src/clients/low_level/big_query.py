@@ -130,12 +130,13 @@ def upsert_into_bg_table(
     # Define a temporary table name
     tmp_table_name = table_name + "_tmp"
 
-    # Create a BigQuery client
     client = bigquery.Client()
 
-    # Load the dataframe into the temporary table
-    job = client.load_table_from_dataframe(df.to_pandas(), tmp_table_name)
-    job.result()  # Wait for the job to complete
+    # Create a temporary table
+    pd_df = df.to_pandas(use_pyarrow_extension_array=True)
+    client.load_table_from_dataframe(
+        pd_df, f"{BQ_DATASET_ID}.{tmp_table_name}"
+    ).result()
 
     # Identity JOIN
     identity_join = " AND ".join(
@@ -144,24 +145,25 @@ def upsert_into_bg_table(
 
     # insert if no conflict
     insert = f"""
-        INSERT {', '.join(insert_fields)}
-        VALUES {', '.join([f'source.{field}' for field in insert_fields])}
+        INSERT ({', '.join(insert_fields)})
+        VALUES ({', '.join([f'source.{field}' for field in insert_fields])})
     """
 
     # Use a MERGE statement to perform the upsert operation
     sql = f"""
-    MERGE {table_name} AS target
-    USING {tmp_table_name} AS source
+    MERGE {BQ_DATASET_ID}.{table_name} AS target
+    USING {BQ_DATASET_ID}.{tmp_table_name} AS source
     ON {identity_join}
     WHEN MATCHED THEN
         UPDATE SET {on_conflict}
-    WHEN NOT MATCHED THEN
-        INSERT {insert}
+    WHEN NOT MATCHED THEN {insert}
     """
-    client.query(sql).result()  # Wait for the query to complete
+
+    logging.info("Running query: %s", sql)
+    execute_bg_query(sql)
 
     # Delete the temporary table
-    client.delete_table(tmp_table_name)
+    delete_bg_table(tmp_table_name)
 
 
 def delete_bg_table(table_name: str):

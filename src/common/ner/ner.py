@@ -31,7 +31,7 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.DEBUG)
+spacy_llm.logger.setLevel(logging.INFO)
 
 
 def get_default_tokenizer(nlp: Language):
@@ -144,9 +144,6 @@ class NerTagger:
 
         logging.info("Starting NER pipeline with %s docs", len(content))
         docs = self.nlp.pipe(content)
-
-        # entities = [doc.ents for doc in docs]
-        # logging.info("%s entity sets for %s content", len(entities), len(content))
 
         get_entities = compose(
             lambda span: [(e.lemma_ or e.text, e.label_) for e in span],
