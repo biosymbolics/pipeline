@@ -40,10 +40,11 @@ def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
-                EXP(-annotation.character_offset_start * {DECAY_RATE}) as search_rank, --- exp decay scaling; higher is better
+                AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
+            GROUP BY publication_number
         )
         SELECT apps.publication_number, apps.title, apps.abstract
         FROM patents.applications AS apps, matches
@@ -111,6 +112,12 @@ def __enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
 
     # remove already processed patents
     filtered = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
+
+    if len(filtered) < len(patents):
+        logging.info(
+            f"Filtered out %s patents that have already been processed",
+            len(patents) - len(filtered),
+        )
 
     # get patent descriptions
     patent_texts = __get_patent_descriptions(filtered)
