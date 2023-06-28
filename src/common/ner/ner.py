@@ -116,7 +116,7 @@ class NerTagger:
 
         def __get_canonical(e):
             term = e.lemma_ or e.text
-            entry = normalization_map[term] or None
+            entry = normalization_map.get(term) or None
             return entry.canonical_name if entry else term
 
         get_entities = compose(

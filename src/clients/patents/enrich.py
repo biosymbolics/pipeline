@@ -214,7 +214,7 @@ def enrich_with_ner(terms: list[str]) -> None:
     while patents:
         df = __enrich_patents(pl.DataFrame(patents))
 
-        # __upsert_annotations(df)
+        __upsert_annotations(df)
         __upsert_terms(df)
         __checkpoint(df, get_id([*terms, last_id]))
 
