@@ -7,7 +7,7 @@ from common.ner.ner import NerTagger
 from common.utils.string import get_id
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 50
+CHUNK_SIZE = 500
 
 MAX_TEXT_LENGTH = 500
 DECAY_RATE = 1 / 2000
@@ -34,7 +34,7 @@ def __get_patents(terms: list[str], last_id: Optional[str] = None) -> list[dict]
     """
     lower_terms = [term.lower() for term in terms]
 
-    pagination_where = f"AND {ID_FIELD} > '{last_id}'" if last_id else ""
+    pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
 
     query = f"""
         WITH matches AS (
@@ -162,7 +162,7 @@ def __upsert_terms(df: pl.DataFrame):
     Upserts `terms` to BigQuery
     """
     terms_df = df.groupby(by=["term"]).agg(
-        pl.col("domain").apply(list).alias("domains"),
+        pl.col("domain").apply(lambda d: list(set(d))).alias("domains"),
         pl.count().alias("count"),
     )
 
