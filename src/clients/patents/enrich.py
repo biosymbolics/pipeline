@@ -131,12 +131,10 @@ def enrich_patents(patents: pl.DataFrame) -> pl.DataFrame:
     """
     tagger = NerTagger.get_instance(use_llm=True)
 
-    print(patents.select(pl.col("text")))
-    enriched = patents.with_columns(
-        pl.col("text")
-        .map(lambda s: tagger.extract(s.to_list(), flatten_results=False))
-        .alias("entities")
-    )
+    entities = [
+        es for es in tagger.extract(patents["text"].to_list(), flatten_results=False)
+    ]
+    enriched = patents.with_columns(pl.Series("entities", entities))
 
     return enriched
 
