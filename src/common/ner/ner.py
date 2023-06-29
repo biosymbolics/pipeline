@@ -5,7 +5,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from functools import partial
 import time
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 from bs4 import BeautifulSoup
 from pydash import flatten
 import spacy
@@ -43,6 +43,9 @@ def get_default_tokenizer(nlp: Language):
     return Tokenizer(nlp.vocab)
 
 
+ContentType = Literal["text", "html"]
+
+
 class NerTagger:
     _instances: dict[tuple, Any] = {}
 
@@ -53,6 +56,7 @@ class NerTagger:
         model: Optional[str] = "en_core_sci_lg",
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
+        content_type: Optional[ContentType] = "text",
     ):
         """
         Named-entity recognition using spacy
@@ -80,7 +84,7 @@ class NerTagger:
         )
 
         self.common_nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
-
+        self.content_type = content_type
         self.__init_tagger()
 
     def __init_tagger(self):
@@ -171,10 +175,11 @@ class NerTagger:
         logging.info("Starting NER pipeline with %s docs", len(content))
 
         if self.use_llm:
-            # if llm, no tokenization, so let's just trip out all the HTML tags
-            content = [
-                " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
-            ]
+            if self.content_type == "html":
+                # if llm, no tokenization, so let's just trip out all the HTML tags
+                content = [
+                    " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
+                ]
 
             # also, chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             content = flatten(chunk_list(content, 10000))
