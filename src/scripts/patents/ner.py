@@ -7,7 +7,7 @@ from system import initialize
 
 initialize()
 
-from clients.patents.enrich import enrich_with_ner
+from clients.patents.extract_entities import enrich_with_ner
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
