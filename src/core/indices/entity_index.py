@@ -100,7 +100,9 @@ def create_from_docs(
     """
     tagger = NerTagger.get_instance(get_tokenizer=get_sec_tokenizer)
     for key, docs in doc_map.items():
-        entities = tagger.extract(docs, flatten_results=True)
+        entities = tagger.extract(
+            docs, flatten_results=True, entity_types=["moas", "compounds", "classes"]
+        )
         ns_key = get_namespace_key(key)
         create_entity_indices(
             entities=cast(list[str], entities),

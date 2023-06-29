@@ -19,6 +19,7 @@ import warnings
 
 from clients.spacy import Spacy
 from common.ner.normalizer import TermNormalizer
+from common.utils.file import save_as_pickle
 from common.utils.functional import compose
 from common.utils.string import chunk_list
 
@@ -109,7 +110,7 @@ class NerTagger:
         )
         self.nlp = nlp
 
-    def __get_entities(self, docs) -> list[DocEntities]:
+    def __get_entities(self, docs, entity_types) -> list[DocEntities]:
         """
         Get normalized entities from a list of docs
         """
@@ -122,18 +123,26 @@ class NerTagger:
             return entry.canonical_name if entry else term
 
         get_entities = compose(
-            lambda span: [(__get_canonical(e), e.label_) for e in span],
+            lambda span: [
+                (__get_canonical(e), e.label_)
+                for e in span
+                if entity_types is None or e.label_ in entity_types
+            ],
             partial(sanitize_entities, nlp=self.common_nlp),
         )
 
         ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
 
         logging.info("Entities: %s", ents_by_doc)
+        save_as_pickle(ents_by_doc)
 
         return ents_by_doc
 
     def extract(
-        self, content: list[str], flatten_results: bool = True
+        self,
+        content: list[str],
+        flatten_results: bool = True,
+        entity_types: Optional[list[str]] = None,
     ) -> Union[list[str], list[DocEntities]]:
         """
         Extract named entities from a list of content
@@ -143,9 +152,10 @@ class NerTagger:
 
         Args:
             content (list[str]): list of content on which to do NER
-            flatten (bool, optional): flatten results.
+            flatten_results (bool, optional): flatten results.
                 Defaults to True and result is returned as list[str].
                 Otherwise, returns list[list[tuple[str, str]]] (entity and its type/label per doc).
+            entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
             >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
@@ -171,7 +181,7 @@ class NerTagger:
 
         docs = list(self.nlp.pipe(content))
 
-        ents_by_doc = self.__get_entities(docs)
+        ents_by_doc = self.__get_entities(docs, entity_types)
 
         if flatten_results:
             return [e[0] for e in flatten(ents_by_doc)]
