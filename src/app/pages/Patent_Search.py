@@ -72,10 +72,10 @@ def get_data(terms, min_patent_years, relevancy_threshold):
             Searching for patents with terms: {terms},
             min_patent_years: {min_patent_years},
             relevancy_threshold: {relevancy_threshold}
-    """
+        """
     )
-    df = patent_client.search(terms, min_patent_years, relevancy_threshold)
-    return pl.from_dicts(cast(list[dict], df))
+    patents = patent_client.search(terms, min_patent_years, relevancy_threshold)
+    return patents
 
 
 @st.cache_data
@@ -117,7 +117,9 @@ def render_selector(patents):
     if st.button("Search"):
         new_patents = get_data(terms, min_patent_years, relevancy_threshold)
         if new_patents is not None:
-            st.session_state.patents = new_patents
+            df = pl.from_dicts(cast(list[dict], new_patents))
+            if new_patents is not None:
+                st.session_state.patents = df
 
     return terms
 

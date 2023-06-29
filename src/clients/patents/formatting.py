@@ -4,9 +4,7 @@ Patent client
 from typing import Any, Sequence, cast
 import polars as pl
 import logging
-import concurrent.futures
 
-from common.ner.ner import NerTagger
 from typings import PatentApplication
 
 from .score import calculate_score
@@ -40,9 +38,6 @@ def format_search_result(
     )
 
     titles = df.select(pl.col("title")).to_series().to_list()
-
-    ners = NerTagger.get_instance().extract(titles, flatten_results=False)
-    df = df.with_columns(pl.Series(ners).alias("ner"))
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
