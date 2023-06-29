@@ -23,10 +23,11 @@ from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .types import GetTokenizer, SpacyPatterns
+from .types import GetTokenizer, LinkedEntity, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
 DocEntities = list[tuple[str, str]]
+LinkedDocEntities = list[tuple[str, str, Optional[LinkedEntity]]]
 ContentType = Literal["text", "html"]
 CHUNK_SIZE = 10000
 
@@ -111,7 +112,7 @@ class NerTagger:
 
     def __get_entities(
         self, docs: list[Doc], entity_types: Optional[list[str]] = None
-    ) -> list[DocEntities]:
+    ) -> list[LinkedDocEntities]:
         """
         Get normalized entities from a list of docs
         """
@@ -123,16 +124,21 @@ class NerTagger:
             [tup[0] for tup in flatten(entity_sets)]
         )
 
-        def __get_canonical(term: str):
-            entry = normalization_map.get(term) or None
-            return entry.canonical_name if entry else term
+        def __get_linked_entities(
+            entities: list[DocEntities],
+        ) -> list[LinkedDocEntities]:
+            def __get_linked_entity(e_set):
+                kept_ents = list(
+                    filter(
+                        lambda e: entity_types is None or e[1] in entity_types, e_set
+                    )
+                )
+                return [(e[0], e[1], normalization_map.get(e[0])) for e in kept_ents]
+
+            return list(map(__get_linked_entity, entities))
 
         get_entities = compose(
-            lambda entities: [
-                (__get_canonical(e[0]), e[1])
-                for e in entities
-                if entity_types is None or e[1] in entity_types
-            ],
+            __get_linked_entities,
             sanitize_entities,
         )
 
@@ -148,7 +154,7 @@ class NerTagger:
         content: list[str],
         flatten_results: bool = True,
         entity_types: Optional[list[str]] = None,
-    ) -> Union[list[str], list[DocEntities]]:
+    ) -> Union[list[str], list[LinkedDocEntities]]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -177,17 +183,15 @@ class NerTagger:
 
         if self.use_llm:
             if self.content_type == "html":
-                # if llm, no tokenization, so let's just trip out all the HTML tags
+                # strip out all the HTML tags (no tokenization with spacy-llm)
                 content = [
                     " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
                 ]
 
-            # also, chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
+            # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             content = flatten(chunk_list(content, CHUNK_SIZE))
 
         docs = list(self.nlp.pipe(content))
-        logging.info("Docs returned: %s", docs)
-
         ents_by_doc = self.__get_entities(docs, entity_types)
 
         if flatten_results:

@@ -8,12 +8,13 @@ from scispacy.candidate_generation import (
     UmlsKnowledgeBase,
     MentionCandidate,
 )
-from scispacy.linking_utils import Entity as SpacyEntity
+
+from .types import LinkedEntity
 
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
 
-NormalizationMap = dict[str, SpacyEntity]
+NormalizationMap = dict[str, LinkedEntity]
 
 
 class TermNormalizer:
@@ -35,7 +36,7 @@ class TermNormalizer:
 
     def __get_normalized_entity(
         self, candidates: list[MentionCandidate]
-    ) -> Union[SpacyEntity, None]:
+    ) -> Union[LinkedEntity, None]:
         """
         Get normalized name from candidate if suggestions exceed min similarity
 
