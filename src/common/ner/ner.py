@@ -49,7 +49,10 @@ class NerTagger:
         use_llm: Optional[bool] = True,
         # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
         model: Optional[str] = "en_core_sci_lg",
-        rule_sets: Optional[list[SpacyPatterns]] = None,
+        rule_sets: Optional[list[SpacyPatterns]] = [
+            INDICATION_SPACY_PATTERNS,
+            INTERVENTION_SPACY_PATTERNS,
+        ],
         get_tokenizer: Optional[GetTokenizer] = None,
         content_type: Optional[ContentType] = "text",
     ):
@@ -64,14 +67,7 @@ class NerTagger:
         """
         self.model = model
         self.use_llm = use_llm
-        self.rule_sets = (
-            [
-                INDICATION_SPACY_PATTERNS,
-                INTERVENTION_SPACY_PATTERNS,
-            ]
-            if rule_sets is None
-            else rule_sets
-        )
+        self.rule_sets = rule_sets
 
         self.get_tokenizer = (
             get_default_tokenizer if get_tokenizer is None else get_tokenizer
