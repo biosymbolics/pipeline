@@ -127,6 +127,8 @@ def main():
     Copy tables from patents-public-data to a local dataset.
     Order matters. Non-idempotent.
 
+    TODO: reload NER from parquet files
+
     Usage:
         >>> python3 -m scripts.patents.initialize_patents
     """

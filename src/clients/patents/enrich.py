@@ -107,7 +107,7 @@ def __enrich_patents(patents: pl.DataFrame) -> Optional[pl.DataFrame]:
         )
         return flattened_df
 
-    tagger = NerTagger.get_instance(use_llm=True)
+    tagger = NerTagger.get_instance(use_llm=True, content_type="text")
     processed_pubs = __get_processed_pubs()
 
     # remove already processed patents

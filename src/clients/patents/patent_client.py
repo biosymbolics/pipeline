@@ -32,10 +32,12 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     "assignees",
+    "classes",
     "compounds",
     # "cited_by",
     "country",
     "diseases",
+    "drugs",
     "effects",
     "family_id",
     "genes",
@@ -47,6 +49,7 @@ SEARCH_RETURN_FIELDS = [
     "ipc_codes",
     # "matched_terms",
     # "matched_domains",
+    "MoAs",
     "proteins",
     "search_rank",
     # "publication_date",
@@ -68,13 +71,16 @@ COM_FILTER = f"""
 def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
     """
     Returns a query for a given domain
+
+    Args:
+        domain (str): domain to query
+        new_domain (str): new domain name
+        threshold (float): threshold for search rank
     """
-    # relaxed threshold relative to search rank
-    term_threshold = threshold / 2
     return f"""
         ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a
         where a.domain = '{domain}'
-        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {term_threshold})
+        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
         as {new_domain}
     """
 
@@ -101,10 +107,8 @@ def search(
     """
     lower_terms = [term.lower() for term in terms]
     fields = ",".join(SEARCH_RETURN_FIELDS)
-
     max_priority_date = get_max_priority_date(min_patent_years)
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
-
     _get_term_query = partial(get_term_query, threshold=threshold)
 
     query = f"""
@@ -114,11 +118,14 @@ def search(
                 annotation.term as matched_term,
                 annotation.domain as matched_domain,
                 EXP(-annotation.character_offset_start * {DECAY_RATE}) as search_rank, --- exp decay scaling; higher is better
-                {_get_term_query('drugs', 'compounds')},
+                {_get_term_query('drugs', 'drugs')},
+                {_get_term_query('compounds', 'compounds')},
+                {_get_term_query('classes', 'classes')},
                 {_get_term_query('diseases', 'diseases')},
                 {_get_term_query('effects', 'effects')},
                 {_get_term_query('humangenes', 'genes')},
-                {_get_term_query('proteins', 'proteins')}
+                {_get_term_query('proteins', 'proteins')},
+                {_get_term_query('moas', 'MoAs')},
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
@@ -129,11 +136,14 @@ def search(
                 ARRAY_AGG(matched_term) as matched_terms,
                 ARRAY_AGG(matched_domain) as matched_domains,
                 AVG(search_rank) as search_rank,
+                ANY_VALUE(drugs) as drugs,
                 ANY_VALUE(compounds) as compounds,
+                ANY_VALUE(classes) as classes,
                 ANY_VALUE(diseases) as diseases,
                 ANY_VALUE(effects) as effects,
                 ANY_VALUE(genes) as genes,
-                ANY_VALUE(proteins) as proteins
+                ANY_VALUE(MoAs) as MoAs,
+                ANY_VALUE(proteins) as proteins,
             FROM matches
             GROUP BY publication_number
         )

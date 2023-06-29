@@ -15,4 +15,6 @@ if __name__ == "__main__":
             "Usage: python3 ner.py\nLoads NER data for patents and saves it to a temporary location"
         )
         sys.exit()
-    enrich_with_ner(["asthma"])
+    enrich_with_ner(
+        ["asthma", "schizophrenia", "pulmonary hypertension", "bipolar disorder"]
+    )

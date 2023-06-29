@@ -39,3 +39,25 @@ def remove_comment_syntax(text: str) -> str:
         return json_blocks[-1]  # return the last
 
     return json_blocks[0]
+
+
+def chunk_text(content: str, chunk_size: int) -> list[str]:
+    """
+    Turns a list into a list of lists of size `batch_size`
+
+    Args:
+        content (str): content to chunk
+        chunk_size (int): chunk size
+    """
+    return [content[i : i + chunk_size] for i in range(0, len(content), chunk_size)]
+
+
+def chunk_list(content_list: list[str], chunk_size: int) -> list[list[str]]:
+    """
+    Chunk a list of content
+
+    Args:
+        content (list): content to chunk
+        chunk_size (int): chunk size
+    """
+    return [chunk_text(content, chunk_size) for content in content_list]

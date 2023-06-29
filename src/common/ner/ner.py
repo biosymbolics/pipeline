@@ -5,7 +5,8 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from functools import partial
 import time
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union
+from bs4 import BeautifulSoup
 from pydash import flatten
 import spacy
 from spacy.language import Language
@@ -18,7 +19,9 @@ import warnings
 
 from clients.spacy import Spacy
 from common.ner.normalizer import TermNormalizer
+from common.utils.file import save_as_pickle
 from common.utils.functional import compose
+from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
 from .debugging import debug_pipeline
@@ -40,6 +43,9 @@ def get_default_tokenizer(nlp: Language):
     return Tokenizer(nlp.vocab)
 
 
+ContentType = Literal["text", "html"]
+
+
 class NerTagger:
     _instances: dict[tuple, Any] = {}
 
@@ -50,6 +56,7 @@ class NerTagger:
         model: Optional[str] = "en_core_sci_lg",
         rule_sets: Optional[list[SpacyPatterns]] = None,
         get_tokenizer: Optional[GetTokenizer] = None,
+        content_type: Optional[ContentType] = "text",
     ):
         """
         Named-entity recognition using spacy
@@ -77,7 +84,7 @@ class NerTagger:
         )
 
         self.common_nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
-
+        self.content_type = content_type
         self.__init_tagger()
 
     def __init_tagger(self):
@@ -107,7 +114,7 @@ class NerTagger:
         )
         self.nlp = nlp
 
-    def __get_entities(self, docs) -> list[DocEntities]:
+    def __get_entities(self, docs, entity_types) -> list[DocEntities]:
         """
         Get normalized entities from a list of docs
         """
@@ -120,18 +127,26 @@ class NerTagger:
             return entry.canonical_name if entry else term
 
         get_entities = compose(
-            lambda span: [(__get_canonical(e), e.label_) for e in span],
+            lambda span: [
+                (__get_canonical(e), e.label_)
+                for e in span
+                if entity_types is None or e.label_ in entity_types
+            ],
             partial(sanitize_entities, nlp=self.common_nlp),
         )
 
         ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
 
         logging.info("Entities: %s", ents_by_doc)
+        save_as_pickle(ents_by_doc)
 
         return ents_by_doc
 
     def extract(
-        self, content: list[str], flatten_results: bool = True
+        self,
+        content: list[str],
+        flatten_results: bool = True,
+        entity_types: Optional[list[str]] = None,
     ) -> Union[list[str], list[DocEntities]]:
         """
         Extract named entities from a list of content
@@ -141,9 +156,10 @@ class NerTagger:
 
         Args:
             content (list[str]): list of content on which to do NER
-            flatten (bool, optional): flatten results.
+            flatten_results (bool, optional): flatten results.
                 Defaults to True and result is returned as list[str].
                 Otherwise, returns list[list[tuple[str, str]]] (entity and its type/label per doc).
+            entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
             >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
@@ -154,13 +170,23 @@ class NerTagger:
             content = [content]
 
         if not self.nlp:
-            logging.error("NER tagger not initialized")
             raise Exception("NER tagger not initialized")
 
         logging.info("Starting NER pipeline with %s docs", len(content))
+
+        if self.use_llm:
+            if self.content_type == "html":
+                # if llm, no tokenization, so let's just trip out all the HTML tags
+                content = [
+                    " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
+                ]
+
+            # also, chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
+            content = flatten(chunk_list(content, 10000))
+
         docs = list(self.nlp.pipe(content))
 
-        ents_by_doc = self.__get_entities(docs)
+        ents_by_doc = self.__get_entities(docs, entity_types)
 
         if flatten_results:
             return [e[0] for e in flatten(ents_by_doc)]

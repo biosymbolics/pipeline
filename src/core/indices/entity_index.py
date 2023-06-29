@@ -39,7 +39,7 @@ def create_entity_indices(
     entities: list[str],
     namespace_key: NamespaceKey,
     documents: list[str],
-    confirm_entities: bool = True,
+    confirm_entities: bool = False,
 ):
     """
     For each entity in the provided list, summarize based on the document and persist in an index
@@ -98,9 +98,11 @@ def create_from_docs(
                 create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    tagger = NerTagger.get_instance(get_tokenizer=get_sec_tokenizer)
+    tagger = NerTagger.get_instance(content_type="html")
     for key, docs in doc_map.items():
-        entities = tagger.extract(docs, flatten_results=True)
+        entities = tagger.extract(
+            docs, flatten_results=True, entity_types=["moas", "compounds", "classes"]
+        )
         ns_key = get_namespace_key(key)
         create_entity_indices(
             entities=cast(list[str], entities),

@@ -1,83 +1,103 @@
-- text: Method of treating ulcerative colitis with anti-il-12/il23 antibody
+- text: Safe and effective method of treating ulcerative colitis with anti-il-12/il23 antibody
   entities:
-    moas:
+    MECHANISM:
       - anti-il-12/il23 antibody
-    diseases:
+    DISEASE:
       - ulcerative colitis
-- text: Making (2h-1,2,3-triazol-2-yl)phenyl compounds as orexin receptor modulators
+- text: Improved synthetic methods of making (2h-1,2,3-triazol-2-yl)phenyl compounds as orexin receptor modulators
   entities:
-    classes:
+    CLASS:
       - (2h-1,2,3-triazol-2-yl)phenyl compounds
-    moas:
+    MECHANISM:
       - orexin receptor modulator
-- text: Antibodies that neutralize coagulase activity during staphylococcus aureus disease
+- text: Compositions and methods related to antibodies that neutralize coagulase activity during staphylococcus aureus disease
   entities:
-    moas:
+    MECHANISM:
       - coagulase-neutralizing antibodies
-    diseases:
+    DISEASE:
       - staphylococcus aureus
-- text: treating multiple myeloma with carfilzomib, dexamethasone, and an antibody that recognizes cd38
+- text: Methods of treating multiple myeloma with a triplet therapy of carfilzomib, dexamethasone, and an antibody that specifically recognizes cd38.
   entities:
-    compounds:
+    COMPOUND:
       - carfilzomib
       - dexamethasone
-    moas:
+    MECHANISM:
       - cd38 antibody
-    diseases:
+    DISEASE:
       - multiple myeloma
+- text: GBA1 Gene Therapy (PR001)  Parkinson's disease  Phase II Phase II trial is ongoing.
+  entities:
+    MECHANISM:
+      - GBA1 Gene Therapy
+    COMPOUND:
+      - PR001
+    DISEASE:
+      - Parkinson's disease
 - text: Cross-reactive epitope for multiple sclerosis
   entities:
-    moas:
+    MECHANISM:
       - Cross-reactive epitope
-    diseases:
+    DISEASE:
       - multiple sclerosis
 - text: Chimeric antigen receptors targeting cd-19
   entities:
-    moas:
+    MECHANISM:
       - cd-19 chimeric antigen receptors
-- text: ANTIBODY TARGETING CELL SURFACE DEPOSITED COMPLEMENT PROTEIN C3d
+- text: ANTIBODY TARGETING CELL SURFACE DEPOSITED COMPLEMENT PROTEIN C3d AND USE THEREOF
   entities:
-    moas:
+    MECHANISM:
       - C3d Complement Protein Antibody
-- text: Anti-h7n9 fully-human monoclonal antibody 5j13; application therefor
+- text: Anti-h7n9 fully-human monoclonal antibody 5j13, preparation method therefor, and application thereof
   entities:
-    moas:
+    MECHANISM:
       - Anti-h7n9 fully-human monoclonal antibody 5j13
 - text: Indazole and azaindazole btk inhibitors
   entities:
-    moas:
+    MECHANISM:
       - btk inhibitor
-    compounds:
+    COMPOUND:
       - indazole
-      - azaindazoles
+      - azaindazole
+- text: Antibodies targeting human claudin 18.2 and uses thereof
+  entities:
+    MECHANISM:
+      - anti-claudin 18.2 antibody
 - text: Peptides inhibiting cold-inducible rna binding protein activity
   entities:
-    moas:
+    MECHANISM:
       - cold-inducible rna binding protein inhibitor
-    classes:
+    CLASS:
       - peptide
-- text: COMPOSITIONS FOR MODULATION OF MONOCYTOPOISIS
+- text: METHODS AND PHARMACEUTICAL COMPOSITIONS FOR MODULATION OF MONOCYTOPOISIS
   entities:
-    moas:
+    MECHANISM:
       - monocytopoiesis modulator
 - text: Covalent inhibitors of pad4
   entities:
-    moas:
+    MECHANISM:
+      - pad4 inhibitor
       - covalent pad4 inhibitor
-- text: Tachykinin inhibitors which act at the NK1 and NK2 receptors
+- text: Compounds are useful as tachykinin inhibitors which act at the NK1, NK2 and NK3 receptors
   entities:
-    moas:
+    MECHANISM:
       - tachykinin inhibitor
       - NK1 receptor antagonist
       - NK2 receptor antagonist
-- text: Compound inhibits ice activity and may be agents against il-1-, apoptosis-, and ifn-y-mediated diseases
+      - NK3 receptor antagonist
+- text: The compounds are well suited for inhibiting ice activity and may be advantageously used as agents against il-1-, apoptosis-, igif-, and ifn-y-mediated diseases
   entities:
-    moas:
+    MECHANISM:
       - ice inhibitor
-    diseases:
+    DISEASE:
       - il-1-mediated diseases
       - apoptosis-mediated diseases
+      - igif-mediated diseases
       - ifn-y-mediated diseases
+- text: Comprises assaying the said sample for the presence of a compound selected from 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one (compound a)and n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide (compound b).
+  entities:
+    COMPOUND:
+      - 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one
+      - n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide
 - text: Inhibitors to elevate certain plasma lipid levels, including HDL-cholesterol
   entities:
     moas:

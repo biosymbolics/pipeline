@@ -44,6 +44,15 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
     "cardiovascular",
     "respiratory",
     "aging",
+    "cardiac",
+    "polymers",
+    "gene",
+    "fatty",
+    "abuse",
+    "motion",
+    "panic",
+    "addiction",
+    "mood",
 ]
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
