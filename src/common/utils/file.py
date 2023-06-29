@@ -21,7 +21,7 @@ def save_as_pickle(obj: Any, filename: Optional[str] = None) -> str:
     Saves obj as pickle
     """
     if not filename:
-        filename = str(uuid.uuid4()) + ".txt"
+        filename = "data/pickles/" + str(uuid.uuid4()) + ".txt"
     with open(filename, "wb") as file:
         pickle.dump(obj, file)
 

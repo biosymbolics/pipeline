@@ -111,26 +111,26 @@ def __enrich_patents(patents: pl.DataFrame) -> Optional[pl.DataFrame]:
     processed_pubs = __get_processed_pubs()
 
     # remove already processed patents
-    filtered = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
+    unprocessed = patents.filter(~pl.col("publication_number").is_in(processed_pubs))
 
-    if len(filtered) == 0:
+    if len(unprocessed) == 0:
         logging.info("No patents to process")
         return None
 
-    if len(filtered) < len(patents):
+    if len(unprocessed) < len(patents):
         logging.info(
             f"Filtered out %s patents that have already been processed",
-            len(patents) - len(filtered),
+            len(patents) - len(unprocessed),
         )
 
     # get patent descriptions
-    patent_texts = __get_patent_descriptions(filtered)
+    patent_texts = __get_patent_descriptions(unprocessed)
 
     # extract entities
     entities = tagger.extract(patent_texts, flatten_results=False)
 
     # add back to orig df
-    enriched = filtered.with_columns(pl.Series("entities", entities))
+    enriched = unprocessed.with_columns(pl.Series("entities", entities))
 
     return format(enriched)
 

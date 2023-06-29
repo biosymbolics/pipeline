@@ -44,7 +44,7 @@ class PatentApplication(PatentBasicInfo):
     filing_date: date
     indications: list[str]
     inventors: list[str]
-    MoAs: list[str]
+    mechanisms: list[str]
     proteins: list[str]
     similar: list[str]
     top_terms: list[str]  # from GPR table

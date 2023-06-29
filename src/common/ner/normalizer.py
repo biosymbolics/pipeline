@@ -11,10 +11,9 @@ from scispacy.candidate_generation import (
 from scispacy.linking_utils import Entity as SpacyEntity
 
 MIN_SIMILARITY = 0.85
+ONTOLOGY = "umls"
 
 NormalizationMap = dict[str, SpacyEntity]
-
-ONTOLOGY = "umls"
 
 
 class TermNormalizer:

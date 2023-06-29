@@ -3,10 +3,10 @@ Utils for the NER pipeline
 """
 from typing import Callable, TypeVar, Union, cast
 import re
-from functools import partial, reduce
+from functools import reduce
 from spacy.language import Language
-from spacy.tokens import Span
 import logging
+from clients.spacy import Spacy
 
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
@@ -18,7 +18,7 @@ CHAR_SUPPRESSIONS = {
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 
-T = TypeVar("T", bound=Union[Span, str])
+T = TypeVar("T", bound=Union[tuple[str, str], str])
 CleanFunction = Callable[[list[T]], list[T]]
 
 DEFAULT_EXCEPTION_LIST: list[str] = [
@@ -60,34 +60,37 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
 ]
 
 
-def get_common_words(additional_words):
+def __get_common_words(additional_words: list[str]) -> list[str]:
     """
     Get common words from a file + additional common words
+
+    Args:
+        additional_words (list[str]): additional common words to add to the vocab
     """
     with open("10000words.txt", "r") as file:
         vocab_words = file.read().splitlines()
     return [*vocab_words, *additional_words]
 
 
-def remove_common(
-    entity_list: list[T],
-    nlp: Language,
+def __filter_common_terms(
+    entities: list[T],
     exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
     additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
 ) -> list[T]:
     """
-    Remove common terms from a list of entities, e.g. "vaccine candidates"
+    Filter out common terms from a list of entities, e.g. "vaccine candidates"
 
     Args:
-        entity_list (list[T]): list of entities
-        nlp (Language): spacy language model
+        entities (list[T]): list of entities
         exception_list (list[str]): list of exceptions to the common terms
+        additional_common_words (list[str]): additional common words to add to the vocab
     """
 
-    common_words = get_common_words(additional_common_words)
+    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
+    common_words = __get_common_words(additional_common_words)
 
     def __is_common(item: T):
-        name = item.text if isinstance(item, Span) else item
+        name = item[0] if isinstance(item, tuple) else item
 
         # remove punctuation and make lowercase
         words = [token.lemma_ for token in nlp(name)]
@@ -109,78 +112,84 @@ def remove_common(
     def __is_uncommon(item):
         return not __is_common(item)
 
-    return list(filter(__is_uncommon, entity_list))
+    return list(filter(__is_uncommon, entities))
 
 
-def normalize_entity(
-    entity: T, char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
-) -> T:
+def __normalize_entity_names(
+    entities: list[T], char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
+) -> list[T]:
     """
     Normalize entity name
     - remove certain characters
     - removes double+ spaces
+    - lemmatize?
 
     Args:
         entity (T): entity
+        nlp (Language): spacy language model
+        char_suppressions (dict[str, str]): characters to remove
     """
-    name = entity.text if isinstance(entity, Span) else entity
+    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
+    texts = [entity[0] if isinstance(entity, tuple) else entity for entity in entities]
+    docs = nlp.pipe(texts)
+
+    def lemmatize(doc):
+        return " ".join([token.lemma_ for token in doc])
 
     def remove_chars(entity_name: str) -> str:
         for pattern, replacement in char_suppressions.items():
             entity_name = re.sub(pattern, replacement, entity_name)
         return entity_name
 
-    cleaning_steps = [remove_chars, remove_extra_spaces]
+    def normalize_entity(entity: T) -> T:
+        doc = next(docs)
+        lemmatized = lemmatize(doc)
 
-    normalized = reduce(lambda x, func: func(x), cleaning_steps, name)
+        cleaning_steps = [remove_chars, remove_extra_spaces]
+        normalized = reduce(lambda x, func: func(x), cleaning_steps, lemmatized)
 
-    if normalized != name:
-        logging.info(f"Normalized entity: {name} -> {normalized}")
+        if normalized != entity:
+            logging.info(f"Normalized entity: {entity} -> {normalized}")
 
-    if isinstance(entity, Span):
-        return cast(T, Span(entity.doc, entity.start, entity.end, label=entity.label))
+        if isinstance(entity, tuple):
+            return cast(T, (normalized, *entity[1:]))
 
-    return normalized
+        return cast(T, normalized)
+
+    return [normalize_entity(entity) for entity in entities]
 
 
-def normalize_entities(entities: list[T]) -> list[T]:
+def __suppress(entities: list[T]) -> list[T]:
     """
-    normalize entity names
+    Filter out irrelevant entities
 
     Args:
         entities (list[T]): entities
     """
-    return [normalize_entity(entity) for entity in entities]
+
+    def should_keep(entity: T) -> bool:
+        name = entity[0] if isinstance(entity, tuple) else entity
+        is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
+        return not is_suppressed
+
+    return [entity for entity in entities if should_keep(entity)]
 
 
-def sanitize_entities(entities: list[T], nlp: Language) -> list[T]:
+def sanitize_entities(entities: list[T]) -> list[T]:
     """
     Sanitize entity list
     - filters out (some) excessively general entities
     - dedups
-    - normalizes entity names
+    - normalizes & lemmatizes entity names
 
     Args:
         entities (list[T]): entities
         nlp (Language): spacy language model
     """
-
-    def suppress(entities: list[T]) -> list[T]:
-        """
-        Filter out irrelevant entities
-        """
-
-        def should_keep(entity: T) -> bool:
-            name = entity.text if isinstance(entity, Span) else entity
-            is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
-            return not is_suppressed
-
-        return [entity for entity in entities if should_keep(entity)]
-
     cleaning_steps: list[CleanFunction] = [
-        suppress,
-        partial(remove_common, nlp=nlp),
-        normalize_entities,
+        __suppress,
+        __normalize_entity_names,
+        __filter_common_terms,
         dedup,
     ]
 

@@ -3,47 +3,42 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
-from functools import partial
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from bs4 import BeautifulSoup
 from pydash import flatten
 import spacy
 from spacy.language import Language
-from spacy.tokens import Span
+from spacy.tokens import Span, Doc
 from spacy.tokenizer import Tokenizer
 import spacy_llm
 from spacy_llm.util import assemble
 import logging
 import warnings
 
-from clients.spacy import Spacy
 from common.ner.normalizer import TermNormalizer
 from common.utils.file import save_as_pickle
 from common.utils.functional import compose
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
-from .debugging import debug_pipeline
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
 from .types import GetTokenizer, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
+DocEntities = list[tuple[str, str]]
+ContentType = Literal["text", "html"]
+CHUNK_SIZE = 10000
 
 warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.INFO)
-
-DocEntities = list[tuple[str, str]]
+spacy_llm.logger.setLevel(logging.DEBUG)
 
 
 def get_default_tokenizer(nlp: Language):
     return Tokenizer(nlp.vocab)
-
-
-ContentType = Literal["text", "html"]
 
 
 class NerTagger:
@@ -77,13 +72,11 @@ class NerTagger:
             if rule_sets is None
             else rule_sets
         )
-        self.normalizer = TermNormalizer()
 
         self.get_tokenizer = (
             get_default_tokenizer if get_tokenizer is None else get_tokenizer
         )
 
-        self.common_nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
         self.content_type = content_type
         self.__init_tagger()
 
@@ -108,34 +101,42 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
+        self.normalizer = TermNormalizer()
+        self.nlp = nlp
+
         logging.info(
             "Init NER pipeline took %s seconds",
             round(time.time() - start_time, 2),
         )
-        self.nlp = nlp
 
-    def __get_entities(self, docs, entity_types) -> list[DocEntities]:
+    def __get_entities(
+        self, docs: list[Doc], entity_types: Optional[list[str]] = None
+    ) -> list[DocEntities]:
         """
         Get normalized entities from a list of docs
         """
-        entity_names = [e.lemma_ or e.text for doc in docs for e in doc.ents]
-        normalization_map = self.normalizer.generate_map(entity_names)
+        entity_span_sets: list[tuple[Span]] = [doc.ents for doc in docs]
+        entity_sets: list[DocEntities] = [
+            [(span.text, span.label_) for span in e_set] for e_set in entity_span_sets
+        ]
+        normalization_map = self.normalizer.generate_map(
+            [tup[0] for tup in flatten(entity_sets)]
+        )
 
-        def __get_canonical(e):
-            term = e.lemma_ or e.text
+        def __get_canonical(term: str):
             entry = normalization_map.get(term) or None
             return entry.canonical_name if entry else term
 
         get_entities = compose(
-            lambda span: [
-                (__get_canonical(e), e.label_)
-                for e in span
-                if entity_types is None or e.label_ in entity_types
+            lambda entities: [
+                (__get_canonical(e[0]), e[1])
+                for e in entities
+                if entity_types is None or e[1] in entity_types
             ],
-            partial(sanitize_entities, nlp=self.common_nlp),
+            sanitize_entities,
         )
 
-        ents_by_doc = [get_entities([span for span in doc.ents]) for doc in docs]
+        ents_by_doc = [get_entities(e_set) for e_set in entity_sets]
 
         logging.info("Entities: %s", ents_by_doc)
         save_as_pickle(ents_by_doc)
@@ -182,9 +183,10 @@ class NerTagger:
                 ]
 
             # also, chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
-            content = flatten(chunk_list(content, 10000))
+            content = flatten(chunk_list(content, CHUNK_SIZE))
 
         docs = list(self.nlp.pipe(content))
+        logging.info("Docs returned: %s", docs)
 
         ents_by_doc = self.__get_entities(docs, entity_types)
 
