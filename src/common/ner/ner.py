@@ -6,6 +6,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 from functools import partial
 import time
 from typing import Any, Optional, TypeVar, Union
+from bs4 import BeautifulSoup
 from pydash import flatten
 import spacy
 from spacy.language import Language
@@ -19,6 +20,7 @@ import warnings
 from clients.spacy import Spacy
 from common.ner.normalizer import TermNormalizer
 from common.utils.functional import compose
+from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
 from .debugging import debug_pipeline
@@ -154,10 +156,19 @@ class NerTagger:
             content = [content]
 
         if not self.nlp:
-            logging.error("NER tagger not initialized")
             raise Exception("NER tagger not initialized")
 
         logging.info("Starting NER pipeline with %s docs", len(content))
+
+        if self.use_llm:
+            # if llm, no tokenization, so let's just trip out all the HTML tags
+            content = [
+                " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
+            ]
+
+            # also, chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
+            content = flatten(chunk_list(content, 10000))
+
         docs = list(self.nlp.pipe(content))
 
         ents_by_doc = self.__get_entities(docs)

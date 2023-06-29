@@ -11,6 +11,9 @@ from .types import GetDocId, GetDocMetadata
 def __is_string_doc_list(documents: list[Any]) -> TypeGuard[list[str]]:
     """
     Check if documents are strings or llama_index Documents
+
+    Args:
+        documents (list[Any]): list of documents
     """
     return isinstance(documents[0], str)
 
@@ -29,7 +32,7 @@ def format_documents(
         get_doc_id (GetDocId): function to get doc id for each document
     """
     if __is_string_doc_list(documents):
-        docs = list(map(Document, documents))
+        docs = list(map(lambda doc: Document(text=doc), documents))
     else:
         docs = cast(list[Document], documents)
 
@@ -37,10 +40,10 @@ def format_documents(
 
     if get_extra_info:
         for doc in docs:
-            doc.extra_info = get_extra_info(doc)
+            doc.metadata = get_extra_info(doc)
 
     if get_doc_id:
         for doc in docs:
-            doc.doc_id = get_doc_id(doc)
+            doc.id_ = get_doc_id(doc)
 
     return docs

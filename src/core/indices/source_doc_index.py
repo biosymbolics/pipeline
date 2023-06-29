@@ -151,7 +151,9 @@ class SourceDocIndex:
         Confirm a list of entities
         """
         query = f"""
-        Our Named Entity Recognition (NER) model has identified a list of potential pharmacological products
+        You are an expert Named Entity Recognition (NER) system and you are checking the work of a older NER system.
+        Your task is to accept Text as input and confirm the extract named entities for the set of predefined entity labels.
+        The older NER model has identified a list of potential pharmacological products
         (drugs, compounds, drug class, mechanism of action, etc) from the source document.
         However, it contains errors such as:
 

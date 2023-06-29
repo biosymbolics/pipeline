@@ -39,7 +39,7 @@ def create_entity_indices(
     entities: list[str],
     namespace_key: NamespaceKey,
     documents: list[str],
-    confirm_entities: bool = True,
+    confirm_entities: bool = False,
 ):
     """
     For each entity in the provided list, summarize based on the document and persist in an index
