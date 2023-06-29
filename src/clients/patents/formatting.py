@@ -37,8 +37,6 @@ def format_search_result(
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
     )
 
-    titles = df.select(pl.col("title")).to_series().to_list()
-
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
 
