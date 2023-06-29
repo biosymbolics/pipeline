@@ -9,7 +9,7 @@ from scispacy.candidate_generation import (
     MentionCandidate,
 )
 
-from .types import LinkedEntity
+from .types import KbLinker, LinkedEntity
 
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
@@ -32,7 +32,7 @@ class TermNormalizer:
         Initialize term normalizer using existing model
         """
         self.candidate_generator = CandidateGenerator()
-        self.kb = UmlsKnowledgeBase()
+        self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
 
     def __get_normalized_entity(
         self, candidates: list[MentionCandidate]

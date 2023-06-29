@@ -18,7 +18,6 @@ import warnings
 
 from common.ner.normalizer import TermNormalizer
 from common.utils.file import save_as_pickle
-from common.utils.functional import compose
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
@@ -110,43 +109,35 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
+    def __get_entity_set(
+        self, doc: Doc, entity_types: Optional[list[str]] = None
+    ) -> LinkedDocEntities:
+        """
+        Get normalized entities for a doc
+        """
+        entity_set = [(span.text, span.label_) for span in doc.ents]
+        normalization_map = self.normalizer.generate_map([ent[0] for ent in entity_set])
+
+        def process_entities(e_set: DocEntities) -> LinkedDocEntities:
+            sanitized = sanitize_entities(e_set)
+            kept = sanitized
+            if entity_types:
+                kept = [e for e in sanitized if e[1] in entity_types]
+
+            return [(e[0], e[1], normalization_map.get(e[0])) for e in kept]
+
+        return process_entities(entity_set)
+
     def __get_entities(
         self, docs: list[Doc], entity_types: Optional[list[str]] = None
     ) -> list[LinkedDocEntities]:
         """
         Get normalized entities from a list of docs
         """
-        entity_span_sets: list[tuple[Span]] = [doc.ents for doc in docs]
-        entity_sets: list[DocEntities] = [
-            [(span.text, span.label_) for span in e_set] for e_set in entity_span_sets
-        ]
-        normalization_map = self.normalizer.generate_map(
-            [tup[0] for tup in flatten(entity_sets)]
-        )
-
-        def __get_linked_entities(
-            entities: list[DocEntities],
-        ) -> list[LinkedDocEntities]:
-            def __get_linked_entity(e_set):
-                kept_ents = list(
-                    filter(
-                        lambda e: entity_types is None or e[1] in entity_types, e_set
-                    )
-                )
-                return [(e[0], e[1], normalization_map.get(e[0])) for e in kept_ents]
-
-            return list(map(__get_linked_entity, entities))
-
-        get_entities = compose(
-            __get_linked_entities,
-            sanitize_entities,
-        )
-
-        ents_by_doc = [get_entities(e_set) for e_set in entity_sets]
+        ents_by_doc = [self.__get_entity_set(doc, entity_types) for doc in docs]
 
         logging.info("Entities: %s", ents_by_doc)
         save_as_pickle(ents_by_doc)
-
         return ents_by_doc
 
     def extract(
