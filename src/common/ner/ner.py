@@ -49,7 +49,7 @@ class NerTagger:
         use_llm: Optional[bool] = True,
         # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
         model: Optional[str] = "en_core_sci_lg",
-        rule_sets: Optional[list[SpacyPatterns]] = [
+        rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
             INTERVENTION_SPACY_PATTERNS,
         ],
