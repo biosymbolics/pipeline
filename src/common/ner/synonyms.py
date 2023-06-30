@@ -113,6 +113,13 @@ class SynonymStore:
             self.add_synonym(term, "temp-" + str(uuid.uuid4()), metadata=metadata)
 
     def remap_synonyms(self, new_canonical_id: str, synonyms: list[str]):
+        """
+        Remap all synonyms to the new canonical id
+
+        Args:
+            new_canonical_id (str): the new canonical id to map to
+            synonyms (list[str]): the synonyms to remap
+        """
         for term in synonyms:
             synonym_data = self.get_synonym(term)
             if synonym_data is not None:
@@ -129,7 +136,6 @@ class SynonymStore:
             new_canonical_id (str): the new canonical id to map to
         """
         result = self.search_synonym(term, distance)
-        for doc in result.docs:
-            most_similar_term = doc.term
-            logging.info(f"Remapping {most_similar_term} to {new_canonical_id}")
-            self.remap_synonyms(new_canonical_id, [term, most_similar_term])
+        terms: list[str] = [doc.term for doc in result.docs]
+        self.remap_synonyms(new_canonical_id, [term, *terms])
+        logging.info("Remapped %s to %s", terms, new_canonical_id)
