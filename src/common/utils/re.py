@@ -74,4 +74,11 @@ def remove_extra_spaces(string: str) -> str:
     Args:
         string (str): string to remove extra spaces from
     """
-    return re.sub(r"\s{2,}", " ", string).strip()
+    extra_space_patterns = {
+        r"\s{2,}": " ",
+        r"\s{1,},": ",",  # e.g. to address "OPSUMIT , other product"
+    }
+    for pattern, replacement in extra_space_patterns.items():
+        string = re.sub(pattern, replacement, string)
+
+    return string.strip()

@@ -4,7 +4,6 @@ Utils for the NER pipeline
 from typing import Callable, TypeVar, Union, cast
 import re
 from functools import reduce
-from spacy.language import Language
 import logging
 from clients.spacy import Spacy
 
@@ -72,7 +71,7 @@ def __get_common_words(additional_words: list[str]) -> list[str]:
     return [*vocab_words, *additional_words]
 
 
-def __filter_common_terms(
+def filter_common_terms(
     entities: list[T],
     exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
     additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
@@ -115,7 +114,7 @@ def __filter_common_terms(
     return list(filter(__is_uncommon, entities))
 
 
-def __normalize_entity_names(
+def normalize_entity_names(
     entities: list[T], char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
 ) -> list[T]:
     """
@@ -188,8 +187,8 @@ def sanitize_entities(entities: list[T]) -> list[T]:
     """
     cleaning_steps: list[CleanFunction] = [
         __suppress,
-        __normalize_entity_names,
-        __filter_common_terms,
+        normalize_entity_names,
+        filter_common_terms,
         dedup,
     ]
 
