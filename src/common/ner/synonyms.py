@@ -33,7 +33,7 @@ class SynonymStore:
         client (redisearch.Client): RedisSearch client
     """
 
-    def __init__(self, index_name: str):
+    def __init__(self, index_name: str = "synonyms"):
         """
         Initialize SynonymStore
 
@@ -124,7 +124,7 @@ class SynonymStore:
         term: str,
         canonical_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
-    ):
+    ) -> SynonymDocument:
         """
         Upsert a synonym (add if new, otherwise update)
         The public interface is "add_synonym", which maps to an existing record if sufficiently similar.
@@ -135,14 +135,13 @@ class SynonymStore:
             metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
         """
         doc_id = self.__get_doc_id(term)
-        doc: Mapping = self.__serialize(
-            {
-                "term": term,
-                "canonical_id": canonical_id or "",
-                "metadata": metadata or {},
-            }
-        )
-        self.client.redis.hset(doc_id, mapping=doc)  # type: ignore
+        doc: SynonymDocument = {
+            "term": term,
+            "canonical_id": canonical_id or "",
+            "metadata": metadata or {},
+        }
+        self.client.redis.hset(doc_id, mapping=self.__serialize(doc))  # type: ignore
+        return doc
 
     def add_synonym(
         self,
@@ -150,27 +149,36 @@ class SynonymStore:
         canonical_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
         distance: int = 5,
-    ):
+    ) -> SynonymDocument:
         """
         Add a synonym to the store and map it to the most similar term
 
         Args:
             term (str): the synonym to add
-            distance (int): the maximum edit distance to search for
+            canonical_id (str, optional): the canonical id of the synonym. Defaults to None.
             metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
+            distance (int): the maximum edit distance to search for
         """
-        docs = self.search_synonym(term, distance)
+        docs = self.search_for_synonyms(term, distance)
         if len(docs) > 0:
             most_similar_term = docs[0].term
-            canonical_id = docs[0].canonical_id
-            self.__upsert_synonym(term, canonical_id, metadata)
-            logger.info(
-                "Added %s as synonym of %s (%s)", term, most_similar_term, canonical_id
-            )
+            new_canonical_id = docs[0].canonical_id
+            if new_canonical_id != canonical_id:
+                logger.warning(
+                    "Term %s already exists with canonical id %s, but %s was provided",
+                    term,
+                    new_canonical_id,
+                    canonical_id,
+                )
         else:
-            _canonical_id = canonical_id or self.__get_tmp_canonical_id()
-            self.__upsert_synonym(term, _canonical_id, metadata=metadata)
-            logger.info("Added %s as new synonym (%s)", term, _canonical_id)
+            most_similar_term = "n/a"
+            new_canonical_id = canonical_id or self.__get_tmp_canonical_id()
+
+        logger.info(
+            "Added %s as synonym of %s (%s)", term, most_similar_term, new_canonical_id
+        )
+        upserted = self.__upsert_synonym(term, new_canonical_id, metadata)
+        return upserted
 
     def get_synonym(self, term: str) -> Optional[SynonymDocument]:
         """
@@ -192,9 +200,9 @@ class SynonymStore:
 
         return self.__deserialize(doc)
 
-    def search_synonym(self, term: str, distance: int = 10):
+    def search_for_synonyms(self, term: str, distance: int = 10):
         """
-        Search for a synonym in the store,
+        Search for a synonym in the store.
 
         Args:
             term (str): the synonym to search for
@@ -234,7 +242,7 @@ class SynonymStore:
             distance (int): the maximum edit distance to search for
             new_canonical_id (str): the new canonical id to map to
         """
-        results = self.search_synonym(term, distance)
+        results = self.search_for_synonyms(term, distance)
         terms: list[str] = [doc.term for doc in results]
         self.remap_synonyms(new_canonical_id, [term, *terms])
         logger.info("Remapped %s to %s", terms, new_canonical_id)

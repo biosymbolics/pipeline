@@ -23,6 +23,12 @@ NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group":
 
 
 class LinkedEntity(NamedTuple):
+    id: str
+    canonical_name: str
+    aliases: Optional[List[str]] = []
+
+
+class SpacyLinkedEntity(NamedTuple):
     concept_id: str
     canonical_name: str
     aliases: List[str]
@@ -31,7 +37,7 @@ class LinkedEntity(NamedTuple):
 
 
 class KbLinker(NamedTuple):
-    cui_to_entity: dict[str, LinkedEntity]
+    cui_to_entity: dict[str, SpacyLinkedEntity]
 
 
 class SciSpacyLinker(NamedTuple):

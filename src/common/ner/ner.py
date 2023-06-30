@@ -3,6 +3,7 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
+from functools import partial, reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from bs4 import BeautifulSoup
@@ -16,8 +17,7 @@ from spacy_llm.util import assemble
 import logging
 import warnings
 
-from common.ner.normalizer import TermNormalizer
-from common.utils.file import save_as_pickle
+from common.ner.linker import TermLinker
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
@@ -97,7 +97,7 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        self.normalizer = TermNormalizer()
+        self.linker = TermLinker()
         self.nlp = nlp
 
         logging.info(
@@ -105,36 +105,50 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __get_entity_set(
+    def __normalize_and_link(
         self, doc: Doc, entity_types: Optional[list[str]] = None
     ) -> LinkedDocEntities:
         """
-        Get normalized entities for a doc
+        Normalize entities for a single doc
+
+        - santize entities (filtering, removing of undesired characters, lemmatization)
+        - normalization (canonicalization, synonymization)
+
+        Args:
+            doc (Doc): SpaCy doc
+            entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
         """
         entity_set = [(span.text, span.label_) for span in doc.ents]
-        normalization_map = self.normalizer.generate_map([ent[0] for ent in entity_set])
+        entity_names = [tup[0] for tup in entity_set]
+        linked_entity_map = dict(self.linker(entity_names))
 
-        def process_entities(e_set: DocEntities) -> LinkedDocEntities:
-            sanitized = sanitize_entities(e_set)
-            kept = sanitized
-            if entity_types:
-                kept = [e for e in sanitized if e[1] in entity_types]
+        # basic filtering, character removal, lemmatization
+        sanitized = sanitize_entities(entity_set)
 
-            return [(e[0], e[1], normalization_map.get(e[0])) for e in kept]
+        # canonicalization, synonymization
+        normalized: LinkedDocEntities = [
+            (e[0], e[1], linked_entity_map[e[0]]) for e in sanitized
+        ]
+        if entity_types:
+            return [e for e in normalized if e[1] in entity_types]
 
-        return process_entities(entity_set)
+        return normalized
 
-    def __get_entities(
-        self, docs: list[Doc], entity_types: Optional[list[str]] = None
-    ) -> list[LinkedDocEntities]:
-        """
-        Get normalized entities from a list of docs
-        """
-        ents_by_doc = [self.__get_entity_set(doc, entity_types) for doc in docs]
+    def __prep_doc(self, content: list[str]) -> list[str]:
+        _content = content.copy()
 
-        logging.info("Entities: %s", ents_by_doc)
-        save_as_pickle(ents_by_doc)
-        return ents_by_doc
+        # if use_llm, no tokenization
+        if self.use_llm:
+            if self.content_type == "html":
+                # strip out all the HTML tags
+                _content = [
+                    " ".join(BeautifulSoup(c).get_text(separator=" ") for c in _content)
+                ]
+
+            # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
+            _content = flatten(chunk_list(_content, CHUNK_SIZE))
+
+        return _content
 
     def extract(
         self,
@@ -160,27 +174,24 @@ class NerTagger:
             >>> tagger.extract("Interferon alpha and omega antibody antagonists")
             >>> tagger.extract("Inhibitors of beta secretase")
         """
-        if not isinstance(content, list):
-            content = [content]
-
         if not self.nlp:
             raise Exception("NER tagger not initialized")
 
         logging.info("Starting NER pipeline with %s docs", len(content))
 
-        if self.use_llm:
-            if self.content_type == "html":
-                # strip out all the HTML tags (no tokenization with spacy-llm)
-                content = [
-                    " ".join(BeautifulSoup(c).get_text(separator=" ") for c in content)
-                ]
+        if not isinstance(content, list):
+            raise Exception("Content must be a list")
 
-            # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
-            content = flatten(chunk_list(content, CHUNK_SIZE))
+        steps = [
+            self.__prep_doc,
+            self.nlp.pipe,
+            partial(self.__normalize_and_link, entity_types=entity_types),
+        ]
+        ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
-        docs = list(self.nlp.pipe(content))
-        ents_by_doc = self.__get_entities(docs, entity_types)
+        logging.info("Entities: %s", ents_by_doc)
 
+        # return just the names (legacy?)
         if flatten_results:
             return [e[0] for e in flatten(ents_by_doc)]
 
