@@ -155,7 +155,7 @@ def upsert_into_bg_table(
     USING {BQ_DATASET_ID}.{tmp_table_name} AS source
     ON {identity_join}
     WHEN MATCHED THEN
-        UPDATE SET {on_conflict}
+        {on_conflict}
     WHEN NOT MATCHED THEN {insert}
     """
 

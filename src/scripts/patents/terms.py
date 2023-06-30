@@ -12,7 +12,7 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
 )
-from common.ner import TermNormalizer
+from common.ner import TermLinker
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
@@ -34,8 +34,8 @@ class TermRecord(BaseTermRecord):
 
 class AggregatedTermRecord(BaseTermRecord):
     domains: list[str]
-    original_terms: list[str]
-    original_ids: list[str]
+    synonyms: list[str]
+    synonym_ids: list[str]
 
 
 def __get_terms():
@@ -58,8 +58,8 @@ def __get_terms():
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
-                "original_terms": dedup([row["original_term"] for row in group]),
-                "original_ids": dedup([row.get("original_id") for row in group]),
+                "synonyms": dedup([row["original_term"] for row in group]),
+                "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
@@ -103,8 +103,8 @@ def __get_terms():
         """
         rows = select_from_bg(terms_query)
 
-        normalizer = TermNormalizer()
-        normalization_map = normalizer.generate_map([row["term"] for row in rows])
+        linker = TermLinker()
+        normalization_map = dict(linker([row["term"] for row in rows]))
 
         def __normalize(row):
             entry = normalization_map.get(row["term"])
@@ -155,8 +155,8 @@ def __create_terms():
         bigquery.SchemaField("canonical_id", "STRING"),
         bigquery.SchemaField("count", "INTEGER"),
         bigquery.SchemaField("domains", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("synonyms", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("synonym_ids", "STRING", mode="REPEATED"),
     ]
     client.delete_table(table_id, not_found_ok=True)
     new_table = client.create_table(new_table)
@@ -168,10 +168,8 @@ def __create_terms():
         execute_with_retries(lambda: client.insert_rows(new_table, b))
         logging.info(f"Inserted %s rows into terms table", len(b))
 
-    # Persist term -> original_terms as synonyms
-    synonym_map = {
-        og_term: row["term"] for row in terms for og_term in row["original_terms"]
-    }
+    # Persist term -> synonyms as synonyms
+    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
 
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 

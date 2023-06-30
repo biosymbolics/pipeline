@@ -3,7 +3,7 @@ Named-entity recognition using spacy
 
 No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
-from functools import partial, reduce
+from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from bs4 import BeautifulSoup
@@ -42,6 +42,10 @@ def get_default_tokenizer(nlp: Language):
 
 
 class NerTagger:
+    """
+    Named-entity recognition using spacy and other means
+    """
+
     _instances: dict[tuple, Any] = {}
 
     def __init__(
@@ -187,7 +191,9 @@ class NerTagger:
         steps = [
             self.__prep_doc,
             self.nlp.pipe,
-            lambda docs: [self.__normalize_and_link(doc, entity_types) for doc in docs],
+            lambda docs: [
+                self.__normalize_and_link(doc, entity_types) for doc in docs
+            ],  # TODO: linking would be faster if done in batch
         ]
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
