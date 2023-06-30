@@ -93,6 +93,11 @@ import importlib
 importlib.reload(common.ner.ner)
 ```
 
+#### Redis
+- `FLUSHALL`
+- `keys *`
+- `HGETALL "term:PD-1 inhibitors"`
+
 #### Other
 ```
 ns = dict_to_named_tuple({
