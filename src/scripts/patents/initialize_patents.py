@@ -2,6 +2,8 @@
 Functions to initialize the patents database
 """
 import logging
+from google.cloud import bigquery
+
 
 from system import initialize
 
@@ -122,6 +124,24 @@ def __create_annotations_table():
     query_to_bg_table(entity_query, table_id)
 
 
+def __create_biosym_annotations_table():
+    client = bigquery.Client()
+    table_id = f"{BQ_DATASET_ID}.biosym_annotations"
+    new_table = bigquery.Table(table_id)
+    new_table.schema = [
+        bigquery.SchemaField("publication_number", "STRING"),
+        bigquery.SchemaField("canonical_term", "STRING"),
+        bigquery.SchemaField("canonical_id", "STRING"),
+        bigquery.SchemaField("original_term", "STRING"),
+        bigquery.SchemaField("domain", "STRING"),
+        bigquery.SchemaField("confidence", "FLOAT"),
+        bigquery.SchemaField("source", "STRING"),
+        bigquery.SchemaField("character_offset_start", "INTEGER"),
+    ]
+    new_table = client.create_table(new_table, exists_ok=True)
+    logging.info(f"Created table {table_id}")
+
+
 def main():
     """
     Copy tables from patents-public-data to a local dataset.
@@ -132,6 +152,7 @@ def main():
     Usage:
         >>> python3 -m scripts.patents.initialize_patents
     """
+    __create_biosym_annotations_table()
     # copy gpr_publications, publications, gpr_annotations tables
     # copy_patent_tables()
 
@@ -139,8 +160,8 @@ def main():
     # create_patent_terms()
 
     # create the (small) tables against which the app will query
-    __create_applications_table()
-    __create_annotations_table()
+    # __create_applications_table()
+    # __create_annotations_table()
 
 
 if __name__ == "__main__":

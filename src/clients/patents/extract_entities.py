@@ -110,10 +110,11 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.lit(0).alias("ocid"),
                     pl.col("entities")
-                    .apply(lambda e: e[0])
-                    .alias("term"),  # preferred name?
+                    .apply(lambda e: e[2].name)
+                    .alias("canonical_term"),
+                    pl.col("entities").apply(lambda e: e[2].id).alias("canonical_id"),
+                    pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
                     pl.lit("title+abstract").alias("source"),
@@ -163,11 +164,12 @@ class PatentEnricher:
         upsert_into_bg_table(
             df,
             "biosym_annotations",
-            id_fields=[ID_FIELD, "term", "domain"],
+            id_fields=[ID_FIELD, "original_term", "domain", "canonical_id"],
             insert_fields=[
                 ID_FIELD,
-                "ocid",
-                "term",
+                "canonical_term",
+                "canonical_id",
+                "original_term",
                 "domain",
                 "confidence",
                 "source",

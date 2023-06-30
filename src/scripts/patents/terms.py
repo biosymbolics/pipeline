@@ -110,7 +110,7 @@ def __get_terms():
             entry = normalization_map.get(row["term"])
             if not entry:
                 return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
-            return entry.canonical_name
+            return entry.name
 
         terms: list[TermRecord] = [
             {

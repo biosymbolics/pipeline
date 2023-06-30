@@ -91,7 +91,7 @@ class TermLinker:
             syn_doc = self.synonym_store.add_synonym(
                 name,
                 canonical_id,
-                {"canonical_name": canonical.canonical_name if canonical else None},
+                {"canonical_name": canonical.name if canonical else None},
             )
             return canonical or CanonicalEntity(
                 syn_doc["canonical_id"],

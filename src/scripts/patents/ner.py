@@ -11,9 +11,7 @@ from clients.patents.extract_entities import PatentEnricher
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print(
-            "Usage: python3 ner.py\nLoads NER data for patents and saves it to a temporary location"
-        )
+        print("Usage: python3 ner.py\nLoads NER data for patents")
         sys.exit()
     enricher = PatentEnricher()
-    enricher(["asthma", "schizophrenia", "pulmonary hypertension", "bipolar disorder"])
+    enricher(["schizophrenia", "pulmonary hypertension", "bipolar disorder"])

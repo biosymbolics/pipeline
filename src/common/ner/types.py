@@ -15,7 +15,6 @@ from typing import (
 )
 from spacy.language import Language
 from spacy.pipeline import Pipe
-from spacy.tokens import Token
 from spacy.tokenizer import Tokenizer
 
 
@@ -24,7 +23,7 @@ NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group":
 
 class CanonicalEntity(NamedTuple):
     id: str
-    canonical_name: str
+    name: str
     aliases: Optional[List[str]] = []
 
 
