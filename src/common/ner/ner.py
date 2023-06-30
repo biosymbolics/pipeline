@@ -159,9 +159,8 @@ class NerTagger:
     def extract(
         self,
         content: list[str],
-        flatten_results: bool = True,
         entity_types: Optional[list[str]] = None,
-    ) -> Union[list[str], list[LinkedDocEntities]]:
+    ) -> list[LinkedDocEntities]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -170,9 +169,6 @@ class NerTagger:
 
         Args:
             content (list[str]): list of content on which to do NER
-            flatten_results (bool, optional): flatten results.
-                Defaults to True and result is returned as list[str].
-                Otherwise, returns list[list[tuple[str, str]]] (entity and its type/label per doc).
             entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
@@ -191,19 +187,14 @@ class NerTagger:
         steps = [
             self.__prep_doc,
             self.nlp.pipe,
-            lambda docs: [
-                self.__normalize_and_link(doc, entity_types) for doc in docs
-            ],  # TODO: linking would be faster if done in batch
+            # TODO: linking would be faster if done in batch
+            lambda docs: [self.__normalize_and_link(doc, entity_types) for doc in docs],
         ]
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
         logging.info("Entities: %s", ents_by_doc)
 
-        # return just the names if flatten_results is True
-        if flatten_results:
-            return [e[0] for e in flatten(ents_by_doc)]
-
-        return ents_by_doc
+        return ents_by_doc  # type: ignore
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         if self.nlp:

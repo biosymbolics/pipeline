@@ -102,12 +102,12 @@ def create_from_docs(
     for key, docs in doc_map.items():
         entities = tagger.extract(
             docs,
-            flatten_results=True,
             entity_types=["mechanisms", "compounds", "classes"],
         )
+        flattend_entities = [ent[0] for ent in entities]
         ns_key = get_namespace_key(key)
         create_entity_indices(
-            entities=cast(list[str], entities),
+            entities=cast(list[str], flattend_entities),
             namespace_key=ns_key,
             documents=docs,
         )

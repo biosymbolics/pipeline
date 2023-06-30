@@ -110,10 +110,8 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.col("entities")
-                    .apply(lambda e: e[2].name)
-                    .alias("canonical_term"),
-                    pl.col("entities").apply(lambda e: e[2].id).alias("canonical_id"),
+                    pl.col("entities").apply(lambda e: e[4]).alias("canonical_term"),
+                    pl.col("entities").apply(lambda e: e[3]).alias("canonical_id"),
                     pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
@@ -145,10 +143,16 @@ class PatentEnricher:
         patent_docs = self.__format_patent_docs(unprocessed)
 
         # extract entities
-        entities = self.tagger.extract(patent_docs, flatten_results=False)
+        entities = self.tagger.extract(patent_docs)
 
         # add back to orig df
-        enriched = unprocessed.with_columns(pl.Series("entities", entities))
+        flatish_ents = [
+            (ent[0], ent[1], ent[2].id, ent[2].name)
+            for ent_set in entities
+            for ent in ent_set
+            if ent[2] is not None
+        ]
+        enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
         return __flatten(enriched)
 
