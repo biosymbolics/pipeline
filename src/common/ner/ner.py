@@ -22,11 +22,11 @@ from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .types import GetTokenizer, LinkedEntity, SpacyPatterns
+from .types import GetTokenizer, CanonicalEntity, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
 DocEntities = list[tuple[str, str]]
-LinkedDocEntities = list[tuple[str, str, Optional[LinkedEntity]]]
+LinkedDocEntities = list[tuple[str, str, Optional[CanonicalEntity]]]
 ContentType = Literal["text", "html"]
 CHUNK_SIZE = 10000
 
@@ -47,7 +47,6 @@ class NerTagger:
     def __init__(
         self,
         use_llm: Optional[bool] = True,
-        # alt models: en_core_sci_scibert, en_ner_bionlp13cg_md, en_ner_bc5cdr_md
         model: Optional[str] = "en_core_sci_lg",
         rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
@@ -119,22 +118,25 @@ class NerTagger:
             entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
         """
         entity_set = [(span.text, span.label_) for span in doc.ents]
-        entity_names = [tup[0] for tup in entity_set]
-        linked_entity_map = dict(self.linker(entity_names))
 
         # basic filtering, character removal, lemmatization
         sanitized = sanitize_entities(entity_set)
+        linked_entity_map = dict(self.linker([tup[0] for tup in sanitized]))
+        logging.info("linked_entity_map %s", linked_entity_map)
 
         # canonicalization, synonymization
-        normalized: LinkedDocEntities = [
-            (e[0], e[1], linked_entity_map[e[0]]) for e in sanitized
-        ]
+        normalized = [(e[0], e[1], linked_entity_map.get(e[0])) for e in sanitized]
+
+        # filter by entity types, if provided
         if entity_types:
             return [e for e in normalized if e[1] in entity_types]
 
         return normalized
 
     def __prep_doc(self, content: list[str]) -> list[str]:
+        """
+        Prepares a list of content for NER
+        """
         _content = content.copy()
 
         # if use_llm, no tokenization
@@ -170,28 +172,28 @@ class NerTagger:
             entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
-            >>> tagger.extract("SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE")
-            >>> tagger.extract("Interferon alpha and omega antibody antagonists")
-            >>> tagger.extract("Inhibitors of beta secretase")
+            >>> tagger.extract(["SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE"])
+            >>> tagger.extract(["Interferon alpha and omega antibody antagonists"])
+            >>> tagger.extract(["Inhibitors of beta secretase"])
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")
 
-        logging.info("Starting NER pipeline with %s docs", len(content))
-
         if not isinstance(content, list):
             raise Exception("Content must be a list")
+
+        logging.info("Starting NER pipeline with %s docs", len(content))
 
         steps = [
             self.__prep_doc,
             self.nlp.pipe,
-            partial(self.__normalize_and_link, entity_types=entity_types),
+            lambda docs: [self.__normalize_and_link(doc, entity_types) for doc in docs],
         ]
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
         logging.info("Entities: %s", ents_by_doc)
 
-        # return just the names (legacy?)
+        # return just the names if flatten_results is True
         if flatten_results:
             return [e[0] for e in flatten(ents_by_doc)]
 

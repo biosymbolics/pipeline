@@ -22,13 +22,13 @@ from spacy.tokenizer import Tokenizer
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
 
-class LinkedEntity(NamedTuple):
+class CanonicalEntity(NamedTuple):
     id: str
     canonical_name: str
     aliases: Optional[List[str]] = []
 
 
-class SpacyLinkedEntity(NamedTuple):
+class SpacyCanonicalEntity(NamedTuple):
     concept_id: str
     canonical_name: str
     aliases: List[str]
@@ -37,7 +37,7 @@ class SpacyLinkedEntity(NamedTuple):
 
 
 class KbLinker(NamedTuple):
-    cui_to_entity: dict[str, SpacyLinkedEntity]
+    cui_to_entity: dict[str, SpacyCanonicalEntity]
 
 
 class SciSpacyLinker(NamedTuple):

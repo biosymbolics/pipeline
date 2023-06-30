@@ -12,12 +12,12 @@ from scispacy.candidate_generation import (
 from common.ner.synonyms import SynonymStore
 
 
-from .types import KbLinker, LinkedEntity
+from .types import KbLinker, CanonicalEntity
 
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
 
-LinkedEntityMap = dict[str, LinkedEntity]
+LinkedEntityMap = dict[str, CanonicalEntity]
 
 
 class TermLinker:
@@ -43,7 +43,7 @@ class TermLinker:
 
     def __get_canonical_entity(
         self, candidates: list[MentionCandidate]
-    ) -> Union[LinkedEntity, None]:
+    ) -> Union[CanonicalEntity, None]:
         """
         Get canonical candidate if suggestions exceed min similarity
 
@@ -52,7 +52,7 @@ class TermLinker:
         """
         if len(candidates) > 0 and candidates[0].similarities[0] > MIN_SIMILARITY:
             entity = self.kb.cui_to_entity[candidates[0].concept_id]
-            linked_entity = LinkedEntity(
+            linked_entity = CanonicalEntity(
                 entity.concept_id,
                 entity.canonical_name,
                 entity.aliases,
@@ -69,28 +69,37 @@ class TermLinker:
             terms (list[str]): list of terms to normalize
 
         Returns:
-            NormalizationMap: mapping of terms to canonical entities
+            LinkedEntityMap: mapping of terms to canonical entities
         """
         candidates = self.candidate_generator(terms, 1)
         canonical_entities = [self.__get_canonical_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
         return {key: value for key, value in entity_map.items() if value is not None}
 
-    def link(self, terms: list[str]) -> list[tuple[str, LinkedEntity]]:
+    def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         """
         Link term to canonical entity or synonym
+
+        Args:
+            terms (list[str]): list of terms to normalize
         """
         canonical_map = self.generate_map(terms)
 
-        def link_entity(name: str) -> LinkedEntity:
+        def link_entity(name: str) -> CanonicalEntity:
             canonical = canonical_map.get(name)
-            canonical_id = canonical.canonical_name if canonical else None
-            syn_doc = self.synonym_store.add_synonym(name, canonical_id)
-            return canonical or LinkedEntity(
-                **{"id": syn_doc["canonical_id"], "canonical_name": "", "aliases": []}
+            canonical_id = canonical.id if canonical else None
+            syn_doc = self.synonym_store.add_synonym(
+                name,
+                canonical_id,
+                {"canonical_name": canonical.canonical_name if canonical else None},
+            )
+            return canonical or CanonicalEntity(
+                syn_doc["canonical_id"],
+                syn_doc["metadata"].get("canonical_name") or "",
+                [],
             )
 
         return [(term, link_entity(term)) for term in terms]
 
-    def __call__(self, terms: list[str]) -> list[tuple[str, LinkedEntity]]:
+    def __call__(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         return self.link(terms)
