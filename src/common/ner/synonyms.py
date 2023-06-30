@@ -102,6 +102,9 @@ class SynonymStore:
 
         Args:
             term (str): The term to prepare
+
+        Example:
+            "PD1 inhibitors" ->  "@term:%PD1% %%%inhibitors%%%"
         """
 
         def __prep_subterm(subterm: str):
@@ -111,19 +114,20 @@ class SynonymStore:
         subterms = [__prep_subterm(subterm) for subterm in term.split(" ")]
 
         query = self.__escape(" ".join(subterms))
-        return query
+        return "@term:" + query
 
     def __get_tmp_canonical_id(self) -> str:
         return "temp-" + str(uuid.uuid4())
 
-    def add_new_synonym(
+    def __upsert_synonym(
         self,
         term: str,
         canonical_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ):
         """
-        Add a new synonym to the store
+        Upsert a synonym (add if new, otherwise update)
+        The public interface is "add_synonym", which maps to an existing record if sufficiently similar.
 
         Args:
             term (str): The synonym to add
@@ -144,8 +148,8 @@ class SynonymStore:
         self,
         term: str,
         canonical_id: Optional[str] = None,
-        distance: int = 5,
         metadata: Optional[dict[str, Any]] = None,
+        distance: int = 5,
     ):
         """
         Add a synonym to the store and map it to the most similar term
@@ -159,13 +163,13 @@ class SynonymStore:
         if len(docs) > 0:
             most_similar_term = docs[0].term
             canonical_id = docs[0].canonical_id
-            self.add_new_synonym(term, canonical_id, metadata)
+            self.__upsert_synonym(term, canonical_id, metadata)
             logger.info(
                 "Added %s as synonym of %s (%s)", term, most_similar_term, canonical_id
             )
         else:
             _canonical_id = canonical_id or self.__get_tmp_canonical_id()
-            self.add_new_synonym(term, _canonical_id, metadata=metadata)
+            self.__upsert_synonym(term, _canonical_id, metadata=metadata)
             logger.info("Added %s as new synonym (%s)", term, _canonical_id)
 
     def get_synonym(self, term: str) -> Optional[SynonymDocument]:
@@ -214,8 +218,7 @@ class SynonymStore:
         for synonym in synonyms:
             syn_doc = self.get_synonym(synonym)
             if syn_doc is not None:
-                # TODO: remove existing doc?
-                self.add_new_synonym(
+                self.__upsert_synonym(
                     syn_doc["term"], new_canonical_id, syn_doc["metadata"]
                 )
                 logger.info("Remapped %s to %s", syn_doc["term"], new_canonical_id)

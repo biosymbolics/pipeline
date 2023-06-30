@@ -10,12 +10,12 @@ class TestSynonymStore(unittest.TestCase):
         self.mock_client = mock_client
         self.synonym_store = SynonymStore("test_index")
 
-    def test_add_new_synonym(self):
+    def test_add_synonym(self):
         term = "test_term"
         canonical_id = "test_id"
         metadata = {"meta1": "value1"}
 
-        self.synonym_store.add_new_synonym(term, canonical_id, metadata)
+        self.synonym_store.add_synonym(term, canonical_id, metadata)
         self.synonym_store.client.redis.hset.assert_called_once()
 
         args, kwargs = self.synonym_store.client.redis.hset.call_args
