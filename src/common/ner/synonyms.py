@@ -1,9 +1,11 @@
 """
 SynonymStore is a wrapper around redisearch to store synonyms and their metadata.
 """
+from functools import reduce
 import json
 import logging
 import os
+import re
 from typing import Any, Mapping, Optional, TypedDict
 import uuid
 from redis.exceptions import ResponseError  # type: ignore
@@ -91,7 +93,14 @@ class SynonymStore:
         Escape a term for RedisSearch
         TODO: more characters to escape?
         """
-        return term.replace("-", "\\-")
+        replacements = {
+            "^-": "",
+            "-": "\\-",
+        }
+        clean_term = reduce(
+            lambda t, kv: re.sub(kv[0], kv[1], t), replacements.items(), term
+        )
+        return clean_term
 
     def __prepare_query(self, term: str) -> str:
         """

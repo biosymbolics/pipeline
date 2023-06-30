@@ -147,10 +147,12 @@ class PatentEnricher:
 
         # add back to orig df
         flatish_ents = [
-            (ent[0], ent[1], ent[2].id, ent[2].name)
+            [
+                (ent[0], ent[1], ent[2].id, ent[2].name)
+                for ent in ent_set
+                if ent[2] is not None
+            ]
             for ent_set in entities
-            for ent in ent_set
-            if ent[2] is not None
         ]
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
