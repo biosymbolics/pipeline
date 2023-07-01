@@ -65,6 +65,14 @@ class TestNerUtils(unittest.TestCase):
                 "input": "/OPSUMIT ®",
                 "expected": "OPSUMIT",
             },
+            {
+                "input": "5-ht1a inhibitors",
+                "expected": "5-ht1a inhibitor",
+            },
+            {
+                "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
+                "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
+            },
         ]
 
         for condition in test_conditions:
