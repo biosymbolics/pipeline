@@ -2,6 +2,7 @@ altair
 beautifulsoup4
 bertopic
 bokeh
+dotenv
 html2text
 jsonschema
 langchain
