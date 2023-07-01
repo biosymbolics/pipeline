@@ -110,8 +110,8 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.col("entities").apply(lambda e: e[4]).alias("canonical_term"),
-                    pl.col("entities").apply(lambda e: e[3]).alias("canonical_id"),
+                    pl.col("entities").apply(lambda e: e[3]).alias("canonical_term"),
+                    pl.col("entities").apply(lambda e: e[2]).alias("canonical_id"),
                     pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
@@ -181,7 +181,7 @@ class PatentEnricher:
                 "source",
                 "character_offset_start",
             ],
-            on_conflict="DO NOTHING",
+            on_conflict="UPDATE SET target.domain = source.domain",  # NOOP
         )
 
     def extract(self, terms: list[str]) -> None:

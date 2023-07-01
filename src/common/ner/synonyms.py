@@ -95,7 +95,13 @@ class SynonymStore:
         """
         replacements = {
             "^-": "",
+            "-$": "",
             "-": "\\-",
+            r"\(": "",
+            r"\)": "",
+            r"\[": "",
+            r"\]": "",
+            ",": "",
         }
         clean_term = reduce(
             lambda t, kv: re.sub(kv[0], kv[1], t), replacements.items(), term
@@ -149,8 +155,12 @@ class SynonymStore:
             "canonical_id": canonical_id or "",
             "metadata": metadata or {},
         }
-        self.client.redis.hset(doc_id, mapping=self.__serialize(doc))  # type: ignore
-        return doc
+        try:
+            self.client.redis.hset(doc_id, mapping=self.__serialize(doc))  # type: ignore
+            return doc
+        except Exception as e:
+            logger.error("Error upserting synonym %s but returning doc anyway", e)
+            return doc
 
     def add_synonym(
         self,
@@ -169,6 +179,7 @@ class SynonymStore:
             distance (int): the maximum edit distance to search for
         """
         docs = self.search_for_synonyms(term, distance)
+
         if len(docs) > 0:
             most_similar_term = docs[0].term
             new_canonical_id = docs[0].canonical_id
@@ -218,11 +229,15 @@ class SynonymStore:
             distance (int): the maximum edit distance to search for
         """
         query = self.__prepare_query(term)
-        logger.info("Query for synonym: %s", query)
+        logger.debug("Query for synonym: %s", query)
 
-        q = Query(query).with_scores().paging(0, distance)
-        result = self.client.search(q)
-        return result.docs
+        try:
+            q = Query(query).with_scores().paging(0, distance)
+            result = self.client.search(q)
+            return result.docs
+        except Exception as e:
+            logger.error("Error searching for synonym %s: %s", term, e)
+            return []
 
     def remap_synonyms(self, new_canonical_id: str, synonyms: list[str]):
         """

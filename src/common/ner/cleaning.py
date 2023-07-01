@@ -133,7 +133,13 @@ def normalize_entity_names(
     docs = nlp.pipe(texts)
 
     def lemmatize(doc):
-        return " ".join([token.lemma_ for token in doc])
+        """
+        Lemmatize and join with " " if separated by whitespace, "" otherwise
+        """
+        lemmatized_text = "".join(
+            [token.lemma_ + (" " if token.whitespace_ else "") for token in doc]
+        ).strip()
+        return lemmatized_text
 
     def remove_chars(entity_name: str) -> str:
         for pattern, replacement in char_suppressions.items():
