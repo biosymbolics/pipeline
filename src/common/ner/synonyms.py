@@ -197,7 +197,6 @@ class SynonymStore:
             most_similar_term = docs[0]["term"]
             new_canonical_id = docs[0]["canonical_id"]
             new_metadata = docs[0]["metadata"] or {"canonical_name": most_similar_term}
-            logging.info("TERM/doc info: %s", docs[0])
         else:
             new_canonical_id = canonical_id or self.__get_tmp_canonical_id()
             new_metadata = metadata or {}
