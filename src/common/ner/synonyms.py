@@ -8,6 +8,7 @@ import os
 import re
 from typing import Any, Mapping, Optional, TypedDict
 import uuid
+import Levenshtein
 from redis.exceptions import ResponseError  # type: ignore
 import redisearch
 from redisearch import TextField, IndexDefinition, Query
@@ -191,8 +192,13 @@ class SynonymStore:
             metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
             distance (int): the maximum edit distance to search for
         """
+
+        def is_similar(doc: SynonymDocument) -> bool:
+            return Levenshtein.distance(doc["term"], term) < distance
+
         # only get docs if no canonical_id
         docs = self.search_for_synonyms(term, distance) if not canonical_id else []
+        docs = [doc for doc in docs if is_similar(doc)]
 
         if not canonical_id and len(docs) > 0:
             most_similar_term = docs[0]["term"]
