@@ -107,6 +107,7 @@ class PatentEnricher:
             """
             flattened_df = (
                 df.explode("entities")
+                .filter(pl.col("canonical_id").is_not_null())
                 .lazy()
                 .select(
                     pl.col("publication_number"),

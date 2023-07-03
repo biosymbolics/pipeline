@@ -113,6 +113,7 @@ def __get_terms():
                 -- biosym annotations
                 SELECT canonical_term as term, canonical_id as original_id, domain
                 FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
+                where canonical_term is not null
             ) AS all_annotations
             group by term, original_id, domain
         """
