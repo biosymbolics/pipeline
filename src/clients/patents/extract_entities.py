@@ -144,6 +144,9 @@ class PatentEnricher:
 
         # extract entities
         entities = self.tagger.extract(patent_docs)
+        if len([ent for ent in entities if len(ent) > 0]) == 0:
+            logging.info("No entities found")
+            return None
 
         # add back to orig df
         flatish_ents = [

@@ -14,4 +14,13 @@ if __name__ == "__main__":
         print("Usage: python3 ner.py\nLoads NER data for patents")
         sys.exit()
     enricher = PatentEnricher()
-    enricher(["schizophrenia", "pulmonary hypertension", "bipolar disorder"])
+    # "schizophrenia", "pulmonary hypertension", "bipolar disorder"
+    enricher(
+        [
+            "depression",
+            "major depressive disorder",
+            "asthma",
+            "melanoma",
+            "alzheimer's disease",
+        ]
+    )

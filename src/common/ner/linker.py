@@ -86,13 +86,18 @@ class TermLinker:
         canonical_map = self.generate_map(terms)
 
         def link_entity(name: str) -> CanonicalEntity:
+            # get canonical entity if exists
             canonical = canonical_map.get(name)
             canonical_id = canonical.id if canonical else None
+
+            # create synonym regardless
             syn_doc = self.synonym_store.add_synonym(
                 name,
                 canonical_id,
                 {"canonical_name": canonical.name if canonical else None},
             )
+
+            # return canonical, otherwise pseudo-canonical from synonym
             return canonical or CanonicalEntity(
                 syn_doc["canonical_id"],
                 syn_doc["metadata"].get("canonical_name") or "",

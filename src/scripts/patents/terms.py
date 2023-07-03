@@ -17,7 +17,7 @@ from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
 
-from ._constants import SYNONYM_MAP
+from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
 
 MIN_ASSIGNEE_COUNT = 10
 
@@ -40,7 +40,11 @@ class AggregatedTermRecord(BaseTermRecord):
 
 def __get_terms():
     """
-    Creates all terms for the terms table
+    Collects all terms for the terms table
+    From
+    - gpr_annotations
+    - biosym_annotations
+    - publications (assignee_harmonized)
     """
 
     def __aggregate_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
@@ -97,9 +101,20 @@ def __get_terms():
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-            SELECT preferred_name as term, ocid as original_id, domain, count(*) as count
-            FROM `{BQ_DATASET_ID}.gpr_annotations`
-            group by preferred_name, original_id, domain
+            SELECT term, original_id, domain, COUNT(*) as count
+            FROM
+            (
+                -- gpr annotations
+                SELECT preferred_name as term, CAST(ocid as STRING) as original_id, domain
+                FROM `{BQ_DATASET_ID}.gpr_annotations`
+
+                UNION ALL
+
+                -- biosym annotations
+                SELECT canonical_term as term, canonical_id as original_id, domain
+                FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
+            ) AS all_annotations
+            group by term, original_id, domain
         """
         rows = select_from_bg(terms_query)
 
@@ -161,6 +176,7 @@ def __create_terms():
     client.delete_table(table_id, not_found_ok=True)
     new_table = client.create_table(new_table)
 
+    # grab terms from annotation tables
     terms = __get_terms()
 
     batched = batch(terms)
@@ -194,7 +210,7 @@ def __create_synonym_map(synonym_map: dict[str, str]):
     client.delete_table(table_id, not_found_ok=True)
     table = client.create_table(table)
 
-    logging.info("Adding default synonym map entries")
+    logging.info("Adding default/hard-coded synonym map entries")
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
@@ -226,6 +242,8 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
 def create_patent_terms():
     """
     Create the terms and synonym map tables
+
+    Idempotent (all tables are dropped and recreated)
     """
     __create_synonym_map(SYNONYM_MAP)
     __create_terms()
