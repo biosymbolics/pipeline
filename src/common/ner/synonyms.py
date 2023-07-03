@@ -112,6 +112,7 @@ class SynonymStore:
             r"\[": "",
             r"\]": "",
             ",": "",
+            r"\.": "\\.",
         }
         clean_term = reduce(
             lambda t, kv: re.sub(kv[0], kv[1], t), replacements.items(), term
