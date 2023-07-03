@@ -144,6 +144,7 @@ class PatentEnricher:
         patent_docs = self.__format_patent_docs(unprocessed)
 
         # extract entities
+        # normalization/linking is hypothetically unnecessary; will be handled by initialize_patents.
         entities = self.tagger.extract(patent_docs)
         if len([ent for ent in entities if len(ent) > 0]) == 0:
             logging.info("No entities found")

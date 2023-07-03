@@ -175,6 +175,8 @@ class NerTagger:
             >>> tagger.extract(["SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE"])
             >>> tagger.extract(["Interferon alpha and omega antibody antagonists"])
             >>> tagger.extract(["Inhibitors of beta secretase"])
+
+        TODO: ability to run without normalization
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")

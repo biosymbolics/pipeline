@@ -12,7 +12,7 @@ from redis.exceptions import ResponseError  # type: ignore
 import redisearch
 from redisearch import TextField, IndexDefinition, Query
 
-from common.utils.string import get_id
+from common.utils.string import byte_dict_to_string_dict, get_id
 
 RedisHashSet = Mapping[bytes, bytes]
 
@@ -68,12 +68,22 @@ class SynonymStore:
         Args:
             hashset (RedisHashSet): The Redis hashset to deserialize
         """
-        syn_doc: SynonymDocument = {
-            "term": (hashset.get(b"term") or b"").decode("utf-8"),
-            "canonical_id": (hashset.get(b"canonical_id") or b"").decode(),
-            "metadata": json.loads(hashset.get(b"metadata") or "{}"),
-        }
-        return syn_doc
+        try:
+            string_hs = byte_dict_to_string_dict(hashset)
+            syn_doc: SynonymDocument = {
+                "term": string_hs.get("term") or "",
+                "canonical_id": string_hs.get("canonical_id") or "",
+                "metadata": json.loads(string_hs.get("metadata") or "{}"),
+            }
+            return syn_doc
+        except Exception as e:
+            logger.error(
+                "Failed to deserialize hashset %s (%s), %s",
+                hashset,
+                str(type(hashset)),
+                e,
+            )
+            raise
 
     def __serialize(self, doc: SynonymDocument) -> RedisHashSet:
         """
@@ -172,32 +182,41 @@ class SynonymStore:
         """
         Add a synonym to the store and map it to the most similar term
 
+        If canonical_id is provided, no mapping; the synonym is just added as a new record.
+
         Args:
             term (str): the synonym to add
             canonical_id (str, optional): the canonical id of the synonym. Defaults to None.
             metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
             distance (int): the maximum edit distance to search for
         """
-        docs = self.search_for_synonyms(term, distance)
+        # only get docs if no canonical_id
+        docs = self.search_for_synonyms(term, distance) if not canonical_id else []
 
-        if len(docs) > 0:
-            most_similar_term = docs[0].term
-            new_canonical_id = docs[0].canonical_id
-            if new_canonical_id != canonical_id:
-                logger.warning(
-                    "Term %s already exists with canonical id %s, but %s was provided",
-                    term,
-                    new_canonical_id,
-                    canonical_id,
-                )
+        if not canonical_id and len(docs) > 0:
+            most_similar_term = docs[0]["term"]
+            new_canonical_id = docs[0]["canonical_id"]
+            new_metadata = docs[0]["metadata"] or {"canonical_name": most_similar_term}
+            logging.info("TERM/doc info: %s", docs[0])
         else:
-            most_similar_term = "n/a"
             new_canonical_id = canonical_id or self.__get_tmp_canonical_id()
+            new_metadata = metadata or {}
 
         logger.info(
-            "Added %s as synonym of %s (%s)", term, most_similar_term, new_canonical_id
+            "Added %s as synonym of %s (%s)", term, new_canonical_id, new_metadata
         )
-        upserted = self.__upsert_synonym(term, new_canonical_id, metadata)
+
+        if not new_canonical_id or len(new_canonical_id.strip()) < 2:
+            logging.error(
+                "Canonical ID must be at least 2 characters long: %s, %s, %s",
+                new_canonical_id,
+                canonical_id,
+                len(docs),
+            )
+            raise Exception("Canonical ID must be at least 2 characters long")
+
+        upserted = self.__upsert_synonym(term, new_canonical_id, new_metadata)
+
         return upserted
 
     def get_synonym(self, term: str) -> Optional[SynonymDocument]:
@@ -220,7 +239,9 @@ class SynonymStore:
 
         return self.__deserialize(doc)
 
-    def search_for_synonyms(self, term: str, distance: int = 10):
+    def search_for_synonyms(
+        self, term: str, distance: int = 10
+    ) -> list[SynonymDocument]:
         """
         Search for a synonym in the store.
 
@@ -234,7 +255,8 @@ class SynonymStore:
         try:
             q = Query(query).with_scores().paging(0, distance)
             result = self.client.search(q)
-            return result.docs
+            hashsets = [self.client.redis.hgetall(doc.id) for doc in result.docs]
+            return [self.__deserialize(hset) for hset in hashsets]
         except Exception as e:
             logger.error("Error searching for synonym %s: %s", term, e)
             return []
@@ -267,6 +289,6 @@ class SynonymStore:
             new_canonical_id (str): the new canonical id to map to
         """
         results = self.search_for_synonyms(term, distance)
-        terms: list[str] = [doc.term for doc in results]
+        terms: list[str] = [doc["term"] for doc in results]
         self.remap_synonyms(new_canonical_id, [term, *terms])
         logger.info("Remapped %s to %s", terms, new_canonical_id)

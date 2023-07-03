@@ -100,7 +100,7 @@ class TermLinker:
             # return canonical, otherwise pseudo-canonical from synonym
             return canonical or CanonicalEntity(
                 syn_doc["canonical_id"],
-                syn_doc["metadata"].get("canonical_name") or "",
+                syn_doc.get("metadata", {}).get("canonical_name") or "",
                 [],
             )
 

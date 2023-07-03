@@ -4,7 +4,7 @@ String utilities
 
 
 import re
-from typing import Union
+from typing import Mapping, TypeGuard, Union
 
 
 def get_id(string: Union[str, list[str]]) -> str:
@@ -61,3 +61,48 @@ def chunk_list(content_list: list[str], chunk_size: int) -> list[list[str]]:
         chunk_size (int): chunk size
     """
     return [chunk_text(content, chunk_size) for content in content_list]
+
+
+def is_bytes_dict(maybe_byte_dict) -> TypeGuard[dict[bytes, bytes]]:
+    """
+    Checks if a dictionary is a dictionary of bytes
+    """
+    return isinstance(maybe_byte_dict, dict) and all(
+        isinstance(key, bytes) and isinstance(value, bytes)
+        for key, value in maybe_byte_dict.items()
+    )
+
+
+def is_strings_dict(maybe_strings_dict) -> TypeGuard[dict[str, str]]:
+    """
+    Checks if a dictionary is a dictionary of strings
+    """
+    return isinstance(maybe_strings_dict, dict) and all(
+        isinstance(key, str) and isinstance(value, str)
+        for key, value in maybe_strings_dict.items()
+    )
+
+
+def byte_dict_to_string_dict(
+    maybe_byte_dict: Union[Mapping[bytes, bytes], Mapping[str, str]]
+) -> Mapping[str, str]:
+    """
+    Converts a dictionary of bytes to a dictionary of strings
+
+    Args:
+        maybe_byte_dict (dict[bytes, bytes]): dictionary of bytes or strings
+    """
+    if is_bytes_dict(maybe_byte_dict):
+        return dict(
+            map(
+                lambda item: (item[0].decode(), item[1].decode()),
+                maybe_byte_dict.items(),
+            )
+        )
+
+    if is_strings_dict(maybe_byte_dict):
+        return maybe_byte_dict
+
+    raise ValueError(
+        f"Expected a dictionary of bytes or strings, got {type(maybe_byte_dict)}"
+    )

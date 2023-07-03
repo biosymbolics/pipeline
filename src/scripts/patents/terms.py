@@ -107,13 +107,14 @@ def __get_terms():
                 -- gpr annotations
                 SELECT preferred_name as term, CAST(ocid as STRING) as original_id, domain
                 FROM `{BQ_DATASET_ID}.gpr_annotations`
+                where length(preferred_name) > 1
 
                 UNION ALL
 
                 -- biosym annotations
                 SELECT canonical_term as term, canonical_id as original_id, domain
                 FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
-                where canonical_term is not null
+                where length(canonical_term) > 1
             ) AS all_annotations
             group by term, original_id, domain
         """
