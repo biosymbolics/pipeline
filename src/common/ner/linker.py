@@ -1,6 +1,7 @@
 """
 Term Normalizer
 """
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from typing import Union
 from scispacy.candidate_generation import (
@@ -48,7 +49,7 @@ class TermLinker:
         Get canonical candidate if suggestions exceed min similarity
 
         Args:
-            candidate (MentionCandidate): candidate
+            candidates (list[MentionCandidate]): candidates
         """
         if len(candidates) > 0 and candidates[0].similarities[0] > MIN_SIMILARITY:
             entity = self.kb.cui_to_entity[candidates[0].concept_id]
@@ -104,7 +105,11 @@ class TermLinker:
                 [],
             )
 
-        return [(term, link_entity(term)) for term in terms]
+        # TODO: make sure this works as expected
+        with ThreadPoolExecutor() as executor:
+            linked_entities = list(executor.map(link_entity, terms))
+
+        return list(zip(terms, linked_entities))
 
     def __call__(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         return self.link(terms)

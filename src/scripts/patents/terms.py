@@ -178,7 +178,7 @@ def __create_terms():
     client.delete_table(table_id, not_found_ok=True)
     new_table = client.create_table(new_table)
 
-    # grab terms from annotation tables
+    # grab terms from annotation tables (slow!!)
     terms = __get_terms()
 
     batched = batch(terms)
