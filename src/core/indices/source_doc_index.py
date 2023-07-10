@@ -14,7 +14,7 @@ from clients.llama_index import (
 )
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
-from clients.vector_dbs import pinecone
+from clients.stores import pinecone
 from common.utils.namespace import get_namespace_id
 from typings.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
@@ -30,7 +30,10 @@ class SourceDocIndex:
 
     def __init__(
         self,
-        context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+        context_args: ContextArgs = ContextArgs(
+            DEFAULT_CONTEXT_ARGS.model_name,
+            {**DEFAULT_CONTEXT_ARGS.storage_args, "storage_type": "mongodb"},
+        ),
         index_impl: Type[LlmIndex] = NerKeywordTableIndex,
     ):
         """

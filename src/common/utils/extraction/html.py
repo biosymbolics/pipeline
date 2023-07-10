@@ -1,9 +1,18 @@
 """
 HTML extraction utilities
 """
+import logging
 from bs4 import BeautifulSoup
 
-DEFAULT_REMOVE_TAGS: list[str] = ["script", "style", "hr", "br"]
+DEFAULT_REMOVE_TAGS: list[str] = [
+    "head",
+    "script",
+    "style",
+    "hr",
+    "br",
+    "noscript",
+    "template",
+]
 MAX_RECURSION_DEPTH = 100
 
 
@@ -54,13 +63,14 @@ class ContentExtractor:
         Convert an element to text
         """
         if depth > MAX_RECURSION_DEPTH:
-            return ""  # Return an empty string when recursion depth limit is reached
+            logging.warning("Exceeded max recursion depth, returning empty string")
+            return ""
 
         if node.name == "table":
             text = self.__table_to_text(node)
         elif node.name == "tr":
             text = self.__row_to_text(node)
-        elif node.name == "div":
+        elif node.name in ["div", "body", "html", "section", "iframe"]:
             children = [
                 child
                 for child in node.children
@@ -98,8 +108,9 @@ class ContentExtractor:
             for element in soup.find_all(removed_tag):
                 element.decompose()
 
-        top_level_nodes = soup.select("body > *")
+        top_level_nodes = soup.find_all(recursive=False)
         html_texts = [self.__element_to_text(node) for node in top_level_nodes]
+
         return html_texts
 
 

@@ -1,11 +1,12 @@
 """
 Biomedical Named Entity Recognition Keyword Table Index
 """
+import logging
 from typing import Optional, Set
 from llama_index.indices.keyword_table import SimpleKeywordTableIndex
 from pydash import flatten
 
-from common.ner.ner import ContentType, NerTagger
+from common.ner.ner import NerTagger
 
 
 class NerKeywordTableIndex(SimpleKeywordTableIndex):
@@ -33,7 +34,14 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             text (str): text from which to extract keywords
             max_keywords (Optional[int], optional): maximum number of keywords to extract. Defaults to 10000.
         """
-        entities = self.tagger.extract([text], link=True)[0]
+        entities_by_doc = self.tagger.extract([text], link=True)
+
+        logging.info(f"Extracted {len(entities_by_doc)} docs")
+
+        if len(entities_by_doc) == 0:
+            raise ValueError("No entities extracted")
+
+        entities = entities_by_doc[0]
         keywords = flatten(
             [(ent[0], ent[2].name) if ent[2] else (ent[0]) for ent in entities]
         )
