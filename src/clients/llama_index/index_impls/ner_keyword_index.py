@@ -5,7 +5,7 @@ from typing import Optional, Set
 from llama_index.indices.keyword_table import SimpleKeywordTableIndex
 from pydash import flatten
 
-from common.ner.ner import NerTagger
+from common.ner.ner import ContentType, NerTagger
 
 
 class NerKeywordTableIndex(SimpleKeywordTableIndex):
@@ -13,12 +13,14 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
     Biomedical Named Entity Recognition Keyword Table Index
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args, ner_options={"use_llm": True, "content_type": "html"}, **kwargs
+    ):
         """
         Initialize super and NER tagger.
         """
         super().__init__(*args, **kwargs)
-        self.tagger = NerTagger.get_instance(use_llm=True, content_type="text")
+        self.tagger = NerTagger.get_instance(**ner_options)
 
     def _ner_extract_keywords(
         self, text: str, max_keywords: Optional[int] = 10000
@@ -27,10 +29,8 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         Extract keywords from text using biomedical NER.
         Includes original term plus canonical term if available.
 
-        TODO: extract more keywords?
-
         Args:
-            text (str): text to extract keywords from
+            text (str): text from which to extract keywords
             max_keywords (Optional[int], optional): maximum number of keywords to extract. Defaults to 10000.
         """
         entities = self.tagger.extract([text], link=True)[0]
@@ -44,7 +44,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         Extract keywords from text, using the simple method augmented by our biomedical NER.
 
         Args:
-            text (str): text to extract keywords from
+            text (str): text from which to extract keywords
         """
 
         simple_keywords = super()._extract_keywords(text)

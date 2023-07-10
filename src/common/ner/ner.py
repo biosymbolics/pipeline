@@ -17,7 +17,7 @@ import logging
 import warnings
 
 from common.ner.linker import TermLinker
-from common.utils.extraction.html import strip_tags
+from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
@@ -163,8 +163,7 @@ class NerTagger:
         # if use_llm, no tokenization
         if self.use_llm:
             if self.content_type == "html":
-                # strip out all the HTML tags
-                _content = [strip_tags(c) for c in _content]
+                _content = [extract_text(c) for c in _content]
 
             # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             _content = flatten(chunk_list(_content, CHUNK_SIZE))

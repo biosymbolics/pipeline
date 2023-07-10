@@ -85,6 +85,9 @@ class SourceDocIndex:
             INDEX_NAME,
             documents,
             index_impl=self.index_impl,
+            index_args={
+                "content_type": "html",
+            },
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
             context_args=self.context_args,

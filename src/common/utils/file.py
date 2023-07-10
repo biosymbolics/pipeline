@@ -17,6 +17,17 @@ def save_as_file(content: Union[str, bytes], filename: str):
         file.write(content)
 
 
+def load_file(filename: str) -> Any:
+    """
+    Simple file reader function
+
+    Args:
+        filename (str): filename to read
+    """
+    with open(filename, "r") as file:
+        return file.read()
+
+
 PICKLE_BASE = "data/pickles/"
 
 
