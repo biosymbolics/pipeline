@@ -107,7 +107,6 @@ class PatentEnricher:
             """
             flattened_df = (
                 df.explode("entities")
-                .filter(pl.col("canonical_id").is_not_null())
                 .lazy()
                 .select(
                     pl.col("publication_number"),
@@ -120,6 +119,7 @@ class PatentEnricher:
                     pl.lit(10).alias("character_offset_start"),
                 )
                 .collect()
+                .filter(pl.col("canonical_id").is_not_null())
             )
             return flattened_df
 
