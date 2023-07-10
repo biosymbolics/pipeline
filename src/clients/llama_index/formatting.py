@@ -20,7 +20,7 @@ def __is_string_doc_list(documents: list[Any]) -> TypeGuard[list[str]]:
 
 def format_documents(
     documents: Union[list[str], list[Document]],
-    get_extra_info: Optional[GetDocMetadata] = None,
+    get_metadata: Optional[GetDocMetadata] = None,
     get_doc_id: Optional[GetDocId] = None,
 ) -> list[Document]:
     """
@@ -28,7 +28,7 @@ def format_documents(
 
     Args:
         documents (list[str] or list[Document]): list of documents
-        get_extra_info (GetExtraInfo): function to get extra info for each document
+        get_metadata (GetDocMetadata): function to get extra info for each document
         get_doc_id (GetDocId): function to get doc id for each document
     """
     if __is_string_doc_list(documents):
@@ -38,9 +38,9 @@ def format_documents(
 
     docs = compact(docs)  # why?
 
-    if get_extra_info:
+    if get_metadata:
         for doc in docs:
-            doc.metadata = get_extra_info(doc)
+            doc.metadata = get_metadata(doc)
 
     if get_doc_id:
         for doc in docs:

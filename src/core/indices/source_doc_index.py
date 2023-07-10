@@ -4,12 +4,17 @@ SourceDocIndex
 from datetime import datetime
 import logging
 from typing import Any, Optional, Type
-from llama_index import GPTVectorStoreIndex
+from llama_index import VectorStoreIndex
 
-from clients.llama_index import load_index, query_index, upsert_index
+from clients.llama_index import (
+    load_index,
+    query_index,
+    upsert_index,
+    NerKeywordTableIndex,
+)
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
 from clients.llama_index.types import DocMetadata
-from clients.vector_dbs.pinecone import get_metadata_filters
+from clients.vector_dbs import pinecone
 from common.utils.namespace import get_namespace_id
 from typings.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 
@@ -21,25 +26,19 @@ class SourceDocIndex:
     SourceDocIndex
 
     Simple index over raw-ish source docs
-
-    Pinecone query example:
-    ``` json
-    { "$and": [{ "company": "PFE" }, { "doc_source": "SEC" }, { "doc_type": "10-K" }, { "period": "2020-12-31" }] }
-    ```
-
     """
 
     def __init__(
         self,
         context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-        index_impl: Type[LlmIndex] = GPTVectorStoreIndex,
+        index_impl: Type[LlmIndex] = NerKeywordTableIndex,
     ):
         """
-        initialize
+        initialize index
 
         Args:
             context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
-            index_impl (LlmIndex, optional): index implementation. Defaults to GPTVectorStoreIndex.
+            index_impl (LlmIndex, optional): index implementation. Defaults to NerKeywordTableIndex.
         """
         self.context_args = context_args
         self.index = None
@@ -75,7 +74,7 @@ class SourceDocIndex:
         def __get_metadata(doc) -> DocMetadata:
             return {
                 **source._asdict(),
-                # "retrieval_date": retrieval_date.isoformat(),
+                "retrieval_date": retrieval_date.isoformat(),  # TODO: this can mess up pinecone
             }
 
         # uniq doc id for deduplication/idempotency
@@ -98,6 +97,17 @@ class SourceDocIndex:
         """
         index = load_index(INDEX_NAME, **self.context_args.storage_args)
         self.index = index
+
+    def __get_metadata_filters(self, source: NamespaceKey):
+        """
+        Get metadata filters for source
+
+        TODO: only works for VectorStoreIndex currently!!
+        """
+        if isinstance(self.index_impl, VectorStoreIndex):
+            return pinecone.get_metadata_filters(source)
+
+        return source._asdict()
 
     def query(
         self,
@@ -128,9 +138,12 @@ class SourceDocIndex:
         if not self.index:
             raise ValueError("Index not initialized.")
 
-        metadata_filters = get_metadata_filters(source)
+        metadata_filters = self.__get_metadata_filters(source)
 
-        logging.info("Querying with filters %s", metadata_filters.__dict__.items())
+        logging.info(
+            "Querying with filters (if vector store) %s",
+            metadata_filters.__dict__.items(),
+        )
 
         answer = query_index(
             self.index,

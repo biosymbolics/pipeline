@@ -8,7 +8,7 @@ from pydash import flatten
 from common.ner.ner import NerTagger
 
 
-class BNerKeywordTableIndex(SimpleKeywordTableIndex):
+class NerKeywordTableIndex(SimpleKeywordTableIndex):
     """
     Biomedical Named Entity Recognition Keyword Table Index
     """
