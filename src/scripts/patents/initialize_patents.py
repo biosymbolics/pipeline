@@ -127,14 +127,14 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     0 as ocid,
-                    LOWER(IF(syn_map.term IS NOT NULL, syn_map.term, COALESCE(a.canonical_term, a.original_term))) as term,
+                    LOWER(COALESCE(syn_map.term, NULLIF(a.canonical_term, ''), a.original_term)) as term,
                     domain,
                     confidence,
                     source,
                     character_offset_start,
                     1 as rank
                 FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}` a
-                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` syn_map ON LOWER(COALESCE(a.canonical_term, a.original_term)) = syn_map.synonym
+                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
         )
         SELECT
             publication_number,
