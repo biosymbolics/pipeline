@@ -6,7 +6,6 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
-from bs4 import BeautifulSoup
 from pydash import flatten
 import spacy
 from spacy.language import Language
@@ -18,15 +17,14 @@ import logging
 import warnings
 
 from common.ner.linker import TermLinker
+from common.utils.extraction.html import strip_tags
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
 from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .types import GetTokenizer, CanonicalEntity, SpacyPatterns
+from .types import DocEntities, GetTokenizer, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
-DocEntities = list[tuple[str, str]]
-LinkedDocEntities = list[tuple[str, str, Optional[CanonicalEntity]]]
 ContentType = Literal["text", "html"]
 CHUNK_SIZE = 10000
 
@@ -77,6 +75,7 @@ class NerTagger:
         )
 
         self.content_type = content_type
+        self.linker: Optional[TermLinker] = None  # lazy initialization
         self.__init_tagger()
 
     def __init_tagger(self):
@@ -100,7 +99,6 @@ class NerTagger:
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
 
-        self.linker = TermLinker()
         self.nlp = nlp
 
         logging.info(
@@ -108,38 +106,57 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __normalize_and_link(
+    def __normalize(
         self, doc: Doc, entity_types: Optional[list[str]] = None
-    ) -> LinkedDocEntities:
-        """
-        Normalize entities for a single doc
-
-        - santize entities (filtering, removing of undesired characters, lemmatization)
-        - normalization (canonicalization, synonymization)
-
-        Args:
-            doc (Doc): SpaCy doc
-            entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
-        """
-        entity_set = [(span.text, span.label_) for span in doc.ents]
+    ) -> DocEntities:
+        entity_set = [(span.text, span.label_, None) for span in doc.ents]
 
         # basic filtering, character removal, lemmatization
-        sanitized = sanitize_entities(entity_set)
-        linked_entity_map = dict(self.linker([tup[0] for tup in sanitized]))
-        logging.info("linked_entity_map %s", linked_entity_map)
-
-        # canonicalization, synonymization
-        normalized = [(e[0], e[1], linked_entity_map.get(e[0])) for e in sanitized]
+        normalized = sanitize_entities(entity_set)
 
         # filter by entity types, if provided
         if entity_types:
             return [e for e in normalized if e[1] in entity_types]
 
+        return normalized  # type: ignore
+
+    def __link(self, entities: DocEntities) -> DocEntities:
+        """
+        Link entities for a single doc
+        Args:
+            entities (DocEntities): Entities to link
+        """
+        if self.linker is None:
+            logging.info("Lazy-loading linker...")
+            self.linker = TermLinker()
+
+        linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
+
+        # canonicalization, synonymization
+        linked = [(e[0], e[1], linked_entity_map.get(e[0])) for e in entities]
+
+        return linked
+
+    def __normalize_and_maybe_link(
+        self, doc: Doc, link: bool = True, entity_types: Optional[list[str]] = None
+    ) -> DocEntities:
+        """
+        Normalize and maybe link entities for a single doc
+
+        Args:
+            doc (Doc): SpaCy doc
+            link (bool, optional): Whether to link entities. Defaults to True.
+            entity_types (Optional[list[str]], optional): Entity types to filter by. Defaults to None.
+        """
+        normalized = self.__normalize(doc, entity_types)
+        if link:
+            return self.__link(normalized)
         return normalized
 
     def __prep_doc(self, content: list[str]) -> list[str]:
         """
         Prepares a list of content for NER
+        (only if use_llm is True)
         """
         _content = content.copy()
 
@@ -147,9 +164,7 @@ class NerTagger:
         if self.use_llm:
             if self.content_type == "html":
                 # strip out all the HTML tags
-                _content = [
-                    " ".join(BeautifulSoup(c).get_text(separator=" ") for c in _content)
-                ]
+                _content = [strip_tags(c) for c in _content]
 
             # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             _content = flatten(chunk_list(_content, CHUNK_SIZE))
@@ -159,8 +174,9 @@ class NerTagger:
     def extract(
         self,
         content: list[str],
+        link: bool = True,
         entity_types: Optional[list[str]] = None,
-    ) -> list[LinkedDocEntities]:
+    ) -> list[DocEntities]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -169,14 +185,13 @@ class NerTagger:
 
         Args:
             content (list[str]): list of content on which to do NER
+            link (bool, optional): whether to link entities. Defaults to True.
             entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
             >>> tagger.extract(["SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE"])
             >>> tagger.extract(["Interferon alpha and omega antibody antagonists"])
-            >>> tagger.extract(["Inhibitors of beta secretase"])
-
-        TODO: ability to run without normalization
+            >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")
@@ -190,11 +205,13 @@ class NerTagger:
             self.__prep_doc,
             self.nlp.pipe,
             # TODO: linking would be faster if done in batch
-            lambda docs: [self.__normalize_and_link(doc, entity_types) for doc in docs],
+            lambda docs: [
+                self.__normalize_and_maybe_link(doc, link, entity_types) for doc in docs
+            ],
         ]
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
-        logging.info("Entities: %s", ents_by_doc)
+        logging.info("Entities found: %s", ents_by_doc)
 
         return ents_by_doc  # type: ignore
 
