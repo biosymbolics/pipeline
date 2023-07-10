@@ -1,6 +1,16 @@
 from bs4 import BeautifulSoup
 
 
+def strip_tags(html: str) -> str:
+    """
+    Strip HTML tags from html, returning content
+
+    Args:
+        html (str): the html
+    """
+    return " ".join(BeautifulSoup(tag).get_text(separator=" ") for tag in html)
+
+
 def strip_inline_styles(html: str) -> str:
     """
     Strip inline styles from html

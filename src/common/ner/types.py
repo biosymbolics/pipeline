@@ -27,6 +27,10 @@ class CanonicalEntity(NamedTuple):
     aliases: Optional[List[str]] = []
 
 
+DocEntity = tuple[str, str, Optional[CanonicalEntity]]
+DocEntities = list[DocEntity]
+
+
 class SpacyCanonicalEntity(NamedTuple):
     concept_id: str
     canonical_name: str

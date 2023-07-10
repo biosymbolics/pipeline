@@ -10,6 +10,8 @@ from clients.spacy import Spacy
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 
+from .types import DocEntity
+
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
@@ -17,7 +19,7 @@ CHAR_SUPPRESSIONS = {
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 
-T = TypeVar("T", bound=Union[tuple[str, str], str])
+T = TypeVar("T", bound=Union[DocEntity, str])
 CleanFunction = Callable[[list[T]], list[T]]
 
 DEFAULT_EXCEPTION_LIST: list[str] = [
