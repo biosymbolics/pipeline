@@ -72,5 +72,5 @@ def get_all_table_elements(html: str):
     soup = BeautifulSoup(html, features="html.parser")
     tables = soup.find_all("table")
     lonely_rows = soup.find_all("tr")
-    lonley_cells = soup.find_all("cells")
-    return tables + lonely_rows + lonley_cells
+    lonely_cells = soup.find_all("cells")
+    return tables + lonely_rows + lonely_cells
