@@ -16,19 +16,29 @@ def save_as_file(content: Union[str, bytes], filename: str):
         file.write(content)
 
 
+PICKLE_BASE = "data/pickles/"
+
+
 def save_as_pickle(
     obj: Any, filename: Optional[str] = None, use_uuid: bool = True
 ) -> str:
     """
     Saves obj as pickle
     """
-    PICKLE_BASE = "data/pickles/"
     if not filename or use_uuid:
         filename = PICKLE_BASE + (filename or "") + str(uuid.uuid4()) + ".txt"
     with open(filename, "wb") as file:
         pickle.dump(obj, file)
 
     return filename
+
+
+def load_pickle(filename: str) -> Any:
+    """
+    Loads pickle from file
+    """
+    with open(PICKLE_BASE + filename, "rb") as file:
+        return pickle.load(file)
 
 
 def save_json_as_file(serializable_obj: Any, filename: str):
