@@ -91,6 +91,21 @@ def get_table(table_name: str) -> bigquery.Table:
     return table
 
 
+def select_insert_into_bg_table(select_query: str, table_name: str):
+    """
+    Insert rows into a table from a select query
+
+    Args:
+        select_query (str): select query
+        table_name (str): name of the table
+    """
+    query = f"""
+        INSERT INTO `f"{BQ_DATASET_ID}.{table_name}"`
+        {select_query}
+    """
+    execute_bg_query(query)
+
+
 def insert_into_bg_table(df: pl.DataFrame, table_name: str):
     """
     Insert rows into a table from a dataframe
@@ -155,7 +170,7 @@ def upsert_into_bg_table(
     USING {BQ_DATASET_ID}.{tmp_table_name} AS source
     ON {identity_join}
     WHEN MATCHED THEN
-        UPDATE SET {on_conflict}
+        {on_conflict}
     WHEN NOT MATCHED THEN {insert}
     """
 
@@ -168,7 +183,7 @@ def upsert_into_bg_table(
 
 def delete_bg_table(table_name: str):
     """
-    Delete a table
+    Delete a table (if exists)
 
     Args:
         table_name (str): name of the table

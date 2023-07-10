@@ -5,6 +5,7 @@ from typing import (
     Any,
     Callable,
     Collection,
+    List,
     Mapping,
     NamedTuple,
     Optional,
@@ -14,23 +15,28 @@ from typing import (
 )
 from spacy.language import Language
 from spacy.pipeline import Pipe
-from spacy.tokens import Token
 from spacy.tokenizer import Tokenizer
 
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
 
-class SciSpacyEntity(NamedTuple):
+class CanonicalEntity(NamedTuple):
+    id: str
+    name: str
+    aliases: Optional[List[str]] = []
+
+
+class SpacyCanonicalEntity(NamedTuple):
     concept_id: str
     canonical_name: str
-    aliases: list[str]
-    types: list[str]
-    definition: Optional[str]
+    aliases: List[str]
+    types: List[str] = []
+    definition: Optional[str] = None
 
 
 class KbLinker(NamedTuple):
-    cui_to_entity: dict[Token, SciSpacyEntity]
+    cui_to_entity: dict[str, SpacyCanonicalEntity]
 
 
 class SciSpacyLinker(NamedTuple):

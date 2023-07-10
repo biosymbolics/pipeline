@@ -1,3 +1,5 @@
+BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
+
 ADHD = "Attention Deficit Hyperactivity Disorder"
 ARTICULATION_DISORDER = "Articulation Disorder"
 AMNESTIC_DISORDER = "Amnestic Disorder"
@@ -2405,3 +2407,19 @@ _COMMON_ENTITY_NAMES = (
 )
 
 COMMON_ENTITY_NAMES = tuple([name.lower() for name in _COMMON_ENTITY_NAMES])
+
+SUPPRESSED_DOMAINS = (
+    "anatomy",
+    "chemCompound",  # 961,573,847
+    "chemClass",
+    "chemGroup",
+    "inorgmat",
+    "methods",  # lots of useless stuff
+    "nutrients",
+    "nutrition",  # 109,587,438
+    "polymers",
+    "toxicity",  # 6,902,999
+    "natprod",  # 23,053,704
+    "species",  # 179,305,306
+    "substances",  # 1,712,732,614
+)

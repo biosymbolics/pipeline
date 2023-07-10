@@ -1,9 +1,13 @@
 """
 Functions for copying around subsets of the patents database
 """
-from clients.low_level.big_query import query_to_bg_table, BQ_DATASET_ID
+from clients.low_level.big_query import (
+    delete_bg_table,
+    query_to_bg_table,
+    BQ_DATASET_ID,
+)
 
-from ._constants import COMMON_ENTITY_NAMES
+from ._constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
 
 BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
@@ -13,12 +17,15 @@ def __copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
+    table_id = "gpr_publications"
+    delete_bg_table(table_id)
+
     query = f"""
         SELECT * FROM `patents-public-data.google_patents_research.publications`
         WHERE EXISTS
         (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
     """
-    query_to_bg_table(query, "gpr_publications")
+    query_to_bg_table(query, table_id)
 
 
 def __copy_gpr_annotations():
@@ -46,21 +53,9 @@ def __copy_gpr_annotations():
     ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
     ```
     """
-    SUPPRESSED_DOMAINS = (
-        "anatomy",
-        "chemCompound",  # 961,573,847
-        "chemClass",
-        "chemGroup",
-        "inorgmat",
-        "methods",  # lots of useless stuff
-        "nutrients",
-        "nutrition",  # 109,587,438
-        "polymers",
-        "toxicity",  # 6,902,999
-        "natprod",  # 23,053,704
-        "species",  # 179,305,306
-        "substances",  # 1,712,732,614
-    )
+    table_id = "gpr_annotations"
+    delete_bg_table(table_id)
+
     query = f"""
         SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
         JOIN `{BQ_DATASET_ID}.publications` AS local_publications
@@ -69,27 +64,31 @@ def __copy_gpr_annotations():
         AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
         AND domain not in {SUPPRESSED_DOMAINS}
     """
-    query_to_bg_table(query, "gpr_annotations")
+    query_to_bg_table(query, table_id)
 
 
 def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
     """
+    table_id = "publications"
+    delete_bg_table(table_id)
+
     query = f"""
         SELECT publications.* FROM `patents-public-data.patents.publications` as publications
         JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
         ON local_gpr.publication_number = publications.publication_number
         WHERE application_kind = 'W'
     """
-    query_to_bg_table(query, "publications")
+    query_to_bg_table(query, table_id)
 
 
 def copy_patent_tables():
     """
     Copy tables from patents-public-data to a local dataset
 
-    Order matters. Non-idempotent.
+    Order matters.
+    Idempotent (as in, tables are deleted and recreated) but not atomic, and also expensive (from a BigQuery standpoint)
     """
     # copy gpr_publications table
     __copy_gpr_publications()

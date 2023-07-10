@@ -49,7 +49,7 @@ SEARCH_RETURN_FIELDS = [
     "ipc_codes",
     # "matched_terms",
     # "matched_domains",
-    "MoAs",
+    "mechanisms",
     "proteins",
     "search_rank",
     # "publication_date",
@@ -125,7 +125,7 @@ def search(
                 {_get_term_query('effects', 'effects')},
                 {_get_term_query('humangenes', 'genes')},
                 {_get_term_query('proteins', 'proteins')},
-                {_get_term_query('moas', 'MoAs')},
+                {_get_term_query('mechanisms', 'mechanisms')},
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
             WHERE annotation.term IN UNNEST({lower_terms})
@@ -142,7 +142,7 @@ def search(
                 ANY_VALUE(diseases) as diseases,
                 ANY_VALUE(effects) as effects,
                 ANY_VALUE(genes) as genes,
-                ANY_VALUE(MoAs) as MoAs,
+                ANY_VALUE(mechanisms) as mechanisms,
                 ANY_VALUE(proteins) as proteins,
             FROM matches
             GROUP BY publication_number

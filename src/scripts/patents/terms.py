@@ -12,12 +12,12 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
 )
-from common.ner import TermNormalizer
+from common.ner import TermLinker
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
 
-from ._constants import SYNONYM_MAP
+from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
 
 MIN_ASSIGNEE_COUNT = 10
 
@@ -34,13 +34,17 @@ class TermRecord(BaseTermRecord):
 
 class AggregatedTermRecord(BaseTermRecord):
     domains: list[str]
-    original_terms: list[str]
-    original_ids: list[str]
+    synonyms: list[str]
+    synonym_ids: list[str]
 
 
 def __get_terms():
     """
-    Creates all terms for the terms table
+    Collects all terms for the terms table
+    From
+    - gpr_annotations
+    - biosym_annotations
+    - publications (assignee_harmonized)
     """
 
     def __aggregate_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
@@ -58,8 +62,8 @@ def __get_terms():
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
-                "original_terms": dedup([row["original_term"] for row in group]),
-                "original_ids": dedup([row.get("original_id") for row in group]),
+                "synonyms": dedup([row["original_term"] for row in group]),
+                "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
@@ -97,20 +101,33 @@ def __get_terms():
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-            SELECT preferred_name as term, ocid as original_id, domain, count(*) as count
-            FROM `{BQ_DATASET_ID}.gpr_annotations`
-            group by preferred_name, original_id, domain
+            SELECT term, original_id, domain, COUNT(*) as count
+            FROM
+            (
+                -- gpr annotations
+                SELECT preferred_name as term, CAST(ocid as STRING) as original_id, domain
+                FROM `{BQ_DATASET_ID}.gpr_annotations`
+                where length(preferred_name) > 1
+
+                UNION ALL
+
+                -- biosym annotations
+                SELECT canonical_term as term, canonical_id as original_id, domain
+                FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
+                where length(canonical_term) > 1
+            ) AS all_annotations
+            group by term, original_id, domain
         """
         rows = select_from_bg(terms_query)
 
-        normalizer = TermNormalizer()
-        normalization_map = normalizer.generate_map([row["term"] for row in rows])
+        linker = TermLinker()
+        normalization_map = dict(linker([row["term"] for row in rows]))
 
         def __normalize(row):
             entry = normalization_map.get(row["term"])
             if not entry:
                 return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
-            return entry.canonical_name
+            return entry.name
 
         terms: list[TermRecord] = [
             {
@@ -155,12 +172,13 @@ def __create_terms():
         bigquery.SchemaField("canonical_id", "STRING"),
         bigquery.SchemaField("count", "INTEGER"),
         bigquery.SchemaField("domains", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_terms", "STRING", mode="REPEATED"),
-        bigquery.SchemaField("original_ids", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("synonyms", "STRING", mode="REPEATED"),
+        bigquery.SchemaField("synonym_ids", "STRING", mode="REPEATED"),
     ]
     client.delete_table(table_id, not_found_ok=True)
     new_table = client.create_table(new_table)
 
+    # grab terms from annotation tables (slow!!)
     terms = __get_terms()
 
     batched = batch(terms)
@@ -168,10 +186,8 @@ def __create_terms():
         execute_with_retries(lambda: client.insert_rows(new_table, b))
         logging.info(f"Inserted %s rows into terms table", len(b))
 
-    # Persist term -> original_terms as synonyms
-    synonym_map = {
-        og_term: row["term"] for row in terms for og_term in row["original_terms"]
-    }
+    # Persist term -> synonyms as synonyms
+    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
 
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
@@ -196,7 +212,7 @@ def __create_synonym_map(synonym_map: dict[str, str]):
     client.delete_table(table_id, not_found_ok=True)
     table = client.create_table(table)
 
-    logging.info("Adding default synonym map entries")
+    logging.info("Adding default/hard-coded synonym map entries")
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
@@ -228,6 +244,8 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
 def create_patent_terms():
     """
     Create the terms and synonym map tables
+
+    Idempotent (all tables are dropped and recreated)
     """
     __create_synonym_map(SYNONYM_MAP)
     __create_terms()

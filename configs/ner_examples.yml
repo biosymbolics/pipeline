@@ -1,105 +1,105 @@
 - text: Safe and effective method of treating ulcerative colitis with anti-il-12/il23 antibody
   entities:
-    MECHANISM:
+    mechanisms:
       - anti-il-12/il23 antibody
-    DISEASE:
+    diseases:
       - ulcerative colitis
 - text: Improved synthetic methods of making (2h-1,2,3-triazol-2-yl)phenyl compounds as orexin receptor modulators
   entities:
-    CLASS:
+    classes:
       - (2h-1,2,3-triazol-2-yl)phenyl compounds
-    MECHANISM:
+    mechanisms:
       - orexin receptor modulator
 - text: Compositions and methods related to antibodies that neutralize coagulase activity during staphylococcus aureus disease
   entities:
-    MECHANISM:
+    mechanisms:
       - coagulase-neutralizing antibodies
-    DISEASE:
+    diseases:
       - staphylococcus aureus
 - text: Methods of treating multiple myeloma with a triplet therapy of carfilzomib, dexamethasone, and an antibody that specifically recognizes cd38.
   entities:
-    COMPOUND:
+    compounds:
       - carfilzomib
       - dexamethasone
-    MECHANISM:
+    mechanisms:
       - cd38 antibody
-    DISEASE:
+    diseases:
       - multiple myeloma
 - text: GBA1 Gene Therapy (PR001)  Parkinson's disease  Phase II Phase II trial is ongoing.
   entities:
-    MECHANISM:
+    mechanisms:
       - GBA1 Gene Therapy
-    COMPOUND:
+    compounds:
       - PR001
-    DISEASE:
+    diseases:
       - Parkinson's disease
 - text: Cross-reactive epitope for multiple sclerosis
   entities:
-    MECHANISM:
+    mechanisms:
       - Cross-reactive epitope
-    DISEASE:
+    diseases:
       - multiple sclerosis
 - text: Chimeric antigen receptors targeting cd-19
   entities:
-    MECHANISM:
+    mechanisms:
       - cd-19 chimeric antigen receptors
 - text: ANTIBODY TARGETING CELL SURFACE DEPOSITED COMPLEMENT PROTEIN C3d AND USE THEREOF
   entities:
-    MECHANISM:
+    mechanisms:
       - C3d Complement Protein Antibody
 - text: Anti-h7n9 fully-human monoclonal antibody 5j13, preparation method therefor, and application thereof
   entities:
-    MECHANISM:
+    mechanisms:
       - Anti-h7n9 fully-human monoclonal antibody 5j13
 - text: Indazole and azaindazole btk inhibitors
   entities:
-    MECHANISM:
+    mechanisms:
       - btk inhibitor
-    COMPOUND:
+    compounds:
       - indazole
       - azaindazole
 - text: Antibodies targeting human claudin 18.2 and uses thereof
   entities:
-    MECHANISM:
+    mechanisms:
       - anti-claudin 18.2 antibody
 - text: Peptides inhibiting cold-inducible rna binding protein activity
   entities:
-    MECHANISM:
+    mechanisms:
       - cold-inducible rna binding protein inhibitor
-    CLASS:
+    classes:
       - peptide
 - text: METHODS AND PHARMACEUTICAL COMPOSITIONS FOR MODULATION OF MONOCYTOPOISIS
   entities:
-    MECHANISM:
+    mechanisms:
       - monocytopoiesis modulator
 - text: Covalent inhibitors of pad4
   entities:
-    MECHANISM:
+    mechanisms:
       - pad4 inhibitor
       - covalent pad4 inhibitor
 - text: Compounds are useful as tachykinin inhibitors which act at the NK1, NK2 and NK3 receptors
   entities:
-    MECHANISM:
+    mechanisms:
       - tachykinin inhibitor
       - NK1 receptor antagonist
       - NK2 receptor antagonist
       - NK3 receptor antagonist
 - text: The compounds are well suited for inhibiting ice activity and may be advantageously used as agents against il-1-, apoptosis-, igif-, and ifn-y-mediated diseases
   entities:
-    MECHANISM:
+    mechanisms:
       - ice inhibitor
-    DISEASE:
+    diseases:
       - il-1-mediated diseases
       - apoptosis-mediated diseases
       - igif-mediated diseases
       - ifn-y-mediated diseases
 - text: Comprises assaying the said sample for the presence of a compound selected from 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one (compound a)and n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide (compound b).
   entities:
-    COMPOUND:
+    compounds:
       - 3-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine-5-(4h)-one
       - n-[5-amino-6-(2,3-dichlorophenyl)-1,2,4-triazine 3-yl]-2,3-dichlorobenzamide
 - text: Inhibitors to elevate certain plasma lipid levels, including HDL-cholesterol
   entities:
-    moas:
+    mechanisms:
       - lipid level modulator
       - HDL-cholesterol level modulator
