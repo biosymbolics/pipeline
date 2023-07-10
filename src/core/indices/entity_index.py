@@ -39,7 +39,6 @@ def create_entity_indices(
     entities: list[str],
     namespace_key: NamespaceKey,
     documents: list[str],
-    confirm_entities: bool = False,
 ):
     """
     For each entity in the provided list, summarize based on the document and persist in an index
@@ -48,24 +47,9 @@ def create_entity_indices(
         entities (list[str]): list of entities
         namespace_key (NamespaceKey): namespace key
         documents (list[str]): list of documents
-        confirm_entities (bool, optional): whether to confirm entities. Defaults to True.
     """
     index = SourceDocIndex()
     index.add_documents(namespace_key, documents)
-
-    if confirm_entities:
-        confirmed_entities = index.confirm_entities(entities, namespace_key)
-
-        removed = set(entities) - set(confirmed_entities)
-        added = set(confirmed_entities) - set(entities)
-        logging.info(
-            f"Delta in confirmed entities. Removed: %s, Added: %s, Remaining: %s",
-            removed,
-            added,
-            confirmed_entities,
-        )
-
-        entities = confirmed_entities
 
     for entity in entities:
         try:

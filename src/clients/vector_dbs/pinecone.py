@@ -14,7 +14,7 @@ from typings.indices import NamespaceKey
 load_dotenv()
 
 API_KEY = os.environ["PINECONE_API_KEY"]
-PINECONE_ENVIRONMENT = "us-west4-gcp"
+PINECONE_ENVIRONMENT = "us-west4-gcp-free"
 
 
 def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
@@ -33,7 +33,7 @@ def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
 
 
 def get_vector_store(
-    index_name: str, pinecone_args: Mapping[str, Any] = {}
+    index_name: str = "biosymbolics", pinecone_args: Mapping[str, Any] = {}
 ) -> pinecone.Index:
     """
     Initializes vector db, creating index if nx

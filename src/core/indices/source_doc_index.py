@@ -5,11 +5,9 @@ from datetime import datetime
 import logging
 from typing import Any, Optional, Type
 from llama_index import GPTVectorStoreIndex
-from langchain.output_parsers import ResponseSchema
 
 from clients.llama_index import load_index, query_index, upsert_index
 from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
-from clients.llama_index.parsing import get_prompts_and_parser, parse_answer
 from clients.llama_index.types import DocMetadata
 from clients.vector_dbs.pinecone import get_metadata_filters
 from common.utils.namespace import get_namespace_id
@@ -143,50 +141,3 @@ class SourceDocIndex:
         )
 
         return answer
-
-    def confirm_entities(
-        self, possible_entities: list[str], source: NamespaceKey
-    ) -> list[str]:
-        """
-        Confirm a list of entities
-        """
-        query = f"""
-        You are an expert Named Entity Recognition (NER) system and you are checking the work of a older NER system.
-        Your task is to accept Text as input and confirm the extract named entities for the set of predefined entity labels.
-        The older NER model has identified a list of potential pharmacological products
-        (drugs, compounds, drug class, mechanism of action, etc) from the source document.
-        However, it contains errors such as:
-
-        - False positives: terms that are not pharmacological products, such as "collaborations" or "anti-corruption"
-        - False negatives: valid products that were not recognized
-        - Over-inclusion: entries containing unnecessary additional information, like "oral anti-coagulant market share gains"
-        - Non-specificity: vague terms such as "second line therapy", "important new therapies" or "innovative vaccines"
-
-        Valid products can be in any of the following forms:
-
-        - Brand names (e.g. "Darzalex", "Advair Diskus")
-        - Generic names (e.g. "daratumumab", "norethindrone acetate")
-        - Investigational IDs (e.g. "AGN-190584", "PF-07321332")
-        - Chemical classes (e.g. "polypeptides", "monoclonal antibodies")
-        - Modes of action (e.g. "antithrombotics", "antidepressants")
-        - Mechanisms of action (e.g. "5-HT1A receptor partial agonist", "anti-CD14 monoclonal antibodies")
-
-        Please correct the following list by removing non-products, adding missing products and normalizing terms:
-        {possible_entities}
-        """
-        response_schemas = [
-            ResponseSchema(
-                name="products",
-                description="all products as a string array, e.g. ['drug1', 'drug2']",
-            ),
-        ]
-
-        prompts, parser = get_prompts_and_parser(response_schemas)
-        response = self.query(query, source, *prompts)
-
-        result = parse_answer(response, parser, return_orig_on_fail=False)
-
-        if "products" not in result:
-            raise ValueError("No products found in result %s", result)
-
-        return result["products"]

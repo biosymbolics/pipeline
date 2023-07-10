@@ -38,7 +38,6 @@ class PatentApplication(PatentBasicInfo):
     country: str
     diseases: list[str]
     genes: list[str]
-    effects: list[str]
     embeddings: list[float]
     grant_date: date
     filing_date: date

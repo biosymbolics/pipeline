@@ -75,7 +75,7 @@ def get_service_context(
 
     llm = __get_llm(model_name)
     llm_predictor = LLMPredictor(llm=llm)
-    prompt_helper = PromptHelper.from_llm_metadata(llm_predictor.get_llm_metadata())
+    prompt_helper = PromptHelper.from_llm_metadata(llm_predictor.metadata)
 
     logging.info("Prompt helper: %s", prompt_helper.__dict__.items())
 

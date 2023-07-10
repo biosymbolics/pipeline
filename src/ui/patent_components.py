@@ -83,7 +83,6 @@ def render_detail(patent: PatentApplication):
     st.markdown(get_horizontal_list(patent["diseases"], "Diseases", URL_BASE))
     st.markdown(get_horizontal_list(patent["genes"], "Genes", URL_BASE))
     st.markdown(get_horizontal_list(patent["proteins"], "Proteins", URL_BASE))
-    st.markdown(get_horizontal_list(patent["effects"], "Effects", URL_BASE))
     st.markdown(get_horizontal_list(patent["ipc_codes"], "IPC Codes"))
     st.divider()
     if len(patent["similar"]) > 0:
