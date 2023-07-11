@@ -9,13 +9,13 @@ from common.utils.misc import dict_to_named_tuple
 from core.indices import entity_index
 from typings.indices import NamespaceKey
 
-from .sec import fetch_annual_reports_with_sections as fetch_annual_reports
+from .sec import fetch_annual_reports_sections as fetch_annual_reports
 
 
 def __format(doc: str) -> str:
     """
     Format HTML content for NER processing
-    - strip styles
+    - extract text content
     - remove certain characters
 
     Args:

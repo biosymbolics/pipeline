@@ -43,7 +43,7 @@ def fetch_annual_reports(
     return reports
 
 
-def fetch_annual_reports_with_sections(
+def fetch_annual_reports_sections(
     ticker: str,
     start_date: date,
     end_date: date = datetime.now(),
@@ -78,3 +78,16 @@ def fetch_annual_reports_with_sections(
             traceback.print_exc()
 
     return section_map
+
+
+def fetch_8k_reports(
+    ticker: str, start_date: date, end_date: date = datetime.now()
+) -> list[SecFiling]:
+    """
+    Fetch “current report” SEC docs (8-K)
+    8-Ks are used to announce shareholder-relevant major events.
+    """
+    criteria = __get_base_criteria(ticker, start_date, end_date)
+    reports = fetch_sec_docs([*criteria, 'formType:"8-K"'])
+
+    return reports
