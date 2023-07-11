@@ -19,7 +19,6 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         *args,
         ner_options={
             "use_llm": True,
-            "content_type": "html",
             "llm_config": "configs/sec/config.cfg",
         },
         **kwargs,

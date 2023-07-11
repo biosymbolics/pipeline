@@ -82,7 +82,7 @@ def create_from_docs(
                 create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    tagger = NerTagger.get_instance(content_type="html")
+    tagger = NerTagger.get_instance()
     for key, docs in doc_map.items():
         entities = tagger.extract(
             docs,
