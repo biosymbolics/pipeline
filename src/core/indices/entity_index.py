@@ -3,7 +3,7 @@ EntityIndex
 """
 from datetime import datetime
 from typing import Callable, Optional, cast
-from llama_index import GPTVectorStoreIndex
+from llama_index import GPTVectorStoreIndex, VectorStoreIndex
 from langchain.output_parsers import ResponseSchema
 from pydash import flatten
 import logging
@@ -194,7 +194,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = load_index(INDEX_NAME, self.context_args)
+        index = load_index(INDEX_NAME, VectorStoreIndex, self.context_args)
         self.index = index
 
     def add_node(

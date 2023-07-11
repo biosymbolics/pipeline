@@ -4,7 +4,7 @@ Client for llama indexes
 import logging
 import traceback
 from typing import Any, Mapping, Optional, Type, TypeVar, Union
-from llama_index import Document, GPTVectorStoreIndex, Response
+from llama_index import Document, Response, load_index_from_storage
 
 from clients.llama_index.context import (
     get_service_context,
@@ -13,6 +13,7 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
+from clients.llama_index.index_impls.ner_keyword_index import NerKeywordTableIndex
 from typings.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocId, GetDocMetadata
@@ -22,32 +23,38 @@ IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 
 def load_index(
     index_name: str,
+    index_impl: Type[IndexImpl],
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
-    index_impl: Type[IndexImpl] = GPTVectorStoreIndex,
     index_args: Mapping[str, Any] = {},
-) -> IndexImpl:
+) -> LlmIndex:
     """
     Load persisted index. Creates new index if not found.
 
     Args:
         index_name (str): name of the index
         context_args (ContextArgs): context args for loading index
-        index_impl (Type[IndexImpl]): index implementation, defaults to GPTVectorStoreIndex
+        index_impl (Type[IndexImpl]): index implementation, defaults to VectorStoreIndex
         index_args (Mapping[str, Any]): args to pass to the index implementation
     """
+    logging.info(
+        "Loading context for index %s (%s, %s)", index_name, context_args, index_impl
+    )
     storage_context = get_storage_context(index_name, **context_args.storage_args)
     service_context = get_service_context(model_name=context_args.model_name)
 
-    index = index_impl(
-        [],
-        storage_context=storage_context,
-        service_context=service_context,
-        **index_args,
-    )
-    logging.info("Returning vector index %s", index_name)
+    try:
+        index = load_index_from_storage(storage_context)
+    except Exception as e:
+        logging.info("Cannot load index; creating")
+        index = index_impl(
+            [],
+            storage_context=storage_context,
+            service_context=service_context,
+            **index_args,
+        )
 
-    if not index:
-        raise Exception(f"Index {index_name} not found")
+    logging.info("Returning index %s", index_name)
+
     return index
 
 
@@ -94,7 +101,7 @@ def upsert_index(
     context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
     get_doc_metadata: Optional[GetDocMetadata] = None,
     get_doc_id: Optional[GetDocId] = None,
-) -> IndexImpl:
+) -> LlmIndex:
     """
     Create or add to an index from supplied document url
 
@@ -109,7 +116,7 @@ def upsert_index(
     """
     logging.info("Adding docs to index %s", index_name)
 
-    index = load_index(index_name, context_args, index_impl, index_args)
+    index = load_index(index_name, index_impl, context_args, index_args)
 
     try:
         ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)

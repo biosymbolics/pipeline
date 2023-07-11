@@ -26,7 +26,10 @@ DEFAULT_SOURCE_DOC_INDEX_CONTEXT_ARGS = ContextArgs(
     {
         **DEFAULT_CONTEXT_ARGS.storage_args,
         "storage_type": "mongodb",
-        "llm_config": "configs/sec/config.cfg",
+        "ner_options": {
+            "use_llm": True,
+            "llm_config": "configs/sec/config.cfg",
+        },
     },
 )
 
@@ -59,7 +62,7 @@ class SourceDocIndex:
         """
         Load source doc index from disk
         """
-        index = load_index(INDEX_NAME, self.context_args)
+        index = load_index(INDEX_NAME, self.index_impl, self.context_args)
         self.index = index
 
     def __get_metadata_filters(self, source: NamespaceKey):
@@ -149,10 +152,11 @@ class SourceDocIndex:
 
         metadata_filters = self.__get_metadata_filters(source)
 
-        logging.info(
-            "Querying with filters (if vector store) %s",
-            metadata_filters.__dict__.items(),
-        )
+        if not isinstance(metadata_filters, dict):
+            logging.info(
+                "Querying with filters (if vector store) %s",
+                metadata_filters.__dict__.items(),
+            )
 
         answer = query_index(
             self.index,

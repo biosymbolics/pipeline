@@ -65,4 +65,5 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         ner_keywords = self._ner_extract_keywords(
             text, max_keywords=self.max_keywords_per_chunk
         )
-        return set([*ner_keywords, *simple_keywords])
+        keywords = set([*ner_keywords, *simple_keywords])
+        return keywords
