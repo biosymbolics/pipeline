@@ -21,6 +21,16 @@ from typings.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
 INDEX_NAME = "source-docs"
 
 
+DEFAULT_SOURCE_DOC_INDEX_CONTEXT_ARGS = ContextArgs(
+    DEFAULT_CONTEXT_ARGS.model_name,
+    {
+        **DEFAULT_CONTEXT_ARGS.storage_args,
+        "storage_type": "mongodb",
+        "llm_config": "configs/sec/config.cfg",
+    },
+)
+
+
 class SourceDocIndex:
     """
     SourceDocIndex
@@ -30,10 +40,7 @@ class SourceDocIndex:
 
     def __init__(
         self,
-        context_args: ContextArgs = ContextArgs(
-            DEFAULT_CONTEXT_ARGS.model_name,
-            {**DEFAULT_CONTEXT_ARGS.storage_args, "storage_type": "mongodb"},
-        ),
+        context_args: ContextArgs = DEFAULT_SOURCE_DOC_INDEX_CONTEXT_ARGS,
         index_impl: Type[LlmIndex] = NerKeywordTableIndex,
     ):
         """
@@ -101,7 +108,7 @@ class SourceDocIndex:
         """
         Load source doc index from disk
         """
-        index = load_index(INDEX_NAME, **self.context_args.storage_args)
+        index = load_index(INDEX_NAME, self.context_args)
         self.index = index
 
     def __get_metadata_filters(self, source: NamespaceKey):

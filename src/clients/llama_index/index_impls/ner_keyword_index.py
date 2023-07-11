@@ -15,7 +15,14 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
     """
 
     def __init__(
-        self, *args, ner_options={"use_llm": True, "content_type": "html"}, **kwargs
+        self,
+        *args,
+        ner_options={
+            "use_llm": True,
+            "content_type": "html",
+            "llm_config": "configs/sec/config.cfg",
+        },
+        **kwargs,
     ):
         """
         Initialize super and NER tagger.

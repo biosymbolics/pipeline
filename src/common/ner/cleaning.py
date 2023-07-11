@@ -155,7 +155,7 @@ def normalize_entity_names(
         cleaning_steps = [remove_chars, remove_extra_spaces]
         normalized = reduce(lambda x, func: func(x), cleaning_steps, lemmatized)
 
-        if normalized != entity:
+        if normalized != (entity[0] if isinstance(entity, tuple) else entity):
             logging.info(f"Normalized entity: {entity} -> {normalized}")
 
         if isinstance(entity, tuple):

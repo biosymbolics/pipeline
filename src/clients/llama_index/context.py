@@ -28,7 +28,6 @@ ContextArgs = NamedTuple(
 
 DEFAULT_CONTEXT_ARGS = ContextArgs(model_name=DEFAULT_MODEL_NAME, storage_args={})
 MONGO_URI = os.environ["MONGO_URI"]
-MONGODB_DATABASE = "SourceDocs.v1"
 
 
 def get_storage_context(
@@ -54,12 +53,8 @@ def get_storage_context(
     elif storage_type == "mongodb":
         logging.info("Loading mongodb doc and index store context")
         return StorageContext.from_defaults(
-            docstore=MongoDocumentStore.from_uri(
-                uri=MONGO_URI, db_name=MONGODB_DATABASE
-            ),
-            index_store=MongoIndexStore.from_uri(
-                uri=MONGO_URI, db_name=MONGODB_DATABASE
-            ),
+            docstore=MongoDocumentStore.from_uri(uri=MONGO_URI),
+            index_store=MongoIndexStore.from_uri(uri=MONGO_URI),
         )
 
     raise Exception(f"Unknown storage type {storage_type}")
