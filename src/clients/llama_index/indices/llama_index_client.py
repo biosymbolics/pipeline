@@ -13,7 +13,6 @@ from clients.llama_index.context import (
     DEFAULT_CONTEXT_ARGS,
 )
 from clients.llama_index.formatting import format_documents
-from clients.llama_index.index_impls.ner_keyword_index import NerKeywordTableIndex
 from typings.indices import LlmIndex, Prompt, RefinePrompt
 
 from ..types import GetDocId, GetDocMetadata

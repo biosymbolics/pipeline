@@ -1,10 +1,8 @@
 """
 Functions around llama index context
 """
-from abc import abstractmethod
 import os
-import sys
-from typing import Any, Callable, Literal, NamedTuple, Optional, cast
+from typing import Any, Literal, NamedTuple, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -69,18 +67,16 @@ def get_storage_context(
         )
 
         chroma_collection = chroma_client.get_or_create_collection(index_name)
-        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-        index_store = MongoIndexStore.from_uri(
-            uri=MONGO_URI, db_name="db_docstore", namespace="index_store"
-        )
 
         return StorageContext.from_defaults(
             # **kwargs
             docstore=MongoDocumentStore.from_uri(
                 uri=MONGO_URI, db_name="db_docstore", namespace="docstore"
             ),
-            index_store=index_store,
-            vector_store=vector_store,
+            index_store=MongoIndexStore.from_uri(
+                uri=MONGO_URI, db_name="db_docstore", namespace="index_store"
+            ),
+            vector_store=ChromaVectorStore(chroma_collection=chroma_collection),
         )
 
     raise Exception(f"Unknown storage type {storage_type}")

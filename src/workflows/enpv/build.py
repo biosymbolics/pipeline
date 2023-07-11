@@ -16,26 +16,26 @@ from common.utils.async_utils import execute_async
 from sources.sec.build import build_indices
 
 PHARMA_TICKERS = [
-    # "PFE",
-    # "JNJ",
+    "PFE",
+    "JNJ",
     # "NVS", # 20-F
-    # "ABBV",
-    # "AMGN",
+    "ABBV",
+    "AMGN",
     # "GSK", # 20-F
-    # "GILD",
+    "GILD",
     # "NVO", # 20-F
     # "TAK", # 20-F
-    # "LLY",
+    "LLY",
     # "AZN", # 20-F
     # "BAYRY", # 20-F
     # "RHHBY", # 20-F
     # "MTZPY", # 20-F
-    # "MRK",
-    # "BMY",
+    "MRK",
+    "BMY",
     "BIIB",
-    # "SNY",
-    # "VTRS",
-    # "REGN",
+    "SNY",
+    "VTRS",
+    "REGN",
 ]
 
 
@@ -67,7 +67,7 @@ async def main():
     Usage:
         >>> python3 -m  workflows.enpv.build
     """
-    start_date = datetime(2022, 1, 1)
+    start_date = datetime(2015, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
     await execute_async(closures)
 
