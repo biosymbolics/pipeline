@@ -51,10 +51,27 @@ class SourceDocIndex:
             index_impl (LlmIndex, optional): index implementation. Defaults to NerKeywordTableIndex.
         """
         self.context_args = context_args
-        self.index = None
         self.index_impl = index_impl
-
+        self.index = None
         self.__load()
+
+    def __load(self):
+        """
+        Load source doc index from disk
+        """
+        index = load_index(INDEX_NAME, self.context_args)
+        self.index = index
+
+    def __get_metadata_filters(self, source: NamespaceKey):
+        """
+        Get metadata filters for source
+
+        TODO: only works for VectorStoreIndex currently!!
+        """
+        if isinstance(self.index_impl, VectorStoreIndex):
+            return pinecone.get_metadata_filters(source)
+
+        return source._asdict()
 
     def add_documents(
         self,
@@ -100,24 +117,6 @@ class SourceDocIndex:
             context_args=self.context_args,
         )
         self.index = index
-
-    def __load(self):
-        """
-        Load source doc index from disk
-        """
-        index = load_index(INDEX_NAME, self.context_args)
-        self.index = index
-
-    def __get_metadata_filters(self, source: NamespaceKey):
-        """
-        Get metadata filters for source
-
-        TODO: only works for VectorStoreIndex currently!!
-        """
-        if isinstance(self.index_impl, VectorStoreIndex):
-            return pinecone.get_metadata_filters(source)
-
-        return source._asdict()
 
     def query(
         self,

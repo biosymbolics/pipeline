@@ -6,7 +6,7 @@ import re
 
 from common.utils.extraction.html import extract_text
 from common.utils.misc import dict_to_named_tuple
-from core.indices import entity_index
+from core import SourceDocIndex
 from typings.indices import NamespaceKey
 
 from .sec import fetch_annual_reports_sections as fetch_annual_reports
@@ -52,4 +52,9 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
             }
         )
 
-    entity_index.create_from_docs(doc_map, get_namespace_key)
+    source_doc_index = SourceDocIndex()
+
+    for key, doc_sections in doc_map.items():
+        source_doc_index.add_documents(get_namespace_key(key), doc_sections)
+
+    # entity_index.create_from_docs(doc_map, get_namespace_key)

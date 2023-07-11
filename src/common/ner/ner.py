@@ -32,7 +32,7 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.DEBUG)
+spacy_llm.logger.setLevel(logging.INFO)
 
 
 def get_default_tokenizer(nlp: Language):

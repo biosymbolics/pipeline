@@ -51,6 +51,7 @@ def get_storage_context(
         return StorageContext.from_defaults(vector_store=vector_store)
 
     elif storage_type == "mongodb":
+        # TODO use index_name
         logging.info("Loading mongodb doc and index store context")
         return StorageContext.from_defaults(
             docstore=MongoDocumentStore.from_uri(uri=MONGO_URI),
