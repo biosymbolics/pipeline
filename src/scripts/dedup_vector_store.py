@@ -11,7 +11,7 @@ from system import initialize
 
 initialize()
 
-from clients.vector_dbs.pinecone import get_vector_store
+from clients.stores.pinecone import get_vector_store
 from core import SOURCE_DOC_INDEX_NAME
 
 PERIODS = [

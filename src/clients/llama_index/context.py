@@ -1,20 +1,23 @@
 """
 Functions around llama index context
 """
-from typing import Any, NamedTuple, Optional
+import os
+from typing import Any, Literal, NamedTuple, Optional
 from llama_index import (
     LLMPredictor,
     PromptHelper,
     ServiceContext,
     StorageContext,
 )
+from llama_index.storage.docstore import MongoDocumentStore
+from llama_index.storage.index_store import MongoIndexStore
 from llama_index.vector_stores import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
-from clients.vector_dbs.pinecone import get_vector_store
+from clients.stores.pinecone import get_vector_store
 from typings.indices import LlmModelType
 
 ContextArgs = NamedTuple(
@@ -22,11 +25,14 @@ ContextArgs = NamedTuple(
     [("model_name", Optional[LlmModelType]), ("storage_args", dict[str, Any])],
 )
 
+
 DEFAULT_CONTEXT_ARGS = ContextArgs(model_name=DEFAULT_MODEL_NAME, storage_args={})
+MONGO_URI = os.environ["MONGO_URI"]
 
 
 def get_storage_context(
     index_name: str,
+    storage_type: Literal["pinecone", "mongodb"] = "pinecone",
     **kwargs,
 ) -> StorageContext:
     """
@@ -37,9 +43,22 @@ def get_storage_context(
         vector_store_kwargs (Mapping[str, Any]): kwargs for vector store
     """
     logging.info("Loading storage context for %s", index_name)
-    pinecone_index = get_vector_store(index_name)
-    vector_store = PineconeVectorStore(pinecone_index, **kwargs)
-    return StorageContext.from_defaults(vector_store=vector_store)
+
+    if storage_type == "pinecone":
+        logging.info("Loading pinecone vector store context")
+        pinecone_index = get_vector_store(index_name)
+        vector_store = PineconeVectorStore(pinecone_index, **kwargs)
+        return StorageContext.from_defaults(vector_store=vector_store)
+
+    elif storage_type == "mongodb":
+        # TODO use index_name
+        logging.info("Loading mongodb doc and index store context")
+        return StorageContext.from_defaults(
+            docstore=MongoDocumentStore.from_uri(uri=MONGO_URI),
+            index_store=MongoIndexStore.from_uri(uri=MONGO_URI),
+        )
+
+    raise Exception(f"Unknown storage type {storage_type}")
 
 
 def get_service_context(

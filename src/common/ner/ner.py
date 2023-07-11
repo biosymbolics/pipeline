@@ -17,7 +17,7 @@ import logging
 import warnings
 
 from common.ner.linker import TermLinker
-from common.utils.extraction.html import strip_tags
+from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
@@ -32,7 +32,7 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="torch.amp.autocast_mode"
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.DEBUG)
+spacy_llm.logger.setLevel(logging.INFO)
 
 
 def get_default_tokenizer(nlp: Language):
@@ -49,6 +49,7 @@ class NerTagger:
     def __init__(
         self,
         use_llm: Optional[bool] = True,
+        llm_config: Optional[str] = "configs/patents/config.cfg",
         model: Optional[str] = "en_core_sci_lg",
         rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
@@ -75,6 +76,7 @@ class NerTagger:
         )
 
         self.content_type = content_type
+        self.llm_config = llm_config
         self.linker: Optional[TermLinker] = None  # lazy initialization
         self.__init_tagger()
 
@@ -87,7 +89,9 @@ class NerTagger:
         )
 
         if self.use_llm:
-            nlp = assemble("configs/config.cfg")
+            if not self.llm_config:
+                raise ValueError("Must provide llm_config if use_llm is True")
+            nlp = assemble(self.llm_config)
         else:
             nlp.tokenizer = self.get_tokenizer(nlp)
             nlp.add_pipe("merge_entities", after="ner")
@@ -163,8 +167,7 @@ class NerTagger:
         # if use_llm, no tokenization
         if self.use_llm:
             if self.content_type == "html":
-                # strip out all the HTML tags
-                _content = [strip_tags(c) for c in _content]
+                _content = [extract_text(c) for c in _content]
 
             # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             _content = flatten(chunk_list(_content, CHUNK_SIZE))

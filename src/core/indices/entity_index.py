@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Callable, Optional, cast
 from llama_index import GPTVectorStoreIndex
 from langchain.output_parsers import ResponseSchema
+from pydash import flatten
 import logging
 
 from clients.llama_index import (
@@ -19,9 +20,8 @@ from clients.llama_index.context import (
 )
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
-from clients.vector_dbs.pinecone import get_metadata_filters
+from clients.stores.pinecone import get_metadata_filters
 from common.ner.ner import NerTagger
-from common.ner.tokenizers.sec_tokenizer import get_sec_tokenizer
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
 from common.utils.string import get_id
@@ -82,13 +82,13 @@ def create_from_docs(
                 create_from_docs(doc_map, get_namespace_key)
             ```
     """
-    tagger = NerTagger.get_instance(content_type="html")
+    tagger = NerTagger.get_instance()
     for key, docs in doc_map.items():
         entities = tagger.extract(
             docs,
             entity_types=["mechanisms", "compounds", "classes"],
         )
-        flattend_entities = [ent[0] for ent in entities]
+        flattend_entities = [ent[0] for ent in flatten(entities)]
         ns_key = get_namespace_key(key)
         create_entity_indices(
             entities=cast(list[str], flattend_entities),
@@ -194,7 +194,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = load_index(INDEX_NAME, **self.context_args.storage_args)
+        index = load_index(INDEX_NAME, self.context_args)
         self.index = index
 
     def add_node(
@@ -243,7 +243,7 @@ class EntityIndex:
         upsert_index(
             INDEX_NAME,
             [details],
-            index_impl=self.index_impl,  # type: ignore
+            index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
             context_args=self.context_args,

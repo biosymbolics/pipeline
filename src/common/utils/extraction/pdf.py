@@ -2,6 +2,7 @@
 Extraction tools for PDFs
 """
 import logging
+import os
 import time
 import traceback
 from unstructured.partition.auto import partition
@@ -11,8 +12,10 @@ import pandas as pd
 
 from common.utils.file import save_as_pickle
 
+API_KEY = os.environ["UNSTRUCTURED_API_KEY"]
 
-def get_tables(filename: str = "./PFE-2021.pdf") -> list[pl.DataFrame]:
+
+def get_tables(filename: str) -> list[pd.DataFrame]:
     """
     Extract tables from PDF and return as dataframes
 
@@ -20,6 +23,17 @@ def get_tables(filename: str = "./PFE-2021.pdf") -> list[pl.DataFrame]:
 
     Args:
         filename (str, optional): path to PDF file. Defaults to "./PFE-2021.pdf".
+
+    API:
+    curl -X 'POST' \
+    'https://api.unstructured.io/general/v0/general' \
+    -H 'accept: application/json' \
+    -H 'Content-Type: multipart/form-data' \
+    -F 'files=@/tmp/sec.pdf' \
+    -F 'strategy=hi_res' \
+    -F 'pdf_infer_table_structure=true' \
+    -H 'unstructured-api-key: API_KEY' \
+    | jq -C . | less -R
     """
     start = time.time()
     try:
@@ -35,7 +49,8 @@ def get_tables(filename: str = "./PFE-2021.pdf") -> list[pl.DataFrame]:
         logging.error("Error extracting tables: %s", e)
         raise e
 
-    df_tables = [pl.from_pandas(table) for table in tables]
+    # df_tables = [pl.from_pandas(table) for table in tables]
+    df_tables = tables
 
     for df in df_tables:
         save_as_pickle(df, "table-df", True)

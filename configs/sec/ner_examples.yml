@@ -1,0 +1,60 @@
+- text: We participated in the joint development of mosunetuzumab, a late-stage bispecific antibody in development for B-cell non-Hodgkin’s lymphoma and other therapeutic areas.
+  entities:
+    products:
+      - mosunetuzumab
+    mechanisms:
+      - late-stage bispecific antibody
+    diseases:
+      - B-cell non-Hodgkin's lymphoma
+- text: commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody
+  entities:
+    products:
+      - BAT1806
+    classes:
+      - biosimilar
+    mechanisms:
+      - anti-interleukin-6 receptor monoclonal antibody
+      - anti-IL-6 receptor monoclonal antibody
+- text: A decrease in Fumarate revenue was primarily due to a decrease in TECFIDERA demand as a result of multiple generics entering the market.
+  entities:
+    products:
+      - TECFIDERA
+    classes:
+      - Fumarate
+- text: zuranolone for treatment of MDD, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)
+  entities:
+    products:
+      - zuranolone
+      - BIIB124
+      - BIIB111
+      - timrepigene emparvovec
+      - SAGE-324
+    diseases:
+      - Major Depressive Disorder (MDD)
+      - essential tremor
+- text: BIIB118 (CK1 inhibitor) - ISWRD in Parkinson's
+  entities:
+    products:
+      - BIIB118
+    mechanisms:
+      - CK1 inhibitor
+    diseases:
+      - Parkinson's Disease
+      - Irregular Sleep Wake Rhythm Disorder (ISWRD)
+- text: Opdivo (nivolumab), a biological product, is a fully human monoclonal antibody that binds to PD-1
+  entities:
+    products:
+      - Opdivo
+      - nivolumab
+    classes:
+      - biological product
+    mechanisms:
+      - PD-1 monoclonal antibody
+- text: GSPT1 CELMoD (CC-90009) --Relapsed/Refractory Acute Myeloid Leukemia
+  entities:
+    products:
+      - GSPT1 CELMoD
+      - CC-90009
+    diseases:
+      - Acute Myeloid Leukemia
+      - Relapsed/Refractory Acute Myeloid Leukemia

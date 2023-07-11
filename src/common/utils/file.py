@@ -2,6 +2,7 @@
 Utils related to files
 """
 import json
+import os
 import pickle
 import uuid
 from typing import Any, Optional, Union
@@ -16,19 +17,54 @@ def save_as_file(content: Union[str, bytes], filename: str):
         file.write(content)
 
 
+def load_file(filename: str) -> Any:
+    """
+    Simple file reader function
+
+    Args:
+        filename (str): filename to read
+    """
+    with open(filename, "r") as file:
+        return file.read()
+
+
+PICKLE_BASE = "data/pickles/"
+
+
 def save_as_pickle(
     obj: Any, filename: Optional[str] = None, use_uuid: bool = True
 ) -> str:
     """
     Saves obj as pickle
     """
-    PICKLE_BASE = "data/pickles/"
     if not filename or use_uuid:
         filename = PICKLE_BASE + (filename or "") + str(uuid.uuid4()) + ".txt"
     with open(filename, "wb") as file:
         pickle.dump(obj, file)
 
     return filename
+
+
+def load_pickle(filename: str) -> Any:
+    """
+    Loads pickle from file
+    """
+    with open(PICKLE_BASE + filename, "rb") as file:
+        return pickle.load(file)
+
+
+def load_pickles(directory: str = PICKLE_BASE) -> dict[str, Any]:
+    """
+    Loads all pickles from directory
+
+    Args:
+        directory (str): directory to load pickles from
+
+    Returns:
+        dict[str, Any]: dict of objects keyed by filename
+    """
+    pickles = [(filename, load_pickle(filename)) for filename in os.listdir(directory)]
+    return dict(pickles)
 
 
 def save_json_as_file(serializable_obj: Any, filename: str):

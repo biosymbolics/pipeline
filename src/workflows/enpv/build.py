@@ -4,6 +4,7 @@ Workflows for building up sec data
 import asyncio
 from datetime import datetime
 import logging
+import sys
 import traceback
 from typing import Callable, Coroutine
 
@@ -62,6 +63,9 @@ def __build_indices(
 async def main():
     """
     Build SEC stuffs
+
+    Usage:
+        >>> python3 -m  workflows.enpv.build
     """
     start_date = datetime(2015, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]
@@ -69,4 +73,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    if "-h" in sys.argv:
+        print("Usage: python3 -m  workflows.enpv.build\nLoad eNVP SEC data")
+        sys.exit()
     asyncio.run(main())
