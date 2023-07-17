@@ -8,44 +8,69 @@ import polars as pl
 
 from common.utils.file import save_json_as_file
 
-# {
-#   "text": "Thyroid hormone receptors form distinct nuclear protein- dependent and independent complexes with a thyroid hormone response element.",
-#   "entity_types": ["protein", "DNA"],
-#   "entity_start_chars": [0, 100],
-#   "entity_end_chars": [30, 133],
-#   "id": "MEDLINE:91125342-0",
-#   "word_start_chars": [0, 8, 16, 26, 31, 40, 48, 57, 67, 71, 83, 93, 98, 100, 108, 116, 125, 132],
-#   "word_end_chars": [7, 15, 25, 30, 39, 47, 56, 66, 70, 82, 92, 97, 99, 107, 115, 124, 132, 133]
-# }
-def format_thing(df: pl.DataFrame):
+
+def format_into_binder(df: pl.DataFrame):
+    """
+    Format a dataframe into the binder format, e.g.
+    {
+        "text": "Thyroid hormone receptors form distinct nuclear protein- dependent and independent complexes with a thyroid hormone response element.",
+        "entity_types": ["protein", "DNA"],
+        "entity_start_chars": [0, 100],
+        "entity_end_chars": [30, 133],
+        "id": "MEDLINE:91125342-0",
+        "word_start_chars": [0, 8, 16, 26, 31, 40, 48, 57, 67, 71, 83, 93, 98, 100, 108, 116, 125, 132],
+        "word_end_chars": [7, 15, 25, 30, 39, 47, 56, 66, 70, 82, 92, 97, 99, 107, 115, 124, 132, 133]
+    }
+    and saves to file.
+    """
     formatted = (
-        df.filter(pl.col("indices").is_not_null())
-        .groupby("publication_number")
-        .agg(
-            [
-                pl.col("publication_number").first().alias("id"),
-                pl.col("text").first(),
-                pl.col("domain").alias("entity_types"),
-                pl.col("indices")
-                .apply(lambda indices: [idx[1][0] for idx in indices])
-                .alias("entity_start_chars"),
-                pl.col("indices")
-                .apply(lambda indices: [idx[1][1] for idx in indices])
-                .alias("entity_end_chars"),
-            ]
+        (
+            df.filter(pl.col("indices").is_not_null())
+            .groupby("publication_number")
+            .agg(
+                [
+                    pl.col("publication_number").first().alias("id"),
+                    pl.col("text").first(),
+                    pl.col("indices")
+                    .apply(lambda indices: sorted([idx[1][0] for idx in indices]))
+                    .alias("entity_start_chars"),
+                    pl.col("indices")
+                    .apply(lambda indices: sorted([idx[1][1] for idx in indices]))
+                    .alias("entity_end_chars"),
+                    pl.struct(["domain", "indices"]).alias("entity_info"),
+                ]
+            )
+            .filter(pl.col("entity_start_chars").is_not_null())
+            .drop("publication_number")
         )
-        .filter(pl.col("entity_start_chars").is_not_null())
-        .drop("publication_number")
+        .with_columns(
+            pl.col("entity_info")
+            .apply(
+                lambda recs: [
+                    d
+                    for _, d in sorted(
+                        zip(
+                            [rec["indices"][1][0] for rec in recs],
+                            [rec["domain"] for rec in recs],
+                        )
+                    )
+                ]
+            )
+            .alias("entity_types")
+        )
+        .drop("entity_info")
     )
 
     with_word_indices = formatted.with_columns(
-        pl.col("text").apply(lambda text: get_word_indices(text)).alias("word_indices")
+        pl.col("text")
+        .apply(lambda text: generate_word_indices(str(text)))
+        .alias("word_indices")
     ).with_columns(
         pl.col("word_indices")
-        .apply(lambda idxs: [i[0] for i in idxs])
+        .apply(lambda idxs: sorted([i[0] for i in idxs]))
         .alias("word_start_chars"),
         pl.col("word_indices")
-        .apply(lambda idxs: [i[1] for i in idxs])
+        .apply(lambda idxs: sorted([i[1] for i in idxs]))
         .alias("word_end_chars"),
     )
     records = with_word_indices.to_dicts()
@@ -53,7 +78,10 @@ def format_thing(df: pl.DataFrame):
     return formatted
 
 
-def get_word_indices(text):
+def generate_word_indices(text: str) -> list[tuple[int, int]]:
+    """
+    Generate word indices for a text
+    """
     word_indices = []
     token_re = re.compile(r"[\s\n]")
     words = token_re.split(text)
@@ -82,6 +110,8 @@ def get_entity_indices(
         df.filter(pl.col("indices").is_not_null()).select(pl.struct(["text", "original_term", "indices"])
             .apply(lambda rec: print(rec["text"][rec["indices"][1][0]:rec["indices"][1][1]] if len(rec["indices"]) > 0 else "hi"))
             .alias("check"))
+
+    # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
     token_re = re.compile(r"[\s\n]")
     words = token_re.split(text)
