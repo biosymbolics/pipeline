@@ -11,6 +11,9 @@ import spacy
 from spacy.language import Language
 from spacy.tokens import Span, Doc
 from spacy.tokenizer import Tokenizer
+from spacy_transformers import Transformer
+from thinc.api import PyTorchWrapper
+
 import spacy_llm
 from spacy_llm.util import assemble
 import logging
@@ -50,7 +53,7 @@ class NerTagger:
         self,
         use_llm: Optional[bool] = True,
         llm_config: Optional[str] = "configs/patents/config.cfg",
-        model: Optional[str] = "en_core_sci_lg",
+        model: Optional[str] = "",  # "en_core_sci_lg",
         rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
             INTERVENTION_SPACY_PATTERNS,
@@ -84,15 +87,26 @@ class NerTagger:
         start_time = time.time()
         nlp = (
             spacy.blank("en")
-            if self.use_llm or not self.model
-            else spacy.load(self.model)
+            # if self.use_llm or not self.model
+            # else spacy.load(self.model, exclude=["ner"])
         )
 
         if self.use_llm:
             if not self.llm_config:
                 raise ValueError("Must provide llm_config if use_llm is True")
             nlp = assemble(self.llm_config)
-        else:
+        elif self.model:
+            if "torch" in self.model or self.model.endswith(".pt"):
+                # thinc_model = PyTorchWrapper(self.model)
+                # self.nlp
+                # trf = Transformer(
+                #     nlp.vocab,
+                #     thinc_model,
+                #     max_batch_items=4096,
+                # )
+                nlp.add_pipe("hf_token_pipe", config={"model": self.model})
+                # nlp.add_pipe(trf, name="ner")
+                nlp.rename_pipe("hf_token_pipe", "ner")
             nlp.tokenizer = self.get_tokenizer(nlp)
             nlp.add_pipe("merge_entities", after="ner")
             ruler = nlp.add_pipe(
@@ -102,6 +116,8 @@ class NerTagger:
             )
             for set in self.rule_sets:
                 ruler.add_patterns(set)  # type: ignore
+        else:
+            raise ValueError("Must provide either use_llm or model")
 
         self.nlp = nlp
 
