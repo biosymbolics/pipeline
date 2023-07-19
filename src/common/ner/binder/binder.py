@@ -1,3 +1,6 @@
+"""
+Binder NER model
+"""
 from functools import partial
 from typing import Any, Optional, TypedDict
 import numpy as np
@@ -19,6 +22,10 @@ MAX_LENGTH = 128  # max??
 
 
 class Annotation(TypedDict):
+    """
+    Annotation class
+    """
+
     id: str
     entity_type: int  # TODO: str
     start_char: int
