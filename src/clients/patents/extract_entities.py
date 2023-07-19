@@ -145,7 +145,9 @@ class PatentEnricher:
 
         # extract entities
         # normalization/linking is unnecessary; will be handled by initialize_patents.
-        entities = self.tagger.extract(patent_docs, link=False)
+        entities = self.tagger.extract(
+            patent_docs, link=False, entity_types=["diseases", "compounds"]
+        )
         if len([ent for ent in entities if len(ent) > 0]) == 0:
             logging.info("No entities found")
             return None
@@ -159,6 +161,7 @@ class PatentEnricher:
             ]
             for ent_set in entities
         ]
+        print(flatish_ents)
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
         return __flatten(enriched)

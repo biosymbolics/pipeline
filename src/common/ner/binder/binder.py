@@ -63,6 +63,7 @@ class BinderNlp:
             "stride": DOC_STRIDE,
             "return_tensors": "pt",
             "padding": "max_length",
+            "truncation": True,
         }
 
     def __call__(self, texts: list[str]):
@@ -134,14 +135,20 @@ class BinderNlp:
         ]
 
         all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
+
         new_doc.set_ents(all_ents)
         return new_doc
 
     def tokenize(self, texts: list[str]):
+        """
+        Main tokenizer
+
+        Args:
+            texts (list[str]): list of texts to tokenize
+        """
         return self.tokenizer(
             texts,
             **{
-                "truncation": False,
                 "return_overflowing_tokens": True,
                 "return_offsets_mapping": True,
                 **self.tokenizer_args,  # type: ignore
@@ -165,10 +172,14 @@ class BinderNlp:
             },
         )
 
-        predictions = self.model(
-            **inputs,
-            **self.__type_descriptions,
-        )
+        try:
+            predictions = self.model(
+                **inputs,
+                **self.__type_descriptions,
+            )
+        except Exception as e:
+            logger.error(f"Error predicting entities for {text}: {e}")
+            raise e
 
         annotations = extract_predictions(
             features, predictions.__dict__["span_scores"], self.type_map

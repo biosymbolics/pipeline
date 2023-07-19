@@ -95,7 +95,7 @@ def extract_predictions(
 
     all_predictions = flatten(
         [
-            __extract_prediction(predictions[idx], feature)
+            __extract_prediction(predictions[0], feature)
             for idx, feature in enumerate(features)
         ]
     )
@@ -162,7 +162,7 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     return features
 
 
-def has_span_overlap(new_ent: Span, existing_ents: list[Span]) -> bool:
+def has_span_overlap(new_ent: Span, index: int, existing_ents: list[Span]) -> bool:
     """
     Check if a new entity overlaps with any of the existing entities
 
@@ -171,8 +171,8 @@ def has_span_overlap(new_ent: Span, existing_ents: list[Span]) -> bool:
         existing_ents: the existing entities to check against
     """
     has_overlap = any(
-        new_ent.start_char < ent.end_char and new_ent.end_char > ent.start_char
-        for ent in existing_ents[: existing_ents.index(new_ent)]
+        new_ent.start_char <= ent.end_char and new_ent.end_char >= ent.start_char
+        for ent in existing_ents[:index]
     )
     return has_overlap
 
@@ -186,4 +186,8 @@ def remove_overlapping_spans(spans: list[Span]) -> list[Span]:
         spans: the spans to remove overlaps from
     """
     sorted_spans = sorted(spans, key=lambda e: e.end_char - e.start_char, reverse=True)
-    return [span for span in sorted_spans if not has_span_overlap(span, sorted_spans)]
+    return [
+        span
+        for idx, span in enumerate(sorted_spans)
+        if not has_span_overlap(span, idx, sorted_spans)
+    ]
