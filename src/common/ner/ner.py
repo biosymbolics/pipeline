@@ -7,12 +7,13 @@ from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
+import spacy
 from spacy.tokens import Span, Doc
-
 import spacy_llm
 from spacy_llm.util import assemble
 import logging
 import warnings
+from clients.spacy import DEFAULT_MODEL
 from common.ner.binder.binder import BinderNlp
 
 from common.ner.linker import TermLinker
@@ -20,7 +21,8 @@ from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
-from .types import DocEntities
+from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
+from .types import DocEntities, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]
@@ -46,20 +48,26 @@ class NerTagger:
         llm_config: Optional[str] = "configs/patents/config.cfg",
         model: Optional[str] = "model.pt",  # ignored if use_llm is True
         content_type: Optional[ContentType] = "text",
+        rule_sets: list[SpacyPatterns] = [
+            INDICATION_SPACY_PATTERNS,
+            INTERVENTION_SPACY_PATTERNS,
+        ],
     ):
         """
         Named-entity recognition using spacy
 
         Args:
             use_llm (Optional[bool], optional): Use LLM model. Defaults to False. If true, no rules or anything are used.
-            model (str, optional): SpaCy model. Defaults to "en_core_sci_scibert".
+            llm_config (Optional[str], optional): LLM config file. Defaults to "configs/patents/config.cfg".
+            model (str, optional): torch NER model. Defaults to "model.pt".
+            content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
-            get_tokenizer (Optional[GetTokenizer], optional): SpaCy tokenizer. Defaults to None.
         """
         self.model = model
         self.use_llm = use_llm
         self.content_type = content_type
         self.llm_config = llm_config
+        self.rule_sets = rule_sets
         self.linker: Optional[TermLinker] = None  # lazy initialization
         start_time = time.time()
 
@@ -71,6 +79,16 @@ class NerTagger:
             if not self.model.endswith(".pt"):
                 raise ValueError("Model must be torch")
             self.nlp = BinderNlp(self.model)
+            rule_nlp = spacy.load(DEFAULT_MODEL)
+            rule_nlp.add_pipe("merge_entities", after="ner")
+            ruler = rule_nlp.add_pipe(
+                "entity_ruler",
+                config={"validate": True, "overwrite_ents": True},
+                after="merge_entities",
+            )
+            for set in self.rule_sets:
+                ruler.add_patterns(set)  # type: ignore
+            self.rule_nlp = rule_nlp
         else:
             raise ValueError("Must provide either use_llm or model")
 
@@ -129,15 +147,12 @@ class NerTagger:
     def __prep_doc(self, content: list[str]) -> list[str]:
         """
         Prepares a list of content for NER
-        (only if use_llm is True)
         """
         _content = content.copy()
+        if self.content_type == "html":
+            _content = [extract_text(c) for c in _content]
 
-        # if use_llm, no tokenization
         if self.use_llm:
-            if self.content_type == "html":
-                _content = [extract_text(c) for c in _content]
-
             # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             _content = flatten(chunk_list(_content, CHUNK_SIZE))
 
@@ -175,6 +190,7 @@ class NerTagger:
 
         steps = [
             self.__prep_doc,
+            self.rule_nlp.pipe if self.rule_nlp else lambda x: x,
             self.nlp.pipe,
             # TODO: linking would be faster if done in batch
             lambda docs: [

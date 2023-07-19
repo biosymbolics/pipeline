@@ -7,11 +7,11 @@ import torch
 from transformers import AutoTokenizer
 import logging
 from spacy.vocab import Vocab
-from spacy.tokens import Doc, Span
+from spacy.tokens import Doc
 
 from .constants import NER_TYPES
 from .types import Annotation
-from .utils import extract_predictions, has_span_overlap, prepare_features
+from .utils import extract_predictions, remove_overlapping_spans, prepare_features
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class BinderNlp:
             vocab=doc.vocab if isinstance(doc, Doc) else Vocab(),
             words=doc.text.split() if isinstance(doc, Doc) else doc.split(),
         )
-        ents = [
+        new_ents = [
             Doc.char_span(
                 new_doc,
                 a["start_char"],
@@ -115,16 +115,19 @@ class BinderNlp:
             for a in annotations
         ]
 
-        # in case spacy refuses to create the ent span
-        if len(ents) > len(annotations):
-            logger.warning(
-                "Some entities are None, because SpaCy got mad (%s vs %s)",
-                ents,
-                annotations,
+        # re-create the existing ents, to reset ent start/end indexes
+        existing_ents = [
+            Doc.char_span(
+                new_doc,
+                e.start_char,
+                e.end_char,
+                label=e.label,
             )
+            for e in (doc.ents if isinstance(doc, Doc) else [])
+        ]
 
-        new_ents = [ent for ent in compact(ents) if not has_span_overlap(ent, ents)]
-        new_doc.set_ents(new_ents)
+        all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
+        new_doc.set_ents(all_ents)
         return new_doc
 
     def tokenize(self, texts: list[str]):

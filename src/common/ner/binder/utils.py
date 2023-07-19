@@ -170,7 +170,20 @@ def has_span_overlap(new_ent: Span, existing_ents: list[Span]) -> bool:
         new_ent: the new entity to check
         existing_ents: the existing entities to check against
     """
-    return not any(
+    has_overlap = any(
         new_ent.start_char < ent.end_char and new_ent.end_char > ent.start_char
-        for ent in existing_ents
+        for ent in existing_ents[: existing_ents.index(new_ent)]
     )
+    return has_overlap
+
+
+def remove_overlapping_spans(spans: list[Span]) -> list[Span]:
+    """
+    Remove overlapping spans from a list of spans.
+    If overlap, leave the longest.
+
+    Args:
+        spans: the spans to remove overlaps from
+    """
+    sorted_spans = sorted(spans, key=lambda e: e.end_char - e.start_char, reverse=True)
+    return [span for span in sorted_spans if not has_span_overlap(span, sorted_spans)]
