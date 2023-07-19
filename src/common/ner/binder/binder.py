@@ -10,7 +10,7 @@ from spacy.tokens import Doc, Span
 
 from .constants import NER_TYPES
 from .types import Annotation
-from .utils import extract_predictions, prepare_features
+from .utils import extract_predictions, has_span_overlap, prepare_features
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,10 @@ class BinderNlp:
     """
     A class for running the Binder NLP model, partially emulating SpaCy's Language (nlp) class.
 
-    To create the model, from the binder dir:
+    To create the model, clone https://github.com/kristinlindquist/binder and from that directory
     ```
-    config = {
+    $ python3
+    >>> config = {
         "cache_dir": "",
         "end_loss_weight": 0.2,
         "hidden_dropout_prob": 0.1,
@@ -42,12 +43,14 @@ class BinderNlp:
         "use_span_width_embedding": True
     }
 
-    import torch
-    from model import Binder
-    from config import BinderConfig
-    model = Binder(BinderConfig(**config))
-    model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('cpu')))
-    torch.save(model, 'model.pt')
+    >>> import torch
+    >>> from model import Binder
+    >>> from config import BinderConfig
+    >>> model = Binder(BinderConfig(**config))
+    >>> model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('cpu')))
+    >>> torch.save(model, 'model.pt')
+
+    and copy model.pt into pipeline/
     ```
     """
 
@@ -74,9 +77,11 @@ class BinderNlp:
         """
         descriptions = self.tokenizer(
             [t["description"] for t in NER_TYPES],
-            padding="longest",
-            return_tensors="pt",
-            **self.tokenizer_args,
+            **{
+                "padding": "longest",
+                "return_tensors": "pt",
+                **self.tokenizer_args,
+            },
         )
         return {
             "type_input_ids": descriptions["input_ids"],
@@ -88,6 +93,8 @@ class BinderNlp:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
+        In the case of overlapping entity spans, takes the largest.
+
         Args:
             doc (Union[str, Doc]): text or SpaCy Doc
             annotations (list[Annotation]): list of annotations
@@ -95,28 +102,24 @@ class BinderNlp:
         new_doc = Doc(
             vocab=doc.vocab if isinstance(doc, Doc) else Vocab(),
             words=doc.text.split() if isinstance(doc, Doc) else doc.split(),
-            # todo: other doc stuff, if doc?
         )
         ents = [
-            Span(
-                new_doc,
-                a["start_char"],  # TODO: ent start
-                a["end_char"],
-                label=a["text"],
-                # label=a["entity_type"],
-            )
+            Doc.char_span(new_doc, a["start_char"], a["end_char"], label=a["text"])
             for a in annotations
         ]
-        new_doc.set_ents(ents)
+        new_ents = [ent for ent in ents if not has_span_overlap(ent, ents)]
+        new_doc.set_ents(new_ents)
         return new_doc
 
     def tokenize(self, texts: list[str]):
         return self.tokenizer(
             texts,
-            truncation=False,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            **self.tokenizer_args,
+            **{
+                "truncation": False,
+                "return_overflowing_tokens": True,
+                "return_offsets_mapping": True,
+                **self.tokenizer_args,  # type: ignore
+            },
         )
 
     def add_entities(self, doc: Union[str, Doc]) -> Doc:
@@ -130,8 +133,10 @@ class BinderNlp:
         features = prepare_features(text, self.tokenize([text]))
         inputs = self.tokenizer(
             text,
-            return_tensors="pt",
-            **self.tokenizer_args,
+            **{
+                "return_tensors": "pt",
+                **self.tokenizer_args,  # type: ignore
+            },
         )
 
         predictions = self.model(

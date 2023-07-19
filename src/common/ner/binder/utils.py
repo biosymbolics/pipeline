@@ -7,6 +7,7 @@ import numpy as np
 from pydash import compact, flatten
 import torch
 from transformers import BatchEncoding
+from spacy.tokens import Span
 
 from .types import Feature, Annotation
 
@@ -165,3 +166,13 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
         for i in range(num_features)
     ]
     return features
+
+
+def has_span_overlap(new_ent: Span, existing_ents: list[Span]) -> bool:
+    """
+    Check if a new entity overlaps with any of the existing entities
+    """
+    return not any(
+        new_ent.start_char < ent.end_char and new_ent.end_char > ent.start_char
+        for ent in existing_ents
+    )
