@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Any, Optional, TypedDict
 import numpy as np
-from pydash import flatten
+from pydash import compact, flatten
 import torch
 from transformers import AutoTokenizer
 import logging
@@ -32,7 +32,7 @@ Feature = TypedDict(
     {
         "id": str,
         "text": str,
-        "offset_mapping": list[tuple[int, int]],
+        "offset_mapping": list[Optional[tuple[int, int]]],
         "token_start_mask": list[int],
         "token_end_mask": list[int],
     },
@@ -102,7 +102,7 @@ def prepare_features(text: str) -> list[Feature]:
         feature["token_start_mask"] = [m[0] for m in token_masks]
         feature["token_end_mask"] = [m[1] for m in token_masks]
         feature["offset_mapping"] = [
-            o for k, o in enumerate(offset_mapping[i]) if sequence_ids[k] == 0
+            o if sequence_ids[k] == 0 else None for k, o in enumerate(offset_mapping[i])
         ]
         return feature
 
@@ -120,7 +120,7 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
     """
 
     def start_end_types(
-        span_logits, feature: Feature
+        span_logits: torch.Tensor, feature: Feature
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         # masks for start and end indices.
         token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
@@ -140,12 +140,12 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
     def create_annotation(tup: tuple[int, int, int], feature: Feature):
         offset_mapping = feature["offset_mapping"]
         start_char, end_char = (
-            offset_mapping[tup[1]][0],
-            offset_mapping[tup[2]][1],
+            offset_mapping[tup[0]][0],  # type: ignore
+            offset_mapping[tup[1]][1],  # type: ignore
         )
         pred = Annotation(
             id=feature["id"],
-            entity_type=tup[0],
+            entity_type=tup[2],
             start_char=start_char,
             end_char=end_char,
             text=feature["text"][start_char:end_char],
@@ -153,10 +153,12 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
         return pred
 
     start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
-    return [
-        create_annotation(rec, feature)
-        for rec in zip(type_ids, start_indexes, end_indexes)
-    ]
+    return compact(
+        [
+            create_annotation(tup, feature)
+            for tup in zip(start_indexes, end_indexes, type_ids)
+        ]
+    )
 
 
 def extract_predictions(
