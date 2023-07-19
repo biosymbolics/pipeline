@@ -44,7 +44,7 @@ class NerTagger:
 
     def __init__(
         self,
-        use_llm: Optional[bool] = True,
+        use_llm: Optional[bool] = False,
         llm_config: Optional[str] = "configs/patents/config.cfg",
         model: Optional[str] = "model.pt",  # ignored if use_llm is True
         content_type: Optional[ContentType] = "text",

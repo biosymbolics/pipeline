@@ -30,7 +30,7 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
 
 
 def extract_predictions(
-    features: list[Feature], predictions: np.ndarray
+    features: list[Feature], predictions: np.ndarray, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a list of features.
@@ -78,7 +78,7 @@ def extract_predictions(
             )
             pred = Annotation(
                 id=f"{feature['id']}-{idx}",
-                entity_type=tup[2],
+                entity_type=type_map[tup[2]],
                 start_char=int(start_char),
                 end_char=int(end_char),
                 text=feature["text"][start_char:end_char],

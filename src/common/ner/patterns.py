@@ -144,18 +144,21 @@ INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
     SpacyPatterns,
     [
         *[
-            {"label": "PRODUCT", "pattern": pattern}
+            {"label": "compounds", "pattern": pattern}
             for pattern in INVESTIGATIONAL_ID_PATTERNS
         ],
-        *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
         *[
-            {"label": "PRODUCT", "pattern": pattern}
+            {"label": "compounds", "pattern": pattern}
+            for pattern in BIOLOGICAL_PATTERNS
+        ],
+        *[
+            {"label": "compounds", "pattern": pattern}
             for pattern in SMALL_MOLECULE_PATTERNS
         ],
-        *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
+        *[{"label": "compounds", "pattern": pattern} for pattern in MOA_PATTERNS],
         # from en_ner_bc5cdr_md model
         {
-            "label": "PRODUCT",
+            "label": "compounds",
             "pattern": [{"ENT_TYPE": "CHEMICAL"}],
         },
     ],
@@ -187,7 +190,7 @@ INDICATION_PATTERNS = [
 INDICATION_SPACY_PATTERNS: SpacyPatterns = cast(
     SpacyPatterns,
     [
-        *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
+        *[{"label": "diseases", "pattern": pattern} for pattern in INDICATION_PATTERNS],
     ],
 )
 

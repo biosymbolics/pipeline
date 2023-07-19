@@ -7,7 +7,7 @@ class Annotation(TypedDict):
     """
 
     id: str
-    entity_type: int  # TODO: str
+    entity_type: str
     start_char: int
     end_char: int
     text: str

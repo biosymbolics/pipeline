@@ -72,6 +72,13 @@ class BinderNlp:
         return outputs
 
     @property
+    def type_map(self) -> dict[int, str]:
+        """
+        Get the type map for reconstituting the NER types
+        """
+        return dict([(i, t["name"]) for i, t in enumerate(NER_TYPES)])
+
+    @property
     def __type_descriptions(self):
         """
         Get the type descriptions used by the Binder model
@@ -109,7 +116,7 @@ class BinderNlp:
                 new_doc,
                 a["start_char"],
                 a["end_char"],
-                label=a["text"],
+                label=a["entity_type"],
                 alignment_mode="expand",
             )
             for a in annotations
@@ -163,7 +170,9 @@ class BinderNlp:
             **self.__type_descriptions,
         )
 
-        annotations = extract_predictions(features, predictions.__dict__["span_scores"])
+        annotations = extract_predictions(
+            features, predictions.__dict__["span_scores"], self.type_map
+        )
         return self.__get_doc(doc, annotations)
 
     def pipe(

@@ -24,7 +24,7 @@ class PatentEnricher:
         """
         Initialize the enricher
         """
-        self.tagger = NerTagger.get_instance(use_llm=True, content_type="text")
+        self.tagger = NerTagger.get_instance(use_llm=False, content_type="text")
 
     def __get_processed_pubs(self) -> list[str]:
         """
