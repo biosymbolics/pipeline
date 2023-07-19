@@ -9,7 +9,7 @@ from common.utils.args import make_hashable
 
 
 # small model lemmatizes antibodies as antibodies, large model as antibody
-DEFAULT_MODEL = "en_core_web_lg"
+DEFAULT_MODEL = "en_core_web_md"
 
 
 class Spacy:
