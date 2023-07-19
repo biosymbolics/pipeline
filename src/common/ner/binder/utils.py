@@ -94,10 +94,7 @@ def extract_predictions(
         )
 
     all_predictions = flatten(
-        [
-            __extract_prediction(predictions[0], feature)
-            for idx, feature in enumerate(features)
-        ]
+        [__extract_prediction(predictions[0], feature) for feature in features]
     )
 
     return all_predictions

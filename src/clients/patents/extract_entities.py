@@ -6,7 +6,7 @@ from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 500
+CHUNK_SIZE = 20
 
 MAX_TEXT_LENGTH = 500
 DECAY_RATE = 1 / 2000
@@ -110,8 +110,8 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.col("entities").apply(lambda e: e[3]).alias("canonical_term"),
-                    pl.col("entities").apply(lambda e: e[2]).alias("canonical_id"),
+                    pl.lit("").alias("canonical_term"),
+                    pl.lit("").alias("canonical_id"),
                     pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
@@ -154,14 +154,9 @@ class PatentEnricher:
 
         # add back to orig df
         flatish_ents = [
-            [
-                (ent[0], ent[1], ent[2].id, ent[2].name)
-                for ent in ent_set
-                if ent[2] is not None
-            ]
+            [(ent[0], ent[1], None) for ent in ent_set if len(ent[0]) > 0]
             for ent_set in entities
         ]
-        print(flatish_ents)
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
         return __flatten(enriched)
