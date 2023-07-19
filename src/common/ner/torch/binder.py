@@ -137,10 +137,8 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
 
         return (start_indexes, end_indexes, type_ids)
 
-    start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
-    offset_mapping = feature["offset_mapping"]
-
-    def create_annotation(tup: tuple[int, int, int]):
+    def create_annotation(tup: tuple[int, int, int], feature: Feature):
+        offset_mapping = feature["offset_mapping"]
         start_char, end_char = (
             offset_mapping[tup[1]][0],
             offset_mapping[tup[2]][1],
@@ -154,7 +152,11 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
         )
         return pred
 
-    return [create_annotation(rec) for rec in zip(type_ids, start_indexes, end_indexes)]
+    start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
+    return [
+        create_annotation(rec, feature)
+        for rec in zip(type_ids, start_indexes, end_indexes)
+    ]
 
 
 def extract_predictions(
