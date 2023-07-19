@@ -15,6 +15,7 @@ from .types import DocEntity
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
+    r"[\.,:;]$": "",
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
