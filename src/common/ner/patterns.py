@@ -26,7 +26,7 @@ MOA_PATTERNS: list = [
             {
                 "LEMMA": {
                     "REGEX": get_entity_re(
-                        moa_prefix + ALPHA_CHARS("*") + ".*", is_case_insensitive=True
+                        moa_prefix + ALPHA_CHARS("*"), is_case_insensitive=True
                     ),
                 },
             }
@@ -174,6 +174,7 @@ INDICATION_REGEXES = [
         get_or_re(INDICATION_MODIFIER_REGEXES, "*")
         + get_or_re(INDICATION_REGEXES, "+"),
         soe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
+        eoe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
         is_case_insensitive=True,
     ),
 ]

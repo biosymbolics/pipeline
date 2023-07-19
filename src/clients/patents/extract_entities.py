@@ -6,7 +6,7 @@ from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 20
+CHUNK_SIZE = 1000
 
 MAX_TEXT_LENGTH = 500
 DECAY_RATE = 1 / 2000
