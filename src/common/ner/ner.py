@@ -7,17 +7,13 @@ from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
-import spacy
-from spacy.language import Language
 from spacy.tokens import Span, Doc
-from spacy.tokenizer import Tokenizer
-from spacy_transformers import Transformer
-from thinc.api import PyTorchWrapper
 
 import spacy_llm
 from spacy_llm.util import assemble
 import logging
 import warnings
+from common.ner.binder.binder import BinderNlp
 
 from common.ner.linker import TermLinker
 from common.utils.extraction.html import extract_text
@@ -36,10 +32,6 @@ warnings.filterwarnings(
 )
 spacy_llm.logger.addHandler(logging.StreamHandler())
 spacy_llm.logger.setLevel(logging.INFO)
-
-
-def get_default_tokenizer(nlp: Language):
-    return Tokenizer(nlp.vocab)
 
 
 class NerTagger:
@@ -72,12 +64,6 @@ class NerTagger:
         """
         self.model = model
         self.use_llm = use_llm
-        self.rule_sets = rule_sets
-
-        self.get_tokenizer = (
-            get_default_tokenizer if get_tokenizer is None else get_tokenizer
-        )
-
         self.content_type = content_type
         self.llm_config = llm_config
         self.linker: Optional[TermLinker] = None  # lazy initialization
@@ -85,41 +71,15 @@ class NerTagger:
 
     def __init_tagger(self):
         start_time = time.time()
-        nlp = (
-            spacy.blank("en")
-            # if self.use_llm or not self.model
-            # else spacy.load(self.model, exclude=["ner"])
-        )
 
         if self.use_llm:
             if not self.llm_config:
                 raise ValueError("Must provide llm_config if use_llm is True")
-            nlp = assemble(self.llm_config)
+            self.nlp = assemble(self.llm_config)
         elif self.model:
-            if "torch" in self.model or self.model.endswith(".pt"):
-                # thinc_model = PyTorchWrapper(self.model)
-                # self.nlp
-                # trf = Transformer(
-                #     nlp.vocab,
-                #     thinc_model,
-                #     max_batch_items=4096,
-                # )
-                nlp.add_pipe("hf_token_pipe", config={"model": self.model})
-                # nlp.add_pipe(trf, name="ner")
-                nlp.rename_pipe("hf_token_pipe", "ner")
-            nlp.tokenizer = self.get_tokenizer(nlp)
-            nlp.add_pipe("merge_entities", after="ner")
-            ruler = nlp.add_pipe(
-                "entity_ruler",
-                config={"validate": True, "overwrite_ents": True},
-                after="merge_entities",
-            )
-            for set in self.rule_sets:
-                ruler.add_patterns(set)  # type: ignore
+            self.nlp = BinderNlp(self.model)
         else:
             raise ValueError("Must provide either use_llm or model")
-
-        self.nlp = nlp
 
         logging.info(
             "Init NER pipeline took %s seconds",
@@ -129,7 +89,7 @@ class NerTagger:
     def __normalize(
         self, doc: Doc, entity_types: Optional[list[str]] = None
     ) -> DocEntities:
-        entity_set = [(span.text, span.label_, None) for span in doc.ents]
+        entity_set: DocEntities = [(span.text, span.label_, None) for span in doc.ents]
 
         # basic filtering, character removal, lemmatization
         normalized = sanitize_entities(entity_set)
@@ -138,7 +98,7 @@ class NerTagger:
         if entity_types:
             return [e for e in normalized if e[1] in entity_types]
 
-        return normalized  # type: ignore
+        return normalized
 
     def __link(self, entities: DocEntities) -> DocEntities:
         """
@@ -166,7 +126,7 @@ class NerTagger:
         Args:
             doc (Doc): SpaCy doc
             link (bool, optional): Whether to link entities. Defaults to True.
-            entity_types (Optional[list[str]], optional): Entity types to filter by. Defaults to None.
+            entity_types (list[str], optional): Entity types to filter by. Defaults to None.
         """
         normalized = self.__normalize(doc, entity_types)
         if link:
@@ -235,8 +195,7 @@ class NerTagger:
         return ents_by_doc  # type: ignore
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-        if self.nlp:
-            return self.extract(*args, **kwds)
+        return self.extract(*args, **kwds)
 
     @classmethod
     def get_instance(cls, **kwargs) -> "NerTagger":
