@@ -181,14 +181,41 @@ def extract_predictions(
     return all_predictions
 
 
-def predict(text: str) -> list[Annotation]:
+def predict(text: str, model_file: str = "model.pt") -> list[Annotation]:
     """
     Predicts annotations for a given text.
 
     Args:
         text (str): The text to annotate.
+
+    To create the model, from the binder dir:
+    ```
+    config = {
+        "cache_dir": "",
+        "end_loss_weight": 0.2,
+        "hidden_dropout_prob": 0.1,
+        "init_temperature": 0.07,
+        "linear_size": 128,
+        "max_span_width": 129,
+        "ner_loss_weight": 0.5,
+        "pretrained_model_name_or_path": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
+        "revision": "main",
+        "span_loss_weight": 0.6,
+        "start_loss_weight": 0.2,
+        "threshold_loss_weight": 0.5,
+        "use_auth_token": False,
+        "use_span_width_embedding": True
+    }
+
+    import torch
+    from model import Binder
+    from config import BinderConfig
+    model = Binder(BinderConfig(**config))
+    model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('cpu')))
+    torch.save(model, 'model.pt')
+    ```
     """
-    model = torch.load("model.pt")
+    model = torch.load(model_file)
 
     descriptions = tokenizer(
         [t["description"] for t in NER_TYPES],
