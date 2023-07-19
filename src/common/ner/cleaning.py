@@ -87,7 +87,7 @@ def filter_common_terms(
         additional_common_words (list[str]): additional common words to add to the vocab
     """
 
-    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
+    nlp = Spacy.get_instance(disable=["ner"])
     common_words = __get_common_words(additional_common_words)
 
     def __is_common(item: T):
@@ -130,7 +130,7 @@ def normalize_entity_names(
         nlp (Language): spacy language model
         char_suppressions (dict[str, str]): characters to remove
     """
-    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
+    nlp = Spacy.get_instance(disable=["ner"])
     texts = [entity[0] if isinstance(entity, tuple) else entity for entity in entities]
     docs = nlp.pipe(texts)
 

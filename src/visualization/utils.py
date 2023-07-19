@@ -31,7 +31,7 @@ VectorizationObjects = NamedTuple(
 
 class SpacyLemmatizer(TransformerMixin):
     def __init__(self):
-        self.nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
+        self.nlp = Spacy.get_instance(disable=["ner"])
         self.nlp.add_pipe("merge_noun_chunks")
 
     def fit(self, X, y=None):

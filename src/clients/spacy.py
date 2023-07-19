@@ -8,6 +8,10 @@ import spacy
 from common.utils.args import make_hashable
 
 
+# small model lemmatizes antibodies as antibodies, large model as antibody
+DEFAULT_MODEL = "en_core_web_lg"
+
+
 class Spacy:
     """
     Wrapper for Spacy NLP model
@@ -20,7 +24,7 @@ class Spacy:
 
     def __init__(
         self,
-        model: str = "en_core_web_sm",
+        model: str = DEFAULT_MODEL,
         **kwargs: Any,
     ):
         self.model = model
@@ -38,7 +42,7 @@ class Spacy:
         return cls.get_instance()._nlp(text)
 
     @classmethod
-    def get_instance(cls, model: str = "en_core_web_sm", **kwargs):
+    def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs):
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:

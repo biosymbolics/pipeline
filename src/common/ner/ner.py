@@ -20,8 +20,7 @@ from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
-from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
-from .types import DocEntities, GetTokenizer, SpacyPatterns
+from .types import DocEntities
 
 T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]
@@ -45,12 +44,7 @@ class NerTagger:
         self,
         use_llm: Optional[bool] = True,
         llm_config: Optional[str] = "configs/patents/config.cfg",
-        model: Optional[str] = "",  # "en_core_sci_lg",
-        rule_sets: list[SpacyPatterns] = [
-            INDICATION_SPACY_PATTERNS,
-            INTERVENTION_SPACY_PATTERNS,
-        ],
-        get_tokenizer: Optional[GetTokenizer] = None,
+        model: Optional[str] = "model.pt",  # ignored if use_llm is True
         content_type: Optional[ContentType] = "text",
     ):
         """
@@ -67,9 +61,6 @@ class NerTagger:
         self.content_type = content_type
         self.llm_config = llm_config
         self.linker: Optional[TermLinker] = None  # lazy initialization
-        self.__init_tagger()
-
-    def __init_tagger(self):
         start_time = time.time()
 
         if self.use_llm:
@@ -77,6 +68,8 @@ class NerTagger:
                 raise ValueError("Must provide llm_config if use_llm is True")
             self.nlp = assemble(self.llm_config)
         elif self.model:
+            if not self.model.endswith(".pt"):
+                raise ValueError("Model must be torch")
             self.nlp = BinderNlp(self.model)
         else:
             raise ValueError("Must provide either use_llm or model")
@@ -171,6 +164,7 @@ class NerTagger:
             >>> tagger.extract(["SMALL MOLECULE INHIBITORS OF NF-kB INDUCING KINASE"])
             >>> tagger.extract(["Interferon alpha and omega antibody antagonists"])
             >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
+            >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")
