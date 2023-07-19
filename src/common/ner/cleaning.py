@@ -6,6 +6,7 @@ import re
 from functools import reduce
 import logging
 from clients.spacy import Spacy
+import html
 
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
@@ -149,11 +150,14 @@ def normalize_entity_names(
             entity_name = re.sub(pattern, replacement, entity_name)
         return entity_name
 
+    def decode_html(entity_name: str) -> str:
+        return html.unescape(entity_name)
+
     def normalize_entity(entity: T) -> T:
         doc = next(docs)
         lemmatized = lemmatize(doc)
 
-        cleaning_steps = [remove_chars, remove_extra_spaces]
+        cleaning_steps = [decode_html, remove_chars, remove_extra_spaces]
         normalized = reduce(lambda x, func: func(x), cleaning_steps, lemmatized)
 
         if normalized != (entity[0] if isinstance(entity, tuple) else entity):
