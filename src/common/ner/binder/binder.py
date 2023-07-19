@@ -6,9 +6,8 @@ import torch
 from transformers import AutoTokenizer
 import logging
 
-from scripts.patents.binder import generate_word_indices
-
 from .constants import NER_TYPES
+from .utils import generate_word_indices
 
 logger = logging.getLogger(__name__)
 

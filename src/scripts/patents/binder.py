@@ -7,6 +7,7 @@ from typing import Optional
 import polars as pl
 
 from common.utils.file import save_json_as_file
+from common.ner.binder.utils import generate_word_indices
 
 
 def format_into_binder(df: pl.DataFrame):
@@ -76,20 +77,6 @@ def format_into_binder(df: pl.DataFrame):
     records = with_word_indices.to_dicts()
     save_json_as_file(records, "formatted_data.json")
     return formatted
-
-
-def generate_word_indices(text: str) -> list[tuple[int, int]]:
-    """
-    Generate word indices for a text
-    """
-    word_indices = []
-    token_re = re.compile(r"[\s\n]")
-    words = token_re.split(text)
-    for idx, word in enumerate(words):
-        start_char = sum([len(word) + 1 for word in words[:idx]])
-        end_char = start_char + len(re.sub("[.,;]$", "", word))
-        word_indices.append((start_char, end_char))
-    return word_indices
 
 
 def get_entity_indices(
