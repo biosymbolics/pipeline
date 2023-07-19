@@ -42,6 +42,9 @@ Feature = TypedDict(
 def prepare_features(text: str) -> list[Feature]:
     """
     Prepare features for a single example.
+
+    Args:
+        text (str): text to prepare features for
     """
     word_idx = generate_word_indices(text)
     word_start_chars = [[word[0] for word in word_idx]]
@@ -115,20 +118,26 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
         span_logits: logits for all spans in the feature.
         feature: the feature from which to extract predictions.
     """
-    # masks for start and end indices.
-    token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
-    token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
 
-    # We use the [CLS] logits as thresholds
-    span_preds = np.triu(span_logits > span_logits[:, 0:1, 0:1])
+    def start_end_types(
+        span_logits, feature: Feature
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        # masks for start and end indices.
+        token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
+        token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
 
-    type_ids, start_indexes, end_indexes = (
-        token_start_mask[np.newaxis, :, np.newaxis]
-        & token_end_mask[np.newaxis, np.newaxis, :]
-        & span_preds
-    ).nonzero()
+        # We use the [CLS] logits as thresholds
+        span_preds = np.triu(span_logits > span_logits[:, 0:1, 0:1])
 
-    # This is what will allow us to map some the positions in our logits to span of texts in the original context.
+        type_ids, start_indexes, end_indexes = (
+            token_start_mask[np.newaxis, :, np.newaxis]
+            & token_end_mask[np.newaxis, np.newaxis, :]
+            & span_preds
+        ).nonzero()
+
+        return (start_indexes, end_indexes, type_ids)
+
+    start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
     offset_mapping = feature["offset_mapping"]
 
     def create_annotation(tup: tuple[int, int, int]):
@@ -145,14 +154,12 @@ def extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
         )
         return pred
 
-    example_predictions = [
-        create_annotation(rec) for rec in zip(type_ids, start_indexes, end_indexes)
-    ]
-
-    return example_predictions
+    return [create_annotation(rec) for rec in zip(type_ids, start_indexes, end_indexes)]
 
 
-def extract_predictions(features: list[Feature], predictions: np.ndarray) -> list:
+def extract_predictions(
+    features: list[Feature], predictions: np.ndarray
+) -> list[Annotation]:
     """
     Extract predictions from a list of features.
 
@@ -160,12 +167,6 @@ def extract_predictions(features: list[Feature], predictions: np.ndarray) -> lis
         features: the features from which to extract predictions.
         predictions: the span predictions from the model.
     """
-    if len(predictions) != len(features):
-        raise ValueError(
-            f"Got {len(predictions)} predictions and {len(features)} features."
-        )
-
-    # We grab the predictions of the model for this feature.
     all_predictions = flatten(
         [
             extract_prediction(predictions[idx], feature)
@@ -193,12 +194,6 @@ def predict(text: str) -> list[Annotation]:
         return_tensors="pt",
     )
 
-    data_collator = {
-        "type_input_ids": descriptions["input_ids"],
-        "type_attention_mask": descriptions["attention_mask"],
-        "type_token_type_ids": descriptions["token_type_ids"],
-    }
-
     features = prepare_features(text)
     inputs = tokenizer(
         text,
@@ -208,7 +203,12 @@ def predict(text: str) -> list[Annotation]:
         return_tensors="pt",
     )
 
-    predictions = model(**inputs, **data_collator).__dict__
+    predictions = model(
+        **inputs,
+        type_input_ids=descriptions["input_ids"],
+        type_attention_mask=descriptions["attention_mask"],
+        type_token_type_ids=descriptions["token_type_ids"],
+    ).__dict__
 
     results = extract_predictions(features, predictions["span_scores"])
     return results
