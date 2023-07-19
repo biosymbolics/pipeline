@@ -2,6 +2,7 @@
 Binder NER model
 """
 from typing import Iterable, Iterator, Union
+from pydash import compact
 import torch
 from transformers import AutoTokenizer
 import logging
@@ -104,10 +105,25 @@ class BinderNlp:
             words=doc.text.split() if isinstance(doc, Doc) else doc.split(),
         )
         ents = [
-            Doc.char_span(new_doc, a["start_char"], a["end_char"], label=a["text"])
+            Doc.char_span(
+                new_doc,
+                a["start_char"],
+                a["end_char"],
+                label=a["text"],
+                alignment_mode="expand",
+            )
             for a in annotations
         ]
-        new_ents = [ent for ent in ents if not has_span_overlap(ent, ents)]
+
+        # in case spacy refuses to create the ent span
+        if len(ents) > len(annotations):
+            logger.warning(
+                "Some entities are None, because SpaCy got mad (%s vs %s)",
+                ents,
+                annotations,
+            )
+
+        new_ents = [ent for ent in compact(ents) if not has_span_overlap(ent, ents)]
         new_doc.set_ents(new_ents)
         return new_doc
 
@@ -142,9 +158,9 @@ class BinderNlp:
         predictions = self.model(
             **inputs,
             **self.__type_descriptions,
-        ).__dict__
+        )
 
-        annotations = extract_predictions(features, predictions["span_scores"])
+        annotations = extract_predictions(features, predictions.__dict__["span_scores"])
         return self.__get_doc(doc, annotations)
 
     def pipe(

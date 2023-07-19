@@ -3,7 +3,7 @@ NER util tests
 """
 import unittest
 
-from common.utils.ner import normalize_entity_name
+from common.ner.cleaning import normalize_entity_names
 
 
 # CC-90010
@@ -57,5 +57,5 @@ class TestNerUtils(unittest.TestCase):
         ]
 
         for test in test_cases:
-            result = normalize_entity_name(test["entity_str"])
-            self.assertEqual(result, test["expected"])
+            result = normalize_entity_names([test["entity_str"]])
+            self.assertEqual(result, [test["expected"]])

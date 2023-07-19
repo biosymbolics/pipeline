@@ -67,7 +67,7 @@ def extract_predictions(
 
             return (start_indexes, end_indexes, type_ids)
 
-        def create_annotation(tup: tuple[int, int, int], feature: Feature):
+        def create_annotation(tup: tuple[int, int, int], feature: Feature, idx: int):
             """
             Applies offset and creates an annotation.
             """
@@ -77,10 +77,10 @@ def extract_predictions(
                 offset_mapping[tup[1]][1],  # type: ignore
             )
             pred = Annotation(
-                id=feature["id"],
+                id=f"{feature['id']}-{idx}",
                 entity_type=tup[2],
-                start_char=start_char,
-                end_char=end_char,
+                start_char=int(start_char),
+                end_char=int(end_char),
                 text=feature["text"][start_char:end_char],
             )
             return pred
@@ -88,8 +88,8 @@ def extract_predictions(
         start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
         return compact(
             [
-                create_annotation(tup, feature)
-                for tup in zip(start_indexes, end_indexes, type_ids)
+                create_annotation(tup, feature, idx)
+                for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
             ]
         )
 
@@ -123,23 +123,17 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     sample_mapping = tokenized.pop("overflow_to_sample_mapping")
     offset_mapping = tokenized.pop("offset_mapping")
 
+    def get_offset_chars(start, end, seq_id, sample_index):
+        if seq_id != 0:
+            return (0, 0)
+        return (
+            int(start in word_start_chars[sample_index]),
+            int(end in word_end_chars[sample_index]),
+        )
+
     def process_feature(text: str, offset_mapping, sample_mapping, i: int):
-        def get_offset_chars(
-            start_char: int,
-            end_char: int,
-            sequence_id: int | None,
-            sample_index: int,
-        ):
-            if sequence_id != 0:
-                return (0, 0)
-
-            return (
-                int(start_char in word_start_chars[sample_index]),
-                int(end_char in word_end_chars[sample_index]),
-            )
-
         feature: Feature = {
-            "id": str(i + 1),
+            "id": f"feat-{str(i + 1)}",
             "text": text,
             "token_start_mask": [],
             "token_end_mask": [],
@@ -171,6 +165,10 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
 def has_span_overlap(new_ent: Span, existing_ents: list[Span]) -> bool:
     """
     Check if a new entity overlaps with any of the existing entities
+
+    Args:
+        new_ent: the new entity to check
+        existing_ents: the existing entities to check against
     """
     return not any(
         new_ent.start_char < ent.end_char and new_ent.end_char > ent.start_char
