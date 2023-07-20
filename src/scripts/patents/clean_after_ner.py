@@ -6,7 +6,11 @@ from clients.low_level.big_query import execute_bg_query
 
 
 def fix_of_for_annotations():
-    # Define your terms
+    """
+    Handles "inhibitors of XYZ" and the like, which neither GPT or SpaCyNER were good at finding
+    (but high hopes for binder)
+    """
+    # Define terms
     terms = [
         "fragments",
         "modulators",
@@ -32,7 +36,7 @@ def fix_of_for_annotations():
         "stimulator",
     ]
 
-    # Loop over your terms
+    # Loop over terms
     for term in terms:
         # Construct the SQL statement
         sql = f"""
@@ -47,6 +51,9 @@ def fix_of_for_annotations():
 
 
 def clean_annotations():
+    """
+    Remove trailing junk and silly matches
+    """
     queries = [
         "update `fair-abbey-386416.patents.biosym_annotations` set original_term=(REGEXP_REPLACE(original_term, 'such', '')) where original_term like '% such';",
         "update  `fair-abbey-386416.patents.biosym_annotations` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
