@@ -155,13 +155,12 @@ INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
             {"label": "compounds", "pattern": pattern}
             for pattern in SMALL_MOLECULE_PATTERNS
         ],
-        *[{"label": "compounds", "pattern": pattern} for pattern in MOA_PATTERNS],
-        # from en_ner_bc5cdr_md model
-        {
-            "label": "compounds",
-            "pattern": [{"ENT_TYPE": "CHEMICAL"}],
-        },
     ],
+)
+
+MECHANISM_SPACY_PATTERNS = cast(
+    SpacyPatterns,
+    [{"label": "mechanisms", "pattern": pattern} for pattern in MOA_PATTERNS],
 )
 
 
@@ -169,12 +168,12 @@ INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
 Indication patterns
 """
 
+ALPHA_PLUS = ALPHA_CHARS("*", None, ["'", "-"])
 INDICATION_REGEXES = [
     get_entity_re(
         get_or_re(INDICATION_MODIFIER_REGEXES, "*")
         + get_or_re(INDICATION_REGEXES, "+"),
-        soe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
-        eoe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
+        soe_re=f"(?:{ALPHA_PLUS}\\s)*",
         is_case_insensitive=True,
     ),
 ]

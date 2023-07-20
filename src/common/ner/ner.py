@@ -13,15 +13,19 @@ import spacy_llm
 from spacy_llm.util import assemble
 import logging
 import warnings
-from clients.spacy import DEFAULT_MODEL
-from common.ner.binder.binder import BinderNlp
+import html
 
+from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
 from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
 from .cleaning import sanitize_entities
-from .patterns import INDICATION_SPACY_PATTERNS, INTERVENTION_SPACY_PATTERNS
+from .patterns import (
+    INDICATION_SPACY_PATTERNS,
+    INTERVENTION_SPACY_PATTERNS,
+    MECHANISM_SPACY_PATTERNS,
+)
 from .types import DocEntities, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
@@ -51,6 +55,7 @@ class NerTagger:
         rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
             INTERVENTION_SPACY_PATTERNS,
+            MECHANISM_SPACY_PATTERNS,
         ],
     ):
         """
@@ -79,15 +84,15 @@ class NerTagger:
             if not self.model.endswith(".pt"):
                 raise ValueError("Model must be torch")
             self.nlp = BinderNlp(self.model)
-            rule_nlp = spacy.load(DEFAULT_MODEL)
+            rule_nlp = spacy.load("en_core_sci_scibert")
             rule_nlp.add_pipe("merge_entities", after="ner")
             ruler = rule_nlp.add_pipe(
                 "entity_ruler",
                 config={"validate": True, "overwrite_ents": True},
                 after="merge_entities",
             )
-            for set in self.rule_sets:
-                ruler.add_patterns(set)  # type: ignore
+            for rules in self.rule_sets:
+                ruler.add_patterns(rules)  # type: ignore
             self.rule_nlp = rule_nlp
         else:
             raise ValueError("Must provide either use_llm or model")
@@ -156,6 +161,8 @@ class NerTagger:
             # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
             _content = flatten(chunk_list(_content, CHUNK_SIZE))
 
+        # remove any escaped characters that may be present
+        _content = [html.unescape(c) for c in _content]
         return _content
 
     def extract(

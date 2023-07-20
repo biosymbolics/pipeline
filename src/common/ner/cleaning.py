@@ -16,7 +16,9 @@ from .types import DocEntity
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
-    r"[\.,:;]$": "",
+    r"[\.,:;'\"]+$": "",
+    r" such$": "",  # common NER error - trailing "such"
+    r"^such ": "",  # common NER error - leading "such"
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
@@ -154,11 +156,12 @@ def normalize_entity_names(
         return html.unescape(entity_name)
 
     def normalize_entity(entity: T) -> T:
-        doc = next(docs)
-        lemmatized = lemmatize(doc)
+        # doc = next(docs)
+        # lemmatized = lemmatize(doc) # too many problems, e.g. Alzheimer's disease -> alzheimer' disease
 
+        text = entity[0] if isinstance(entity, tuple) else entity
         cleaning_steps = [decode_html, remove_chars, remove_extra_spaces]
-        normalized = reduce(lambda x, func: func(x), cleaning_steps, lemmatized)
+        normalized = reduce(lambda x, func: func(x), cleaning_steps, text)
 
         if normalized != (entity[0] if isinstance(entity, tuple) else entity):
             logging.info(f"Normalized entity: {entity} -> {normalized}")
