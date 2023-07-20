@@ -85,7 +85,10 @@ def extract_predictions(
             )
             return pred
 
-        start_indexes, end_indexes, type_ids = start_end_types(span_logits, feature)
+        cpu_span_logits = (
+            span_logits.detach().cpu().clone().numpy()
+        )  # https://github.com/pytorch/pytorch/issues/77764
+        start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
         return compact(
             [
                 create_annotation(tup, feature, idx)

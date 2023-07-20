@@ -8,6 +8,7 @@ import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
 import spacy
+from thinc.api import prefer_gpu
 from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
@@ -20,7 +21,7 @@ from common.ner.linker import TermLinker
 from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
-from .cleaning import sanitize_entities
+from .cleaning import EntityCleaner
 from .patterns import (
     INDICATION_SPACY_PATTERNS,
     INTERVENTION_SPACY_PATTERNS,
@@ -68,12 +69,15 @@ class NerTagger:
             content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
         """
+        prefer_gpu()
+
         self.model = model
         self.use_llm = use_llm
         self.content_type = content_type
         self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.linker: Optional[TermLinker] = None  # lazy initialization
+        self.cleaner = EntityCleaner()
         start_time = time.time()
 
         if self.use_llm:
@@ -108,7 +112,7 @@ class NerTagger:
         entity_set: DocEntities = [(span.text, span.label_, None) for span in doc.ents]
 
         # basic filtering, character removal, lemmatization
-        normalized = sanitize_entities(entity_set)
+        normalized = self.cleaner(entity_set)
 
         # filter by entity types, if provided
         if entity_types:
@@ -153,6 +157,7 @@ class NerTagger:
         """
         Prepares a list of content for NER
         """
+        logging.info("prepping docs (%s)", len(content))
         _content = content.copy()
         if self.content_type == "html":
             _content = [extract_text(c) for c in _content]

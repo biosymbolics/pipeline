@@ -24,4 +24,4 @@ if __name__ == "__main__":
         "melanoma",
         "alzheimer's disease",
     ]
-    enricher()
+    enricher(["rheumatoid arthritis"])

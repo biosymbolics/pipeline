@@ -1,6 +1,7 @@
 """
 Binder NER model
 """
+import os
 from typing import Iterable, Iterator, Union
 from pydash import compact
 import torch
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 DOC_STRIDE = 16
 MAX_LENGTH = 128  # max??
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
+
+DEFAULT_DEVICE = "mps"
 
 
 class BinderNlp:
@@ -44,11 +47,13 @@ class BinderNlp:
         "use_span_width_embedding": True
     }
 
-    >>> import torch
+    >>> import torch, sys
+    >>> sys.path.push("src")
+    >>> torch.device('mps')
     >>> from model import Binder
     >>> from config import BinderConfig
     >>> model = Binder(BinderConfig(**config))
-    >>> model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('cpu')))
+    >>> model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('mps')))
     >>> torch.save(model, 'model.pt')
 
     and copy model.pt into pipeline/
@@ -56,21 +61,13 @@ class BinderNlp:
     """
 
     def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_MODEL):
+        device = torch.device(DEFAULT_DEVICE)
         self.model = torch.load(model_file)
-        self.tokenizer = AutoTokenizer.from_pretrained(base_model)
-        self.tokenizer_args = {
-            "max_length": MAX_LENGTH,
-            "stride": DOC_STRIDE,
-            "return_tensors": "pt",
-            "padding": "max_length",
-            "truncation": True,
-        }
+        self.model.to(device)
+        self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
 
     def __call__(self, texts: list[str]):
-        inputs = self.tokenize(texts)
-        outputs = self.model(inputs)
-
-        return outputs
+        return self.pipe(texts)
 
     @property
     def type_map(self) -> dict[int, str]:
@@ -84,12 +81,11 @@ class BinderNlp:
         """
         Get the type descriptions used by the Binder model
         """
-        descriptions = self.tokenizer(
+        descriptions = self.tokenize(
             [t["description"] for t in NER_TYPES],
-            **{
+            {
                 "padding": "longest",
                 "return_tensors": "pt",
-                **self.tokenizer_args,
             },
         )
         return {
@@ -139,21 +135,29 @@ class BinderNlp:
         new_doc.set_ents(all_ents)
         return new_doc
 
-    def tokenize(self, texts: list[str]):
+    def tokenize(
+        self,
+        text: Union[str, list[str]],
+        tokenize_args: dict = {
+            "return_overflowing_tokens": True,
+            "return_offsets_mapping": True,
+        },
+    ):
         """
         Main tokenizer
 
         Args:
-            texts (list[str]): list of texts to tokenize
+            text (Union[str, list[str]]): text or list of texts to tokenize
         """
-        return self.tokenizer(
-            texts,
-            **{
-                "return_overflowing_tokens": True,
-                "return_offsets_mapping": True,
-                **self.tokenizer_args,  # type: ignore
-            },
-        )
+        common_args = {
+            "max_length": MAX_LENGTH,
+            "stride": DOC_STRIDE,
+            "return_tensors": "pt",
+            "padding": "max_length",
+            "truncation": True,
+        }
+        all_args = {**common_args, **tokenize_args}
+        return self.__tokenizer(text, **all_args).to(DEFAULT_DEVICE)
 
     def add_entities(self, doc: Union[str, Doc]) -> Doc:
         """
@@ -163,23 +167,13 @@ class BinderNlp:
             doc (Union[str, Doc]): The Spacy Docs (or strings) to annotate.
         """
         text = doc.text if isinstance(doc, Doc) else doc
-        features = prepare_features(text, self.tokenize([text]))
-        inputs = self.tokenizer(
-            text,
-            **{
-                "return_tensors": "pt",
-                **self.tokenizer_args,  # type: ignore
-            },
-        )
+        features = prepare_features(text, self.tokenize(text))
+        inputs = self.tokenize(text, {"return_tensors": "pt"})
 
-        try:
-            predictions = self.model(
-                **inputs,
-                **self.__type_descriptions,
-            )
-        except Exception as e:
-            logger.error(f"Error predicting entities for {text}: {e}")
-            raise e
+        predictions = self.model(
+            **inputs,
+            **self.__type_descriptions,
+        )
 
         annotations = extract_predictions(
             features, predictions.__dict__["span_scores"], self.type_map
@@ -192,11 +186,12 @@ class BinderNlp:
     ) -> Iterator[Doc]:
         """
         Apply the pipeline to a batch of texts.
-        (currently only supports single-threaded processing)
+        Single threaded because GPU handles parallelism.
 
         Args:
             texts (Iterable[Union[str, Doc]]): The texts to annotate.
         """
-        docs = [self.add_entities(text) for text in texts]
-        for doc in docs:
-            yield doc
+        logging.info("Starting binder NER extraction")
+
+        for text in texts:
+            yield self.add_entities(text)
