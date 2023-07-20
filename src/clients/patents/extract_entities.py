@@ -43,7 +43,7 @@ class PatentEnricher:
             f.write("\n".join(df["publication_number"].to_list()))
 
     def __fetch_patents_batch(
-        self, terms: list[str], last_id: Optional[str] = None
+        self, terms: Optional[list[str]], last_id: Optional[str] = None
     ) -> list[dict]:
         """
         Fetch a batch of patents from BigQuery
@@ -54,24 +54,37 @@ class PatentEnricher:
 
         TODO: don't depend upon generated table?
         """
-        lower_terms = [term.lower() for term in terms]
-
         pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
 
+        if terms:
+            lower_terms = [term.lower() for term in terms]
+
+            term_query = f"""
+                WITH matches AS (
+                    SELECT
+                        a.publication_number as publication_number,
+                        AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
+                    FROM patents.annotations a,
+                    UNNEST(a.annotations) as annotation
+                    WHERE annotation.term IN UNNEST({lower_terms})
+                    GROUP BY publication_number
+                )
+                SELECT apps.publication_number, apps.title, apps.abstract
+                FROM patents.applications AS apps, matches
+                WHERE apps.publication_number = matches.publication_number
+                AND search_rank > {MIN_SEARCH_RANK}
+                {pagination_where}
+                ORDER BY apps.{ID_FIELD} ASC
+                limit {CHUNK_SIZE}
+            """
+            patents = select_from_bg(term_query)
+            return patents
+
+        # otherwise, just start from the beginning
         query = f"""
-            WITH matches AS (
-                SELECT
-                    a.publication_number as publication_number,
-                    AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
-                FROM patents.annotations a,
-                UNNEST(a.annotations) as annotation
-                WHERE annotation.term IN UNNEST({lower_terms})
-                GROUP BY publication_number
-            )
             SELECT apps.publication_number, apps.title, apps.abstract
-            FROM patents.applications AS apps, matches
-            WHERE apps.publication_number = matches.publication_number
-            AND search_rank > {MIN_SEARCH_RANK}
+            FROM patents.applications AS apps
+            WHERE 1 = 1
             {pagination_where}
             ORDER BY apps.{ID_FIELD} ASC
             limit {CHUNK_SIZE}
@@ -189,7 +202,7 @@ class PatentEnricher:
             on_conflict="UPDATE SET target.domain = source.domain",  # NOOP
         )
 
-    def extract(self, terms: list[str]) -> None:
+    def extract(self, terms: Optional[list[str]] = None) -> None:
         """
         Enriches patents with NER annotations
 
