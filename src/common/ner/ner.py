@@ -157,7 +157,6 @@ class NerTagger:
         """
         Prepares a list of content for NER
         """
-        logging.info("prepping docs (%s)", len(content))
         _content = content.copy()
         if self.content_type == "html":
             _content = [extract_text(c) for c in _content]
@@ -168,6 +167,7 @@ class NerTagger:
 
         # remove any escaped characters that may be present
         _content = [html.unescape(c) for c in _content]
+
         return _content
 
     def extract(
@@ -198,6 +198,7 @@ class NerTagger:
         if not isinstance(content, list):
             raise Exception("Content must be a list")
 
+        start_time = time.time()
         logging.info("Starting NER pipeline with %s docs", len(content))
 
         steps = [
@@ -211,7 +212,9 @@ class NerTagger:
         ]
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
-        logging.info("Entities found: %s", ents_by_doc)
+        logging.info(
+            "Entities found: %s, took %s", ents_by_doc, time.time() - start_time
+        )
 
         return ents_by_doc  # type: ignore
 

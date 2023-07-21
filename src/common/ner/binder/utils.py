@@ -8,6 +8,9 @@ from pydash import compact, flatten
 import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
+import time
+import logging
+import polars as pl
 
 from .types import Feature, Annotation
 
@@ -85,16 +88,20 @@ def extract_predictions(
             )
             return pred
 
+        start_time = time.time()
         cpu_span_logits = (
             span_logits.detach().cpu().clone().numpy()
         )  # https://github.com/pytorch/pytorch/issues/77764
         start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
-        return compact(
+        logging.info("Extracted predictions in %s seconds", time.time() - start_time)
+
+        annotations = compact(
             [
                 create_annotation(tup, feature, idx)
                 for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
             ]
         )
+        return annotations
 
     all_predictions = flatten(
         [__extract_prediction(predictions[0], feature) for feature in features]
@@ -116,22 +123,13 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     Note: this is kinda convuluted and should be refactored.
     """
     word_idx = generate_word_indices(text)
-    word_start_chars = [[word[0] for word in word_idx]]
-    word_end_chars = [[word[1] for word in word_idx]]
+    word_start_chars = [word[0] for word in word_idx]
+    word_end_chars = [word[1] for word in word_idx]
 
     num_features = len(tokenized.pop("input_ids"))
-    sample_mapping = tokenized.pop("overflow_to_sample_mapping")
     offset_mapping = tokenized.pop("offset_mapping")
 
-    def get_offset_chars(start, end, seq_id, sample_index):
-        if seq_id != 0:
-            return (0, 0)
-        return (
-            int(start in word_start_chars[sample_index]),
-            int(end in word_end_chars[sample_index]),
-        )
-
-    def process_feature(text: str, offset_mapping, sample_mapping, i: int):
+    def process_feature(text: str, offset_mapping, i: int):
         feature: Feature = {
             "id": f"feat-{str(i + 1)}",
             "text": text,
@@ -141,24 +139,38 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
         }
         sequence_ids = tokenized.sequence_ids(i)
 
-        token_masks = [
-            get_offset_chars(
-                om[0], om[1], sequence_ids[offset_index], sample_index=sample_mapping[i]
-            )
-            for offset_index, om in enumerate(feature["offset_mapping"])
-            if om is not None
-        ]
-        feature["token_start_mask"] = [m[0] for m in token_masks]
-        feature["token_end_mask"] = [m[1] for m in token_masks]
+        # Create a DataFrame
+        df = pl.DataFrame(
+            {
+                "offset_mapping": list(
+                    offset_mapping[i].detach().cpu().clone().numpy()
+                ),
+                "sequence_ids": list(sequence_ids),
+            }
+        )
+
+        # Split offset_mapping into two separate columns for start and end
+        df = df.with_columns(
+            (
+                pl.col("offset_mapping").apply(lambda om: om[0] in word_start_chars)
+                & ((pl.col("sequence_ids") == 0))
+            ).alias("start_mask"),
+            (
+                pl.col("offset_mapping").apply(lambda om: om[1] in word_end_chars)
+                & ((pl.col("sequence_ids") == 0))
+            ).alias("end_mask"),
+        )
+
+        feature["token_start_mask"] = (
+            df.select(pl.col("start_mask")).to_series().to_list()
+        )
+        feature["token_end_mask"] = df.select(pl.col("end_mask")).to_series().to_list()
         feature["offset_mapping"] = [
             o if sequence_ids[k] == 0 else None for k, o in enumerate(offset_mapping[i])
         ]
         return feature
 
-    features = [
-        process_feature(text, offset_mapping, sample_mapping, i)
-        for i in range(num_features)
-    ]
+    features = [process_feature(text, offset_mapping, i) for i in range(num_features)]
     return features
 
 

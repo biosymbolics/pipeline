@@ -10,6 +10,7 @@ initialize()
 from clients.patents.extract_entities import PatentEnricher
 
 if __name__ == "__main__":
+
     if "-h" in sys.argv:
         print("Usage: python3 ner.py\nLoads NER data for patents")
         sys.exit()

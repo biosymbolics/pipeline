@@ -74,6 +74,7 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
     "group",
     "plasma",
     "antibody",
+    "dry",  # dry eye
 ]
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
@@ -133,9 +134,9 @@ class EntityCleaner:
             is_common_not_excepted = is_common and not is_excepted
 
             if is_common_not_excepted:
-                logging.info(f"Removing common term: {item}")
+                logging.debug(f"Removing common term: {item}")
             elif is_excepted:
-                logging.info(f"Keeping exception term: {item}")
+                logging.debug(f"Keeping exception term: {item}")
             return is_common_not_excepted
 
         def __is_uncommon(item):
