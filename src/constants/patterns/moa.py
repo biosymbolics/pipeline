@@ -106,12 +106,7 @@ EFFECTS = [
     *ACTIONS,
     *["dual[-\\s]?" + effect for effect in ACTIONS],
     *["tri[-\\s]?" + effect for effect in ACTIONS],
-]
-
-DRUG_CLASS_TYPE = [
-    f"anti[-\\s]?{ALPHA_CHARS('+')} agent",
-    f"anti[-\\s]?{ALPHA_CHARS('+')}s",
-    f"anti-{ALPHA_CHARS('+')}",
+    *[f"anti[-\\s]?{ALPHA_CHARS('+')} {action}" for action in ACTIONS],
 ]
 
 CAR_T_INFIXES = [
@@ -131,10 +126,8 @@ CAR_T_INFIXES = [
 ]
 
 MOA_INFIXES = [
-    *DRUG_CLASS_TYPE,
     *CAR_T_INFIXES,
     ".+-targeted",
-    ".+-based",
     ".+-binding",
 ]
 
@@ -144,7 +137,6 @@ MOA_SUFFIXES = [
     "composition",
     "regimen",
     "therapy",
-    "variants",
 ]
 
 

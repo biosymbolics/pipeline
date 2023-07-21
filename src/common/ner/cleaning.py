@@ -6,6 +6,7 @@ import re
 from functools import reduce
 import logging
 from clients.spacy import Spacy
+import html
 
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
@@ -15,6 +16,9 @@ from .types import DocEntity
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
+    r"[\.,:;'\"]+$": "",
+    r" such$": "",  # common NER error - trailing "such"
+    r"^such ": "",  # common NER error - leading "such"
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
@@ -54,6 +58,23 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
     "panic",
     "addiction",
     "mood",
+    "regulatory",
+    "region",
+    "viral",
+    "chronic",
+    "joint",
+    "digits",
+    "protein",
+    "complex",
+    "death",
+    "coding" "regulation",
+    "mrna",
+    "cell",
+    "nervous",  # CNS
+    "group",
+    "plasma",
+    "antibody",
+    "dry",  # dry eye
 ]
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
@@ -61,145 +82,147 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
 ]
 
 
-def __get_common_words(additional_words: list[str]) -> list[str]:
+class EntityCleaner:
     """
-    Get common words from a file + additional common words
-
-    Args:
-        additional_words (list[str]): additional common words to add to the vocab
-    """
-    with open("10000words.txt", "r") as file:
-        vocab_words = file.read().splitlines()
-    return [*vocab_words, *additional_words]
-
-
-def filter_common_terms(
-    entities: list[T],
-    exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
-    additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
-) -> list[T]:
-    """
-    Filter out common terms from a list of entities, e.g. "vaccine candidates"
-
-    Args:
-        entities (list[T]): list of entities
-        exception_list (list[str]): list of exceptions to the common terms
-        additional_common_words (list[str]): additional common words to add to the vocab
+    Class for cleaning entities
     """
 
-    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
-    common_words = __get_common_words(additional_common_words)
+    def __init__(
+        self,
+        additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
+        char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+    ):
+        self.additional_common_words = additional_common_words
+        self.char_suppressions = char_suppressions
+        self.__common_words = None
+        self.nlp = Spacy.get_instance(disable=["ner"])
 
-    def __is_common(item: T):
-        name = item[0] if isinstance(item, tuple) else item
-
-        # remove punctuation and make lowercase
-        words = [token.lemma_ for token in nlp(name)]
-
-        # check if all words are in the vocab
-        is_common = set(words).issubset(common_words)
-
-        # check if any words are in the exception list
-        is_excepted = bool(set(exception_list) & set(words))
-
-        is_common_not_excepted = is_common and not is_excepted
-
-        if is_common_not_excepted:
-            logging.info(f"Removing common term: {item}")
-        elif is_excepted:
-            logging.info(f"Keeping exception term: {item}")
-        return is_common_not_excepted
-
-    def __is_uncommon(item):
-        return not __is_common(item)
-
-    return list(filter(__is_uncommon, entities))
-
-
-def normalize_entity_names(
-    entities: list[T], char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS
-) -> list[T]:
-    """
-    Normalize entity name
-    - remove certain characters
-    - removes double+ spaces
-    - lemmatize?
-
-    Args:
-        entity (T): entity
-        nlp (Language): spacy language model
-        char_suppressions (dict[str, str]): characters to remove
-    """
-    nlp = Spacy.get_instance("en_core_web_sm", disable=["ner"])
-    texts = [entity[0] if isinstance(entity, tuple) else entity for entity in entities]
-    docs = nlp.pipe(texts)
-
-    def lemmatize(doc):
+    @property
+    def common_words(self) -> list[str]:
         """
-        Lemmatize and join with " " if separated by whitespace, "" otherwise
+        Get common words from a file + additional common words
         """
-        lemmatized_text = "".join(
-            [token.lemma_ + (" " if token.whitespace_ else "") for token in doc]
-        ).strip()
-        return lemmatized_text
+        if self.__common_words is None:
+            with open("10000words.txt", "r") as file:
+                vocab_words = file.read().splitlines()
+            return [*vocab_words, *self.additional_common_words]
+        return self.__common_words
 
-    def remove_chars(entity_name: str) -> str:
-        for pattern, replacement in char_suppressions.items():
-            entity_name = re.sub(pattern, replacement, entity_name)
-        return entity_name
+    def filter_common_terms(
+        self, entities: list[T], exception_list: list[str] = DEFAULT_EXCEPTION_LIST
+    ) -> list[T]:
+        """
+        Filter out common terms from a list of entities, e.g. "vaccine candidates"
 
-    def normalize_entity(entity: T) -> T:
-        doc = next(docs)
-        lemmatized = lemmatize(doc)
+        Args:
+            entities (list[T]): list of entities
+            exception_list (list[str]): list of exceptions to the common terms
+        """
 
-        cleaning_steps = [remove_chars, remove_extra_spaces]
-        normalized = reduce(lambda x, func: func(x), cleaning_steps, lemmatized)
+        def __is_common(item: T):
+            name = item[0] if isinstance(item, tuple) else item
 
-        if normalized != (entity[0] if isinstance(entity, tuple) else entity):
-            logging.info(f"Normalized entity: {entity} -> {normalized}")
+            # remove punctuation and make lowercase
+            words = [token.lemma_ for token in self.nlp(name)]
 
-        if isinstance(entity, tuple):
-            return cast(T, (normalized, *entity[1:]))
+            # check if all words are in the vocab
+            is_common = set(words).issubset(self.common_words)
 
-        return cast(T, normalized)
+            # check if any words are in the exception list
+            is_excepted = bool(set(exception_list) & set(words))
 
-    return [normalize_entity(entity) for entity in entities]
+            is_common_not_excepted = is_common and not is_excepted
 
+            if is_common_not_excepted:
+                logging.debug(f"Removing common term: {item}")
+            elif is_excepted:
+                logging.debug(f"Keeping exception term: {item}")
+            return is_common_not_excepted
 
-def __suppress(entities: list[T]) -> list[T]:
-    """
-    Filter out irrelevant entities
+        def __is_uncommon(item):
+            return not __is_common(item)
 
-    Args:
-        entities (list[T]): entities
-    """
+        return list(filter(__is_uncommon, entities))
 
-    def should_keep(entity: T) -> bool:
-        name = entity[0] if isinstance(entity, tuple) else entity
-        is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
-        return not is_suppressed
+    def normalize_entity_names(self, entities: list[T]) -> list[T]:
+        """
+        Normalize entity name
+        - remove certain characters
+        - removes double+ spaces
+        - lemmatize?
 
-    return [entity for entity in entities if should_keep(entity)]
+        Args:
+            entities (list[T]): entities
+        """
+        texts = [
+            entity[0] if isinstance(entity, tuple) else entity for entity in entities
+        ]
+        docs = self.nlp.pipe(texts)
 
+        def lemmatize(doc):
+            """
+            Lemmatize and join with " " if separated by whitespace, "" otherwise
+            """
+            lemmatized_text = "".join(
+                [token.lemma_ + (" " if token.whitespace_ else "") for token in doc]
+            ).strip()
+            return lemmatized_text
 
-def sanitize_entities(entities: list[T]) -> list[T]:
-    """
-    Sanitize entity list
-    - filters out (some) excessively general entities
-    - dedups
-    - normalizes & lemmatizes entity names
+        def remove_chars(entity_name: str) -> str:
+            for pattern, replacement in self.char_suppressions.items():
+                entity_name = re.sub(pattern, replacement, entity_name)
+            return entity_name
 
-    Args:
-        entities (list[T]): entities
-        nlp (Language): spacy language model
-    """
-    cleaning_steps: list[CleanFunction] = [
-        __suppress,
-        normalize_entity_names,
-        filter_common_terms,
-        dedup,
-    ]
+        def decode_html(entity_name: str) -> str:
+            return html.unescape(entity_name)
 
-    sanitized = reduce(lambda x, func: func(x), cleaning_steps, entities)
+        def normalize_entity(entity: T) -> T:
+            text = entity[0] if isinstance(entity, tuple) else entity
+            cleaning_steps = [decode_html, remove_chars, remove_extra_spaces]
+            normalized = reduce(lambda x, func: func(x), cleaning_steps, text)
 
-    return sanitized
+            if normalized != (entity[0] if isinstance(entity, tuple) else entity):
+                logging.info(f"Normalized entity: {entity} -> {normalized}")
+
+            if isinstance(entity, tuple):
+                return cast(T, (normalized, *entity[1:]))
+
+            return cast(T, normalized)
+
+        return [normalize_entity(entity) for entity in entities]
+
+    def suppress(self, entities: list[T]) -> list[T]:
+        """
+        Filter out irrelevant entities
+
+        Args:
+            entities (list[T]): entities
+        """
+
+        def should_keep(entity: T) -> bool:
+            name = entity[0] if isinstance(entity, tuple) else entity
+            is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
+            return not is_suppressed
+
+        return [entity for entity in entities if should_keep(entity)]
+
+    def __call__(self, entities: list[T]) -> list[T]:
+        """
+        Sanitize entity list
+        - filters out (some) excessively general entities
+        - dedups
+        - normalizes & lemmatizes entity names
+
+        Args:
+            entities (list[T]): entities
+        """
+        cleaning_steps: list[CleanFunction] = [
+            self.suppress,
+            self.normalize_entity_names,
+            self.filter_common_terms,
+            dedup,
+        ]
+
+        sanitized = reduce(lambda x, func: func(x), cleaning_steps, entities)
+
+        return sanitized

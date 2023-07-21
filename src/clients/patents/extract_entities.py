@@ -6,7 +6,7 @@ from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 from common.ner.ner import NerTagger
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 500
+CHUNK_SIZE = 1000
 
 MAX_TEXT_LENGTH = 500
 DECAY_RATE = 1 / 2000
@@ -24,7 +24,7 @@ class PatentEnricher:
         """
         Initialize the enricher
         """
-        self.tagger = NerTagger.get_instance(use_llm=True, content_type="text")
+        self.tagger = NerTagger.get_instance(use_llm=False, content_type="text")
 
     def __get_processed_pubs(self) -> list[str]:
         """
@@ -43,7 +43,7 @@ class PatentEnricher:
             f.write("\n".join(df["publication_number"].to_list()))
 
     def __fetch_patents_batch(
-        self, terms: list[str], last_id: Optional[str] = None
+        self, terms: Optional[list[str]], last_id: Optional[str] = None
     ) -> list[dict]:
         """
         Fetch a batch of patents from BigQuery
@@ -54,24 +54,37 @@ class PatentEnricher:
 
         TODO: don't depend upon generated table?
         """
-        lower_terms = [term.lower() for term in terms]
-
         pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
 
+        if terms:
+            lower_terms = [term.lower() for term in terms]
+
+            term_query = f"""
+                WITH matches AS (
+                    SELECT
+                        a.publication_number as publication_number,
+                        AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
+                    FROM patents.annotations a,
+                    UNNEST(a.annotations) as annotation
+                    WHERE annotation.term IN UNNEST({lower_terms})
+                    GROUP BY publication_number
+                )
+                SELECT apps.publication_number, apps.title, apps.abstract
+                FROM patents.applications AS apps, matches
+                WHERE apps.publication_number = matches.publication_number
+                AND search_rank > {MIN_SEARCH_RANK}
+                {pagination_where}
+                ORDER BY apps.{ID_FIELD} ASC
+                limit {CHUNK_SIZE}
+            """
+            patents = select_from_bg(term_query)
+            return patents
+
+        # otherwise, just start from the beginning
         query = f"""
-            WITH matches AS (
-                SELECT
-                    a.publication_number as publication_number,
-                    AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
-                FROM patents.annotations a,
-                UNNEST(a.annotations) as annotation
-                WHERE annotation.term IN UNNEST({lower_terms})
-                GROUP BY publication_number
-            )
             SELECT apps.publication_number, apps.title, apps.abstract
-            FROM patents.applications AS apps, matches
-            WHERE apps.publication_number = matches.publication_number
-            AND search_rank > {MIN_SEARCH_RANK}
+            FROM patents.applications AS apps
+            WHERE 1 = 1
             {pagination_where}
             ORDER BY apps.{ID_FIELD} ASC
             limit {CHUNK_SIZE}
@@ -110,8 +123,8 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.col("entities").apply(lambda e: e[3]).alias("canonical_term"),
-                    pl.col("entities").apply(lambda e: e[2]).alias("canonical_id"),
+                    pl.lit("").alias("canonical_term"),
+                    pl.lit("").alias("canonical_id"),
                     pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
@@ -145,18 +158,18 @@ class PatentEnricher:
 
         # extract entities
         # normalization/linking is unnecessary; will be handled by initialize_patents.
-        entities = self.tagger.extract(patent_docs, link=False)
+        entities = self.tagger.extract(
+            patent_docs,
+            link=False,
+            entity_types=["diseases", "compounds", "mechanisms"],
+        )
         if len([ent for ent in entities if len(ent) > 0]) == 0:
             logging.info("No entities found")
             return None
 
         # add back to orig df
         flatish_ents = [
-            [
-                (ent[0], ent[1], ent[2].id, ent[2].name)
-                for ent in ent_set
-                if ent[2] is not None
-            ]
+            [(ent[0], ent[1], None) for ent in ent_set if len(ent[0]) > 0]
             for ent_set in entities
         ]
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
@@ -189,7 +202,7 @@ class PatentEnricher:
             on_conflict="UPDATE SET target.domain = source.domain",  # NOOP
         )
 
-    def extract(self, terms: list[str]) -> None:
+    def extract(self, terms: Optional[list[str]] = None) -> None:
         """
         Enriches patents with NER annotations
 

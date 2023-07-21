@@ -10,7 +10,7 @@ ONCOLOGY_REGEXES: list[str] = [
     "hematologic malignancy",
     "leukemia",
     "malignant",
-    f"\\w+?oma",  # neuroblastoma, etc
+    r"\w+?oma",  # neuroblastoma, etc
     "solid tumor",
     "tumor",
 ]

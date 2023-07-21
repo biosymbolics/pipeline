@@ -21,7 +21,7 @@
       - TECFIDERA
     classes:
       - Fumarate
-- text: zuranolone for treatment of MDD, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)
+- text: zuranolone for treatment of major depression, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)
   entities:
     products:
       - zuranolone

@@ -16,18 +16,17 @@ from constants.patterns import (
     SMALL_MOLECULE_SUFFIXES,
 )
 
-from common.utils.re import get_or_re, wrap, ALPHA_CHARS, LEGAL_SYMBOLS
+from common.utils.re import get_or_re, wrap, ALPHA_CHARS
 from .types import SpacyPatterns
 from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
 
-# also ENTITY Opdualag tag: NNP pos: PROPN dep: nmod lemma: Opdualag morph: Number=Sing prob: -20.0 head: approval span: [of, ,, nivolumab, ,]
 MOA_PATTERNS: list = [
     *[
         [
             {
                 "LEMMA": {
                     "REGEX": get_entity_re(
-                        moa_prefix + ALPHA_CHARS("*") + ".*", is_case_insensitive=True
+                        moa_prefix + ALPHA_CHARS("*"), is_case_insensitive=True
                     ),
                 },
             }
@@ -74,7 +73,6 @@ MOA_PATTERNS: list = [
     ],
 ]
 
-# IN supported with REGEX supported in 3.5+
 INVESTIGATIONAL_ID_PATTERNS: list[list[dict]] = [
     [
         {
@@ -142,49 +140,27 @@ SMALL_MOLECULE_PATTERNS: list[list[dict]] = [
     for sm_re in SMALL_MOLECULE_REGEXES
 ]
 
-# Additional: infrequent (tf/idf) PROPN?
-CR_OR_REG_SYM = f"[ ]?[{''.join(LEGAL_SYMBOLS)}]"
-BRAND_NAME_RE = get_entity_re(ALPHA_CHARS(5) + CR_OR_REG_SYM, eoe_re=".*")
-BRAND_NAME_PATTERNS: list[list[dict]] = [
-    [
-        {
-            "TEXT": {
-                "REGEX": BRAND_NAME_RE
-            }  # e.g. "Blenrep® (belantamab mafodotin-blmf)"
-        },
-    ],
-    [
-        {
-            "POS": {"IN": ["PROPN", "NOUN"]},
-        },
-        {
-            "TEXT": {
-                "REGEX": CR_OR_REG_SYM + ".*"
-            },  # in "XYZ ® blah", the space after the mark is not recognized as \b
-        },  # e.g. "Blenrep ®" as two different entities
-    ],
-]
-
 INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
     SpacyPatterns,
     [
         *[
-            {"label": "PRODUCT", "pattern": pattern}
+            {"label": "compounds", "pattern": pattern}
             for pattern in INVESTIGATIONAL_ID_PATTERNS
         ],
-        *[{"label": "PRODUCT", "pattern": pattern} for pattern in BIOLOGICAL_PATTERNS],
         *[
-            {"label": "PRODUCT", "pattern": pattern}
+            {"label": "compounds", "pattern": pattern}
+            for pattern in BIOLOGICAL_PATTERNS
+        ],
+        *[
+            {"label": "compounds", "pattern": pattern}
             for pattern in SMALL_MOLECULE_PATTERNS
         ],
-        *[{"label": "PRODUCT", "pattern": pattern} for pattern in BRAND_NAME_PATTERNS],
-        *[{"label": "PRODUCT", "pattern": pattern} for pattern in MOA_PATTERNS],
-        # from en_ner_bc5cdr_md model
-        {
-            "label": "PRODUCT",
-            "pattern": [{"ENT_TYPE": "CHEMICAL"}],
-        },
     ],
+)
+
+MECHANISM_SPACY_PATTERNS = cast(
+    SpacyPatterns,
+    [{"label": "mechanisms", "pattern": pattern} for pattern in MOA_PATTERNS],
 )
 
 
@@ -192,11 +168,12 @@ INTERVENTION_SPACY_PATTERNS: SpacyPatterns = cast(
 Indication patterns
 """
 
+ALPHA_PLUS = ALPHA_CHARS("*", None, ["'", "-"])
 INDICATION_REGEXES = [
     get_entity_re(
         get_or_re(INDICATION_MODIFIER_REGEXES, "*")
         + get_or_re(INDICATION_REGEXES, "+"),
-        soe_re=f"(?:{ALPHA_CHARS('*')}\\s)*",
+        soe_re=f"(?:{ALPHA_PLUS}\\s)*",
         is_case_insensitive=True,
     ),
 ]
@@ -213,7 +190,7 @@ INDICATION_PATTERNS = [
 INDICATION_SPACY_PATTERNS: SpacyPatterns = cast(
     SpacyPatterns,
     [
-        *[{"label": "DISEASE", "pattern": pattern} for pattern in INDICATION_PATTERNS],
+        *[{"label": "diseases", "pattern": pattern} for pattern in INDICATION_PATTERNS],
     ],
 )
 
