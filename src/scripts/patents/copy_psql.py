@@ -2,13 +2,19 @@
 Utils for copying psql data to BigQuery
 """
 import sys
+import time
 import psycopg2
 import logging
+
+from system import initialize
+
+initialize()
 
 from clients.low_level.big_query import (
     create_bq_table,
     delete_bg_table,
     insert_into_bg_table,
+    execute_with_retries,
 )
 
 
@@ -37,6 +43,9 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         new_table_name (str): name of the new table
         database (str): name of the database
     """
+    # delete if exists
+    delete_bg_table(new_table_name)
+
     conn = psycopg2.connect(
         database=database,
         # user='your_username',
@@ -46,15 +55,13 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
     )
     columns, data = fetch_data_from_postgres(conn, sql_query)
 
-    # delete if exists
-    delete_bg_table(new_table_name)
-
     # recreate
     create_bq_table(new_table_name, columns)
+    time.sleep(20)  # such a hack
 
     # add records
     records = [dict(zip(columns, row)) for row in data]
-    insert_into_bg_table(records, new_table_name)
+    execute_with_retries(lambda: insert_into_bg_table(records, new_table_name))
 
 
 def copy_patent_approvals():
@@ -66,26 +73,28 @@ def copy_patent_approvals():
     """
     PATENT_FIELDS = [
         "concat('US-', patent_no) as publication_number",
-        "app_no as nda_number",
-        "p.ndc_product_code as ndc_code",
-        "trade_name as brand_name",
-        "stem",
-        "applicant",
-        "p.marketing_status as application_type",
-        "approval_date",
-        "patent_expire_date",
-        "p.description as patent_indication",
-        "cd_formula as formula",
-        "smiles",
-        "cd_molweight as molweight",
-        "active_ingredient_count",
-        "route",
+        "(array_agg(appl_no))[1] as nda_number",
+        "(array_agg(prod.ndc_product_code))[1] as ndc_code",
+        "(array_agg(trade_name))[1] as brand_name",
+        "(ARRAY_TO_STRING(array_agg(distinct s.name), '+')) as generic_name",
+        "(array_agg(stem))[1] as stem",
+        "(array_agg(applicant))[1] as applicant",
+        "(array_agg(prod.marketing_status))[1] as application_type",
+        "(array_agg(approval_date))[1] as approval_date",
+        "(array_agg(patent_expire_date))[1] as patent_expire_date",
+        "(array_agg(pv.description))[1] as patent_indication",
+        "(array_agg(cd_formula))[1] as formula",
+        "(array_agg(smiles))[1] as smiles",
+        "(array_agg(cd_molweight))[1] as molweight",
+        "(array_agg(active_ingredient_count))[1] as active_ingredient_count",
+        "(array_agg(pv.route))[1] as route",
     ]
     query = f"""
-        select {PATENT_FIELDS}
-        from ob_patent_view p, product prod, structures s
-        where lower(p.trade_name) = lower(prod.product_name)
-        AND s.id = p.struct_id
+        select {", ".join(PATENT_FIELDS)}
+        from ob_patent_view pv, product prod, structures s
+        where lower(pv.trade_name) = lower(prod.product_name)
+        AND s.id = pv.struct_id
+        group by pv.patent_no
     """
     database = "drugcentral"
     new_table_name = "patent_approvals"
@@ -104,5 +113,4 @@ if __name__ == "__main__":
         print("Usage: python3 copy_psql.py\nCopies psql data to BigQuery")
         sys.exit()
 
-    copy_tables: bool = "copy_tables" in sys.argv
     main()

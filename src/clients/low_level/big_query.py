@@ -71,11 +71,20 @@ def select_from_bg(query: str) -> list[dict]:
 def create_bq_table(table_name: str, columns: list[str]):
     """
     Create a BigQuery table
+
+    Args:
+        table_name (str): name of the table
+        columns (list[str]): list of column names. If the column name ends with "_date", the type will be DATE (else STRING)
     """
     client = bigquery.Client()
-    # schema = [bigquery.SchemaField(field_name, 'STRING') for field_name in columns]
+    schema = [
+        bigquery.SchemaField(
+            field_name, "DATE" if field_name.endswith("_date") else "STRING"
+        )
+        for field_name in columns
+    ]
     table_id = f"{BQ_DATASET_ID}.{table_name}"
-    new_table = bigquery.Table(table_id)
+    new_table = bigquery.Table(table_id, schema)
     return client.create_table(new_table)
 
 
