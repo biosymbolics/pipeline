@@ -40,7 +40,7 @@ class PatentEnricher:
         """
         logging.info(f"Persisting processed publication_numbers")
         with open(PROCESSED_PUBS_FILE, "a") as f:
-            f.write("\n".join(df["publication_number"].to_list()))
+            f.write("\n" + "\n".join(df["publication_number"].to_list()))
 
     def __fetch_patents_batch(
         self, terms: Optional[list[str]], last_id: Optional[str] = None
@@ -202,7 +202,9 @@ class PatentEnricher:
             on_conflict="UPDATE SET target.domain = source.domain",  # NOOP
         )
 
-    def extract(self, terms: Optional[list[str]] = None) -> None:
+    def extract(
+        self, terms: Optional[list[str]] = None, starting_id: Optional[str] = None
+    ) -> None:
         """
         Enriches patents with NER annotations
 
@@ -214,7 +216,7 @@ class PatentEnricher:
         Args:
             terms: list of terms for which to pull and enrich patents
         """
-        patents = self.__fetch_patents_batch(terms, last_id=None)
+        patents = self.__fetch_patents_batch(terms, last_id=starting_id)
         last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
