@@ -26,6 +26,7 @@ logging.basicConfig(level=logging.INFO)
 FIELDS = [
     # gpr_publications
     "gpr_pubs.publication_number as publication_number",
+    "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
     "abstract",
     "application_number",
     "cited_by",
@@ -57,6 +58,8 @@ FIELDS = [
     "publication_date",
     "spif_application_number",
     "spif_publication_number",
+    "all_publication_numbers"
+    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
 ]
 
 
