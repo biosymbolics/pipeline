@@ -4,10 +4,35 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
 
+from typings.patents import PatentApplication
+
 LR = 1e-3  # learning rate
 CHECKPOINT_PATH = "patent_model_checkpoints"
 OPTIMIZER_CLASS = torch.optim.Adam
 SAVE_FREQUENCY = 5  # save model every 5 epochs
+
+# Query for approval data
+# product p, active_ingredient ai, synonyms syns, approval a
+"""
+select
+    p.ndc_product_code as ndc,
+    (array_agg(distinct p.generic_name))[1] as generic_name,
+    (array_agg(distinct p.product_name))[1] as brand_name,
+    (array_agg(distinct p.marketing_status))[1] as status,
+    (array_agg(distinct active_ingredient_count))[1] as active_ingredient_count,
+    (array_agg(distinct route))[1] as route,
+    (array_agg(distinct s.name)) as substance_names,
+    (array_agg(distinct a.type)) as approval_types,
+    (array_agg(distinct a.approval)) as approval_dates,
+    (array_agg(distinct a.applicant)) as applicants
+from structures s
+LEFT JOIN approval a on a.struct_id=s.id
+LEFT JOIN active_ingredient ai on ai.struct_id=s.id
+LEFT JOIN product p on p.ndc_product_code=ai.ndc_product_code
+LEFT JOIN synonyms syns on syns.id=s.id
+where (syns.name ilike '%elexacaftor%' or p.generic_name ilike '%elexacaftor%' or p.product_name ilike '%elexacaftor%')
+group by p.ndc_product_code;
+"""
 
 
 class DNN(nn.Module):
@@ -104,8 +129,11 @@ def save_checkpoint(model: CombinedModel, optimizer: torch.optim.Optimizer, epoc
     torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
 
 
+Data = list
+
+
 def do_train(
-    data: list,
+    data: Data,
     model: Optional[CombinedModel] = None,
     optimizer: Optional[torch.optim.Optimizer] = None,
     start_epoch: int = 0,
@@ -115,7 +143,7 @@ def do_train(
     Train model
 
     Args:
-        data (list): List of data batches
+        data (Data): List of data batches
         model (Optional[CombinedModel], optional): Model to train. Defaults to None.
         optimizer (Optional[torch.optim.Optimizer], optional): Optimizer to use. Defaults to None.
         start_epoch (int, optional): Epoch to start training from. Defaults to 0.
@@ -137,7 +165,7 @@ def do_train(
     return model
 
 
-def resume(data, checkpoint_name: str):
+def resume(data: Data, checkpoint_name: str):
     """
     Resume training from a checkpoint
 
@@ -157,3 +185,74 @@ def resume(data, checkpoint_name: str):
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     start_epoch = checkpoint["epoch"] + 1
     return do_train(data, model, optimizer, start_epoch)
+
+
+DNN_PATENT_FEATURES = [
+    "application_kind",
+    "assignees",
+    "attributes",
+    "compounds",
+    "country",
+    "diseases",
+    "ipc_codes",
+    "inventors",
+    "mechanisms",
+]  # title and abstract??
+
+
+def get_features(patent: PatentApplication, feature_fields: list[str]) -> list:
+    """
+    Get features for a patent
+
+    Args:
+        patent (PatentApplication): Patent
+
+    Returns:
+        list: List of features
+    """
+    features = [patent[feature] for feature in feature_fields]
+    return features
+
+
+def prepare_dnn_data(
+    patents: list[PatentApplication], outcome_map: dict[str, int]
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Prepare data for DNN
+
+    Args:
+        patents (list[PatentApplication]): List of patents
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: DNN data
+    """
+    things_patented = [
+        " + ".join(patent["compounds"] + patent["mechanisms"]) for patent in patents
+    ]
+    x1 = torch.tensor([get_features(patent, DNN_PATENT_FEATURES) for patent in patents])
+    y = torch.tensor(
+        [outcome_map.get(patented_thing, 0) for patented_thing in things_patented]
+    )
+    return (x1, y)
+
+
+def prepare_gnn_data(
+    patents: list[PatentApplication],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Prepare data for GNN
+
+    Args:
+        patents (list[PatentApplication]): List of patents
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: GNN data
+    """
+    GNN_FEATURES = [
+        "diseases",
+        "compounds",
+        "mechanisms",
+    ]  # TODO: enirch with pathways, targets, disease pathways
+    x2 = torch.tensor([get_features(patent, GNN_FEATURES) for patent in patents])
+    edge_index = torch.tensor([[i, i] for i in range(len(patents))])
+    return (x2, edge_index)
