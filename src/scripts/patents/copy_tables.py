@@ -6,6 +6,7 @@ from clients.low_level.big_query import (
     query_to_bg_table,
     BQ_DATASET_ID,
 )
+from scripts.patents.copy_psql import copy_patent_approvals
 
 from ._constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
 
@@ -104,3 +105,5 @@ def copy_patent_tables():
 
     # copy gpr_annotations table
     __copy_gpr_annotations()
+
+    copy_patent_approvals()
