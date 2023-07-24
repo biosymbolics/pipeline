@@ -12,8 +12,10 @@ from clients.patents.extract_entities import PatentEnricher
 if __name__ == "__main__":
 
     if "-h" in sys.argv:
-        print("Usage: python3 ner.py\nLoads NER data for patents")
+        print("Usage: python3 ner.py [starting_id]\nLoads NER data for patents")
         sys.exit()
+
+    starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
     terms = [
         "schizophrenia",
@@ -25,4 +27,4 @@ if __name__ == "__main__":
         "melanoma",
         "alzheimer's disease",
     ]
-    enricher(None)
+    enricher(None, starting_id)
