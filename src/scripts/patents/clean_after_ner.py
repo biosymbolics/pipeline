@@ -3,14 +3,47 @@ To run after NER is complete
 """
 import sys
 import logging
+from typing import Literal, Union
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import execute_bg_query
+from clients.low_level.big_query import delete_bg_table, execute_bg_query, BQ_DATASET_ID
 
-TABLE = "fair-abbey-386416.patents.biosym_annotations"
+TABLE = f"{BQ_DATASET_ID}.biosym_annotations"
+
+TextField = Literal["title", "abstract"]
+
+
+def remove_substrings():
+    """
+    Removes substrings from annotations
+    """
+    query = f"""
+        CREATE OR REPLACE TABLE {BQ_DATASET_ID}.names_to_remove AS
+            SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
+            FROM {TABLE} t1
+            JOIN {TABLE} t2
+            ON t1.publication_number = t2.publication_number
+            WHERE t2.original_term<>t1.original_term
+            AND lower(t1.original_term) like CONCAT('%', lower(t2.original_term), '%')
+            AND length(t1.original_term) > length(t2.original_term)
+            AND array_length(SPLIT(t2.original_term, ' ')) < 3
+            ORDER BY length(t2.original_term) DESC
+    """
+
+    delete_query = f"""
+        DELETE FROM {TABLE}
+        WHERE (publication_number, original_term) IN (
+            SELECT (publication_number, removal_term)
+            FROM {BQ_DATASET_ID}.names_to_remove
+        )
+    """
+
+    execute_bg_query(query)
+    execute_bg_query(delete_query)
+    delete_bg_table("names_to_remove")
 
 
 def fix_of_for_annotations():
@@ -47,17 +80,20 @@ def fix_of_for_annotations():
         "vaccine adjuvants",
         "analogs",
         "analogues",
+        "homologues",
         "enzymes",
         "anions",
         "ions",
         "drugs",
+        "regimens",
+        "clones",
     ]
 
     term_sets = [
         ["modulators", "modulating", "modulations"],
         ["modifiers", "modifying", "modifications"],
         ["inhibitors", "inhibition", "inhibiting", "inhibits"],
-        ["agonists", "agonizing", "agonizes", "agonism"],
+        ["agonists", "agonizing", "agonizes", "agonisms"],
         ["antagonists", "antagonizing", "antagonizes", "antagonism"],
         [
             "activators",
@@ -65,7 +101,7 @@ def fix_of_for_annotations():
             "activating",
         ],
         ["neuromodulations", "neuromodulators", "neuromodulating", "neuromodulates"],
-        ["simulators", "simulations", "simulating", "simulates"],
+        ["stimulators", "stimulations", "stimulating", "stimulates"],
         ["conjugations", "conjugating", "conjugates"],
         ["modulates", "modulates? binding"],
         ["(?:poly)peptides", "(?:poly)peptides? binding"],
@@ -75,7 +111,8 @@ def fix_of_for_annotations():
         ["ligands", "ligands? binding", "ligands? that bind"],
         ["fragments", "fragments? binding", "fragments? that bind"],
         ["promotion", "promoting", "promotes"],
-        ["enhancement", "enhancing", "enhances", "enhancer"],
+        ["enhancements", "enhancing", "enhances", "enhancers"],
+        ["regulators", "regulation", "regulating"],
     ]
 
     prefixes = [
@@ -105,16 +142,20 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
-    def get_query(term, second_term=None):
-        if not second_term:
-            second_term = term
+    TEXT_FIELDS: list[TextField] = ["title", "abstract"]
+
+    def get_query(term: Union[str, list[str]], field: TextField):
+        if isinstance(term, list):
+            term = "(?:" + "?|".join(term) + ")"
+        else:
+            term = term + "?"
         sql = f"""
             UPDATE {TABLE} a
-            SET original_term=(REGEXP_EXTRACT(title, '(?i)((?:{prefix_re})*{term}? (?:of|for|the|that|to) (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{term} (?:of |for |the |that |to |comprising )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
             FROM `fair-abbey-386416.patents.gpr_publications` p
             WHERE p.publication_number=a.publication_number
-            AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{second_term}?$")
-            AND REGEXP_CONTAINS(p.title, '(?i).*{term}? (?:of|for).*')
+            AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{term}$")
+            AND REGEXP_CONTAINS(p.{field}, '(?i).*{term} (?:of|for|the|that|to|comprising).*')
         """
         return sql
 
@@ -130,36 +171,73 @@ def fix_of_for_annotations():
         return sql
 
     for term in terms:
-        sql = get_query(term)
+        sql = get_query(term, "title")
         execute_bg_query(sql)
 
-    # for term in [*terms, *[t for term_set in term_sets for t in term_set]]:
-    #     sql = get_hyphen_query(term)
-    #     execute_bg_query(sql)
+    for term in [*terms, *[t for term_set in term_sets for t in term_set]]:
+        sql = get_hyphen_query(term)
+        execute_bg_query(sql)
 
     # loop over term sets, in which the original_term may be in another form than the title variant
     for term_set in term_sets:
-        for term in term_set:
-            sql = get_query(term, term_set[0])
+        for field in TEXT_FIELDS:
+            sql = get_query(term_set, field)
             execute_bg_query(sql)
+
+
+WordPlace = Literal["leading", "trailing", "all"]
 
 
 def clean_annotations():
     """
     Remove trailing junk and silly matches
     """
+
+    def get_remove_word(word, place: WordPlace):
+        if place == "trailing":
+            return f"""update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i) {word}$', '')) where regexp_contains(original_term, '(?i).* {word}$')"""
+        elif place == "leading":
+            return f"""update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)^{word} ', '')) where regexp_contains(original_term, '(?i)^{word} .*')"""
+        else:
+            return rf"""update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){word}(?:^|$| )', ' ')) where regexp_contains(original_term, '(?i)(?:^|$| ){word}(?:^|$| )')"""
+
+    removal_words: dict[str, WordPlace] = {
+        "such": "all",
+        "methods?": "all",
+        "obtainable": "all",
+        "the": "leading",
+        "excellent": "all",
+        "particular": "leading",
+        "useful": "trailing",
+        "thereof": "trailing",
+        "capable": "trailing",
+        "specific": "leading",
+        "novel": "leading",
+        "new": "leading",
+        "inventive": "leading",
+        "other": "leading",
+        "of": "trailing",
+        "therapeutically": "trailing",
+        "suitable": "all",
+        "therapeutic": "leading",
+        "patient": "leading",
+        "patient": "trailing",
+        "acceptable": "all",
+        "thereto": "trailing",
+        "certain": "leading",
+    }
     queries = [
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, ' such', '')) where original_term like '% such';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'such ', '')) where original_term like 'such %';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'the ', '')) where original_term like 'the %';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'excellent', '')) where original_term like '%excellent%';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'particular ', '')) where original_term like 'particular %';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, ' useful', '')) where original_term like '% useful';",
-        f"update  `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
-        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'thereof', '')) where original_term like '% thereof';",
-        f"delete from `{TABLE}` where original_term='COMPOSITION' or original_term='therapeutical' or original_term='prognosticating' or original_term in ('wherein said compound', 'fragment of', 'therapeutically', 'general formula (I)', 'medicine Compounds', 'liver', 'treatment regimens', 'unsubstituted', 'Compound I', 'medicinal compositions', 'COMPOUND', 'DISEASE', 'medicine Compounds of formula', 'THERAPY') or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
+        *[get_remove_word(word, place) for word, place in removal_words.items()],
         f"delete from `{TABLE}` where original_term is null",
+        f"update `{TABLE}` "
+        + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where regexp_contains(original_term, '[ ]{2,}')",
+        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where regexp_contains(original_term, '^[ ]+')",
+        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
+        f"delete from `{TABLE}` where original_term='COMPOSITION' or original_term='therapeutical' or original_term='prognosticating' or original_term in ('wherein a', 'pharmaceutical compositions', 'compound I', 'wherein said compound', 'fragment of', 'pharmacological compositions', 'therapeutically', 'general formula (I)', 'medicine Compounds', 'receptacle', 'liver', 'treatment regimens', 'unsubstituted', 'Compound I', 'medicinal compositions', 'COMPOUND', 'DISEASE', 'medicine Compounds of formula', 'THERAPY') or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
         f"update `{TABLE}` set domain='mechanisms' where original_term in ('tumor infiltrating lymphocytes')",
+        f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
+        f"update `{TABLE}` set "
+        + "original_term=regexp_extract(original_term, '(.{10,})(?:\\. [A-Z]\\w{3,}).*') where regexp_contains(original_term, '.{10,}\\. [A-Z]\\w{3,}')",
     ]
     for sql in queries:
         results = execute_bg_query(sql)
@@ -172,3 +250,4 @@ if __name__ == "__main__":
 
     fix_of_for_annotations()
     clean_annotations()
+    remove_substrings()

@@ -106,4 +106,5 @@ def copy_patent_tables():
     # copy gpr_annotations table
     __copy_gpr_annotations()
 
+    # copy data about approvals
     copy_patent_approvals()

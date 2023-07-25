@@ -112,9 +112,9 @@ def __get_terms():
                 UNION ALL
 
                 -- biosym annotations
-                SELECT canonical_term as term, canonical_id as original_id, domain
+                SELECT original_term as term, canonical_id as original_id, domain
                 FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
-                where length(canonical_term) > 1
+                where length(original_term) > 1
             ) AS all_annotations
             group by term, original_id, domain
         """
@@ -192,7 +192,7 @@ def __create_terms():
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
-def __create_synonym_map(synonym_map: dict[str, str]):
+def __init_synonym_map(synonym_map: dict[str, str]):
     """
     Create a table of synonyms
 
@@ -247,5 +247,5 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    __create_synonym_map(SYNONYM_MAP)
+    __init_synonym_map(SYNONYM_MAP)
     __create_terms()
