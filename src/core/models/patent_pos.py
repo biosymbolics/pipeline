@@ -1,11 +1,27 @@
 import os
-from typing import Optional
+from typing import Optional, TypedDict, cast
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
 import polars as pl
+from torchtext.data.utils import get_tokenizer
+from torchtext.vocab import build_vocab_from_iterator
+from clients.spacy import Spacy
 
-from typings.patents import PatentApplication
+from common.utils.list import batch_dict
+from typings.patents import ApprovedPatentApplication as PatentApplication
+
+GnnInput = TypedDict("GnnInput", {"x2": torch.Tensor, "edge_index": torch.Tensor})
+DnnInput = TypedDict("DnnInput", {"x1": torch.Tensor, "y": torch.Tensor})
+AllInput = TypedDict(
+    "AllInput",
+    {
+        "x1": torch.Tensor,
+        "y": torch.Tensor,
+        "x2": torch.Tensor,
+        "edge_index": torch.Tensor,
+    },
+)
 
 LR = 1e-3  # learning rate
 CHECKPOINT_PATH = "patent_model_checkpoints"
@@ -130,11 +146,8 @@ def save_checkpoint(model: CombinedModel, optimizer: torch.optim.Optimizer, epoc
     torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
 
 
-Data = list
-
-
 def do_train(
-    data: Data,
+    patents: list[PatentApplication],
     model: Optional[CombinedModel] = None,
     optimizer: Optional[torch.optim.Optimizer] = None,
     start_epoch: int = 0,
@@ -144,34 +157,35 @@ def do_train(
     Train model
 
     Args:
-        data (Data): List of data batches
+        patents (list[PatentApplication]): List of patents
         model (Optional[CombinedModel], optional): Model to train. Defaults to None.
         optimizer (Optional[torch.optim.Optimizer], optional): Optimizer to use. Defaults to None.
         start_epoch (int, optional): Epoch to start training from. Defaults to 0.
         num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
     """
+    batches = batch_dict(prepare_inputs(patents))
     model, optimizer = (model, optimizer) if model and optimizer else get_model()
     criterion = nn.BCEWithLogitsLoss()
 
     for epoch in range(start_epoch, num_epochs):
-        for batch in data:
+        for batch in batches:
             if epoch % SAVE_FREQUENCY == 0:
                 save_checkpoint(model, optimizer, epoch)
             optimizer.zero_grad()
-            pred = model(batch.x1, batch.x2, batch.edge_index)
-            loss = criterion(pred, batch.y)
+            pred = model(batch["x1"], batch["x2"], batch["edge_index"])
+            loss = criterion(pred, batch["y"])
             loss.backward()
             optimizer.step()
 
     return model
 
 
-def resume(data: Data, checkpoint_name: str):
+def resume(patents: list[PatentApplication], checkpoint_name: str):
     """
     Resume training from a checkpoint
 
     Args:
-        data (list): List of data batches
+        patents (list[PatentApplication]): List of patents
         checkpoint_name (str): Checkpoint from which to resume
     """
     model = CombinedModel()
@@ -185,57 +199,66 @@ def resume(data: Data, checkpoint_name: str):
     optimizer = OPTIMIZER_CLASS(model.parameters(), lr=LR)  # Initialize new optimizer
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     start_epoch = checkpoint["epoch"] + 1
-    return do_train(data, model, optimizer, start_epoch)
+    return do_train(patents, model, optimizer, start_epoch)
 
 
-DNN_PATENT_FEATURES = [
-    "application_kind",
-    "assignees",
-    "attributes",
-    "compounds",
-    "country",
-    "diseases",
-    "ipc_codes",
-    "inventors",
-    "mechanisms",
-]  # title and abstract??
-
-
-def get_features(patent: PatentApplication, feature_fields: list[str]) -> list:
+def get_feature_embeddings(
+    patents: list[PatentApplication],
+    categorical_fields: list[str],
+    text_fields: list[str] = [],
+):
     """
-    Get features for a patent
+    Get embeddings for patent features
 
     Args:
-        patent (PatentApplication): Patent
-
-    Returns:
-        list: List of features
+        patents (list[PatentApplication]): List of patents
+        categorical_fields (list[str]): List of fields to embed as categorical variables
+        text_fields (list[str]): List of fields to embed as text
     """
-    features = [patent[feature] for feature in feature_fields]
-    return features
-
-
-def get_feature_embeddings(patents: list[PatentApplication], feature_fields: list[str]):
     df = pl.from_dicts([patent.__dict__ for patent in patents])
     size_map = dict(
-        [(field, df.select(pl.col(field)).n_unique()) for field in feature_fields]
+        [
+            (field, df.select(pl.col(field).flatten()).n_unique())
+            for field in categorical_fields
+        ]
     )
     embedding_layers = dict(
-        [(field, nn.Embedding(size_map[field], 32)) for field in feature_fields]
+        [(field, nn.Embedding(size_map[field], 32)) for field in categorical_fields]
     )
 
-    def get_node_features(patent):
-        return torch.cat(
-            [embedding_layers[field](patent[field]) for field in feature_fields], dim=1
-        )
+    nlp = Spacy.get_instance(disable=["ner"])
 
-    embeddings = [get_node_features(patent) for patent in patents]
+    def get_values(patent, field) -> list:
+        val = patent[field]
+        if isinstance(val, list):
+            return val
+        return [val]
+
+    def get_patent_features(patent):
+        cat_features = torch.cat(
+            [
+                embedding_layers[field](value)
+                for field in categorical_fields
+                for value in get_values(patent, field)
+            ],
+            dim=1,
+        )
+        text_features = torch.cat(
+            [
+                torch.mean(
+                    torch.stack([nlp.vocab[token] for token in nlp.pipe(value)]), dim=0
+                )
+                for field in text_fields
+                for value in get_values(patent, field)
+            ]
+        )
+        return torch.cat([cat_features, text_features])
+
+    embeddings = [get_patent_features(patent) for patent in patents]
     return embeddings
 
 
-def prepare_dnn_data(
-    patents: list[PatentApplication], outcome_map: dict[str, int]
-) -> tuple[torch.Tensor, torch.Tensor]:
+def prepare_dnn_data(patents: list[PatentApplication]) -> DnnInput:
     """
     Prepare data for DNN
 
@@ -245,24 +268,35 @@ def prepare_dnn_data(
     Returns:
         tuple[torch.Tensor, torch.Tensor]: DNN data
     """
-    embeddings = get_feature_embeddings(patents, DNN_PATENT_FEATURES)
-    x1 = torch.cat(embeddings, dim=1)
-
-    things_patented = [
-        " + ".join(patent["compounds"] + patent["mechanisms"]) for patent in patents
+    categorical_fields = [
+        "application_kind",
+        "attributes",
+        "compounds",
+        "country",
+        "diseases",
+        "mechanisms",
+        "ipc_codes",
+    ]
+    text_fields = [
+        "title",
+        "abstract",
+        "claims",
+        "assignees",
+        "inventors",
     ]
 
-    y = torch.tensor(
-        [outcome_map.get(patented_thing, 0) for patented_thing in things_patented]
-    )
-    return (x1, y)
+    embeddings = get_feature_embeddings(patents, categorical_fields, text_fields)
+    x1 = torch.cat(embeddings, dim=1)
+
+    y = torch.tensor([patent["approval_date"] is not None for patent in patents])
+    return {"x1": x1, "y": y}
 
 
-def prepare_gnn_data(
+def prepare_gnn_input(
     patents: list[PatentApplication],
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> GnnInput:
     """
-    Prepare data for GNN
+    Prepare inputs for GNN
 
     Args:
         patents (list[PatentApplication]): List of patents
@@ -270,15 +304,23 @@ def prepare_gnn_data(
     Returns:
         tuple[torch.Tensor, torch.Tensor]: GNN data
     """
-    GNN_FEATURES = [
+    # TODO: enirch with pathways, targets, disease pathways
+    categorical_features = [
         "diseases",
-        "compounds",
-        "mechanisms",
-    ]  # TODO: enirch with pathways, targets, disease pathways
+        "compounds",  # text list?
+        "mechanisms",  # text list?
+    ]
 
     # GNN input features for this node
-    embeddings = get_feature_embeddings(patents, GNN_FEATURES)
+    embeddings = get_feature_embeddings(patents, categorical_features)
     x2 = torch.cat(embeddings, dim=1)
 
     edge_index = torch.tensor([[i, i] for i in range(len(patents))])
-    return (x2, edge_index)
+    return {"x2": x2, "edge_index": edge_index}
+
+
+def prepare_inputs(patents: list[PatentApplication]) -> AllInput:
+    """
+    Prepare inputs for model
+    """
+    return cast(AllInput, {**prepare_dnn_data(patents), **prepare_gnn_input(patents)})
