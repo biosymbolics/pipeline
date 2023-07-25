@@ -1,3 +1,6 @@
+"""
+Patent Probability of Success (PoS) model(s)
+"""
 import logging
 import os
 import sys
@@ -27,7 +30,7 @@ AllInput = TypedDict(
 LR = 1e-3  # learning rate
 CHECKPOINT_PATH = "patent_model_checkpoints"
 OPTIMIZER_CLASS = torch.optim.Adam
-SAVE_FREQUENCY = 5  # save model every 5 epochs
+SAVE_FREQUENCY = 2
 
 # Query for approval data
 # product p, active_ingredient ai, synonyms syns, approval a
@@ -124,28 +127,27 @@ class TrainableCombinedModel:
     Trainable combined model for patent classification
     """
 
-    def __init__(self, checkpoint_file: Optional[str] = None):
+    def __init__(
+        self,
+        model: Optional[CombinedModel] = None,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+    ):
         """
         Initialize model
 
         Args:
-            checkpoint_file (Optional[str], optional): Path to checkpoint file. Defaults to None.
+            model (Optional[CombinedModel]): Model to train
+            optimizer (Optional[torch.optim.Optimizer]): Optimizer to use
         """
-        if checkpoint_file:
-            model, optimizer, epoch = TrainableCombinedModel.load_checkpoint(
-                checkpoint_file
-            )
-            self.model = model
-            self.optimizer = optimizer
-            self.epoch = epoch
-        else:
-            self.model = CombinedModel()
-            self.optimizer = OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
-            self.criterion = nn.BCEWithLogitsLoss()
-            self.epoch = 0
+        self.model = model or CombinedModel()
+        self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
+        self.criterion = nn.BCEWithLogitsLoss()
 
     def __call__(self, *args, **kwargs):
-        self.do_train(*args, **kwargs)
+        """
+        Alias for self.train
+        """
+        self.train(*args, **kwargs)
 
     def __get_feature_embeddings(
         self,
@@ -297,7 +299,7 @@ class TrainableCombinedModel:
         except Exception as e:
             logging.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
 
-    def do_train(
+    def train(
         self,
         patents: Sequence[PatentApplication],
         start_epoch: int = 0,
@@ -315,23 +317,22 @@ class TrainableCombinedModel:
 
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
-            self.epoch = epoch
             for bi, batch in enumerate(batches):
                 logging.info("Starting batch %s out of %s", bi, len(batches))
-                if epoch % SAVE_FREQUENCY == 0:
-                    self.save_checkpoint(epoch)
                 self.optimizer.zero_grad()
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 loss = self.criterion(pred, batch["y"])
                 loss.backward()
                 self.optimizer.step()
+            if epoch % SAVE_FREQUENCY == 0:
+                self.save_checkpoint(epoch)
 
     @classmethod
     def load_checkpoint(
-        cls, checkpoint_name: str
-    ) -> tuple[CombinedModel, torch.optim.Optimizer, int]:
+        cls, checkpoint_name: str, patents: Optional[Sequence[PatentApplication]] = None
+    ):
         """
-        Load model
+        Load model from checkpoint. If patents provided, will start training from the next epoch
 
         Args:
             patents (Sequence[PatentApplication]): List of patents
@@ -346,14 +347,17 @@ class TrainableCombinedModel:
 
         checkpoint = torch.load(checkpoint_file)
         model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer = OPTIMIZER_CLASS(
-            model.parameters(), lr=LR
-        )  # Initialize new optimizer
+        optimizer = OPTIMIZER_CLASS(model.parameters(), lr=LR)
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch = checkpoint["epoch"] + 1
 
         logging.info("Loaded checkpoint %s", checkpoint_name)
-        return (model, optimizer, start_epoch)
+
+        trainable_model = TrainableCombinedModel(model, optimizer)
+
+        if patents:
+            trainable_model.train(patents, start_epoch=checkpoint["epoch"] + 1)
+
+        return trainable_model
 
 
 def main():
@@ -361,7 +365,7 @@ def main():
         Sequence[PatentApplication], patent_client.search(["asthma"], True, 0, "medium")
     )
     model = TrainableCombinedModel()
-    model.do_train(patents)
+    model.train(patents)
 
 
 if __name__ == "__main__":
