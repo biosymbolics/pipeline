@@ -3,7 +3,7 @@ Patent types
 """
 
 from datetime import date
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 
 class PatentBasicInfo(TypedDict):
@@ -47,3 +47,10 @@ class PatentApplication(PatentBasicInfo):
     proteins: list[str]  # remove?
     similar: list[str]
     top_terms: list[str]  # from GPR table
+
+
+class ApprovedPatentApplication(PatentApplication):
+    brand_name: str
+    generic_name: str
+    approval_date: date
+    indication: str

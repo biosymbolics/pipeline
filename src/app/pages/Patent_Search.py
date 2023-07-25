@@ -74,7 +74,7 @@ def get_data(terms, min_patent_years, relevancy_threshold):
             relevancy_threshold: {relevancy_threshold}
         """
     )
-    patents = patent_client.search(terms, min_patent_years, relevancy_threshold)
+    patents = patent_client.search(terms, False, min_patent_years, relevancy_threshold)
     return patents
 
 

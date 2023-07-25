@@ -3,6 +3,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
+import polars as pl
 
 from typings.patents import PatentApplication
 
@@ -214,6 +215,24 @@ def get_features(patent: PatentApplication, feature_fields: list[str]) -> list:
     return features
 
 
+def get_feature_embeddings(patents: list[PatentApplication], feature_fields: list[str]):
+    df = pl.from_dicts([patent.__dict__ for patent in patents])
+    size_map = dict(
+        [(field, df.select(pl.col(field)).n_unique()) for field in feature_fields]
+    )
+    embedding_layers = dict(
+        [(field, nn.Embedding(size_map[field], 32)) for field in feature_fields]
+    )
+
+    def get_node_features(patent):
+        return torch.cat(
+            [embedding_layers[field](patent[field]) for field in feature_fields], dim=1
+        )
+
+    embeddings = [get_node_features(patent) for patent in patents]
+    return embeddings
+
+
 def prepare_dnn_data(
     patents: list[PatentApplication], outcome_map: dict[str, int]
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -226,10 +245,13 @@ def prepare_dnn_data(
     Returns:
         tuple[torch.Tensor, torch.Tensor]: DNN data
     """
+    embeddings = get_feature_embeddings(patents, DNN_PATENT_FEATURES)
+    x1 = torch.cat(embeddings, dim=1)
+
     things_patented = [
         " + ".join(patent["compounds"] + patent["mechanisms"]) for patent in patents
     ]
-    x1 = torch.tensor([get_features(patent, DNN_PATENT_FEATURES) for patent in patents])
+
     y = torch.tensor(
         [outcome_map.get(patented_thing, 0) for patented_thing in things_patented]
     )
@@ -253,6 +275,10 @@ def prepare_gnn_data(
         "compounds",
         "mechanisms",
     ]  # TODO: enirch with pathways, targets, disease pathways
-    x2 = torch.tensor([get_features(patent, GNN_FEATURES) for patent in patents])
+
+    # GNN input features for this node
+    embeddings = get_feature_embeddings(patents, GNN_FEATURES)
+    x2 = torch.cat(embeddings, dim=1)
+
     edge_index = torch.tensor([[i, i] for i in range(len(patents))])
     return (x2, edge_index)

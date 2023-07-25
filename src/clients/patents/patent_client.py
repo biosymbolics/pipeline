@@ -2,11 +2,11 @@
 Patent client
 """
 from functools import partial
-from typing import Sequence, cast
+from typing import Sequence, Union, cast
 import logging
 
 from clients import select_from_bg
-from typings import PatentApplication
+from typings import ApprovedPatentApplication, PatentApplication
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
@@ -58,6 +58,13 @@ SEARCH_RETURN_FIELDS = [
     "url",
 ]
 
+APPROVED_SERACH_RETURN_FIELDS = [
+    "brand_name",
+    "generic_name",
+    "approval_date",
+    "patent_indication as indication",
+]
+
 # composition of matter filter
 COM_FILTER = f"""
     (
@@ -87,9 +94,10 @@ def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
 
 def search(
     terms: Sequence[str],
+    fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
-) -> Sequence[PatentApplication]:
+) -> Union[Sequence[PatentApplication], Sequence[ApprovedPatentApplication]]:
     """
     Search patents by terms
     Filters on
@@ -106,12 +114,17 @@ def search(
         >>> search(['asthma', 'astrocytoma'])
     """
     lower_terms = [term.lower() for term in terms]
-    fields = ",".join(SEARCH_RETURN_FIELDS)
+    fields = ",".join(
+        [
+            *SEARCH_RETURN_FIELDS,
+            *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+        ]
+    )
     max_priority_date = get_max_priority_date(min_patent_years)
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     _get_term_query = partial(get_term_query, threshold=threshold)
 
-    query = f"""
+    select = f"""
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
@@ -153,6 +166,15 @@ def search(
             WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms})
         ) AS matched_pubs
         ON apps.publication_number = matched_pubs.publication_number
+    """
+
+    if fetch_approval:
+        select += """
+            JOIN patents.patent_approvals AS approvals
+            ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
+        """
+
+    where = f"""
         WHERE
         priority_date > {max_priority_date}
         AND {COM_FILTER}
@@ -160,6 +182,8 @@ def search(
         ORDER BY search_rank DESC
         limit {MAX_SEARCH_RESULTS}
     """
+
+    query = select + where
     results = select_from_bg(query)
     return format_search_result(results)
 
