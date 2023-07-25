@@ -11,9 +11,10 @@ initialize()
 
 from clients.low_level.big_query import delete_bg_table, execute_bg_query, BQ_DATASET_ID
 
-TABLE = f"{BQ_DATASET_ID}.biosym_annotations"
-
 TextField = Literal["title", "abstract"]
+
+TABLE = f"{BQ_DATASET_ID}.biosym_annotations"
+TEXT_FIELDS: list[TextField] = ["title", "abstract"]
 
 
 def remove_substrings():
@@ -142,8 +143,6 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
-    TEXT_FIELDS: list[TextField] = ["title", "abstract"]
-
     def get_query(term: Union[str, list[str]], field: TextField):
         if isinstance(term, list):
             term = "(?:" + "?|".join(term) + ")"
@@ -243,11 +242,38 @@ def clean_annotations():
         results = execute_bg_query(sql)
 
 
+def fix_unmatched():
+    """
+    Example: 3 -d]pyrimidine derivatives -> Pyrrolo [2, 3 -d]pyrimidine derivatives
+    """
+
+    def get_query(field, char_set):
+        sql = rf"""
+            UPDATE {TABLE} a
+            set original_term=REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', `{BQ_DATASET_ID}.escape_regex_chars`(original_term), ')'))
+            from `{BQ_DATASET_ID}.gpr_publications` p
+            WHERE p.publication_number=a.publication_number
+            AND REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', `{BQ_DATASET_ID}.escape_regex_chars`(original_term), ')')) is not null
+            AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
+            AND {field} like '%{char_set[0]}%{char_set[1]}%'
+        """
+        return sql
+
+    for field in TEXT_FIELDS:
+        for char_set in [("{", "}"), ("[", "]"), ("(", ")")]:
+            sql = get_query(field, char_set)
+            execute_bg_query(sql)
+
+
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print("Usage: python3 ner.py\nCleans up annotations after NER is complete")
         sys.exit()
 
-    fix_of_for_annotations()
-    clean_annotations()
-    remove_substrings()
+    # fix_of_for_annotations()
+
+    # derivatives -> compounds
+    # clean_annotations()
+    # remove_substrings()
+
+    fix_unmatched()
