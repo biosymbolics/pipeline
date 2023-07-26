@@ -98,6 +98,7 @@ importlib.reload(common.ner.ner)
 ```
 
 #### Redis
+- `redis-cli -h redis-12973.c1.us-west-2-2.ec2.cloud.redislabs.com -p 12973`
 - `FLUSHALL`
 - `keys *`
 - `HGETALL "term:PD-1 inhibitors"`

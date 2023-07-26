@@ -3,6 +3,7 @@ Patent Probability of Success (PoS) model(s)
 """
 from collections import namedtuple
 import logging
+import math
 import os
 import sys
 from typing import Optional, Sequence, TypedDict, cast
@@ -64,6 +65,8 @@ where (syns.name ilike '%elexacaftor%' or p.generic_name ilike '%elexacaftor%' o
 group by p.ndc_product_code;
 """
 
+BATCH_SIZE = 256
+
 
 class DNN(nn.Module):
     """
@@ -109,7 +112,7 @@ class CombinedModel(nn.Module):
 
     def __init__(
         self,
-        dnn_input_dim: int = 256,
+        dnn_input_dim: int = BATCH_SIZE,
         gnn_input_dim=64,
         dnn_hidden_dim=64,
         gnn_hidden_dim=64,
@@ -123,7 +126,9 @@ class CombinedModel(nn.Module):
         self.fc2 = nn.Linear(midway_hidden_dim, 1)
 
     def forward(self, x1, x2, edge_index):
-        dnn_emb = self.dnn(x1)
+        dnn_emb = self.dnn(
+            x1
+        )  # mat1 and mat2 shapes cannot be multiplied (256x110400 and 256x64)
         gnn_emb = self.gnn(x2, edge_index)
         x = torch.cat([dnn_emb, gnn_emb], dim=1)
         x = self.fc1(x)
@@ -138,6 +143,7 @@ class TrainableCombinedModel:
 
     def __init__(
         self,
+        batch_size: int = BATCH_SIZE,
         model: Optional[CombinedModel] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
     ):
@@ -148,7 +154,9 @@ class TrainableCombinedModel:
             model (Optional[CombinedModel]): Model to train
             optimizer (Optional[torch.optim.Optimizer]): Optimizer to use
         """
-        self.model = model or CombinedModel()
+        torch.device("mps")
+        self.batch_size = batch_size
+        self.model = model or CombinedModel(batch_size)
         self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
         self.criterion = nn.BCEWithLogitsLoss()
 
@@ -202,7 +210,6 @@ class TrainableCombinedModel:
             CatTuple(*fv)._asdict()
             for fv in zip(*[enc[1][1] for enc in label_encoders])
         ]
-        print(cat_feats[0:1])
 
         nlp = Spacy.get_instance(disable=["ner"])._nlp
 
@@ -213,43 +220,50 @@ class TrainableCombinedModel:
             return [val]
 
         def get_patent_features(patent):
-            tensor_map = dict(
-                [
-                    (field, torch.tensor(patent[field], dtype=torch.int))
-                    for field in categorical_fields
-                ]
+            tensors = [
+                embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
+                for field in categorical_fields
+            ]
+            max_len = max(f.size(0) for f in tensors)
+            cat_feats = torch.flatten(
+                torch.cat(
+                    [
+                        F.pad(f, (0, 0, 0, max_len - f.size(0)))
+                        for f in tensors
+                        if f.size(0) > 0
+                    ]
+                )
             )
-            max_len = max(t.size(0) for t in tensor_map.values())
-            tensor_map = dict(
-                [
-                    (field, F.pad(t, (0, max_len - t.size(0))))
-                    for field, t in tensor_map.items()
-                ]
-            )
-            cat_features = torch.cat(
-                [
-                    embedding_layers[field](tensor)
-                    for field, tensor in tensor_map.items()
-                ],
-                dim=1,
+            text_feats = [
+                torch.mean(
+                    torch.tensor(
+                        [
+                            token.vector
+                            for value in get_values(patent, field)
+                            for token in nlp(value)
+                        ]
+                    ),
+                    dim=0,
+                )
+                for field in text_fields
+            ]
+            combo_text_feats = (
+                torch.cat(text_feats) if len(text_feats) > 0 else torch.tensor([])
             )
 
-            text_features = torch.cat(
-                [
-                    torch.mean(
-                        torch.tensor([token.vector for token in nlp(value)]),
-                        dim=0,
-                    )
-                    for field in text_fields
-                    for value in get_values(patent, field)
-                ]
+            feats = [cat_feats, combo_text_feats]
+            max_len = max(f.size(0) for f in feats)
+
+            combined = torch.cat(
+                [F.pad(f, (0, max_len - f.size(0))) for f in feats], dim=0
             )
-            return torch.cat([cat_features, text_features])
+            return combined
 
         embeddings = [
             get_patent_features({**patent, **cat_feat})
             for patent, cat_feat in zip(patents, cat_feats)
         ]
+        print([e.size() for e in embeddings[0:100]])
         return embeddings
 
     def __prepare_dnn_data(self, patents: Sequence[PatentApplication]) -> DnnInput:
@@ -281,10 +295,17 @@ class TrainableCombinedModel:
         embeddings = self.__get_feature_embeddings(
             patents, categorical_fields, text_fields
         )
-        x1 = torch.cat(embeddings, dim=1)
+        x1 = self.__size_batch_embeddings(embeddings)
 
         y = torch.tensor([patent["approval_date"] is not None for patent in patents])
         return {"x1": x1, "y": y}
+
+    def __size_batch_embeddings(self, embeddings):
+        max_len = max(e.size(0) for e in embeddings)
+        padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
+        return torch.cat(
+            [emb.unsqueeze(0) for emb in padded_emb], dim=0
+        )  # [batch_size, feat_len]
 
     def __prepare_gnn_input(
         self,
@@ -302,13 +323,13 @@ class TrainableCombinedModel:
         # TODO: enirch with pathways, targets, disease pathways
         categorical_features = [
             "diseases",
-            "compounds",  # text list?
-            "mechanisms",  # text list?
+            "compounds",
+            "mechanisms",
         ]
 
         # GNN input features for this node
         embeddings = self.__get_feature_embeddings(patents, categorical_features)
-        x2 = torch.cat(embeddings, dim=1)
+        x2 = self.__size_batch_embeddings(embeddings)
 
         edge_index = torch.tensor([[i, i] for i in range(len(patents))])
         return {"x2": x2, "edge_index": edge_index}
@@ -358,7 +379,7 @@ class TrainableCombinedModel:
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
-        batches = batch_dict(self.__prepare_inputs(patents))
+        batches = batch_dict(self.__prepare_inputs(patents), self.batch_size)
 
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
@@ -397,7 +418,7 @@ class TrainableCombinedModel:
 
         logging.info("Loaded checkpoint %s", checkpoint_name)
 
-        trainable_model = TrainableCombinedModel(model, optimizer)
+        trainable_model = TrainableCombinedModel(BATCH_SIZE, model, optimizer)
 
         if patents:
             trainable_model.train(patents, start_epoch=checkpoint["epoch"] + 1)
