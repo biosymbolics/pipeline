@@ -31,7 +31,6 @@ class PatentApplication(PatentBasicInfo):
     Patent application object as per Google Patents API / local modifications
     """
 
-    application_kind: str
     classes: list[str]  # remove?
     compounds: list[str]
     drugs: list[str]  # remove?

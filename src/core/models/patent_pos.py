@@ -1,16 +1,25 @@
 """
 Patent Probability of Success (PoS) model(s)
 """
+from collections import namedtuple
 import logging
 import os
 import sys
 from typing import Optional, Sequence, TypedDict, cast
+from pydash import flatten
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 import polars as pl
-from clients.spacy import Spacy
+from sklearn.preprocessing import LabelEncoder
 
+
+from system import initialize
+
+initialize()
+
+from clients.spacy import Spacy
 from common.utils.list import batch_dict
 from clients.patents import patent_client
 from typings.patents import ApprovedPatentApplication as PatentApplication
@@ -163,7 +172,7 @@ class TrainableCombinedModel:
             categorical_fields (list[str]): List of fields to embed as categorical variables
             text_fields (list[str]): List of fields to embed as text
         """
-        df = pl.from_dicts([patent.__dict__ for patent in patents])
+        df = pl.from_dicts([patent for patent in patents])  # type: ignore
         size_map = dict(
             [
                 (field, df.select(pl.col(field).flatten()).n_unique())
@@ -174,27 +183,61 @@ class TrainableCombinedModel:
             [(field, nn.Embedding(size_map[field], 32)) for field in categorical_fields]
         )
 
-        nlp = Spacy.get_instance(disable=["ner"])
+        def encode_category(field):
+            le = LabelEncoder()
+            new_list = df.select(pl.col(field)).to_series().to_list()
+            le.fit(flatten(new_list))
+            values = [le.transform([x] if isinstance(x, str) else x) for x in new_list]
+            return (le, values)
 
-        def get_values(patent, field) -> list:
-            val = patent[field]
+        # { 'mechanisms': [array([5]), array([5]) ...] }
+        label_encoders = [
+            (field, encode_category(field)) for field in categorical_fields
+        ]
+        encoder_map = dict([(field, enc[0]) for field, enc in label_encoders])
+
+        # 🐈
+        CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
+        cat_feats = [
+            CatTuple(*fv)._asdict()
+            for fv in zip(*[enc[1][1] for enc in label_encoders])
+        ]
+        print(cat_feats[0:1])
+
+        nlp = Spacy.get_instance(disable=["ner"])._nlp
+
+        def get_values(patent: PatentApplication, field: str) -> list:
+            val = patent.get(field)
             if isinstance(val, list):
                 return val
             return [val]
 
         def get_patent_features(patent):
+            tensor_map = dict(
+                [
+                    (field, torch.tensor(patent[field], dtype=torch.int))
+                    for field in categorical_fields
+                ]
+            )
+            max_len = max(t.size(0) for t in tensor_map.values())
+            tensor_map = dict(
+                [
+                    (field, F.pad(t, (0, max_len - t.size(0))))
+                    for field, t in tensor_map.items()
+                ]
+            )
             cat_features = torch.cat(
                 [
-                    embedding_layers[field](value)
-                    for field in categorical_fields
-                    for value in get_values(patent, field)
+                    embedding_layers[field](tensor)
+                    for field, tensor in tensor_map.items()
                 ],
                 dim=1,
             )
+
             text_features = torch.cat(
                 [
                     torch.mean(
-                        torch.stack([nlp.vocab[token] for token in nlp.pipe(value)]),
+                        torch.tensor([token.vector for token in nlp(value)]),
                         dim=0,
                     )
                     for field in text_fields
@@ -203,7 +246,10 @@ class TrainableCombinedModel:
             )
             return torch.cat([cat_features, text_features])
 
-        embeddings = [get_patent_features(patent) for patent in patents]
+        embeddings = [
+            get_patent_features({**patent, **cat_feat})
+            for patent, cat_feat in zip(patents, cat_feats)
+        ]
         return embeddings
 
     def __prepare_dnn_data(self, patents: Sequence[PatentApplication]) -> DnnInput:
@@ -217,7 +263,6 @@ class TrainableCombinedModel:
             tuple[torch.Tensor, torch.Tensor]: DNN data
         """
         categorical_fields = [
-            "application_kind",
             "attributes",
             "compounds",
             "country",
@@ -228,7 +273,7 @@ class TrainableCombinedModel:
         text_fields = [
             "title",
             "abstract",
-            "claims",
+            # "claims",
             "assignees",
             "inventors",
         ]
