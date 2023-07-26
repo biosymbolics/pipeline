@@ -41,6 +41,7 @@ LR = 1e-3  # learning rate
 CHECKPOINT_PATH = "patent_model_checkpoints"
 OPTIMIZER_CLASS = torch.optim.Adam
 SAVE_FREQUENCY = 2
+EMBEDDING_DIM = 16  # good? should be small stuff
 
 # Query for approval data
 # product p, active_ingredient ai, synonyms syns, approval a
@@ -66,6 +67,28 @@ group by p.ndc_product_code;
 """
 
 BATCH_SIZE = 256
+
+CATEGORICAL_FIELDS = [
+    "attributes",
+    "compounds",
+    "country",
+    "diseases",
+    "mechanisms",
+    "ipc_codes",
+]
+TEXT_FIELDS = [
+    "title",
+    "abstract",
+    # "claims",
+    "assignees",
+    "inventors",
+]
+
+GNN_CATEGORICAL_FIELDS = [
+    "diseases",
+    "compounds",
+    "mechanisms",
+]
 
 
 class DNN(nn.Module):
@@ -112,7 +135,7 @@ class CombinedModel(nn.Module):
 
     def __init__(
         self,
-        dnn_input_dim: int = BATCH_SIZE,
+        dnn_input_dim: int,
         gnn_input_dim=64,
         dnn_hidden_dim=64,
         gnn_hidden_dim=64,
@@ -126,14 +149,24 @@ class CombinedModel(nn.Module):
         self.fc2 = nn.Linear(midway_hidden_dim, 1)
 
     def forward(self, x1, x2, edge_index):
-        dnn_emb = self.dnn(
-            x1
-        )  # mat1 and mat2 shapes cannot be multiplied (256x110400 and 256x64)
+        dnn_emb = self.dnn(x1)
         gnn_emb = self.gnn(x2, edge_index)
         x = torch.cat([dnn_emb, gnn_emb], dim=1)
         x = self.fc1(x)
         x = self.fc2(x)
         return x
+
+
+def get_input_dim(
+    categorical_fields,
+    text_fields=[],
+    embedding_dim=EMBEDDING_DIM,
+    text_embedding_dim=300,
+):
+    input_length = (len(categorical_fields) * embedding_dim) + (
+        len(text_fields) * text_embedding_dim
+    )
+    return input_length
 
 
 class TrainableCombinedModel:
@@ -146,6 +179,9 @@ class TrainableCombinedModel:
         batch_size: int = BATCH_SIZE,
         model: Optional[CombinedModel] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
+        gnn_categorical_fields: list[str] = GNN_CATEGORICAL_FIELDS,
+        dnn_categorical_fields: list[str] = CATEGORICAL_FIELDS,
+        dnn_text_fields: list[str] = TEXT_FIELDS,
     ):
         """
         Initialize model
@@ -155,10 +191,18 @@ class TrainableCombinedModel:
             optimizer (Optional[torch.optim.Optimizer]): Optimizer to use
         """
         torch.device("mps")
+        self.embedding_dim = EMBEDDING_DIM
         self.batch_size = batch_size
-        self.model = model or CombinedModel(batch_size)
+
+        dnn_input_dim = get_input_dim(
+            dnn_categorical_fields, dnn_text_fields, self.embedding_dim
+        )
+        self.model = model or CombinedModel(dnn_input_dim)
         self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
         self.criterion = nn.BCEWithLogitsLoss()
+        self.gnn_categorical_fields = gnn_categorical_fields
+        self.dnn_categorical_fields = dnn_categorical_fields
+        self.dnn_text_fields = dnn_text_fields
 
     def __call__(self, *args, **kwargs):
         """
@@ -188,7 +232,10 @@ class TrainableCombinedModel:
             ]
         )
         embedding_layers = dict(
-            [(field, nn.Embedding(size_map[field], 32)) for field in categorical_fields]
+            [
+                (field, nn.Embedding(size_map[field], self.embedding_dim))
+                for field in categorical_fields
+            ]
         )
 
         def encode_category(field):
@@ -202,68 +249,76 @@ class TrainableCombinedModel:
         label_encoders = [
             (field, encode_category(field)) for field in categorical_fields
         ]
-        encoder_map = dict([(field, enc[0]) for field, enc in label_encoders])
+        # encoder_map = dict([(field, enc[0]) for field, enc in label_encoders])
 
         # 🐈
         CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
+        # all len 6
         cat_feats = [
             CatTuple(*fv)._asdict()
             for fv in zip(*[enc[1][1] for enc in label_encoders])
         ]
 
-        nlp = Spacy.get_instance(disable=["ner"])._nlp
+        nlp = Spacy.get_instance(disable=["ner"])
+
+        MAX_STRING_LEN = 200
 
         def get_values(patent: PatentApplication, field: str) -> list:
             val = patent.get(field)
             if isinstance(val, list):
-                return val
-            return [val]
+                return [v[0:MAX_STRING_LEN] for v in val]
+            if val is None:
+                return [None]
+            return [val[0:MAX_STRING_LEN]]
 
-        def get_patent_features(patent):
-            tensors = [
-                embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
-                for field in categorical_fields
+        cat_tensors: list[list[torch.Tensor]] = [
+            embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
+            for field in categorical_fields
+            for patent in cat_feats
+        ]
+        max_len = max(f.size(0) for f in flatten(cat_tensors))
+        padded_cat_tensors = [
+            [
+                F.pad(f, (0, max_len - f.size(0)))
+                if f.size(0) > 0
+                else torch.empty([max_len])
+                for f in cat_tensors[i]
             ]
-            max_len = max(f.size(0) for f in tensors)
-            cat_feats = torch.flatten(
-                torch.cat(
+            for i in range(len(cat_tensors))
+        ]
+        cat_feats = [
+            torch.cat(tensor_set) if len(tensor_set) > 0 else torch.Tensor([[]])
+            for tensor_set in padded_cat_tensors
+        ]
+        text_feats = [
+            [
+                torch.tensor(
                     [
-                        F.pad(f, (0, 0, 0, max_len - f.size(0)))
-                        for f in tensors
-                        if f.size(0) > 0
-                    ]
+                        token.vector
+                        for value in get_values(patent, field)
+                        for token in nlp(value)
+                    ],
                 )
-            )
-            text_feats = [
-                torch.mean(
-                    torch.tensor(
-                        [
-                            token.vector
-                            for value in get_values(patent, field)
-                            for token in nlp(value)
-                        ]
-                    ),
-                    dim=0,
-                )
-                for field in text_fields
             ]
-            combo_text_feats = (
-                torch.cat(text_feats) if len(text_feats) > 0 else torch.tensor([])
+            for field in text_fields
+            for patent in patents
+        ]
+
+        def get_patent_features(i: int) -> torch.Tensor:
+            combo_text_feats = torch.flatten(
+                (
+                    torch.cat(text_feats[i])
+                    if len(text_feats[i]) > 0
+                    else torch.tensor([[]])
+                )
             )
 
-            feats = [cat_feats, combo_text_feats]
-            max_len = max(f.size(0) for f in feats)
+            combo_cat_feats = torch.flatten(cat_feats[i])
 
-            combined = torch.cat(
-                [F.pad(f, (0, max_len - f.size(0))) for f in feats], dim=0
-            )
+            combined = torch.cat([combo_text_feats, combo_cat_feats], dim=0)
             return combined
 
-        embeddings = [
-            get_patent_features({**patent, **cat_feat})
-            for patent, cat_feat in zip(patents, cat_feats)
-        ]
-        print([e.size() for e in embeddings[0:100]])
+        embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
         return embeddings
 
     def __prepare_dnn_data(self, patents: Sequence[PatentApplication]) -> DnnInput:
@@ -276,36 +331,26 @@ class TrainableCombinedModel:
         Returns:
             tuple[torch.Tensor, torch.Tensor]: DNN data
         """
-        categorical_fields = [
-            "attributes",
-            "compounds",
-            "country",
-            "diseases",
-            "mechanisms",
-            "ipc_codes",
-        ]
-        text_fields = [
-            "title",
-            "abstract",
-            # "claims",
-            "assignees",
-            "inventors",
-        ]
-
         embeddings = self.__get_feature_embeddings(
-            patents, categorical_fields, text_fields
+            patents, self.dnn_categorical_fields, self.dnn_text_fields
         )
+        print("EmbeddingsX1: ", len(embeddings))
         x1 = self.__size_batch_embeddings(embeddings)
+        print("X1: ", x1.size())
 
         y = torch.tensor([patent["approval_date"] is not None for patent in patents])
         return {"x1": x1, "y": y}
 
-    def __size_batch_embeddings(self, embeddings):
+    def __size_batch_embeddings(self, embeddings: list[torch.Tensor]):
         max_len = max(e.size(0) for e in embeddings)
         padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
-        return torch.cat(
-            [emb.unsqueeze(0) for emb in padded_emb], dim=0
-        )  # [batch_size, feat_len]
+        batches = [
+            torch.stack(padded_emb[i : i + self.batch_size])
+            for i in range(0, len(padded_emb), self.batch_size)
+        ]
+        print("Batches: ", len(batches), [b.size() for b in batches])
+        sized = torch.stack(batches)
+        return sized
 
     def __prepare_gnn_input(
         self,
@@ -321,14 +366,8 @@ class TrainableCombinedModel:
             tuple[torch.Tensor, torch.Tensor]: GNN data
         """
         # TODO: enirch with pathways, targets, disease pathways
-        categorical_features = [
-            "diseases",
-            "compounds",
-            "mechanisms",
-        ]
-
         # GNN input features for this node
-        embeddings = self.__get_feature_embeddings(patents, categorical_features)
+        embeddings = self.__get_feature_embeddings(patents, self.gnn_categorical_fields)
         x2 = self.__size_batch_embeddings(embeddings)
 
         edge_index = torch.tensor([[i, i] for i in range(len(patents))])
@@ -379,12 +418,15 @@ class TrainableCombinedModel:
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
-        batches = batch_dict(self.__prepare_inputs(patents), self.batch_size)
+        input_dict = self.__prepare_inputs(patents)
+        num_batches = input_dict["x1"].size(0)
 
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
-            for bi, batch in enumerate(batches):
-                logging.info("Starting batch %s out of %s", bi, len(batches))
+            # for bi, batch in enumerate(batches):
+            for i in range(num_batches):
+                batch = {k: v[i] for k, v in input_dict.items()}  # type: ignore
+                logging.info("Starting batch %s out of %s", i, num_batches)
                 self.optimizer.zero_grad()
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 loss = self.criterion(pred, batch["y"])
@@ -405,7 +447,7 @@ class TrainableCombinedModel:
             checkpoint_name (str): Checkpoint from which to resume
         """
         logging.info("Loading checkpoint %s", checkpoint_name)
-        model = CombinedModel()
+        model = CombinedModel(100)  # TODO!!
         checkpoint_file = os.path.join(CHECKPOINT_PATH, checkpoint_name)
 
         if not os.path.exists(checkpoint_file):

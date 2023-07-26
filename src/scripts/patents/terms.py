@@ -13,6 +13,7 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermLinker
+from common.utils.file import save_json_as_file
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
@@ -120,8 +121,12 @@ def __get_terms():
         """
         rows = select_from_bg(terms_query)
 
+        logging.info("Linking %s terms", len(rows))
+
         linker = TermLinker()
         normalization_map = dict(linker([row["term"] for row in rows]))
+
+        logging.info("Finished creating norm map")
 
         def __normalize(row):
             entry = normalization_map.get(row["term"])
@@ -146,7 +151,10 @@ def __get_terms():
         return __aggregate_terms(terms)
 
     # Normalize, dedupe, and count the terms
+    logging.info("Getting entity terms")
     entity_terms = __get_entity_terms()
+
+    logging.info("Getting assignee terms")
     assignee_terms = __get_assignee_terms()
 
     terms = assignee_terms + entity_terms
@@ -180,6 +188,7 @@ def __create_terms():
 
     # grab terms from annotation tables (slow!!)
     terms = __get_terms()
+    save_json_as_file(terms, "terms.json")
 
     batched = batch(terms)
     for b in batched:
