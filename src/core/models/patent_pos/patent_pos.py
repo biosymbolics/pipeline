@@ -6,44 +6,38 @@ import logging
 import math
 import os
 import sys
-from typing import Any, Optional, Sequence, TypeGuard, TypedDict, Union, cast
+from typing import Any, Optional, Sequence, cast
 from pydash import flatten
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 import polars as pl
-from sklearn.preprocessing import LabelEncoder
 import numpy as np
 
 from system import initialize
 
 initialize()
 
-from common.utils.list import batch_as_tensors
+from common.utils.list import batch, batch_as_tensors
 from clients.spacy import Spacy
 from clients.patents import patent_client
 from typings.patents import ApprovedPatentApplication as PatentApplication
 from typings.core import Primitive
 
-GnnInput = TypedDict("GnnInput", {"x2": torch.Tensor, "edge_index": torch.Tensor})
-DnnInput = TypedDict("DnnInput", {"x1": torch.Tensor, "y": torch.Tensor})
-AllInput = TypedDict(
-    "AllInput",
-    {
-        "x1": torch.Tensor,
-        "y": torch.Tensor,
-        "x2": torch.Tensor,
-        "edge_index": torch.Tensor,
-    },
+from .constants import (
+    BATCH_SIZE,
+    CHECKPOINT_PATH,
+    EMBEDDING_DIM,
+    LR,
+    OPTIMIZER_CLASS,
+    SAVE_FREQUENCY,
+    CATEGORICAL_FIELDS,
+    TEXT_FIELDS,
+    GNN_CATEGORICAL_FIELDS,
 )
-
-LR = 1e-3  # learning rate
-CHECKPOINT_PATH = "patent_model_checkpoints"
-OPTIMIZER_CLASS = torch.optim.Adam
-SAVE_FREQUENCY = 2
-EMBEDDING_DIM = 16  # good? should be small stuff
-MAX_STRING_LEN = 200
+from .types import AllInput, DnnInput, GnnInput
+from .utils import encode_category, get_input_dim, get_string_values, is_tensor_list
 
 # Query for approval data
 # product p, active_ingredient ai, synonyms syns, approval a
@@ -67,36 +61,6 @@ LEFT JOIN synonyms syns on syns.id=s.id
 where (syns.name ilike '%elexacaftor%' or p.generic_name ilike '%elexacaftor%' or p.product_name ilike '%elexacaftor%')
 group by p.ndc_product_code;
 """
-
-BATCH_SIZE = 256
-
-CATEGORICAL_FIELDS = [
-    "attributes",
-    "compounds",
-    "country",
-    "diseases",
-    "mechanisms",
-    "ipc_codes",
-]
-TEXT_FIELDS = [
-    "title",
-    "abstract",
-    # "claims",
-    "assignees",
-    "inventors",
-]
-
-GNN_CATEGORICAL_FIELDS = [
-    "diseases",
-    "compounds",
-    "mechanisms",
-]
-
-
-def is_tensor_list(
-    embeddings: Union[list[torch.Tensor], list[Primitive]]
-) -> TypeGuard[list[torch.Tensor]]:
-    return isinstance(embeddings[0], torch.Tensor)
 
 
 class DNN(nn.Module):
@@ -171,45 +135,10 @@ class CombinedModel(nn.Module):
         gnn_emb = self.gnn(x2, edge_index).unsqueeze(0).repeat(256, 1)
 
         print("SHAPES:", dnn_emb.shape, gnn_emb.shape)
-        # torch.Size([256, 64]) torch.Size([64])
         x = torch.cat([dnn_emb, gnn_emb], dim=1)
         x = self.fc1(x)
         x = self.fc2(x)
         return x.squeeze()
-
-
-# 5145 vs 1296
-def get_input_dim(
-    categorical_fields,
-    text_fields=[],
-    embedding_dim=EMBEDDING_DIM,
-    text_embedding_dim=300,
-):
-    if len(text_fields) > 0:
-        return 76920  # hack
-    else:
-        return 16560
-    # input_length = (len(categorical_fields) * embedding_dim * 6) + (
-    #     len(text_fields) * text_embedding_dim
-    # )
-    # return input_length
-
-
-def get_string_values(patent: PatentApplication, field: str) -> list:
-    val = patent.get(field)
-    if isinstance(val, list):
-        return [v[0:MAX_STRING_LEN] for v in val]
-    if val is None:
-        return [None]
-    return [val[0:MAX_STRING_LEN]]
-
-
-def encode_category(field, df):
-    le = LabelEncoder()
-    new_list = df.select(pl.col(field)).to_series().to_list()
-    le.fit(flatten(new_list))
-    values = [le.transform([x] if isinstance(x, str) else x) for x in new_list]
-    return (le, values)
 
 
 class TrainableCombinedModel:
@@ -355,18 +284,18 @@ class TrainableCombinedModel:
         embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
         return embeddings
 
-    def __batch(self, embeddings: list[torch.Tensor] | list[Primitive]) -> torch.Tensor:
+    def __batch(self, items: list[torch.Tensor] | list[Primitive]) -> torch.Tensor:
 
-        if not is_tensor_list(embeddings):
-            # then list of bools
-            logging.info("Batching labels")
-            batches = batch_as_tensors(embeddings, self.batch_size)
-            return torch.stack(batches)
+        if not is_tensor_list(items):
+            # then list of primitives
+            batches = batch_as_tensors(cast(list[Primitive], items), self.batch_size)
+            num_dims = 1
+        else:
+            num_dims = len(items[0].size()) + 1
+            batches = batch(items, self.batch_size)
+            batches = [torch.stack(b) for b in batches]
 
-        num_dims = len(embeddings[0].size())
-        batches = batch_as_tensors(embeddings, self.batch_size)
-
-        def get_pad_tup(batch: torch.Tensor):
+        def get_batch_pad(batch: torch.Tensor):
             if num_dims == 1:
                 return (0, self.batch_size - batch.size(0))
 
@@ -375,9 +304,10 @@ class TrainableCombinedModel:
 
             raise ValueError("Unsupported number of dimensions: %s" % num_dims)
 
-        padded = [F.pad(b, get_pad_tup(b)) for b in batches]
-        logging.info("Batches: %s (%s)", len(padded), [b.size() for b in padded])
-        return torch.stack(padded)
+        batches = [F.pad(b, get_batch_pad(b)) for b in batches]
+
+        logging.info("Batches: %s (%s)", len(batches), [b.size() for b in batches])
+        return torch.stack(batches)
 
     def __resize_and_batch(self, embeddings: list[torch.Tensor]):
         """
@@ -395,7 +325,7 @@ class TrainableCombinedModel:
             patents (Sequence[PatentApplication]): List of patents
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: DNN data
+            DnnInput: data shaped for DNN input layer
         """
         embeddings = self.__get_feature_embeddings(
             patents, self.dnn_categorical_fields, self.dnn_text_fields
@@ -418,7 +348,7 @@ class TrainableCombinedModel:
             patents (Sequence[PatentApplication]): List of patents
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: GNN data
+            GNNInput: data shaped for GNN input layer
         """
         # TODO: enirch with pathways, targets, disease pathways
         # GNN input features for this node
@@ -484,6 +414,7 @@ class TrainableCombinedModel:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 self.optimizer.zero_grad()
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
+                print(pred)
                 # PRED: torch.Size([256, 1]) torch.Size([])
                 print("PRED:", pred.size(), batch["y"].size())
                 loss = self.criterion(pred, batch["y"])  # contrastive??
