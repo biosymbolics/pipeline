@@ -170,7 +170,7 @@ def search(
 
     if fetch_approval:
         select += """
-            JOIN patents.patent_approvals AS approvals
+            LEFT JOIN patents.patent_approvals AS approvals
             ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
         """
 

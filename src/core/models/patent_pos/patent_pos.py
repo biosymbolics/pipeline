@@ -1,21 +1,16 @@
 """
 Patent Probability of Success (PoS) model(s)
 """
-from collections import namedtuple
 import logging
 import os
 import sys
 from typing import Any, Optional, Sequence, cast
-from pydash import flatten
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
-import polars as pl
-import numpy as np
 
 from common.utils.list import batch, batch_as_tensors
-from clients.spacy import Spacy
 from clients.patents import patent_client
 from typings.patents import ApprovedPatentApplication as PatentApplication
 from typings.core import Primitive
@@ -32,7 +27,7 @@ from .constants import (
     GNN_CATEGORICAL_FIELDS,
 )
 from .types import AllInput, DnnInput, GnnInput
-from .utils import encode_category, get_input_dim, get_string_values, is_tensor_list
+from .utils import get_feature_embeddings, get_input_dim, is_tensor_list
 
 # Query for approval data
 # product p, active_ingredient ai, synonyms syns, approval a
@@ -114,7 +109,7 @@ class CombinedModel(nn.Module):
         gnn_hidden_dim: int = 64,
     ):
         super().__init__()
-        combo_hidden_dim = gnn_hidden_dim + dnn_hidden_dim
+        combo_hidden_dim = dnn_hidden_dim  # + gnn_hidden_dim
         midway_hidden_dim = round(combo_hidden_dim / 2)
         self.dnn = DNN(dnn_input_dim, dnn_hidden_dim)
         self.gnn = GNN(gnn_input_dim, gnn_hidden_dim)
@@ -124,13 +119,14 @@ class CombinedModel(nn.Module):
     def forward(self, x1, x2, edge_index) -> torch.Tensor:
         """
         Returns:
-            torch.Tensor (torch.Size([256]))
+            torch.Tensor (torch.Size([BATCH_SIZE]))
         """
         dnn_emb = self.dnn(x1)
-        gnn_emb = self.gnn(x2, edge_index).unsqueeze(0).repeat(256, 1)
+        gnn_emb = self.gnn(x2, edge_index).unsqueeze(0).repeat(BATCH_SIZE, 1)
 
-        print("SHAPES:", dnn_emb.shape, gnn_emb.shape)
-        x = torch.cat([dnn_emb, gnn_emb], dim=1)
+        logging.info("DNN (%s), GNN (%s)", dnn_emb.shape, gnn_emb.shape)
+        # x = torch.cat([dnn_emb, gnn_emb], dim=1)
+        x = dnn_emb
         x = self.fc1(x)
         x = self.fc2(x)
         return x.squeeze()
@@ -178,107 +174,6 @@ class TrainableCombinedModel:
         """
         self.train(*args, **kwargs)
 
-    def __get_feature_embeddings(
-        self,
-        patents: Sequence[PatentApplication],
-        categorical_fields: list[str],
-        text_fields: list[str] = [],
-    ):
-        """
-        Get embeddings for patent features
-
-        Args:
-            patents (Sequence[PatentApplication]): List of patents
-            categorical_fields (list[str]): List of fields to embed as categorical variables
-            text_fields (list[str]): List of fields to embed as text
-        """
-        df = pl.from_dicts([patent for patent in patents])  # type: ignore
-        size_map = dict(
-            [
-                (field, df.select(pl.col(field).flatten()).n_unique())
-                for field in categorical_fields
-            ]
-        )
-        embedding_layers = dict(
-            [
-                (field, nn.Embedding(size_map[field], self.embedding_dim))
-                for field in categorical_fields
-            ]
-        )
-
-        label_encoders = [
-            (field, encode_category(field, df)) for field in categorical_fields
-        ]
-        CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
-        # all len 6
-        cat_feats = [
-            CatTuple(*fv)._asdict()
-            for fv in zip(*[enc[1][1] for enc in label_encoders])
-        ]
-
-        nlp = Spacy.get_instance(disable=["ner"])
-
-        cat_tensors: list[list[torch.Tensor]] = [
-            [
-                embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
-                for field in categorical_fields
-            ]
-            for patent in cat_feats
-        ]
-        max_len_0 = max(f.size(0) for f in flatten(cat_tensors))
-        max_len_1 = max(f.size(1) for f in flatten(cat_tensors))
-        padded_cat_tensors = [
-            [
-                F.pad(f, (0, max_len_1 - f.size(1), 0, max_len_0 - f.size(0)))
-                if f.size(0) > 0
-                else torch.empty([max_len_0, max_len_1])
-                for f in cat_tensor
-            ]
-            for cat_tensor in cat_tensors
-        ]
-        cat_feats = [torch.cat(tensor_set) for tensor_set in padded_cat_tensors]
-        text_feats = [
-            [
-                torch.tensor(
-                    np.array(
-                        [
-                            token.vector
-                            for value in get_string_values(patent, field)
-                            for token in nlp(value)
-                        ]
-                    ),
-                )
-                for field in text_fields
-            ]
-            for patent in patents
-        ]
-        # pad?? token_len x word_vec_len (300)
-
-        def get_patent_features(i: int) -> torch.Tensor:
-            combo_text_feats = (
-                torch.flatten(torch.cat(text_feats[i]))
-                if len(text_fields) > 0
-                else None
-            )
-
-            combo_cat_feats = torch.flatten(cat_feats[i])
-            combined = (
-                torch.cat([combo_cat_feats, combo_text_feats], dim=0)
-                if combo_text_feats is not None
-                else combo_cat_feats
-            )
-            if False and combo_text_feats is not None:
-                logging.info(
-                    "Combined: %s (%s, %s)",
-                    combined.size(),
-                    combo_cat_feats.size(),
-                    combo_text_feats.size(),
-                )
-            return combined
-
-        embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
-        return embeddings
-
     def __batch(self, items: list[torch.Tensor] | list[Primitive]) -> torch.Tensor:
 
         if not is_tensor_list(items):
@@ -322,7 +217,7 @@ class TrainableCombinedModel:
         Returns:
             DnnInput: data shaped for DNN input layer
         """
-        embeddings = self.__get_feature_embeddings(
+        embeddings = get_feature_embeddings(
             patents, self.dnn_categorical_fields, self.dnn_text_fields
         )
         x1 = self.__resize_and_batch(embeddings)
@@ -347,11 +242,11 @@ class TrainableCombinedModel:
         """
         # TODO: enirch with pathways, targets, disease pathways
         # GNN input features for this node
-        embeddings = self.__get_feature_embeddings(patents, self.gnn_categorical_fields)
+        embeddings = get_feature_embeddings(patents, self.gnn_categorical_fields)
         x2 = self.__resize_and_batch(embeddings)
-        logging.info("X2: %s", x2.size())
-
         edge_index = torch.tensor([[i, i] for i in range(len(patents))])
+        logging.info("X2: %s, EI", x2.size(), edge_index.size())
+
         return {"x2": x2, "edge_index": edge_index}
 
     def __prepare_inputs(self, patents: Sequence[PatentApplication]) -> AllInput:
@@ -411,10 +306,13 @@ class TrainableCombinedModel:
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 print(pred)
                 print(batch["y"][0:5])
-                print(batch["x1"][0:5])
-                print(batch["x2"][0:5])
-                print(batch["edge_index"][0:5])
-                # PRED: torch.Size([256, 1]) torch.Size([])
+                print(
+                    batch["x1"][0:5]
+                )  # tensor([[ 0.4233, -0.9974, -0.6870,  ...,  0.0000,  0.0000,  0.0000]
+                print(
+                    batch["x2"][0:5]
+                )  # tensor([[-2.0202,  0.3456, -0.3380,  ...,  0.0000,  0.0000,  0.0000],
+                print(batch["edge_index"][0:5])  # tensor([0, 0])
                 print("PRED:", pred.size(), batch["y"].size())
                 loss = self.criterion(pred, batch["y"])  # contrastive??
                 loss.backward()
@@ -459,6 +357,7 @@ def main():
     patents = cast(
         Sequence[PatentApplication], patent_client.search(["asthma"], True, 0, "medium")
     )
+    print(patents[0])
     model = TrainableCombinedModel()
     model.train(patents)
 
