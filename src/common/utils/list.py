@@ -5,6 +5,7 @@ Utils for lists/arrays
 
 from typing import Mapping, TypeVar, cast
 from pydash import compact
+import torch
 
 T = TypeVar("T")
 BATCH_SIZE = 1000
@@ -53,6 +54,18 @@ def batch(items: list[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
         batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
     """
     return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
+
+
+def batch_as_tensors(items: list, batch_size: int = BATCH_SIZE) -> list[torch.Tensor]:
+    """
+    Turns a list into a list of tensors of size `batch_size`
+
+    Args:
+        items (list): list to batch
+        batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
+    """
+    batches = batch(items, batch_size)
+    return [torch.stack(batch) for batch in batches]
 
 
 BT = TypeVar("BT", bound=Mapping)
