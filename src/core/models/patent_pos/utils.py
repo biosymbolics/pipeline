@@ -21,6 +21,30 @@ from typings.patents import ApprovedPatentApplication as PatentApplication
 from .constants import EMBEDDING_DIM, MAX_STRING_LEN, MAX_CATS_PER_LIST, TEXT_FEATURES
 
 
+# Query for approval data
+# product p, active_ingredient ai, synonyms syns, approval a
+"""
+select
+    p.ndc_product_code as ndc,
+    (array_agg(distinct p.generic_name))[1] as generic_name,
+    (array_agg(distinct p.product_name))[1] as brand_name,
+    (array_agg(distinct p.marketing_status))[1] as status,
+    (array_agg(distinct active_ingredient_count))[1] as active_ingredient_count,
+    (array_agg(distinct route))[1] as route,
+    (array_agg(distinct s.name)) as substance_names,
+    (array_agg(distinct a.type)) as approval_types,
+    (array_agg(distinct a.approval)) as approval_dates,
+    (array_agg(distinct a.applicant)) as applicants
+from structures s
+LEFT JOIN approval a on a.struct_id=s.id
+LEFT JOIN active_ingredient ai on ai.struct_id=s.id
+LEFT JOIN product p on p.ndc_product_code=ai.ndc_product_code
+LEFT JOIN synonyms syns on syns.id=s.id
+where (syns.name ilike '%elexacaftor%' or p.generic_name ilike '%elexacaftor%' or p.product_name ilike '%elexacaftor%')
+group by p.ndc_product_code;
+"""
+
+
 def is_tensor_list(
     embeddings: list[torch.Tensor] | list[Primitive],
 ) -> TypeGuard[list[torch.Tensor]]:
@@ -256,3 +280,36 @@ def prepare_inputs(
             **__prepare_gnn_input(patents, gnn_categorical_fields, batch_size),
         },
     )
+
+
+# @classmethod
+# def load_checkpoint(
+#     cls, checkpoint_name: str, patents: Optional[Sequence[PatentApplication]] = None
+# ):
+#     """
+#     Load model from checkpoint. If patents provided, will start training from the next epoch
+
+#     Args:
+#         patents (Sequence[PatentApplication]): List of patents
+#         checkpoint_name (str): Checkpoint from which to resume
+#     """
+#     logging.info("Loading checkpoint %s", checkpoint_name)
+#     model = CombinedModel(100, 100)  # TODO!!
+#     checkpoint_file = os.path.join(CHECKPOINT_PATH, checkpoint_name)
+
+#     if not os.path.exists(checkpoint_file):
+#         raise Exception(f"Checkpoint {checkpoint_name} does not exist")
+
+#     checkpoint = torch.load(checkpoint_file)
+#     model.load_state_dict(checkpoint["model_state_dict"])
+#     optimizer = OPTIMIZER_CLASS(model.parameters(), lr=LR)
+#     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+#     logging.info("Loaded checkpoint %s", checkpoint_name)
+
+#     trainable_model = TrainableCombinedModel(BATCH_SIZE, model, optimizer)
+
+#     if patents:
+#         trainable_model.train(patents, start_epoch=checkpoint["epoch"] + 1)
+
+#     return trainable_model
