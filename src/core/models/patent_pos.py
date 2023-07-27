@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 import polars as pl
 from sklearn.preprocessing import LabelEncoder
+import numpy as np
 
 
 from system import initialize
@@ -21,7 +22,6 @@ from system import initialize
 initialize()
 
 from clients.spacy import Spacy
-from common.utils.list import batch_dict
 from clients.patents import patent_client
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
@@ -42,6 +42,7 @@ CHECKPOINT_PATH = "patent_model_checkpoints"
 OPTIMIZER_CLASS = torch.optim.Adam
 SAVE_FREQUENCY = 2
 EMBEDDING_DIM = 16  # good? should be small stuff
+MAX_STRING_LEN = 200
 
 # Query for approval data
 # product p, active_ingredient ai, synonyms syns, approval a
@@ -96,7 +97,7 @@ class DNN(nn.Module):
     Contrastive DNN for patent classification
     """
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim: int, hidden_dim: int):
         super().__init__()
         self.dnn = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -115,7 +116,7 @@ class GNN(nn.Module):
     Where be the loss?
     """
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim: int, hidden_dim: int):
         super().__init__()
         self.conv1 = GCNConv(input_dim, hidden_dim)
         self.conv2 = GCNConv(hidden_dim, hidden_dim)
@@ -149,7 +150,9 @@ class CombinedModel(nn.Module):
         self.fc2 = nn.Linear(midway_hidden_dim, 1)
 
     def forward(self, x1, x2, edge_index):
-        dnn_emb = self.dnn(x1)
+        dnn_emb = self.dnn(
+            x1
+        )  # mat1 and mat2 shapes cannot be multiplied (256x5145 and 1296x64), x1: torch.Size([8, 256, 5145])
         gnn_emb = self.gnn(x2, edge_index)
         x = torch.cat([dnn_emb, gnn_emb], dim=1)
         x = self.fc1(x)
@@ -157,16 +160,34 @@ class CombinedModel(nn.Module):
         return x
 
 
+# 5145 vs 1296
 def get_input_dim(
     categorical_fields,
     text_fields=[],
     embedding_dim=EMBEDDING_DIM,
     text_embedding_dim=300,
 ):
-    input_length = (len(categorical_fields) * embedding_dim) + (
+    input_length = (len(categorical_fields) * embedding_dim * 6) + (
         len(text_fields) * text_embedding_dim
     )
     return input_length
+
+
+def get_values(patent: PatentApplication, field: str) -> list:
+    val = patent.get(field)
+    if isinstance(val, list):
+        return [v[0:MAX_STRING_LEN] for v in val]
+    if val is None:
+        return [None]
+    return [val[0:MAX_STRING_LEN]]
+
+
+def encode_category(field, df):
+    le = LabelEncoder()
+    new_list = df.select(pl.col(field)).to_series().to_list()
+    le.fit(flatten(new_list))
+    values = [le.transform([x] if isinstance(x, str) else x) for x in new_list]
+    return (le, values)
 
 
 class TrainableCombinedModel:
@@ -238,20 +259,9 @@ class TrainableCombinedModel:
             ]
         )
 
-        def encode_category(field):
-            le = LabelEncoder()
-            new_list = df.select(pl.col(field)).to_series().to_list()
-            le.fit(flatten(new_list))
-            values = [le.transform([x] if isinstance(x, str) else x) for x in new_list]
-            return (le, values)
-
-        # { 'mechanisms': [array([5]), array([5]) ...] }
         label_encoders = [
-            (field, encode_category(field)) for field in categorical_fields
+            (field, encode_category(field, df)) for field in categorical_fields
         ]
-        # encoder_map = dict([(field, enc[0]) for field, enc in label_encoders])
-
-        # 🐈
         CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
         # all len 6
         cat_feats = [
@@ -261,43 +271,35 @@ class TrainableCombinedModel:
 
         nlp = Spacy.get_instance(disable=["ner"])
 
-        MAX_STRING_LEN = 200
-
-        def get_values(patent: PatentApplication, field: str) -> list:
-            val = patent.get(field)
-            if isinstance(val, list):
-                return [v[0:MAX_STRING_LEN] for v in val]
-            if val is None:
-                return [None]
-            return [val[0:MAX_STRING_LEN]]
-
         cat_tensors: list[list[torch.Tensor]] = [
-            embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
-            for field in categorical_fields
+            [
+                embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
+                for field in categorical_fields
+            ]
             for patent in cat_feats
         ]
-        max_len = max(f.size(0) for f in flatten(cat_tensors))
+        max_len_0 = max(f.size(0) for f in flatten(cat_tensors))
+        max_len_1 = max(f.size(1) for f in flatten(cat_tensors))
         padded_cat_tensors = [
             [
-                F.pad(f, (0, max_len - f.size(0)))
+                F.pad(f, (0, max_len_1 - f.size(1), 0, max_len_0 - f.size(0)))
                 if f.size(0) > 0
-                else torch.empty([max_len])
-                for f in cat_tensors[i]
+                else torch.empty([max_len_0, max_len_1])
+                for f in cat_tensor
             ]
-            for i in range(len(cat_tensors))
+            for cat_tensor in cat_tensors
         ]
-        cat_feats = [
-            torch.cat(tensor_set) if len(tensor_set) > 0 else torch.Tensor([[]])
-            for tensor_set in padded_cat_tensors
-        ]
+        cat_feats = [torch.cat(tensor_set) for tensor_set in padded_cat_tensors]
         text_feats = [
             [
                 torch.tensor(
-                    [
-                        token.vector
-                        for value in get_values(patent, field)
-                        for token in nlp(value)
-                    ],
+                    np.array(
+                        [
+                            token.vector
+                            for value in get_values(patent, field)
+                            for token in nlp(value)
+                        ]
+                    ),
                 )
             ]
             for field in text_fields
@@ -305,21 +307,54 @@ class TrainableCombinedModel:
         ]
 
         def get_patent_features(i: int) -> torch.Tensor:
-            combo_text_feats = torch.flatten(
-                (
-                    torch.cat(text_feats[i])
-                    if len(text_feats[i]) > 0
-                    else torch.tensor([[]])
+            combo_text_feats = (
+                torch.flatten(
+                    (
+                        torch.cat(text_feats[i])
+                        if len(text_feats[i]) > 0
+                        else torch.tensor([[]])
+                    )
                 )
+                if len(text_fields) > 0
+                else None
             )
 
             combo_cat_feats = torch.flatten(cat_feats[i])
-
-            combined = torch.cat([combo_text_feats, combo_cat_feats], dim=0)
+            combined = (
+                torch.cat([combo_cat_feats, combo_text_feats], dim=0)
+                if combo_text_feats is not None
+                else combo_cat_feats
+            )
+            if combo_text_feats is not None:
+                logging.info(
+                    "Combined: %s (%s, %s)",
+                    combined.size(),
+                    combo_cat_feats.size(),
+                    combo_text_feats.size(),
+                )
             return combined
 
         embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
         return embeddings
+
+    def __size_batch_embeddings(self, embeddings: list[torch.Tensor]):
+        """
+        Size embeddings into batches
+        """
+        max_len = max(e.size(0) for e in embeddings)
+        padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
+        batches = [
+            torch.stack(padded_emb[i : i + self.batch_size])
+            for i in range(0, len(padded_emb), self.batch_size)
+        ]
+        padded_batches = [
+            F.pad(b, (0, 0, 0, self.batch_size - b.size(0))) for b in batches
+        ]
+        logging.info(
+            "Batches: %s (%s)", len(padded_batches), [b.size() for b in padded_batches]
+        )
+        sized = torch.stack(padded_batches)
+        return sized
 
     def __prepare_dnn_data(self, patents: Sequence[PatentApplication]) -> DnnInput:
         """
@@ -334,23 +369,11 @@ class TrainableCombinedModel:
         embeddings = self.__get_feature_embeddings(
             patents, self.dnn_categorical_fields, self.dnn_text_fields
         )
-        print("EmbeddingsX1: ", len(embeddings))
         x1 = self.__size_batch_embeddings(embeddings)
-        print("X1: ", x1.size())
+        logging.info("X1: %s", x1.size())
 
         y = torch.tensor([patent["approval_date"] is not None for patent in patents])
         return {"x1": x1, "y": y}
-
-    def __size_batch_embeddings(self, embeddings: list[torch.Tensor]):
-        max_len = max(e.size(0) for e in embeddings)
-        padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
-        batches = [
-            torch.stack(padded_emb[i : i + self.batch_size])
-            for i in range(0, len(padded_emb), self.batch_size)
-        ]
-        print("Batches: ", len(batches), [b.size() for b in batches])
-        sized = torch.stack(batches)
-        return sized
 
     def __prepare_gnn_input(
         self,
@@ -369,6 +392,7 @@ class TrainableCombinedModel:
         # GNN input features for this node
         embeddings = self.__get_feature_embeddings(patents, self.gnn_categorical_fields)
         x2 = self.__size_batch_embeddings(embeddings)
+        logging.info("X2: %s", x2.size())
 
         edge_index = torch.tensor([[i, i] for i in range(len(patents))])
         return {"x2": x2, "edge_index": edge_index}
@@ -423,7 +447,6 @@ class TrainableCombinedModel:
 
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
-            # for bi, batch in enumerate(batches):
             for i in range(num_batches):
                 batch = {k: v[i] for k, v in input_dict.items()}  # type: ignore
                 logging.info("Starting batch %s out of %s", i, num_batches)
