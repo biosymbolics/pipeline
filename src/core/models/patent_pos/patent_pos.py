@@ -39,7 +39,7 @@ class DNN(nn.Module):
             nn.ReLU(),
         )
 
-    def forward(self, x) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.dnn(x)
 
     def __call__(self, *args: Any, **kwds: Any) -> torch.Tensor:
@@ -58,7 +58,7 @@ class GNN(nn.Module):
         self.conv1 = GCNConv(input_dim, hidden_dim)
         self.conv2 = GCNConv(hidden_dim, hidden_dim)
 
-    def forward(self, x, edge_index) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
         x = self.conv1(x, edge_index)
         x = x.relu()
         x = self.conv2(x, edge_index)
@@ -89,7 +89,9 @@ class CombinedModel(nn.Module):
         self.fc1 = nn.Linear(combo_hidden_dim, midway_hidden_dim)
         self.fc2 = nn.Linear(midway_hidden_dim, 1)
 
-    def forward(self, x1, x2, edge_index) -> torch.Tensor:
+    def forward(
+        self, x1: torch.Tensor, x2: torch.Tensor, edge_index: torch.Tensor
+    ) -> torch.Tensor:
         """
         Returns:
             torch.Tensor (torch.Size([BATCH_SIZE]))
@@ -104,7 +106,7 @@ class CombinedModel(nn.Module):
 
         logging.info("DNN (%s)", dnn_emb.shape)
         # x = torch.cat([dnn_emb, gnn_emb], dim=1)
-        x = dnn_emb
+        x = torch.clone(dnn_emb)
         x = self.fc1(x)
         x = self.fc2(x)
         x = x.squeeze()
@@ -207,7 +209,7 @@ class TrainableCombinedModel:
 def main():
     patents = cast(
         Sequence[PatentApplication],
-        patent_client.search(["asthma"], True, 0, "medium", max_results=2000),
+        patent_client.search(["asthma"], True, 0, "medium", max_results=10000),
     )
     input_dict = prepare_inputs(
         patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS

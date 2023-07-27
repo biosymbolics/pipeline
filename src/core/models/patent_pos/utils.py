@@ -1,3 +1,7 @@
+"""
+Utils for patent eNPV model
+"""
+
 import logging
 import random
 from git import Sequence
@@ -221,9 +225,9 @@ def resize_and_batch(embeddings: list[torch.Tensor], batch_size: int) -> torch.T
 def prepare_inputs(
     patents: Sequence[PatentApplication],
     batch_size: int,
-    dnn_categorical_fields,
-    dnn_text_fields,
-    gnn_categorical_fields,
+    dnn_categorical_fields: list[str],
+    dnn_text_fields: list[str],
+    gnn_categorical_fields: list[str],
 ) -> AllInput:
     """
     Prepare inputs for model
@@ -242,12 +246,12 @@ def prepare_inputs(
             patents, dnn_categorical_fields, dnn_text_fields
         )
         x1 = resize_and_batch(embeddings, batch_size)
-        logging.info("X1: %s", x1.size())
 
         y_vals = [(patent["approval_date"] is not None) for patent in patents]
         y = __batch(cast(list[Primitive], y_vals), batch_size)
         logging.info(
-            "Y: %s (t: %s, f: %s)",
+            "X1: %s, Y: %s (t: %s, f: %s)",
+            x1.size(),
             y.size(),
             len(compact(y_vals)),
             len(compact([not y for y in y_vals])),
@@ -267,7 +271,7 @@ def prepare_inputs(
         x2 = resize_and_batch(embeddings, batch_size)
         edge_index = [torch.tensor([i, i]) for i in range(len(patents))]
         ei = __batch(edge_index, batch_size)
-        logging.info("X2: %s, EI %s", x2.size(), ei.size())
+        # logging.info("X2: %s, EI %s", x2.size(), ei.size())
 
         return {"x2": x2, "edge_index": ei}
 
