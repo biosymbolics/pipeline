@@ -15,6 +15,7 @@ from .types import RelevancyThreshold, TermResult
 
 MIN_TERM_FREQUENCY = 100
 MAX_SEARCH_RESULTS = 2000
+MAX_ARRAY_LENGTH = 50
 
 """
 Larger decay rates will result in more matches
@@ -87,7 +88,8 @@ def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
     return f"""
         ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a
         where a.domain = '{domain}'
-        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
+        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold}
+        limit {MAX_ARRAY_LENGTH})
         as {new_domain}
     """
 
@@ -97,6 +99,7 @@ def search(
     fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
+    max_results: int = MAX_SEARCH_RESULTS,
 ) -> Union[Sequence[PatentApplication], Sequence[ApprovedPatentApplication]]:
     """
     Search patents by terms
@@ -158,7 +161,7 @@ def search(
             FROM matches
             GROUP BY publication_number
         )
-        SELECT {fields}
+        SELECT {fields}, (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer
         FROM patents.applications AS apps
         JOIN (
             SELECT *
@@ -179,8 +182,8 @@ def search(
         priority_date > {max_priority_date}
         AND {COM_FILTER}
         AND search_rank > {threshold}
-        ORDER BY search_rank DESC
-        limit {MAX_SEARCH_RESULTS}
+        ORDER BY {"randomizer desc, " if fetch_approval else ""} search_rank DESC
+        limit {max_results}
     """
 
     query = select + where

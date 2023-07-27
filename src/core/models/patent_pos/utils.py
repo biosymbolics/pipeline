@@ -1,41 +1,30 @@
+import logging
+import random
 from git import Sequence
 import numpy as np
-from pydash import flatten
-from typing import TypeGuard
+from pydash import compact, flatten
+from typing import TypeGuard, cast
 import torch
 from sklearn.calibration import LabelEncoder
 import polars as pl
 from clients.spacy import Spacy
 from torch import nn
 import torch.nn.functional as F
+from collections import namedtuple
+from sklearn.decomposition import PCA
+from common.utils.list import batch, batch_as_tensors
+from core.models.patent_pos.types import AllInput, DnnInput, GnnInput
 
 from typings.core import Primitive
-from typings.patents import PatentApplication
+from typings.patents import ApprovedPatentApplication as PatentApplication
 
-from .constants import EMBEDDING_DIM, MAX_STRING_LEN
+from .constants import EMBEDDING_DIM, MAX_STRING_LEN, MAX_CATS_PER_LIST, TEXT_FEATURES
 
 
 def is_tensor_list(
     embeddings: list[torch.Tensor] | list[Primitive],
 ) -> TypeGuard[list[torch.Tensor]]:
     return isinstance(embeddings[0], torch.Tensor)
-
-
-# 5145 vs 1296
-def get_input_dim(
-    categorical_fields,
-    text_fields=[],
-    embedding_dim=EMBEDDING_DIM,
-    text_embedding_dim=300,
-):
-    if len(text_fields) > 0:
-        return 76920  # hack
-    else:
-        return 16560
-    # input_length = (len(categorical_fields) * embedding_dim * 6) + (
-    #     len(text_fields) * text_embedding_dim
-    # )
-    # return input_length
 
 
 def get_string_values(patent: PatentApplication, field: str) -> list:
@@ -68,8 +57,14 @@ def get_feature_embeddings(
         patents (Sequence[PatentApplication]): List of patents
         categorical_fields (list[str]): List of fields to embed as categorical variables
         text_fields (list[str]): List of fields to embed as text
+        embedding_dim (int, optional): Embedding dimension. Defaults to EMBEDDING_DIM.
     """
-    df = pl.from_dicts([patent for patent in patents])  # type: ignore
+    nlp = Spacy.get_instance(disable=["ner"])
+    pca = PCA(n_components=TEXT_FEATURES)
+
+    _patents = [*patents]
+    random.shuffle(_patents)
+    df = pl.from_dicts(_patents)  # type: ignore
     size_map = dict(
         [
             (field, df.select(pl.col(field).flatten()).n_unique())
@@ -83,20 +78,17 @@ def get_feature_embeddings(
         ]
     )
 
-    label_encoders = [
-        (field, encode_category(field, df)) for field in categorical_fields
-    ]
+    label_encoders = [encode_category(field, df) for field in categorical_fields]
     CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
-    # all len 6
     cat_feats = [
-        CatTuple(*fv)._asdict() for fv in zip(*[enc[1][1] for enc in label_encoders])
+        CatTuple(*fv)._asdict() for fv in zip(*[enc[1] for enc in label_encoders])
     ]
-
-    nlp = Spacy.get_instance(disable=["ner"])
 
     cat_tensors: list[list[torch.Tensor]] = [
         [
-            embedding_layers[field](torch.tensor(patent[field], dtype=torch.int))
+            embedding_layers[field](
+                torch.tensor(patent[field][0:MAX_CATS_PER_LIST], dtype=torch.int)
+            )
             for field in categorical_fields
         ]
         for patent in cat_feats
@@ -113,28 +105,36 @@ def get_feature_embeddings(
         for cat_tensor in cat_tensors
     ]
     cat_feats = [torch.cat(tensor_set) for tensor_set in padded_cat_tensors]
-    text_feats = [
-        [
-            torch.tensor(
-                np.array(
-                    [
-                        token.vector
-                        for value in get_string_values(patent, field)
-                        for token in nlp(value)
-                    ]
-                ),
+
+    if len(text_fields) > 0:
+        text_vectors = [
+            np.concatenate(
+                [
+                    np.array(
+                        [
+                            token.vector
+                            for value in get_string_values(patent, field)
+                            for token in nlp(value)
+                        ]
+                    )
+                    for field in text_fields
+                ]
             )
-            for field in text_fields
+            for patent in patents
+            if len(text_fields) > 0
         ]
-        for patent in patents
-    ]
-    # pad?? token_len x word_vec_len (300)
+        pca_model = pca.fit(np.concatenate(text_vectors, axis=0))
+        text_feats = [
+            torch.flatten(torch.tensor(pca_model.transform(text_vector)))
+            for text_vector in text_vectors
+        ]
+        max_len = max(f.size(0) for f in flatten(text_feats))
+        text_feats = [F.pad(f, (0, max_len - f.size(0))) for f in text_feats]
 
     def get_patent_features(i: int) -> torch.Tensor:
         combo_text_feats = (
-            torch.flatten(torch.cat(text_feats[i])) if len(text_fields) > 0 else None
+            torch.flatten(text_feats[i]) if len(text_fields) > 0 else None
         )
-
         combo_cat_feats = torch.flatten(cat_feats[i])
         combined = (
             torch.cat([combo_cat_feats, combo_text_feats], dim=0)
@@ -145,3 +145,114 @@ def get_feature_embeddings(
 
     embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
     return embeddings
+
+
+def __batch(
+    items: list[torch.Tensor] | list[Primitive], batch_size: int
+) -> torch.Tensor:
+    """
+    Batch a list of tensors or primitives
+
+    Args:
+        items (list[torch.Tensor] | list[Primitive]): List of tensors or primitives
+        batch_size (int): Batch size
+    """
+    if not is_tensor_list(items):
+        # then list of primitives
+        batches = batch_as_tensors(cast(list[Primitive], items), batch_size)
+        num_dims = 1
+    else:
+        num_dims = len(items[0].size()) + 1
+        batches = batch(items, batch_size)
+        batches = [torch.stack(b) for b in batches]
+
+    def get_batch_pad(b: torch.Tensor):
+        if num_dims == 1:
+            return (0, batch_size - b.size(0))
+
+        if num_dims == 2:
+            return (0, 0, 0, batch_size - b.size(0))
+
+        raise ValueError("Unsupported number of dimensions: %s" % num_dims)
+
+    batches = [F.pad(b, get_batch_pad(b)) for b in batches]
+
+    logging.info("Batches: %s (%s)", len(batches), [b.size() for b in batches])
+    return torch.stack(batches)
+
+
+def resize_and_batch(embeddings: list[torch.Tensor], batch_size: int) -> torch.Tensor:
+    """
+    Size embeddings into batches
+
+    Args:
+        embeddings (list[torch.Tensor]): List of embeddings
+        batch_size (int): Batch size
+    """
+    max_len = max(e.size(0) for e in embeddings)
+    padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
+    return __batch(padded_emb, batch_size)
+
+
+def prepare_inputs(
+    patents: Sequence[PatentApplication],
+    batch_size: int,
+    dnn_categorical_fields,
+    dnn_text_fields,
+    gnn_categorical_fields,
+) -> AllInput:
+    """
+    Prepare inputs for model
+    """
+
+    def __prepare_dnn_data(
+        patents: Sequence[PatentApplication],
+        dnn_categorical_fields: list[str],
+        dnn_text_fields: list[str],
+        batch_size: int,
+    ) -> DnnInput:
+        """
+        Prepare data for DNN
+        """
+        embeddings = get_feature_embeddings(
+            patents, dnn_categorical_fields, dnn_text_fields
+        )
+        x1 = resize_and_batch(embeddings, batch_size)
+        logging.info("X1: %s", x1.size())
+
+        y_vals = [(patent["approval_date"] is not None) for patent in patents]
+        y = __batch(cast(list[Primitive], y_vals), batch_size)
+        logging.info(
+            "Y: %s (t: %s, f: %s)",
+            y.size(),
+            len(compact(y_vals)),
+            len(compact([not y for y in y_vals])),
+        )
+        return {"x1": x1, "y": y.float()}
+
+    def __prepare_gnn_input(
+        patents: Sequence[PatentApplication],
+        gnn_categorical_fields: list[str],
+        batch_size: int,
+    ) -> GnnInput:
+        """
+        Prepare inputs for GNN
+        """
+        # TODO: enirch with pathways, targets, disease pathways
+        embeddings = get_feature_embeddings(patents, gnn_categorical_fields)
+        x2 = resize_and_batch(embeddings, batch_size)
+        edge_index = [torch.tensor([i, i]) for i in range(len(patents))]
+        ei = __batch(edge_index, batch_size)
+        logging.info("X2: %s, EI %s", x2.size(), ei.size())
+
+        return {"x2": x2, "edge_index": ei}
+
+    return cast(
+        AllInput,
+        {
+            **__prepare_dnn_data(
+                patents, dnn_categorical_fields, dnn_text_fields, batch_size
+            ),
+            **__prepare_gnn_input(patents, gnn_categorical_fields, batch_size),
+        },
+    )
