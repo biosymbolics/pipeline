@@ -3,7 +3,6 @@ Patent Probability of Success (PoS) model(s)
 """
 from collections import namedtuple
 import logging
-import math
 import os
 import sys
 from typing import Any, Optional, Sequence, cast
@@ -14,10 +13,6 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 import polars as pl
 import numpy as np
-
-from system import initialize
-
-initialize()
 
 from common.utils.list import batch, batch_as_tensors
 from clients.spacy import Spacy
@@ -415,6 +410,10 @@ class TrainableCombinedModel:
                 self.optimizer.zero_grad()
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 print(pred)
+                print(batch["y"][0:5])
+                print(batch["x1"][0:5])
+                print(batch["x2"][0:5])
+                print(batch["edge_index"][0:5])
                 # PRED: torch.Size([256, 1]) torch.Size([])
                 print("PRED:", pred.size(), batch["y"].size())
                 loss = self.criterion(pred, batch["y"])  # contrastive??
@@ -467,7 +466,7 @@ def main():
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 patent_pos.py\nTrians patent PoS (probability of success) model"
+            "Usage: python3 -m core.models.patent_pos.patent_pos \nTrains patent PoS (probability of success) model"
         )
         sys.exit()
 
