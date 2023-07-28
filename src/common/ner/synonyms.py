@@ -156,7 +156,7 @@ class SynonymStore:
 
         This will go away once escaping fixed to be reversible
         """
-        return SynonymStore.__escape(new_term) == term_from_redis
+        return SynonymStore.__escape(new_term) == SynonymStore.__escape(term_from_redis)
 
     def __prepare_query(self, term: str) -> str:
         """
@@ -244,9 +244,8 @@ class SynonymStore:
         )
 
         if found_self:
-            return docs[
-                0
-            ]  # nothing more to do; return (to avoid doing anything else resource-intensive)
+            # nothing more to do; return (to avoid doing anything else resource-intensive)
+            return docs[0]
 
         if has_kg_match:
             """
@@ -281,7 +280,9 @@ class SynonymStore:
             doc = self.client.redis.hgetall(doc_id)
 
             if not doc:
-                raise Exception("No synonym found")
+                raise LookupError("No synonym found")
+        except LookupError:
+            return None
         except Exception as e:
             logger.error("Error getting synonym %s: %s", term, e)
             return None
