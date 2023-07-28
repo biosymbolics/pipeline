@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Mapping, Optional, TypedDict
+from typing import Any, Mapping, Optional, TypedDict, cast
 import uuid
 import Levenshtein
 from redis.exceptions import ResponseError  # type: ignore
@@ -146,27 +146,32 @@ class SynonymStore:
     def __get_tmp_canonical_id(self) -> str:
         return "temp-" + str(uuid.uuid4())
 
-    def __upsert_synonym(
+    def __get_synonym_doc(
         self,
-        term: str,
+        term,
         canonical_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
+    ) -> SynonymDocument:
+        return {
+            "term": term,
+            "canonical_id": canonical_id or "",
+            "metadata": metadata or {},
+        }
+
+    def __upsert_synonym(
+        self,
+        doc: SynonymDocument,
     ) -> SynonymDocument:
         """
         Upsert a synonym (add if new, otherwise update)
         The public interface is "add_synonym", which maps to an existing record if sufficiently similar.
 
         Args:
-            term (str): The synonym to add
-            canonical_id (str, optional): The canonical id of the synonym. Defaults to None.
-            metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
+            doc (SynonymDocument): The synonym doc to upsert
         """
+        term, canonical_id, metadata = doc["term"], doc["canonical_id"], doc["metadata"]
+        logger.info("Upserting %s as synonym of %s (%s)", term, canonical_id, metadata)
         doc_id = self.__get_doc_id(term)
-        doc: SynonymDocument = {
-            "term": term,
-            "canonical_id": canonical_id or "",
-            "metadata": metadata or {},
-        }
         try:
             self.client.redis.hset(doc_id, mapping=self.__serialize(doc))  # type: ignore
             return doc
@@ -192,38 +197,33 @@ class SynonymStore:
             metadata (dict[str, Any], optional): Metadata to store with the synonym. Defaults to None.
             distance (int): the maximum edit distance to search for
         """
-
-        def is_similar(doc: SynonymDocument) -> bool:
-            return Levenshtein.distance(doc["term"], term) < distance
-
-        # only get docs if no canonical_id
+        # only get docs if no canonical_id (otherwise we know what it is, precisely)
         docs = self.search_for_synonyms(term, distance) if not canonical_id else []
-        docs = [doc for doc in docs if is_similar(doc)]
 
         if not canonical_id and len(docs) > 0:
-            most_similar_term = docs[0]["term"]
-            new_canonical_id = docs[0]["canonical_id"]
-            new_metadata = docs[0]["metadata"] or {"canonical_name": most_similar_term}
-        else:
-            new_canonical_id = canonical_id or self.__get_tmp_canonical_id()
-            new_metadata = metadata or {}
-
-        logger.info(
-            "Added %s as synonym of %s (%s)", term, new_canonical_id, new_metadata
-        )
-
-        if not new_canonical_id or len(new_canonical_id.strip()) < 2:
-            logging.error(
-                "Canonical ID must be at least 2 characters long: %s, %s, %s",
-                new_canonical_id,
-                canonical_id,
-                len(docs),
+            # no UMLS match but a search result
+            most_similar_term, new_canonical_id = (
+                docs[0]["term"],
+                docs[0]["canonical_id"],
             )
-            raise Exception("Canonical ID must be at least 2 characters long")
+            new_metadata = docs[0]["metadata"] or {"canonical_name": most_similar_term}
+            doc = self.__get_synonym_doc(term, new_canonical_id, new_metadata)
 
-        upserted = self.__upsert_synonym(term, new_canonical_id, new_metadata)
+            is_self = most_similar_term == term
 
-        return upserted
+            if is_self:
+                return doc  # nothing more to do; return for perf
+        elif canonical_id:
+            # UMLS match;
+            # this flow does mean we *always* upsert even if unncessary, but seemingly better than search
+            doc = self.__get_synonym_doc(term, canonical_id, metadata or {})
+        else:
+            doc = self.__get_synonym_doc(
+                term, self.__get_tmp_canonical_id(), metadata or {}
+            )
+
+        self.__upsert_synonym(doc)
+        return doc
 
     def get_synonym(self, term: str) -> Optional[SynonymDocument]:
         """
@@ -258,11 +258,15 @@ class SynonymStore:
         query = self.__prepare_query(term)
         logger.debug("Query for synonym: %s", query)
 
+        def is_similar(doc: SynonymDocument) -> bool:
+            return Levenshtein.distance(doc["term"], term) < distance
+
         try:
             q = Query(query).with_scores().paging(0, distance)
             result = self.client.search(q)
             hashsets = [self.client.redis.hgetall(doc.id) for doc in result.docs]
-            return [self.__deserialize(hset) for hset in hashsets]
+            docs = [self.__deserialize(hset) for hset in hashsets]
+            return [doc for doc in docs if is_similar(doc)]
         except Exception as e:
             logger.error("Error searching for synonym %s: %s", term, e)
             return []
@@ -279,7 +283,7 @@ class SynonymStore:
             syn_doc = self.get_synonym(synonym)
             if syn_doc is not None:
                 self.__upsert_synonym(
-                    syn_doc["term"], new_canonical_id, syn_doc["metadata"]
+                    cast(SynonymDocument, {**syn_doc, "canonical_id": new_canonical_id})
                 )
                 logger.info("Remapped %s to %s", syn_doc["term"], new_canonical_id)
             else:
