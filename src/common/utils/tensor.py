@@ -1,6 +1,7 @@
 """
 Tensor utilities
 """
+import logging
 import torch
 import torch.nn.functional as F
 
@@ -14,9 +15,13 @@ def pad_or_truncate_to_size(tensor: torch.Tensor, size: tuple[int, ...]):
         size (tuple[int, ...]): Size to pad or truncate to
     """
     # Make sure the size is correct
-    assert len(tensor.shape) == len(
-        size
-    ), "Size must match number of dimensions in tensor"
+    if len(tensor.size()) != len(size):
+        logging.error(
+            "Size must match number of dimensions in tensor (%s vs %s)",
+            size,
+            tensor.size(),
+        )
+        raise ValueError("Size must match number of dimensions in tensor")
 
     # For each dimension
     for dim in range(len(size)):

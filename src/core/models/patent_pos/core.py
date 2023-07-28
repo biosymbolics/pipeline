@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from typing import Any, Optional, Sequence, cast
+from pydash import flatten
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
@@ -39,6 +40,7 @@ class DNN(nn.Module):
             nn.Linear(input_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(),
+            nn.Softmax(dim=1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -194,6 +196,7 @@ class ModelTrainer:
         Train model
 
         Args:
+            input_dict (AllInput): Dictionary of input tensors
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
@@ -221,21 +224,21 @@ class ModelTrainer:
     @classmethod
     def predict(cls, patents: list[PatentApplication]) -> list[float]:
         """
-                Predict probability of success for a given input
+        Predict probability of success for a given input
 
-                Args:
-                    patents (list[PatentApplication]): List of patent applications
+        Args:
+            patents (list[PatentApplication]): List of patent applications
 
-                Returns:
-                    torch.Tensor: Probability of success
+        Returns:
+            torch.Tensor: Probability of success
 
-                Example:
-                    ```
-        import system; system.initialize();
-        from core.models.patent_pos import ModelTrainer; from clients.patents import patent_client
-        patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
-        ModelTrainer.predict(patents)
-                    ```
+        Example:
+            ```
+            import system; system.initialize();
+            from core.models.patent_pos import ModelTrainer; from clients.patents import patent_client
+            patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
+            ModelTrainer.predict(patents)
+            ```
         """
         input_dict = prepare_inputs(
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS
@@ -249,10 +252,15 @@ class ModelTrainer:
         )
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
+
         x1_padded = pad_or_truncate_to_size(
-            input_dict["x1"].squeeze(), (BATCH_SIZE, dnn_input_dim)
+            input_dict["x1"], (input_dict["x1"].size(0), BATCH_SIZE, dnn_input_dim)
         )
-        output = model(x1_padded)
+
+        num_batches = input_dict["x1"].size(0)
+        output = torch.flatten(
+            torch.cat([model(x1_padded[i]) for i in range(num_batches)])
+        )
 
         for i, patent in enumerate(patents):
             logging.info(
