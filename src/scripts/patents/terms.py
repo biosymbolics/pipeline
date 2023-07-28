@@ -150,12 +150,11 @@ def __get_terms():
 
         return __aggregate_terms(terms)
 
-    # Normalize, dedupe, and count the terms
-    logging.info("Getting entity terms")
-    entity_terms = __get_entity_terms()
-
     logging.info("Getting assignee terms")
     assignee_terms = __get_assignee_terms()
+
+    logging.info("Getting entity terms")
+    entity_terms = __get_entity_terms()
 
     terms = assignee_terms + entity_terms
     return terms
