@@ -92,7 +92,7 @@ def get_feature_embeddings(
 
     _patents = [*patents]
     random.shuffle(_patents)
-    df = pl.from_dicts(_patents)  # type: ignore
+    df = pl.from_dicts(_patents, infer_schema_length=1000)  # type: ignore
     size_map = dict(
         [
             (field, df.select(pl.col(field).flatten()).n_unique())
@@ -247,16 +247,18 @@ def prepare_inputs(
         )
         x1 = resize_and_batch(embeddings, batch_size)
 
-        y_vals = [(patent["approval_date"] is not None) for patent in patents]
+        y_vals = [
+            (1.0 if patent["approval_date"] is not None else 0.0) for patent in patents
+        ]
         y = __batch(cast(list[Primitive], y_vals), batch_size)
         logging.info(
             "X1: %s, Y: %s (t: %s, f: %s)",
             x1.size(),
             y.size(),
-            len(compact(y_vals)),
-            len(compact([not y for y in y_vals])),
+            len([y for y in y_vals if y == 1.0]),
+            len([y for y in y_vals if y == 0.0]),
         )
-        return {"x1": x1, "y": y.float()}
+        return {"x1": x1, "y": y}
 
     def __prepare_gnn_input(
         patents: Sequence[PatentApplication],
@@ -311,7 +313,7 @@ def prepare_inputs(
 
 #     logging.info("Loaded checkpoint %s", checkpoint_name)
 
-#     trainable_model = TrainableCombinedModel(BATCH_SIZE, model, optimizer)
+#     trainable_model = ModelTrainer(BATCH_SIZE, model, optimizer)
 
 #     if patents:
 #         trainable_model.train(patents, start_epoch=checkpoint["epoch"] + 1)

@@ -71,21 +71,32 @@ def __copy_gpr_annotations():
 def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
+
+    NOTE: this has not been tested
     """
     table_id = "publications"
     delete_bg_table(table_id)
 
     # add to this all publication_numbers with the same family_id
     query = f"""
-        SELECT
+        WITH numbered_rows AS (
+        SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY publication_number) as row_number
+        FROM (
+            SELECT
             main_publications.*,
             ARRAY_AGG(related_publications.publication_number) OVER (PARTITION BY main_publications.family_id) AS all_publication_numbers
-        FROM `patents-public-data.patents.publications` as main_publications
-        JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
-        ON local_gpr.publication_number = main_publications.publication_number
-        JOIN `patents-public-data.patents.publications` AS related_publications
-        ON related_publications.family_id = main_publications.family_id
-        WHERE main_publications.application_kind = 'W'
+            FROM `patents-public-data.patents.publications` as main_publications
+            JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
+            ON local_gpr.publication_number = main_publications.publication_number
+            JOIN `patents-public-data.patents.publications` AS related_publications
+            ON related_publications.family_id = main_publications.family_id
+            WHERE main_publications.application_kind = 'W'
+        )
+        )
+        SELECT *
+        FROM numbered_rows
+        WHERE row_number = 1
     """
     query_to_bg_table(query, table_id)
 

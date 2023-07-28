@@ -161,7 +161,9 @@ def search(
             FROM matches
             GROUP BY publication_number
         )
-        SELECT {fields}, (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer
+        SELECT
+            {fields},
+            (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer,
         FROM patents.applications AS apps
         JOIN (
             SELECT *
@@ -173,7 +175,7 @@ def search(
 
     if fetch_approval:
         select += """
-            LEFT JOIN patents.patent_approvals AS approvals
+            LEFT JOIN `patents.patent_approvals` approvals
             ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
         """
 

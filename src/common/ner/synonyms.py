@@ -156,7 +156,9 @@ class SynonymStore:
 
         This will go away once escaping fixed to be reversible
         """
-        return SynonymStore.__escape(new_term) == SynonymStore.__escape(term_from_redis)
+        return SynonymStore.__escape(new_term.lower()) == SynonymStore.__escape(
+            term_from_redis.lower()
+        )
 
     def __prepare_query(self, term: str) -> str:
         """
@@ -244,6 +246,7 @@ class SynonymStore:
         )
 
         if found_self:
+            logger.info("Found record %s; no updates", term)
             # nothing more to do; return (to avoid doing anything else resource-intensive)
             return docs[0]
 
