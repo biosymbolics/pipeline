@@ -108,7 +108,7 @@ class TermLinker:
                 [],
             )
 
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             linked_entities = list(executor.map(link_entity, terms))
             logging.info("Completed linking batch of %s terms", len(terms))
 
