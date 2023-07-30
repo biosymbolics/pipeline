@@ -273,6 +273,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    # __init_synonym_map(SYNONYM_MAP)
-    # __create_terms()
+    __init_synonym_map(SYNONYM_MAP)
+    __create_terms()
     __add_synonyms_from_terms()
