@@ -2,6 +2,7 @@
 Utils related to files
 """
 import json
+import logging
 import os
 import pickle
 import uuid
@@ -73,3 +74,15 @@ def save_json_as_file(serializable_obj: Any, filename: str):
     """
     json_str = json.dumps(serializable_obj)
     save_as_file(json_str, filename)
+
+
+def load_json_from_file(filename: str) -> Any:
+    """
+    JSON encodes and persists serializable_obj
+    """
+    json_str = load_file(filename)
+    try:
+        return json.loads(json_str)
+    except json.decoder.JSONDecodeError as e:
+        logging.error("Failure to load JSON from file %s", filename)
+        raise e

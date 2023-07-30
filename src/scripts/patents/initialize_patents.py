@@ -195,7 +195,7 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    __create_applications_table()
+    # __create_applications_table()
 
     # create annotations
     __create_annotations()

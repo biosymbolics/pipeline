@@ -13,7 +13,7 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermLinker
-from common.utils.file import save_json_as_file
+from common.utils.file import load_json_from_file, save_json_as_file
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
@@ -21,6 +21,7 @@ from clients.patents.utils import clean_assignee
 from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
 
 MIN_ASSIGNEE_COUNT = 10
+TERMS_FILE = "terms.json"
 
 BaseTermRecord = TypedDict(
     "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
@@ -187,17 +188,12 @@ def __create_terms():
 
     # grab terms from annotation tables (slow!!)
     terms = __get_terms()
-    save_json_as_file(terms, "terms.json")
+    save_json_as_file(terms, TERMS_FILE)
 
     batched = batch(terms)
     for b in batched:
         execute_with_retries(lambda: client.insert_rows(new_table, b))
         logging.info(f"Inserted %s rows into terms table", len(b))
-
-    # Persist term -> synonyms as synonyms
-    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
-
-    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
 def __init_synonym_map(synonym_map: dict[str, str]):
@@ -221,6 +217,28 @@ def __init_synonym_map(synonym_map: dict[str, str]):
     table = client.create_table(table)
 
     logging.info("Adding default/hard-coded synonym map entries")
+    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
+
+
+def __add_synonyms_from_terms(
+    existing_terms: Optional[list[AggregatedTermRecord]] = None,
+):
+    """
+    Add synonym records based on terms
+
+    Args:
+        existing_terms: a list of terms to use as the basis for synonyms.
+            If not provided, terms will be loaded from file (TERMS_FILE/terms.json)
+    """
+    terms = existing_terms or load_json_from_file(TERMS_FILE)
+
+    if not isinstance(terms, list):
+        logging.error("Terms must be a list, instead is type %s", type(terms))
+        raise Exception("Terms must be a list")
+
+    # Persist term -> synonyms as synonyms
+    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
+
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
@@ -255,5 +273,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    __init_synonym_map(SYNONYM_MAP)
-    __create_terms()
+    # __init_synonym_map(SYNONYM_MAP)
+    # __create_terms()
+    __add_synonyms_from_terms()
