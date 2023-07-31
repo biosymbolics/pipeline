@@ -1,4 +1,10 @@
-from .core import JsonSerializable
-from .patents import PatentBasicInfo, PatentApplication
+from .core import JsonSerializable, Primitive
+from .patents import PatentBasicInfo, PatentApplication, ApprovedPatentApplication
 
-__all__ = ["JsonSerializable", "PatentBasicInfo", "PatentApplication"]
+__all__ = [
+    "Primitive",
+    "JsonSerializable",
+    "ApprovedPatentApplication",
+    "PatentBasicInfo",
+    "PatentApplication",
+]

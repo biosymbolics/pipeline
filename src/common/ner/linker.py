@@ -9,6 +9,7 @@ from scispacy.candidate_generation import (
     UmlsKnowledgeBase,
     MentionCandidate,
 )
+import torch
 
 from common.ner.synonyms import SynonymStore
 
@@ -38,6 +39,7 @@ class TermLinker:
         """
         Initialize term normalizer using existing model
         """
+        torch.device("mps")  # does this work?
         self.candidate_generator = CandidateGenerator()
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
         self.synonym_store = SynonymStore()
@@ -73,9 +75,14 @@ class TermLinker:
             LinkedEntityMap: mapping of terms to canonical entities
         """
         candidates = self.candidate_generator(terms, 1)
+        logging.info("Finished generating candidates")
         canonical_entities = [self.__get_canonical_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
-        return {key: value for key, value in entity_map.items() if value is not None}
+        return {
+            key: value
+            for key, value in entity_map.items()
+            if value is not None and len(value) > 1 and len(key) > 1
+        }
 
     def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         """
@@ -105,9 +112,11 @@ class TermLinker:
                 [],
             )
 
-        # TODO: make sure this works as expected
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             linked_entities = list(executor.map(link_entity, terms))
+            logging.info("Completed linking batch of %s terms", len(terms))
+
+        executor.shutdown()
 
         return list(zip(terms, linked_entities))
 

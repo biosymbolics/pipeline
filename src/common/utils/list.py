@@ -3,8 +3,11 @@ Utils for lists/arrays
 """
 
 
-from typing import TypeVar
+from typing import Mapping, TypeVar, cast
 from pydash import compact
+import torch
+
+from typings.core import Primitive
 
 T = TypeVar("T")
 BATCH_SIZE = 1000
@@ -53,3 +56,37 @@ def batch(items: list[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
         batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
     """
     return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
+
+
+def batch_as_tensors(
+    items: list[Primitive], batch_size: int = BATCH_SIZE
+) -> list[torch.Tensor]:
+    """
+    Turns a list into a list of tensors of size `batch_size`
+
+    Args:
+        items (list): list to batch
+        batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
+    """
+    batches = batch(items, batch_size)
+    return [torch.tensor(batch) for batch in batches]
+
+
+BT = TypeVar("BT", bound=Mapping)
+
+
+def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> list[BT]:
+    """
+    Turns a dict of lists into a list of dicts of lists of size `batch_size`
+
+    Args:
+        data_dict (dict): dict to batch
+        batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
+    """
+    return cast(
+        list[BT],
+        [
+            {k: v[i : i + batch_size] for k, v in data_dict.items()}
+            for i in range(0, len(next(iter(data_dict.values()))), batch_size)
+        ],
+    )

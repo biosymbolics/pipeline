@@ -68,6 +68,26 @@ def select_from_bg(query: str) -> list[dict]:
     return rows
 
 
+def create_bq_table(table_name: str, columns: list[str]):
+    """
+    Create a BigQuery table
+
+    Args:
+        table_name (str): name of the table
+        columns (list[str]): list of column names. If the column name ends with "_date", the type will be DATE (else STRING)
+    """
+    client = bigquery.Client()
+    schema = [
+        bigquery.SchemaField(
+            field_name, "DATE" if field_name.endswith("_date") else "STRING"
+        )
+        for field_name in columns
+    ]
+    table_id = f"{BQ_DATASET_ID}.{table_name}"
+    new_table = bigquery.Table(table_id, schema)
+    return client.create_table(new_table)
+
+
 def query_to_bg_table(query: str, new_table_name: str):
     """
     Create a new table from a query
@@ -91,7 +111,7 @@ def get_table(table_name: str) -> bigquery.Table:
     return table
 
 
-def select_insert_into_bg_table(select_query: str, table_name: str):
+def select_insert_df_into_bg_table(select_query: str, table_name: str):
     """
     Insert rows into a table from a select query
 
@@ -106,7 +126,7 @@ def select_insert_into_bg_table(select_query: str, table_name: str):
     execute_bg_query(query)
 
 
-def insert_into_bg_table(df: pl.DataFrame, table_name: str):
+def insert_df_into_bg_table(df: pl.DataFrame, table_name: str):
     """
     Insert rows into a table from a dataframe
     - validate that the table exists
@@ -122,6 +142,31 @@ def insert_into_bg_table(df: pl.DataFrame, table_name: str):
     # insert the df rows into the table
     client = bigquery.Client()
     client.insert_rows_from_dataframe(table, df.to_pandas())
+
+
+def insert_into_bg_table(records: list[dict], table_name: str):
+    """
+    Insert records into a table
+
+    Args:
+        records (list[dict]): list of records to insert
+        table_name (str): name of the table
+    """
+    logging.info("Inserting into table %s", table_name)
+    table = get_table(table_name)
+
+    # insert the df rows into the table
+    client = bigquery.Client()
+
+    try:
+        errors = client.insert_rows(table, records)
+        if errors:
+            raise Exception("Error inserting rows")
+    except Exception as e:
+        logging.error("Error inserting rows: %s", e)
+        raise e
+
+    logging.info("Successfully inserted %s rows", len(records))
 
 
 def upsert_into_bg_table(

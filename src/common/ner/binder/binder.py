@@ -1,7 +1,6 @@
 """
 Binder NER model
 """
-import os
 from typing import Iterable, Iterator, Union
 from pydash import compact
 import torch
@@ -94,7 +93,8 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def __get_doc(self, doc: Union[str, Doc], annotations: list[Annotation]) -> Doc:
+    @staticmethod
+    def __get_doc(doc: Union[str, Doc], annotations: list[Annotation]) -> Doc:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
@@ -159,9 +159,9 @@ class BinderNlp:
         all_args = {**common_args, **tokenize_args}
         return self.__tokenizer(text, **all_args).to(DEFAULT_DEVICE)
 
-    def add_entities(self, doc: Union[str, Doc]) -> Doc:
+    def extract(self, doc: Union[str, Doc]) -> Doc:
         """
-        Predicts entity annotations for a given text.
+        Extracts entity annotations for a given text.
 
         Args:
             doc (Union[str, Doc]): The Spacy Docs (or strings) to annotate.
@@ -194,4 +194,4 @@ class BinderNlp:
         logging.info("Starting binder NER extraction")
 
         for text in texts:
-            yield self.add_entities(text)
+            yield self.extract(text)

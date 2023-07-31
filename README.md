@@ -3,7 +3,7 @@
 - `brew install pre-commit`
 - `pre-commit install`
 - `. .pythonenv`
-- `source .env` (containing AIRTABLE_API_KEY, OPENAI_API_KEY, SEC_API_KEY)
+- `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
 - `python3 -m spacy download en_core_web_md`
 - Create/copy model.pt for non-GPT NER
@@ -98,6 +98,7 @@ importlib.reload(common.ner.ner)
 ```
 
 #### Redis
+- `redis-cli -h redis-12973.c1.us-west-2-2.ec2.cloud.redislabs.com -p 12973`
 - `FLUSHALL`
 - `keys *`
 - `HGETALL "term:PD-1 inhibitors"`
@@ -111,4 +112,14 @@ ns = dict_to_named_tuple({
     "period": "2020-12-31",
 })
 si = core.indices.source_doc_index.SourceDocIndex()
+```
+
+#### Test
+```
+import system
+system.initialize()
+from common.ner.ner import NerTagger
+tagger = NerTagger()
+text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
+tagger.extract([text], link=False)
 ```

@@ -2,19 +2,20 @@
 Patent client
 """
 from functools import partial
-from typing import Sequence, cast
+from typing import Sequence, Union, cast
 import logging
 
 from clients import select_from_bg
-from typings import PatentApplication
+from typings import ApprovedPatentApplication, PatentApplication
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
 from .utils import get_max_priority_date
 from .types import RelevancyThreshold, TermResult
 
-MIN_TERM_FREQUENCY = 100
+MIN_TERM_FREQUENCY = 20
 MAX_SEARCH_RESULTS = 2000
+MAX_ARRAY_LENGTH = 50
 
 """
 Larger decay rates will result in more matches
@@ -32,12 +33,12 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     "assignees",
-    "classes",
+    # "classes",
     "compounds",
     # "cited_by",
     "country",
     "diseases",
-    "drugs",
+    # "drugs",
     # "effects", # not very useful
     "family_id",
     "genes",
@@ -50,12 +51,19 @@ SEARCH_RETURN_FIELDS = [
     # "matched_terms",
     # "matched_domains",
     "mechanisms",
-    "proteins",
+    # "proteins",
     "search_rank",
     # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
     "top_terms",
     "url",
+]
+
+APPROVED_SERACH_RETURN_FIELDS = [
+    "brand_name",
+    "generic_name",
+    "approval_date",
+    "patent_indication as indication",
 ]
 
 # composition of matter filter
@@ -78,18 +86,24 @@ def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
         threshold (float): threshold for search rank
     """
     return f"""
-        ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a
-        where a.domain = '{domain}'
-        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
+        ARRAY(
+            SELECT a.term FROM UNNEST(a.annotations) as a
+            where a.domain = '{domain}'
+            and length(a.term) > 1
+            and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold}
+            limit {MAX_ARRAY_LENGTH}
+        )
         as {new_domain}
     """
 
 
 def search(
     terms: Sequence[str],
+    fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
-) -> Sequence[PatentApplication]:
+    max_results: int = MAX_SEARCH_RESULTS,
+) -> Union[Sequence[PatentApplication], Sequence[ApprovedPatentApplication]]:
     """
     Search patents by terms
     Filters on
@@ -106,24 +120,34 @@ def search(
         >>> search(['asthma', 'astrocytoma'])
     """
     lower_terms = [term.lower() for term in terms]
-    fields = ",".join(SEARCH_RETURN_FIELDS)
+    fields = ",".join(
+        [
+            *SEARCH_RETURN_FIELDS,
+            *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+        ]
+    )
     max_priority_date = get_max_priority_date(min_patent_years)
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     _get_term_query = partial(get_term_query, threshold=threshold)
 
-    query = f"""
+    if fetch_approval:
+        select_stmt = (
+            fields
+            + ", (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer"
+        )
+    else:
+        select_stmt = fields
+
+    select_query = f"""
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
                 annotation.term as matched_term,
                 annotation.domain as matched_domain,
                 EXP(-annotation.character_offset_start * {DECAY_RATE}) as search_rank, --- exp decay scaling; higher is better
-                {_get_term_query('drugs', 'drugs')},
                 {_get_term_query('compounds', 'compounds')},
-                {_get_term_query('classes', 'classes')},
                 {_get_term_query('diseases', 'diseases')},
                 {_get_term_query('humangenes', 'genes')},
-                {_get_term_query('proteins', 'proteins')},
                 {_get_term_query('mechanisms', 'mechanisms')},
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
@@ -135,31 +159,39 @@ def search(
                 ARRAY_AGG(matched_term) as matched_terms,
                 ARRAY_AGG(matched_domain) as matched_domains,
                 AVG(search_rank) as search_rank,
-                ANY_VALUE(drugs) as drugs,
                 ANY_VALUE(compounds) as compounds,
-                ANY_VALUE(classes) as classes,
                 ANY_VALUE(diseases) as diseases,
                 ANY_VALUE(genes) as genes,
                 ANY_VALUE(mechanisms) as mechanisms,
-                ANY_VALUE(proteins) as proteins,
             FROM matches
             GROUP BY publication_number
         )
-        SELECT {fields}
+        SELECT {select_stmt}
         FROM patents.applications AS apps
         JOIN (
             SELECT *
             FROM grouped_matches
-            WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms})
+            WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms}) -- effective AND
         ) AS matched_pubs
         ON apps.publication_number = matched_pubs.publication_number
+    """
+
+    if fetch_approval:
+        select_query += """
+            LEFT JOIN `patents.patent_approvals` approvals
+            ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
+        """
+
+    where = f"""
         WHERE
         priority_date > {max_priority_date}
         AND {COM_FILTER}
         AND search_rank > {threshold}
-        ORDER BY search_rank DESC
-        limit {MAX_SEARCH_RESULTS}
+        ORDER BY {"randomizer desc, " if fetch_approval else ""} search_rank DESC
+        limit {max_results}
     """
+
+    query = select_query + where
     results = select_from_bg(query)
     return format_search_result(results)
 

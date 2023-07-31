@@ -13,6 +13,7 @@ from clients.low_level.big_query import (
     BQ_DATASET,
 )
 from common.ner import TermLinker
+from common.utils.file import load_json_from_file, save_json_as_file
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignee
@@ -20,6 +21,7 @@ from clients.patents.utils import clean_assignee
 from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
 
 MIN_ASSIGNEE_COUNT = 10
+TERMS_FILE = "terms.json"
 
 BaseTermRecord = TypedDict(
     "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
@@ -92,7 +94,7 @@ def __get_terms():
             for row in rows
         ]
 
-        terms = __aggregate_terms(normalized)
+        terms = __aggregate_terms([row for row in normalized if len(row["term"]) > 1])
         return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
 
     def __get_entity_terms() -> list[AggregatedTermRecord]:
@@ -112,16 +114,20 @@ def __get_terms():
                 UNION ALL
 
                 -- biosym annotations
-                SELECT canonical_term as term, canonical_id as original_id, domain
+                SELECT original_term as term, canonical_id as original_id, domain
                 FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
-                where length(canonical_term) > 1
+                where length(original_term) > 1
             ) AS all_annotations
             group by term, original_id, domain
         """
         rows = select_from_bg(terms_query)
 
+        logging.info("Linking %s terms", len(rows))
+
         linker = TermLinker()
         normalization_map = dict(linker([row["term"] for row in rows]))
+
+        logging.info("Finished creating norm map")
 
         def __normalize(row):
             entry = normalization_map.get(row["term"])
@@ -145,9 +151,11 @@ def __get_terms():
 
         return __aggregate_terms(terms)
 
-    # Normalize, dedupe, and count the terms
-    entity_terms = __get_entity_terms()
+    logging.info("Getting assignee terms")
     assignee_terms = __get_assignee_terms()
+
+    logging.info("Getting entity terms")
+    entity_terms = __get_entity_terms()
 
     terms = assignee_terms + entity_terms
     return terms
@@ -180,19 +188,16 @@ def __create_terms():
 
     # grab terms from annotation tables (slow!!)
     terms = __get_terms()
+    save_json_as_file(terms, TERMS_FILE)
 
     batched = batch(terms)
-    for b in batched:
-        execute_with_retries(lambda: client.insert_rows(new_table, b))
-        logging.info(f"Inserted %s rows into terms table", len(b))
-
-    # Persist term -> synonyms as synonyms
-    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
-
-    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
+    for i, b in enumerate(batched):
+        cb = [r for r in b if len(r["term"]) > 1]
+        execute_with_retries(lambda: client.insert_rows(new_table, cb))
+        logging.info(f"Inserted %s rows into terms table, batch %s", len(cb), i)
 
 
-def __create_synonym_map(synonym_map: dict[str, str]):
+def __init_synonym_map(synonym_map: dict[str, str]):
     """
     Create a table of synonyms
 
@@ -213,6 +218,28 @@ def __create_synonym_map(synonym_map: dict[str, str]):
     table = client.create_table(table)
 
     logging.info("Adding default/hard-coded synonym map entries")
+    execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
+
+
+def __add_synonyms_from_terms(
+    existing_terms: Optional[list[AggregatedTermRecord]] = None,
+):
+    """
+    Add synonym records based on terms
+
+    Args:
+        existing_terms: a list of terms to use as the basis for synonyms.
+            If not provided, terms will be loaded from file (TERMS_FILE/terms.json)
+    """
+    terms = existing_terms or load_json_from_file(TERMS_FILE)
+
+    if not isinstance(terms, list):
+        logging.error("Terms must be a list, instead is type %s", type(terms))
+        raise Exception("Terms must be a list")
+
+    # Persist term -> synonyms as synonyms
+    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
+
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
 
@@ -247,5 +274,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    __create_synonym_map(SYNONYM_MAP)
+    __init_synonym_map(SYNONYM_MAP)
     __create_terms()
+    __add_synonyms_from_terms()
