@@ -3,7 +3,7 @@
 - `brew install pre-commit`
 - `pre-commit install`
 - `. .pythonenv`
-- `source .env` (containing AIRTABLE_API_KEY, OPENAI_API_KEY, SEC_API_KEY)
+- `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
 - `python3 -m spacy download en_core_web_md`
 - Create/copy model.pt for non-GPT NER

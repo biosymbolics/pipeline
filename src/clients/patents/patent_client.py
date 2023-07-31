@@ -127,7 +127,15 @@ def search(
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     _get_term_query = partial(get_term_query, threshold=threshold)
 
-    select = f"""
+    if fetch_approval:
+        select_stmt = (
+            fields
+            + ", (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer"
+        )
+    else:
+        select_stmt = fields
+
+    select_query = f"""
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
@@ -161,9 +169,7 @@ def search(
             FROM matches
             GROUP BY publication_number
         )
-        SELECT
-            {fields},
-            (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer,
+        SELECT {select_stmt}
         FROM patents.applications AS apps
         JOIN (
             SELECT *
@@ -174,7 +180,7 @@ def search(
     """
 
     if fetch_approval:
-        select += """
+        select_query += """
             LEFT JOIN `patents.patent_approvals` approvals
             ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
         """
@@ -188,7 +194,7 @@ def search(
         limit {max_results}
     """
 
-    query = select + where
+    query = select_query + where
     results = select_from_bg(query)
     return format_search_result(results)
 

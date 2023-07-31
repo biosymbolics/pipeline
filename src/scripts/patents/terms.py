@@ -191,9 +191,10 @@ def __create_terms():
     save_json_as_file(terms, TERMS_FILE)
 
     batched = batch(terms)
-    for b in batched:
-        execute_with_retries(lambda: client.insert_rows(new_table, b))
-        logging.info(f"Inserted %s rows into terms table", len(b))
+    for i, b in enumerate(batched):
+        cb = [r for r in b if len(r["term"]) > 1]
+        execute_with_retries(lambda: client.insert_rows(new_table, cb))
+        logging.info(f"Inserted %s rows into terms table, batch %s", len(cb), i)
 
 
 def __init_synonym_map(synonym_map: dict[str, str]):

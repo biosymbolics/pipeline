@@ -237,6 +237,7 @@ def clean_annotations():
         f"update `{TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
         f"update `{TABLE}` set "
         + "original_term=regexp_extract(original_term, '(.{10,})(?:\\. [A-Z]\\w{3,}).*') where regexp_contains(original_term, '.{10,}\\. [A-Z]\\w{3,}')",
+        f"delete FROM `{TABLE}` where length(original_term) < 2",
     ]
     for sql in queries:
         results = execute_bg_query(sql)

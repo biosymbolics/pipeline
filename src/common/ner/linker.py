@@ -78,7 +78,11 @@ class TermLinker:
         logging.info("Finished generating candidates")
         canonical_entities = [self.__get_canonical_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
-        return {key: value for key, value in entity_map.items() if value is not None}
+        return {
+            key: value
+            for key, value in entity_map.items()
+            if value is not None and len(value) > 1 and len(key) > 1
+        }
 
     def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         """
