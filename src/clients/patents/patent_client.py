@@ -33,12 +33,12 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     "assignees",
-    "classes",
+    # "classes",
     "compounds",
     # "cited_by",
     "country",
     "diseases",
-    "drugs",
+    # "drugs",
     # "effects", # not very useful
     "family_id",
     "genes",
@@ -51,7 +51,7 @@ SEARCH_RETURN_FIELDS = [
     # "matched_terms",
     # "matched_domains",
     "mechanisms",
-    "proteins",
+    # "proteins",
     "search_rank",
     # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
@@ -86,10 +86,13 @@ def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
         threshold (float): threshold for search rank
     """
     return f"""
-        ARRAY(SELECT a.term FROM UNNEST(a.annotations) as a
-        where a.domain = '{domain}'
-        and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold}
-        limit {MAX_ARRAY_LENGTH})
+        ARRAY(
+            SELECT a.term FROM UNNEST(a.annotations) as a
+            where a.domain = '{domain}'
+            and length(a.term) > 1
+            and EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold}
+            limit {MAX_ARRAY_LENGTH}
+        )
         as {new_domain}
     """
 
@@ -142,12 +145,9 @@ def search(
                 annotation.term as matched_term,
                 annotation.domain as matched_domain,
                 EXP(-annotation.character_offset_start * {DECAY_RATE}) as search_rank, --- exp decay scaling; higher is better
-                {_get_term_query('drugs', 'drugs')},
                 {_get_term_query('compounds', 'compounds')},
-                {_get_term_query('classes', 'classes')},
                 {_get_term_query('diseases', 'diseases')},
                 {_get_term_query('humangenes', 'genes')},
-                {_get_term_query('proteins', 'proteins')},
                 {_get_term_query('mechanisms', 'mechanisms')},
             FROM patents.annotations a,
             UNNEST(a.annotations) as annotation
@@ -159,13 +159,10 @@ def search(
                 ARRAY_AGG(matched_term) as matched_terms,
                 ARRAY_AGG(matched_domain) as matched_domains,
                 AVG(search_rank) as search_rank,
-                ANY_VALUE(drugs) as drugs,
                 ANY_VALUE(compounds) as compounds,
-                ANY_VALUE(classes) as classes,
                 ANY_VALUE(diseases) as diseases,
                 ANY_VALUE(genes) as genes,
                 ANY_VALUE(mechanisms) as mechanisms,
-                ANY_VALUE(proteins) as proteins,
             FROM matches
             GROUP BY publication_number
         )

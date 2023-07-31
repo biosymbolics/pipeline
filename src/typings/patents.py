@@ -31,19 +31,19 @@ class PatentApplication(PatentBasicInfo):
     Patent application object as per Google Patents API / local modifications
     """
 
-    classes: list[str]  # remove?
+    # classes: list[str]  # remove?
     compounds: list[str]
-    drugs: list[str]  # remove?
+    # drugs: list[str]  # remove?
     country: str
     diseases: list[str]
     genes: list[str]  # remove?
     embeddings: list[float]
     grant_date: date
     filing_date: date
-    indications: list[str]  # remove?
+    # indications: list[str]  # remove?
     inventors: list[str]
     mechanisms: list[str]
-    proteins: list[str]  # remove?
+    # proteins: list[str]  # remove?
     similar: list[str]
     top_terms: list[str]  # from GPR table
 
