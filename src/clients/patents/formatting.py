@@ -24,6 +24,10 @@ def format_search_result(
     Args:
         results (list[dict]): list of search results
     """
+
+    if len(results) == 0:
+        raise ValueError("No results returned. Try adjusting parameters.")
+
     df = pl.from_dicts(results)
 
     df = df.with_columns(

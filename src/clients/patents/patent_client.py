@@ -13,7 +13,7 @@ from .formatting import format_search_result
 from .utils import get_max_priority_date
 from .types import RelevancyThreshold, TermResult
 
-MIN_TERM_FREQUENCY = 100
+MIN_TERM_FREQUENCY = 20
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 
@@ -171,7 +171,7 @@ def search(
         JOIN (
             SELECT *
             FROM grouped_matches
-            WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms})
+            WHERE ARRAY_LENGTH(matched_terms) = ARRAY_LENGTH({lower_terms}) -- effective AND
         ) AS matched_pubs
         ON apps.publication_number = matched_pubs.publication_number
     """

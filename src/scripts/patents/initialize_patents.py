@@ -152,22 +152,27 @@ def __create_annotations_table():
     query_to_bg_table(entity_query, table_id)
 
 
-def __create_biosym_annotations_table():
+def __create_biosym_annotations_tables():
     client = bigquery.Client()
-    table_id = f"{BQ_DATASET_ID}.biosym_annotations"
-    new_table = bigquery.Table(table_id)
-    new_table.schema = [
-        bigquery.SchemaField("publication_number", "STRING"),
-        bigquery.SchemaField("canonical_term", "STRING"),
-        bigquery.SchemaField("canonical_id", "STRING"),
-        bigquery.SchemaField("original_term", "STRING"),
-        bigquery.SchemaField("domain", "STRING"),
-        bigquery.SchemaField("confidence", "FLOAT"),
-        bigquery.SchemaField("source", "STRING"),
-        bigquery.SchemaField("character_offset_start", "INTEGER"),
+    table_ids = [
+        f"{BQ_DATASET_ID}.biosym_annotations",
+        f"{BQ_DATASET_ID}.biosym_annotations_source",
     ]
-    new_table = client.create_table(new_table, exists_ok=True)
-    logging.info(f"(Maybe) created table {table_id}")
+
+    for table_id in table_ids:
+        new_table = bigquery.Table(table_id)
+        new_table.schema = [
+            bigquery.SchemaField("publication_number", "STRING"),
+            bigquery.SchemaField("canonical_term", "STRING"),
+            bigquery.SchemaField("canonical_id", "STRING"),
+            bigquery.SchemaField("original_term", "STRING"),
+            bigquery.SchemaField("domain", "STRING"),
+            bigquery.SchemaField("confidence", "FLOAT"),
+            bigquery.SchemaField("source", "STRING"),
+            bigquery.SchemaField("character_offset_start", "INTEGER"),
+        ]
+        new_table = client.create_table(new_table, exists_ok=True)
+        logging.info(f"(Maybe) created table {table_id}")
 
 
 def __create_annotations():
@@ -187,7 +192,7 @@ def main(copy_tables: bool = False):
         >>> python3 -m scripts.patents.initialize_patents -copy_tables
         >>> python3 -m scripts.patents.initialize_patents
     """
-    # __create_biosym_annotations_table()
+    # __create_biosym_annotations_tables()
 
     if copy_tables:
         # copy gpr_publications, publications, gpr_annotations tables
@@ -195,7 +200,7 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    __create_applications_table()
+    # __create_applications_table()
 
     # create annotations
     __create_annotations()

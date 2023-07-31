@@ -35,6 +35,10 @@ INTERVENTION_BASE_TERMS = [
     "immunoconjugate",
     "immunotherapy",
     "toxin",
+    "exosome",
+    "particle",
+    "nanoparticle",
+    "microparticle",
 ]
 
 INTERVENTION_BASE_TERM_SETS = [
@@ -68,8 +72,7 @@ INTERVENTION_BASE_PREFIXES = [
     "reversible",
     "irreversible",
     "new",
-    "bispecific",
-    "bi-specific",
+    "bi-?specific",
     "monoclonal",
     "acceptable",
     "receptor",

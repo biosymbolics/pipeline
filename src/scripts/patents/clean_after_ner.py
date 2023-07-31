@@ -74,9 +74,10 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
-    def get_query(term: str | list[str], field: TextField):
-        if isinstance(term, list):
-            re_term = "(?:" + "?|".join(f"{term}s?") + ")"
+    def get_query(term_or_term_set: str | list[str], field: TextField):
+        if isinstance(term_or_term_set, list):
+            # term set
+            re_term = "(?:" + "|".join([f"{ts}s?" for ts in term_or_term_set]) + ")"
         else:
             re_term = term + "s?"
         sql = f"""

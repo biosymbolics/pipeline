@@ -94,7 +94,7 @@ def __get_terms():
             for row in rows
         ]
 
-        terms = __aggregate_terms(normalized)
+        terms = __aggregate_terms([row for row in normalized if len(row["term"]) > 1])
         return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
 
     def __get_entity_terms() -> list[AggregatedTermRecord]:
