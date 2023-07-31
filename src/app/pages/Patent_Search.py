@@ -1,6 +1,7 @@
 """
 Patent lookup
 """
+from pydash import compact
 import streamlit as st
 import polars as pl
 from typing import Optional, cast
@@ -38,7 +39,7 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
-def __get_default_option(options, params) -> Optional[str]:
+def __get_default_option(options: list[str], params) -> Optional[str]:
     """
     Get the default option from the query params
     """
@@ -48,7 +49,7 @@ def __get_default_option(options, params) -> Optional[str]:
         return None
 
     default = [opt for opt in options if opt.lower().startswith(search.lower())]
-    return default[0] if default else None
+    return default[0] if default else search
 
 
 @st.cache_data
@@ -105,7 +106,9 @@ def render_selector(patents):
         options = get_options()
         default_option = __get_default_option(options, query_params)
         terms = st.multiselect(
-            "Enter in terms for patent search", options=options, default=default_option
+            "Enter in terms for patent search",
+            options=compact([*options, default_option]),
+            default=default_option,
         )
         terms = __format_terms(terms)
     with metric_col:
