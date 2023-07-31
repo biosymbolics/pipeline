@@ -192,7 +192,7 @@ def main(copy_tables: bool = False):
         >>> python3 -m scripts.patents.initialize_patents -copy_tables
         >>> python3 -m scripts.patents.initialize_patents
     """
-    # __create_biosym_annotations_tables()
+    __create_biosym_annotations_tables()
 
     if copy_tables:
         # copy gpr_publications, publications, gpr_annotations tables
@@ -200,7 +200,7 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    # __create_applications_table()
+    __create_applications_table()
 
     # create annotations
     __create_annotations()

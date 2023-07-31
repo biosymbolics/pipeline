@@ -163,6 +163,29 @@ def remove_junk():
         "therapeutic procedures": "all",
         "therapeutic procedure": "all",
     }
+    delete_terms = [
+        "wherein a",
+        "pharmaceutical compositions",
+        "compound I",
+        "wherein said compound",
+        "fragment of",
+        "pharmacological compositions",
+        "therapeutically",
+        "general formula (I)",
+        "medicine Compounds",
+        "receptacle",
+        "liver",
+        "treatment regimens",
+        "unsubstituted",
+        "Compound I",
+        "medicinal compositions",
+        "COMPOUND",
+        "DISEASE",
+        "medicine Compounds of formula",
+        "THERAPY",
+        "geographic locations",
+        "quantitation",
+    ]
     queries = [
         *[get_remove_word(word, place) for word, place in removal_words.items()],
         f"delete from `{WORKING_TABLE}` where original_term is null",
@@ -170,12 +193,14 @@ def remove_junk():
         + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where regexp_contains(original_term, '[ ]{2,}')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where regexp_contains(original_term, '^[ ]+')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
-        f"delete from `{WORKING_TABLE}` where original_term='COMPOSITION' or original_term='therapeutical' or original_term like '%transducer%' or original_term='prognosticating' or original_term in ('wherein a', 'pharmaceutical compositions', 'compound I', 'wherein said compound', 'fragment of', 'pharmacological compositions', 'therapeutically', 'general formula (I)', 'medicine Compounds', 'receptacle', 'liver', 'treatment regimens', 'unsubstituted', 'Compound I', 'medicinal compositions', 'COMPOUND', 'DISEASE', 'medicine Compounds of formula', 'THERAPY') or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
+        f"delete from `{WORKING_TABLE}` where original_term='COMPOSITION' or original_term='therapeutical' or original_term like '%transducer%' or original_term='prognosticating' or original_term in ({delete_terms}) or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term in ('tumor infiltrating lymphocytes')",
+        f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
         f"update `{WORKING_TABLE}` set "
         + "original_term=regexp_extract(original_term, '(.{10,})(?:\\. [A-Z]\\w{3,}).*') where regexp_contains(original_term, '.{10,}\\. [A-Z]\\w{3,}')",
         f"delete FROM `{WORKING_TABLE}` where length(original_term) < 2",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='compounds'",
     ]
     for sql in queries:
         results = execute_bg_query(sql)

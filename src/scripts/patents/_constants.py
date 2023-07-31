@@ -30,6 +30,8 @@ INTERVENTION_BASE_TERMS = [
     "anion",
     "ion",
     "drug",
+    "gene therapy",
+    "therapy",
     "regimen",
     "clone",
     "immunoconjugate",
@@ -39,6 +41,20 @@ INTERVENTION_BASE_TERMS = [
     "particle",
     "nanoparticle",
     "microparticle",
+    "nuclease",
+    "recombinant",
+    "rna",
+    "micro[ ]?rna",
+    "messenger rna",
+    "mrna",
+    "sh[ ]?rna",
+    "hairpin rna",
+    "si[ ]?rna",
+    "ds[ ]?rna",
+    "double[- ]?stranded rna",
+    "cell",
+    "interference",
+    "oligo[ ]?nucleotide",
 ]
 
 INTERVENTION_BASE_TERM_SETS = [
@@ -55,7 +71,7 @@ INTERVENTION_BASE_TERM_SETS = [
     ["neuromodulation", "neuromodulator", "neuromodulating", "neuromodulate"],
     ["stimulator", "stimulation", "stimulating", "stimulate"],
     ["conjugation", "conjugating", "conjugate"],
-    ["modulate", "modulates? binding"],
+    ["modulate", "modulates? binding", "modulating", "modulation", "modulator"],
     ["(?:poly)peptide", "(?:poly)peptides? binding"],
     ["protein", "proteins? binding"],
     ["(?:poly)?nucleotide", "(?:poly)?nucleotides? binding"],
@@ -91,6 +107,7 @@ INTERVENTION_BASE_PREFIXES = [
     "inverse",
     "dual",
     "single",
+    "short",
 ]
 
 BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"

@@ -92,10 +92,9 @@ if "patents" not in st.session_state:
     st.session_state.patents = None
 
 
-select_col, metric_col = st.columns([10, 1])
-
-
 def render_selector():
+    select_col, metric_col = st.columns([10, 1])
+
     with st.sidebar:
         min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
         relevancy_threshold = st.select_slider(
@@ -164,7 +163,7 @@ if st.session_state.patents is not None:
                 "assignees": True,
                 "mechanisms": True,
                 "ipc_codes": False,
-                "inventors": False,
+                "inventors": True,
                 "similar": True,
                 "compounds": True,
                 "diseases": True,
