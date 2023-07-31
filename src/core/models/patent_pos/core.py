@@ -3,13 +3,12 @@ Patent Probability of Success (PoS) model(s)
 """
 import logging
 import os
+import random
 import sys
 from typing import Any, Optional, Sequence, cast
-from pydash import flatten
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv
-from torch.nn import functional as F
 
 from clients.patents import patent_client
 from common.utils.tensor import pad_or_truncate_to_size
@@ -18,13 +17,13 @@ from typings.patents import ApprovedPatentApplication as PatentApplication
 
 from .constants import (
     BATCH_SIZE,
+    CATEGORICAL_FIELDS,
     CHECKPOINT_PATH,
+    GNN_CATEGORICAL_FIELDS,
     LR,
     OPTIMIZER_CLASS,
     SAVE_FREQUENCY,
-    CATEGORICAL_FIELDS,
     TEXT_FIELDS,
-    GNN_CATEGORICAL_FIELDS,
 )
 from .utils import prepare_inputs
 
@@ -37,10 +36,7 @@ class DNN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int):
         super().__init__()
         self.dnn = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Softmax(dim=1),
+            nn.Linear(input_dim, hidden_dim), nn.BatchNorm1d(hidden_dim), nn.ReLU()
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -120,11 +116,7 @@ class CombinedModel(nn.Module):
         # gnn_emb = self.gnn(x2, edge_index).unsqueeze(0).repeat(BATCH_SIZE, 1)
         # x = torch.cat([dnn_emb, gnn_emb], dim=1)
 
-        layers = nn.Sequential(
-            self.dnn,
-            self.fc1,
-            self.fc2,
-        )
+        layers = nn.Sequential(self.dnn, self.fc1, self.fc2, nn.Sigmoid())
 
         return layers(x1).squeeze()
 
@@ -136,7 +128,7 @@ class ModelTrainer:
 
     def __init__(
         self,
-        dnn_input_dim: int,  # 4140
+        dnn_input_dim: int,
         gnn_input_dim: int,
         model: Optional[CombinedModel] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
@@ -155,6 +147,8 @@ class ModelTrainer:
         self.model = model or CombinedModel(dnn_input_dim, gnn_input_dim)
         self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
         self.criterion = nn.BCEWithLogitsLoss()
+
+        self.dnn_input_dim = dnn_input_dim
 
     def __call__(self, *args, **kwargs):
         """
@@ -208,21 +202,71 @@ class ModelTrainer:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch = {k: v[i] for k, v in input_dict.items()}  # type: ignore
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
-                logging.info(
-                    "Prediction size: %s, is_nan %s, contents: %s",
-                    pred.size(),
-                    any(pred.isnan().flatten()),
-                    pred[0:10],
-                )
                 loss = self.criterion(pred, batch["y"])  # contrastive??
+                logging.info(
+                    "Prediction size: %s, loss %s",
+                    pred.size(),
+                    loss,
+                )
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
             if epoch % SAVE_FREQUENCY == 0:
                 self.save_checkpoint(epoch)
 
-    @classmethod
-    def predict(cls, patents: list[PatentApplication]) -> list[float]:
+
+class ModelPredictor:
+    """
+    Class for model prediction
+
+    Example:
+    ```
+    from core.models.patent_pos import ModelPredictor; from clients.patents import patent_client
+    patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
+    predictor = ModelPredictor()
+    preds = predictor(patents)
+    ```
+    """
+
+    def __init__(
+        self,
+        checkpoint: str = "checkpoint_15.pt",
+        dnn_input_dim: int = 5040,
+        gnn_input_dim: int = 480,
+    ):
+        self.dnn_input_dim = dnn_input_dim
+        self.gnn_input_dim = gnn_input_dim
+        model = CombinedModel(dnn_input_dim, gnn_input_dim)
+        checkpoint_obj = torch.load(
+            f"{CHECKPOINT_PATH}/{checkpoint}",
+            map_location=torch.device("mps"),
+        )
+        model.load_state_dict(checkpoint_obj["model_state_dict"])
+        model.eval()
+        self.model = model
+
+    def __call__(self, *args, **kwargs):
+        return self.predict(*args, **kwargs)
+
+    def predict_tensor(self, input_dict: AllInput) -> list[float]:
+        """
+        Predict probability of success for a given tensor input
+
+        Args:
+            input_dict (AllInput): Dictionary of input tensors
+        """
+        x1_padded = pad_or_truncate_to_size(
+            input_dict["x1"], (input_dict["x1"].size(0), BATCH_SIZE, self.dnn_input_dim)
+        )
+        num_batches = x1_padded.size(0)
+
+        output = torch.flatten(
+            torch.cat([self.model(x1_padded[i]) for i in range(num_batches)])
+        )
+
+        return [output[i].item() for i in range(output.size(0))]
+
+    def predict(self, patents: list[PatentApplication]) -> list[float]:
         """
         Predict probability of success for a given input
 
@@ -230,48 +274,24 @@ class ModelTrainer:
             patents (list[PatentApplication]): List of patent applications
 
         Returns:
-            torch.Tensor: Probability of success
-
-        Example:
-            ```
-            import system; system.initialize();
-            from core.models.patent_pos import ModelTrainer; from clients.patents import patent_client
-            patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
-            ModelTrainer.predict(patents)
-            ```
+            list[float]: Probabilities of success
         """
         input_dict = prepare_inputs(
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS
         )
-        dnn_input_dim = 4140  # input_dict["x1"].size(2)
-        gnn_input_dim = 480  # input_dict["x2"].size(2)
-        model = CombinedModel(dnn_input_dim, gnn_input_dim)
-        checkpoint = torch.load(
-            "patent_model_checkpoints/checkpoint_15.pt",
-            map_location=torch.device("mps"),
-        )
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.eval()
 
-        x1_padded = pad_or_truncate_to_size(
-            input_dict["x1"], (input_dict["x1"].size(0), BATCH_SIZE, dnn_input_dim)
-        )
-
-        num_batches = input_dict["x1"].size(0)
-        output = torch.flatten(
-            torch.cat([model(x1_padded[i]) for i in range(num_batches)])
-        )
+        output = self.predict_tensor(input_dict)
 
         for i, patent in enumerate(patents):
             logging.info(
                 "Patent %s (%s): %s (%s)",
                 patent["publication_number"],
-                (output[i] > 0.5).int().item(),
+                (output[i] > 0.5),
                 patent["title"],
-                output[i].item(),
+                output[i],
             )
 
-        return [output[i].item() for i in range(len(patents))]
+        return output
 
 
 def main():

@@ -1,3 +1,3 @@
-from .core import CombinedModel, ModelTrainer
+from .core import CombinedModel, ModelPredictor, ModelTrainer
 
-__all__ = ["CombinedModel", "ModelTrainer"]
+__all__ = ["CombinedModel", "ModelPredictor", "ModelTrainer"]
