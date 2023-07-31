@@ -65,6 +65,8 @@ INTERVENTION_BASE_TERM_SETS = [
     ["promotion", "promoting", "promote"],
     ["enhancement", "enhancing", "enhance", "enhancer"],
     ["regulator", "regulation", "regulating"],
+    ["degrader", "degradation", "degrading", "degrade"],
+    ["inducer", "inducing", "induce", "induction"],
 ]
 
 INTERVENTION_BASE_PREFIXES = [
