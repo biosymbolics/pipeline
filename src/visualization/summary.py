@@ -42,16 +42,17 @@ def __get_summary_chart(
     else:
         by_column = df.to_pandas()
 
+    chart_encodings = {
+        "x": alt.X("count", axis=alt.Axis(title="")),
+        "y": alt.Y(column, axis=alt.Axis(labelLimit=300, title=""), sort="-x"),
+        "color": alt.value(Bokeh8[idx % len(Bokeh8)]),
+        "tooltip": column,
+        "href": "url" if has_href else alt.value(None),
+    }
     chart = (
         alt.Chart(by_column, title=column, width=150)
         .mark_bar()
-        .encode(
-            x=alt.X("count", axis=alt.Axis(title="")),
-            y=alt.Y(column, axis=alt.Axis(labelLimit=300, title=""), sort="-x"),
-            color=alt.value(Bokeh8[idx % len(Bokeh8)]),
-            tooltip=column,
-            href="url",
-        )
+        .encode(**chart_encodings)
     )
 
     chart = chart.interactive()
@@ -60,24 +61,26 @@ def __get_summary_chart(
 
 
 def render_summary(
-    df: pl.DataFrame, columns: Optional[list[str]] = None, suppressions: list[str] = []
+    df: pl.DataFrame,
+    column_map: Optional[dict[str, bool]] = None,
+    suppressions: list[str] = [],
 ):
     """
     Render summary stats
 
     Args:
         df (pl.DataFrame): Dataframe
-        columns (list[str], optional): Columns to summarize. Defaults to all columns containing string arrays.
+        column_map (dict[str, bool], optional): Columns to summarize; value is whether to add href.
+            Defaults to None, in which case all string array columns are used.
         suppressions (list[str], optional): Columns to suppress. Defaults to [].
     """
-    columns = (
-        [col for col in find_string_array_columns(df) if col not in suppressions]
-        if not columns
-        else columns
-    )
+    column_map = column_map or {
+        col: True for col in find_string_array_columns(df) if col not in suppressions
+    }
 
     charts = [
-        __get_summary_chart(df, column, idx) for idx, column in enumerate(columns)
+        __get_summary_chart(df, column, idx, has_href)
+        for idx, (column, has_href) in enumerate(column_map.items())
     ]
 
     # rows of charts

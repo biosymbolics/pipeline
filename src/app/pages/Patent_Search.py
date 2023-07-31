@@ -92,7 +92,10 @@ if "patents" not in st.session_state:
     st.session_state.patents = None
 
 
-def render_selector(patents):
+select_col, metric_col = st.columns([10, 1])
+
+
+def render_selector():
     with st.sidebar:
         min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
         relevancy_threshold = st.select_slider(
@@ -101,7 +104,6 @@ def render_selector(patents):
             value="high",
         )
 
-    select_col, metric_col = st.columns([10, 1])
     with select_col:
         options = get_options()
         default_option = __get_default_option(options, query_params)
@@ -111,11 +113,6 @@ def render_selector(patents):
             default=default_option,
         )
         terms = __format_terms(terms)
-    with metric_col:
-        st.metric(
-            label="Results",
-            value=len(patents) if patents is not None else 0,
-        )
 
     if st.button("Search"):
         new_patents = get_data(terms, min_patent_years, relevancy_threshold)
@@ -124,12 +121,20 @@ def render_selector(patents):
             if new_patents is not None:
                 st.session_state.patents = df
 
+    with metric_col:
+        st.metric(
+            label="Results",
+            value=len(st.session_state.patents)
+            if st.session_state.patents is not None
+            else 0,
+        )
     return terms
 
 
 st.title("Search for patents")
 
-terms = render_selector(st.session_state.patents)
+
+terms = render_selector()
 
 if st.session_state.patents is not None:
     main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])
@@ -155,7 +160,16 @@ if st.session_state.patents is not None:
 
         try:
             st.subheader(f"About these patents")
-            render_summary(st.session_state.patents, None, ["top_terms"])
+            column_map = {
+                "assignees": True,
+                "mechanisms": True,
+                "ipc_codes": False,
+                "inventors": False,
+                "similar": True,
+                "compounds": True,
+                "diseases": True,
+            }
+            render_summary(st.session_state.patents, column_map)
             # render_umap(patents, terms)
         except Exception as e:
             logging.error(e)
