@@ -5,6 +5,8 @@ from functools import partial
 from typing import Sequence, Union, cast
 import logging
 
+from pydash import compact
+
 from clients import select_from_bg
 from typings import ApprovedPatentApplication, PatentApplication
 
@@ -35,7 +37,6 @@ SEARCH_RETURN_FIELDS = [
     "assignees",
     # "cited_by",
     "country",
-    # "effects", # not very useful
     "family_id",
     # "cpc_codes",
     # "embedding_v1 as embeddings",
@@ -115,37 +116,53 @@ def search(
     max_priority_date = get_max_priority_date(min_patent_years)
     _get_term_query = partial(get_term_query, threshold=threshold)
     fields = ",".join(
-        [
-            *SEARCH_RETURN_FIELDS,
-            *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
-            _get_term_query("compounds", "compounds"),
-            _get_term_query("diseases", "diseases"),
-            _get_term_query("humangenes", "genes"),
-            _get_term_query("mechanisms", "mechanisms"),
-        ]
-    )
-
-    if fetch_approval:
-        select_stmt = (
-            fields
-            + ", (CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer"
+        compact(
+            [
+                *SEARCH_RETURN_FIELDS,
+                *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                _get_term_query("compounds", "compounds"),
+                _get_term_query("diseases", "diseases"),
+                _get_term_query("humangenes", "genes"),
+                _get_term_query("mechanisms", "mechanisms"),
+                "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (RAND() - 0.9) as randomizer"
+                if fetch_approval
+                else None,  # for randomizing approved patents
+            ]
         )
-    else:
-        select_stmt = fields
+    )
 
     select_query = f"""
         WITH matches AS (
             SELECT
                 a.publication_number as publication_number,
-                ARRAY_AGG(annotation.term) as matched_terms,
-                ARRAY_AGG(annotation.domain) as matched_domains,
-                AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
+                ARRAY_AGG(
+                    DISTINCT
+                    CASE
+                        WHEN annotation.term IN UNNEST({lower_terms}) THEN annotation.term
+                        WHEN lower(apps.publication_number) IN UNNEST({lower_terms}) THEN apps.publication_number
+                        ELSE ""
+                    END
+                ) as matched_terms,
+                ARRAY_AGG(distinct annotation.domain) as matched_domains,
+                AVG(
+                    CASE
+                        WHEN annotation.term IN UNNEST({lower_terms}) THEN EXP(-annotation.character_offset_start * {DECAY_RATE})
+                        WHEN lower(apps.publication_number) IN UNNEST({lower_terms}) THEN 1.0
+                        ELSE 0
+                    END
+                ) as search_rank, --- exp decay scaling; higher is better
             FROM patents.annotations a,
+            patents.applications AS apps,
             UNNEST(a.annotations) as annotation
-            WHERE annotation.term IN UNNEST({lower_terms})
+            WHERE apps.publication_number = a.publication_number
+            AND (
+                lower(annotation.term) IN UNNEST({lower_terms})
+                OR
+                lower(apps.publication_number) IN UNNEST({lower_terms})
+            )
             GROUP BY publication_number
         )
-        SELECT {select_stmt}
+        SELECT {fields}
         FROM patents.applications AS apps
         JOIN patents.annotations a on a.publication_number = apps.publication_number
         JOIN matches ON (
