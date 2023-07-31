@@ -12,7 +12,6 @@ from torch_geometric.nn import GCNConv
 
 from clients.patents import patent_client
 from common.utils.tensor import pad_or_truncate_to_size
-from core.models.patent_pos.loss import contrastive_loss
 from core.models.patent_pos.types import AllInput
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
@@ -76,7 +75,7 @@ class CombinedModel(nn.Module):
     Loading:
         >>> import torch; import system; system.initialize();
         >>> from core.models.patent_pos.core import CombinedModel
-        >>> model = CombinedModel(4140, 480)
+        >>> model = CombinedModel()
         >>> checkpoint = torch.load("patent_model_checkpoints/checkpoint_15.pt", map_location=torch.device('mps'))
         >>> model.load_state_dict(checkpoint["model_state_dict"])
         >>> model.eval()
@@ -170,7 +169,6 @@ class ModelTrainer:
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "epoch": epoch,
-            # 'loss': LOSS,
         }
         checkpoint_name = f"checkpoint_{epoch}.pt"
 
@@ -219,15 +217,15 @@ class ModelTrainer:
 
 class ModelPredictor:
     """
-        Class for model prediction
+    Class for model prediction
 
-        Example:
-        ```
+    Example:
+    ```
     from core.models.patent_pos import ModelPredictor; from clients.patents import patent_client
     patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
     predictor = ModelPredictor()
     preds = predictor(patents)
-        ```
+    ```
     """
 
     def __init__(
