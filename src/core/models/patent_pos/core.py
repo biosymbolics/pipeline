@@ -291,7 +291,7 @@ def main():
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m core.models.patent_pos.patent_pos \nTrains patent PoS (probability of success) model"
+            "Usage: python3 -m core.models.patent_pos.core \nTrains patent PoS (probability of success) model"
         )
         sys.exit()
 

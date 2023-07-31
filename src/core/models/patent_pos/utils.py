@@ -138,19 +138,23 @@ def get_feature_embeddings(
         text_vectors = [
             np.concatenate(
                 [
-                    np.array(
-                        [
-                            token.vector
-                            for value in get_string_values(patent, field)
-                            for token in nlp(value)
-                        ]
-                    )
-                    for field in text_fields
+                    tv
+                    for tv in [
+                        np.array(
+                            [
+                                token.vector
+                                for value in get_string_values(patent, field)
+                                for token in nlp(value)
+                            ]
+                        )
+                        for field in text_fields
+                    ]
+                    if len(tv.shape) > 1
                 ]
             )
             for patent in patents
-            if len(text_fields) > 0
         ]
+
         pca_model = pca.fit(np.concatenate(text_vectors, axis=0))
         text_feats = [
             torch.flatten(torch.tensor(pca_model.transform(text_vector)))
