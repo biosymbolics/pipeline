@@ -12,6 +12,7 @@ from torch_geometric.nn import GCNConv
 
 from clients.patents import patent_client
 from common.utils.tensor import pad_or_truncate_to_size
+from core.models.patent_pos.loss import contrastive_loss
 from core.models.patent_pos.types import AllInput
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
@@ -86,8 +87,8 @@ class CombinedModel(nn.Module):
         self,
         dnn_input_dim: int,
         gnn_input_dim: int,
-        dnn_hidden_dim: int = 64,
-        gnn_hidden_dim: int = 64,
+        dnn_hidden_dim: int = 128,
+        gnn_hidden_dim: int = 128,
     ):
         torch.device("mps")
         super().__init__()
@@ -184,7 +185,7 @@ class ModelTrainer:
         self,
         input_dict: AllInput,
         start_epoch: int = 0,
-        num_epochs: int = 20,
+        num_epochs: int = 100,
     ):
         """
         Train model
@@ -200,9 +201,10 @@ class ModelTrainer:
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
-                batch = {k: v[i] for k, v in input_dict.items()}  # type: ignore
+                batch: AllInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
-                loss = self.criterion(pred, batch["y"])  # contrastive??
+                loss = self.criterion(pred, batch["y"])  # max 0.497 min 0.162
+
                 logging.info(
                     "Prediction size: %s, loss %s",
                     pred.size(),
@@ -217,20 +219,20 @@ class ModelTrainer:
 
 class ModelPredictor:
     """
-    Class for model prediction
+        Class for model prediction
 
-    Example:
-    ```
+        Example:
+        ```
     from core.models.patent_pos import ModelPredictor; from clients.patents import patent_client
     patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
     predictor = ModelPredictor()
     preds = predictor(patents)
-    ```
+        ```
     """
 
     def __init__(
         self,
-        checkpoint: str = "checkpoint_15.pt",
+        checkpoint: str = "checkpoint_95.pt",
         dnn_input_dim: int = 5040,
         gnn_input_dim: int = 480,
     ):
@@ -297,7 +299,7 @@ class ModelPredictor:
 def main():
     patents = cast(
         Sequence[PatentApplication],
-        patent_client.search(["asthma"], True, 0, "medium", max_results=10000),
+        patent_client.search(["asthma"], True, 0, "medium", max_results=1000),
     )
     input_dict = prepare_inputs(
         patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS
