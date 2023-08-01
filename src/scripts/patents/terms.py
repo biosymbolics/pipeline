@@ -3,11 +3,10 @@ Functions to initialize the terms and synonym tables
 """
 from itertools import groupby
 from typing import Optional, TypedDict
-import time
 from google.cloud import bigquery
 import logging
 
-from clients.low_level.big_query import select_from_bg
+from clients.low_level.big_query import get_table, select_from_bg
 from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
@@ -193,7 +192,7 @@ def __create_terms():
         bigquery.SchemaField("synonym_ids", "STRING", mode="REPEATED"),
     ]
     client.delete_table(table_id, not_found_ok=True)
-    new_table = client.create_table(new_table)
+    new_table = client.create_table(new_table, exists_ok=True)
 
     # grab terms from annotation tables (slow!!)
     terms = __get_terms()
@@ -260,6 +259,7 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
         synonym_map: a map of synonyms to canonical names
     """
     client = bigquery.Client()
+    table_ref = get_table("synonym_map")
 
     data = [
         {
@@ -269,10 +269,10 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
         for entry in synonym_map.items()
         if entry[1] is not None and entry[0] != entry[1]
     ]
+
     batched = batch(data)
 
     for b in batched:
-        table_ref = client.dataset(BQ_DATASET).table("synonym_map")
         errors = client.insert_rows_json(table_ref, b)
         logging.info("Inserted %s rows into synonym_map (errors: %s)", len(b), errors)
 
