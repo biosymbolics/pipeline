@@ -3,47 +3,49 @@ Loss functions for patent_pos model.
 """
 import logging
 import torch
+from torch import nn
 from torch.nn import functional as F
 
 
-def contrastive_loss(
-    output1: torch.Tensor,
-    output2: torch.Tensor,
-    label: torch.Tensor,
-    margin: float = 1.0,
-):
+class FocalLoss(nn.Module):
     """
-    Contrastive loss function.
-
-    loss = (1/2N) * sum(y * d^2 + (1 - y) * max(margin - d, 0)^2)
-
-    N == batch size
-
-    Args:
-        output1 (torch.Tensor): output from the first network
-        output2 (torch.Tensor): output from the second network
-        label (torch.Tensor): label for the pair
-
-    Usage:
-    ```
-        y_true_sample = pred[torch.where(y == 1.0)[0]]
-        y_false_sample = pred[torch.where(y == 0.0)[0]]
-        loss = contrastive_loss(y_true_sample, y_false_sample, y)
-    ```
-
-    TODO:
-        - multi-stage loss: patent -> trial, trial -> regulatory approval
+    Focal loss is designed to address classification imbalance by down-weighting inliers
+    (easy examples) such that their contribution to the total loss is small even if their
+    number is large. (from GPT4)
     """
-    logging.info(
-        "output1: %s, output2: %s, label: %s",
-        output1.size(),
-        output2.size(),
-        label.size(),
-    )
-    euclidean_distance = F.pairwise_distance(output1, output2)
-    loss_contrastive = torch.mean(
-        (1 - label) * torch.pow(euclidean_distance, 2)
-        + (label) * torch.pow(torch.clamp(margin - euclidean_distance, min=0.0), 2)
-    )
 
-    return loss_contrastive
+    def __init__(self, alpha: float = 0.25, gamma: int = 2, reduce: bool = False):
+        """
+        alpha (float: range [0, 1]): factor to balance the relative importance of positive/negative examples
+        gamma (int): a focusing parameter that controls how much the loss focuses on harder examples.
+               The larger the gamma, the more the loss focuses on harder examples.
+        reduce (bool): if True, calculate the mean loss over the batch.
+                If False, return the loss for each example in the batch.
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduce = reduce
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        BCE_loss = F.binary_cross_entropy_with_logits(x, y, reduce=False)
+
+        """
+        pt == probability assigned to the true class by the model.
+        it's an algebraic trick to recover this from BCE_loss, given
+        BCE_loss = - log(pt) for y = 1
+        therefore, pt = exp(-BCE_loss) for y = 1
+        """
+        pt = torch.exp(-BCE_loss)
+
+        # Calculate Focal Loss as defined in the original paper
+        # It modifies the BCE_loss by a factor that gives more weight to hard examples
+        # The factor is alpha*(1-pt)^gamma, which increases for examples where pt is small (misclassified examples)
+        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+
+        if self.reduce:
+            # return mean loss over batch
+            return torch.mean(F_loss)
+
+        # return per-element losses
+        return F_loss
