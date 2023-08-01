@@ -93,9 +93,9 @@ def get_service_context(
         """
         Get llm based on model_name
         """
-        if model_name == "ChatGPT":
+        if model_name in ["ChatGPT", "GPT4"]:
             return ChatOpenAI(
-                model="gpt-3.5-turbo-16k",
+                model="gpt-3.5-turbo-16k" if model_name == "ChatGPT" else "gpt-4",
                 max_tokens=10000,
                 client="chat",
                 temperature=0.1,

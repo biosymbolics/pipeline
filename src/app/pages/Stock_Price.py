@@ -41,7 +41,7 @@ prompt = (
 )
 
 with st.spinner("Initializing..."):
-    ei = EntityIndex(model_name="gpt-4")
+    ei = EntityIndex(model_name="GPT4")
 
 if st.button("Submit"):
     if not ticker.strip() or not start_date or not end_date:
