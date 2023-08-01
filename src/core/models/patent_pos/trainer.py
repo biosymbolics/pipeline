@@ -54,7 +54,8 @@ class ModelTrainer:
         logging.info("DNN input dim: %s", dnn_input_dim)
         self.model = model or CombinedModel(dnn_input_dim, gnn_input_dim)
         self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
-        self.criterion = FocalLoss()  # nn.BCEWithLogitsLoss()
+        # heavily penalize false negatives
+        self.criterion = FocalLoss(alpha=0.75, gamma=20)  # nn.BCEWithLogitsLoss()
         self.dnn_input_dim = dnn_input_dim
 
         self.precision = Precision(average=True)
@@ -114,37 +115,32 @@ class ModelTrainer:
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 loss = self.criterion(pred, batch["y"])  # max 0.497 min 0.162
 
-                logging.info("Prediction loss: %s", loss)
+                logging.info("Prediction loss (x100): %s", loss * 100)
 
+                # backprop
                 self.optimizer.zero_grad()
-                loss.backward(
-                    retain_graph=True
-                )  # grad can be implicitly created only for scalar outputs
+                loss.backward(retain_graph=True)
                 self.optimizer.step()
+
+                # update status
+                y_pred = pred > TRUE_THRESHOLD
+                y_true = batch["y"] > TRUE_THRESHOLD
+                self.precision.update((y_pred, y_true))
+                self.recall.update((y_pred, y_true))
             if epoch % SAVE_FREQUENCY == 0:
-                self.evaluate(input_dict)
+                self.evaluate()
                 self.save_checkpoint(epoch)
 
-    def evaluate(self, input_dict: AllInput):
+    def evaluate(self):
         """
         Output evaluation metrics (precision, recall, F1)
         """
-        num_batches = input_dict["x1"].size(0)
-
-        for i in range(num_batches):
-            batch: AllInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
-            y_pred = (
-                self.model(batch["x1"], batch["x2"], input_dict["edge_index"])
-                > TRUE_THRESHOLD
-            )
-            y_true = batch["y"] > TRUE_THRESHOLD
-
-            self.precision.update((y_pred, y_true))
-            self.recall.update((y_pred, y_true))
-
         logging.info("Precision: %s", self.precision.compute())
         logging.info("Recall: %s", self.recall.compute())
         logging.info("F1 score: %s", self.f1.compute())
+
+        self.precision.reset()
+        self.recall.reset()
 
     @staticmethod
     def train_from_patents():

@@ -12,13 +12,15 @@ class FocalLoss(nn.Module):
     Focal loss is designed to address classification imbalance by down-weighting inliers
     (easy examples) such that their contribution to the total loss is small even if their
     number is large. (from GPT4)
+
+    OG paper: https://arxiv.org/pdf/1708.02002.pdf
     """
 
     def __init__(self, alpha: float = 0.25, gamma: int = 2, reduce: bool = True):
         """
         alpha (float: range [0, 1]): factor to balance the relative importance of positive/negative examples
         gamma (int): a focusing parameter that controls how much the loss focuses on harder examples.
-               The larger the gamma, the more the loss focuses on harder examples.
+               The larger the gamma, the more the loss penalizes (significantly) false negatives.
         reduce (bool): if True, calculate the mean loss over the batch.
                 If False, return the loss for each example in the batch.
         """
@@ -37,7 +39,7 @@ class FocalLoss(nn.Module):
         """
         pt == probability assigned to the true class by the model.
         it's an algebraic trick to recover this from BCE_loss, given
-        BCE_loss = - log(pt) for y = 1
+        BCE_loss = -log(pt) for y = 1
         therefore, pt = exp(-BCE_loss) for y = 1
         """
         pt = torch.exp(-BCE_loss)
