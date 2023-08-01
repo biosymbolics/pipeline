@@ -93,7 +93,7 @@ def __get_terms():
             {
                 "term": clean_assignee(row["name"])
                 if row["domain"] == "assignee"
-                else row["name"],  # normalized assignee name
+                else row["name"],
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
