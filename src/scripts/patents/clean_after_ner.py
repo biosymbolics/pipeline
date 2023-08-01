@@ -185,6 +185,16 @@ def remove_junk():
         "THERAPY",
         "geographic locations",
         "quantitation",
+        "dosage regimen",
+        "administrative procedure",
+        "cannula",
+        "endoscope",
+        "optionally substituted",
+        "stent",
+        "capacitor",
+        "mass spectrometry",
+        "suction",
+        "accelerometer",
     ]
     queries = [
         *[get_remove_word(word, place) for word, place in removal_words.items()],
@@ -201,6 +211,9 @@ def remove_junk():
         + "original_term=regexp_extract(original_term, '(.{10,})(?:\\. [A-Z]\\w{3,}).*') where regexp_contains(original_term, '.{10,}\\. [A-Z]\\w{3,}')",
         f"delete FROM `{WORKING_TABLE}` where length(original_term) < 2",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='compounds'",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='diseases' and not regexp_contains(original_term, '(?i)(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)')",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% factor' and original_term not like '%risk%' and original_term not like '%disease%' and domain='diseases'",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where regexp_contains(original_term, 'receptors?$') and domain='diseases'",
     ]
     for sql in queries:
         results = execute_bg_query(sql)

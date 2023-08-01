@@ -4,6 +4,7 @@ Summary viz
 import logging
 from typing import Optional, cast
 import polars as pl
+from pydash import compact
 import streamlit as st
 import altair as alt
 
@@ -17,7 +18,7 @@ LIMIT = 20
 
 def __get_summary_chart(
     df: pl.DataFrame, column: str, idx: int, has_href=True
-) -> alt.Chart:
+) -> alt.Chart | None:
     """
     Get a summary chart for a column
 
@@ -26,21 +27,21 @@ def __get_summary_chart(
         column (str): column name
         idx (int): index of column
     """
-    df = (
-        df.select(pl.col(column).explode().drop_nulls())
-        .groupby(column)
-        .agg(pl.count())
-        .sort("count")
-        .reverse()
-        .limit(LIMIT)
-    )
+    col_df = df.select(pl.col(column).explode().drop_nulls())
+    if col_df.shape[0] > 0:
+        grouped = (
+            col_df.groupby(column).agg(pl.count()).sort("count").reverse().limit(LIMIT)
+        )
+    else:
+        logging.error("Column %s is empty", column)
+        return None
 
     if has_href:
-        by_column = df.with_columns(
+        by_column = grouped.with_columns(
             ("/Patent_Search?search=" + pl.col(column)).alias("url")
         ).to_pandas()
     else:
-        by_column = df.to_pandas()
+        by_column = grouped.to_pandas()
 
     chart_encodings = {
         "x": alt.X("count", axis=alt.Axis(title="")),
@@ -78,10 +79,12 @@ def render_summary(
         col: True for col in find_string_array_columns(df) if col not in suppressions
     }
 
-    charts = [
-        __get_summary_chart(df, column, idx, has_href)
-        for idx, (column, has_href) in enumerate(column_map.items())
-    ]
+    charts = compact(
+        [
+            __get_summary_chart(df, column, idx, has_href)
+            for idx, (column, has_href) in enumerate(column_map.items())
+        ]
+    )
 
     # rows of charts
     rows = batch(charts, 2)

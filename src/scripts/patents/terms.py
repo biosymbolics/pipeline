@@ -79,12 +79,14 @@ def __get_terms():
             SELECT assignee.name as name, "assignee" as domain, count(*) as count
             FROM `{BQ_DATASET_ID}.publications` p,
             unnest(p.assignee_harmonized) as assignee
-            group by assignee
+            group by name
+
+            UNION ALL
 
             SELECT inventor.name as name, "inventor" as domain, count(*) as count
             FROM  `{BQ_DATASET_ID}.publications` p,
             unnest(p.inventor_harmonized) as inventor
-            group by inventor
+            group by name
         """
         rows = select_from_bg(owner_query)
         normalized: list[TermRecord] = [

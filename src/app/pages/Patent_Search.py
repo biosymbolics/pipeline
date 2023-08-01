@@ -48,7 +48,7 @@ def __get_default_option(options: list[str], params) -> Optional[str]:
     if not search:
         return None
 
-    default = [opt for opt in options if opt.lower().startswith(search.lower())]
+    default = [opt for opt in options if opt.lower() == search.lower()]
     return default[0] if default else search
 
 

@@ -20,6 +20,7 @@ INTERVENTION_BASE_TERMS = [
     "autoantibodie",
     "donor",
     "pro-?drug",
+    "precursor",
     "adjuvant",
     "vaccine",
     "vaccine adjuvant",
@@ -53,8 +54,14 @@ INTERVENTION_BASE_TERMS = [
     "ds[ ]?rna",
     "double[- ]?stranded rna",
     "cell",
+    "stem cell",
     "interference",
     "oligo[ ]?nucleotide",
+    "liposome",
+    "factor",
+    "growth factor",
+    "differentiation",
+    "vector",
 ]
 
 INTERVENTION_BASE_TERM_SETS = [
