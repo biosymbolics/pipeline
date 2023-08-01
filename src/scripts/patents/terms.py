@@ -71,24 +71,33 @@ def __get_terms():
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
         return agg_terms
 
-    def __get_assignee_terms() -> list[AggregatedTermRecord]:
+    def __get_owner_terms() -> list[AggregatedTermRecord]:
         """
-        Creates assignee terms from the publications table
+        Creates owner terms (assignee/inventor) from the publications table
         """
-        assignees_query = f"""
-            SELECT assignee.name as assignee, "assignee" as domain, count(*) as count
+        owner_query = f"""
+            SELECT assignee.name as name, "assignee" as domain, count(*) as count
             FROM `{BQ_DATASET_ID}.publications` p,
             unnest(p.assignee_harmonized) as assignee
-            group by assignee
+            group by name
+
+            UNION ALL
+
+            SELECT inventor.name as name, "inventor" as domain, count(*) as count
+            FROM  `{BQ_DATASET_ID}.publications` p,
+            unnest(p.inventor_harmonized) as inventor
+            group by name
         """
-        rows = select_from_bg(assignees_query)
+        rows = select_from_bg(owner_query)
         normalized: list[TermRecord] = [
             {
-                "term": clean_assignee(row["assignee"]),  # normalized assignee name
+                "term": clean_assignee(row["name"])
+                if row["domain"] == "assignee"
+                else row["name"],
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
-                "original_term": row["assignee"],
+                "original_term": row["name"],
                 "original_id": None,
             }
             for row in rows
@@ -151,8 +160,8 @@ def __get_terms():
 
         return __aggregate_terms(terms)
 
-    logging.info("Getting assignee terms")
-    assignee_terms = __get_assignee_terms()
+    logging.info("Getting owner (assignee, inventor) terms")
+    assignee_terms = __get_owner_terms()
 
     logging.info("Getting entity terms")
     entity_terms = __get_entity_terms()

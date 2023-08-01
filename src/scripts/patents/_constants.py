@@ -20,6 +20,7 @@ INTERVENTION_BASE_TERMS = [
     "autoantibodie",
     "donor",
     "pro-?drug",
+    "precursor",
     "adjuvant",
     "vaccine",
     "vaccine adjuvant",
@@ -30,6 +31,8 @@ INTERVENTION_BASE_TERMS = [
     "anion",
     "ion",
     "drug",
+    "gene therapy",
+    "therapy",
     "regimen",
     "clone",
     "immunoconjugate",
@@ -39,6 +42,26 @@ INTERVENTION_BASE_TERMS = [
     "particle",
     "nanoparticle",
     "microparticle",
+    "nuclease",
+    "recombinant",
+    "rna",
+    "micro[ ]?rna",
+    "messenger rna",
+    "mrna",
+    "sh[ ]?rna",
+    "hairpin rna",
+    "si[ ]?rna",
+    "ds[ ]?rna",
+    "double[- ]?stranded rna",
+    "cell",
+    "stem cell",
+    "interference",
+    "oligo[ ]?nucleotide",
+    "liposome",
+    "factor",
+    "growth factor",
+    "differentiation",
+    "vector",
 ]
 
 INTERVENTION_BASE_TERM_SETS = [
@@ -55,7 +78,7 @@ INTERVENTION_BASE_TERM_SETS = [
     ["neuromodulation", "neuromodulator", "neuromodulating", "neuromodulate"],
     ["stimulator", "stimulation", "stimulating", "stimulate"],
     ["conjugation", "conjugating", "conjugate"],
-    ["modulate", "modulates? binding"],
+    ["modulate", "modulates? binding", "modulating", "modulation", "modulator"],
     ["(?:poly)peptide", "(?:poly)peptides? binding"],
     ["protein", "proteins? binding"],
     ["(?:poly)?nucleotide", "(?:poly)?nucleotides? binding"],
@@ -65,6 +88,8 @@ INTERVENTION_BASE_TERM_SETS = [
     ["promotion", "promoting", "promote"],
     ["enhancement", "enhancing", "enhance", "enhancer"],
     ["regulator", "regulation", "regulating"],
+    ["degrader", "degradation", "degrading", "degrade"],
+    ["inducer", "inducing", "induce", "induction"],
 ]
 
 INTERVENTION_BASE_PREFIXES = [
@@ -89,6 +114,7 @@ INTERVENTION_BASE_PREFIXES = [
     "inverse",
     "dual",
     "single",
+    "short",
 ]
 
 BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"

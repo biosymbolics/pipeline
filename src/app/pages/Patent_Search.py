@@ -1,6 +1,7 @@
 """
 Patent lookup
 """
+from pydash import compact
 import streamlit as st
 import polars as pl
 from typing import Optional, cast
@@ -38,7 +39,7 @@ def __format_terms(terms: list[str]) -> list[str]:
     return [re.sub("\\([0-9]{1,}\\)$", "", term).strip() for term in terms]
 
 
-def __get_default_option(options, params) -> Optional[str]:
+def __get_default_option(options: list[str], params) -> Optional[str]:
     """
     Get the default option from the query params
     """
@@ -47,8 +48,8 @@ def __get_default_option(options, params) -> Optional[str]:
     if not search:
         return None
 
-    default = [opt for opt in options if opt.lower().startswith(search.lower())]
-    return default[0] if default else None
+    default = [opt for opt in options if opt.lower() == search.lower()]
+    return default[0] if default else search
 
 
 @st.cache_data
@@ -91,7 +92,9 @@ if "patents" not in st.session_state:
     st.session_state.patents = None
 
 
-def render_selector(patents):
+def render_selector():
+    select_col, metric_col = st.columns([10, 1])
+
     with st.sidebar:
         min_patent_years = st.slider("Minimum Patent Years Left", 0, 20, 10)
         relevancy_threshold = st.select_slider(
@@ -100,19 +103,15 @@ def render_selector(patents):
             value="high",
         )
 
-    select_col, metric_col = st.columns([10, 1])
     with select_col:
         options = get_options()
         default_option = __get_default_option(options, query_params)
         terms = st.multiselect(
-            "Enter in terms for patent search", options=options, default=default_option
+            "Enter in terms for patent search",
+            options=compact([*options, default_option]),
+            default=default_option,
         )
         terms = __format_terms(terms)
-    with metric_col:
-        st.metric(
-            label="Results",
-            value=len(patents) if patents is not None else 0,
-        )
 
     if st.button("Search"):
         new_patents = get_data(terms, min_patent_years, relevancy_threshold)
@@ -121,12 +120,20 @@ def render_selector(patents):
             if new_patents is not None:
                 st.session_state.patents = df
 
+    with metric_col:
+        st.metric(
+            label="Results",
+            value=len(st.session_state.patents)
+            if st.session_state.patents is not None
+            else 0,
+        )
     return terms
 
 
 st.title("Search for patents")
 
-terms = render_selector(st.session_state.patents)
+
+terms = render_selector()
 
 if st.session_state.patents is not None:
     main_tab, landscape_tab, timeline_tab = st.tabs(["Search", "Landscape", "Timeline"])
@@ -152,7 +159,16 @@ if st.session_state.patents is not None:
 
         try:
             st.subheader(f"About these patents")
-            render_summary(st.session_state.patents, None, ["top_terms"])
+            column_map = {
+                "assignees": True,
+                "mechanisms": True,
+                "ipc_codes": False,
+                "inventors": True,
+                "similar": True,
+                "compounds": True,
+                "diseases": True,
+            }
+            render_summary(st.session_state.patents, column_map)
             # render_umap(patents, terms)
         except Exception as e:
             logging.error(e)
