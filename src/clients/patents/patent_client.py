@@ -79,7 +79,7 @@ def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
     """
     return f"""
         ARRAY(
-            SELECT a.term FROM UNNEST(a.annotations) as a
+            SELECT distinct a.term FROM UNNEST(a.annotations) as a
             where a.domain = '{domain}'
             and length(a.term) > 1
             and EXP(-a.character_offset_start * {DECAY_RATE}) > {threshold}

@@ -210,7 +210,7 @@ def remove_junk():
         f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
         f"update `{WORKING_TABLE}` set "
-        + "original_term=regexp_extract(original_term, '(.{10,})(?:\\. [A-Z]\\w{3,}).*') where regexp_contains(original_term, '.{10,}\\. [A-Z]\\w{3,}')",
+        + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where regexp_contains(original_term, '.{10,}[.] [A-Z][A-Za-z0-9]{3,}')",
         f"delete FROM `{WORKING_TABLE}` where length(original_term) < 2",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='compounds'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='diseases' and not regexp_contains(original_term, '(?i)(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)')",
@@ -248,18 +248,20 @@ def remove_common_terms():
     """
     Remove common original terms
     """
+    # regex in here, effectively ignored
     common_terms = [
         *flatten(INTERVENTION_BASE_TERM_SETS),
         *INTERVENTION_BASE_TERMS,
-    ]  # regex in here, effectively ignored
+    ]
     with_plurals = [
         *common_terms,
         *[f"{term}s" for term in common_terms],
-    ]  # add plurals
+    ]
 
+    # hack regex check
     str_match = ", ".join(
         [f"'{term.lower()}'" for term in with_plurals if "?" not in term]
-    )  # hack regex check
+    )
     re_match = " OR ".join(
         [
             f"regexp_contains(original_term, '^{term.lower()}s?$')"
