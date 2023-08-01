@@ -9,11 +9,11 @@ from llama_index import Document, Response, load_index_from_storage
 from clients.llama_index.context import (
     get_service_context,
     get_storage_context,
-    ContextArgs,
-    DEFAULT_CONTEXT_ARGS,
+    StorageArgs,
 )
 from clients.llama_index.formatting import format_documents
-from typings.indices import LlmIndex, Prompt, RefinePrompt
+from constants.core import DEFAULT_MODEL_NAME
+from typings.indices import LlmIndex, LlmModelType, Prompt, RefinePrompt
 
 from ..types import GetDocId, GetDocMetadata
 
@@ -23,7 +23,8 @@ IndexImpl = TypeVar("IndexImpl", bound=LlmIndex)
 def load_index(
     index_name: str,
     index_impl: Type[IndexImpl],
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+    model_name: LlmModelType = DEFAULT_MODEL_NAME,
+    storage_args: StorageArgs = {},
     index_args: Mapping[str, Any] = {},
 ) -> LlmIndex:
     """
@@ -36,10 +37,14 @@ def load_index(
         index_args (Mapping[str, Any]): args to pass to the index implementation
     """
     logging.info(
-        "Loading context for index %s (%s, %s)", index_name, context_args, index_impl
+        "Loading context for index %s (%s, %s)",
+        index_name,
+        model_name,
+        storage_args,
+        index_impl,
     )
-    storage_context = get_storage_context(index_name, **context_args.storage_args)
-    service_context = get_service_context(model_name=context_args.model_name)
+    storage_context = get_storage_context(index_name, **storage_args)
+    service_context = get_service_context(model_name=model_name)
 
     try:
         index = load_index_from_storage(storage_context)
@@ -97,7 +102,8 @@ def upsert_index(
     documents: Union[list[str], list[Document]],
     index_impl: Type[IndexImpl],
     index_args: Mapping[str, Any] = {},
-    context_args: ContextArgs = DEFAULT_CONTEXT_ARGS,
+    model_name: LlmModelType = DEFAULT_MODEL_NAME,
+    storage_args: StorageArgs = {},
     get_doc_metadata: Optional[GetDocMetadata] = None,
     get_doc_id: Optional[GetDocId] = None,
 ) -> LlmIndex:
@@ -109,13 +115,14 @@ def upsert_index(
         documents (Document): list of strings or docs
         index_impl (IndexImpl): the llama index type to use
         index_args (dict): args to pass to the LlmIndex obj
-        context_args (ContextArgs): context args for loading index
+        model_name (LlmModelType): name of the model to use
+        storage_args (StorageArgs): storage args for loading index
         get_doc_metadata (GetDocMetadata): function to get extra info to put on docs (metadata)
         get_doc_id (GetDocId): function to get doc id from doc
     """
     logging.info("Adding docs to index %s", index_name)
 
-    index = load_index(index_name, index_impl, context_args, index_args)
+    index = load_index(index_name, index_impl, model_name, storage_args, index_args)
 
     try:
         ll_docs = format_documents(documents, get_doc_metadata, get_doc_id)

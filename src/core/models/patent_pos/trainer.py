@@ -115,7 +115,7 @@ class ModelTrainer:
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 loss = self.criterion(pred, batch["y"])  # max 0.497 min 0.162
 
-                logging.info("Prediction loss (x100): %s", loss * 100)
+                logging.info("Prediction loss (x1000): %s", loss * 1000)
 
                 # backprop
                 self.optimizer.zero_grad()

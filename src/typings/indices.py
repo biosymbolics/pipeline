@@ -4,7 +4,7 @@ from llama_index.indices.base import BaseIndex
 
 LlmIndex = BaseIndex
 NamespaceKey = NamedTuple
-LlmModelType = Literal["ChatGPT", "VertexAI", "Anthropic"]
+LlmModelType = Literal["GPT4", "ChatGPT", "VertexAI", "Anthropic"]
 
 
 # adding these here in case we want to abstract 'em

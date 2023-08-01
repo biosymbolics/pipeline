@@ -42,7 +42,7 @@ df_schema = {
     "iqr": pl.Float64,
 }
 
-gpt_client = GptApiClient(schemas=response_schemas)
+gpt_client = GptApiClient(schemas=response_schemas, model="gpt-4")
 
 if st.button("Submit"):
     status = st.progress(0)

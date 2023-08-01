@@ -16,7 +16,7 @@ prompt = f"""
 """
 
 with st.spinner("Initializing..."):
-    ei = EntityIndex()
+    ei = EntityIndex(model_name="GPT4")
     si = SourceDocIndex()
 
 if st.button("Submit"):

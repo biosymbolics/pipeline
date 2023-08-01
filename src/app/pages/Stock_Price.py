@@ -40,6 +40,9 @@ prompt = (
     + '{ "YYYY-MM-DD": "the event" }.'
 )
 
+with st.spinner("Initializing..."):
+    ei = EntityIndex(model_name="GPT4")
+
 if st.button("Submit"):
     if not ticker.strip() or not start_date or not end_date:
         st.error(f"Please ticker, start and end date.")
@@ -48,7 +51,6 @@ if st.button("Submit"):
             with st.spinner("Please wait..."):
                 stock_data = fetch_yfinance_data(ticker, start_date, end_date)  # type: ignore
                 source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
-                ei = EntityIndex()
                 ei_answer = ei.query(prompt, source)
                 st.code(ei_answer, "json")
                 plost.line_chart(
