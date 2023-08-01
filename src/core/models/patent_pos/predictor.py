@@ -14,6 +14,7 @@ from .constants import (
     CHECKPOINT_PATH,
     GNN_CATEGORICAL_FIELDS,
     TEXT_FIELDS,
+    TRUE_THRESHOLD,
 )
 from .types import AllInput
 from .utils import prepare_inputs
@@ -90,7 +91,7 @@ class ModelPredictor:
             logging.info(
                 "Patent %s (%s): %s (%s)",
                 patent["publication_number"],
-                (output[i] > 0.5),
+                (output[i] > TRUE_THRESHOLD),
                 patent["title"],
                 output[i],
             )

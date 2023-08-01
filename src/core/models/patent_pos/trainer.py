@@ -3,6 +3,7 @@ import os
 import sys
 from typing import Any, Optional, Sequence, cast
 import torch
+from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
 from typings.patents import ApprovedPatentApplication as PatentApplication
@@ -16,6 +17,7 @@ from .constants import (
     OPTIMIZER_CLASS,
     SAVE_FREQUENCY,
     TEXT_FIELDS,
+    TRUE_THRESHOLD,
 )
 from .core import CombinedModel
 from .loss import FocalLoss
@@ -42,7 +44,8 @@ class ModelTrainer:
         Initialize model
 
         Args:
-            input_dict (AllInput): Dictionary of input tensors
+            dnn_input_dim (int): Input dimension for DNN
+            gnn_input_dim (int): Input dimension for GNN
             model (Optional[CombinedModel]): Model to train
             optimizer (Optional[torch.optim.Optimizer]): Optimizer to use
         """
@@ -52,8 +55,11 @@ class ModelTrainer:
         self.model = model or CombinedModel(dnn_input_dim, gnn_input_dim)
         self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
         self.criterion = FocalLoss()  # nn.BCEWithLogitsLoss()
-
         self.dnn_input_dim = dnn_input_dim
+
+        self.precision = Precision(average=True)
+        self.recall = Recall(average=True)
+        self.f1 = 2 * (self.precision * self.recall) / (self.precision + self.recall)
 
     def __call__(self, *args, **kwargs):
         """
@@ -108,22 +114,43 @@ class ModelTrainer:
                 pred = self.model(batch["x1"], batch["x2"], batch["edge_index"])
                 loss = self.criterion(pred, batch["y"])  # max 0.497 min 0.162
 
-                logging.info(
-                    "Prediction size: %s, loss %s",
-                    pred.size(),
-                    loss,
-                )
+                logging.info("Prediction loss: %s", loss)
+
                 self.optimizer.zero_grad()
-                loss.backward(retain_graph=True)
+                loss.backward(
+                    retain_graph=True
+                )  # grad can be implicitly created only for scalar outputs
                 self.optimizer.step()
             if epoch % SAVE_FREQUENCY == 0:
+                self.evaluate(input_dict)
                 self.save_checkpoint(epoch)
+
+    def evaluate(self, input_dict: AllInput):
+        """
+        Output evaluation metrics (precision, recall, F1)
+        """
+        num_batches = input_dict["x1"].size(0)
+
+        for i in range(num_batches):
+            batch: AllInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
+            y_pred = (
+                self.model(batch["x1"], batch["x2"], input_dict["edge_index"])
+                > TRUE_THRESHOLD
+            )
+            y_true = batch["y"] > TRUE_THRESHOLD
+
+            self.precision.update((y_pred, y_true))
+            self.recall.update((y_pred, y_true))
+
+        logging.info("Precision: %s", self.precision.compute())
+        logging.info("Recall: %s", self.recall.compute())
+        logging.info("F1 score: %s", self.f1.compute())
 
     @staticmethod
     def train_from_patents():
         patents = cast(
             Sequence[PatentApplication],
-            patent_client.search(["asthma"], True, 0, "medium", max_results=1000),
+            patent_client.search(["asthma"], True, 0, "medium", max_results=10000),
         )
         input_dict = prepare_inputs(
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS

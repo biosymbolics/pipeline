@@ -14,7 +14,7 @@ class FocalLoss(nn.Module):
     number is large. (from GPT4)
     """
 
-    def __init__(self, alpha: float = 0.25, gamma: int = 2, reduce: bool = False):
+    def __init__(self, alpha: float = 0.25, gamma: int = 2, reduce: bool = True):
         """
         alpha (float: range [0, 1]): factor to balance the relative importance of positive/negative examples
         gamma (int): a focusing parameter that controls how much the loss focuses on harder examples.
@@ -22,6 +22,10 @@ class FocalLoss(nn.Module):
         reduce (bool): if True, calculate the mean loss over the batch.
                 If False, return the loss for each example in the batch.
         """
+
+        if gamma <= 0:
+            raise ValueError("gamma should be a positive integer")
+
         super().__init__()
         self.gamma = gamma
         self.alpha = alpha
@@ -38,9 +42,14 @@ class FocalLoss(nn.Module):
         """
         pt = torch.exp(-BCE_loss)
 
-        # Calculate Focal Loss as defined in the original paper
-        # It modifies the BCE_loss by a factor that gives more weight to hard examples
-        # The factor is alpha*(1-pt)^gamma, which increases for examples where pt is small (misclassified examples)
+        """
+        Calculate Focal Loss as defined in the original paper.
+        It modifies the BCE_loss by a factor that gives more weight to hard examples
+        F_loss increases for examples where pt is small (misclassified examples)
+
+        (1 - pt)^gamma -> the effect of the hard examples (pt is small) is increased
+        relative to the easy ones (pt is closer to 1).
+        """
         F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
 
         if self.reduce:
