@@ -126,6 +126,22 @@ def __create_annotations_table():
 
                 UNION ALL
 
+                --- inventors as annotations
+                SELECT
+                    publication_number,
+                    0 as ocid,
+                    LOWER(IF(map.term IS NOT NULL, map.term, inventor.name)) as term,
+                    "inventor" as domain,
+                    1.0 as confidence,
+                    "record" as source,
+                    1 as character_offset_start,
+                    1 as rank
+                FROM `{BQ_DATASET_ID}.publications` p,
+                unnest(p.inventor_harmonized) as inventor
+                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(inventor.name) = map.synonym
+
+                UNION ALL
+
                 --- biosym (our) annotations
                 SELECT
                     publication_number,
@@ -175,14 +191,6 @@ def __create_biosym_annotations_tables():
         logging.info(f"(Maybe) created table {table_id}")
 
 
-def __create_annotations():
-    """
-    Creates patent terms, synonym table and then finally annotations
-    """
-    create_patent_terms()
-    __create_annotations_table()
-
-
 def main(copy_tables: bool = False):
     """
     Copy tables from patents-public-data to a local dataset.
@@ -192,7 +200,7 @@ def main(copy_tables: bool = False):
         >>> python3 -m scripts.patents.initialize_patents -copy_tables
         >>> python3 -m scripts.patents.initialize_patents
     """
-    # __create_biosym_annotations_tables()
+    __create_biosym_annotations_tables()
 
     if copy_tables:
         # copy gpr_publications, publications, gpr_annotations tables
@@ -200,10 +208,13 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    # __create_applications_table()
+    __create_applications_table()
+
+    # create patent terms
+    create_patent_terms()
 
     # create annotations
-    __create_annotations()
+    __create_annotations_table()
 
 
 if __name__ == "__main__":
