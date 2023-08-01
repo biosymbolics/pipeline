@@ -15,6 +15,15 @@ BQ_DATASET = "patents"
 BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET
 
 
+def get_table_name(new_table: str) -> str:
+    """
+    Get the full table name (including project and dataset) from a table name
+    """
+    return (
+        f"{BQ_DATASET_ID}.{new_table}" if BQ_DATASET_ID not in new_table else new_table
+    )
+
+
 def execute_bg_query(query: str) -> RowIterator:
     """
     Execute BigQuery query
@@ -83,7 +92,7 @@ def create_bq_table(table_name: str, columns: list[str]):
         )
         for field_name in columns
     ]
-    table_id = f"{BQ_DATASET_ID}.{table_name}"
+    table_id = get_table_name(table_name)
     new_table = bigquery.Table(table_id, schema)
     return client.create_table(new_table)
 
@@ -97,7 +106,8 @@ def query_to_bg_table(query: str, new_table_name: str):
         new_table_name (str): name of the new table
     """
     logging.info("Creating table %s", new_table_name)
-    create_table_query = f"CREATE TABLE `{BQ_DATASET_ID}.{new_table_name}` AS {query};"
+    table_name = get_table_name(new_table_name)
+    create_table_query = f"CREATE TABLE `{table_name}` AS {query};"
     execute_bg_query(create_table_query)
 
 
@@ -107,7 +117,7 @@ def get_table(table_name: str) -> bigquery.Table:
     """
     logging.info("Grabbling table %s", table_name)
     client = bigquery.Client()
-    table = client.get_table(f"{BQ_DATASET_ID}.{table_name}")
+    table = client.get_table(get_table_name(table_name))
     return table
 
 
@@ -120,7 +130,7 @@ def select_insert_df_into_bg_table(select_query: str, table_name: str):
         table_name (str): name of the table
     """
     query = f"""
-        INSERT INTO `f"{BQ_DATASET_ID}.{table_name}"`
+        INSERT INTO `{get_table_name(table_name)}`
         {select_query}
     """
     execute_bg_query(query)
@@ -137,11 +147,10 @@ def insert_df_into_bg_table(df: pl.DataFrame, table_name: str):
         table_name (str): name of the table
     """
     logging.info("Inserting into table %s", table_name)
-    table = get_table(table_name)
 
     # insert the df rows into the table
     client = bigquery.Client()
-    client.insert_rows_from_dataframe(table, df.to_pandas())
+    client.insert_rows_from_dataframe(get_table(table_name), df.to_pandas())
 
 
 def insert_into_bg_table(records: list[dict], table_name: str):
@@ -153,13 +162,12 @@ def insert_into_bg_table(records: list[dict], table_name: str):
         table_name (str): name of the table
     """
     logging.info("Inserting into table %s", table_name)
-    table = get_table(table_name)
 
     # insert the df rows into the table
     client = bigquery.Client()
 
     try:
-        errors = client.insert_rows(table, records)
+        errors = client.insert_rows(get_table(table_name), records)
         if errors:
             raise Exception("Error inserting rows")
     except Exception as e:
@@ -194,9 +202,7 @@ def upsert_into_bg_table(
 
     # Create a temporary table
     pd_df = df.to_pandas(use_pyarrow_extension_array=True)
-    client.load_table_from_dataframe(
-        pd_df, f"{BQ_DATASET_ID}.{tmp_table_name}"
-    ).result()
+    client.load_table_from_dataframe(pd_df, get_table_name(tmp_table_name)).result()
 
     # Identity JOIN
     identity_join = " AND ".join(
@@ -211,8 +217,8 @@ def upsert_into_bg_table(
 
     # Use a MERGE statement to perform the upsert operation
     sql = f"""
-    MERGE {BQ_DATASET_ID}.{table_name} AS target
-    USING {BQ_DATASET_ID}.{tmp_table_name} AS source
+    MERGE {get_table_name(table_name)} AS target
+    USING {get_table_name(tmp_table_name)} AS source
     ON {identity_join}
     WHEN MATCHED THEN
         {on_conflict}
@@ -234,5 +240,5 @@ def delete_bg_table(table_name: str):
         table_name (str): name of the table
     """
     logging.info("Deleting table %s", table_name)
-    delete_table_query = f"DROP TABLE IF EXISTS `{BQ_DATASET_ID}.{table_name}`;"
+    delete_table_query = f"DROP TABLE IF EXISTS `{get_table_name(table_name)}`;"
     execute_bg_query(delete_table_query)

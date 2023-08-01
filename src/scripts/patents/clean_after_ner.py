@@ -3,6 +3,7 @@ To run after NER is complete
 """
 import sys
 import logging
+import time
 from typing import Literal
 
 from pydash import flatten
@@ -272,14 +273,18 @@ def remove_common_terms():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 ner.py\nCleans up annotations after NER is complete")
+        print(
+            "Usage: python3 -m scripts.patents.clean_after_ner \nCleans up annotations after NER is complete"
+        )
         sys.exit()
 
     # copy to destination table
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    query_to_bg_table("SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
+    delete_bg_table(WORKING_TABLE)
+    time.sleep(20)
+    query_to_bg_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
 
     fix_of_for_annotations()
     fix_unmatched()
