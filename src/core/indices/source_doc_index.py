@@ -12,26 +12,23 @@ from clients.llama_index import (
     upsert_index,
     NerKeywordTableIndex,
 )
-from clients.llama_index.context import ContextArgs, DEFAULT_CONTEXT_ARGS
+from clients.llama_index.context import StorageArgs
 from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
 from common.utils.namespace import get_namespace_id
-from typings.indices import LlmIndex, NamespaceKey, Prompt, RefinePrompt
+from constants.core import DEFAULT_MODEL_NAME
+from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 INDEX_NAME = "source-docs"
 
 
-DEFAULT_SOURCE_DOC_INDEX_CONTEXT_ARGS = ContextArgs(
-    DEFAULT_CONTEXT_ARGS.model_name,
-    {
-        **DEFAULT_CONTEXT_ARGS.storage_args,
-        "storage_type": "mongodb",
-        "ner_options": {
-            "use_llm": True,
-            "llm_config": "configs/sec/config.cfg",
-        },
+DEFAULT_STORAGE_ARGS: StorageArgs = {
+    "storage_type": "mongodb",
+    "ner_options": {
+        "use_llm": True,
+        "llm_config": "configs/sec/config.cfg",
     },
-)
+}
 
 
 class SourceDocIndex:
@@ -43,17 +40,20 @@ class SourceDocIndex:
 
     def __init__(
         self,
-        context_args: ContextArgs = DEFAULT_SOURCE_DOC_INDEX_CONTEXT_ARGS,
+        storage_args: StorageArgs = DEFAULT_STORAGE_ARGS,
+        model_name: LlmModelType = DEFAULT_MODEL_NAME,
         index_impl: Type[LlmIndex] = NerKeywordTableIndex,
     ):
         """
         initialize index
 
         Args:
-            context_args (ContextArgs, optional): context args. Defaults to DEFAULT_CONTEXT_ARGS.
+            storage_args (StorageArgs, optional): storage args. Defaults to DEFAULT_STORAGE_ARGS.
+            model_name (str, optional): model name. Defaults to DEFAULT_MODEL_NAME.
             index_impl (LlmIndex, optional): index implementation. Defaults to NerKeywordTableIndex.
         """
-        self.context_args = context_args
+        self.storage_args = storage_args
+        self.model: LlmModelType = model_name
         self.index_impl = index_impl
         self.index = None
         self.__load()
@@ -62,7 +62,7 @@ class SourceDocIndex:
         """
         Load source doc index from disk
         """
-        index = load_index(INDEX_NAME, self.index_impl, self.context_args)
+        index = load_index(INDEX_NAME, self.index_impl, self.model, self.storage_args)
         self.index = index
 
     def __get_metadata_filters(self, source: NamespaceKey):
@@ -117,7 +117,8 @@ class SourceDocIndex:
             index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
-            context_args=self.context_args,
+            model_name=self.model,
+            storage_args=self.storage_args,
         )
         self.index = index
 

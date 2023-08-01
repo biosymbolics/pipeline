@@ -14,10 +14,7 @@ from clients.llama_index import (
     parse_answer,
     upsert_index,
 )
-from clients.llama_index.context import (
-    DEFAULT_CONTEXT_ARGS,
-    ContextArgs,
-)
+from clients.llama_index.context import StorageArgs
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.stores.pinecone import get_metadata_filters
@@ -25,76 +22,14 @@ from common.ner.ner import NerTagger
 from common.utils.misc import dict_to_named_tuple
 from common.utils.namespace import get_namespace_id
 from common.utils.string import get_id
-from typings.indices import NamespaceKey
+from constants.core import DEFAULT_MODEL_NAME
+from typings.indices import LlmModelType, NamespaceKey
 from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
 INDEX_NAME = "entity-docs"
-ENTITY_INDEX_CONTEXT_ARGS = DEFAULT_CONTEXT_ARGS
-
-
-def create_entity_indices(
-    entities: list[str],
-    namespace_key: NamespaceKey,
-    documents: list[str],
-):
-    """
-    For each entity in the provided list, summarize based on the document and persist in an index
-
-    Args:
-        entities (list[str]): list of entities
-        namespace_key (NamespaceKey): namespace key
-        documents (list[str]): list of documents
-    """
-    index = SourceDocIndex()
-    index.add_documents(namespace_key, documents)
-
-    for entity in entities:
-        try:
-            idx = EntityIndex()
-            idx.add_node(entity, index, namespace_key)
-        except Exception as e:
-            logging.error(f"Error creating entity index for {entity}: {e}")
-
-
-def create_from_docs(
-    doc_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
-):
-    """
-    Create entity index from a map of docs
-
-    Args:
-        doc_map (dict[str, list[str]]): map of docs
-        get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
-            ``` python
-                def get_namespace_key(key: str) -> NamespaceKey:
-                    return dict_to_named_tuple(
-                        {
-                            "company": "PFE",
-                            "doc_source": "SEC",
-                            "doc_type": "10-K",
-                            "period": key,
-                        }
-                    )
-
-                create_from_docs(doc_map, get_namespace_key)
-            ```
-    """
-    tagger = NerTagger.get_instance()
-    for key, docs in doc_map.items():
-        entities = tagger.extract(
-            docs,
-            entity_types=["mechanisms", "compounds", "classes"],
-        )
-        flattend_entities = [ent[0] for ent in flatten(entities)]
-        ns_key = get_namespace_key(key)
-        create_entity_indices(
-            entities=cast(list[str], flattend_entities),
-            namespace_key=ns_key,
-            documents=docs,
-        )
 
 
 class EntityIndex:
@@ -106,15 +41,18 @@ class EntityIndex:
 
     def __init__(
         self,
-        context_args: ContextArgs = ENTITY_INDEX_CONTEXT_ARGS,
+        model_name: LlmModelType = DEFAULT_MODEL_NAME,
+        storage_args: StorageArgs = {},
     ):
         """
         Initialize EntityIndex
 
         Args:
-            context_args (ContextArgs): context args. Defaults to ENTITY_INDEX_CONTEXT_ARGS.
+            model_name (LlmModelType, optional): model name. Defaults to DEFAULT_MODEL_NAME.
+            storage_args (StorageArgs, optional): storage args. Defaults to {}.
         """
-        self.context_args = context_args
+        self.storage_args = storage_args
+        self.model: LlmModelType = model_name
         self.index = None
         self.index_impl = GPTVectorStoreIndex
         self.__load()
@@ -194,7 +132,7 @@ class EntityIndex:
         """
         Load entity index from disk
         """
-        index = load_index(INDEX_NAME, VectorStoreIndex, self.context_args)
+        index = load_index(INDEX_NAME, VectorStoreIndex, self.model, self.storage_args)
         self.index = index
 
     def add_node(
@@ -246,7 +184,8 @@ class EntityIndex:
             index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
-            context_args=self.context_args,
+            model_name=self.model,
+            storage_args=self.storage_args,
         )
 
     def add_node_from_docs(
@@ -291,3 +230,65 @@ class EntityIndex:
             self.index, query_string, metadata_filters=metadata_filters
         )
         return answer
+
+    @staticmethod
+    def create_entity_indices(
+        entities: list[str],
+        namespace_key: NamespaceKey,
+        documents: list[str],
+    ):
+        """
+        For each entity in the provided list, summarize based on the document and persist in an index
+
+        Args:
+            entities (list[str]): list of entities
+            namespace_key (NamespaceKey): namespace key
+            documents (list[str]): list of documents
+        """
+        index = SourceDocIndex()
+        index.add_documents(namespace_key, documents)
+
+        for entity in entities:
+            try:
+                idx = EntityIndex()
+                idx.add_node(entity, index, namespace_key)
+            except Exception as e:
+                logging.error(f"Error creating entity index for {entity}: {e}")
+
+    @staticmethod
+    def create_from_docs(
+        doc_map: dict[str, list[str]], get_namespace_key: Callable[[str], NamespaceKey]
+    ):
+        """
+        Create entity index from a map of docs
+
+        Args:
+            doc_map (dict[str, list[str]]): map of docs
+            get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
+                ``` python
+                    def get_namespace_key(key: str) -> NamespaceKey:
+                        return dict_to_named_tuple(
+                            {
+                                "company": "PFE",
+                                "doc_source": "SEC",
+                                "doc_type": "10-K",
+                                "period": key,
+                            }
+                        )
+
+                    create_from_docs(doc_map, get_namespace_key)
+                ```
+        """
+        tagger = NerTagger.get_instance()
+        for key, docs in doc_map.items():
+            entities = tagger.extract(
+                docs,
+                entity_types=["mechanisms", "compounds", "classes"],
+            )
+            flattend_entities = [ent[0] for ent in flatten(entities)]
+            ns_key = get_namespace_key(key)
+            EntityIndex.create_entity_indices(
+                entities=cast(list[str], flattend_entities),
+                namespace_key=ns_key,
+                documents=docs,
+            )

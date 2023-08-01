@@ -17,6 +17,7 @@ from visualization.summary import render_summary
 from ui.patent_components import render_dataframe, render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")
+gpt_client = GptApiClient(model="gpt-4")
 
 # increase the max width of chips
 st.markdown(
@@ -107,7 +108,7 @@ def render_selector():
         options = get_options()
         default_option = __get_default_option(options, query_params)
         terms = st.multiselect(
-            "Enter in terms for patent search",
+            "Enter terms (compounds, diseases, mechanisms, assignees, inventors, etc)",
             options=compact([*options, default_option]),
             default=default_option,
         )
@@ -132,7 +133,6 @@ def render_selector():
 
 st.title("Search for patents")
 
-
 terms = render_selector()
 
 if st.session_state.patents is not None:
@@ -151,7 +151,6 @@ if st.session_state.patents is not None:
         render_timeline(st.session_state.patents)
 
     with landscape_tab:
-        gpt_client = GptApiClient()
         if terms is not None:
             st.subheader(f"About these terms ({str(len(terms))})")
             with st.spinner("Please wait..."):

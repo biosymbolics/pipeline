@@ -109,7 +109,11 @@ def search(
     Returns: a list of matching patent applications
 
     Example:
-        >>> search(['asthma', 'astrocytoma'])
+    ```
+    import system; system.initialize()
+    from clients.patents import patent_client
+    patent_client.search(['asthma', 'astrocytoma'])
+    ```
     """
     lower_terms = [term.lower() for term in terms]
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]

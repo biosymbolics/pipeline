@@ -23,14 +23,10 @@ from constants.core import DEFAULT_MODEL_NAME
 from clients.stores.pinecone import get_vector_store
 from typings.indices import LlmModelType
 
-ContextArgs = NamedTuple(
-    "ContextArgs",
-    [("model_name", Optional[LlmModelType]), ("storage_args", dict[str, Any])],
-)
+StorageArgs = dict[str, Any]
 
 logging.basicConfig(level=logging.DEBUG)
 
-DEFAULT_CONTEXT_ARGS = ContextArgs(model_name=DEFAULT_MODEL_NAME, storage_args={})
 MONGO_URI = os.environ["MONGO_URI"]
 
 

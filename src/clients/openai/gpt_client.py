@@ -5,15 +5,17 @@ import os
 from langchain import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 import logging
 
 from .utils import parse_answer
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-DEFAULT_GPT_MODEL = "gpt-3.5-turbo"
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
+
+GptModel = Literal["gpt-3.5-turbo", "gpt-4"]
+DEFAULT_GPT_MODEL: GptModel = "gpt-3.5-turbo"
 
 
 class GptApiClient:
@@ -21,8 +23,13 @@ class GptApiClient:
     Class for OpenAI API client
     """
 
-    def __init__(self, schemas: Optional[list[ResponseSchema]] = None):
+    def __init__(
+        self,
+        schemas: Optional[list[ResponseSchema]] = None,
+        model: GptModel = DEFAULT_GPT_MODEL,
+    ):
         self.client = None
+        self.model = model
 
         if schemas:
             prompt_template, output_parser = self.__get_schema_things(schemas)

@@ -57,4 +57,4 @@ def build_indices(ticker: str, start_date: date, end_date: date = datetime.now()
     for key, doc_sections in doc_map.items():
         source_doc_index.add_documents(get_namespace_key(key), doc_sections)
 
-    # entity_index.create_from_docs(doc_map, get_namespace_key)
+    # EntityIndex.create_from_docs(doc_map, get_namespace_key)
