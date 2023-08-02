@@ -86,32 +86,6 @@ class PatentEnricher:
             pl.DataFrame: enriched patents
         """
 
-        def __flatten(df: pl.DataFrame):
-            """
-            Unpacks entities into separate rows
-            """
-            flattened_df = (
-                df.explode("entities")
-                .lazy()
-                .select(
-                    pl.col("publication_number"),
-                    pl.lit("").alias("normalized_term"),
-                    pl.lit("").alias("canonical_id"),
-                    pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
-                    pl.col("entities").apply(lambda e: e[1]).alias("domain"),
-                    pl.lit(0.90000001).alias("confidence"),
-                    pl.lit("title+abstract").alias("source"),
-                    pl.col("entities")
-                    .apply(lambda e: e[3])
-                    .alias("character_offset_start"),
-                    pl.col("entities")
-                    .apply(lambda e: e[4])
-                    .alias("character_offset_end"),
-                )
-                .collect()
-            )
-            return flattened_df
-
         processed_pubs = self.__get_processed_pubs()
 
         # remove already processed patents
@@ -139,6 +113,7 @@ class PatentEnricher:
             link=False,
             entity_types=ENTITY_TYPES,
         )
+
         if len([ent for ent in entities if len(ent) > 0]) == 0:
             logging.info("No entities found")
             return None
@@ -147,7 +122,24 @@ class PatentEnricher:
         flatish_ents = [[e for e in ent_set if len(e[0]) > 0] for ent_set in entities]
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
-        return __flatten(enriched)
+        flattened_df = (
+            enriched.explode("entities")
+            .lazy()
+            .select(
+                pl.col("publication_number"),
+                pl.lit("").alias("normalized_term"),
+                pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
+                pl.col("entities").apply(lambda e: e[1]).alias("domain"),
+                pl.lit(0.90000001).alias("confidence"),
+                pl.lit("title+abstract").alias("source"),
+                pl.col("entities")
+                .apply(lambda e: e[3])
+                .alias("character_offset_start"),
+                pl.col("entities").apply(lambda e: e[4]).alias("character_offset_end"),
+            )
+            .collect()
+        )
+        return flattened_df
 
     def __upsert_biosym_annotations(self, df: pl.DataFrame):
         """
