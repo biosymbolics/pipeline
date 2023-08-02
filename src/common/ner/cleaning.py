@@ -3,10 +3,9 @@ Utils for the NER pipeline
 """
 from typing import Callable, TypeVar, Union, cast
 import re
-from functools import reduce
+from functools import partial, reduce
 import logging
 import html
-from spacy.tokens import Doc
 
 from clients.spacy import Spacy
 from common.ner.utils import lemmatize_tail
@@ -14,6 +13,7 @@ from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 
 from .types import DocEntity
+from .utils import normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 CleanFunction = Callable[[list[T]], list[T]]
@@ -170,69 +170,17 @@ class EntityCleaner:
         def decode_html(entity_name: str) -> str:
             return html.unescape(entity_name)
 
-        def normalize_by_pos(entity_name: str) -> str:
-            """
-            Normalizes entity by POS
-
-            Dashes:
-                Remove and replace with "" if Spacy considers PUNCT and followed by NUM:
-                    - APoE-4 -> apoe4 (NOUN(PUNCT)NUM)
-                    - HIV-1 -> hiv1 (NOUN(PUNCT)NUM)
-
-                Remove and replace with **space** if Spacy considers it PUNCT or ADJ:
-                - sodium channel-mediated diseases (NOUN(PUNCT)VERB)
-                - neuronal hypo-kinetic disease (NOUN(PUNCT)ADJ) # TODO: better if ""
-                - Loeys-Dietz syndrome (PROPN(PUNCT)NOUN)
-                - sleep-wake cycles (NOUN(PUNCT)NOUN)
-                - low-grade prostate cancer (ADJ(PUNCT)NOUN)
-                - non-insulin dependent diabetes mellitus (ADJ(ADJ)NOUN)
-                - T-cell lymphoblastic leukemia (NOUN(ADJ)NOUN)
-                - T-cell (NOUN(PUNCT)NOUN)
-                - MAGE-A3 gene (PROPN(PUNCT)NOUN) # TODO: better if ""
-                - Bcr-Abl (NOUN(ADJ)ADJ) -> Bcr-Abl # TODO
-
-                Keep if Spacy considers is a NOUN
-                - HLA-C (NOUN(NOUN)NOUN) -> HLA-C
-                - IL-6 (NOUN(NOUN)NUM) -> IL-6
-
-            Other changes:
-              - Alzheimer's disease -> Alzheimer disease
-            """
-            dashes = ["–", "-"]
-            tokens = self.nlp(
-                re.sub(r"[–-]", " - ", entity_name)
-            )  # otherwise spacy will keep it as one token
-
-            def clean_by_pos(t, next_t):
-                # spacy only marks a token as SPACE if it is hanging out in a weird place
-                if t.pos_ == "SPACE":
-                    return ""
-                if t.text == "'s" and t.pos_ == "PART":
-                    # alzheimer's disease -> alzheimer disease
-                    return ""
-                if t.text == "-":
-                    if t.pos_ == "ADJ":
-                        return ""
-                    if t.pos_ == "PUNCT":
-                        if next_t is not None and next_t.pos_ == "NUM":
-                            # ApoE-4 -> apoe4
-                            return ""
-                        return " "
-                    else:
-                        # pos_ == NOUN, PROPN, etc
-                        return "-"
-
-                if next_t is not None and next_t.text in dashes:
-                    return t.text  # omitting pre-dash space
-
-                return t.text_with_ws
-
-            return "".join(
-                [
-                    clean_by_pos(t, tokens[i] if len(tokens) > i + 1 else None)
-                    for i, t in enumerate(tokens)
-                ]
-            )
+        def remove_duplicative_phrasing(entity_name: str) -> str:
+            duplicative_phrases = {
+                "diseases and conditions": "diseases",
+                "conditions and diseases": "diseases",
+            }
+            steps = [
+                lambda s: re.sub(rf"\b{dup}\b", canonical, s)
+                for dup, canonical in duplicative_phrases.items()
+            ]
+            text = reduce(lambda x, func: func(x), steps, entity_name)
+            return text
 
         def normalize_entity(entity: T) -> T:
             text = entity[0] if isinstance(entity, DocEntity) else entity
@@ -240,6 +188,8 @@ class EntityCleaner:
                 decode_html,
                 remove_chars,
                 remove_extra_spaces,
+                remove_duplicative_phrasing,
+                rearrange_terms,
                 lemmatize_tail,
                 normalize_by_pos,
                 lambda s: s.lower(),
@@ -267,7 +217,11 @@ class EntityCleaner:
 
         return [entity for entity in entities if should_keep(entity)]
 
-    def __call__(self, entities: list[T]) -> list[T]:
+    def __call__(
+        self,
+        entities: list[T],
+        filter_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
+    ) -> list[T]:
         """
         Sanitize entity list
         - filters out (some) excessively general entities
@@ -283,7 +237,7 @@ class EntityCleaner:
         cleaning_steps: list[CleanFunction] = [
             self.suppress,
             self.normalize_entity_names,
-            self.filter_common_terms,
+            partial(self.filter_common_terms, exception_list=filter_exception_list),
             dedup,
         ]
 
