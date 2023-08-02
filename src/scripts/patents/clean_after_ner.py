@@ -163,6 +163,7 @@ def remove_junk():
         ", and": "trailing",
         "therapeutic procedures": "all",
         "therapeutic procedure": "all",
+        "exemplary": "all",
     }
     delete_terms = [
         "wherein a",
@@ -196,6 +197,7 @@ def remove_junk():
         "mass spectrometry",
         "suction",
         "accelerometer",
+        "Compound 1",
     ]
     queries = [
         *[get_remove_word(word, place) for word, place in removal_words.items()],

@@ -146,7 +146,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     0 as ocid,
-                    LOWER(COALESCE(syn_map.term, NULLIF(a.canonical_term, ''), a.original_term)) as term,
+                    LOWER(COALESCE(NULLIF(syn_map.term, ''), NULLIF(a.canonical_term, ''), a.original_term)) as term,
                     domain,
                     confidence,
                     source,
@@ -200,7 +200,7 @@ def main(copy_tables: bool = False):
         >>> python3 -m scripts.patents.initialize_patents -copy_tables
         >>> python3 -m scripts.patents.initialize_patents
     """
-    __create_biosym_annotations_tables()
+    # __create_biosym_annotations_tables()
 
     if copy_tables:
         # copy gpr_publications, publications, gpr_annotations tables
@@ -208,10 +208,10 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    __create_applications_table()
+    # __create_applications_table()
 
     # create patent terms
-    create_patent_terms()
+    # create_patent_terms()
 
     # create annotations
     __create_annotations_table()
@@ -220,7 +220,7 @@ def main(copy_tables: bool = False):
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 initialize_patents.py [-copy_tables]\nCopies and transforms patent data"
+            "Usage: python3 -m scripts.patents.initialize_patents [-copy_tables]\nCopies and transforms patent data"
         )
         sys.exit()
 

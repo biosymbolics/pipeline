@@ -36,7 +36,7 @@ class ModelPredictor:
     def __init__(
         self,
         checkpoint: str = "checkpoint_95.pt",
-        dnn_input_dim: int = 5040,
+        dnn_input_dim: int = 5860,
         gnn_input_dim: int = 480,
     ):
         self.dnn_input_dim = dnn_input_dim
@@ -114,6 +114,9 @@ if __name__ == "__main__":
             """
             Usage: python3 -m core.models.patent_pos.predictor [patent search term(s)]
             Trains patent PoS (probability of success) model
+
+            Example:
+                >>> python3 -m core.models.patent_pos.predictor asthma
             """
         )
         sys.exit()
