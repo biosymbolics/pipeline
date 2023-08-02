@@ -7,14 +7,14 @@ from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
+import logging
+import warnings
+import html
 import spacy
 from thinc.api import prefer_gpu
 from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
-import logging
-import warnings
-import html
 
 from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
