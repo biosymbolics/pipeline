@@ -18,6 +18,10 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
     query_to_bg_table,
 )
+from constants.core import (
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
+    WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
+)
 
 from ._constants import (
     INTERVENTION_BASE_TERMS,
@@ -27,8 +31,6 @@ from ._constants import (
 
 TextField = Literal["title", "abstract"]
 
-WORKING_TABLE = f"{BQ_DATASET_ID}.biosym_annotations"
-SOURCE_TABLE = f"{BQ_DATASET_ID}.biosym_annotations_source"
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
 
 

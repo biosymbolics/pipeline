@@ -4,6 +4,8 @@ import polars as pl
 from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 
 from common.ner.ner import NerTagger
+from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
+
 
 ID_FIELD = "publication_number"
 CHUNK_SIZE = 1000
@@ -13,6 +15,8 @@ DECAY_RATE = 1 / 2000
 PROCESSED_PUBS_FILE = "data/processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
 MIN_SEARCH_RANK = 0.1
+
+ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
 
 
 class PatentEnricher:
@@ -42,45 +46,17 @@ class PatentEnricher:
         with open(PROCESSED_PUBS_FILE, "a") as f:
             f.write("\n" + "\n".join(df["publication_number"].to_list()))
 
-    def __fetch_patents_batch(
-        self, terms: Optional[list[str]], last_id: Optional[str] = None
-    ) -> list[dict]:
+    def __fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
         """
         Fetch a batch of patents from BigQuery
 
         Args:
-            terms (list[str]): terms on which to search for patents
             last_id (Optional[str], optional): last id to paginate from. Defaults to None.
 
         TODO: don't depend upon generated table?
         """
         pagination_where = f"AND apps.{ID_FIELD} > '{last_id}'" if last_id else ""
 
-        if terms:
-            lower_terms = [term.lower() for term in terms]
-
-            term_query = f"""
-                WITH matches AS (
-                    SELECT
-                        a.publication_number as publication_number,
-                        AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank, --- exp decay scaling; higher is better
-                    FROM patents.annotations a,
-                    UNNEST(a.annotations) as annotation
-                    WHERE annotation.term IN UNNEST({lower_terms})
-                    GROUP BY publication_number
-                )
-                SELECT apps.publication_number, apps.title, apps.abstract
-                FROM patents.applications AS apps, matches
-                WHERE apps.publication_number = matches.publication_number
-                AND search_rank > {MIN_SEARCH_RANK}
-                {pagination_where}
-                ORDER BY apps.{ID_FIELD} ASC
-                limit {CHUNK_SIZE}
-            """
-            patents = select_from_bg(term_query)
-            return patents
-
-        # otherwise, just start from the beginning
         query = f"""
             SELECT apps.publication_number, apps.title, apps.abstract
             FROM patents.applications AS apps
@@ -123,16 +99,16 @@ class PatentEnricher:
                 .lazy()
                 .select(
                     pl.col("publication_number"),
-                    pl.lit("").alias("canonical_term"),
+                    pl.lit("").alias("normalized_term"),
                     pl.lit("").alias("canonical_id"),
                     pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
                     pl.lit("title+abstract").alias("source"),
                     pl.lit(10).alias("character_offset_start"),
+                    pl.lit(10).alias("character_offset_end"),
                 )
                 .collect()
-                .filter(pl.col("canonical_id").is_not_null())
             )
             return flattened_df
 
@@ -161,7 +137,7 @@ class PatentEnricher:
         entities = self.tagger.extract(
             patent_docs,
             link=False,
-            entity_types=["diseases", "compounds", "mechanisms"],
+            entity_types=ENTITY_TYPES,
         )
         if len([ent for ent in entities if len(ent) > 0]) == 0:
             logging.info("No entities found")
@@ -187,24 +163,22 @@ class PatentEnricher:
 
         upsert_into_bg_table(
             df,
-            "biosym_annotations",
-            id_fields=[ID_FIELD, "original_term", "domain", "canonical_id"],
+            SOURCE_BIOSYM_ANNOTATIONS_TABLE,
+            id_fields=[ID_FIELD, "original_term", "domain"],
             insert_fields=[
                 ID_FIELD,
-                "canonical_term",
-                "canonical_id",
+                "normalized_term",
                 "original_term",
                 "domain",
                 "confidence",
                 "source",
                 "character_offset_start",
+                "character_offset_end",
             ],
             on_conflict="UPDATE SET target.domain = source.domain",  # NOOP
         )
 
-    def extract(
-        self, terms: Optional[list[str]] = None, starting_id: Optional[str] = None
-    ) -> None:
+    def extract(self, starting_id: Optional[str] = None) -> None:
         """
         Enriches patents with NER annotations
 
@@ -214,9 +188,9 @@ class PatentEnricher:
         - Persist to annotations and terms tables
 
         Args:
-            terms: list of terms for which to pull and enrich patents
+            starting_id (Optional[str], optional): last id to paginate from. Defaults to None.
         """
-        patents = self.__fetch_patents_batch(terms, last_id=starting_id)
+        patents = self.__fetch_patents_batch(last_id=starting_id)
         last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
@@ -226,7 +200,7 @@ class PatentEnricher:
                 self.__upsert_biosym_annotations(df)
                 self.__checkpoint(df)
 
-            patents = self.__fetch_patents_batch(terms, last_id=last_id)
+            patents = self.__fetch_patents_batch(last_id=last_id)
             if patents:
                 last_id = max(patent["publication_number"] for patent in patents)
 

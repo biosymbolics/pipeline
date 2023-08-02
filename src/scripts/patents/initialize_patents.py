@@ -15,6 +15,10 @@ from clients.low_level.big_query import (
     query_to_bg_table,
     BQ_DATASET_ID,
 )
+from constants.core import (
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE,
+    WORKING_BIOSYM_ANNOTATIONS_TABLE,
+)
 
 from ._constants import BIOSYM_ANNOTATIONS_TABLE
 from .copy_tables import copy_patent_tables
@@ -170,22 +174,19 @@ def __create_annotations_table():
 
 def __create_biosym_annotations_tables():
     client = bigquery.Client()
-    table_ids = [
-        f"{BQ_DATASET_ID}.biosym_annotations",
-        f"{BQ_DATASET_ID}.biosym_annotations_source",
-    ]
+    table_ids = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
 
     for table_id in table_ids:
         new_table = bigquery.Table(table_id)
         new_table.schema = [
             bigquery.SchemaField("publication_number", "STRING"),
-            bigquery.SchemaField("canonical_term", "STRING"),
-            bigquery.SchemaField("canonical_id", "STRING"),
+            bigquery.SchemaField("normalized_term", "STRING"),
             bigquery.SchemaField("original_term", "STRING"),
             bigquery.SchemaField("domain", "STRING"),
             bigquery.SchemaField("confidence", "FLOAT"),
             bigquery.SchemaField("source", "STRING"),
             bigquery.SchemaField("character_offset_start", "INTEGER"),
+            bigquery.SchemaField("character_offset_end", "INTEGER"),
         ]
         new_table = client.create_table(new_table, exists_ok=True)
         logging.info(f"(Maybe) created table {table_id}")
