@@ -1,7 +1,7 @@
 import unittest
 
 from common.ner.cleaning import EntityCleaner
-from common.ner.utils import rearrange_terms
+from common.ner.utils import rearrange_terms, normalize_by_pos, lemmatize_tail
 
 
 class TestNerUtils(unittest.TestCase):
@@ -134,6 +134,84 @@ class TestNerUtils(unittest.TestCase):
             expected = condition["expected"]
 
             result = rearrange_terms(input)
+            if result != expected:
+                print(f"Actual: '{result}', expected: '{expected}'")
+
+            self.assertEqual(result, expected)
+
+    def test_pos_dash(self):
+        test_conditions = [
+            {
+                "input": "APoE-4",
+                "expected": "APoE4",
+            },
+            {
+                "input": "HIV-1 infection",
+                "expected": "HIV1 infection",
+            },
+            {
+                "input": "sodium channel-mediated diseases",
+                "expected": "sodium channel mediated diseases",
+            },
+            {
+                "input": "neuronal hypo-kinetic disease",
+                "expected": "neuronal hypo kinetic disease",  # TODO
+            },
+            {
+                "input": "Loeys-Dietz syndrome",
+                "expected": "Loeys Dietz syndrome",
+            },
+            {
+                "input": "sleep-wake cycles",
+                "expected": "sleep wake cycles",
+            },
+            {
+                "input": "low-grade prostate cancer",
+                "expected": "low grade prostate cancer",
+            },
+            {
+                "input": "non-insulin dependent diabetes mellitus",
+                "expected": "non insulin dependent diabetes mellitus",
+            },
+            {
+                "input": "T-cell lymphoblastic leukemia",
+                "expected": "T cell lymphoblastic leukemia",
+            },
+            {
+                "input": "T-cell",
+                "expected": "T cell",
+            },
+            {
+                "input": "MAGE-A3 gene",
+                "expected": "MAGEA3 gene",
+            },
+            {
+                "input": "Bcr-Abl kinase",
+                "expected": "Bcr Abl kinase",
+            },
+            {
+                "input": "HLA-C gene",
+                "expected": "HLAC gene",
+            },
+            {
+                "input": "IL-6",
+                "expected": "IL6",
+            },
+            {
+                "input": "interleukin-6",
+                "expected": "interleukin 6",
+            },
+            {
+                "input": "Alzheimer's disease",
+                "expected": "Alzheimer disease",
+            },
+        ]
+
+        for condition in test_conditions:
+            input = condition["input"]
+            expected = condition["expected"]
+
+            result = normalize_by_pos(input)
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 

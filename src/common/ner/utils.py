@@ -203,38 +203,46 @@ def normalize_by_pos(entity_name: str) -> str:
         - T-cell (NOUN(PUNCT)NOUN)
         - MAGE-A3 gene (PROPN(PUNCT)NOUN) # TODO: better if ""
         - Bcr-Abl (NOUN(ADJ)ADJ) -> Bcr-Abl # TODO
+        - HIV-1 (NOUN(PUNCT)PROPN) -> HIV-1 # TODO
 
         Keep if Spacy considers is a NOUN
-        - HLA-C (NOUN(NOUN)NOUN) -> HLA-C
-        - IL-6 (NOUN(NOUN)NUM) -> IL-6
+        - HLA-C (NOUN(NOUN)NOUN) -> HLA-C # TODO??
+        - IL-6 (NOUN(NOUN)NUM) -> IL-6 # TODO??
 
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
+    dash = "-"
     nlp = Spacy.get_instance()
     dashes = ["–", "-"]
-    tokens = nlp(
-        re.sub(r"[–-]", " - ", entity_name)
-    )  # otherwise spacy will keep it as one token
 
-    def clean_by_pos(t, next_t):
+    # otherwise spacy will keep it as one token
+    tokens = nlp(re.sub(f"[{''.join(dashes)}]", f" {dash} ", entity_name))
+
+    def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
         if t.pos_ == "SPACE":
             return ""
         if t.text == "'s" and t.pos_ == "PART":
             # alzheimer's disease -> alzheimer disease
-            return ""
-        if t.text == "-":
+            return " "
+        if t.text == dash:
             if t.pos_ == "ADJ":
-                return ""
+                return " "
             if t.pos_ == "PUNCT":
-                if next_t is not None and next_t.pos_ == "NUM":
+                if (
+                    next_t is not None
+                    and (next_t.pos_ == "NUM" or len(next_t.text) < 3)
+                    and len(prev_t.text) < 5
+                ):
                     # ApoE-4 -> apoe4
+                    # IL-6 -> IL6
+                    # Interleukin-6 -> Interleukin 6
                     return ""
                 return " "
             else:
                 # pos_ == NOUN, PROPN, etc
-                return "-"
+                return dash
 
         if next_t is not None and next_t.text in dashes:
             return t.text  # omitting pre-dash space
@@ -243,7 +251,11 @@ def normalize_by_pos(entity_name: str) -> str:
 
     return "".join(
         [
-            clean_by_pos(t, tokens[i] if len(tokens) > i + 1 else None)
+            clean_by_pos(
+                t,
+                (tokens[i - 1] if i > 0 else None),
+                (tokens[i + 1] if len(tokens) > (i + 1) else None),
+            )
             for i, t in enumerate(tokens)
         ]
     )
