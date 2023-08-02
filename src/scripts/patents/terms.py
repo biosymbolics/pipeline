@@ -6,7 +6,13 @@ from typing import Optional, TypedDict
 from google.cloud import bigquery
 import logging
 
-from clients.low_level.big_query import get_table, select_from_bg
+from clients.low_level.big_query import (
+    create_bq_table,
+    delete_bg_table,
+    get_table,
+    insert_into_bg_table,
+    select_from_bg,
+)
 from clients.low_level.big_query import (
     BQ_DATASET_ID,
     BQ_DATASET,
@@ -213,17 +219,10 @@ def __init_synonym_map(synonym_map: dict[str, str]):
         synonym_map: a map of synonyms to canonical names
     """
     logging.info("Creating synonym map")
-    client = bigquery.Client()
-    table_id = f"{BQ_DATASET_ID}.synonym_map"
-    table = bigquery.Table(table_id)
-    table.schema = [
-        bigquery.SchemaField("synonym", "STRING"),
-        bigquery.SchemaField("term", "STRING"),
-    ]
 
     # remove and (re)create the table
-    client.delete_table(table_id, not_found_ok=True)
-    table = client.create_table(table)
+    delete_bg_table("synonym_map")
+    create_bq_table("synonym_map", ["synonym", "term"])
 
     logging.info("Adding default/hard-coded synonym map entries")
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
@@ -246,7 +245,12 @@ def __add_synonyms_from_terms(
         raise Exception("Terms must be a list")
 
     # Persist term -> synonyms as synonyms
-    synonym_map = {og_term: row["term"] for row in terms for og_term in row["synonyms"]}
+    synonym_map = {
+        og_term: row["term"]
+        for row in terms
+        for og_term in row["synonyms"]
+        if len(row["term"]) > 1
+    }
 
     execute_with_retries(lambda: __add_to_synonym_map(synonym_map))
 
@@ -258,23 +262,20 @@ def __add_to_synonym_map(synonym_map: dict[str, str]):
     Args:
         synonym_map: a map of synonyms to canonical names
     """
-    client = bigquery.Client()
-    table_ref = get_table("synonym_map")
-
     data = [
         {
-            "synonym": entry[0].lower() if entry[0] is not None else None,
+            "synonym": entry[0].lower(),
             "term": entry[1].lower(),
         }
         for entry in synonym_map.items()
-        if entry[1] is not None and entry[0] != entry[1]
+        if entry[1] is not None and entry[0] is not None and entry[0] != entry[1]
     ]
 
     batched = batch(data)
 
     for b in batched:
-        errors = client.insert_rows_json(table_ref, b)
-        logging.info("Inserted %s rows into synonym_map (errors: %s)", len(b), errors)
+        insert_into_bg_table(b, "synonym_map")
+        logging.info("Inserted %s rows into synonym_map", len(b))
 
 
 def create_patent_terms():
