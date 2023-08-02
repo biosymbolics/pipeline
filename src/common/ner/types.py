@@ -27,7 +27,7 @@ class CanonicalEntity(NamedTuple):
     aliases: Optional[List[str]] = []
 
 
-DocEntity = tuple[str, str, Optional[CanonicalEntity]]
+DocEntity = tuple[str, str, int, int, Optional[CanonicalEntity]]
 DocEntities = list[DocEntity]
 
 

@@ -109,7 +109,10 @@ class NerTagger:
     def __normalize(
         self, doc: Doc, entity_types: Optional[list[str]] = None
     ) -> DocEntities:
-        entity_set: DocEntities = [(span.text, span.label_, None) for span in doc.ents]
+        entity_set: DocEntities = [
+            (span.text, span.label_, span.start_char, span.end_char, None)
+            for span in doc.ents
+        ]
 
         # basic filtering, character removal, lemmatization
         normalized = self.cleaner(entity_set)
@@ -133,7 +136,7 @@ class NerTagger:
         linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
 
         # canonicalization, synonymization
-        linked = [(e[0], e[1], linked_entity_map.get(e[0])) for e in entities]
+        linked = [(*e[0:4], linked_entity_map.get(e[0])) for e in entities]
 
         return linked
 

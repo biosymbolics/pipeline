@@ -8,15 +8,11 @@ from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 
 ID_FIELD = "publication_number"
-CHUNK_SIZE = 1000
-
+ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
+BATCH_SIZE = 1000
 MAX_TEXT_LENGTH = 500
-DECAY_RATE = 1 / 2000
 PROCESSED_PUBS_FILE = "data/processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
-MIN_SEARCH_RANK = 0.1
-
-ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
 
 
 class PatentEnricher:
@@ -63,7 +59,7 @@ class PatentEnricher:
             WHERE 1 = 1
             {pagination_where}
             ORDER BY apps.{ID_FIELD} ASC
-            limit {CHUNK_SIZE}
+            limit {BATCH_SIZE}
         """
         patents = select_from_bg(query)
         return patents
@@ -105,8 +101,12 @@ class PatentEnricher:
                     pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                     pl.lit(0.90000001).alias("confidence"),
                     pl.lit("title+abstract").alias("source"),
-                    pl.lit(10).alias("character_offset_start"),
-                    pl.lit(10).alias("character_offset_end"),
+                    pl.col("entities")
+                    .apply(lambda e: e[3])
+                    .alias("character_offset_start"),
+                    pl.col("entities")
+                    .apply(lambda e: e[4])
+                    .alias("character_offset_end"),
                 )
                 .collect()
             )
@@ -144,10 +144,7 @@ class PatentEnricher:
             return None
 
         # add back to orig df
-        flatish_ents = [
-            [(ent[0], ent[1], None) for ent in ent_set if len(ent[0]) > 0]
-            for ent_set in entities
-        ]
+        flatish_ents = [[e for e in ent_set if len(e[0]) > 0] for ent_set in entities]
         enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
 
         return __flatten(enriched)
