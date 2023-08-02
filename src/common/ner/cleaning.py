@@ -85,6 +85,14 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
 class EntityCleaner:
     """
     Class for cleaning entities
+
+    Usage:
+    ```
+    import system; system.initialize()
+    from common.ner.cleaning import EntityCleaner
+    clean = EntityCleaner()
+    clean(["atherosclerotic changes"])
+    ```
     """
 
     def __init__(
@@ -204,6 +212,9 @@ class EntityCleaner:
         Args:
             entities (list[T]): entities
         """
+        if not isinstance(entities, list):
+            raise ValueError("Entities must be a list")
+
         cleaning_steps: list[CleanFunction] = [
             self.suppress,
             self.normalize_entity_names,

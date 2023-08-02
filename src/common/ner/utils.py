@@ -89,7 +89,7 @@ def lemmatize_tail(term: str | Doc) -> str:
     e.g.
     "heart attacks" -> "heart attack"
     but not
-    "fast progressing cancer" -> "fast progress cancer"
+    "fast reacting phenotypes" -> "fast reacting phenotype"
     """
     if isinstance(term, str):
         nlp = Spacy.get_instance()
@@ -100,7 +100,7 @@ def lemmatize_tail(term: str | Doc) -> str:
     # include all tokens as-is except for the last
     tail_lemmatied = "".join(
         [
-            token.text_with_ws if i < len(doc) else token.lemma_
+            token.text_with_ws if i < len(doc) - 1 else token.lemma_
             for i, token in enumerate(doc)
         ]
     ).strip()
