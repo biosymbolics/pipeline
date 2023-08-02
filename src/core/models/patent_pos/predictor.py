@@ -2,6 +2,7 @@ import logging
 import sys
 from typing import Sequence, cast
 import torch
+from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
 from common.utils.tensor import pad_or_truncate_to_size
@@ -16,7 +17,7 @@ from .constants import (
     TEXT_FIELDS,
     TRUE_THRESHOLD,
 )
-from .types import AllInput
+from .types import AllInput, ModelMetrics
 from .utils import prepare_inputs
 
 
@@ -49,16 +50,46 @@ class ModelPredictor:
         model.load_state_dict(checkpoint_obj["model_state_dict"])
         model.eval()
         self.model = model
+        self.precision = Precision(average=True)
+        self.recall = Recall(average=True)
+        self.f1 = 2 * (self.precision * self.recall) / (self.precision + self.recall)
 
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
 
-    def predict_tensor(self, input_dict: AllInput) -> list[float]:
+    def evaluate(self, y_input: torch.Tensor, prediction: torch.Tensor) -> ModelMetrics:
+        """
+        Evaluate model performance
+
+        Args:
+            input_dict (AllInput): Dictionary of input tensors
+            prediction (torch.Tensor): Tensor of predictions (1d)
+        """
+        y_true = y_input > TRUE_THRESHOLD
+        y_pred = prediction > TRUE_THRESHOLD
+        self.precision.update((y_pred, y_true))
+        self.recall.update((y_pred, y_true))
+
+        metrics: ModelMetrics = {
+            "precision": float(self.precision.compute()),
+            "recall": float(self.recall.compute()),
+            "f1": self.f1.compute(),
+        }
+
+        self.precision.reset()
+        self.recall.reset()
+
+        return metrics
+
+    def predict_tensor(self, input_dict: AllInput) -> torch.Tensor:
         """
         Predict probability of success for a given tensor input
 
         Args:
             input_dict (AllInput): Dictionary of input tensors
+
+        Returns:
+            torch.Tensor: Tensor of predictions (1d)
         """
         x1_padded = pad_or_truncate_to_size(
             input_dict["x1"], (input_dict["x1"].size(0), BATCH_SIZE, self.dnn_input_dim)
@@ -69,9 +100,11 @@ class ModelPredictor:
             torch.cat([self.model(x1_padded[i]) for i in range(num_batches)])
         )
 
-        return [output[i].item() for i in range(output.size(0))]
+        return output
 
-    def predict(self, patents: list[PatentApplication]) -> list[float]:
+    def predict(
+        self, patents: list[PatentApplication]
+    ) -> tuple[torch.Tensor, ModelMetrics]:
         """
         Predict probability of success for a given input
 
@@ -85,18 +118,22 @@ class ModelPredictor:
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS
         )
 
-        output = self.predict_tensor(input_dict)
+        predictions = self.predict_tensor(input_dict)
+        actuals = torch.flatten(input_dict["y"])
 
         for i, patent in enumerate(patents):
             logging.info(
-                "Patent %s (%s): %s (%s)",
+                "Patent %s (pred: %s, act: %s): %s (%s)",
                 patent["publication_number"],
-                (output[i] > TRUE_THRESHOLD),
+                (predictions[i] > TRUE_THRESHOLD).item(),
+                (actuals[i] > TRUE_THRESHOLD).item(),
                 patent["title"],
-                output[i],
+                predictions[i].item(),
             )
 
-        return output
+        metrics = self.evaluate(actuals, predictions)
+
+        return (predictions, metrics)
 
 
 def main(terms: list[str]):
@@ -105,7 +142,14 @@ def main(terms: list[str]):
         patent_client.search(terms, True, 0, "medium", max_results=1000),
     )
     predictor = ModelPredictor()
-    predictor.predict(patents)
+    preds, metrics = predictor.predict(patents)
+    logging.info(
+        "Prediction mean: %s, min: %s and max: %s",
+        preds.mean().item(),
+        preds.min().item(),
+        preds.max().item(),
+    )
+    logging.info("Metrics: %s", metrics)
 
 
 if __name__ == "__main__":
