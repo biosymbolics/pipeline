@@ -120,6 +120,7 @@ def rearrange_terms(entity_name: str) -> str:
     terms = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
+        # "by": r"mediated by\b",
     }
 
     def _rearrange(text: str, adp_term: str, adp_ext: str) -> str:

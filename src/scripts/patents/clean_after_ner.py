@@ -85,11 +85,11 @@ def fix_of_for_annotations():
             re_term = term + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} a
-            SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
-            FROM `fair-abbey-386416.patents.gpr_publications` p
+            SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            FROM `{BQ_DATASET_ID}.gpr_publications` p
             WHERE p.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{re_term}$")
-            AND REGEXP_CONTAINS(p.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising).*')
+            AND REGEXP_CONTAINS(p.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
         """
         return sql
 
@@ -98,7 +98,7 @@ def fix_of_for_annotations():
         sql = f"""
             UPDATE {WORKING_TABLE} a
             SET original_term=(REGEXP_EXTRACT(title, '(?i)([A-Za-z0-9]+-{re_term})'))
-            FROM `fair-abbey-386416.patents.gpr_publications` p
+            FROM `{BQ_DATASET_ID}.gpr_publications` p
             WHERE p.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, '^(?i){re_term}$')
             AND REGEXP_CONTAINS(p.{field}, '(?i).*[A-Za-z0-9]+-{re_term}.*')
@@ -150,9 +150,12 @@ def remove_junk():
         "capable": "trailing",
         "specific": "leading",
         "novel": "leading",
+        "improved": "leading",
         "new": "leading",
+        "potent": "trailing",
         "inventive": "leading",
         "other": "leading",
+        "more": "leading",
         "of": "trailing",
         "therapeutically": "trailing",
         "suitable": "all",
@@ -166,6 +169,19 @@ def remove_junk():
         "therapeutic procedures": "all",
         "therapeutic procedure": "all",
         "exemplary": "all",
+        "against": "trailing",
+        "treatment method": "trailing",
+        "usable": "trailing",
+        "other": "leading",
+        "suitable": "trailing",
+        "preparation": "trailing",
+        "composition": "trailing",
+        "combination": "trailing",
+        "pharmaceutical": "all",
+        "dosage form": "all",
+        "use of": "leading",
+        "certain": "leading",
+        "working": "leading",
     }
     delete_terms = [
         "wherein a",

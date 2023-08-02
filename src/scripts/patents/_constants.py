@@ -53,6 +53,7 @@ INTERVENTION_BASE_TERMS = [
     "si[ ]?rna",
     "ds[ ]?rna",
     "double[- ]?stranded rna",
+    "scfv",  # single-chain variable fragment
     "cell",
     "stem cell",
     "interference",
@@ -93,6 +94,8 @@ INTERVENTION_BASE_TERM_SETS = [
 ]
 
 INTERVENTION_BASE_PREFIXES = [
+    "anti",
+    "chimeric",
     "cyclic",
     "reversible",
     "irreversible",

@@ -127,6 +127,14 @@ class TestNerUtils(unittest.TestCase):
                 "input": "conditions associated with production of IL-1 and IL-6",
                 "expected": "IL-1 and il-6 production conditions",
             },
+            # {
+            #     "input": "disorders mediated by neurofibrillary tangles",
+            #     "expected": "neurofibrillary tangle mediated disorders",
+            # }
+            # {
+            #     "input": "inhibitors for use in the treatment of blood-borne cancers",
+            #     "expected": "blood-borne cancer treatment inhibitors",
+            # }
         ]
 
         for condition in test_conditions:
@@ -204,6 +212,14 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "Alzheimer's disease",
                 "expected": "Alzheimer disease",
+            },
+            {
+                "input": "graft-versus-host-disease",
+                "expected": "graft versus host disease",
+            },
+            {
+                "input": "graft -versus - host - disease (gvhd)",  # IRL example
+                "expected": "graft  versus host disease (gvhd)",  # dup space removed elsewhere
             },
         ]
 

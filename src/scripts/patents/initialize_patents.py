@@ -4,7 +4,7 @@ Functions to initialize the patents database
 import logging
 import sys
 from google.cloud import bigquery
-
+from common.utils.file import save_json_as_file
 
 from system import initialize
 
@@ -12,13 +12,17 @@ initialize()
 
 from clients.low_level.big_query import (
     delete_bg_table,
+    execute_bg_query,
     query_to_bg_table,
     BQ_DATASET_ID,
+    select_from_bg,
 )
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from common.ner.cleaning import EntityCleaner
+from common.utils.list import batch, batch_dict, dedup
 
 from ._constants import BIOSYM_ANNOTATIONS_TABLE
 from .copy_tables import copy_patent_tables
@@ -212,7 +216,7 @@ def main(copy_tables: bool = False):
     # __create_applications_table()
 
     # create patent terms
-    # create_patent_terms()
+    create_patent_terms()
 
     # create annotations
     __create_annotations_table()
