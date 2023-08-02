@@ -1,6 +1,7 @@
 """
 NER types
 """
+from collections import namedtuple
 from typing import (
     Any,
     Callable,
@@ -27,7 +28,10 @@ class CanonicalEntity(NamedTuple):
     aliases: Optional[List[str]] = []
 
 
-DocEntity = tuple[str, str, int, int, Optional[CanonicalEntity]]
+DocEntity = namedtuple(
+    "DocEntity",
+    ["term", "type", "start_char", "end_char", "normalized_term", "linked_entity"],
+)
 DocEntities = list[DocEntity]
 
 

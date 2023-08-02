@@ -8,6 +8,7 @@ from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 
 ID_FIELD = "publication_number"
+TEXT_FIELDS = ["title", "abstract"]
 ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
 BATCH_SIZE = 1000
 MAX_TEXT_LENGTH = 500
@@ -70,7 +71,7 @@ class PatentEnricher:
         Concatenates title and abstract into `text` column, trucates to MAX_TEXT_LENGTH
         """
         df = patents.with_columns(
-            pl.concat_str(["title", "abstract"], separator="\n").alias("text"),
+            pl.concat_str(TEXT_FIELDS, separator="\n").alias("text"),
         )
 
         return [text[0:MAX_TEXT_LENGTH] for text in df["text"].to_list()]

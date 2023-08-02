@@ -27,7 +27,7 @@ from .patterns import (
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
-from .types import DocEntities, SpacyPatterns
+from .types import DocEntities, DocEntity, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]
@@ -110,7 +110,9 @@ class NerTagger:
         self, doc: Doc, entity_types: Optional[list[str]] = None
     ) -> DocEntities:
         entity_set: DocEntities = [
-            (span.text, span.label_, span.start_char, span.end_char, None)
+            DocEntity(
+                span.text, span.label_, span.start_char, span.end_char, None, None
+            )
             for span in doc.ents
         ]
 
@@ -136,7 +138,7 @@ class NerTagger:
         linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
 
         # canonicalization, synonymization
-        linked = [(*e[0:4], linked_entity_map.get(e[0])) for e in entities]
+        linked = [DocEntity(*e[0:5], linked_entity_map.get(e[0])) for e in entities]
 
         return linked
 
@@ -185,6 +187,8 @@ class NerTagger:
         - applies rule_sets
         - normalizes terms
 
+        Note: for bulk processing, linking is better done in a separate step, batched
+
         Args:
             content (list[str]): list of content on which to do NER
             link (bool, optional): whether to link entities. Defaults to True.
@@ -208,7 +212,6 @@ class NerTagger:
             self.__prep_doc,
             self.rule_nlp.pipe if self.rule_nlp else lambda x: x,
             self.nlp.pipe,
-            # TODO: linking would be faster if done in batch
             lambda docs: [
                 self.__normalize_and_maybe_link(doc, link, entity_types) for doc in docs
             ],

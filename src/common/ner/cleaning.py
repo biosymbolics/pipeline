@@ -5,13 +5,17 @@ from typing import Callable, TypeVar, Union, cast
 import re
 from functools import reduce
 import logging
-from clients.spacy import Spacy
 import html
 
+from clients.spacy import Spacy
+from common.ner.utils import lemmatize_tail
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 
 from .types import DocEntity
+
+T = TypeVar("T", bound=Union[DocEntity, str])
+CleanFunction = Callable[[list[T]], list[T]]
 
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
@@ -22,10 +26,6 @@ CHAR_SUPPRESSIONS = {
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
-
-T = TypeVar("T", bound=Union[DocEntity, str])
-CleanFunction = Callable[[list[T]], list[T]]
-
 DEFAULT_EXCEPTION_LIST: list[str] = [
     "hiv",
     "asthma",
@@ -154,19 +154,6 @@ class EntityCleaner:
         Args:
             entities (list[T]): entities
         """
-        texts = [
-            entity[0] if isinstance(entity, tuple) else entity for entity in entities
-        ]
-        docs = self.nlp.pipe(texts)
-
-        def lemmatize(doc):
-            """
-            Lemmatize and join with " " if separated by whitespace, "" otherwise
-            """
-            lemmatized_text = "".join(
-                [token.lemma_ + (" " if token.whitespace_ else "") for token in doc]
-            ).strip()
-            return lemmatized_text
 
         def remove_chars(entity_name: str) -> str:
             for pattern, replacement in self.char_suppressions.items():
@@ -177,16 +164,17 @@ class EntityCleaner:
             return html.unescape(entity_name)
 
         def normalize_entity(entity: T) -> T:
-            text = entity[0] if isinstance(entity, tuple) else entity
-            cleaning_steps = [decode_html, remove_chars, remove_extra_spaces]
+            text = entity[0] if isinstance(entity, DocEntity) else entity
+            cleaning_steps = [
+                decode_html,
+                remove_chars,
+                remove_extra_spaces,
+                lemmatize_tail,
+            ]
             normalized = reduce(lambda x, func: func(x), cleaning_steps, text)
 
-            if normalized != (entity[0] if isinstance(entity, tuple) else entity):
-                logging.info(f"Normalized entity: {entity} -> {normalized}")
-
-            if isinstance(entity, tuple):
-                return cast(T, (normalized, *entity[1:]))
-
+            if isinstance(entity, DocEntity):
+                return cast(T, DocEntity(*entity[0:4], normalized, entity[5]))
             return cast(T, normalized)
 
         return [normalize_entity(entity) for entity in entities]

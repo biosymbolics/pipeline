@@ -1,15 +1,15 @@
 """
 Utils for the NER pipeline
 """
+from spacy.tokens import Doc
+from clients.spacy import Spacy
+
 from common.utils.re import (
     get_or_re,
     ReCount,
     ALPHA_CHARS,
 )
 
-"""
-Re utils
-"""
 # end-of-entity regex
 EOE_RE = "\\b" + ".*"
 
@@ -80,3 +80,29 @@ def get_suffix_entitiy_re(
         prefix_count (ReCount): number of alpha chars in prefix
     """
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
+
+
+def lemmatize_tail(term: str | Doc) -> str:
+    """
+    Lemmatizes the tail of a term
+
+    e.g.
+    "heart attacks" -> "heart attack"
+    but not
+    "fast progressing cancer" -> "fast progress cancer"
+    """
+    if isinstance(term, str):
+        nlp = Spacy.get_instance()
+        doc = nlp(term)  # turn into spacy doc (has lemma info)
+    else:
+        doc = term
+
+    # include all tokens as-is except for the last
+    tail_lemmatied = "".join(
+        [
+            token.text_with_ws if i < len(doc) else token.lemma_
+            for i, token in enumerate(doc)
+        ]
+    ).strip()
+
+    return tail_lemmatied
