@@ -3,6 +3,7 @@ Term Normalizer
 """
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import time
 from typing import Union
 from scispacy.candidate_generation import (
     CandidateGenerator,
@@ -73,8 +74,12 @@ class TermLinker:
         Returns:
             LinkedEntityMap: mapping of terms to canonical entities
         """
+        logging.info("Starting candidate generation")
+        start_time = time.time()
         candidates = self.candidate_generator(terms, 1)
-        logging.info("Finished generating candidates")
+        logging.info(
+            "Finished generating candidates (took %s)", time.time() - start_time
+        )
         canonical_entities = [self.__get_canonical_entity(c) for c in candidates]
         entity_map = dict(zip(terms, canonical_entities))
         return {
@@ -98,9 +103,8 @@ class TermLinker:
 
         executor.shutdown()
 
-        assert len(terms) == len(
-            linked_entities
-        )  # should always be the same length ("" for omitted terms)
+        # should always be the same length ("" for omitted terms)
+        assert len(terms) == len(linked_entities)
 
         return list(zip(terms, linked_entities))
 
