@@ -2,6 +2,7 @@
 Utils for the NER pipeline
 """
 from functools import partial, reduce
+import logging
 import re
 from spacy.tokens import Doc
 from clients.spacy import Spacy
@@ -147,41 +148,52 @@ def rearrange_adp(entity_name: str, adp_term: str = "of") -> str:
     nlp = Spacy.get_instance()
     tokens = nlp(text)
 
-    indices = [t.i for t in tokens if t.text == adp_term]
-    adp_index = indices[0] if len(indices) > 0 else None
+    # get indices of all ADPs, to use those as stopping points
+    all_adp_indices = [t.i for t in tokens if t.pos_ == "ADP"]
+
+    # get ADP index for the specific term we're looking for
+    specific_adp_indices = [
+        t.i for t in tokens if t.text == adp_term and t.pos_ == "ADP"
+    ]
+    adp_index = specific_adp_indices[0] if len(specific_adp_indices) > 0 else None
 
     if adp_index is None:
         return text
 
-    # get indices of all other ADPs, to use those as stopping points
-    other_adp_indices = [t.i for t in tokens if t.pos_ == "ADP"]
-    rel_adp_index = other_adp_indices.index(adp_index)
+    # relative adp index (== index on all_adp_list)
+    rel_adp_index = all_adp_indices.index(adp_index)
 
-    # all ADPs before the current one
-    before_adp_indices = other_adp_indices[0:rel_adp_index]
-    # start at the closest one before (if any)
-    before_start_idx = max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
-    before_tokens = tokens[before_start_idx:adp_index]
-    before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
+    try:
+        # all ADPs before the current one
+        before_adp_indices = all_adp_indices[0:rel_adp_index]
+        # start at the closest one before (if any)
+        before_start_idx = (
+            max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
+        )
+        before_tokens = tokens[before_start_idx:adp_index]
+        before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
 
-    # all ADPs after
-    after_adp_indices = other_adp_indices[rel_adp_index + 1 :]
-    # stop at the first ADP after (if any)
-    after_start_idx = (
-        min(after_adp_indices) if len(after_adp_indices) > 0 else len(tokens)
-    )
-    after_tokens = tokens[adp_index + 1 : after_start_idx]
-    after_phrase = lemmatize_tail("".join([t.text_with_ws for t in after_tokens]))
+        # all ADPs after
+        after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
+        # stop at the first ADP after (if any)
+        after_start_idx = (
+            min(after_adp_indices) if len(after_adp_indices) > 0 else len(tokens)
+        )
+        after_tokens = tokens[adp_index + 1 : after_start_idx]
+        after_phrase = lemmatize_tail("".join([t.text_with_ws for t in after_tokens]))
 
-    # if we cut off stuff from the beginning, put back
-    # e.g. (diseases associated with) expression of GU Protein
-    other_stuff = (
-        "".join([t.text_with_ws for t in tokens[0:before_start_idx]])
-        if before_start_idx > 0
-        else ""
-    )
+        # if we cut off stuff from the beginning, put back
+        # e.g. (diseases associated with) expression of GU Protein
+        other_stuff = (
+            "".join([t.text_with_ws for t in tokens[0:before_start_idx]])
+            if before_start_idx > 0
+            else ""
+        )
 
-    return f"{other_stuff}{after_phrase} {before_phrase}"
+        return f"{other_stuff}{after_phrase} {before_phrase}"
+    except Exception as e:
+        logging.error("Error in rearrange_adp, returning orig text: %s", e)
+        return text
 
 
 def normalize_by_pos(entity_name: str) -> str:

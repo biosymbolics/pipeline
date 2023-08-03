@@ -4,6 +4,7 @@ Functions to initialize the patents database
 import logging
 import sys
 from google.cloud import bigquery
+from common.ner.types import DocEntity
 from common.utils.file import save_json_as_file
 
 from system import initialize
