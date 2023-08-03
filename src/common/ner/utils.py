@@ -122,8 +122,8 @@ def lemmatize_tails(terms: list[str]) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
     """
-    nlp = Spacy.get_instance()
-    docs = nlp.pipe(terms)  # turn into spacy docs
+    nlp = Spacy.get_instance()._nlp
+    docs = nlp.pipe(terms, n_process=4)  # turn into spacy docs
 
     for doc in docs:
         yield lemmatize_tail(doc)
@@ -162,8 +162,8 @@ def __rearrange_adp(terms: list[str], adp_term: str = "of") -> Iterable[str]:
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
-    nlp = Spacy.get_instance()
-    docs = nlp.pipe(terms)
+    nlp = Spacy.get_instance()._nlp
+    docs = nlp.pipe(terms, n_process=4)
 
     def __rearrange(doc: Doc) -> str:
         tokens = doc
@@ -308,7 +308,7 @@ def normalize_by_pos(terms: list[str]) -> Iterable[str]:
 
     sep_dash_terms = [sep_dash(term) for term in terms]
     nlp = Spacy.get_instance()
-    docs = nlp.pipe(sep_dash_terms)
+    docs = nlp.pipe(sep_dash_terms, n_process=4)
 
     for doc in docs:
         if skip(doc.text):
