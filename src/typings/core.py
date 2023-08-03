@@ -7,7 +7,9 @@ JsonSerializable = Union[
 
 Primitive = bool | str | int | float | None
 
-Doc = SpacyDoc
+
+class Doc(SpacyDoc):
+    pass
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:
@@ -23,7 +25,7 @@ def is_string_list(obj: Any) -> TypeGuard[list[str]]:
     return isinstance(obj, list) and all(isinstance(x, str) for x in obj)
 
 
-def is_doc_list(obj: Any) -> TypeGuard[list[SpacyDoc]]:
+def is_doc_list(obj: Any) -> TypeGuard[list[Doc]]:
     """
     Checks if an object is a list of SpaCy docs
 
@@ -33,4 +35,4 @@ def is_doc_list(obj: Any) -> TypeGuard[list[SpacyDoc]]:
     Returns:
         bool: True if the object is a list of SpaCy docs
     """
-    return isinstance(obj, list) and all(isinstance(x, SpacyDoc) for x in obj)
+    return isinstance(obj, list) and all(isinstance(x, Doc) for x in obj)
