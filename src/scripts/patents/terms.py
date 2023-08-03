@@ -13,7 +13,7 @@ from clients.low_level.big_query import (
     select_from_bg,
 )
 from clients.low_level.big_query import BQ_DATASET_ID
-from common.ner import TermLinker
+from common.ner import TermNormalizer
 from common.utils.file import load_json_from_file, save_json_as_file
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
@@ -184,7 +184,7 @@ class TermAssembler:
         return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
 
     @staticmethod
-    def __fetch_entity_terms() -> list[AggregatedTermRecord]:
+    def __generate_entity_terms() -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations table
         Normalizes terms and associates to canonical ids
@@ -208,13 +208,13 @@ class TermAssembler:
                 group by term, original_id, domain
             """
         rows = select_from_bg(terms_query)
+        terms: list[str] = [row["term"] for row in rows]
 
         logging.info("Linking %s terms", len(rows))
+        normalizer = TermNormalizer()
+        normalization_map = dict(normalizer.normalize(terms))
 
-        linker = TermLinker()
-        normalization_map = dict(linker([row["term"] for row in rows]))
-
-        logging.info("Finished creating norm map")
+        logging.info("Finished creating normalization_map")
 
         def __normalize(row):
             entry = normalization_map.get(row["term"])
@@ -222,7 +222,7 @@ class TermAssembler:
                 return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
             return entry.name
 
-        terms: list[TermRecord] = [
+        term_records: list[TermRecord] = [
             {
                 "term": __normalize(row),
                 "count": row["count"] or 0,
@@ -236,12 +236,12 @@ class TermAssembler:
             for row in rows
         ]
 
-        return TermAssembler.__aggregate(terms)
+        return TermAssembler.__aggregate(term_records)
 
     @staticmethod
-    def fetch_terms():
+    def generate_terms():
         """
-        Collects all terms for the terms table
+        Collects and forms terms for the terms table
         From
         - gpr_annotations
         - biosym_annotations
@@ -250,8 +250,8 @@ class TermAssembler:
         logging.info("Getting owner (assignee, inventor) terms")
         assignee_terms = TermAssembler.__fetch_owner_terms()
 
-        logging.info("Getting entity terms")
-        entity_terms = TermAssembler.__fetch_entity_terms()
+        logging.info("Generating entity terms")
+        entity_terms = TermAssembler.__generate_entity_terms()
 
         terms = assignee_terms + entity_terms
         return terms
@@ -278,7 +278,7 @@ class TermAssembler:
         create_bq_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
 
         # grab terms from annotation tables (slow!!)
-        terms = TermAssembler.fetch_terms()
+        terms = TermAssembler.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
         batched = batch(terms)

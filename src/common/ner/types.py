@@ -35,6 +35,13 @@ DocEntity = namedtuple(
 DocEntities = list[DocEntity]
 
 
+def is_entity_doc_list(obj: Any) -> TypeGuard[DocEntities]:
+    """
+    Check if object is a list of entities
+    """
+    return isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], DocEntity)
+
+
 class SpacyCanonicalEntity(NamedTuple):
     concept_id: str
     canonical_name: str

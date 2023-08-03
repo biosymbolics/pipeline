@@ -11,15 +11,15 @@ from scispacy.candidate_generation import (
 )
 import torch
 
+from common.ner.cleaning import EntityCleaner
 from common.ner.synonyms import SynonymStore
-
 
 from .types import KbLinker, CanonicalEntity
 
+LinkedEntityMap = dict[str, CanonicalEntity]
+
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
-
-LinkedEntityMap = dict[str, CanonicalEntity]
 
 
 class TermLinker:
@@ -84,7 +84,7 @@ class TermLinker:
             if value is not None and len(value) > 1 and len(key) > 1
         }
 
-    def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
+    def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity | None]]:
         """
         Link term to canonical entity or synonym
 
@@ -93,24 +93,8 @@ class TermLinker:
         """
         canonical_map = self.generate_map(terms)
 
-        def link_entity(name: str) -> CanonicalEntity:
-            # get canonical entity if exists
-            canonical = canonical_map.get(name)
-            canonical_id = canonical.id if canonical else None
-
-            # create synonym regardless
-            syn_doc = self.synonym_store.add_synonym(
-                name,
-                canonical_id,
-                {"canonical_name": canonical.name if canonical else None},
-            )
-
-            # return canonical, otherwise pseudo-canonical from synonym
-            return canonical or CanonicalEntity(
-                syn_doc["canonical_id"],
-                syn_doc.get("metadata", {}).get("canonical_name") or "",
-                [],
-            )
+        def link_entity(name: str) -> CanonicalEntity | None:
+            return canonical_map.get(name)
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             linked_entities = list(executor.map(link_entity, terms))
@@ -120,5 +104,50 @@ class TermLinker:
 
         return list(zip(terms, linked_entities))
 
-    def __call__(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
+    def __call__(self, terms: list[str]) -> list[tuple[str, CanonicalEntity | None]]:
         return self.link(terms)
+
+
+class TermNormalizer:
+    """
+    Normalizes and attempts to link entities.
+    If no canonical entity found, then normalized term is returned
+    Note that original term should always be preserved in order to keep association to original source.
+    """
+
+    def __init__(self):
+        """
+        Initialize term normalizer using existing model
+        """
+        self.term_linker: TermLinker = TermLinker()
+        self.cleaner: EntityCleaner = EntityCleaner()
+
+    def normalize(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
+        """
+        Normalize and link terms to canonical entities
+
+        Args:
+            terms (list[str]): list of terms to normalize
+
+        Note:
+            - canonical linking is based on normalized term
+            - if no linking is found, then normalized term is as canonical_name, with an empty id
+        """
+        normalized = self.cleaner.clean(terms)
+        links = self.term_linker.link(normalized)
+
+        def get_canonical(
+            entity: tuple[str, CanonicalEntity | None], normalized: str
+        ) -> CanonicalEntity:
+            if entity[1] is None:
+                return CanonicalEntity(
+                    id="", name=normalized, aliases=[]
+                )  # in this case, ent
+            return entity[1]
+
+        return [
+            (t[0], get_canonical(t[1], t[2])) for t in zip(terms, links, normalized)
+        ]
+
+    def __call__(self, *args, **kwargs) -> list[tuple[str, CanonicalEntity]]:
+        return self.normalize(*args, **kwargs)
