@@ -212,7 +212,7 @@ def main(copy_tables: bool = False):
     # __create_applications_table()
 
     # create patent terms
-    # create_patent_terms()
+    create_patent_terms()
 
     # create annotations
     __create_annotations_table()

@@ -130,14 +130,15 @@ def insert_into_bg_table(records: list[T], table_name: str):
         records (list[dict]): list of records to insert
         table_name (str): name of the table
     """
-    table_id = get_table_id(table_name)
-    logging.info("Inserting into table %s", table_id)
+    logging.info("Inserting into table %s", table_name)
 
     # insert the df rows into the table
     client = bigquery.Client()
 
+    table = get_bg_table(table_name)
+
     try:
-        errors = client.insert_rows(table_id, records)
+        errors = client.insert_rows(table, records)
         if errors:
             raise Exception("Error inserting rows")
     except Exception as e:
