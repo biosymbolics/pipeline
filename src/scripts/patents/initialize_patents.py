@@ -4,28 +4,22 @@ Functions to initialize the patents database
 import logging
 import sys
 from google.cloud import bigquery
-from common.ner.types import DocEntity
-from common.utils.file import save_json_as_file
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.big_query import (
+    create_bq_table,
     delete_bg_table,
-    execute_bg_query,
     query_to_bg_table,
     BQ_DATASET_ID,
-    select_from_bg,
 )
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
-from common.ner.cleaning import EntityCleaner
-from common.utils.list import batch, batch_dict, dedup
 
-from ._constants import BIOSYM_ANNOTATIONS_TABLE
 from .copy_tables import copy_patent_tables
 from .terms import create_patent_terms
 
@@ -78,8 +72,8 @@ def __create_applications_table():
     """
     logging.info("Create a table of patent applications for use in app queries")
 
-    table_id = "applications"
-    delete_bg_table(table_id)
+    table_name = "applications"
+    delete_bg_table(table_name)
 
     applications = f"""
         SELECT
@@ -88,7 +82,7 @@ def __create_applications_table():
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
-    query_to_bg_table(applications, table_id)
+    query_to_bg_table(applications, table_name)
 
 
 def __create_annotations_table():
@@ -96,8 +90,8 @@ def __create_annotations_table():
     Create a table of annotations for use in app queries
     """
     logging.info("Create a table of annotations for use in app queries")
-    table_id = "annotations"
-    delete_bg_table(table_id)
+    table_name = "annotations"
+    delete_bg_table(table_name)
 
     entity_query = f"""
         WITH ranked_terms AS (
@@ -161,7 +155,7 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     1 as rank
-                FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}` a
+                FROM `{WORKING_BIOSYM_ANNOTATIONS_TABLE}` a
                 LEFT JOIN `{BQ_DATASET_ID}.synonym_map` syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
         )
         SELECT
@@ -174,18 +168,19 @@ def __create_annotations_table():
         WHERE rank = 1
         GROUP BY publication_number
     """
-    query_to_bg_table(entity_query, table_id)
+    query_to_bg_table(entity_query, table_name)
 
 
 def __create_biosym_annotations_tables():
-    client = bigquery.Client()
-    table_ids = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
+    """
+    Creates biosym annotations tables if need be
+    (NOTE: does not check schema if exists)
+    """
+    table_names = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
 
-    for table_id in table_ids:
-        new_table = bigquery.Table(table_id)
-        new_table.schema = [
+    for table_name in table_names:
+        schema = [
             bigquery.SchemaField("publication_number", "STRING"),
-            bigquery.SchemaField("normalized_term", "STRING"),
             bigquery.SchemaField("original_term", "STRING"),
             bigquery.SchemaField("domain", "STRING"),
             bigquery.SchemaField("confidence", "FLOAT"),
@@ -193,8 +188,8 @@ def __create_biosym_annotations_tables():
             bigquery.SchemaField("character_offset_start", "INTEGER"),
             bigquery.SchemaField("character_offset_end", "INTEGER"),
         ]
-        new_table = client.create_table(new_table, exists_ok=True)
-        logging.info(f"(Maybe) created table {table_id}")
+        create_bq_table(table_name, schema, exists_ok=True, truncate_if_exists=False)
+        logging.info(f"(Maybe) created table {table_name}")
 
 
 def main(copy_tables: bool = False):
@@ -217,7 +212,7 @@ def main(copy_tables: bool = False):
     # __create_applications_table()
 
     # create patent terms
-    create_patent_terms()
+    # create_patent_terms()
 
     # create annotations
     __create_annotations_table()

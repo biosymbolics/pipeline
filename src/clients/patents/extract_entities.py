@@ -128,7 +128,6 @@ class PatentEnricher:
             .lazy()
             .select(
                 pl.col("publication_number"),
-                pl.lit("").alias("normalized_term"),
                 pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
                 pl.col("entities").apply(lambda e: e[1]).alias("domain"),
                 pl.lit(0.90000001).alias("confidence"),
@@ -157,7 +156,6 @@ class PatentEnricher:
             id_fields=[ID_FIELD, "original_term", "domain"],
             insert_fields=[
                 ID_FIELD,
-                "normalized_term",
                 "original_term",
                 "domain",
                 "confidence",
