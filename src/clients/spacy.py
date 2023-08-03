@@ -6,8 +6,6 @@ import logging
 from typing import Any
 import spacy
 from spacy.language import Language
-from thinc.api import prefer_gpu
-import torch
 
 from common.utils.args import make_hashable
 
@@ -31,9 +29,12 @@ class Spacy:
         model: str = DEFAULT_MODEL,
         **kwargs: Any,
     ):
-        is_gpu_avail = prefer_gpu()
-        logging.info(f"GPU available: {is_gpu_avail}")
-        torch.device("mps")
+        # acceleration via https://github.com/explosion/thinc-apple-ops
+        # not using GPU/M1 right now, tho...
+        # is_gpu_avail = prefer_gpu()
+        # logging.info(f"GPU available: {is_gpu_avail}")
+        # torch.device("mps")
+
         self.model = model
         self._nlp: Language = spacy.load(self.model, **kwargs)
 

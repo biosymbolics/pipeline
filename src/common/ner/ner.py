@@ -69,7 +69,7 @@ class NerTagger:
             content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
         """
-        prefer_gpu()
+        # prefer_gpu()
 
         self.model = model
         self.use_llm = use_llm
