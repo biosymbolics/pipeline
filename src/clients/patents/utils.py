@@ -100,7 +100,7 @@ ASSIGNEE_MAP = {
 }
 
 
-def clean_assignee(assignee: str) -> str:
+def clean_assignees(assignees: list[str]) -> Iterable[str]:
     """
     Clean an assignee name
     - removes suppressions
@@ -108,7 +108,7 @@ def clean_assignee(assignee: str) -> str:
     - title cases
 
     Args:
-        assignee (str): assignee name
+        assignees (list[str]): List of assignee names
     """
 
     def remove_suppressions(terms: list[str], only_definite=False) -> Iterable[str]:
@@ -126,11 +126,11 @@ def clean_assignee(assignee: str) -> str:
         for term in terms:
             yield re.sub("(?i)" + suppress_re, "", term).rstrip("&[ ]*")
 
-    def get_mapping(string, key):
+    def get_mapping(clean_assignee: str, og_assignee: str, key: str) -> str | None:
         """
         See if there is an explicit name mapping on cleaned or original assignee
         """
-        to_check = [assignee, string]
+        to_check = [clean_assignee, og_assignee]
         has_mapping = any(
             [re.findall("(?i)" + "\\b" + key + "\\b", check) for check in to_check]
         )
@@ -138,16 +138,23 @@ def clean_assignee(assignee: str) -> str:
             return key
         return None
 
-    def handle_mapping(terms: list[str]) -> Iterable[str]:
-        def __map(term):
-            mappings = [key for key in ASSIGNEE_MAP.keys() if get_mapping(term, key)]
+    def rewrite(assignees: list[str], lookup_map) -> Iterable[str]:
+        def __map(cleaned: str):
+            og_assignee = lookup_map[cleaned]
+            mappings = [
+                key
+                for key in ASSIGNEE_MAP.keys()
+                if get_mapping(cleaned, og_assignee, key)
+            ]
             if len(mappings) > 0:
-                logging.debug("Found mapping for assignee: %s -> %s", term, mappings[0])
+                logging.debug(
+                    "Found mapping for assignee: %s -> %s", assignee, mappings[0]
+                )
                 return ASSIGNEE_MAP[mappings[0]]
-            return term
+            return assignee
 
-        for term in terms:
-            yield __map(term)
+        for assignee in assignees:
+            yield __map(assignee)
 
     def handle_exception(terms: list[str]) -> Iterable[str]:
         """
@@ -165,19 +172,24 @@ def clean_assignee(assignee: str) -> str:
         ]
         for term, is_exception in zip(terms, exceptions):
             _term = reduce(
-                lambda x, func: func(x) if is_exception else term, steps, term
+                lambda x, func: (func(x) if is_exception else term), steps, term
             )
             yield _term
+
+    def title(assignees: list[str]) -> Iterable[str]:
+        for assignee in assignees:
+            yield assignee.title()
 
     cleaning_steps = [
         remove_suppressions,
         remove_extra_spaces,
         handle_exception,
-        handle_mapping,
+        title,
     ]
-    cleaned = reduce(lambda x, func: func(x), cleaning_steps, assignee)
+    cleaned = reduce(lambda x, func: func(x), cleaning_steps, assignees)
+    lookup_map = dict(zip(cleaned, assignees))
 
-    return cleaned.title()
+    return rewrite(cleaned, lookup_map)
 
 
 def get_patent_attributes(titles: pl.Series) -> pl.Series:

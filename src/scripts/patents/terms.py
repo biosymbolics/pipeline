@@ -17,7 +17,7 @@ from common.ner import TermNormalizer
 from common.utils.file import load_json_from_file, save_json_as_file
 from common.utils.list import batch, dedup
 from clients.low_level.big_query import execute_with_retries
-from clients.patents.utils import clean_assignee
+from clients.patents.utils import clean_assignees
 
 from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
 
@@ -164,18 +164,19 @@ class TermAssembler:
             group by name
         """
         rows = select_from_bg(owner_query)
+        names = [row["name"] for row in rows]
+        cleaned = clean_assignees(names)
+
         normalized: list[TermRecord] = [
             {
-                "term": clean_assignee(row["name"])
-                if row["domain"] == "assignee"
-                else row["name"],
+                "term": assignee if row["domain"] == "assignee" else row["name"],
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
                 "original_term": row["name"],
                 "original_id": None,
             }
-            for row in rows
+            for row, assignee in zip(rows, cleaned)
         ]
 
         terms = TermAssembler.__aggregate(
