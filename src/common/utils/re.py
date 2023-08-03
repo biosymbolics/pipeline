@@ -3,7 +3,7 @@ Regex utilities
 """
 
 import re
-from typing import Literal, Optional, Union
+from typing import Iterable, Literal, Optional, Union
 
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
@@ -66,19 +66,23 @@ def wrap(core_re: str) -> str:
     return "(?:" + core_re + ")"
 
 
-def remove_extra_spaces(string: str) -> str:
+def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
     """
-    Removes extra spaces from a string
+    Removes extra spaces from terms
     (also strips)
 
     Args:
-        string (str): string to remove extra spaces from
+        terms: list of terms from which to remove extra spaces
     """
     extra_space_patterns = {
         r"\s{2,}": " ",
         r"\s{1,},": ",",  # e.g. to address "OPSUMIT , other product"
     }
-    for pattern, replacement in extra_space_patterns.items():
-        string = re.sub(pattern, replacement, string)
 
-    return string.strip()
+    def __remove(term: str):
+        for pattern, replacement in extra_space_patterns.items():
+            term = re.sub(pattern, replacement, term)
+        return term.strip()
+
+    for term in terms:
+        yield __remove(term)

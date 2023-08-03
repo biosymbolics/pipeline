@@ -1,10 +1,10 @@
 """
 Utility functions for the patents client
 """
-from functools import reduce
+from functools import partial, reduce
 import logging
 import re
-from typing import Optional
+from typing import Iterable, Optional
 from datetime import date
 import polars as pl
 
@@ -16,6 +16,15 @@ from .constants import (
     PATENT_ATTRIBUTE_MAP,
     MAX_PATENT_LIFE,
 )
+
+EXCEPTION_TERMS = [
+    "agency",
+    "council",
+    "gen",
+    "korea",
+    "life",
+    "univ",
+]
 
 
 def get_max_priority_date(min_patent_years: Optional[int] = 0) -> int:
@@ -102,7 +111,7 @@ def clean_assignee(assignee: str) -> str:
         assignee (str): assignee name
     """
 
-    def remove_suppressions(string, only_definite=False):
+    def remove_suppressions(terms: list[str], only_definite=False) -> Iterable[str]:
         """
         Remove suppressions (generic terms like LLC, country, etc),
         Examples:
@@ -113,7 +122,9 @@ def clean_assignee(assignee: str) -> str:
             COMPANY_SUPPRESSIONS_DEFINITE if only_definite else COMPANY_SUPPRESSIONS
         )
         suppress_re = "\\b" + get_or_re(suppressions) + "\\b"
-        return re.sub("(?i)" + suppress_re, "", string).rstrip("&[ ]*")
+
+        for term in terms:
+            yield re.sub("(?i)" + suppress_re, "", term).rstrip("&[ ]*")
 
     def get_mapping(string, key):
         """
@@ -127,32 +138,36 @@ def clean_assignee(assignee: str) -> str:
             return key
         return None
 
-    def handle_mapping(string):
-        mappings = [key for key in ASSIGNEE_MAP.keys() if get_mapping(string, key)]
-        if len(mappings) > 0:
-            logging.debug("Found mapping for assignee: %s -> %s", string, mappings[0])
-            return ASSIGNEE_MAP[mappings[0]]
-        return string
+    def handle_mapping(terms: list[str]) -> Iterable[str]:
+        def __map(term):
+            mappings = [key for key in ASSIGNEE_MAP.keys() if get_mapping(term, key)]
+            if len(mappings) > 0:
+                logging.debug("Found mapping for assignee: %s -> %s", term, mappings[0])
+                return ASSIGNEE_MAP[mappings[0]]
+            return term
 
-    def handle_exception(string):
+        for term in terms:
+            yield __map(term)
+
+    def handle_exception(terms: list[str]) -> Iterable[str]:
         """
         Avoid reducing names to near nothing
         e.g. "Med Inst", "Lt Mat"
         TODO: make longer (4-5 chars) but check for common word or not
         """
-        is_exception = len(string) < 3 or string.lower() in [
-            "agency",
-            "council",
-            "gen",
-            "korea",
-            "life",
-            "univ",
+        exceptions = [
+            len(term) < 3 or term.lower() in EXCEPTION_TERMS for term in terms
         ]
-        return (
-            remove_extra_spaces(remove_suppressions(assignee, True))
-            if is_exception
-            else string
-        )
+
+        steps = [
+            partial(remove_suppressions, only_definite=True),
+            remove_extra_spaces,
+        ]
+        for term, is_exception in zip(terms, exceptions):
+            _term = reduce(
+                lambda x, func: func(x) if is_exception else term, steps, term
+            )
+            yield _term
 
     cleaning_steps = [
         remove_suppressions,

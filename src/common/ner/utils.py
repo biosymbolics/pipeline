@@ -4,6 +4,7 @@ Utils for the NER pipeline
 from functools import partial, reduce
 import logging
 import re
+from typing import Iterable
 from spacy.tokens import Doc
 from clients.spacy import Spacy
 
@@ -18,6 +19,9 @@ EOE_RE = "\\b" + ".*"
 
 # start-of-entity regex
 SOE_RE = ".*"
+
+DASH = "-"
+DASHES = ["–", "-"]
 
 
 def get_entity_re(
@@ -101,102 +105,167 @@ def lemmatize_tail(term: str | Doc) -> str:
         doc = term
 
     # include all tokens as-is except for the last
-    tail_lemmatied = "".join(
+    tail_lemmatized = "".join(
         [
             token.text_with_ws if i < len(doc) - 1 else token.lemma_
             for i, token in enumerate(doc)
         ]
     ).strip()
 
-    return tail_lemmatied
+    return tail_lemmatized
 
 
-def rearrange_terms(entity_name: str) -> str:
+def lemmatize_tails(terms: list[str]) -> Iterable[str]:
+    """
+    Lemmatizes the tails of a list of terms
+    """
+    nlp = Spacy.get_instance()
+    docs = nlp.pipe(terms)  # turn into spacy docs
+
+    for doc in docs:
+        yield lemmatize_tail(doc)
+
+
+def rearrange_terms(terms: list[str]) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
-    terms = {
+    adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
         # "by": r"mediated by\b",
     }
 
-    def _rearrange(text: str, adp_term: str, adp_ext: str) -> str:
-        subbed = re.sub(adp_ext, adp_term, text)
-        final = rearrange_adp(subbed, adp_term=adp_term)
+    def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
+        subbed = [re.sub(adp_ext, adp_term, t) for t in _terms]
+        final = __rearrange_adp(subbed, adp_term=adp_term)
         return final
 
     steps = [
-        partial(_rearrange, adp_term=term, adp_ext=ext) for term, ext in terms.items()
+        partial(_rearrange, adp_term=term, adp_ext=ext) for term, ext in adp_map.items()
     ]
-    text = reduce(lambda x, func: func(x), steps, entity_name)
 
+    text = reduce(lambda x, func: func(x), steps, terms)  # type: ignore
     return text
 
 
-def rearrange_adp(entity_name: str, adp_term: str = "of") -> str:
+def __rearrange_adp(terms: list[str], adp_term: str = "of") -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
-    text = entity_name
     nlp = Spacy.get_instance()
-    tokens = nlp(text)
+    docs = nlp.pipe(terms)
 
-    # get indices of all ADPs, to use those as stopping points
-    all_adp_indices = [t.i for t in tokens if t.pos_ == "ADP"]
+    def __rearrange(doc: Doc) -> str:
+        tokens = doc
+        # get indices of all ADPs, to use those as stopping points
+        all_adp_indices = [t.i for t in tokens if t.pos_ == "ADP"]
 
-    # get ADP index for the specific term we're looking for
-    specific_adp_indices = [
-        t.i for t in tokens if t.text == adp_term and t.pos_ == "ADP"
-    ]
-    adp_index = specific_adp_indices[0] if len(specific_adp_indices) > 0 else None
+        # get ADP index for the specific term we're looking for
+        specific_adp_indices = [
+            t.i for t in tokens if t.text == adp_term and t.pos_ == "ADP"
+        ]
+        adp_index = specific_adp_indices[0] if len(specific_adp_indices) > 0 else None
 
-    if adp_index is None:
-        return text
+        if adp_index is None:
+            return doc.text
 
-    # relative adp index (== index on all_adp_list)
-    rel_adp_index = all_adp_indices.index(adp_index)
+        # relative adp index (== index on all_adp_list)
+        rel_adp_index = all_adp_indices.index(adp_index)
 
-    try:
-        # all ADPs before the current one
-        before_adp_indices = all_adp_indices[0:rel_adp_index]
-        # start at the closest one before (if any)
-        before_start_idx = (
-            max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
-        )
-        before_tokens = tokens[before_start_idx:adp_index]
-        before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
+        try:
+            # all ADPs before the current one
+            before_adp_indices = all_adp_indices[0:rel_adp_index]
+            # start at the closest one before (if any)
+            before_start_idx = (
+                max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
+            )
+            before_tokens = tokens[before_start_idx:adp_index]
+            before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
 
-        # all ADPs after
-        after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
-        # stop at the first ADP after (if any)
-        after_start_idx = (
-            min(after_adp_indices) if len(after_adp_indices) > 0 else len(tokens)
-        )
-        after_tokens = tokens[adp_index + 1 : after_start_idx]
-        after_phrase = lemmatize_tail("".join([t.text_with_ws for t in after_tokens]))
+            # all ADPs after
+            after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
+            # stop at the first ADP after (if any)
+            after_start_idx = (
+                min(after_adp_indices) if len(after_adp_indices) > 0 else len(tokens)
+            )
+            after_tokens = tokens[adp_index + 1 : after_start_idx]
+            after_phrase = lemmatize_tail(
+                "".join([t.text_with_ws for t in after_tokens])
+            )
 
-        # if we cut off stuff from the beginning, put back
-        # e.g. (diseases associated with) expression of GU Protein
-        other_stuff = (
-            "".join([t.text_with_ws for t in tokens[0:before_start_idx]])
-            if before_start_idx > 0
-            else ""
-        )
+            # if we cut off stuff from the beginning, put back
+            # e.g. (diseases associated with) expression of GU Protein
+            other_stuff = (
+                "".join([t.text_with_ws for t in tokens[0:before_start_idx]])
+                if before_start_idx > 0
+                else ""
+            )
 
-        return f"{other_stuff}{after_phrase} {before_phrase}"
-    except Exception as e:
-        logging.error("Error in rearrange_adp, returning orig text: %s", e)
-        return text
+            return f"{other_stuff}{after_phrase} {before_phrase}"
+        except Exception as e:
+            logging.error("Error in rearrange_adp, returning orig text: %s", e)
+            return doc.text
+
+    for doc in docs:
+        yield __rearrange(doc)
 
 
-def normalize_by_pos(entity_name: str) -> str:
+def __normalize_by_pos(doc: Doc):
+    """
+    Normalizes a spacy doc by removing tokens based on their POS
+    """
+
+    def clean_by_pos(t, prev_t, next_t):
+        # spacy only marks a token as SPACE if it is hanging out in a weird place
+        if t.pos_ == "SPACE":
+            return ""
+        if t.text == "'s" and t.pos_ == "PART":
+            # alzheimer's disease -> alzheimer disease
+            return " "
+        if t.text == DASH:
+            if t.pos_ == "ADJ":
+                return " "
+            if t.pos_ == "PUNCT":
+                if (
+                    next_t is not None
+                    and (next_t.pos_ == "NUM" or len(next_t.text) < 3)
+                    and len(prev_t.text) < 5
+                ):
+                    # ApoE-4 -> apoe4
+                    # IL-6 -> IL6
+                    # Interleukin-6 -> Interleukin 6
+                    return ""
+                return " "
+            else:
+                # pos_ == NOUN, PROPN, etc
+                return DASH
+
+        if next_t is not None and next_t.text in DASHES:
+            return t.text  # omitting pre-dash space
+
+        return t.text_with_ws
+
+    tokens = doc
+    return "".join(
+        [
+            clean_by_pos(
+                t,
+                (tokens[i - 1] if i > 0 else None),
+                (tokens[i + 1] if len(tokens) > (i + 1) else None),
+            )
+            for i, t in enumerate(tokens)
+        ]
+    )
+
+
+def normalize_by_pos(terms: list[str]) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -225,50 +294,11 @@ def normalize_by_pos(entity_name: str) -> str:
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
-    dash = "-"
-    nlp = Spacy.get_instance()
-    dashes = ["–", "-"]
-
     # otherwise spacy will keep it as one token
-    tokens = nlp(re.sub(f"[{''.join(dashes)}]", f" {dash} ", entity_name))
+    sep_dash_terms = [re.sub(f"[{''.join(DASHES)}]", DASH, term) for term in terms]
 
-    def clean_by_pos(t, prev_t, next_t):
-        # spacy only marks a token as SPACE if it is hanging out in a weird place
-        if t.pos_ == "SPACE":
-            return ""
-        if t.text == "'s" and t.pos_ == "PART":
-            # alzheimer's disease -> alzheimer disease
-            return " "
-        if t.text == dash:
-            if t.pos_ == "ADJ":
-                return " "
-            if t.pos_ == "PUNCT":
-                if (
-                    next_t is not None
-                    and (next_t.pos_ == "NUM" or len(next_t.text) < 3)
-                    and len(prev_t.text) < 5
-                ):
-                    # ApoE-4 -> apoe4
-                    # IL-6 -> IL6
-                    # Interleukin-6 -> Interleukin 6
-                    return ""
-                return " "
-            else:
-                # pos_ == NOUN, PROPN, etc
-                return dash
+    nlp = Spacy.get_instance()
+    docs = nlp.pipe(sep_dash_terms)
 
-        if next_t is not None and next_t.text in dashes:
-            return t.text  # omitting pre-dash space
-
-        return t.text_with_ws
-
-    return "".join(
-        [
-            clean_by_pos(
-                t,
-                (tokens[i - 1] if i > 0 else None),
-                (tokens[i + 1] if len(tokens) > (i + 1) else None),
-            )
-            for i, t in enumerate(tokens)
-        ]
-    )
+    for doc in docs:
+        yield __normalize_by_pos(doc)

@@ -92,14 +92,15 @@ class TermLinker:
         """
         canonical_map = self.generate_map(terms)
 
-        def link_entity(name: str) -> CanonicalEntity | None:
-            return canonical_map.get(name)
-
         with ThreadPoolExecutor(max_workers=4) as executor:
-            linked_entities = list(executor.map(link_entity, terms))
+            linked_entities = list(executor.map(lambda e: canonical_map.get(e), terms))
             logging.info("Completed linking batch of %s terms", len(terms))
 
         executor.shutdown()
+
+        assert len(terms) == len(
+            linked_entities
+        )  # should always be the same length ("" for omitted terms)
 
         return list(zip(terms, linked_entities))
 
@@ -131,6 +132,7 @@ class TermNormalizer:
         Note:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
+            - will return fewer terms than input, if term meets conditions for suppression
         """
         normalized = self.cleaner.clean(terms)
         links = self.term_linker.link(normalized)
@@ -139,14 +141,15 @@ class TermNormalizer:
             entity: tuple[str, CanonicalEntity | None], normalized: str
         ) -> CanonicalEntity:
             if entity[1] is None:
-                return CanonicalEntity(
-                    id="", name=normalized, aliases=[]
-                )  # in this case, ent
+                return CanonicalEntity(id="", name=normalized, aliases=[])
             return entity[1]
 
-        return [
-            (t[0], get_canonical(t[1], t[2])) for t in zip(terms, links, normalized)
+        tups = [
+            (t[0], get_canonical(t[1], t[2]))
+            for t in zip(terms, links, normalized)
+            if len(t[0]) > 0
         ]
+        return tups
 
     def __call__(self, *args, **kwargs) -> list[tuple[str, CanonicalEntity]]:
         return self.normalize(*args, **kwargs)

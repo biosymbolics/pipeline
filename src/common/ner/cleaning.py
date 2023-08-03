@@ -1,7 +1,7 @@
 """
 Utils for the NER pipeline
 """
-from typing import Callable, TypeVar, Union, cast
+from typing import Callable, Iterable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
 import logging
@@ -117,19 +117,19 @@ class EntityCleaner:
         return self.__common_words
 
     def filter_common_terms(
-        self, entities: list[str], exception_list: list[str] = DEFAULT_EXCEPTION_LIST
+        self, terms: list[str], exception_list: list[str] = DEFAULT_EXCEPTION_LIST
     ) -> list[str]:
         """
-        Filter out common terms from a list of entities, e.g. "vaccine candidates"
+        Filter out common terms from a list of terms, e.g. "vaccine candidates"
 
         Args:
-            entities (list[T]): list of entities
+            terms (list[str]): list of terms
             exception_list (list[str]): list of exceptions to the common terms
         """
 
-        def __is_common(name):
+        def __is_common(term):
             # remove punctuation and make lowercase
-            words = [token.lemma_ for token in self.nlp(name)]
+            words = [token.lemma_ for token in self.nlp(term)]
 
             # check if all words are in the vocab
             is_common = set(words).issubset(self.common_words)
@@ -140,20 +140,20 @@ class EntityCleaner:
             is_common_not_excepted = is_common and not is_excepted
 
             if is_common_not_excepted:
-                logging.debug(f"Removing common term: {name}")
+                logging.debug(f"Removing common term: {term}")
             elif is_excepted:
-                logging.debug(f"Keeping exception term: {name}")
+                logging.debug(f"Keeping exception term: {term}")
             return is_common_not_excepted
 
-        def __is_uncommon(item):
-            return not __is_common(item)
+        def __is_uncommon(term):
+            return not __is_common(term)
 
-        new_list = [(ent if __is_uncommon(ent) else "") for ent in entities]
+        new_list = [(t if __is_uncommon(t) else "") for t in terms]
         return new_list
 
-    def normalize_entity_names(self, entities: list[str]) -> list[str]:
+    def normalize_terms(self, terms: list[str]) -> list[str]:
         """
-        Normalize entity name
+        Normalize terms
         - remove certain characters
         - removes double+ spaces
         - lemmatize?
@@ -162,15 +162,24 @@ class EntityCleaner:
             entities (list[T]): entities
         """
 
-        def remove_chars(entity_name: str) -> str:
-            for pattern, replacement in self.char_suppressions.items():
-                entity_name = re.sub(pattern, replacement, entity_name)
-            return entity_name
+        def remove_chars(_terms: list[str]) -> Iterable[str]:
+            def __remove_chars(term):
+                for pattern, replacement in self.char_suppressions.items():
+                    term = re.sub(pattern, replacement, term)
+                return term
 
-        def decode_html(entity_name: str) -> str:
-            return html.unescape(entity_name)
+            for term in _terms:
+                yield __remove_chars(term)
 
-        def remove_duplicative_phrasing(entity_name: str) -> str:
+        def decode_html(_terms: list[str]) -> Iterable[str]:
+            for term in _terms:
+                yield html.unescape(term)
+
+        def lower(_terms: list[str]) -> Iterable[str]:
+            for term in _terms:
+                yield term.lower()
+
+        def remove_duplicative_phrasing(_terms: list[str]) -> Iterable[str]:
             duplicative_phrases = {
                 "diseases and conditions": "diseases",
                 "conditions and diseases": "diseases",
@@ -179,11 +188,11 @@ class EntityCleaner:
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)
                 for dup, canonical in duplicative_phrases.items()
             ]
-            text = reduce(lambda x, func: func(x), steps, entity_name)
-            return text
 
-        def normalize_entity(entity: str) -> str:
-            text = entity[0] if isinstance(entity, DocEntity) else entity
+            for term in _terms:
+                yield reduce(lambda x, func: func(x), steps, term)
+
+        def normalize_terms(_terms: list[str]) -> Iterable[str]:
             cleaning_steps = [
                 decode_html,
                 remove_chars,
@@ -192,34 +201,33 @@ class EntityCleaner:
                 rearrange_terms,
                 lemmatize_tail,
                 normalize_by_pos,
-                lambda s: s.lower(),
+                lower,
             ]
-            normalized = reduce(lambda x, func: func(x), cleaning_steps, text)
+            normalized = reduce(lambda x, func: func(x), cleaning_steps, _terms)
             return normalized
 
-        return [normalize_entity(entity) for entity in entities]
+        return list(normalize_terms(terms))
 
-    def suppress(self, entities: list[str]) -> list[str]:
+    def __suppress(self, terms: list[str]) -> list[str]:
         """
-        Filter out irrelevant entities
+        Filter out irrelevant terms
 
         Args:
-            entities (list[str]): entities
+            terms (list[str]): terms
         """
 
-        def should_keep(entity) -> bool:
-            name = entity[0] if isinstance(entity, tuple) else entity
-            is_suppressed = any([sup in name.lower() for sup in INCLUSION_SUPPRESSIONS])
+        def should_keep(term) -> bool:
+            is_suppressed = any([sup in term.lower() for sup in INCLUSION_SUPPRESSIONS])
             return not is_suppressed
 
-        return [(entity if should_keep(entity) else "") for entity in entities]
+        return [(term if should_keep(term) else "") for term in terms]
 
     @staticmethod
-    def get_text(entity) -> str:
+    def __get_text(entity) -> str:
         return entity[0] if isinstance(entity, tuple) else entity
 
     @staticmethod
-    def return_to_type(modified_texts: list[str], orig_ents: list[T]) -> list[T]:
+    def __return_to_type(modified_texts: list[str], orig_ents: list[T]) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             raise ValueError("Modified text must be same length as original entities")
 
@@ -253,16 +261,19 @@ class EntityCleaner:
             raise ValueError("Entities must be a list")
 
         cleaning_steps: list[CleanFunction] = [
-            self.suppress,
-            self.normalize_entity_names,
+            self.__suppress,
+            self.normalize_terms,
             partial(self.filter_common_terms, exception_list=filter_exception_list),
             dedup,
         ]
 
-        string_ents = [self.get_text(ent) for ent in entities]
-        sanitized = reduce(lambda x, func: func(x), cleaning_steps, string_ents)
+        terms = [self.__get_text(ent) for ent in entities]
+        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
 
-        return self.return_to_type(sanitized, entities)
+        # should always be the same; removed entities left as empty strings
+        assert len(cleaned) == len(entities)
+
+        return self.__return_to_type(cleaned, entities)
 
     def __call__(self, *args, **kwargs):
         return self.clean(*args, **kwargs)
