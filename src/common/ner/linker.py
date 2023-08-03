@@ -12,7 +12,6 @@ from scispacy.candidate_generation import (
 import torch
 
 from common.ner.cleaning import EntityCleaner
-from common.ner.synonyms import SynonymStore
 
 from .types import KbLinker, CanonicalEntity
 
@@ -42,7 +41,7 @@ class TermLinker:
         torch.device("mps")  # does this work?
         self.candidate_generator = CandidateGenerator()
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
-        self.synonym_store = SynonymStore()
+        # self.synonym_store = SynonymStore()
 
     def __get_canonical_entity(
         self, candidates: list[MentionCandidate]
