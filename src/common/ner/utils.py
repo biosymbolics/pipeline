@@ -22,6 +22,7 @@ SOE_RE = ".*"
 
 DASH = "-"
 DASHES = ["–", "-"]
+DASHES_RE = rf"[{''.join(DASHES)}]"
 
 
 def get_entity_re(
@@ -101,8 +102,10 @@ def lemmatize_tail(term: str | Doc) -> str:
     if isinstance(term, str):
         nlp = Spacy.get_instance()
         doc = nlp(term)  # turn into spacy doc (has lemma info)
-    else:
+    elif isinstance(term, Doc):
         doc = term
+    else:
+        raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
     # include all tokens as-is except for the last
     tail_lemmatized = "".join(
@@ -294,11 +297,22 @@ def normalize_by_pos(terms: list[str]) -> Iterable[str]:
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
-    # otherwise spacy will keep it as one token
-    sep_dash_terms = [re.sub(f"[{''.join(DASHES)}]", DASH, term) for term in terms]
 
+    def skip(term: str) -> bool:
+        # simple hack to avoid futzing with things like '1-(3-aminophenyl)-6,8-dimethyl-5-...'
+        return len(term.split(DASH)) > 3 and re.match(r"[0-9]+", term) is not None
+
+    # avoid spacy keeping terms with - as a single token
+    def sep_dash(term: str) -> str:
+        return re.sub(DASHES_RE, rf" {DASH} ", term) if not skip(term) else term
+
+    sep_dash_terms = [sep_dash(term) for term in terms]
     nlp = Spacy.get_instance()
     docs = nlp.pipe(sep_dash_terms)
 
     for doc in docs:
+        if skip(doc.text):
+            yield doc.text
+            continue
+
         yield __normalize_by_pos(doc)

@@ -8,7 +8,7 @@ import logging
 import html
 
 from clients.spacy import Spacy
-from common.ner.utils import lemmatize_tail
+from common.ner.utils import lemmatize_tails
 from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 from typings.core import is_string_list
@@ -192,21 +192,24 @@ class EntityCleaner:
             for term in _terms:
                 yield reduce(lambda x, func: func(x), steps, term)
 
-        def normalize_terms(_terms: list[str]) -> Iterable[str]:
-            cleaning_steps = [
-                decode_html,
-                remove_chars,
-                remove_extra_spaces,
-                remove_duplicative_phrasing,
-                rearrange_terms,
-                lemmatize_tail,
-                normalize_by_pos,
-                lower,
-            ]
-            normalized = reduce(lambda x, func: func(x), cleaning_steps, _terms)
-            return normalized
+        def exec_func(func, x):
+            logging.info("Executing function: %s", func.__name__)
+            return func(x)
 
-        return list(normalize_terms(terms))
+        cleaning_steps = [
+            decode_html,
+            remove_chars,
+            remove_extra_spaces,
+            remove_duplicative_phrasing,
+            rearrange_terms,
+            lemmatize_tails,
+            normalize_by_pos,
+            lower,
+        ]
+
+        normalized = reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
+
+        return normalized
 
     def __suppress(self, terms: list[str]) -> list[str]:
         """
@@ -227,7 +230,9 @@ class EntityCleaner:
         return entity[0] if isinstance(entity, tuple) else entity
 
     @staticmethod
-    def __return_to_type(modified_texts: list[str], orig_ents: list[T]) -> list[T]:
+    def __return_to_type(
+        modified_texts: list[str], orig_ents: list[T], remove_supressions: bool = False
+    ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             raise ValueError("Modified text must be same length as original entities")
 
@@ -236,9 +241,13 @@ class EntityCleaner:
                 DocEntity(*orig_ents[i][0:4], modified_texts[i], orig_ents[i][5])
                 for i in range(len(orig_ents))
             ]
+            if remove_supressions:
+                doc_ents = [d for d in doc_ents if len(d[0]) > 0]
             return cast(list[T], doc_ents)
 
         if is_string_list(orig_ents):
+            if remove_supressions:
+                modified_texts = [t for t in modified_texts if len(t) > 0]
             return cast(list[T], modified_texts)
 
         raise ValueError("Original entities must be a list of strings or DocEntities")
@@ -247,6 +256,7 @@ class EntityCleaner:
         self,
         entities: list[T],
         filter_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
+        remove_supressions: bool = False,
     ) -> list[T]:
         """
         Sanitize entity list
@@ -256,6 +266,8 @@ class EntityCleaner:
 
         Args:
             entities (list[T]): entities
+            filter_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
+            remove_supressions (bool, optional): remove suppressions? Defaults to False (leaves empty spaces in, to maintain order)
         """
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
@@ -264,16 +276,13 @@ class EntityCleaner:
             self.__suppress,
             self.normalize_terms,
             partial(self.filter_common_terms, exception_list=filter_exception_list),
-            dedup,
+            # dedup,
         ]
 
         terms = [self.__get_text(ent) for ent in entities]
         cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
 
-        # should always be the same; removed entities left as empty strings
-        assert len(cleaned) == len(entities)
-
-        return self.__return_to_type(cleaned, entities)
+        return self.__return_to_type(cleaned, entities, remove_supressions)
 
     def __call__(self, *args, **kwargs):
         return self.clean(*args, **kwargs)

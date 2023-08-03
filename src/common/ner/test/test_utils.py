@@ -1,91 +1,91 @@
 import unittest
 
 from common.ner.cleaning import EntityCleaner
-from common.ner.utils import rearrange_terms, normalize_by_pos, lemmatize_tail
+from common.ner.utils import rearrange_terms, normalize_by_pos
 
 
 class TestNerUtils(unittest.TestCase):
     def setUp(self):
-        self.clean = EntityCleaner()
+        self.cleaner = EntityCleaner()
 
-    # def test_filter_common_terms(self):
-    #     test_conditions = [
-    #         {
-    #             "terms": [
-    #                 "vaccine candidates",
-    #                 "PF-06863135",
-    #                 "therapeutic options",
-    #                 "COVID-19 mRNA vaccine",
-    #                 "exception term",
-    #                 "common term",
-    #             ],
-    #             "exception_list": ["exception"],
-    #             "expected_output": [
-    #                 "PF-06863135",
-    #                 "COVID-19 mRNA vaccine",
-    #                 "exception term",
-    #             ],
-    #         },
-    #         {
-    #             "terms": [
-    #                 "vaccine candidate",
-    #                 "vaccine candidates",
-    #                 "therapeutic options",
-    #                 "therapeutic option",
-    #                 "therapeutics option",
-    #                 "COVID-19 mRNA vaccine",
-    #                 "common term",
-    #             ],
-    #             "exception_list": [],
-    #             "expected_output": ["COVID-19 mRNA vaccine"],
-    #         },
-    #         # Add more test conditions as needed
-    #     ]
+    def test_filter_common_terms(self):
+        test_conditions = [
+            {
+                "terms": [
+                    "vaccine candidates",
+                    "PF-06863135",
+                    "therapeutic options",
+                    "COVID-19 mRNA vaccine",
+                    "exception term",
+                    "common term",
+                ],
+                "exception_list": ["exception"],
+                "expected_output": [
+                    "pf06863135",
+                    "covid 19 mrna vaccine",
+                    "exception term",
+                ],
+            },
+            {
+                "terms": [
+                    "vaccine candidate",
+                    "vaccine candidates",
+                    "therapeutic options",
+                    "therapeutic option",
+                    "therapeutics option",
+                    "COVID-19 mRNA vaccine",
+                    "common term",
+                ],
+                "exception_list": [],
+                "expected_output": ["covid 19 mrna vaccine"],
+            },
+            # Add more test conditions as needed
+        ]
 
-    #     for condition in test_conditions:
-    #         terms = condition["terms"]
-    #         exception_list = condition["exception_list"]
-    #         expected_output = condition["expected_output"]
+        for condition in test_conditions:
+            terms = condition["terms"]
+            exception_list = condition["exception_list"]
+            expected_output = condition["expected_output"]
 
-    #         result = clean(terms, exception_list)
-    #         print("Actual", result, "expected", expected_output)
-    #         self.assertEqual(result, expected_output)
+            result = self.cleaner.clean(terms, exception_list, True)
+            print("Actual", result, "expected", expected_output)
+            self.assertEqual(result, expected_output)
 
-    # def test_clean_entities(self):
-    #     test_conditions = [
-    #         {
-    #             "input": "OPSUMIT ®",
-    #             "expected": "opsumit",
-    #         },
-    #         {
-    #             "input": "OPSUMIT®",
-    #             "expected": "opsumit",
-    #         },
-    #         {
-    #             "input": "OPSUMIT®, other product",
-    #             "expected": "opsumit, other product",
-    #         },
-    #         {
-    #             "input": "/OPSUMIT ®",
-    #             "expected": "OPSUMIT",
-    #         },
-    #         {
-    #             "input": "5-ht1a inhibitors",
-    #             "expected": "5-ht1a inhibitor",
-    #         },
-    #         {
-    #             "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
-    #             "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
-    #         },
-    #     ]
+    def test_clean_entities(self):
+        test_conditions = [
+            {
+                "input": "OPSUMIT ®",
+                "expected": "opsumit",
+            },
+            {
+                "input": "OPSUMITA®",
+                "expected": "opsumita",
+            },
+            {
+                "input": "OPSUMITB®, other product",
+                "expected": "opsumitb, other product",
+            },
+            {
+                "input": "/OPSUMITC ®",
+                "expected": "opsumitc",
+            },
+            {
+                "input": "5-ht1a inhibitors",
+                "expected": "5-ht1a inhibitor",
+            },
+            {
+                "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
+                "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
+            },
+        ]
 
-    #     for condition in test_conditions:
-    #         input = condition["input"]
-    #         expected = condition["expected"]
+        for condition in test_conditions:
+            input = condition["input"]
+            expected = condition["expected"]
 
-    #         result = clean([input])
-    #         print("Actual", result, "expected", [expected])
-    #         self.assertEqual(result, [expected])
+            result = self.cleaner.clean([input], [], True)
+            print("Actual", result, "expected", [expected])
+            self.assertEqual(result, [expected])
 
     def test_rearrange_of(self):
         test_conditions = [
@@ -141,7 +141,7 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = rearrange_terms(input)
+            result = list(rearrange_terms([input]))[0]
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 
@@ -219,7 +219,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "graft -versus - host - disease (gvhd)",  # IRL example
-                "expected": "graft  versus host disease (gvhd)",  # dup space removed elsewhere
+                "expected": "graft  versus host disease (gvhd)",  # TODO
             },
         ]
 
@@ -227,7 +227,7 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = normalize_by_pos(input)
+            result = list(normalize_by_pos([input]))[0]
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 

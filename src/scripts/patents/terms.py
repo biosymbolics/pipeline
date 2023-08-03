@@ -211,7 +211,7 @@ class TermAssembler:
         rows = select_from_bg(terms_query)
         terms: list[str] = [row["term"] for row in rows]
 
-        logging.info("Linking %s terms", len(rows))
+        logging.info("Normalizing/linking %s terms", len(rows))
         normalizer = TermNormalizer()
         normalization_map = dict(normalizer.normalize(terms))
 
