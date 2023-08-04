@@ -1,8 +1,8 @@
 """
 Average clinical development pipeline
 """
+import altair as alt
 import streamlit as st
-import matplotlib.pyplot as plt
 import polars as pl
 from langchain.output_parsers import ResponseSchema
 import logging
@@ -45,31 +45,63 @@ df_schema = {
     "iqr": pl.Float64,
 }
 
+
+def get_data() -> pl.DataFrame:
+    answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
+    df = pl.from_dicts(answer_as_array, schema=df_schema).reverse()
+    df = df.with_columns(
+        pl.col("offset").alias("start"),
+        pl.struct(["offset", "median_duration"]).apply(lambda rec: rec["offset"] + rec["median_duration"]).alias("end"),  # type: ignore
+    )
+    return df
+
+
+def render_df(df: pl.DataFrame):
+    st.dataframe(
+        df.reverse(),
+        column_config={
+            "0": "phase",
+            "1": "offset",
+            "2": "median_duration",
+            "3": "iqr",
+            "4": "start",
+            "5": "end",
+        },
+        hide_index=True,
+    )
+
+
+def render_chart(df: pl.DataFrame):
+    pdf = df.to_pandas()
+    error_left = (
+        alt.Chart(pdf, width=450, height=300)
+        .mark_errorbar(extent="stderr", ticks=True)
+        .encode(x="start", xError="iqr", y="stage")
+    )
+    error_right = (
+        alt.Chart(pdf, width=450, height=300)
+        .mark_errorbar(extent="stderr", ticks=True)
+        .encode(x="end", xError="iqr", y="stage")
+    )
+    bar = (
+        alt.Chart(pdf, width=450, height=300)
+        .mark_bar()
+        .encode(x="start", x2="end", y="stage")
+    )
+    layered = error_left + error_right + bar
+    st.altair_chart(layered)  # type: ignore
+
+
 gpt_client = GptApiClient(schemas=response_schemas, model="gpt-4")
 
 if st.button("Submit"):
-    status = st.progress(0)
     if not indication.strip():
         st.error(f"Please provide an indication.")
     else:
         try:
             with st.spinner("Please wait..."):
-                answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
-                df = pl.from_dicts(answer_as_array, schema=df_schema).reverse()
-                st.dataframe(
-                    df.reverse(),
-                    column_config={
-                        "0": "phase",
-                        "1": "offset",
-                        "2": "median_duration",
-                        "3": "iqr",
-                    },
-                    hide_index=True,
-                )
-                fig, ax = plt.subplots()
-                plt.barh(
-                    y=df["stage"], width=df["median_duration"], left=df["offset"] + 1
-                )
-                st.pyplot(fig)
+                df = get_data()
+                render_df(df)
+                render_chart(df)
         except Exception as e:
             st.error(f"An error occurred: {e}")
