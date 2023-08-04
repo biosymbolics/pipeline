@@ -15,7 +15,7 @@ from clients.low_level.big_query import (
 from clients.low_level.big_query import BQ_DATASET_ID
 from common.ner import TermNormalizer
 from common.utils.file import load_json_from_file, save_json_as_file
-from common.utils.list import batch, dedup
+from common.utils.list import dedup
 from clients.low_level.big_query import execute_with_retries
 from clients.patents.utils import clean_assignees
 
@@ -110,11 +110,8 @@ class SynonymMapper:
             if entry[1] is not None and entry[0] is not None and entry[0] != entry[1]
         ]
 
-        batched = batch(data)
-
-        for b in batched:
-            insert_into_bg_table(b, SYNONYM_TABLE_NAME)
-            logging.info("Inserted %s rows into synonym_map", len(b))
+        insert_into_bg_table(data, SYNONYM_TABLE_NAME)
+        logging.info("Inserted %s rows into synonym_map", len(data))
 
 
 class TermAssembler:
@@ -282,11 +279,9 @@ class TermAssembler:
         terms = TermAssembler.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
-        batched = batch(terms)
-        for i, b in enumerate(batched):
-            cb = [r for r in b if len(r["term"]) > 1]
-            insert_into_bg_table(cb, table_name)
-            logging.info(f"Inserted %s rows into terms table, batch %s", len(cb), i)
+        rows = [row for row in terms if len(row["term"]) > 1]
+        insert_into_bg_table(rows, table_name)
+        logging.info(f"Inserted %s rows into terms table", len(rows))
 
     @staticmethod
     def run():

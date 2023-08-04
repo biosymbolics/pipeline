@@ -9,7 +9,7 @@ from typings import PatentApplication
 
 from .score import calculate_score
 from .utils import (
-    clean_assignee,
+    clean_assignees,
     get_patent_years,
     get_patent_attributes,
 )
@@ -36,7 +36,7 @@ def format_search_result(
         .str.strptime(pl.Date, "%Y%m%d")
         .alias("priority_date"),
         pl.col("assignees").apply(
-            lambda r: [clean_assignee(assignee) for assignee in r]
+            lambda assignees: clean_assignees(assignees.to_list())
         ),
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
     )

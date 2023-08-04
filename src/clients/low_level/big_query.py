@@ -9,6 +9,7 @@ import time
 import logging
 import os
 import polars as pl
+from common.utils.list import batch
 
 from typings.core import is_string_list
 
@@ -81,7 +82,7 @@ def get_bg_table(table_name: str) -> bigquery.Table:
     throws exception if it doesn't
     """
     table_id = get_table_id(table_name)
-    logging.info("Grabbling table %s", table_id)
+    logging.info("Grabbing table %s", table_id)
     client = bigquery.Client()
     table = client.get_table(table_id)
     return table
@@ -122,30 +123,38 @@ def insert_df_into_bg_table(df: pl.DataFrame, table_name: str):
 T = TypeVar("T", bound=Mapping)
 
 
-def insert_into_bg_table(records: list[T], table_name: str):
+def insert_into_bg_table(records: list[T], table_name: str, batch_size: int = 1000):
     """
-    Insert records into a table
+    Insert rows into a table from a list of records
 
     Args:
         records (list[dict]): list of records to insert
         table_name (str): name of the table
+        batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
     """
-    logging.info("Inserting into table %s", table_name)
 
-    # insert the df rows into the table
-    client = bigquery.Client()
+    def __insert_into_bg_table(records: list[T], table: bigquery.Table):
+        """
+        Insert records into a table
+        """
+        client = bigquery.Client()
 
+        try:
+            errors = client.insert_rows(table, records)
+            if errors:
+                raise Exception("Error inserting rows")
+        except Exception as e:
+            logging.error("Error inserting rows: %s", e)
+            raise e
+
+        logging.info("Successfully inserted %s rows", len(records))
+
+    batched = batch(records, batch_size)
     table = get_bg_table(table_name)
 
-    try:
-        errors = client.insert_rows(table, records)
-        if errors:
-            raise Exception("Error inserting rows")
-    except Exception as e:
-        logging.error("Error inserting rows: %s", e)
-        raise e
-
-    logging.info("Successfully inserted %s rows", len(records))
+    for i, b in enumerate(batched):
+        logging.info("Inserting batch %s into table %s", i, table_name)
+        __insert_into_bg_table(b, table)
 
 
 def upsert_into_bg_table(
