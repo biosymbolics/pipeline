@@ -79,6 +79,7 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(i)",  # so common in patents, e.g. "general formula (I)"
+    "(1)",
 ]
 
 
@@ -179,14 +180,34 @@ class EntityCleaner:
             for term in _terms:
                 yield term.lower()
 
-        def remove_duplicative_phrasing(_terms: list[str]) -> Iterable[str]:
-            duplicative_phrases = {
+        def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
+            phrases = {
                 "diseases and conditions": "diseases",
                 "conditions and diseases": "diseases",
+                "diseases and disorders": "diseases",
+                "disorders and diseases": "diseases",
+                "analogues?": "analog",
+                "drug delivery": "delivery",
+                "tumours?": "tumor",
+                "receptor agonists?": "agonist",  # ??
+                "receptor antagonists?": "antagonist",  # ??
+                "receptor modulators?": "modulator",
+                "activity modulators?": "modulator",
+                "binding modulators?": "modulator",
+                "inhibitor compounds?": "inhibitor",
+                "activity modulators?": "modulator",
+                "small molecule inhibitors?": "inhibitor",
+                "associated proteins?": "protein",
+                "transporter inhibitors?": "transport inhibitor",
+                "mediated conditions?": "associated disease",
+                "mediated diseases?": "associated disease",
+                "related conditions?": "associated disease",
+                "related diseases?": "associated disease",
+                "antibodies?": "antibody",
             }
             steps = [
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)
-                for dup, canonical in duplicative_phrases.items()
+                for dup, canonical in phrases.items()
             ]
 
             for term in _terms:
@@ -200,7 +221,7 @@ class EntityCleaner:
             decode_html,
             remove_chars,
             remove_extra_spaces,
-            remove_duplicative_phrasing,
+            normalize_phrasing,
             rearrange_terms,
             lemmatize_tails,
             normalize_by_pos,

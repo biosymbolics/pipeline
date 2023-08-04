@@ -127,6 +127,16 @@ class TestNerUtils(unittest.TestCase):
                 "input": "conditions associated with production of IL-1 and IL-6",
                 "expected": "IL-1 and il-6 production conditions",
             },
+            # (+)-hydrocodone
+            # (6e)-8-hydroxygeraniol
+            # (6R,S)-5-formyltetrahydrofolate
+            # (meth)acrylic acid polymer
+            # inhibitors of the interaction between mdm2
+            # mannose-1-phosphate guanylyltransferase (GDP) activity
+            # {
+            #     "input": "middle-of-the night insomnia",
+            #     "expected": "middle of the night insomnia",
+            # }
             # {
             #     "input": "disorders mediated by neurofibrillary tangles",
             #     "expected": "neurofibrillary tangle mediated disorders",
@@ -220,6 +230,10 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "graft -versus - host - disease (gvhd)",  # IRL example
                 "expected": "graft  versus host disease (gvhd)",  # TODO
+            },
+            {
+                "input": "(-)-ditoluoyltartaric acid",
+                "expected": "(-) ditoluoyltartaric acid",
             },
         ]
 

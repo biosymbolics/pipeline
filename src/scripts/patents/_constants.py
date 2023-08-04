@@ -91,6 +91,7 @@ INTERVENTION_BASE_TERM_SETS = [
     ["regulator", "regulation", "regulating"],
     ["degrader", "degradation", "degrading", "degrade"],
     ["inducer", "inducing", "induce", "induction"],
+    ["promoter", "promoting", "promote", "promotion"],
 ]
 
 INTERVENTION_BASE_PREFIXES = [
@@ -106,7 +107,9 @@ INTERVENTION_BASE_PREFIXES = [
     "receptor",
     "encoding",
     "encoders",
-    "positive allosteric",
+    "positive",
+    "negative",
+    "allosteric",
     "small molecule",
     "potent",
     "inventive",

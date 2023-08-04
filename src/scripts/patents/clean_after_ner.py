@@ -7,6 +7,7 @@ import time
 from typing import Literal
 
 from pydash import flatten
+from common.utils.re import get_or_re
 
 from system import initialize
 
@@ -32,6 +33,146 @@ from ._constants import (
 TextField = Literal["title", "abstract"]
 
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
+
+WordPlace = Literal["leading", "trailing", "all"]
+
+REMOVAL_WORDS: dict[str, WordPlace] = {
+    "such": "all",
+    "methods?": "all",
+    "obtainable": "all",
+    "the": "leading",
+    "excellent": "all",
+    "particular": "leading",
+    "useful": "trailing",
+    "thereof": "trailing",
+    "capable": "trailing",
+    "specific": "leading",
+    "novel": "leading",
+    "improved": "leading",
+    "improving": "trailing",
+    "new": "leading",
+    "potent": "trailing",
+    "inventive": "leading",
+    "other": "leading",
+    "more": "leading",
+    "of": "trailing",
+    "be": "trailing",
+    "use": "trailing",
+    "therapeutically": "trailing",
+    "therapy": "trailing",
+    "drugs?": "trailing",
+    "(?:pharmaceutical |chemical )?composition": "trailing",
+    "components?": "trailing",
+    "complexe?s?": "trailing",
+    "portions?": "trailing",
+    "intermediate": "trailing",
+    "suitable": "all",
+    "procedure": "trailing",
+    "patients?": "leading",
+    "patients?": "trailing",
+    "acceptable": "all",
+    "thereto": "trailing",
+    "certain": "leading",
+    "therapeutic procedures?": "all",
+    "therapeutic": "leading",
+    "therapeutics?": "leading",
+    "treatments?": "trailing",
+    "exemplary": "all",
+    "against": "trailing",
+    "treatment method": "trailing",
+    "(?:combination )?treatment": "trailing",
+    "treating": "trailing",
+    "usable": "trailing",
+    "other": "leading",
+    "suitable": "trailing",
+    "preparations?": "trailing",
+    "compositions?": "trailing",
+    "combinations?": "trailing",
+    "pharmaceutical": "all",
+    "dosage(?: form)?": "all",
+    "use of": "leading",
+    "certain": "leading",
+    "working": "leading",
+    "on": "trailing",
+    "in(?: a)?": "trailing",
+    "(?: ,)?and": "trailing",
+    "and ": "leading",
+    "the": "trailing",
+    "with": "trailing",
+    "a": "trailing",
+    "of": "trailing",
+    "for": "trailing",
+    "=": "trailing",
+    "unit(?:[(]s[)])?": "trailing",
+    "formations?": "trailing",
+    "measurements?": "trailing",
+    "measuring": "trailing",
+    "systems?": "trailing",
+    "[.]": "trailing",
+    "analysis": "trailing",
+    "methods?": "trailing",
+    "management": "trailing",
+    "below": "trailing",
+    "fixed": "leading",
+    "pharmacological": "all",
+    "acquisitions?": "trailing",
+    "applications?": "trailing",
+    "assembly": "trailing",
+    "solutions?": "trailing",
+    "production": "trailing",
+    "solutions?": "trailing",
+    "lead candidate": "all",
+    "candidate": "trailing",
+    "molecules?": "trailing",
+    "conjugates?": "trailing",
+    "substrates?": "trailing",
+    "particles?": "trailing",
+    "mediums?": "trailing",
+    "forms?": "trailing",
+    "compounds?": "trailing",
+    "control": "trailing",
+    "modified": "leading",
+    "variants?": "trailing",
+    "variety": "trailing",
+    "varieties": "trailing",
+    "salts?": "trailing",
+    "analogs?": "trailing",
+    "analogues?": "trailing",
+    "products?": "trailing",
+    "family": "trailing",
+    "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
+    "derivatives?": "trailing",
+    "pure": "leading",
+    "specific": "trailing",
+    "chemically (?:modified)?": "leading",
+    "based": "trailing",
+    "an?": "leading",
+    "ingredients?": "trailing",
+    "active": "leading",
+    "additional": "leading",
+    "additives?": "leading",
+    "advantageous": "leading",
+    "aforementioned": "leading",
+    "aforesaid": "leading",
+    "candidate": "leading",
+    "efficient": "leading",
+    "first": "leading",
+    "formula [(][ivxab]{1,3}[)]": "trailing",
+    "formula": "leading",
+    "formulations?": "trailing",
+    "materials?": "trailing",
+    "biomaterials?": "trailing",
+    "is": "leading",
+    "medicament": "trailing",
+    "precipitation": "trailing",
+    "sufficient": "trailing",
+    "due": "trailing",
+    "locate": "trailing",
+    "specifications?": "trailing",
+    "modality": "trailing",
+    "detect": "trailing",
+    "similar": "trailing",
+}
 
 
 def remove_substrings():
@@ -122,87 +263,60 @@ def fix_of_for_annotations():
             execute_bg_query(sql)
 
 
-WordPlace = Literal["leading", "trailing", "all"]
-
-
 def remove_junk():
     """
     Remove trailing junk and silly matches
     """
 
-    def get_remove_word(word, place: WordPlace):
-        if place == "trailing":
-            return f"""update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i) {word}$', '')) where regexp_contains(original_term, '(?i).* {word}$')"""
-        elif place == "leading":
-            return f"""update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)^{word} ', '')) where regexp_contains(original_term, '(?i)^{word} .*')"""
-        else:
-            return rf"""update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){word}(?:^|$| )', ' ')) where regexp_contains(original_term, '(?i)(?:^|$| ){word}(?:^|$| )')"""
+    def get_remove_words():
+        def get_sql(place):
+            if place == "trailing":
+                words = ["[ ]" + t[0] for t in REMOVAL_WORDS.items() if t[1] == place]
+                words_re = get_or_re(words, "+")
+                return f"""
+                    update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', ''))
+                    where regexp_contains(original_term, '(?i).*{words_re}$')
+                """
+            elif place == "leading":
+                words = [t[0] + "[ ]" for t in REMOVAL_WORDS.items() if t[1] == place]
+                words_re = get_or_re(words, "+")
+                return f"""
+                    update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', ''))
+                    where regexp_contains(original_term, '(?i)^{words_re}.*')
+                """
+            elif place == "all":
+                words = [t[0] + "[ ]?" for t in REMOVAL_WORDS.items() if t[1] == place]
+                words_re = get_or_re(words, "+")
+                return rf"""
+                    update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' '))
+                    where regexp_contains(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )')
+                """
+            else:
+                raise ValueError(f"Unknown place: {place}")
 
-    removal_words: dict[str, WordPlace] = {
-        "such": "all",
-        "methods?": "all",
-        "obtainable": "all",
-        "the": "leading",
-        "excellent": "all",
-        "particular": "leading",
-        "useful": "trailing",
-        "thereof": "trailing",
-        "capable": "trailing",
-        "specific": "leading",
-        "novel": "leading",
-        "improved": "leading",
-        "new": "leading",
-        "potent": "trailing",
-        "inventive": "leading",
-        "other": "leading",
-        "more": "leading",
-        "of": "trailing",
-        "therapeutically": "trailing",
-        "suitable": "all",
-        "therapeutic": "leading",
-        "patient": "leading",
-        "patient": "trailing",
-        "acceptable": "all",
-        "thereto": "trailing",
-        "certain": "leading",
-        ", and": "trailing",
-        "therapeutic procedures": "all",
-        "therapeutic procedure": "all",
-        "exemplary": "all",
-        "against": "trailing",
-        "treatment method": "trailing",
-        "usable": "trailing",
-        "other": "leading",
-        "suitable": "trailing",
-        "preparation": "trailing",
-        "composition": "trailing",
-        "combination": "trailing",
-        "pharmaceutical": "all",
-        "dosage form": "all",
-        "use of": "leading",
-        "certain": "leading",
-        "working": "leading",
-    }
+        return [get_sql(place) for place in ["leading", "trailing", "all"]]
+
     delete_terms = [
         "wherein a",
         "pharmaceutical compositions",
-        "compound I",
+        "compound i",
         "wherein said compound",
         "fragment of",
         "pharmacological compositions",
+        "pharmacological",
         "therapeutically",
-        "general formula (I)",
+        "general formula (i)",
         "medicine Compounds",
         "receptacle",
         "liver",
         "treatment regimens",
         "unsubstituted",
-        "Compound I",
+        "compound i",
         "medicinal compositions",
-        "COMPOUND",
-        "DISEASE",
+        "compound",
+        "disease",
         "medicine Compounds of formula",
-        "THERAPY",
+        "therapy",
         "geographic locations",
         "quantitation",
         "dosage regimen",
@@ -215,23 +329,32 @@ def remove_junk():
         "mass spectrometry",
         "suction",
         "accelerometer",
-        "Compound 1",
+        "compound 1",
+        "prognosticating",
+        "formula",
     ]
+    delete_terms = ",".join([rf"'{dt}'" for dt in delete_terms])
     queries = [
-        *[get_remove_word(word, place) for word, place in removal_words.items()],
-        f"delete from `{WORKING_TABLE}` where original_term is null",
+        f"update `{WORKING_TABLE}` "
+        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where regexp_contains(original_term, '^[(][^)(]+[)]$')",
+        *get_remove_words(),
         f"update `{WORKING_TABLE}` "
         + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where regexp_contains(original_term, '[ ]{2,}')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where regexp_contains(original_term, '^[ ]+')",
+        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where regexp_contains(original_term, '[ ]$')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, r'^\"', '')) where regexp_contains(original_term, r'^\"')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
-        f"delete from `{WORKING_TABLE}` where original_term='COMPOSITION' or original_term='therapeutical' or original_term like '%transducer%' or original_term='prognosticating' or original_term in ({delete_terms}) or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
-        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term in ('tumor infiltrating lymphocytes')",
-        f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy')",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
         f"update `{WORKING_TABLE}` set "
         + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where regexp_contains(original_term, '.{10,}[.] [A-Z][A-Za-z0-9]{3,}')",
-        f"delete FROM `{WORKING_TABLE}` where length(original_term) < 2",
+        f"delete FROM `{WORKING_TABLE}` "
+        + r"where regexp_contains(original_term, '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$')",
+        f"delete FROM `{WORKING_TABLE}` "
+        + r"where regexp_contains(original_term, '^[0-9., ]+$')",
+        f"delete FROM `{WORKING_TABLE}` where length(original_term) < 3 or original_term is null",
+        f"delete from `{WORKING_TABLE}` where lower(original_term) in ({delete_terms}) or original_term like '%transducer%' or original_term like '% administration' or original_term like '% patients' or original_term like 'treat %' or original_term like 'treating %' or original_term like 'field of %'",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term in ('tumor infiltrating lymphocytes')",
+        f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy')",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='compounds'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='diseases' and not regexp_contains(original_term, '(?i)(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)')",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% factor' and original_term not like '%risk%' and original_term not like '%disease%' and domain='diseases'",
