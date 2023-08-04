@@ -15,24 +15,23 @@ prompt = f"""
     {question}
 """
 
-with st.spinner("Initializing..."):
-    ei = EntityIndex(model_name="GPT4")
-    si = SourceDocIndex(model_name="GPT4")
-
 if st.button("Submit"):
     if not question.strip():
         st.error(f"Please supply a question.")
     else:
         try:
+            with st.spinner("Initializing..."):
+                # ei = EntityIndex(model_name="ChatGPT")
+                si = SourceDocIndex(model_name="ChatGPT")  # GPT4
             source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
             st.subheader("Answer from source doc index:")
             with st.spinner("Please wait..."):
                 si_answer = si.query(prompt, source)
                 st.markdown(si_answer)
 
-            st.subheader("Answer from entity doc index:")
-            with st.spinner("Please wait..."):
-                ei_answer = ei.query(prompt, source)
-                st.markdown(ei_answer)
+            # st.subheader("Answer from entity doc index:")
+            # with st.spinner("Please wait..."):
+            #     ei_answer = ei.query(prompt, source)
+            #     st.markdown(ei_answer)
         except Exception as e:
             st.error(f"An error occurred: {e}")

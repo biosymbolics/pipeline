@@ -2,9 +2,10 @@
 Client for llama indexes
 """
 import logging
+import time
 import traceback
 from typing import Any, Mapping, Optional, Type, TypeVar, Union
-from llama_index import Document, Response, load_index_from_storage
+from llama_index import Document, Response, load_indices_from_storage
 
 from clients.llama_index.context import (
     get_service_context,
@@ -37,7 +38,7 @@ def load_index(
         index_args (Mapping[str, Any]): args to pass to the index implementation
     """
     logging.info(
-        "Loading context for index %s (%s, %s)",
+        "Loading index %s (%s, %s, %s)",
         index_name,
         model_name,
         storage_args,
@@ -47,9 +48,21 @@ def load_index(
     service_context = get_service_context(model_name=model_name)
 
     try:
-        index = load_index_from_storage(storage_context)
+        indices = load_indices_from_storage(storage_context)
+        if len(indices) > 1:
+            logging.warning(
+                "Found multiple indices (%s) for %s, using first one.",
+                index_name,
+                len(indices),
+            )
+
+        index_struct = indices[0].index_struct
+        index = index_impl(
+            index_struct=index_struct,
+            storage_context=storage_context,
+        )
     except Exception as e:
-        logging.info("Cannot load index; creating")
+        logging.info("Cannot load index; creating. Exception: %s", e)
         index = index_impl(
             [],
             storage_context=storage_context,
@@ -57,7 +70,7 @@ def load_index(
             **index_args,
         )
 
-    logging.info("Returning index %s", index_name)
+    logging.info("Returning index %s (%s)", index_name, type(index).__name__)
 
     return index
 
@@ -79,6 +92,7 @@ def query_index(
         refine_prompt (RefinePrompt): prompt to use for refine (optional)
         **kwargs: additional args to pass to the query engine
     """
+    start = time.time()
     if prompt_template and refine_prompt:
         query_engine = index.as_query_engine(
             **kwargs,
@@ -93,6 +107,10 @@ def query_index(
     if not isinstance(response, Response) or not response.response:
         logging.error("Could not parse response: %s", response)
         raise Exception("Could not parse response")
+
+    logging.info(
+        "Returning response from query, took: %s seconds", round(time.time() - start)
+    )
 
     return response.response
 

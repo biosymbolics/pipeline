@@ -2,7 +2,8 @@
 Functions around llama index context
 """
 import os
-from typing import Any, Literal, NamedTuple, Optional
+from typing import Any, Literal, Optional, TypedDict
+from typing_extensions import NotRequired
 from llama_index import (
     LLMPredictor,
     PromptHelper,
@@ -16,7 +17,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 from llama_index.vector_stores import ChromaVectorStore
 import chromadb
-from chromadb.config import Settings
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
@@ -24,6 +24,12 @@ from clients.stores.pinecone import get_vector_store
 from typings.indices import LlmModelType
 
 StorageArgs = dict[str, Any]
+
+
+class ModelInfo(TypedDict):
+    max_tokens: NotRequired[int]
+    model: str
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -55,11 +61,8 @@ def get_storage_context(
         logging.info(
             "Loading mongodb doc and index store context, chromadb vector store"
         )
-        chroma_client = chromadb.Client(
-            Settings(
-                chroma_db_impl="duckdb+parquet",
-                persist_directory="./storage/vector_storage/chromadb/",
-            )
+        chroma_client = chromadb.PersistentClient(
+            path="./storage/vector_storage/chromadb/"
         )
 
         chroma_collection = chroma_client.get_or_create_collection(index_name)
@@ -76,6 +79,15 @@ def get_storage_context(
         )
 
     raise Exception(f"Unknown storage type {storage_type}")
+
+
+OUTPUT_TOKENS = 6000
+MODEL_TO_TOKENS: dict[LlmModelType, dict] = {
+    "ChatGPT": {"max_tokens": 2000, "model": "gpt-3.5-turbo-16k"},
+    "GPT4": {"max_tokens": 2000, "model": "gpt-4-32k"},
+    "VertexAI": {"model": "text-bison"},
+    "Anthropic": {"max_tokens": 100000 - OUTPUT_TOKENS, "model": "claude-v1.3-100k"},
+}
 
 
 def get_service_context(
@@ -95,16 +107,14 @@ def get_service_context(
         """
         if model_name in ["ChatGPT", "GPT4"]:
             return ChatOpenAI(
-                model="gpt-3.5-turbo-16k" if model_name == "ChatGPT" else "gpt-4",
-                max_tokens=10000,
+                **MODEL_TO_TOKENS[model_name],
                 client="chat",
                 temperature=0.1,
             )
         if model_name == "VertexAI":
-            return VertexAI(model_name="text-bison", temperature=0.1)
+            return VertexAI(**MODEL_TO_TOKENS[model_name], temperature=0.1)
         if model_name == "Anthropic":
             # untested, but used in https://colab.research.google.com/drive/1uuqvPI2_WNFMd7g-ahFoioSHV7ExB2GR?usp=sharing
-            # benefit is massive input token limit. use with GPTListIndex?
             return Anthropic(model="claude-v1.3-100k", temperature=0.1)
 
         raise Exception(f"Unknown model {model_name}")

@@ -118,18 +118,18 @@ def lemmatize_tail(term: str | Doc) -> str:
     return tail_lemmatized
 
 
-def lemmatize_tails(terms: list[str]) -> Iterable[str]:
+def lemmatize_tails(terms: list[str], parallelize: bool = True) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
     """
     nlp = Spacy.get_instance()._nlp
-    docs = nlp.pipe(terms, n_process=4)  # turn into spacy docs
+    docs = nlp.pipe(terms, n_process=4 if parallelize else 1)  # turn into spacy docs
 
     for doc in docs:
         yield lemmatize_tail(doc)
 
 
-def rearrange_terms(terms: list[str]) -> Iterable[str]:
+def rearrange_terms(terms: list[str], parallelize: bool = True) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
@@ -144,7 +144,7 @@ def rearrange_terms(terms: list[str]) -> Iterable[str]:
 
     def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
         subbed = [re.sub(adp_ext, adp_term, t) for t in _terms]
-        final = __rearrange_adp(subbed, adp_term=adp_term)
+        final = __rearrange_adp(subbed, adp_term=adp_term, parallelize=parallelize)
         return final
 
     steps = [
@@ -155,7 +155,9 @@ def rearrange_terms(terms: list[str]) -> Iterable[str]:
     return text
 
 
-def __rearrange_adp(terms: list[str], adp_term: str = "of") -> Iterable[str]:
+def __rearrange_adp(
+    terms: list[str], adp_term: str = "of", parallelize: bool = True
+) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
@@ -163,7 +165,7 @@ def __rearrange_adp(terms: list[str], adp_term: str = "of") -> Iterable[str]:
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
     nlp = Spacy.get_instance()._nlp
-    docs = nlp.pipe(terms, n_process=4)
+    docs = nlp.pipe(terms, n_process=4 if parallelize else 1)
 
     def __rearrange(doc: Doc) -> str:
         tokens = doc
@@ -268,7 +270,7 @@ def __normalize_by_pos(doc: Doc):
     )
 
 
-def normalize_by_pos(terms: list[str]) -> Iterable[str]:
+def normalize_by_pos(terms: list[str], parallelize: bool = True) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -308,7 +310,7 @@ def normalize_by_pos(terms: list[str]) -> Iterable[str]:
 
     sep_dash_terms = [sep_dash(term) for term in terms]
     nlp = Spacy.get_instance()
-    docs = nlp.pipe(sep_dash_terms, n_process=4)
+    docs = nlp.pipe(sep_dash_terms, n_process=4 if parallelize else 1)
 
     for doc in docs:
         if skip(doc.text):

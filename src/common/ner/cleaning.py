@@ -100,9 +100,11 @@ class EntityCleaner:
         self,
         additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
         char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+        parallelize: bool = True,
     ):
         self.additional_common_words = additional_common_words
         self.char_suppressions = char_suppressions
+        self.parallelize = parallelize
         self.__common_words = None
         self.nlp = Spacy.get_instance(disable=["ner"])
 
@@ -214,7 +216,7 @@ class EntityCleaner:
                 yield reduce(lambda x, func: func(x), steps, term)
 
         def exec_func(func, x):
-            logging.info("Executing function: %s", func.__name__)
+            logging.debug("Executing function: %s", func)
             return func(x)
 
         cleaning_steps = [
@@ -222,9 +224,9 @@ class EntityCleaner:
             remove_chars,
             remove_extra_spaces,
             normalize_phrasing,
-            rearrange_terms,
-            lemmatize_tails,
-            normalize_by_pos,
+            partial(rearrange_terms, parallelize=self.parallelize),
+            partial(lemmatize_tails, parallelize=self.parallelize),
+            partial(normalize_by_pos, parallelize=self.parallelize),
             lower,
         ]
 
