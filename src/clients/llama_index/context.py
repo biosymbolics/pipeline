@@ -86,8 +86,8 @@ def get_storage_context(
 
 OUTPUT_TOKENS = 6000
 MODEL_TO_TOKENS: dict[LlmModelType, dict] = {
-    "ChatGPT": {"max_tokens": 2000, "model": "gpt-3.5-turbo-16k"},
-    "GPT4": {"max_tokens": 2000, "model": "gpt-4"},  # "gpt-4-32k"
+    "ChatGPT": {"model": "gpt-3.5-turbo-16k"},
+    "GPT4": {"model": "gpt-4"},  # "gpt-4-32k"
     "VertexAI": {"model": "text-bison"},
     "Anthropic": {"max_tokens": 100000 - OUTPUT_TOKENS, "model": "claude-v1.3-100k"},
 }
