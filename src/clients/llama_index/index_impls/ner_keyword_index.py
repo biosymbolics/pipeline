@@ -17,10 +17,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
     def __init__(
         self,
         *args,
-        ner_options={
-            "use_llm": True,
-            "llm_config": "configs/sec/config.cfg",
-        },
+        ner_options={"use_llm": False},
         **kwargs,
     ):
         """
@@ -49,7 +46,12 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
 
         entities = entities_by_doc[0]
         keywords = flatten(
-            [(ent[0], ent[2].name) if ent[2] else (ent[0]) for ent in entities]
+            [
+                (ent.term, ent.linked_entity.name)
+                if ent.linked_entity
+                else (ent.normalized_term)
+                for ent in entities
+            ]
         )
         return set(keywords[0:max_keywords])
 

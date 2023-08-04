@@ -25,8 +25,7 @@ INDEX_NAME = "source-docs"
 DEFAULT_STORAGE_ARGS: StorageArgs = {
     "storage_type": "mongodb",
     "ner_options": {
-        "use_llm": True,
-        "llm_config": "configs/sec/config.cfg",
+        "use_llm": False,
     },
 }
 
@@ -87,17 +86,7 @@ class SourceDocIndex:
 
         Args:
             documents (list[str]): list of documents
-            source (NamespaceKey): source namespace, e.g.
-                ``` python
-                dict_to_named_tuple(
-                    {
-                        "company": "PFE",
-                        "doc_source": "SEC",
-                        "doc_type": "10-K",
-                        "period": "2020-12-31",
-                    }
-                )
-                ```
+            source (NamespaceKey): source namespace
             retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
 
@@ -136,7 +125,7 @@ class SourceDocIndex:
             query_string (str): query string
             source (NamespaceKey): source namespace that acts as filter, e.g.
                 ``` python
-                dict_to_named_tuple(
+                NamespaceKey(
                     {
                         "company": "BIBB",
                         "doc_source": "SEC",

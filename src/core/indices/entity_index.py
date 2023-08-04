@@ -265,19 +265,7 @@ class EntityIndex:
         Args:
             doc_map (dict[str, list[str]]): map of docs
             get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
-                ``` python
-                    def get_namespace_key(key: str) -> NamespaceKey:
-                        return dict_to_named_tuple(
-                            {
-                                "company": "PFE",
-                                "doc_source": "SEC",
-                                "doc_type": "10-K",
-                                "period": key,
-                            }
-                        )
-
-                    create_from_docs(doc_map, get_namespace_key)
-                ```
+                `create_from_docs(doc_map, get_namespace_key)`
         """
         tagger = NerTagger.get_instance()
         for key, docs in doc_map.items():
