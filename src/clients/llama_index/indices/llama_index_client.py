@@ -64,6 +64,7 @@ def load_index(
         index = index_impl(
             index_struct=index_struct,
             storage_context=storage_context,
+            service_context=service_context,
         )
     except ValueError as e:
         logging.info("Cannot load index; creating. Exception: %s", e)
@@ -97,14 +98,15 @@ def query_index(
         **kwargs: additional args to pass to the query engine
     """
     start = time.time()
-    if prompt_template and refine_prompt:
-        query_engine = index.as_query_engine(
-            **kwargs,
-            text_qa_template=prompt_template,
-            refine_template=refine_prompt,
-        )
-    else:
-        query_engine = index.as_query_engine(**kwargs)
+    args = {
+        k: v
+        for k, v in {
+            "text_qa_template": prompt_template,
+            "refine_template": refine_prompt,
+        }.items()
+        if v is not None
+    }
+    query_engine = index.as_query_engine(**args, **kwargs)
 
     response = query_engine.query(query)
 

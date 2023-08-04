@@ -62,13 +62,16 @@ def get_storage_context(
             "Loading mongodb doc and index store context, chromadb vector store"
         )
         chroma_client = chromadb.PersistentClient(
-            path="./storage/vector_storage/chromadb/"
+            path="./storage/vector_storage/chromadb/",
         )
 
         chroma_collection = chroma_client.get_or_create_collection(index_name)
 
+        logging.info(
+            "Loaded chroma collection; contains %s docs", chroma_collection.count()
+        )
+
         return StorageContext.from_defaults(
-            # **kwargs
             docstore=MongoDocumentStore.from_uri(
                 uri=MONGO_URI, db_name="db_docstore", namespace="docstore"
             ),
@@ -84,7 +87,7 @@ def get_storage_context(
 OUTPUT_TOKENS = 6000
 MODEL_TO_TOKENS: dict[LlmModelType, dict] = {
     "ChatGPT": {"max_tokens": 2000, "model": "gpt-3.5-turbo-16k"},
-    "GPT4": {"max_tokens": 2000, "model": "gpt-4-32k"},
+    "GPT4": {"max_tokens": 2000, "model": "gpt-4"},  # "gpt-4-32k"
     "VertexAI": {"model": "text-bison"},
     "Anthropic": {"max_tokens": 100000 - OUTPUT_TOKENS, "model": "claude-v1.3-100k"},
 }

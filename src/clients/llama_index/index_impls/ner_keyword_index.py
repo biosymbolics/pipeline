@@ -2,17 +2,23 @@
 Biomedical Named Entity Recognition Keyword Table Index
 """
 import logging
-from typing import Any, Optional, Set
-from llama_index import QueryBundle, VectorStoreIndex, get_response_synthesizer
+from typing import Any, Optional, Sequence, Set
+from llama_index import (
+    QueryBundle,
+    ServiceContext,
+    StorageContext,
+    VectorStoreIndex,
+    get_response_synthesizer,
+)
 from llama_index.chat_engine.types import BaseChatEngine, ChatMode
 from llama_index.indices.base_retriever import BaseRetriever
 from llama_index.indices.keyword_table import SimpleKeywordTableIndex
 from llama_index.indices.keyword_table.retrievers import BaseKeywordTableRetriever
 from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
+from llama_index.data_structs.data_structs import IndexDict
 from llama_index.retrievers import VectorIndexRetriever
 from llama_index.schema import NodeWithScore
 from pydash import flatten
-from clients.llama_index.indices.llama_index_client import load_index
 
 from common.ner.ner import NerTagger
 
@@ -117,17 +123,23 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
     def __init__(
         self,
         *args,
+        service_context: ServiceContext,
+        storage_context: StorageContext,
         ner_options={"use_llm": False},
         **kwargs,
     ):
         """
         Initialize super and NER tagger.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            *args,
+            service_context=service_context,
+            storage_context=storage_context,
+            **kwargs,
+        )
         self.tagger = NerTagger.get_instance(**ner_options, parallelize=False)
-        self.response_synthesizer = get_response_synthesizer()
         self.vector_index = VectorStoreIndex.from_vector_store(
-            self.storage_context.vector_store, self.service_context
+            storage_context.vector_store, service_context
         )
 
     def _ner_extract_keywords(
@@ -197,11 +209,13 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
 
     def as_query_engine(self, **kwargs: Any):
         retriever = self.as_retriever(**kwargs)
+        metadata_filters = kwargs.pop("metadata_filters")  # TODO
 
+        response_synthesizer = get_response_synthesizer(
+            service_context=self.service_context, **kwargs
+        )
         ktner_query_engine = RetrieverQueryEngine(
-            retriever=retriever,
-            response_synthesizer=self.response_synthesizer,
-            # **kwargs,
+            retriever=retriever, response_synthesizer=response_synthesizer
         )
 
         return ktner_query_engine
@@ -211,3 +225,8 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
     ) -> BaseChatEngine:
         logging.warning("Chat engine is just generic keyword table index, not NER")
         return super().as_chat_engine(chat_mode, **kwargs)
+
+    def refresh_ref_docs(self, documents, **update_kwargs: Any) -> list[bool]:
+        res = super().refresh_ref_docs(documents, **update_kwargs)
+        self.vector_index.refresh_ref_docs(documents, **update_kwargs)
+        return res
