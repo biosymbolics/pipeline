@@ -3,12 +3,16 @@ Biomedical Named Entity Recognition Keyword Table Index
 """
 import logging
 from typing import Any, Optional, Set
+from llama_index import QueryBundle, VectorStoreIndex, get_response_synthesizer
 from llama_index.chat_engine.types import BaseChatEngine, ChatMode
+from llama_index.indices.base_retriever import BaseRetriever
 from llama_index.indices.keyword_table import SimpleKeywordTableIndex
 from llama_index.indices.keyword_table.retrievers import BaseKeywordTableRetriever
-from llama_index import get_response_synthesizer
 from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
+from llama_index.retrievers import VectorIndexRetriever
+from llama_index.schema import NodeWithScore
 from pydash import flatten
+from clients.llama_index.indices.llama_index_client import load_index
 
 from common.ner.ner import NerTagger
 
@@ -17,9 +21,10 @@ def extract_keywords(text: str, tagger: NerTagger, max_keywords: int) -> set[str
     """
     Extract keywords from text using NER tagger.
     """
-    entities_by_doc = tagger.extract([text], link=True)
+    entities_by_doc = tagger.extract([text], link=False)
 
     logging.info(f"Extracted {len(entities_by_doc)} docs")
+    print(entities_by_doc)
 
     if len(entities_by_doc) == 0:
         raise ValueError("No entities extracted")
@@ -29,7 +34,7 @@ def extract_keywords(text: str, tagger: NerTagger, max_keywords: int) -> set[str
         [
             (ent.term, ent.linked_entity.name)
             if ent.linked_entity
-            else (ent.normalized_term)
+            else (ent.normalized_term or ent.term)
             for ent in entities
         ]
     )
@@ -61,6 +66,49 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
         )
 
 
+class HybridNerRetriever(BaseRetriever):
+    """
+    Hybrid vector/keyword table retriever
+    """
+
+    def __init__(
+        self,
+        keyword_retriever: KeywordTableNerRetriever,
+        vector_retriever: VectorIndexRetriever,
+    ):
+        """
+        Initialize super and NER tagger.
+        """
+        super().__init__()
+        self.keyword_retriever: KeywordTableNerRetriever = keyword_retriever
+        self.vector_retriever: VectorIndexRetriever = vector_retriever
+        self.mode = "OR"
+
+    def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
+        keyword_nodes = self.keyword_retriever.retrieve(query_bundle)
+        vector_nodes = self.vector_retriever.retrieve(query_bundle)
+
+        logging.info(
+            "Retrieved %s keyword nodes and %s vector nodes",
+            len(keyword_nodes),
+            len(vector_nodes),
+        )
+
+        vector_ids = {n.node.node_id for n in vector_nodes}
+        keyword_ids = {n.node.node_id for n in keyword_nodes}
+
+        combined_dict = {n.node.node_id: n for n in vector_nodes}
+        combined_dict.update({n.node.node_id: n for n in keyword_nodes})
+
+        if self.mode == "AND":
+            retrieve_ids = vector_ids.intersection(keyword_ids)
+        else:
+            retrieve_ids = vector_ids.union(keyword_ids)
+
+        retrieve_nodes = [combined_dict[rid] for rid in retrieve_ids]
+        return retrieve_nodes
+
+
 class NerKeywordTableIndex(SimpleKeywordTableIndex):
     """
     Biomedical Named Entity Recognition Keyword Table Index
@@ -78,6 +126,9 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         super().__init__(*args, **kwargs)
         self.tagger = NerTagger.get_instance(**ner_options, parallelize=False)
         self.response_synthesizer = get_response_synthesizer()
+        self.vector_index = VectorStoreIndex.from_vector_store(
+            self.storage_context.vector_store, self.service_context
+        )
 
     def _ner_extract_keywords(
         self, text: str, max_keywords: Optional[int] = 10000
@@ -128,9 +179,17 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         self,
         retriever_mode: str = "ner",
         **kwargs,
-    ) -> KeywordTableNerRetriever:
+    ) -> HybridNerRetriever:
         if retriever_mode == "ner":
-            return KeywordTableNerRetriever(self, tagger=self.tagger, **kwargs)
+            vector_retriever = VectorIndexRetriever(
+                index=self.vector_index, similarity_top_k=2
+            )
+            keyword_retriever = KeywordTableNerRetriever(
+                self, tagger=self.tagger, vector_retriever=vector_retriever, **kwargs
+            )
+            return HybridNerRetriever(
+                keyword_retriever=keyword_retriever, vector_retriever=vector_retriever
+            )
         else:
             raise ValueError(
                 f"Unsupported retriever mode for custom index: {retriever_mode}"

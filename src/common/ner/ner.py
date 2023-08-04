@@ -224,7 +224,7 @@ class NerTagger:
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
         logging.info(
-            "Entities found: %s, took %s",
+            "Entities found: %s, took %s seconds",
             ents_by_doc,
             round(time.time() - start_time, 2),
         )

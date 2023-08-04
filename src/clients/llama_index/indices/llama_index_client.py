@@ -27,7 +27,7 @@ def load_index(
     model_name: LlmModelType = DEFAULT_MODEL_NAME,
     storage_args: StorageArgs = {},
     index_args: Mapping[str, Any] = {},
-) -> LlmIndex:
+) -> IndexImpl:
     """
     Load persisted index. Creates new index if not found.
 
@@ -52,8 +52,8 @@ def load_index(
         if len(indices) > 1:
             logging.warning(
                 "Found multiple indices (%s) for %s, using first one.",
-                index_name,
                 len(indices),
+                index_name,
             )
 
         index_struct = indices[0].index_struct
@@ -61,7 +61,7 @@ def load_index(
             index_struct=index_struct,
             storage_context=storage_context,
         )
-    except Exception as e:
+    except ValueError as e:
         logging.info("Cannot load index; creating. Exception: %s", e)
         index = index_impl(
             [],

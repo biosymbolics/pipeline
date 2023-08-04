@@ -1,6 +1,7 @@
 """
 Utils for the NER pipeline
 """
+import time
 from typing import Callable, Iterable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
@@ -292,6 +293,7 @@ class EntityCleaner:
             filter_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
             remove_supressions (bool, optional): remove suppressions? Defaults to False (leaves empty spaces in, to maintain order)
         """
+        start = time.time()
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
@@ -304,6 +306,12 @@ class EntityCleaner:
 
         terms = [self.__get_text(ent) for ent in entities]
         cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
+
+        logging.info(
+            "Cleaned %s entities in %s seconds",
+            len(entities),
+            round(time.time() - start, 2),
+        )
 
         return self.__return_to_type(cleaned, entities, remove_supressions)
 
