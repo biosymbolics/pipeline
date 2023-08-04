@@ -49,6 +49,10 @@ def load_index(
 
     try:
         indices = load_indices_from_storage(storage_context)
+
+        if len(indices) == 0:
+            raise ValueError("No indices found")
+
         if len(indices) > 1:
             logging.warning(
                 "Found multiple indices (%s) for %s, using first one.",
