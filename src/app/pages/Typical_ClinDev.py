@@ -24,15 +24,18 @@ response_schemas = [
     ResponseSchema(name="stage", description="e.g. Phase 1"),
     ResponseSchema(
         name="offset",
-        description="equal to cumulative median duration of previous stages, 0 for the first stage. data type: float.",
+        description="equal to cumulative median duration of previous stages, 0 for the first stage.",
+        type="float",
     ),
     ResponseSchema(
         name="median_duration",
-        description="median duration of this stage in years, e.g. 2.5. data type: float.",
+        description="median duration of this stage in years (e.g. 2.5)",
+        type="float",
     ),
     ResponseSchema(
         name="iqr",
-        description="interquartile range of this stage's duration in years, e.g. 0.8. data type: float.",
+        description="interquartile range of this stage's duration in years (e.g. 0.8)",
+        type="float",
     ),
 ]
 df_schema = {
@@ -52,17 +55,16 @@ if st.button("Submit"):
         try:
             with st.spinner("Please wait..."):
                 answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
-                st.code(answer_as_array, "json")
                 df = pl.from_dicts(answer_as_array, schema=df_schema).reverse()
                 st.dataframe(
                     df.reverse(),
                     column_config={
-                        "_index": "",
                         "0": "phase",
                         "1": "offset",
                         "2": "median_duration",
                         "3": "iqr",
                     },
+                    hide_index=True,
                 )
                 fig, ax = plt.subplots()
                 plt.barh(
