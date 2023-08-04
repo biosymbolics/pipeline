@@ -53,6 +53,7 @@ INTERVENTION_BASE_TERMS = [
     "si[ ]?rna",
     "ds[ ]?rna",
     "double[- ]?stranded rna",
+    "scfv",  # single-chain variable fragment
     "cell",
     "stem cell",
     "interference",
@@ -90,9 +91,12 @@ INTERVENTION_BASE_TERM_SETS = [
     ["regulator", "regulation", "regulating"],
     ["degrader", "degradation", "degrading", "degrade"],
     ["inducer", "inducing", "induce", "induction"],
+    ["promoter", "promoting", "promote", "promotion"],
 ]
 
 INTERVENTION_BASE_PREFIXES = [
+    "anti",
+    "chimeric",
     "cyclic",
     "reversible",
     "irreversible",
@@ -103,7 +107,9 @@ INTERVENTION_BASE_PREFIXES = [
     "receptor",
     "encoding",
     "encoders",
-    "positive allosteric",
+    "positive",
+    "negative",
+    "allosteric",
     "small molecule",
     "potent",
     "inventive",

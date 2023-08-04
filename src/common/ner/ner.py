@@ -7,14 +7,14 @@ from functools import reduce
 import time
 from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
+import logging
+import warnings
+import html
 import spacy
 from thinc.api import prefer_gpu
 from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
-import logging
-import warnings
-import html
 
 from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
@@ -27,7 +27,7 @@ from .patterns import (
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
-from .types import DocEntities, SpacyPatterns
+from .types import DocEntities, DocEntity, SpacyPatterns
 
 T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]
@@ -69,7 +69,7 @@ class NerTagger:
             content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
         """
-        prefer_gpu()
+        # prefer_gpu()
 
         self.model = model
         self.use_llm = use_llm
@@ -109,7 +109,12 @@ class NerTagger:
     def __normalize(
         self, doc: Doc, entity_types: Optional[list[str]] = None
     ) -> DocEntities:
-        entity_set: DocEntities = [(span.text, span.label_, None) for span in doc.ents]
+        entity_set: DocEntities = [
+            DocEntity(
+                span.text, span.label_, span.start_char, span.end_char, None, None
+            )
+            for span in doc.ents
+        ]
 
         # basic filtering, character removal, lemmatization
         normalized = self.cleaner(entity_set)
@@ -133,7 +138,7 @@ class NerTagger:
         linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
 
         # canonicalization, synonymization
-        linked = [(e[0], e[1], linked_entity_map.get(e[0])) for e in entities]
+        linked = [DocEntity(*e[0:5], linked_entity_map.get(e[0])) for e in entities]
 
         return linked
 
@@ -182,6 +187,8 @@ class NerTagger:
         - applies rule_sets
         - normalizes terms
 
+        Note: for bulk processing, linking is better done in a separate step, batched
+
         Args:
             content (list[str]): list of content on which to do NER
             link (bool, optional): whether to link entities. Defaults to True.
@@ -205,7 +212,6 @@ class NerTagger:
             self.__prep_doc,
             self.rule_nlp.pipe if self.rule_nlp else lambda x: x,
             self.nlp.pipe,
-            # TODO: linking would be faster if done in batch
             lambda docs: [
                 self.__normalize_and_maybe_link(doc, link, entity_types) for doc in docs
             ],
