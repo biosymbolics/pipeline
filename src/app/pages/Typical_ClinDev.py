@@ -53,12 +53,12 @@ def get_data() -> pl.DataFrame:
         pl.col("offset").alias("start"),
         pl.struct(["offset", "median_duration"]).apply(lambda rec: rec["offset"] + rec["median_duration"]).alias("end"),  # type: ignore
     )
-    return df
+    return df.sort("offset")
 
 
 def render_df(df: pl.DataFrame):
     st.dataframe(
-        df.reverse(),
+        df,
         column_config={
             "0": "phase",
             "1": "offset",
@@ -73,20 +73,19 @@ def render_df(df: pl.DataFrame):
 
 def render_chart(df: pl.DataFrame):
     pdf = df.to_pandas()
-    error_left = (
-        alt.Chart(pdf, width=450, height=300)
-        .mark_errorbar(extent="stderr", ticks=True)
-        .encode(x="start", xError="iqr", y="stage")
+    max_end = pdf["end"].max() + 2
+    base = alt.Chart(pdf, width=450, height=300)
+    y = alt.Y("stage", sort=alt.SortField(field="x", order="ascending"))
+    error_left = base.mark_errorbar(extent="iqr", ticks=True).encode(
+        x="start", xError="iqr", y=y
     )
-    error_right = (
-        alt.Chart(pdf, width=450, height=300)
-        .mark_errorbar(extent="stderr", ticks=True)
-        .encode(x="end", xError="iqr", y="stage")
+    error_right = base.mark_errorbar(extent="iqr", ticks=True).encode(
+        x="end", xError="iqr", y=y
     )
-    bar = (
-        alt.Chart(pdf, width=450, height=300)
-        .mark_bar()
-        .encode(x="start", x2="end", y="stage")
+    bar = base.mark_bar().encode(
+        x=alt.X("start"),
+        x2="end",
+        y=y,
     )
     layered = error_left + error_right + bar
     st.altair_chart(layered)  # type: ignore
