@@ -11,10 +11,10 @@ import logging
 import warnings
 import html
 import spacy
-from thinc.api import prefer_gpu
 from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
+from clients.spacy import DEFAULT_MODEL
 
 from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
@@ -58,6 +58,7 @@ class NerTagger:
             INTERVENTION_SPACY_PATTERNS,
             MECHANISM_SPACY_PATTERNS,
         ],
+        parallelize: bool = True,
     ):
         """
         Named-entity recognition using spacy
@@ -77,26 +78,30 @@ class NerTagger:
         self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.linker: Optional[TermLinker] = None  # lazy initialization
-        self.cleaner = EntityCleaner()
+        self.cleaner = EntityCleaner(parallelize=parallelize)
         start_time = time.time()
 
         if self.use_llm:
             if not self.llm_config:
                 raise ValueError("Must provide llm_config if use_llm is True")
             self.nlp = assemble(self.llm_config)
+
         elif self.model:
             if not self.model.endswith(".pt"):
                 raise ValueError("Model must be torch")
             self.nlp = BinderNlp(self.model)
-            rule_nlp = spacy.load("en_core_sci_scibert")
+
+            rule_nlp = spacy.load(DEFAULT_MODEL)  # "en_core_sci_scibert")
             rule_nlp.add_pipe("merge_entities", after="ner")
             ruler = rule_nlp.add_pipe(
                 "entity_ruler",
                 config={"validate": True, "overwrite_ents": True},
                 after="merge_entities",
             )
+
             for rules in self.rule_sets:
                 ruler.add_patterns(rules)  # type: ignore
+
             self.rule_nlp = rule_nlp
         else:
             raise ValueError("Must provide either use_llm or model")
@@ -154,7 +159,7 @@ class NerTagger:
             entity_types (list[str], optional): Entity types to filter by. Defaults to None.
         """
         normalized = self.__normalize(doc, entity_types)
-        if link:
+        if link and len(normalized) > 0:
             return self.__link(normalized)
         return normalized
 
@@ -219,7 +224,9 @@ class NerTagger:
         ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
 
         logging.info(
-            "Entities found: %s, took %s", ents_by_doc, time.time() - start_time
+            "Entities found: %s, took %s seconds",
+            ents_by_doc,
+            round(time.time() - start_time, 2),
         )
 
         return ents_by_doc  # type: ignore

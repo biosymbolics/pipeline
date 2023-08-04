@@ -1,6 +1,7 @@
 """
 Utils for the NER pipeline
 """
+import time
 from typing import Callable, Iterable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
@@ -100,9 +101,11 @@ class EntityCleaner:
         self,
         additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
         char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+        parallelize: bool = True,
     ):
         self.additional_common_words = additional_common_words
         self.char_suppressions = char_suppressions
+        self.parallelize = parallelize
         self.__common_words = None
         self.nlp = Spacy.get_instance(disable=["ner"])
 
@@ -214,7 +217,7 @@ class EntityCleaner:
                 yield reduce(lambda x, func: func(x), steps, term)
 
         def exec_func(func, x):
-            logging.info("Executing function: %s", func.__name__)
+            logging.debug("Executing function: %s", func)
             return func(x)
 
         cleaning_steps = [
@@ -222,9 +225,9 @@ class EntityCleaner:
             remove_chars,
             remove_extra_spaces,
             normalize_phrasing,
-            rearrange_terms,
-            lemmatize_tails,
-            normalize_by_pos,
+            partial(rearrange_terms, parallelize=self.parallelize),
+            partial(lemmatize_tails, parallelize=self.parallelize),
+            partial(normalize_by_pos, parallelize=self.parallelize),
             lower,
         ]
 
@@ -290,6 +293,7 @@ class EntityCleaner:
             filter_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
             remove_supressions (bool, optional): remove suppressions? Defaults to False (leaves empty spaces in, to maintain order)
         """
+        start = time.time()
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
@@ -302,6 +306,12 @@ class EntityCleaner:
 
         terms = [self.__get_text(ent) for ent in entities]
         cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
+
+        logging.info(
+            "Cleaned %s entities in %s seconds",
+            len(entities),
+            round(time.time() - start, 2),
+        )
 
         return self.__return_to_type(cleaned, entities, remove_supressions)
 

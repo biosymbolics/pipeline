@@ -32,7 +32,7 @@ PHARMA_TICKERS = [
     # "MTZPY", # 20-F
     "MRK",
     "BMY",
-    "BIIB",
+    # "BIIB",
     "SNY",
     "VTRS",
     "REGN",
@@ -74,6 +74,11 @@ async def main():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 -m  workflows.enpv.build\nLoad eNVP SEC data")
+        print(
+            """
+              Usage: python3 -m  workflows.enpv.build
+              Load eNVP SEC data
+        """
+        )
         sys.exit()
     asyncio.run(main())

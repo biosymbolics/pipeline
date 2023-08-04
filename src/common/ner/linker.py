@@ -42,7 +42,6 @@ class TermLinker:
         torch.device("mps")  # does this work?
         self.candidate_generator = CandidateGenerator()
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
-        # self.synonym_store = SynonymStore()
 
     def __get_canonical_entity(
         self, candidates: list[MentionCandidate]
@@ -95,6 +94,10 @@ class TermLinker:
         Args:
             terms (list[str]): list of terms to normalize
         """
+        if len(terms) == 0:
+            logging.warning("No terms to link")
+            return []
+
         canonical_map = self.generate_map(terms)
 
         with ThreadPoolExecutor(max_workers=4) as executor:
