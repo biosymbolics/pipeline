@@ -134,7 +134,7 @@ MOA_INFIXES = [
 MOA_SUFFIXES = [
     *EFFECTS,
     *BIOLOGIC_SUFFIXES,
-    "composition",
+    "composition",  # compound suffix
     "regimen",
     "therapy",
 ]

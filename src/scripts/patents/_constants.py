@@ -105,6 +105,7 @@ INTERVENTION_BASE_PREFIXES = [
     "monoclonal",
     "acceptable",
     "receptor",
+    "(?:ion )?channel",
     "encoding",
     "encoders",
     "positive",

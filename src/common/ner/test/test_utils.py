@@ -132,6 +132,7 @@ class TestNerUtils(unittest.TestCase):
             # (6R,S)-5-formyltetrahydrofolate
             # (meth)acrylic acid polymer
             # inhibitors of the interaction between mdm2
+            # inhibitors of phosphatidylinositol 3-kinase gamma
             # mannose-1-phosphate guanylyltransferase (GDP) activity
             # {
             #     "input": "middle-of-the night insomnia",

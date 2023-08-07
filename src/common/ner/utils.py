@@ -4,6 +4,7 @@ Utils for the NER pipeline
 from functools import partial, reduce
 import logging
 import re
+import time
 from typing import Iterable
 from spacy.tokens import Doc
 from clients.spacy import Spacy
@@ -118,18 +119,18 @@ def lemmatize_tail(term: str | Doc) -> str:
     return tail_lemmatized
 
 
-def lemmatize_tails(terms: list[str], parallelize: bool = True) -> Iterable[str]:
+def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
     """
     nlp = Spacy.get_instance()._nlp
-    docs = nlp.pipe(terms, n_process=4 if parallelize else 1)  # turn into spacy docs
+    docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
         yield lemmatize_tail(doc)
 
 
-def rearrange_terms(terms: list[str], parallelize: bool = True) -> Iterable[str]:
+def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
@@ -144,7 +145,7 @@ def rearrange_terms(terms: list[str], parallelize: bool = True) -> Iterable[str]
 
     def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
         subbed = [re.sub(adp_ext, adp_term, t) for t in _terms]
-        final = __rearrange_adp(subbed, adp_term=adp_term, parallelize=parallelize)
+        final = __rearrange_adp(subbed, adp_term=adp_term, n_process=n_process)
         return final
 
     steps = [
@@ -156,7 +157,7 @@ def rearrange_terms(terms: list[str], parallelize: bool = True) -> Iterable[str]
 
 
 def __rearrange_adp(
-    terms: list[str], adp_term: str = "of", parallelize: bool = True
+    terms: list[str], adp_term: str = "of", n_process: int = 1
 ) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
@@ -165,7 +166,7 @@ def __rearrange_adp(
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
     nlp = Spacy.get_instance()._nlp
-    docs = nlp.pipe(terms, n_process=4 if parallelize else 1)
+    docs = nlp.pipe(terms, n_process=n_process)
 
     def __rearrange(doc: Doc) -> str:
         tokens = doc
@@ -270,7 +271,7 @@ def __normalize_by_pos(doc: Doc):
     )
 
 
-def normalize_by_pos(terms: list[str], parallelize: bool = True) -> Iterable[str]:
+def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -299,6 +300,8 @@ def normalize_by_pos(terms: list[str], parallelize: bool = True) -> Iterable[str
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
+    start = time.time()
+    nlp = Spacy.get_instance()
 
     def skip(term: str) -> bool:
         # simple hack to avoid futzing with things like '1-(3-aminophenyl)-6,8-dimethyl-5-...'
@@ -309,8 +312,7 @@ def normalize_by_pos(terms: list[str], parallelize: bool = True) -> Iterable[str
         return re.sub(DASHES_RE, rf" {DASH} ", term) if not skip(term) else term
 
     sep_dash_terms = [sep_dash(term) for term in terms]
-    nlp = Spacy.get_instance()
-    docs = nlp.pipe(sep_dash_terms, n_process=4 if parallelize else 1)
+    docs = nlp.pipe(sep_dash_terms, n_process=n_process)
 
     for doc in docs:
         if skip(doc.text):
@@ -318,3 +320,7 @@ def normalize_by_pos(terms: list[str], parallelize: bool = True) -> Iterable[str
             continue
 
         yield __normalize_by_pos(doc)
+
+    logging.info(
+        "Took %s seconds to complete pos rearrange", round(time.time() - start, 2)
+    )

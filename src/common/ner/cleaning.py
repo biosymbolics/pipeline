@@ -18,7 +18,7 @@ from .types import DocEntity, is_entity_doc_list
 from .utils import normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
-CleanFunction = Callable[[list[T]], list[T]]
+CleanFunction = Callable[[list[str], int], list[str]]
 
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
@@ -83,6 +83,8 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(1)",
 ]
 
+MAX_N_PROCESS = 4
+
 
 class EntityCleaner:
     """
@@ -107,7 +109,18 @@ class EntityCleaner:
         self.char_suppressions = char_suppressions
         self.parallelize = parallelize
         self.__common_words = None
-        self.nlp = Spacy.get_instance(disable=["ner"])
+        self.nlp = Spacy.get_instance(disable=["ner"])._nlp
+
+    def get_n_process(self, num_entries: int) -> int:
+        """
+        Get the number of processes to use for parallelization in nlp pipeline
+
+        only parallelize if
+            1) parallelize is set to true and
+            2) there are more than 50 entities (otherwise the overhead way exceeds the benefits)
+        """
+        parallelize = self.parallelize and num_entries > 50
+        return MAX_N_PROCESS if parallelize else 1
 
     @property
     def common_words(self) -> list[str]:
@@ -121,7 +134,10 @@ class EntityCleaner:
         return self.__common_words
 
     def filter_common_terms(
-        self, terms: list[str], exception_list: list[str] = DEFAULT_EXCEPTION_LIST
+        self,
+        terms: list[str],
+        exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
+        n_process: int = 1,
     ) -> list[str]:
         """
         Filter out common terms from a list of terms, e.g. "vaccine candidates"
@@ -130,11 +146,11 @@ class EntityCleaner:
             terms (list[str]): list of terms
             exception_list (list[str]): list of exceptions to the common terms
         """
+        # doing in bulk for perf
+        words = self.nlp.pipe(terms, n_process=n_process)
+        term_words = [(term, words) for term, words in zip(terms, words)]
 
-        def __is_common(term):
-            # remove punctuation and make lowercase
-            words = [token.lemma_ for token in self.nlp(term)]
-
+        def __is_common(term, words):
             # check if all words are in the vocab
             is_common = set(words).issubset(self.common_words)
 
@@ -149,13 +165,13 @@ class EntityCleaner:
                 logging.debug(f"Keeping exception term: {term}")
             return is_common_not_excepted
 
-        def __is_uncommon(term):
-            return not __is_common(term)
+        def __is_uncommon(term, words):
+            return not __is_common(term, words)
 
-        new_list = [(t if __is_uncommon(t) else "") for t in terms]
+        new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_words])
         return new_list
 
-    def normalize_terms(self, terms: list[str]) -> list[str]:
+    def normalize_terms(self, terms: list[str], n_process: int = 1) -> list[str]:
         """
         Normalize terms
         - remove certain characters
@@ -163,8 +179,10 @@ class EntityCleaner:
         - lemmatize?
 
         Args:
-            entities (list[T]): entities
+            terms (list[str]): terms
+            n_process (int): number of processes to use for parallelization
         """
+        start = time.time()
 
         def remove_chars(_terms: list[str]) -> Iterable[str]:
             def __remove_chars(term):
@@ -207,6 +225,7 @@ class EntityCleaner:
                 "related conditions?": "associated disease",
                 "related diseases?": "associated disease",
                 "antibodies?": "antibody",
+                "diarrhoea": "diarrhea",
             }
             steps = [
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)
@@ -225,14 +244,21 @@ class EntityCleaner:
             remove_chars,
             remove_extra_spaces,
             normalize_phrasing,
-            partial(rearrange_terms, parallelize=self.parallelize),
-            partial(lemmatize_tails, parallelize=self.parallelize),
-            partial(normalize_by_pos, parallelize=self.parallelize),
+            partial(rearrange_terms, n_process=n_process),
+            partial(lemmatize_tails, n_process=n_process),
+            partial(normalize_by_pos, n_process=n_process),
             lower,
         ]
 
-        normalized = reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
+        normalized = list(
+            reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
+        )
 
+        logging.info(
+            "Normalized %s terms in %s seconds",
+            len(terms),
+            round(time.time() - start, 2),
+        )
         return normalized
 
     def __suppress(self, terms: list[str]) -> list[str]:
@@ -258,6 +284,8 @@ class EntityCleaner:
         modified_texts: list[str], orig_ents: list[T], remove_supressions: bool = False
     ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
+            logging.info("Modified text: %s", modified_texts)
+            logging.info("Original entities: %s", orig_ents)
             raise ValueError("Modified text must be same length as original entities")
 
         if is_entity_doc_list(orig_ents):
@@ -297,15 +325,20 @@ class EntityCleaner:
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
+        num_processes = self.get_n_process(len(entities))
+
         cleaning_steps: list[CleanFunction] = [
-            self.__suppress,
+            lambda terms, n_process: self.__suppress(terms),
             self.normalize_terms,
-            partial(self.filter_common_terms, exception_list=filter_exception_list),
+            partial(
+                self.filter_common_terms,
+                exception_list=filter_exception_list,
+            ),
             # dedup,
         ]
 
         terms = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
+        cleaned = reduce(lambda x, func: func(x, num_processes), cleaning_steps, terms)
 
         logging.info(
             "Cleaned %s entities in %s seconds",

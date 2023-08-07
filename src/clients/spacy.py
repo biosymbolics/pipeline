@@ -55,5 +55,7 @@ class Spacy:
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
+            logging.info("Returning UNCACHED nlp model (%s)", model)
             cls._instances[args_hash] = cls(model, **kwargs)
+        logging.info("Returning CACHED nlp model (%s)", model)
         return cls._instances[args_hash]
