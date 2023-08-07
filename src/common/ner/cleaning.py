@@ -1,12 +1,14 @@
 """
 Utils for the NER pipeline
 """
+from abc import abstractmethod
 import time
 from typing import Callable, Iterable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
 import logging
 import html
+from typing_extensions import Protocol
 
 from clients.spacy import Spacy
 from common.ner.utils import lemmatize_tails
@@ -18,7 +20,13 @@ from .types import DocEntity, is_entity_doc_list
 from .utils import normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
-CleanFunction = Callable[[list[str], int], list[str]]
+
+
+class CleanFunction(Protocol):
+    @abstractmethod
+    def __call__(self, terms: list[str], n_process: int) -> list[str]:
+        pass
+
 
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
@@ -338,7 +346,9 @@ class EntityCleaner:
         ]
 
         terms = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(lambda x, func: func(x, num_processes), cleaning_steps, terms)
+        cleaned = reduce(
+            lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
+        )
 
         logging.info(
             "Cleaned %s entities in %s seconds",
