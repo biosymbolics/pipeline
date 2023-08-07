@@ -72,7 +72,7 @@ def query_to_bg_table(query: str, new_table_name: str):
     """
     logging.info("Creating table %s", new_table_name)
     new_table_id = get_table_id(new_table_name)
-    create_table_query = f"CREATE TABLE `{new_table_id}` AS {query};"
+    create_table_query = f"CREATE or REPLACE TABLE `{new_table_id}` AS {query};"
     execute_bg_query(create_table_query)
 
 

@@ -431,8 +431,6 @@ if __name__ == "__main__":
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    delete_bg_table(WORKING_TABLE)
-    time.sleep(20)
     query_to_bg_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
 
     fix_of_for_annotations()

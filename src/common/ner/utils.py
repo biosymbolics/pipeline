@@ -300,7 +300,6 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
-    start = time.time()
     nlp = Spacy.get_instance()
 
     def skip(term: str) -> bool:
@@ -320,7 +319,3 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
             continue
 
         yield __normalize_by_pos(doc)
-
-    logging.info(
-        "Took %s seconds to complete pos rearrange", round(time.time() - start, 2)
-    )

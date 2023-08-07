@@ -3,16 +3,18 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Callable, Iterable, TypeVar, Union, cast
+from typing import Iterable, TypeVar, Union, cast
 import re
 from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
+from spacy.tokens import Token
 
 from clients.spacy import Spacy
 from common.ner.utils import lemmatize_tails
-from common.utils.list import dedup
+
+# from common.utils.list import dedup
 from common.utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 from typings.core import is_string_list
 
@@ -155,15 +157,18 @@ class EntityCleaner:
             exception_list (list[str]): list of exceptions to the common terms
         """
         # doing in bulk for perf
-        words = self.nlp.pipe(terms, n_process=n_process)
-        term_words = [(term, words) for term, words in zip(terms, words)]
+        token_sets = self.nlp.pipe(terms, n_process=n_process)
+        term_lemmas = [
+            (term, set([t.lemma_ for t in tokens]))
+            for term, tokens in zip(terms, token_sets)
+        ]
 
-        def __is_common(term, words):
+        def __is_common(term: str, lemmas: set[str]) -> bool:
             # check if all words are in the vocab
-            is_common = set(words).issubset(self.common_words)
+            is_common = lemmas.issubset(self.common_words)
 
             # check if any words are in the exception list
-            is_excepted = bool(set(exception_list) & set(words))
+            is_excepted = bool(set(exception_list) & set(lemmas))
 
             is_common_not_excepted = is_common and not is_excepted
 
@@ -173,10 +178,10 @@ class EntityCleaner:
                 logging.debug(f"Keeping exception term: {term}")
             return is_common_not_excepted
 
-        def __is_uncommon(term, words):
-            return not __is_common(term, words)
+        def __is_uncommon(term: str, lemmas: set[str]) -> bool:
+            return not __is_common(term, lemmas)
 
-        new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_words])
+        new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_lemmas])
         return new_list
 
     def normalize_terms(self, terms: list[str], n_process: int = 1) -> list[str]:
@@ -292,8 +297,9 @@ class EntityCleaner:
         modified_texts: list[str], orig_ents: list[T], remove_supressions: bool = False
     ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
-            logging.info("Modified text: %s", modified_texts)
-            logging.info("Original entities: %s", orig_ents)
+            logging.info(
+                "Modified text: %s, original entities: %s", modified_texts, orig_ents
+            )
             raise ValueError("Modified text must be same length as original entities")
 
         if is_entity_doc_list(orig_ents):
