@@ -192,18 +192,18 @@ class TermAssembler:
                 FROM
                 (
                     -- gpr annotations
-                    SELECT preferred_name as term, CAST(ocid as STRING) as original_id, domain
+                    SELECT lower(preferred_name) as term, CAST(ocid as STRING) as original_id, domain
                     FROM `{BQ_DATASET_ID}.gpr_annotations`
                     where length(preferred_name) > 1
 
                     UNION ALL
 
                     -- biosym annotations
-                    SELECT original_term as term, canonical_id as original_id, domain
+                    SELECT lower(original_term) as term, canonical_id as original_id, domain
                     FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
                     where length(original_term) > 1
                 ) AS all_annotations
-                group by term, original_id, domain
+                group by lower(term), original_id, domain
             """
         rows = select_from_bg(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -217,7 +217,7 @@ class TermAssembler:
         def __normalize(row):
             entry = normalization_map.get(row["term"])
             if not entry:
-                return SYNONYM_MAP.get(row["term"].lower()) or row["term"]
+                return SYNONYM_MAP.get(row["term"]) or row["term"]
             return entry.name
 
         term_records: list[TermRecord] = [

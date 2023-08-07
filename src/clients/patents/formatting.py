@@ -36,7 +36,7 @@ def format_search_result(
         .str.strptime(pl.Date, "%Y%m%d")
         .alias("priority_date"),
         pl.col("assignees").apply(
-            lambda assignees: clean_assignees(assignees.to_list())
+            lambda assignees: list(clean_assignees(assignees.to_list()))
         ),
         pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
     )
