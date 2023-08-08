@@ -30,7 +30,7 @@ def get_or_re(
 
     Args:
         re_strs (list[str]): list of regexes
-        count (Optional[ReCount]): count to apply to regex
+        count (Optional[ReCount]): count to apply to regex (defaults to None, which is effectively {1})
     """
     base_re = f"(?:{'|'.join(re_strs)})"
 

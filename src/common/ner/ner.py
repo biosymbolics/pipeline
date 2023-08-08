@@ -200,9 +200,10 @@ class NerTagger:
             entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
-            >>> tagger.extract(["Inhibitors of beta secretase"], link=False) # non-working 07/19/2023
+            >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
             >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
-            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"])
+            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"]) # as of 08/08/2023, il-6 not captured
+            >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"], link=False)
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")

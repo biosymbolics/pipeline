@@ -227,6 +227,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
+    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
@@ -239,6 +240,9 @@ def __normalize_by_pos(doc: Doc):
             if t.pos_ == "ADJ":
                 return " "
             if t.pos_ == "PUNCT":
+                if prev_t.pos_ == "PUNCT":
+                    # (-)-ditoluoyltartaric acid -> (-)-ditoluoyltartaric acid
+                    return DASH
                 if (
                     next_t is not None
                     and (next_t.pos_ == "NUM" or len(next_t.text) < 3)

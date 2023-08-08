@@ -127,13 +127,13 @@ class TestNerUtils(unittest.TestCase):
                 "input": "conditions associated with production of IL-1 and IL-6",
                 "expected": "IL-1 and il-6 production conditions",
             },
-            # (+)-hydrocodone
-            # (6e)-8-hydroxygeraniol
-            # (6R,S)-5-formyltetrahydrofolate
+            {
+                "input": "inhibitors of phosphatidylinositol 3-kinase gamma",
+                "expected": "phosphatidylinositol 3-kinase gamma inhibitors",
+            },
             # (meth)acrylic acid polymer
             # inhibitors of the interaction between mdm2
-            # inhibitors of phosphatidylinositol 3-kinase gamma
-            # mannose-1-phosphate guanylyltransferase (GDP) activity
+            #
             # {
             #     "input": "middle-of-the night insomnia",
             #     "expected": "middle of the night insomnia",
@@ -234,7 +234,19 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "(-)-ditoluoyltartaric acid",
-                "expected": "(-) ditoluoyltartaric acid",
+                "expected": "(-)-ditoluoyltartaric acid",
+            },
+            {
+                "input": "(+)-hydrocodone",
+                "expected": "(+)-hydrocodone",
+            },
+            {
+                "input": "(6e)-8-hydroxygeraniol",
+                "expected": "(6e)-8 hydroxygeraniol",
+            },
+            {
+                "input": "(6R,S)-5-formyltetrahydrofolate",
+                "expected": "(6R,S) 5-formyltetrahydrofolate",  # not ideal, but ok
             },
         ]
 
