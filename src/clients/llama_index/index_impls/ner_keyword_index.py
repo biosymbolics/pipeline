@@ -2,7 +2,7 @@
 Biomedical Named Entity Recognition Keyword Table Index
 """
 import logging
-from typing import Any, Optional, Set
+from typing import Any, Set
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -17,7 +17,6 @@ from llama_index.indices.keyword_table.retrievers import BaseKeywordTableRetriev
 from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
 from llama_index.retrievers import VectorIndexRetriever
 from llama_index.schema import NodeWithScore
-from pydash import flatten
 
 from common.ner.ner import NerTagger
 
@@ -29,20 +28,14 @@ def extract_keywords(
 ) -> set[str]:
     """
     Extract keywords from text using NER tagger.
+
+    Args:
+        text (str): text to extract keywords from
+        tagger (NerTagger): NER tagger
+        max_keywords (int): max number of keywords to extract
     """
-    entities_by_doc = tagger.extract([text], link=True)
-
-    logging.info(f"Extracted {len(entities_by_doc)} docs")
-
-    entities = entities_by_doc[0]
-    keywords = flatten(
-        [
-            (ent.term, ent.linked_entity.name)
-            if ent.linked_entity
-            else (ent.normalized_term or ent.term)
-            for ent in entities
-        ]
-    )
+    entities = tagger.extract_strings([text], link=True)
+    keywords = entities[0]
     return set(keywords[0:max_keywords])
 
 
@@ -143,51 +136,18 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             storage_context.vector_store, service_context
         )
 
-    def _ner_extract_keywords(
-        self, text: str, max_keywords: Optional[int] = 10000
-    ) -> Set[str]:
-        """
-        Extract keywords from text using biomedical NER.
-        Includes original term plus canonical term if available.
-
-        Args:
-            text (str): text from which to extract keywords
-            max_keywords (Optional[int], optional): maximum number of keywords to extract. Defaults to 10000.
-        """
-        entities_by_doc = self.tagger.extract([text], link=True)
-
-        logging.info(f"Extracted {len(entities_by_doc)} docs: %s", entities_by_doc)
-
-        entities = entities_by_doc[0]
-
-        if len(entities) == 0:
-            logging.warning("No entities extracted")
-
-        keywords = flatten(
-            [
-                (ent.term, ent.linked_entity.name)
-                if ent.linked_entity
-                else (ent.normalized_term)
-                for ent in entities
-            ]
-        )
-        return set(keywords[0:max_keywords])
-
     async def _async_extract_keywords(self, text: str) -> Set[str]:
         raise NotImplementedError("Async not implemented for NER index")
 
-    def _extract_keywords(self, text: str) -> Set[str]:
+    def _extract_keywords(self, text: str, max_keywords: int = 10000) -> Set[str]:
         """
         Extract keywords from text, using the simple method augmented by our biomedical NER.
 
         Args:
             text (str): text from which to extract keywords
+            max_keywords (int, optional): maximum number of keywords to extract. Defaults to 10000.
         """
-
-        keywords = self._ner_extract_keywords(
-            text, max_keywords=self.max_keywords_per_chunk
-        )
-        return keywords
+        return extract_keywords(text, tagger=self.tagger, max_keywords=max_keywords)
 
     def as_retriever(
         self,

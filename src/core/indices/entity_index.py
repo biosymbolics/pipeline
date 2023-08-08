@@ -30,6 +30,7 @@ from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
 INDEX_NAME = "entity-docs"
+from core.constants import DEFAULT_ENTITY_TYPES
 
 
 class EntityIndex:
@@ -51,17 +52,21 @@ class EntityIndex:
             model_name (LlmModelType, optional): model name. Defaults to DEFAULT_MODEL_NAME.
             storage_args (StorageArgs, optional): storage args. Defaults to {}.
         """
-        self.storage_args = storage_args
-        self.model: LlmModelType = model_name
         self.index = None
-        self.index_impl = GPTVectorStoreIndex
-        self.__load()
+        self.index_impl = VectorStoreIndex
+        self.all_index_args = {
+            "index_impl": self.index_impl,
+            "model_name": model_name,
+            "storage_args": storage_args,
+        }
+        index = load_index(INDEX_NAME, **self.all_index_args)
+        self.index = index
 
     def __get_namespace(
         self,
         source: NamespaceKey,
         entity_id: Optional[str] = None,
-        entity_type: Optional[str] = "intervention",
+        entity_type: Optional[str] = "compounds",
     ) -> NamespaceKey:
         """
         Namespace for the entity, e.g.
@@ -128,13 +133,6 @@ class EntityIndex:
             raise Exception(f"Failed to parse entity %s", entity_id)
         return entity_obj
 
-    def __load(self):
-        """
-        Load entity index from disk
-        """
-        index = load_index(INDEX_NAME, VectorStoreIndex, self.model, self.storage_args)
-        self.index = index
-
     def add_node(
         self,
         entity_id: str,
@@ -181,11 +179,9 @@ class EntityIndex:
         upsert_index(
             INDEX_NAME,
             [details],
-            index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
-            model_name=self.model,
-            storage_args=self.storage_args,
+            **self.all_index_args,
         )
 
     def add_node_from_docs(
@@ -267,16 +263,12 @@ class EntityIndex:
             get_namespace_key (Callable[[str], NamespaceKey]): function to get namespace id from key, e.g.
                 `create_from_docs(doc_map, get_namespace_key)`
         """
-        tagger = NerTagger.get_instance()
+        tagger = NerTagger.get_instance(entity_types=DEFAULT_ENTITY_TYPES)
         for key, docs in doc_map.items():
-            entities = tagger.extract(
-                docs,
-                entity_types=["mechanisms", "compounds", "classes"],
-            )
-            flattend_entities = [ent[0] for ent in flatten(entities)]
+            keywords = flatten(tagger.extract_strings(docs))
             ns_key = get_namespace_key(key)
             EntityIndex.create_entity_indices(
-                entities=cast(list[str], flattend_entities),
+                entities=keywords,
                 namespace_key=ns_key,
                 documents=docs,
             )

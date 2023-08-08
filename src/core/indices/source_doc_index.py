@@ -17,6 +17,7 @@ from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
 from common.utils.namespace import get_namespace_id
 from constants.core import DEFAULT_MODEL_NAME
+from core.constants import DEFAULT_ENTITY_TYPES
 from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 INDEX_NAME = "source-docs"
@@ -24,8 +25,6 @@ INDEX_NAME = "source-docs"
 DEFAULT_STORAGE_ARGS: StorageArgs = {
     "storage_type": "mongodb",
 }
-
-DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 
 DEFAULT_INDEX_ARGS = {
     "ner_options": {

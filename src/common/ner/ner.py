@@ -5,7 +5,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from functools import reduce
 import time
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Any, Generic, Literal, Optional, Type, TypeVar, Union
 from pydash import flatten
 import logging
 import warnings
@@ -177,17 +177,36 @@ class NerTagger:
         entity_set = spans_to_doc_entities(ents)
         return entity_set
 
+    @staticmethod
+    def __get_string_entity(entity: DocEntity) -> str:
+        """
+        Get the string representation of an entity
+        (linked name otherwise normalized term otherwise term)
+        """
+        if entity.linked_entity:
+            return entity.linked_entity.name
+        return entity.normalized_term or entity.term
+
+    @staticmethod
+    def __get_string_entities(entities: DocEntities) -> list[str]:
+        """
+        Get the string representation of a list of entities
+        """
+        return [NerTagger.__get_string_entity(entity) for entity in entities]
+
     def __extract(self, content: list[str]) -> list[DocEntities]:
         """
         Run both NLP pipelines (rule_nlp and binder)
 
         To avoid reconstructing the SpaCy doc, just return DocEntities
         """
-        docs_1 = self.nlp.pipe(content)
+        binder_docs = self.nlp.pipe(content)
         if self.rule_nlp:
-            docs_2 = self.rule_nlp.pipe(content)
-            return [self.__extract_ents(d1, d2) for d1, d2 in zip(docs_1, docs_2)]
-        return [spans_to_doc_entities(doc.ents) for doc in docs_1]
+            rule_docs = self.rule_nlp.pipe(content)
+            return [
+                self.__extract_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
+            ]
+        return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
     def __extract_and_normalize(
         self,
@@ -235,6 +254,7 @@ class NerTagger:
         Args:
             content (list[str]): list of content on which to do NER
             link (bool, optional): whether to link entities. Defaults to True.
+            return_type (LT, optional): type of return value. Defaults to None (in which case list[DocEntities] is returned)
 
         Examples:
             >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
@@ -260,7 +280,14 @@ class NerTagger:
             ents_by_doc,
         )
 
-        return ents_by_doc  # type: ignore
+        return ents_by_doc
+
+    def extract_strings(self, content: list[str], **kwargs) -> list[list[str]]:
+        """
+        Extract named entities from a list of content, returning a list of strings
+        """
+        ents_by_doc = self.extract(content, **kwargs)
+        return [self.__get_string_entities(e) for e in ents_by_doc]
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return self.extract(*args, **kwds)
