@@ -28,10 +28,22 @@ class CanonicalEntity(NamedTuple):
     aliases: Optional[List[str]] = []
 
 
-DocEntity = namedtuple(
-    "DocEntity",
-    ["term", "type", "start_char", "end_char", "normalized_term", "linked_entity"],
-)
+class DocEntity(
+    namedtuple(
+        "DocEntity",
+        ["term", "type", "start_char", "end_char", "normalized_term", "linked_entity"],
+    )
+):
+    def __str__(self):
+        norm_term = (
+            self.linked_entity.name if self.linked_entity else self.normalized_term
+        )
+        return f"{self.term} ({self.type}, s: {self.start_char}, e: {self.end_char}, norm_term: {norm_term})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
 DocEntities = list[DocEntity]
 
 

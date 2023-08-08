@@ -203,7 +203,7 @@ class NerTagger:
         ents_by_doc = self.__extract(self.__prep_for_extract(content.copy()))
 
         def __normalize(entity_set):
-            normalized = self.cleaner(entity_set, remove_supressions=True)
+            normalized = self.cleaner.clean(entity_set, remove_suppresed=True)
 
             # filter by entity types, if provided
             if include_entity_types:
@@ -234,7 +234,7 @@ class NerTagger:
         Args:
             content (list[str]): list of content on which to do NER
             link (bool, optional): whether to link entities. Defaults to True.
-            entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
+            include_entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
             >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
@@ -255,9 +255,9 @@ class NerTagger:
         ents_by_doc = self.__extract_and_normalize(content, link, entity_types)
 
         logging.info(
-            "Entities found: %s, took %s seconds",
-            ents_by_doc,
+            "Full entity extraction took %s seconds, yielded %s",
             round(time.time() - start_time, 2),
+            ents_by_doc,
         )
 
         return ents_by_doc  # type: ignore

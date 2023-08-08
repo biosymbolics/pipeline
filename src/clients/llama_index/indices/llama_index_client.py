@@ -38,11 +38,12 @@ def load_index(
         index_args (Mapping[str, Any]): args to pass to the index implementation
     """
     logging.info(
-        "Loading index %s (%s, %s, %s)",
+        "Loading index %s (%s, %s, %s, %s)",
         index_name,
         model_name,
         storage_args,
         index_impl,
+        index_args,
     )
     storage_context = get_storage_context(index_name, **storage_args)
     service_context = get_service_context(model_name=model_name)
@@ -65,6 +66,7 @@ def load_index(
             index_struct=index_struct,
             storage_context=storage_context,
             service_context=service_context,
+            **index_args,
         )
     except ValueError as e:
         logging.info("Cannot load index; creating. Exception: %s", e)

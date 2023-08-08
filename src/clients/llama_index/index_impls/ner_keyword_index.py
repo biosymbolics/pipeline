@@ -2,7 +2,7 @@
 Biomedical Named Entity Recognition Keyword Table Index
 """
 import logging
-from typing import Any, Optional, Sequence, Set
+from typing import Any, Optional, Set
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -15,7 +15,6 @@ from llama_index.indices.base_retriever import BaseRetriever
 from llama_index.indices.keyword_table import SimpleKeywordTableIndex
 from llama_index.indices.keyword_table.retrievers import BaseKeywordTableRetriever
 from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
-from llama_index.data_structs.data_structs import IndexDict
 from llama_index.retrievers import VectorIndexRetriever
 from llama_index.schema import NodeWithScore
 from pydash import flatten
@@ -23,14 +22,18 @@ from pydash import flatten
 from common.ner.ner import NerTagger
 
 
-def extract_keywords(text: str, tagger: NerTagger, max_keywords: int) -> set[str]:
+def extract_keywords(
+    text: str,
+    tagger: NerTagger,
+    max_keywords: int,
+    entity_types: list[str] | None = None,
+) -> set[str]:
     """
     Extract keywords from text using NER tagger.
     """
-    entities_by_doc = tagger.extract([text], link=False)
+    entities_by_doc = tagger.extract([text], link=False, entity_types=entity_types)
 
     logging.info(f"Extracted {len(entities_by_doc)} docs")
-    print(entities_by_doc)
 
     if len(entities_by_doc) == 0:
         raise ValueError("No entities extracted")
@@ -56,6 +59,7 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
         self,
         *args,
         tagger: NerTagger,
+        entity_types: list[str] | None = None,
         **kwargs,
     ):
         """
@@ -63,11 +67,15 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
         """
         super().__init__(*args, **kwargs)
         self.tagger = tagger
+        self.entity_types = entity_types
 
     def _get_keywords(self, query_str: str) -> list[str]:
         return list(
             extract_keywords(
-                query_str, tagger=self.tagger, max_keywords=self.max_keywords_per_query
+                query_str,
+                tagger=self.tagger,
+                max_keywords=self.max_keywords_per_query,
+                entity_types=self.entity_types,
             )
         )
 
@@ -126,6 +134,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         service_context: ServiceContext,
         storage_context: StorageContext,
         ner_options={"use_llm": False},
+        entity_types: list[str] | None = None,
         **kwargs,
     ):
         """
@@ -141,6 +150,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         self.vector_index = VectorStoreIndex.from_vector_store(
             storage_context.vector_store, service_context
         )
+        self.entity_types = entity_types
 
     def _ner_extract_keywords(
         self, text: str, max_keywords: Optional[int] = 10000
@@ -153,7 +163,9 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             text (str): text from which to extract keywords
             max_keywords (Optional[int], optional): maximum number of keywords to extract. Defaults to 10000.
         """
-        entities_by_doc = self.tagger.extract([text], link=True)
+        entities_by_doc = self.tagger.extract(
+            [text], link=True, entity_types=self.entity_types
+        )
 
         logging.info(f"Extracted {len(entities_by_doc)} docs")
 
@@ -197,7 +209,11 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
                 index=self.vector_index, similarity_top_k=2
             )
             keyword_retriever = KeywordTableNerRetriever(
-                self, tagger=self.tagger, vector_retriever=vector_retriever, **kwargs
+                self,
+                tagger=self.tagger,
+                vector_retriever=vector_retriever,
+                entity_types=self.entity_types,
+                **kwargs,
             )
             return HybridNerRetriever(
                 keyword_retriever=keyword_retriever, vector_retriever=vector_retriever

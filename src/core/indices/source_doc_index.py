@@ -21,6 +21,8 @@ from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, Refine
 
 INDEX_NAME = "source-docs"
 
+ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
+
 
 DEFAULT_STORAGE_ARGS: StorageArgs = {
     "storage_type": "mongodb",
@@ -61,7 +63,13 @@ class SourceDocIndex:
         """
         Load source doc index from disk
         """
-        index = load_index(INDEX_NAME, self.index_impl, self.model, self.storage_args)
+        index = load_index(
+            INDEX_NAME,
+            self.index_impl,
+            self.model,
+            self.storage_args,
+            index_args={"entity_types": ENTITY_TYPES},
+        )
         self.index = index
 
     def __get_metadata_filters(self, source: NamespaceKey):
@@ -108,6 +116,7 @@ class SourceDocIndex:
             get_doc_id=__get_doc_id,
             model_name=self.model,
             storage_args=self.storage_args,
+            index_args={"entity_types": ENTITY_TYPES},
         )
         self.index = index
 

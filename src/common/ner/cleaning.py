@@ -9,7 +9,6 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
-from spacy.tokens import Token
 
 from clients.spacy import Spacy
 from common.ner.utils import lemmatize_tails
@@ -91,6 +90,8 @@ DEFAULT_EXCEPTION_LIST: list[str] = [
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(i)",  # so common in patents, e.g. "general formula (I)"
     "(1)",
+    "sec",
+    "second",
 ]
 
 MAX_N_PROCESS = 4
@@ -300,7 +301,7 @@ class EntityCleaner:
 
     @staticmethod
     def __return_to_type(
-        modified_texts: list[str], orig_ents: list[T], remove_supressions: bool = False
+        modified_texts: list[str], orig_ents: list[T], remove_suppresed: bool = False
     ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             logging.info(
@@ -313,12 +314,12 @@ class EntityCleaner:
                 DocEntity(*orig_ents[i][0:4], modified_texts[i], orig_ents[i][5])
                 for i in range(len(orig_ents))
             ]
-            if remove_supressions:
-                doc_ents = [d for d in doc_ents if len(d[0]) > 0]
+            if remove_suppresed:
+                doc_ents = [d for d in doc_ents if len(d.normalized_term) > 0]
             return cast(list[T], doc_ents)
 
         if is_string_list(orig_ents):
-            if remove_supressions:
+            if remove_suppresed:
                 modified_texts = [t for t in modified_texts if len(t) > 0]
             return cast(list[T], modified_texts)
 
@@ -328,7 +329,7 @@ class EntityCleaner:
         self,
         entities: list[T],
         common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
-        remove_supressions: bool = False,
+        remove_suppresed: bool = False,
     ) -> list[T]:
         """
         Sanitize entity list
@@ -338,7 +339,7 @@ class EntityCleaner:
         Args:
             entities (list[T]): entities
             common_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
-            remove_supressions (bool, optional): remove suppressions? Defaults to False (leaves empty spaces in, to maintain order)
+            remove_suppresed (bool, optional): remove empties? Defaults to False (leaves empty spaces in, to maintain order)
         """
         start = time.time()
         if not isinstance(entities, list):
@@ -366,7 +367,9 @@ class EntityCleaner:
             round(time.time() - start, 2),
         )
 
-        return self.__return_to_type(cleaned, entities, remove_supressions)
+        return self.__return_to_type(
+            cleaned, entities, remove_suppresed=remove_suppresed
+        )
 
     def __call__(self, *args, **kwargs):
         return self.clean(*args, **kwargs)
