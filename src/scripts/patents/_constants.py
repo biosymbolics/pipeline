@@ -36,7 +36,7 @@ MECHANISM_BASE_TERMS = [
     "differentiation",
     "adjuvant",
     "precursor",
-    "pro-?drug",
+    "pro[ -]?drug",
     "pathway",
 ]
 BIOLOGIC_BASE_TERMS = [
