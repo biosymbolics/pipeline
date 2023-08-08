@@ -26,17 +26,13 @@ def extract_keywords(
     text: str,
     tagger: NerTagger,
     max_keywords: int,
-    entity_types: list[str] | None = None,
 ) -> set[str]:
     """
     Extract keywords from text using NER tagger.
     """
-    entities_by_doc = tagger.extract([text], link=False, entity_types=entity_types)
+    entities_by_doc = tagger.extract([text], link=True)
 
     logging.info(f"Extracted {len(entities_by_doc)} docs")
-
-    if len(entities_by_doc) == 0:
-        raise ValueError("No entities extracted")
 
     entities = entities_by_doc[0]
     keywords = flatten(
@@ -59,7 +55,6 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
         self,
         *args,
         tagger: NerTagger,
-        entity_types: list[str] | None = None,
         **kwargs,
     ):
         """
@@ -67,7 +62,6 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
         """
         super().__init__(*args, **kwargs)
         self.tagger = tagger
-        self.entity_types = entity_types
 
     def _get_keywords(self, query_str: str) -> list[str]:
         return list(
@@ -75,7 +69,6 @@ class KeywordTableNerRetriever(BaseKeywordTableRetriever):
                 query_str,
                 tagger=self.tagger,
                 max_keywords=self.max_keywords_per_query,
-                entity_types=self.entity_types,
             )
         )
 
@@ -133,8 +126,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         *args,
         service_context: ServiceContext,
         storage_context: StorageContext,
-        ner_options={"use_llm": False},
-        entity_types: list[str] | None = None,
+        ner_options: dict[str, Any],
         **kwargs,
     ):
         """
@@ -150,7 +142,6 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         self.vector_index = VectorStoreIndex.from_vector_store(
             storage_context.vector_store, service_context
         )
-        self.entity_types = entity_types
 
     def _ner_extract_keywords(
         self, text: str, max_keywords: Optional[int] = 10000
@@ -163,16 +154,15 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             text (str): text from which to extract keywords
             max_keywords (Optional[int], optional): maximum number of keywords to extract. Defaults to 10000.
         """
-        entities_by_doc = self.tagger.extract(
-            [text], link=True, entity_types=self.entity_types
-        )
+        entities_by_doc = self.tagger.extract([text], link=True)
 
-        logging.info(f"Extracted {len(entities_by_doc)} docs")
-
-        if len(entities_by_doc) == 0:
-            raise ValueError("No entities extracted")
+        logging.info(f"Extracted {len(entities_by_doc)} docs: %s", entities_by_doc)
 
         entities = entities_by_doc[0]
+
+        if len(entities) == 0:
+            logging.warning("No entities extracted")
+
         keywords = flatten(
             [
                 (ent.term, ent.linked_entity.name)
@@ -212,7 +202,6 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
                 self,
                 tagger=self.tagger,
                 vector_retriever=vector_retriever,
-                entity_types=self.entity_types,
                 **kwargs,
             )
             return HybridNerRetriever(

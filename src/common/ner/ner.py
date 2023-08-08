@@ -14,7 +14,6 @@ import spacy
 from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
-from clients.spacy import DEFAULT_MODEL
 
 from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
@@ -54,6 +53,7 @@ class NerTagger:
         llm_config: Optional[str] = "configs/patents/config.cfg",
         model: Optional[str] = "model.pt",  # ignored if use_llm is True
         content_type: Optional[ContentType] = "text",
+        entity_types: Optional[list[str]] = None,
         rule_sets: list[SpacyPatterns] = [
             INDICATION_SPACY_PATTERNS,
             INTERVENTION_SPACY_PATTERNS,
@@ -70,6 +70,7 @@ class NerTagger:
             model (str, optional): torch NER model. Defaults to "model.pt".
             content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
+            parallelize (bool, optional): Parallelize. Defaults to True. Even if true, will only parallelize for sufficiently large batches.
         """
         # prefer_gpu()
 
@@ -78,6 +79,7 @@ class NerTagger:
         self.content_type = content_type
         self.llm_config = llm_config
         self.rule_sets = rule_sets
+        self.entity_types = entity_types
         self.linker: Optional[TermLinker] = None  # lazy initialization
         self.cleaner = EntityCleaner(parallelize=parallelize)
         start_time = time.time()
@@ -134,16 +136,17 @@ class NerTagger:
         """
         Prepares a list of content for NER
         """
-        _content = content.copy()
-        if self.content_type == "html":
-            _content = [extract_text(c) for c in _content]
+        steps = [
+            lambda string: [extract_text(s) for s in string]
+            if self.content_type == "html"
+            else string,
+            lambda string: flatten(chunk_list(string, CHUNK_SIZE))
+            if self.use_llm
+            else string,
+            lambda string: [html.unescape(s) for s in string],
+        ]
 
-        if self.use_llm:
-            # chunk it up (spacy-llm doesn't use langchain for chaining, i guess?)
-            _content = flatten(chunk_list(_content, CHUNK_SIZE))
-
-        # remove any escaped characters that may be present
-        _content = [html.unescape(c) for c in _content]
+        _content = reduce(lambda c, f: f(c), steps, content)
 
         return _content
 
@@ -190,7 +193,6 @@ class NerTagger:
         self,
         content: list[str],
         link: bool = True,
-        include_entity_types: list[str] | None = None,
     ) -> list[DocEntities]:
         """
         Extract named entities from a list of content, normalize and link if link == True
@@ -206,8 +208,8 @@ class NerTagger:
             normalized = self.cleaner.clean(entity_set, remove_suppresed=True)
 
             # filter by entity types, if provided
-            if include_entity_types:
-                normalized = [e for e in normalized if e[1] in include_entity_types]
+            if self.entity_types:
+                normalized = [e for e in normalized if e[1] in self.entity_types]
 
             if link and len(normalized) > 0:
                 return self.__link(normalized)
@@ -221,7 +223,6 @@ class NerTagger:
         self,
         content: list[str],
         link: bool = True,
-        entity_types: Optional[list[str]] = None,
     ) -> list[DocEntities]:
         """
         Extract named entities from a list of content
@@ -234,7 +235,6 @@ class NerTagger:
         Args:
             content (list[str]): list of content on which to do NER
             link (bool, optional): whether to link entities. Defaults to True.
-            include_entity_types (Optional[list[str]], optional): filter by entity types. Defaults to None (all types permitted)
 
         Examples:
             >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
@@ -252,7 +252,7 @@ class NerTagger:
         start_time = time.time()
         logging.info("Starting NER pipeline with %s docs", len(content))
 
-        ents_by_doc = self.__extract_and_normalize(content, link, entity_types)
+        ents_by_doc = self.__extract_and_normalize(content, link)
 
         logging.info(
             "Full entity extraction took %s seconds, yielded %s",

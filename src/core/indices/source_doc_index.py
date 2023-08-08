@@ -21,13 +21,17 @@ from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, Refine
 
 INDEX_NAME = "source-docs"
 
-ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
-
-
 DEFAULT_STORAGE_ARGS: StorageArgs = {
     "storage_type": "mongodb",
+}
+
+DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
+
+DEFAULT_INDEX_ARGS = {
     "ner_options": {
         "use_llm": False,
+        "content_type": "text",  # converted to text upfront
+        "entity_types": DEFAULT_ENTITY_TYPES,
     },
 }
 
@@ -44,6 +48,7 @@ class SourceDocIndex:
         storage_args: StorageArgs = DEFAULT_STORAGE_ARGS,
         model_name: LlmModelType = DEFAULT_MODEL_NAME,
         index_impl: Type[LlmIndex] = NerKeywordTableIndex,
+        index_args: dict[str, Any] = DEFAULT_INDEX_ARGS,
     ):
         """
         initialize index
@@ -52,25 +57,19 @@ class SourceDocIndex:
             storage_args (StorageArgs, optional): storage args. Defaults to DEFAULT_STORAGE_ARGS.
             model_name (str, optional): model name. Defaults to DEFAULT_MODEL_NAME.
             index_impl (LlmIndex, optional): index implementation. Defaults to NerKeywordTableIndex.
+            index_args (dict[str, Any], optional): index args. Defaults to DEFAULT_INDEX_ARGS. # TODO: naming
         """
-        self.storage_args = storage_args
-        self.model: LlmModelType = model_name
         self.index_impl = index_impl
-        self.index = None
-        self.__load()
-
-    def __load(self):
-        """
-        Load source doc index from disk
-        """
-        index = load_index(
+        self.all_index_args = {
+            "index_impl": index_impl,
+            "model_name": model_name,
+            "storage_args": storage_args,
+            "index_args": index_args,
+        }
+        self.index = load_index(
             INDEX_NAME,
-            self.index_impl,
-            self.model,
-            self.storage_args,
-            index_args={"entity_types": ENTITY_TYPES},
+            **self.all_index_args,
         )
-        self.index = index
 
     def __get_metadata_filters(self, source: NamespaceKey):
         """
@@ -93,8 +92,8 @@ class SourceDocIndex:
         Load docs into index with metadata
 
         Args:
-            documents (list[str]): list of documents
             source (NamespaceKey): source namespace
+            documents (list[str]): list of documents
             retrieval_date (datetime, optional): retrieval date of source docs. Defaults to datetime.now().
         """
 
@@ -111,12 +110,9 @@ class SourceDocIndex:
         index = upsert_index(
             INDEX_NAME,
             documents,
-            index_impl=self.index_impl,
             get_doc_metadata=__get_metadata,
             get_doc_id=__get_doc_id,
-            model_name=self.model,
-            storage_args=self.storage_args,
-            index_args={"entity_types": ENTITY_TYPES},
+            **self.all_index_args,
         )
         self.index = index
 
