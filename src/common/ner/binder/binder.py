@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 DOC_STRIDE = 16
 MAX_LENGTH = 128  # max??
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
-
 DEFAULT_DEVICE = "mps"
 
 
