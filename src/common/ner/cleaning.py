@@ -214,6 +214,10 @@ class EntityCleaner:
             for term in _terms:
                 yield term.lower()
 
+        def unwrap(_terms: list[str]) -> Iterable[str]:
+            for term in _terms:
+                yield term.strip("()[]")
+
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             phrases = {
                 "diseases and conditions": "diseases",
@@ -256,6 +260,7 @@ class EntityCleaner:
         cleaning_steps = [
             decode_html,
             remove_chars,
+            unwrap,
             remove_extra_spaces,
             normalize_phrasing,
             partial(rearrange_terms, n_process=n_process),
@@ -322,18 +327,17 @@ class EntityCleaner:
     def clean(
         self,
         entities: list[T],
-        filter_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
+        common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
         remove_supressions: bool = False,
     ) -> list[T]:
         """
         Sanitize entity list
         - filters out (some) excessively general entities
-        - dedups
         - normalizes & lemmatizes entity names
 
         Args:
             entities (list[T]): entities
-            filter_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
+            common_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
             remove_supressions (bool, optional): remove suppressions? Defaults to False (leaves empty spaces in, to maintain order)
         """
         start = time.time()
@@ -347,9 +351,8 @@ class EntityCleaner:
             self.normalize_terms,
             partial(
                 self.filter_common_terms,
-                exception_list=filter_exception_list,
+                exception_list=common_exception_list,
             ),
-            # dedup,
         ]
 
         terms = [self.__get_text(ent) for ent in entities]

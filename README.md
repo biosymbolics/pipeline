@@ -77,7 +77,7 @@
 
 #### Dependencies
 ```
-python3 -m pip freeze | grep -v @ | awk -F'==' '{print $1}' | grep -vi spacy | xargs python3 -m pip install --upgrade
+python3 -m pip freeze | grep -v @ | awk -F'==' '{print $1}' | grep -vi scispacy | xargs python3 -m pip install --upgrade
 python3 -m pip install --upgrade --no-deps --force-reinstall --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 ```
 (later until MPS support in main torch build - see https://github.com/pytorch/pytorch/issues/96610)

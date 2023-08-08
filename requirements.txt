@@ -9,7 +9,6 @@ langchain
 matplotlib
 numpy
 pandas
-Plost
 polars
 protobuf
 pyairtable
@@ -25,7 +24,6 @@ scispacy
 sec_api
 selectolax
 setuptools
-skweak
 spacy_llm
 streamlit
 streamlit_timeline

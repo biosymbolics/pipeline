@@ -18,6 +18,7 @@ from clients.spacy import DEFAULT_MODEL
 
 from common.ner.binder.binder import BinderNlp
 from common.ner.linker import TermLinker
+from common.ner.utils import spans_to_doc_entities
 from common.utils.extraction.html import extract_text
 from common.utils.string import chunk_list
 
@@ -91,7 +92,8 @@ class NerTagger:
                 raise ValueError("Model must be torch")
             self.nlp = BinderNlp(self.model)
 
-            rule_nlp = spacy.load(DEFAULT_MODEL)  # "en_core_sci_scibert")
+            # rules catch a few things the binder model misses
+            rule_nlp = spacy.load("en_core_sci_lg")  # "en_core_sci_scibert" == errors
             rule_nlp.add_pipe("merge_entities", after="ner")
             ruler = rule_nlp.add_pipe(
                 "entity_ruler",
@@ -111,25 +113,6 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __normalize(
-        self, doc: Doc, entity_types: Optional[list[str]] = None
-    ) -> DocEntities:
-        entity_set: DocEntities = [
-            DocEntity(
-                span.text, span.label_, span.start_char, span.end_char, None, None
-            )
-            for span in doc.ents
-        ]
-
-        # basic filtering, character removal, lemmatization
-        normalized = self.cleaner(entity_set)
-
-        # filter by entity types, if provided
-        if entity_types:
-            return [e for e in normalized if e[1] in entity_types]
-
-        return normalized
-
     def __link(self, entities: DocEntities) -> DocEntities:
         """
         Link entities for a single doc
@@ -147,23 +130,7 @@ class NerTagger:
 
         return linked
 
-    def __normalize_and_maybe_link(
-        self, doc: Doc, link: bool = True, entity_types: Optional[list[str]] = None
-    ) -> DocEntities:
-        """
-        Normalize and maybe link entities for a single doc
-
-        Args:
-            doc (Doc): SpaCy doc
-            link (bool, optional): Whether to link entities. Defaults to True.
-            entity_types (list[str], optional): Entity types to filter by. Defaults to None.
-        """
-        normalized = self.__normalize(doc, entity_types)
-        if link and len(normalized) > 0:
-            return self.__link(normalized)
-        return normalized
-
-    def __prep_doc(self, content: list[str]) -> list[str]:
+    def __prep_for_extract(self, content: list[str]) -> list[str]:
         """
         Prepares a list of content for NER
         """
@@ -179,6 +146,76 @@ class NerTagger:
         _content = [html.unescape(c) for c in _content]
 
         return _content
+
+    @staticmethod
+    def __extract_ents(doc1: Doc, doc2: Doc) -> DocEntities:
+        """
+        Extract entities from two docs (produced by two different nlp pipelines)
+        and combine them.
+
+        - If the same entity is found in both docs, use the longest one.
+        - Hacks: entit
+        """
+        # Create a new list combining entities from both docs
+        all_ents = [*doc1.ents, *doc2.ents]
+        start_ends = sorted([(ent.start, ent.end) for ent in all_ents], reverse=True)
+
+        # due to the sort order, the longest entity will be first (e.g. [(1, 3), (1, 1)])
+        deduped: list[tuple[int, int]] = reduce(
+            lambda l, se: l if se[0] in [e[0] for e in l] else l + [se], start_ends, []
+        )
+
+        # get the ents back in the original order
+        ents = [
+            e for e in all_ents if (e.start, e.end) in sorted(deduped, reverse=True)
+        ]
+
+        # turn into doc entities
+        entity_set = spans_to_doc_entities(ents)
+        return entity_set
+
+    def __extract(self, content: list[str]) -> list[DocEntities]:
+        """
+        Run both NLP pipelines (rule_nlp and binder)
+
+        To avoid reconstructing the SpaCy doc, just return DocEntities
+        """
+        docs_1 = self.nlp.pipe(content)
+        if self.rule_nlp:
+            docs_2 = self.rule_nlp.pipe(content)
+            return [self.__extract_ents(d1, d2) for d1, d2 in zip(docs_1, docs_2)]
+        return [spans_to_doc_entities(doc.ents) for doc in docs_1]
+
+    def __extract_and_normalize(
+        self,
+        content: list[str],
+        link: bool = True,
+        include_entity_types: list[str] | None = None,
+    ) -> list[DocEntities]:
+        """
+        Extract named entities from a list of content, normalize and link if link == True
+
+        Args:
+            content (list[str]): List of content to extract entities from
+            link (bool, optional): Whether to link entities. Defaults to True.
+            entity_types (list[str] | None, optional): List of entity types to include. Defaults to None.
+        """
+        ents_by_doc = self.__extract(self.__prep_for_extract(content.copy()))
+
+        def __normalize(entity_set):
+            normalized = self.cleaner(entity_set, remove_supressions=True)
+
+            # filter by entity types, if provided
+            if include_entity_types:
+                normalized = [e for e in normalized if e[1] in include_entity_types]
+
+            if link and len(normalized) > 0:
+                return self.__link(normalized)
+
+            return normalized
+
+        norm_ents_by_doc = [__normalize(e_set) for e_set in ents_by_doc]
+        return norm_ents_by_doc
 
     def extract(
         self,
@@ -204,6 +241,7 @@ class NerTagger:
             >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
             >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"]) # as of 08/08/2023, il-6 not captured
             >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"], link=False)
+            >>> tagger.extract(["zuranolone for treatment of major depression, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)"]) # as of 08/08/2023, some entities not captured
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")
@@ -214,15 +252,7 @@ class NerTagger:
         start_time = time.time()
         logging.info("Starting NER pipeline with %s docs", len(content))
 
-        steps = [
-            self.__prep_doc,
-            self.rule_nlp.pipe if self.rule_nlp else lambda x: x,
-            self.nlp.pipe,
-            lambda docs: [
-                self.__normalize_and_maybe_link(doc, link, entity_types) for doc in docs
-            ],
-        ]
-        ents_by_doc = reduce(lambda x, func: func(x), steps, content.copy())
+        ents_by_doc = self.__extract_and_normalize(content, link, entity_types)
 
         logging.info(
             "Entities found: %s, took %s seconds",

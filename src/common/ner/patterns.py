@@ -193,15 +193,3 @@ INDICATION_SPACY_PATTERNS: SpacyPatterns = cast(
         *[{"label": "diseases", "pattern": pattern} for pattern in INDICATION_PATTERNS],
     ],
 )
-
-
-"""
-All patterns
-"""
-
-ALL_INTERVENTION_PATTERNS = [
-    *MOA_PATTERNS,
-    *INVESTIGATIONAL_ID_PATTERNS,
-    *BIOLOGICAL_PATTERNS,
-    *SMALL_MOLECULE_PATTERNS,
-]

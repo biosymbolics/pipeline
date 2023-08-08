@@ -72,5 +72,7 @@ INDICATION_REGEXES: list[str] = [
     "syndrome",
     "autoimmune",
     "failure",
+    "tremor",
+    # "condition", # ?
     *ONCOLOGY_REGEXES,
 ]

@@ -6,8 +6,9 @@ import logging
 import re
 import time
 from typing import Iterable
-from spacy.tokens import Doc
+from spacy.tokens import Doc, Span
 from clients.spacy import Spacy
+from common.ner.types import DocEntities, DocEntity
 
 from common.utils.re import (
     get_or_re,
@@ -233,7 +234,7 @@ def __normalize_by_pos(doc: Doc):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
         if t.pos_ == "SPACE":
             return ""
-        if t.text == "'s" and t.pos_ == "PART":
+        if t.text in ["'s", "’s"] and t.pos_ == "PART":
             # alzheimer's disease -> alzheimer disease
             return " "
         if t.text == DASH:
@@ -241,7 +242,7 @@ def __normalize_by_pos(doc: Doc):
                 return " "
             if t.pos_ == "PUNCT":
                 if prev_t.pos_ == "PUNCT":
-                    # (-)-ditoluoyltartaric acid -> (-)-ditoluoyltartaric acid
+                    # "(-)-ditoluoyltartaric acid" unchnaged
                     return DASH
                 if (
                     next_t is not None
@@ -296,6 +297,7 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
         - MAGE-A3 gene (PROPN(PUNCT)NOUN) # TODO: better if ""
         - Bcr-Abl (NOUN(ADJ)ADJ) -> Bcr-Abl # TODO
         - HIV-1 (NOUN(PUNCT)PROPN) -> HIV-1 # TODO
+        - (-)-ditoluoyltartaric acid ((PUNCT)(PUNCT)(PUNCT)(PUNCT)NOUN) -> (-)-ditoluoyltartaric acid
 
         Keep if Spacy considers is a NOUN
         - HLA-C (NOUN(NOUN)NOUN) -> HLA-C # TODO??
@@ -323,3 +325,17 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
             continue
 
         yield __normalize_by_pos(doc)
+
+
+def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
+    """
+    Converts a list of spacy spans to a list of DocEntity
+
+    Args:
+        spans: list of spacy spans
+    """
+    entity_set: DocEntities = [
+        DocEntity(span.text, span.label_, span.start_char, span.end_char, None, None)
+        for span in spans
+    ]
+    return entity_set
