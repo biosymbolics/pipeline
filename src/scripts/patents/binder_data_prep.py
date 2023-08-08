@@ -90,13 +90,35 @@ def get_entity_indices(
         entity (str): entity to search for
 
     Usage:
-        df = df.with_columns(df.select(pl.struct(["text", "original_term"])
-            .apply(lambda rec: get_entity_indices(rec["text"], rec["original_term"])).alias("indices")))
+    ```
+    # export stored query https://console.cloud.google.com/bigquery?sq=1056123862280:06dfa28ce71c45f19755ee3d5f631843
+    export_file = "ner_training.csv"
+    csv_df = pl.read_csv(export_file)
+    df = csv_df.with_columns(csv_df.select(pl.struct(["text", "original_term"])
+        .apply(lambda rec: get_entity_indices(rec["text"], rec["original_term"])).alias("indices")))
+    ```
 
     To check:
         df.filter(pl.col("indices").is_not_null()).select(pl.struct(["text", "original_term", "indices"])
             .apply(lambda rec: print(rec["text"][rec["indices"][1][0]:rec["indices"][1][1]] if len(rec["indices"]) > 0 else "hi"))
             .alias("check"))
+
+    To split:
+    ``` bash
+    split_ratio=0.2
+    export export_file="ner_training.csv"
+    export output_file="output.jsonl"
+    jq -c '.[]' ./formatted_data.json | while IFS= read -r line; do   echo "$line" >> "$output_file"; done
+    export total_lines=$(cat "$output_file" | wc -l)
+    export test_lines_rounded=`printf %.0f $(echo "$total_lines * $split_ratio" | bc -l)`
+    split -l "$test_lines_rounded" output.jsonl
+    mv xaa test.json
+    mv xab dev.json
+    mv xac train.json
+    cat xad >> train.json
+    cat xae >> train.json
+    rm xad xae
+    ```
 
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """

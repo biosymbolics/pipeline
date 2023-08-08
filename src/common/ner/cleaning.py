@@ -233,6 +233,7 @@ class EntityCleaner:
                 "small molecule inhibitors?": "inhibitor",
                 "associated proteins?": "protein",
                 "transporter inhibitors?": "transport inhibitor",
+                # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
                 "mediated conditions?": "associated disease",
                 "mediated diseases?": "associated disease",
                 "related conditions?": "associated disease",

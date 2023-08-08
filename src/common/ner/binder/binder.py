@@ -29,7 +29,7 @@ class BinderNlp:
     To create the model, clone https://github.com/kristinlindquist/binder and from that directory
     ```
     $ python3
-    >>> config = {
+    config = {
         "cache_dir": "",
         "end_loss_weight": 0.2,
         "hidden_dropout_prob": 0.1,
@@ -46,14 +46,14 @@ class BinderNlp:
         "use_span_width_embedding": True
     }
 
-    >>> import torch, sys
-    >>> sys.path.push("src")
-    >>> torch.device('mps')
-    >>> from model import Binder
-    >>> from config import BinderConfig
-    >>> model = Binder(BinderConfig(**config))
-    >>> model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('mps')))
-    >>> torch.save(model, 'model.pt')
+    import torch, sys
+    sys.path.append("src")
+    torch.device('mps')
+    from model import Binder
+    from config import BinderConfig
+    model = Binder(BinderConfig(**config))
+    model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('mps')))
+    torch.save(model, 'model.pt')
 
     and copy model.pt into pipeline/
     ```
