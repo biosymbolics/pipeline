@@ -8,3 +8,4 @@ sec_docs
 data/**
 patent_model_checkpoints/**
 model.pt
+model_old.pt
