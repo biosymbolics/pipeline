@@ -8,6 +8,40 @@
 - `python3 -m spacy download en_core_web_md`
 - Create/copy model.pt for non-GPT NER
 
+
+### Deploy
+
+In order to deploy the example, you need to run the following command:
+
+```
+$ serverless deploy
+```
+
+After running deploy, you should see output similar to:
+
+```bash
+Deploying aws-python-project to stage dev (us-east-1)
+
+✔ Service deployed to stack aws-python-project-dev (112s)
+
+functions:
+  hello: aws-python-project-dev-hello (1.5 kB)
+```
+
+#### Invocation
+
+After successful deployment, you can invoke the deployed function by using the following command:
+
+**Remote**:
+```bash
+serverless invoke --function hello
+```
+
+**Local**:
+```bash
+serverless invoke local --function hello
+```
+
 ### Running
 
 #### UI

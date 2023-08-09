@@ -1,0 +1,18 @@
+org: kristinalindquist
+app: biosymbolics-pipeline
+service: biosymbolics-pipeline
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.10
+
+functions:
+  search-patents:
+    handler: src.handlers.patents.search
+  autocomplete-patents:
+    handler: src.handlers.patents.autocomplete
+
+plugins:
+  - serverless-python-requirements
