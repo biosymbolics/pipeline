@@ -25,37 +25,7 @@ class BinderNlp:
     """
     A class for running the Binder NLP model, partially emulating SpaCy's Language (nlp) class.
 
-    To create the model, clone https://github.com/kristinlindquist/binder and from that directory
-    ```
-    $ python3
-    config = {
-        "cache_dir": "",
-        "end_loss_weight": 0.2,
-        "hidden_dropout_prob": 0.1,
-        "init_temperature": 0.07,
-        "linear_size": 128,
-        "max_span_width": 129,
-        "ner_loss_weight": 0.5,
-        "pretrained_model_name_or_path": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
-        "revision": "main",
-        "span_loss_weight": 0.6,
-        "start_loss_weight": 0.2,
-        "threshold_loss_weight": 0.5,
-        "use_auth_token": False,
-        "use_span_width_embedding": True
-    }
-
-    import torch, sys
-    sys.path.append("src")
-    torch.device('mps')
-    from model import Binder
-    from config import BinderConfig
-    model = Binder(BinderConfig(**config))
-    model.load_state_dict(torch.load('/tmp/pytorch_model.bin', map_location=torch.device('mps')))
-    torch.save(model, 'model.pt')
-
-    and copy model.pt into pipeline/
-    ```
+    To create the model, clone https://github.com/kristinlindquist/binder and from that directory, run the instructions in the readme.
     """
 
     def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_MODEL):

@@ -5,7 +5,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 """
 from functools import reduce
 import time
-from typing import Any, Generic, Literal, Optional, Type, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 from pydash import flatten
 import logging
 import warnings
