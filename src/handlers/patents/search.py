@@ -24,20 +24,20 @@ def search(event: SearchEvent, context):
     Search patents by terms
 
     Invocation:
-    - serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'
+    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
     """
-    print(event)
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")
 
     if not params or not terms:
         logging.error(
-            "Missing queryStringParameters or queryStringParameters.terms, params: %s",
+            "Missing queryStringParameters or param `terms`, params: %s",
             params,
         )
         return {
             "statusCode": 400,
-            "message": "Missing queryStringParameters or queryStringParameters.terms",
+            "message": "Missing parameter(s)",
         }
 
     fetch_approval = params.get("fetch_approval") or False
