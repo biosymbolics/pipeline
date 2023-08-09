@@ -7,12 +7,50 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: python3.10
+  environment:
+    GOOGLE_CLOUD_PROJECT: fair-abbey-386416
+    MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
+    OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
+    PYTHONPATH: ./src:.
+    TOKENIZERS_PARALLELISM: False
+    SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
+
 
 functions:
   search-patents:
-    handler: src.handlers.patents.search
+    handler: handlers.patents.search
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   autocomplete-patents:
-    handler: src.handlers.patents.autocomplete
+    handler: handlers.patents.autocomplete
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 
 plugins:
   - serverless-python-requirements
+
+package:
+  # individually: true
+  exclude:
+    - patent_model_checkpoints/**
+    - lib/**
+    - data/**
+    - storage/**
+    - .mypy_cache/**
+    - "**/__pycache__/**"
+    - .pytest_cache/**
+    - node_modules/**
+    - package-lock.json
+    - src/scripts/**
+    - "**/test/**"
+    - "*.pt"
+    - ".requirements.zip"
+
+custom:
+  pythonRequirements:
+    # dockerizePip: true
+    zip: true
+    slim: true
+    layer: true
+    noDeploy:
+      - pytest

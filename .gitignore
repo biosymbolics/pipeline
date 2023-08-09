@@ -12,3 +12,4 @@ node_modules
 .serverless/**
 s_*.py
 serverless_sdk
+.requirements.zip

@@ -2,23 +2,23 @@
 Utils for patent eNPV model
 """
 
+from typing import Sequence, TypeGuard, cast
 import logging
 import random
-from git import Sequence
 import numpy as np
-from pydash import compact, flatten
-from typing import TypeGuard, cast
+from collections import namedtuple
+from pydash import flatten
 import torch
 from sklearn.calibration import LabelEncoder
+from sklearn.decomposition import PCA
 import polars as pl
-from clients.spacy import Spacy
 from torch import nn
 import torch.nn.functional as F
-from collections import namedtuple
-from sklearn.decomposition import PCA
-from common.utils.list import batch, batch_as_tensors
-from core.models.patent_pos.types import AllInput, DnnInput, GnnInput
 
+from clients.spacy import Spacy
+from common.utils.list import batch
+from common.utils.tensor import batch_as_tensors
+from core.models.patent_pos.types import AllInput, DnnInput, GnnInput
 from typings.core import Primitive
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
@@ -134,6 +134,7 @@ def get_feature_embeddings(
     ]
     cat_feats = [torch.cat(tensor_set) for tensor_set in padded_cat_tensors]
 
+    text_feats = []
     if len(text_fields) > 0:
         text_vectors = [
             np.concatenate(
