@@ -4,6 +4,7 @@ Utility functions for the Binder NER model
 
 import re
 import numpy as np
+import numpy.typing as npt
 from pydash import compact, flatten
 import torch
 from transformers import BatchEncoding
@@ -33,7 +34,7 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
 
 
 def extract_predictions(
-    features: list[Feature], predictions: np.ndarray, type_map: dict[int, str]
+    features: list[Feature], predictions: npt.NDArray, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a list of features.
@@ -52,7 +53,7 @@ def extract_predictions(
 
         def start_end_types(
             span_logits: torch.Tensor, feature: Feature
-        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
             """
             Extracts predictions from the tensor
             """

@@ -3,12 +3,11 @@ Topic modeling utilities
 """
 from typing import Optional, NamedTuple
 from langchain.output_parsers import ResponseSchema
-from scipy.sparse import spmatrix  # type: ignore
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import CountVectorizer
 from bertopic import BERTopic
 import umap
-import numpy as np
+import numpy.typing as npt
 import polars as pl
 import logging
 
@@ -20,8 +19,8 @@ RANDOM_STATE = 42
 
 class TopicObjects(NamedTuple):
     topics: list[str]
-    topic_embedding: np.ndarray
-    dictionary: np.ndarray  # would like to type this more specifically... i think (int, float) but not sure
+    topic_embedding: npt.NDArray
+    dictionary: npt.NDArray  # would like to type this more specifically... i think (int, float) but not sure
 
 
 def describe_topics(
@@ -72,8 +71,8 @@ def describe_topics(
 
 
 def get_topics(
-    vectorized_data: spmatrix,
-    feature_names: np.ndarray,
+    vectorized_data: npt.NDArray,
+    feature_names: npt.NDArray,
     n_topics: int,
     n_top_words: int,
     context_terms: Optional[list[str]] = None,
@@ -99,7 +98,7 @@ def get_topics(
 
     logging.info("Creating topic map")
 
-    def __get_feat_names(feature_set: np.ndarray) -> list[str]:
+    def __get_feat_names(feature_set: npt.NDArray) -> list[str]:
         top_features = feature_set.argsort()[: -n_top_words - 1 : -1]
         return [str(feature_names[i]) for i in top_features]
 
@@ -116,17 +115,17 @@ def get_topics(
 
 
 def calculate_umap_embedding(
-    vectorized_data: spmatrix,
-    dictionary: np.ndarray,
+    vectorized_data: npt.NDArray,
+    dictionary: npt.NDArray,
     knn: int = 10,
     min_dist: float = 0.75,
-) -> tuple[pl.DataFrame, np.ndarray]:
+) -> tuple[pl.DataFrame, npt.NDArray]:
     """
     Calculate the UMAP embedding
 
     Args:
         vectorized_data: vectorized data (tfidf matrix)
-        dictionary (np.ndarray): factorization matrix
+        dictionary (npt.NDArray): factorization matrix
         knn (int): number of nearest neighbors
         min_dist (float): minimum distance
 
@@ -139,10 +138,7 @@ def calculate_umap_embedding(
         min_dist=min_dist,
         random_state=RANDOM_STATE,
     )
-    embedding = umap_embr.fit_transform(vectorized_data.toarray())
-
-    if not isinstance(embedding, np.ndarray):
-        raise TypeError("UMAP embedding is not a numpy array")
+    embedding = umap_embr.fit_transform(vectorized_data)  # .toarray()
 
     embedding = pl.from_numpy(embedding, schema={"x": pl.Float32, "y": pl.Float32})
 

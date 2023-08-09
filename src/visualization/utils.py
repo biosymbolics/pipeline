@@ -7,9 +7,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 import polars as pl
 import logging
-from scipy.sparse import spmatrix  # type: ignore
 from sklearn.pipeline import Pipeline
-import numpy as np
+import numpy.typing as npt
 from sklearn.base import TransformerMixin
 
 from clients.spacy import Spacy
@@ -23,8 +22,8 @@ MIN_DOC_FREQ = 2
 VectorizationObjects = NamedTuple(
     "VectorizationObjects",
     [
-        ("vectorized_data", spmatrix),
-        ("feature_names", np.ndarray),
+        ("vectorized_data", npt.NDArray),
+        ("feature_names", npt.NDArray),
     ],
 )
 

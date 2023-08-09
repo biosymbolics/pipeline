@@ -1,7 +1,6 @@
 Requests
 beautifulsoup4
 numpy
-pandas
 polars
 pydash
 python-dotenv
