@@ -9,8 +9,8 @@ import time
 import logging
 import os
 import polars as pl
-from common.utils.list import batch
 
+from common.utils.list import batch
 from typings.core import is_string_list
 
 BQ_PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]

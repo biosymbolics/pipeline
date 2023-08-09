@@ -3,8 +3,6 @@ Patent client
 """
 from functools import partial
 from typing import Sequence, Union, cast
-import logging
-
 from pydash import compact
 
 from clients import select_from_bg

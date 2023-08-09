@@ -10,3 +10,5 @@ patent_model_checkpoints/**
 model*.pt
 node_modules
 .serverless/**
+s_*.py
+serverless_sdk
