@@ -9,3 +9,4 @@ data/**
 patent_model_checkpoints/**
 model*.pt
 node_modules
+.serverless/**
