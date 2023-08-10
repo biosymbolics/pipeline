@@ -11,7 +11,7 @@ from llama_index.prompts.default_prompts import (
     DEFAULT_REFINE_PROMPT_TMPL,
 )
 
-from common.utils.string import remove_comment_syntax
+from utils.string import remove_comment_syntax
 
 
 def get_output_parser(schemas: list[ResponseSchema]) -> LangchainOutputParser:

@@ -8,7 +8,7 @@ from typing import Callable, Optional
 import logging
 
 from clients.sec import fetch_sec_docs, sec_client
-from common.utils.date import format_date_range
+from utils.date import format_date_range
 from sources.sec.types import SecFiling
 
 

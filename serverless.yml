@@ -11,18 +11,18 @@ provider:
     GOOGLE_CLOUD_PROJECT: fair-abbey-386416
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
-    PYTHONPATH: ./src:.
+    PYTHONPATH: ./src:./:/opt/python:/opt/python/lib/python3.10/site-packages
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
 
 
 functions:
   search-patents:
-    handler: handlers.patents.search
+    handler: src.handlers.patents.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
   autocomplete-patents:
-    handler: handlers.patents.autocomplete
+    handler: src.handlers.patents.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
 
@@ -44,15 +44,16 @@ package:
     - src/scripts/**
     - "**/test/**"
     - "*.pt"
-    - ".requirements.zip"
+    - 10000words.txt
 
 custom:
   pythonRequirements:
-    # dockerizePip: true
-    # zip: true
+    dockerizePip: true
     slim: true
+    slimPatternsAppendDefaults: true
     slimPatterns:
       - "**/__pycache__/**"
+      - "**/tests/**"
     fileName: src/handlers/requirements.txt
     layer: true
     noDeploy:

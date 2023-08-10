@@ -4,7 +4,7 @@ Patterns related to IUPAC nomenclature
 
 import re
 
-from common.utils.re import get_or_re, ALPHA_CHARS
+from utils.re import get_or_re, ALPHA_CHARS
 
 
 def compose_iupac_re() -> str:

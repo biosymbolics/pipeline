@@ -3,16 +3,11 @@ Patent client
 """
 from typing import Any, Sequence, cast
 import polars as pl
-import logging
 
 from typings import PatentApplication
 
 from .score import calculate_score
-from .utils import (
-    clean_assignees,
-    get_patent_years,
-    get_patent_attributes,
-)
+from .utils import get_patent_years
 
 
 def format_search_result(
@@ -35,10 +30,8 @@ def format_search_result(
         .cast(str)
         .str.strptime(pl.Date, "%Y%m%d")
         .alias("priority_date"),
-        pl.col("assignees").apply(
-            lambda assignees: list(clean_assignees(assignees.to_list()))
-        ),
-        pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
+        # pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
+        pl.lit([""]).alias("attributes"),
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))

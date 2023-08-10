@@ -12,14 +12,14 @@ from clients.low_level.big_query import (
     insert_into_bg_table,
     select_from_bg,
 )
-from clients.low_level.big_query import BQ_DATASET_ID
-from common.ner import TermNormalizer
-from common.utils.file import load_json_from_file, save_json_as_file
-from common.utils.list import dedup
-from clients.low_level.big_query import execute_with_retries
-from clients.patents.utils import clean_assignees
+from clients.low_level.big_query import BQ_DATASET_ID, execute_with_retries
+from data.ner import TermNormalizer
+from utils.file import load_json_from_file, save_json_as_file
+from utils.list import dedup
+
 
 from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
+from .utils import clean_assignees
 
 MIN_ASSIGNEE_COUNT = 10
 TERMS_FILE = "terms.json"

@@ -11,9 +11,9 @@ import requests_random_user_agent  # necessary
 from llama_index.readers.schema.base import Document
 
 from typings.indices import NamespaceKey
-from common.utils.file import save_as_file
-from common.utils.namespace import get_namespace
-from common.utils.url import url_to_filename
+from utils.file import save_as_file
+from utils.namespace import get_namespace
+from utils.url import url_to_filename
 
 
 class CachedWedPageReader:

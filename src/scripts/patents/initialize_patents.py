@@ -9,6 +9,7 @@ from system import initialize
 
 initialize()
 
+from constants.patents import PATENT_ATTRIBUTE_MAP
 from clients.low_level.big_query import (
     create_bq_table,
     delete_bg_table,
@@ -216,6 +217,9 @@ def main(copy_tables: bool = False):
 
     # create annotations
     __create_annotations_table()
+
+    # TODODODOD!!
+    # patent_attributes = classify_by_keywords(titles, PATENT_ATTRIBUTE_MAP, None)
 
 
 if __name__ == "__main__":

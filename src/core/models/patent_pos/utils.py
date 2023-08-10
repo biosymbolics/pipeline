@@ -15,9 +15,9 @@ import polars as pl
 from torch import nn
 import torch.nn.functional as F
 
-from clients.spacy import Spacy
-from common.utils.list import batch
-from common.utils.tensor import batch_as_tensors
+from data.ner.spacy import Spacy
+from utils.list import batch
+from utils.tensor import batch_as_tensors
 from core.models.patent_pos.types import AllInput, DnnInput, GnnInput
 from typings.core import Primitive
 from typings.patents import ApprovedPatentApplication as PatentApplication

@@ -1,5 +1,5 @@
 from typing import Any, TypeGuard, Union, List, Dict
-from spacy.tokens import Doc as SpacyDoc
+from spacy.tokens.doc import Doc as SpacyDoc
 
 JsonSerializable = Union[
     Dict[str, "JsonSerializable"], List["JsonSerializable"], str, int, float, bool, None

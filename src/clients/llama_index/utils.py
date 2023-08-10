@@ -4,7 +4,7 @@ LlamaIndex utils
 import pathlib
 
 from clients.llama_index.constants import BASE_STORAGE_DIR
-from common.utils.namespace import get_namespace
+from utils.namespace import get_namespace
 from typings.indices import NamespaceKey
 
 

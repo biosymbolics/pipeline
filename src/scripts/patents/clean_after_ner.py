@@ -7,7 +7,7 @@ import time
 from typing import Literal
 
 from pydash import flatten
-from common.utils.re import get_or_re
+from utils.re import get_or_re
 
 from system import initialize
 

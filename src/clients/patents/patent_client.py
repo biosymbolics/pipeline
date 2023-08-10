@@ -6,9 +6,10 @@ from typing import Sequence, Union, cast
 from pydash import compact
 
 from clients.low_level.big_query import select_from_bg
+from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings import ApprovedPatentApplication, PatentApplication
 
-from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
+from .constants import RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
 from .types import RelevancyThreshold, TermResult
 from .utils import get_max_priority_date

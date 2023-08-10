@@ -3,7 +3,7 @@ from typing import Any, Optional
 import polars as pl
 from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
 
-from common.ner.ner import NerTagger
+from data.ner import NerTagger
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 

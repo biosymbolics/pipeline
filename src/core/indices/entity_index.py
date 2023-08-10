@@ -18,10 +18,10 @@ from clients.llama_index.context import StorageArgs
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.stores.pinecone import get_metadata_filters
-from common.ner.ner import NerTagger
-from common.utils.misc import dict_to_named_tuple
-from common.utils.namespace import get_namespace_id
-from common.utils.string import get_id
+from data.ner import NerTagger
+from utils.misc import dict_to_named_tuple
+from utils.namespace import get_namespace_id
+from utils.string import get_id
 from constants.core import DEFAULT_MODEL_NAME
 from typings.indices import LlmModelType, NamespaceKey
 from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE

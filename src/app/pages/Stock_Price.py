@@ -9,9 +9,9 @@ import plost
 from datetime import date
 import json
 
-from common.utils.date import format_date
-from common.utils.misc import dict_to_named_tuple
-from clients import fetch_yfinance_data
+from utils.date import format_date
+from utils.misc import dict_to_named_tuple
+from clients.finance import fetch_yfinance_data
 from core import SourceDocIndex
 
 st.set_page_config(page_title="Stock Price & Events", page_icon="📈")

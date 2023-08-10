@@ -4,8 +4,8 @@ SEC build
 from datetime import date, datetime
 import re
 
-from common.utils.extraction.html import extract_text
-from common.utils.misc import dict_to_named_tuple
+from utils.extraction.html import extract_text
+from utils.misc import dict_to_named_tuple
 from core import SourceDocIndex
 from core.indices.entity_index import EntityIndex
 from typings.indices import NamespaceKey

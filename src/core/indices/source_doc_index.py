@@ -15,7 +15,7 @@ from clients.llama_index import (
 from clients.llama_index.context import StorageArgs
 from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
-from common.utils.namespace import get_namespace_id
+from utils.namespace import get_namespace_id
 from constants.core import DEFAULT_MODEL_NAME
 from core.constants import DEFAULT_ENTITY_TYPES
 from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt

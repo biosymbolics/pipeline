@@ -9,7 +9,7 @@ import json
 import re
 import logging
 
-from common.utils.string import remove_comment_syntax
+from utils.string import remove_comment_syntax
 
 
 def load_json_array(text: str) -> list[str]:

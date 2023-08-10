@@ -3,7 +3,7 @@ Patterns related to generic mechanisms of action
 
 TODO: car-ts belong in biologics
 """
-from common.utils.re import ALPHA_CHARS
+from utils.re import ALPHA_CHARS
 
 ACTIONS = [
     "activator",

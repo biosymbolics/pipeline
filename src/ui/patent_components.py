@@ -5,7 +5,7 @@ import streamlit as st
 from streamlit_timeline import timeline
 import polars as pl
 
-from common.utils.date import format_date
+from utils.date import format_date
 from typings import PatentApplication
 
 from .common import get_horizontal_list, get_markdown_link
