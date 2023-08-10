@@ -1,6 +1,7 @@
 """
 Handler for patents search
 """
+import json
 from typing_extensions import NotRequired
 from typing import TypedDict
 import logging
@@ -18,7 +19,7 @@ class SearchParams(TypedDict):
 
 
 class SearchEvent(TypedDict):
-    queryStringParameters: SearchParams
+    query: SearchParams
 
 
 def search(event: SearchEvent, context):
@@ -26,15 +27,16 @@ def search(event: SearchEvent, context):
     Search patents by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
-    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
+    - Local: `serverless invoke local --function search-patents --data='{"query": { "terms":["asthma"] }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"query": { "terms":["asthma"] }}'`
+    - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/patents/search?terms=asthma`
     """
-    params = event.get("queryStringParameters", {})
+    params = event.get("query", {})
     terms = params.get("terms")
 
     if not params or not terms:
         logging.error(
-            "Missing queryStringParameters or param `terms`, params: %s",
+            "Missing query or param `terms`, params: %s",
             params,
         )
         return {
@@ -51,4 +53,4 @@ def search(event: SearchEvent, context):
         terms, fetch_approval, min_patent_years, relevancy_threshold, max_results
     )
 
-    return {"statusCode": 200, "body": patents}
+    return {"statusCode": 200, "body": json.dumps(patents, default=str)}

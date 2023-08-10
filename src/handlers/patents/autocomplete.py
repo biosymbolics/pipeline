@@ -8,9 +8,7 @@ from clients import patents as patent_client
 
 
 AutocompleteParams = TypedDict("AutocompleteParams", {"term": str})
-AutocompleteEvent = TypedDict(
-    "AutocompleteEvent", {"queryStringParameters": AutocompleteParams}
-)
+AutocompleteEvent = TypedDict("AutocompleteEvent", {"query": AutocompleteParams})
 
 
 def autocomplete(event: AutocompleteEvent, context):
@@ -18,8 +16,9 @@ def autocomplete(event: AutocompleteEvent, context):
     Autocomplete term for patents (used in patent term autocomplete)
 
     Invocation:
-    - Local: `serverless invoke local --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
-    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
+    - Local: `serverless invoke local --function autocomplete-patents --data='{"query": { "term":"asthm" }}'`
+    - Remote: `serverless invoke --function autocomplete-patents --data='{"query": { "term":"asthm" }}'`
+    - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/terms/search?term=asthm`
 
     Output (for string "asthm"):
     ```json
@@ -37,12 +36,12 @@ def autocomplete(event: AutocompleteEvent, context):
     }
     ```
     """
-    params = event.get("queryStringParameters", {})
+    params = event.get("query", {})
     term = params.get("term")
 
     if not params or not term:
         logging.error(
-            "Missing queryStringParameters or param `term`, params: %s",
+            "Missing query or param `term`, params: %s",
             params,
         )
         return {

@@ -25,10 +25,20 @@ provider:
 
 functions:
   search-patents:
+    events:
+      - http:
+          path: patents/search
+          method: get
+          cors: true
     handler: src.handlers.patents.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
   autocomplete-patents:
+    events:
+      - http:
+          path: terms/search
+          method: get
+          cors: true
     handler: src.handlers.patents.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
