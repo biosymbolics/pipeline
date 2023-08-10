@@ -1,6 +1,8 @@
 boto3
 google-cloud-bigquery
 google-cloud-core
+langchain
+openai
 polars
 pydash
 python-dotenv

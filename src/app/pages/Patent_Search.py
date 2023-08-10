@@ -13,7 +13,7 @@ from clients.openai.gpt_client import GptApiClient
 from clients.patents.types import is_relevancy_threshold
 
 # from visualization.dim_reduction import render_umap
-from visualization.summary import render_summary
+from data.visualization.summary import render_summary
 from ui.patent_components import render_dataframe, render_detail, render_timeline
 
 st.set_page_config(page_title="Patent Search", page_icon="📜", layout="wide")

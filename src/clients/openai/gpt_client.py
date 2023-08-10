@@ -76,7 +76,7 @@ class GptApiClient:
         chat_model = ChatOpenAI(
             temperature=0,
             client="chat",
-            model=DEFAULT_GPT_MODEL,
+            model=self.model,
             max_tokens=DEFAULT_MAX_TOKENS,
             openai_api_key=OPENAI_API_KEY,
         )
