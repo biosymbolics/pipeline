@@ -123,6 +123,7 @@ def search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                _get_term_query("attributes", "attributes"),
                 _get_term_query("compounds", "compounds"),
                 _get_term_query("diseases", "diseases"),
                 _get_term_query("humangenes", "genes"),

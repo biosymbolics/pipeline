@@ -2,13 +2,16 @@ import logging
 import sys
 from typing import Any, Optional
 import polars as pl
+from pydash import flatten
+from data.ner.classifier import classify_by_keywords
+from data.ner.types import DocEntities, DocEntity
 
 from system import initialize
 
 initialize()
 
-
-from clients.low_level.big_query import select_from_bg, upsert_into_bg_table
+from constants.patents import PATENT_ATTRIBUTE_MAP
+from clients.low_level.big_query import select_from_bg, upsert_df_into_bg_table
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import NerTagger
 
@@ -120,13 +123,22 @@ class PatentEnricher:
             link=False,
         )
 
-        if len([ent for ent in entities if len(ent) > 0]) == 0:
+        patent_attributes: list[DocEntities] = [
+            [
+                DocEntity(a_set[0], "attribute", 0, 0, a_set[0], None)
+                for a_set in attribute_set
+            ]
+            for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
+        ]
+
+        all_entities = [list(set(a + b)) for a, b in zip(entities, patent_attributes)]
+
+        if len(flatten(all_entities)) == 0:
             logging.info("No entities found")
             return None
 
         # add back to orig df
-        flatish_ents = [[e for e in ent_set if len(e[0]) > 0] for ent_set in entities]
-        enriched = unprocessed.with_columns(pl.Series("entities", flatish_ents))
+        enriched = unprocessed.with_columns(pl.Series("entities", all_entities))
 
         flattened_df = (
             enriched.explode("entities")
@@ -155,7 +167,7 @@ class PatentEnricher:
         """
         logging.info(f"Upserting %s", df)
 
-        upsert_into_bg_table(
+        upsert_df_into_bg_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
             id_fields=[ID_FIELD, "original_term", "domain"],

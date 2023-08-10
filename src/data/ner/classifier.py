@@ -64,16 +64,16 @@ def classify_string(
 
 
 def classify_by_keywords(
-    strings: pl.Series,
+    strings: list[str],
     keyword_map: Mapping[str, list[str]],
     nx_name: Union[str, None] = "OTHER",
-) -> pl.Series:
+) -> list[list[str]]:
     """
     Classify a string by keywords + keyword map.
     Uses lemmatization.
 
     Args:
-        string (str): string to classify
+        strings (list[str]): strings to classify
         keyword_map (Mapping[str, list[str]]): mapping of categories to keywords
         nx_name (str): name to use for non-matches
 
@@ -84,6 +84,4 @@ def classify_by_keywords(
     """
     lookup = create_lookup_map(keyword_map)
 
-    __classify = partial(classify_string, lookup_map=lookup, nx_name=nx_name)
-
-    return strings.apply(__classify)
+    return [classify_string(s, lookup_map=lookup, nx_name=nx_name) for s in strings]

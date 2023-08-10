@@ -30,8 +30,6 @@ def format_search_result(
         .cast(str)
         .str.strptime(pl.Date, "%Y%m%d")
         .alias("priority_date"),
-        # pl.col("title").map(lambda t: get_patent_attributes(t)).alias("attributes"),
-        pl.lit([""]).alias("attributes"),
     )
 
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))

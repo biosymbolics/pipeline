@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class BigQueryClient(bigquery.Client):
     def __init__(self):
-        creds = BigQueryClient.get_google_credentials_from_ssm(CREDENTIALS_PATH)
+        creds = self.get_google_credentials_from_ssm(CREDENTIALS_PATH)
         super().__init__(credentials=creds)
 
     @classmethod
@@ -179,7 +179,7 @@ def insert_into_bg_table(records: list[T], table_name: str, batch_size: int = 10
         __insert_into_bg_table(b, table)
 
 
-def upsert_into_bg_table(
+def upsert_df_into_bg_table(
     df: pl.DataFrame,
     table_name: str,
     id_fields: list[str],
