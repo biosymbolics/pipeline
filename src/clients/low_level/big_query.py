@@ -5,17 +5,39 @@ from typing import Any, Callable, Mapping, TypeVar
 from google.cloud import bigquery
 from google.cloud.bigquery.table import RowIterator
 from google.api_core.exceptions import NotFound
+from google.oauth2.service_account import Credentials
 import time
 import logging
 import os
 import polars as pl
+import json
 
+from clients.low_level.boto3 import get_boto_client
 from utils.list import batch
 from typings.core import is_string_list
 
 BQ_PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BQ_DATASET = "patents"
 BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET
+
+CREDENTIALS_PATH = "/biosymbolics/pipeline/google/credentials"
+
+logger = logging.getLogger(__name__)
+
+
+class BigQueryClient(bigquery.Client):
+    def __init__(self):
+        creds = BigQueryClient.get_google_credentials_from_ssm(CREDENTIALS_PATH)
+        super().__init__(credentials=creds)
+
+    @classmethod
+    def get_google_credentials_from_ssm(cls, parameter_name: str):
+        ssm_client = get_boto_client("ssm")
+        response = ssm_client.get_parameter(Name=parameter_name, WithDecryption=True)
+        value = response["Parameter"]["Value"]
+        cred_info = json.loads(value)
+        creds = Credentials.from_service_account_info(cred_info)
+        return creds
 
 
 def get_table_id(table_name: str) -> str:
@@ -36,7 +58,7 @@ def execute_bg_query(query: str) -> RowIterator:
     Args:
         query (str): SQL query
     """
-    client = bigquery.Client()
+    client = BigQueryClient()
     logging.info("Starting query: %s", query)
 
     query_job = client.query(query)
@@ -83,7 +105,7 @@ def get_bg_table(table_name: str) -> bigquery.Table:
     """
     table_id = get_table_id(table_name)
     logging.info("Grabbing table %s", table_id)
-    client = bigquery.Client()
+    client = BigQueryClient()
     table = client.get_table(table_id)
     return table
 

@@ -7,6 +7,13 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: python3.10
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+          Resource: "arn:aws:ssm:*:*:parameter/biosymbolics/pipeline/*"
   environment:
     GOOGLE_CLOUD_PROJECT: fair-abbey-386416
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
@@ -31,20 +38,20 @@ plugins:
 
 package:
   # individually: true
-  exclude:
-    - patent_model_checkpoints/**
-    - lib/**
-    - data/**
-    - storage/**
-    - .mypy_cache/**
-    - "**/__pycache__/**"
-    - .pytest_cache/**
-    - node_modules/**
-    - package-lock.json
-    - src/scripts/**
-    - "**/test/**"
-    - "*.pt"
-    - 10000words.txt
+  patterns:
+    - "!patent_model_checkpoints/**"
+    - "!lib/**"
+    - "!data/**"
+    - "!storage/**"
+    - "!.mypy_cache/**"
+    - "!**/__pycache__/**"
+    - "!.pytest_cache/**"
+    - "!node_modules/**"
+    - "!package-lock.json"
+    - "!src/scripts/**"
+    - "!**/test/**"
+    - "!*.pt"
+    - "!10000words.txt"
 
 custom:
   pythonRequirements:
