@@ -25,8 +25,6 @@ from constants.core import (
 )
 
 from ._constants import (
-    COMPOUND_BASE_TERMS,
-    COMPOUND_BASE_TERM_SETS,
     MECHANISM_BASE_TERMS,
     MECHANISM_BASE_TERM_SETS,
     INTERVENTION_BASE_TERMS,

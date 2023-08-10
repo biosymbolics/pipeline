@@ -2,7 +2,6 @@
 Debugging functions for NER
 """
 import multiprocessing
-import os
 from typing import Literal
 from spacy.tokens import Doc
 from spacy import displacy
