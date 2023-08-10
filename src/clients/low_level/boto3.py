@@ -13,5 +13,5 @@ def get_boto_client(service: str):
     Returns:
         boto3.client: boto client
     """
-    session = boto3.Session(profile_name="biosym-1")
+    session = boto3.Session()
     return session.client(service)
