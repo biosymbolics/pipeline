@@ -2,7 +2,7 @@ from llama_index import Prompt
 import streamlit as st
 from llama_index.prompts.prompt_type import PromptType
 
-from common.utils.misc import dict_to_named_tuple
+from utils.misc import dict_to_named_tuple
 from core import EntityIndex, SourceDocIndex
 
 st.set_page_config(page_title="Ask SEC", page_icon="🔎")

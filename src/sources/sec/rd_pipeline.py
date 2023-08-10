@@ -7,7 +7,7 @@ from pydash import flatten
 import polars as pl
 
 
-from common.utils.list import diff_lists
+from utils.list import diff_lists
 from clients.sec import sec_client
 from sources.sec.sec import fetch_annual_reports
 from sources.sec.types import SecFiling

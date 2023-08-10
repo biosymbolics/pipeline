@@ -1,0 +1,9 @@
+boto3
+google-cloud-bigquery
+google-cloud-core
+polars
+pydash
+python-dotenv
+requests
+sec_api
+typing_extensions

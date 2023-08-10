@@ -3,17 +3,16 @@ Patent client
 """
 from functools import partial
 from typing import Sequence, Union, cast
-import logging
-
 from pydash import compact
 
-from clients import select_from_bg
+from clients.low_level.big_query import select_from_bg
+from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings import ApprovedPatentApplication, PatentApplication
 
-from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
+from .constants import RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .utils import get_max_priority_date
 from .types import RelevancyThreshold, TermResult
+from .utils import get_max_priority_date
 
 MIN_TERM_FREQUENCY = 20
 MAX_SEARCH_RESULTS = 2000
@@ -124,6 +123,7 @@ def search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                _get_term_query("attributes", "attributes"),
                 _get_term_query("compounds", "compounds"),
                 _get_term_query("diseases", "diseases"),
                 _get_term_query("humangenes", "genes"),

@@ -10,7 +10,7 @@ import re
 import requests
 from pydash import flatten
 
-from common.utils.list import dedup
+from utils.list import dedup
 
 Node = TypedDict("Node", {"id": str, "parent": Optional[str], "name": str})
 ReactomeNode = TypedDict("ReactomeNode", {"displayName": str, "stId": str})

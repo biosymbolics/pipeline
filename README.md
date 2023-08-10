@@ -8,6 +8,29 @@
 - `python3 -m spacy download en_core_web_md`
 - Create/copy model.pt for non-GPT NER
 
+
+### Deploy
+
+In order to deploy the example, you need to run the following command:
+
+```
+$ serverless deploy
+```
+
+#### Invocation
+
+After successful deployment, you can invoke the deployed function by using the following command:
+
+**Remote**:
+```bash
+serverless invoke --function search-patents
+```
+
+**Local**:
+```bash
+serverless invoke local --function search-patents
+```
+
 ### Running
 
 #### UI
@@ -120,7 +143,7 @@ si = core.indices.source_doc_index.SourceDocIndex()
 ```
 import system
 system.initialize()
-from common.ner.ner import NerTagger
+from data.ner import NerTagger
 tagger = NerTagger()
 text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
 tagger.extract([text], link=False)

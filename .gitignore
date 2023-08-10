@@ -7,5 +7,9 @@ storage/**
 sec_docs
 data/**
 patent_model_checkpoints/**
-model.pt
-model_old.pt
+model*.pt
+node_modules
+.serverless/**
+s_*.py
+serverless_sdk
+.requirements.zip

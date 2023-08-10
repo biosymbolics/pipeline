@@ -5,7 +5,7 @@ import torch
 from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
-from common.utils.tensor import pad_or_truncate_to_size
+from utils.tensor import pad_or_truncate_to_size
 from core.models.patent_pos.core import CombinedModel
 from typings.patents import ApprovedPatentApplication as PatentApplication
 

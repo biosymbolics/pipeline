@@ -6,8 +6,8 @@ import re
 from typing import Optional
 import polars as pl
 
-from common.utils.file import save_json_as_file
-from common.ner.binder.utils import generate_word_indices
+from utils.file import save_json_as_file
+from data.ner.binder.utils import generate_word_indices
 
 
 def format_into_binder(df: pl.DataFrame):

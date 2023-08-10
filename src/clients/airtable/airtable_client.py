@@ -6,7 +6,7 @@ import logging
 import polars as pl
 from pyairtable import Table
 
-from common.utils.file import save_as_pickle
+from utils.file import save_as_pickle
 
 API_KEY = os.environ["AIRTABLE_API_KEY"]
 

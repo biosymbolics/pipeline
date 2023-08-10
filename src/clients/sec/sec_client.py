@@ -7,7 +7,7 @@ from typing import Callable, Optional
 import polars as pl
 from sec_api import ExtractorApi, QueryApi, RenderApi
 
-from common.utils.extraction.product_table import extract_product_tables
+from utils.extraction.product_table import extract_product_tables
 from sources.sec.types import ExtractReturnType, SecFiling
 
 API_KEY = os.environ["SEC_API_KEY"]

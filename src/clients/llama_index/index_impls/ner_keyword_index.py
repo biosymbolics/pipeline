@@ -18,7 +18,7 @@ from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
 from llama_index.retrievers import VectorIndexRetriever
 from llama_index.schema import NodeWithScore
 
-from common.ner.ner import NerTagger
+from data.ner import NerTagger
 
 
 def extract_keywords(
