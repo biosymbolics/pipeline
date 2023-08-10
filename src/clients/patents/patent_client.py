@@ -2,6 +2,7 @@
 Patent client
 """
 from functools import partial
+import logging
 from typing import Sequence, Union, cast
 from pydash import compact
 
@@ -13,6 +14,9 @@ from .constants import RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
 from .types import RelevancyThreshold, TermResult
 from .utils import get_max_priority_date
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MIN_TERM_FREQUENCY = 20
 MAX_SEARCH_RESULTS = 2000
@@ -114,6 +118,9 @@ def search(
     patent_client.search(['asthma', 'astrocytoma'])
     ```
     """
+    if not isinstance(terms, list):
+        raise ValueError("Terms must be a list")
+
     lower_terms = [term.lower() for term in terms]
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     max_priority_date = get_max_priority_date(min_patent_years)
@@ -192,6 +199,7 @@ def search(
     """
 
     query = select_query + where
+    logger.info("Running query: %s", query)
     results = select_from_bg(query)
     return format_search_result(results)
 

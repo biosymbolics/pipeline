@@ -10,6 +10,7 @@ from clients import patents as patent_client
 from clients.patents import RelevancyThreshold
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class SearchParams(TypedDict):
@@ -29,8 +30,8 @@ def search(event: SearchEvent, context):
     Search patents by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
-    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":["asthma"] }}'`
+    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
     - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/patents/search?terms=asthma`
     """
     params = event.get("queryStringParameters", {})
@@ -38,7 +39,7 @@ def search(event: SearchEvent, context):
     terms_list = terms.split(",") if terms else []
 
     if not params or not terms or not all([len(t) > 1 for t in terms_list]):
-        logging.error(
+        logger.error(
             "Missing or malformed query params: %s",
             params,
         )
@@ -47,12 +48,12 @@ def search(event: SearchEvent, context):
             "message": "Missing parameter(s)",
         }
 
-    fetch_approval = params.get("fetch_approval") or False
+    fetch_approval = params.get("fetch_approval") or True
     min_patent_years = params.get("min_patent_years") or 10
     relevancy_threshold = params.get("relevancy_threshold") or "high"
     max_results = params.get("max_results") or 100
 
-    logging.info(
+    logger.info(
         "Fetching patents for terms: %s (%s, %s, %s, %s)",
         terms_list,
         fetch_approval,
@@ -62,7 +63,7 @@ def search(event: SearchEvent, context):
     )
 
     patents = patent_client.search(
-        terms, fetch_approval, min_patent_years, relevancy_threshold, max_results
+        terms_list, fetch_approval, min_patent_years, relevancy_threshold, max_results
     )
 
     return {"statusCode": 200, "body": json.dumps(patents, default=str)}

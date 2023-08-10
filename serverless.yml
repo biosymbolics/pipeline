@@ -7,6 +7,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: python3.10
+  timeout: 300
   iam:
     role:
       statements:
@@ -63,6 +64,8 @@ functions:
           path: terms/describe
           method: get
           cors: true
+    url:
+      invokeMode: RESPONSE_STREAM
     handler: src.handlers.patents.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer

@@ -12,6 +12,7 @@ class DescribeEvent(TypedDict):
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def describe(event: DescribeEvent, context):
@@ -30,7 +31,7 @@ def describe(event: DescribeEvent, context):
     terms_list = terms.split(",") if terms else []
 
     if not params or not terms or not all([len(t) > 1 for t in terms_list]):
-        logging.error(
+        logger.error(
             "Missing or malformed query params: %s",
             params,
         )
@@ -39,11 +40,11 @@ def describe(event: DescribeEvent, context):
             "message": "Missing parameter(s)",
         }
 
-    logging.info(
+    logger.info(
         "Fetching description for terms: %s",
         terms_list,
     )
 
     description = gpt_client.describe_terms(terms_list)
 
-    return {"statusCode": 200, "body": {"description": description}}
+    return {"statusCode": 200, "body": description}
