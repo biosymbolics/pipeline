@@ -8,7 +8,7 @@ from clients.low_level.big_query import (
 )
 from scripts.patents.copy_psql import copy_patent_approvals
 
-from ._constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
+from .gpr_constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
 
 BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))

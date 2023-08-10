@@ -18,7 +18,8 @@ from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
 
-from ._constants import BIOSYM_ANNOTATIONS_TABLE, SYNONYM_MAP
+from ._constants import BIOSYM_ANNOTATIONS_TABLE
+from .gpr_constants import SYNONYM_MAP
 from .utils import clean_assignees
 
 MIN_ASSIGNEE_COUNT = 10
