@@ -5,13 +5,13 @@ from functools import partial
 from typing import Sequence, Union, cast
 from pydash import compact
 
-from clients import select_from_bg
+from clients.low_level.big_query import select_from_bg
 from typings import ApprovedPatentApplication, PatentApplication
 
 from .constants import COMPOSITION_OF_MATTER_IPC_CODES, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .utils import get_max_priority_date
 from .types import RelevancyThreshold, TermResult
+from .utils import get_max_priority_date
 
 MIN_TERM_FREQUENCY = 20
 MAX_SEARCH_RESULTS = 2000

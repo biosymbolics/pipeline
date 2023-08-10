@@ -1,4 +1,6 @@
-import json
+"""
+Handler for patents search
+"""
 from typing_extensions import NotRequired
 from typing import TypedDict
 import logging

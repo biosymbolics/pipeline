@@ -1,4 +1,6 @@
-import json
+"""
+Handler for patents autocomplete
+"""
 import logging
 from typing import TypedDict
 

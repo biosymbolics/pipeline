@@ -1,0 +1,6 @@
+polars
+pydash
+python-dotenv
+requests
+sec_api
+typing_extensions

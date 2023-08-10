@@ -12,8 +12,8 @@ provider:
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
     PYTHONPATH: ./src:.
-    TOKENIZERS_PARALLELISM: False
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
+    TOKENIZERS_PARALLELISM: False
 
 
 functions:
@@ -49,8 +49,11 @@ package:
 custom:
   pythonRequirements:
     # dockerizePip: true
-    zip: true
+    # zip: true
     slim: true
+    slimPatterns:
+      - "**/__pycache__/**"
+    fileName: src/handlers/requirements.txt
     layer: true
     noDeploy:
       - pytest

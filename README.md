@@ -23,12 +23,12 @@ After successful deployment, you can invoke the deployed function by using the f
 
 **Remote**:
 ```bash
-serverless invoke --function hello
+serverless invoke --function search-patents
 ```
 
 **Local**:
 ```bash
-serverless invoke local --function hello
+serverless invoke local --function search-patents
 ```
 
 ### Running
