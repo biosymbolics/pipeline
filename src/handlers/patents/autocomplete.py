@@ -1,6 +1,7 @@
 """
 Handler for patents autocomplete
 """
+import json
 import logging
 from typing import TypedDict
 
@@ -53,4 +54,4 @@ def autocomplete(event: AutocompleteEvent, context):
 
     terms = patent_client.autocomplete_terms(term)
 
-    return {"statusCode": 200, "body": terms}
+    return {"statusCode": 200, "body": json.dumps({"terms": terms})}

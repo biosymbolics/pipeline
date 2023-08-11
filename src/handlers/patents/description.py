@@ -1,3 +1,4 @@
+import json
 from typing import TypedDict
 from clients.openai.gpt_client import GptApiClient
 import logging

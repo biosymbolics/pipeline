@@ -12,7 +12,7 @@ from typings import ApprovedPatentApplication, PatentApplication
 
 from .constants import RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .types import RelevancyThreshold, TermResult
+from .types import AutocompleteTerm, RelevancyThreshold, TermResult
 from .utils import get_max_priority_date
 
 logger = logging.getLogger(__name__)
@@ -204,7 +204,7 @@ def search(
     return format_search_result(results)
 
 
-def autocomplete_terms(string: str) -> list[str]:
+def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
     """
     Fetch all terms from patents.terms
     Sort by term, then by count. Terms must have a count > MIN_TERM_FREQUENCY
@@ -215,8 +215,8 @@ def autocomplete_terms(string: str) -> list[str]:
     Returns: a list of matching terms
     """
 
-    def format_term(entity: TermResult) -> str:
-        return f"{entity['term']} ({entity['count']})"
+    def format_term(entity: TermResult) -> AutocompleteTerm:
+        return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
     query = f"""
         SELECT *

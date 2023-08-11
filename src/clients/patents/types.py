@@ -4,6 +4,7 @@ Patent types
 from typing import Literal, TypeGuard, TypedDict, Union
 import typing
 
+AutocompleteTerm = TypedDict("AutocompleteTerm", {"id": str, "label": str})
 TermResult = TypedDict("TermResult", {"term": str, "count": int})
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
