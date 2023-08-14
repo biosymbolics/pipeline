@@ -17,9 +17,9 @@ from data.ner import NerTagger
 
 
 ID_FIELD = "publication_number"
-TEXT_FIELDS = ["title", "abstract"]
-ENTITY_TYPES = ["compounds", "diseases", "mechanisms"]
-BATCH_SIZE = 1000
+TEXT_FIELDS = frozenset(["title", "abstract"])
+ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
+BATCH_SIZE = 10000
 MAX_TEXT_LENGTH = 500
 PROCESSED_PUBS_FILE = "data/processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
@@ -40,8 +40,11 @@ class PatentEnricher:
         """
         Returns a list of already processed publication numbers
         """
-        with open(PROCESSED_PUBS_FILE, "r") as f:
-            return f.read().splitlines()
+        try:
+            with open(PROCESSED_PUBS_FILE, "r") as f:
+                return f.read().splitlines()
+        except FileNotFoundError:
+            return []
 
     def __checkpoint(self, df: pl.DataFrame) -> None:
         """
@@ -49,7 +52,7 @@ class PatentEnricher:
         - processed publication numbers added to a file
         """
         logging.info(f"Persisting processed publication_numbers")
-        with open(PROCESSED_PUBS_FILE, "a") as f:
+        with open(PROCESSED_PUBS_FILE, "a+") as f:
             f.write("\n" + "\n".join(df["publication_number"].to_list()))
 
     def __fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
@@ -125,13 +128,16 @@ class PatentEnricher:
 
         patent_attributes: list[DocEntities] = [
             [
-                DocEntity(a_set[0], "attribute", 0, 0, a_set[0], None)
+                DocEntity(a_set, "attribute", 0, 0, a_set[0], None)
                 for a_set in attribute_set
             ]
             for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
         ]
 
-        all_entities = [list(set(a + b)) for a, b in zip(entities, patent_attributes)]
+        all_entities = [
+            [a._asdict() for a in es]  # turn into dicts for polars' sake
+            for es in [list(a + b) for a, b in zip(entities, patent_attributes)]
+        ]
 
         if len(flatten(all_entities)) == 0:
             logging.info("No entities found")
@@ -139,22 +145,25 @@ class PatentEnricher:
 
         # add back to orig df
         enriched = unprocessed.with_columns(pl.Series("entities", all_entities))
+        logging.info("Enriched df: %s", enriched)
 
         flattened_df = (
             enriched.explode("entities")
-            .lazy()
+            # .lazy()
             .select(
                 pl.col("publication_number"),
-                pl.col("entities").apply(lambda e: e[0]).alias("original_term"),
-                pl.col("entities").apply(lambda e: e[1]).alias("domain"),
+                pl.col("entities").apply(lambda e: e["term"]).alias("original_term"),  # type: ignore
+                pl.col("entities").apply(lambda e: e["type"]).alias("domain"),  # type: ignore
                 pl.lit(0.90000001).alias("confidence"),
                 pl.lit("title+abstract").alias("source"),
                 pl.col("entities")
-                .apply(lambda e: e[3])
+                .apply(lambda e: e["start_char"])  # type: ignore
                 .alias("character_offset_start"),
-                pl.col("entities").apply(lambda e: e[4]).alias("character_offset_end"),
+                pl.col("entities")
+                .apply(lambda e: e["end_char"])  # type: ignore
+                .alias("character_offset_end"),
             )
-            .collect()
+            # .collect()
         )
         return flattened_df
 
@@ -215,19 +224,11 @@ class PatentEnricher:
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 ner.py [starting_id]\nLoads NER data for patents")
+        print(
+            "Usage: python3 -m scripts.patents.extract_entities [starting_id]\nLoads NER data for patents"
+        )
         sys.exit()
 
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
-    terms = [
-        "schizophrenia",
-        "pulmonary hypertension",
-        "bipolar disorder",
-        "depression",
-        "major depressive disorder",
-        "asthma",
-        "melanoma",
-        "alzheimer's disease",
-    ]
-    enricher(None, starting_id)
+    enricher(starting_id)

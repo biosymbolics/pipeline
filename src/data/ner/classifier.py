@@ -66,7 +66,7 @@ def classify_string(
 def classify_by_keywords(
     strings: list[str],
     keyword_map: Mapping[str, list[str]],
-    nx_name: Union[str, None] = "OTHER",
+    nx_name: Union[str, None] = None,
 ) -> list[list[str]]:
     """
     Classify a string by keywords + keyword map.

@@ -84,6 +84,9 @@ class NerTagger:
         self.cleaner = EntityCleaner(parallelize=parallelize)
         start_time = time.time()
 
+        if entity_types is not None and not isinstance(entity_types, frozenset):
+            raise ValueError("entity_types must be a frozenset")
+
         if self.use_llm:
             if not self.llm_config:
                 raise ValueError("Must provide llm_config if use_llm is True")

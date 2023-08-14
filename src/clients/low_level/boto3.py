@@ -13,5 +13,5 @@ def get_boto_client(service: str):
     Returns:
         boto3.client: boto client
     """
-    session = boto3.Session()
+    session = boto3.Session(region_name="us-east-1")
     return session.client(service)

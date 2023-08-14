@@ -96,7 +96,7 @@ def extract_predictions(
             span_logits.detach().cpu().clone().numpy()
         )  # https://github.com/pytorch/pytorch/issues/77764
         start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
-        logger.info(
+        logger.debug(
             "Extracted predictions in %s seconds", round(time.time() - start_time, 2)
         )
 
