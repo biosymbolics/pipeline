@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class BigQueryClient(bigquery.Client):
-    def __init__(self, use_service_account: bool = DEFAULT_USE_SERVICE_ACCOUNT):
+    def __init__(self, use_service_account: bool):
         if use_service_account:
             creds = self.get_google_credentials_from_ssm(CREDENTIALS_PATH)
             super().__init__(credentials=creds)
@@ -47,7 +47,7 @@ class BigQueryClient(bigquery.Client):
 
 
 class DatabaseClient:
-    def __init__(self, use_service_account: bool = True):
+    def __init__(self, use_service_account: bool = False):
         self.client = BigQueryClient(use_service_account=use_service_account)
 
     @staticmethod

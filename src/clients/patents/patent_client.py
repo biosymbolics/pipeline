@@ -200,7 +200,7 @@ def search(
 
     query = select_query + where
     logger.info("Running query: %s", query)
-    results = DatabaseClient().select(query)
+    results = DatabaseClient(use_service_account=True).select(query)
     return format_search_result(results)
 
 
@@ -225,5 +225,5 @@ def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC
     """
-    results = DatabaseClient().select(query)
+    results = DatabaseClient(use_service_account=True).select(query)
     return [format_term(cast(TermResult, result)) for result in results]
