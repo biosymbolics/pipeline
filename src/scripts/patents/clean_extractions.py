@@ -11,10 +11,8 @@ from system import initialize
 initialize()
 
 from clients.low_level.big_query import (
-    delete_bg_table,
-    execute_bg_query,
+    DatabaseClient,
     BQ_DATASET_ID,
-    query_to_bg_table,
 )
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
@@ -604,9 +602,11 @@ def remove_substrings():
         )
     """
 
-    execute_bg_query(query)
-    execute_bg_query(delete_query)
-    delete_bg_table("names_to_remove")
+    client = DatabaseClient()
+
+    client.execute_query(query)
+    client.execute_query(delete_query)
+    client.delete_table("names_to_remove")
 
 
 def fix_of_for_annotations():
@@ -650,21 +650,22 @@ def fix_of_for_annotations():
         """
         return sql
 
+    client = DatabaseClient()
     for term in terms:
         for field in TEXT_FIELDS:
             sql = get_query(term, field)
-            execute_bg_query(sql)
+            client.execute_query(sql)
 
     for term in [*terms, *[t for term_set in term_sets for t in term_set]]:
         for field in TEXT_FIELDS:
             sql = get_hyphen_query(term, field)
-            execute_bg_query(sql)
+            client.execute_query(sql)
 
     # loop over term sets, in which the original_term may be in another form than the title variant
     for term_set in term_sets:
         for field in TEXT_FIELDS:
             sql = get_query(term_set, field)
-            execute_bg_query(sql)
+            client.execute_query(sql)
 
 
 def remove_junk():
@@ -750,8 +751,9 @@ def remove_junk():
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% factor' and original_term not like '%risk%' and original_term not like '%disease%' and domain='diseases'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where regexp_contains(original_term, 'receptors?$') and domain='diseases'",
     ]
+    client = DatabaseClient()
     for sql in queries:
-        results = execute_bg_query(sql)
+        client.execute_query(sql)
 
 
 def fix_unmatched():
@@ -771,10 +773,11 @@ def fix_unmatched():
         """
         return sql
 
+    client = DatabaseClient()
     for field in TEXT_FIELDS:
         for char_set in [("{", "}"), ("[", "]"), ("(", ")")]:
             sql = get_query(field, char_set)
-            execute_bg_query(sql)
+            client.execute_query(sql)
 
 
 def remove_common_terms():
@@ -803,7 +806,7 @@ def remove_common_terms():
         ]
     )
     query = f"delete from {WORKING_TABLE} where lower(original_term) in ({str_match}) OR {re_match}"
-    execute_bg_query(query)
+    DatabaseClient().execute_query(query)
 
 
 if __name__ == "__main__":
@@ -817,7 +820,7 @@ if __name__ == "__main__":
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    query_to_bg_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
+    DatabaseClient().query_to_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
 
     fix_of_for_annotations()
     fix_unmatched()

@@ -7,12 +7,10 @@ from google.cloud import bigquery
 import logging
 
 from clients.low_level.big_query import (
-    create_bq_table,
-    truncate_bg_table,
-    insert_into_bg_table,
-    select_from_bg,
+    DatabaseClient,
+    BQ_DATASET_ID,
+    execute_with_retries,
 )
-from clients.low_level.big_query import BQ_DATASET_ID, execute_with_retries
 from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
@@ -60,9 +58,10 @@ class SynonymMapper:
         """
         logging.info("Creating synonym map (truncating if exists)")
 
+        client = DatabaseClient()
         # truncate and (re)create the table
-        truncate_bg_table(SYNONYM_TABLE_NAME)
-        create_bq_table(SYNONYM_TABLE_NAME, ["synonym", "term"])
+        client.truncate_table(SYNONYM_TABLE_NAME)
+        client.create_table(SYNONYM_TABLE_NAME, ["synonym", "term"])
 
         logging.info("Adding default/hard-coded synonym map entries")
         execute_with_retries(lambda: SynonymMapper.add_map(synonym_map))
@@ -111,7 +110,7 @@ class SynonymMapper:
             if entry[1] is not None and entry[0] is not None and entry[0] != entry[1]
         ]
 
-        insert_into_bg_table(data, SYNONYM_TABLE_NAME)
+        DatabaseClient().insert_into_table(data, SYNONYM_TABLE_NAME)
         logging.info("Inserted %s rows into synonym_map", len(data))
 
 
@@ -161,7 +160,7 @@ class TermAssembler:
             unnest(p.inventor_harmonized) as inventor
             group by name
         """
-        rows = select_from_bg(owner_query)
+        rows = DatabaseClient().select(owner_query)
         names = [row["name"] for row in rows]
         cleaned = clean_assignees(names)
 
@@ -206,7 +205,7 @@ class TermAssembler:
                 ) AS all_annotations
                 group by lower(term), original_id, domain
             """
-        rows = select_from_bg(terms_query)
+        rows = DatabaseClient().select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
 
         logging.info("Normalizing/linking %s terms", len(rows))
@@ -265,6 +264,7 @@ class TermAssembler:
         - inserts them into a new table
         - adds synonym entries for the original terms
         """
+        client = DatabaseClient()
         table_name = "terms"
         schema = [
             bigquery.SchemaField("term", "STRING"),
@@ -274,14 +274,14 @@ class TermAssembler:
             bigquery.SchemaField("synonyms", "STRING", mode="REPEATED"),
             bigquery.SchemaField("synonym_ids", "STRING", mode="REPEATED"),
         ]
-        create_bq_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
+        client.create_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
 
         # grab terms from annotation tables (slow!!)
         terms = TermAssembler.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
         rows = [row for row in terms if len(row["term"]) > 1]
-        insert_into_bg_table(rows, table_name)
+        client.insert_into_table(rows, table_name)
         logging.info(f"Inserted %s rows into terms table", len(rows))
 
     @staticmethod

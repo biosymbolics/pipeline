@@ -10,9 +10,7 @@ from system import initialize
 initialize()
 
 from clients.low_level.big_query import (
-    create_bq_table,
-    delete_bg_table,
-    query_to_bg_table,
+    DatabaseClient,
     BQ_DATASET_ID,
 )
 from constants.core import (
@@ -73,7 +71,8 @@ def __create_applications_table():
     logging.info("Create a table of patent applications for use in app queries")
 
     table_name = "applications"
-    delete_bg_table(table_name)
+    client = DatabaseClient()
+    client.delete_table(table_name)
 
     applications = f"""
         SELECT
@@ -82,7 +81,7 @@ def __create_applications_table():
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
-    query_to_bg_table(applications, table_name)
+    client.query_to_table(applications, table_name)
 
 
 def __create_annotations_table():
@@ -91,7 +90,9 @@ def __create_annotations_table():
     """
     logging.info("Create a table of annotations for use in app queries")
     table_name = "annotations"
-    delete_bg_table(table_name)
+
+    client = DatabaseClient()
+    client.delete_table(table_name)
 
     entity_query = f"""
         WITH ranked_terms AS (
@@ -168,7 +169,7 @@ def __create_annotations_table():
         WHERE rank = 1
         GROUP BY publication_number
     """
-    query_to_bg_table(entity_query, table_name)
+    client.query_to_table(entity_query, table_name)
 
 
 def __create_biosym_annotations_tables():
@@ -177,6 +178,8 @@ def __create_biosym_annotations_tables():
     (NOTE: does not check schema if exists)
     """
     table_names = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
+
+    client = DatabaseClient()
 
     for table_name in table_names:
         schema = [
@@ -188,7 +191,9 @@ def __create_biosym_annotations_tables():
             bigquery.SchemaField("character_offset_start", "INTEGER"),
             bigquery.SchemaField("character_offset_end", "INTEGER"),
         ]
-        create_bq_table(table_name, schema, exists_ok=True, truncate_if_exists=False)
+        client.create_table(
+            table_name, schema, exists_ok=True, truncate_if_exists=False
+        )
         logging.info(f"(Maybe) created table {table_name}")
 
 

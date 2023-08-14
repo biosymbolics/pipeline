@@ -227,7 +227,7 @@ class NerTagger:
         ents_by_doc = self.__extract(self.__prep_for_extract(content.copy()))
 
         def __normalize(entity_set):
-            normalized = self.cleaner.clean(entity_set, remove_suppresed=True)
+            normalized = self.cleaner.clean(entity_set, remove_suppressed=True)
 
             # filter by entity types, if provided
             if self.entity_types:

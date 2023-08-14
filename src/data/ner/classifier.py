@@ -47,7 +47,7 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
 
 
 def classify_string(
-    string: str, lookup_map: Mapping[str, str], nx_name: Union[str, None] = "OTHER"
+    string: str, lookup_map: Mapping[str, str], nx_name: Union[str, None] = None
 ) -> list[str]:
     """
     Classify a string by keywords + lookup map.
