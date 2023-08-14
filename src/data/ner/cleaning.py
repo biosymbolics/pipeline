@@ -10,15 +10,12 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from data.ner.spacy import Spacy
-from ner.utils import lemmatize_tails
-
-# from utils.list import dedup
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 from typings.core import is_string_list
 
+from .spacy import Spacy
 from .types import DocEntity, is_entity_doc_list
-from .utils import normalize_by_pos, rearrange_terms
+from .utils import lemmatize_tails, normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 

@@ -5,15 +5,14 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from typing import Union
+import torch
 from scispacy.candidate_generation import (
     CandidateGenerator,
     UmlsKnowledgeBase,
     MentionCandidate,
 )
-import torch
 
-from ner.cleaning import EntityCleaner
-
+from .cleaning import EntityCleaner
 from .types import KbLinker, CanonicalEntity
 
 LinkedEntityMap = dict[str, CanonicalEntity]

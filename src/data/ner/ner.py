@@ -15,19 +15,19 @@ from spacy.tokens import Span, Doc
 import spacy_llm
 from spacy_llm.util import assemble
 
-from ner.binder.binder import BinderNlp
-from ner.linker import TermLinker
-from ner.utils import spans_to_doc_entities
 from utils.extraction.html import extract_text
 from utils.string import chunk_list
 
+from .binder import BinderNlp
 from .cleaning import EntityCleaner
+from .linker import TermLinker
 from .patterns import (
     INDICATION_SPACY_PATTERNS,
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
 from .types import DocEntities, DocEntity, SpacyPatterns
+from .utils import spans_to_doc_entities
 
 T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]

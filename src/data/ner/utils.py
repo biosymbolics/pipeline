@@ -7,14 +7,16 @@ import re
 import time
 from typing import Iterable
 from spacy.tokens import Doc, Span
-from data.ner.spacy import Spacy
-from ner.types import DocEntities, DocEntity
 
 from utils.re import (
     get_or_re,
     ReCount,
     ALPHA_CHARS,
 )
+
+from .spacy import Spacy
+from .types import DocEntities, DocEntity
+
 
 # end-of-entity regex
 EOE_RE = "\\b" + ".*"

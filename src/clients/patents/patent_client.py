@@ -123,7 +123,7 @@ def search(
 
     lower_terms = [term.lower() for term in terms]
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
-    max_priority_date = get_max_priority_date(min_patent_years)
+    max_priority_date = get_max_priority_date(int(min_patent_years))
     _get_term_query = partial(get_term_query, threshold=threshold)
     fields = ",".join(
         compact(

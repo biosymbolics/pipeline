@@ -54,7 +54,8 @@ def search(event: SearchEvent, context):
     max_results = params.get("max_results") or 100
 
     logger.info(
-        "Fetching patents for terms: %s (%s, %s, %s, %s)",
+        "Fetching patents for terms: %s (%s, %s, %s, %s, params %s)",
+        params,
         terms_list,
         fetch_approval,
         min_patent_years,
