@@ -90,7 +90,7 @@ class TestNerUtils(unittest.TestCase):
                     # if no unescaping, we get:
                     # [..., 'h2o per millisecond']
                     "the 16 cm h2o,",  # TODO;  P1 is from 4 to 16 cm H2
-                    "to 4 mm h2o per",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond
+                    "to 4 mm h2o per",  # TODO
                     "millisecond, the",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease...
                 ],
             },
@@ -113,6 +113,26 @@ class TestNerUtils(unittest.TestCase):
                     "than codeine and",  # TODO
                     "agonist antagonist analgesic",
                     # hydrocodone and tramadol # TODO
+                ],
+            },
+            {
+                "text": """
+                Biomarkers for oxidative stress
+                This invention relates generally to methods of detecting and quantifying biomarkers of oxidative stress in proteins. The biomarker may be any amino acid that has undergone oxidation (or other modification, e.g. chloro-tyrosine, dityrosine). Emphasis is given herein on oxidized sulfur- or selenium-containing amino acids (SSAA). The biomarker of oxidative stress in proteins may be detected with an antibody that binds to oxidized amino acids, specifically oxidized sulfur- or selenium-containing amino acids. The antibody may be monoclonal or polyclonal. The presence of biomarker or amount of biomarker present in a sample may be used to aid in assessing the efficacy of environmental, nutritional and therapeutic interventions, among other uses.
+                """,
+                "expected_output": [
+                    "oxidative stress",
+                    "protein",
+                    "dityrosine",
+                    "selenium containing amino acid",
+                    "protein",
+                    "antibody",
+                    "selenium containing amino acid",
+                    "antibody",
+                    "biomarker or",  # TODO
+                    # antibody that binds to oxidized amino acids # TODO
+                    # chloro-tyrosine todo
+                    # oxidized sulfur- or selenium-containing amino acids (SSAA) # TODO
                 ],
             },
         ]
