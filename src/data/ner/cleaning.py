@@ -298,7 +298,7 @@ class EntityCleaner:
 
     @staticmethod
     def __return_to_type(
-        modified_texts: list[str], orig_ents: list[T], remove_suppresed: bool = False
+        modified_texts: list[str], orig_ents: list[T], remove_suppressed: bool = False
     ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             logging.info(
@@ -311,12 +311,12 @@ class EntityCleaner:
                 DocEntity(*orig_ents[i][0:4], modified_texts[i], orig_ents[i][5])
                 for i in range(len(orig_ents))
             ]
-            if remove_suppresed:
+            if remove_suppressed:
                 doc_ents = [d for d in doc_ents if len(d.normalized_term) > 0]
             return cast(list[T], doc_ents)
 
         if is_string_list(orig_ents):
-            if remove_suppresed:
+            if remove_suppressed:
                 modified_texts = [t for t in modified_texts if len(t) > 0]
             return cast(list[T], modified_texts)
 
@@ -326,7 +326,7 @@ class EntityCleaner:
         self,
         entities: list[T],
         common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
-        remove_suppresed: bool = False,
+        remove_suppressed: bool = False,
     ) -> list[T]:
         """
         Sanitize entity list
@@ -336,7 +336,7 @@ class EntityCleaner:
         Args:
             entities (list[T]): entities
             common_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
-            remove_suppresed (bool, optional): remove empties? Defaults to False (leaves empty spaces in, to maintain order)
+            remove_suppressed (bool, optional): remove empties? Defaults to False (leaves empty spaces in, to maintain order)
         """
         start = time.time()
         if not isinstance(entities, list):
@@ -366,7 +366,7 @@ class EntityCleaner:
         )
 
         return self.__return_to_type(
-            cleaned, entities, remove_suppresed=remove_suppresed
+            cleaned, entities, remove_suppressed=remove_suppressed
         )
 
     def __call__(self, *args, **kwargs):

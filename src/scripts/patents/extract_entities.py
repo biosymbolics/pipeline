@@ -10,8 +10,8 @@ from system import initialize
 
 initialize()
 
+from clients.low_level.big_query import DatabaseClient
 from constants.patents import PATENT_ATTRIBUTE_MAP
-from clients.low_level.big_query import select_from_bg, upsert_df_into_bg_table
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import NerTagger
 
@@ -19,7 +19,7 @@ from data.ner import NerTagger
 ID_FIELD = "publication_number"
 TEXT_FIELDS = frozenset(["title", "abstract"])
 ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
-BATCH_SIZE = 10000
+BATCH_SIZE = 2000
 MAX_TEXT_LENGTH = 500
 PROCESSED_PUBS_FILE = "data/processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
@@ -34,6 +34,7 @@ class PatentEnricher:
         """
         Initialize the enricher
         """
+        self.db = DatabaseClient()
         self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES)
 
     def __get_processed_pubs(self) -> list[str]:
@@ -74,7 +75,7 @@ class PatentEnricher:
             ORDER BY apps.{ID_FIELD} ASC
             limit {BATCH_SIZE}
         """
-        patents = select_from_bg(query)
+        patents = self.db.select(query)
         return patents
 
     def __format_patent_docs(self, patents: pl.DataFrame) -> list[str]:
@@ -128,7 +129,7 @@ class PatentEnricher:
 
         patent_attributes: list[DocEntities] = [
             [
-                DocEntity(a_set, "attribute", 0, 0, a_set[0], None)
+                DocEntity(a_set, "attribute", 0, 0, a_set, None)
                 for a_set in attribute_set
             ]
             for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
@@ -144,12 +145,15 @@ class PatentEnricher:
             return None
 
         # add back to orig df
-        enriched = unprocessed.with_columns(pl.Series("entities", all_entities))
+        enriched = unprocessed.with_columns(pl.Series("entities", all_entities)).filter(
+            pl.col("entities").list.lengths() > 0
+        )
         logging.info("Enriched df: %s", enriched)
 
         flattened_df = (
-            enriched.explode("entities")
-            # .lazy()
+            # polars can't handle explode list[struct] as of 08/14/23
+            pl.from_pandas(enriched.to_pandas().explode("entities"))
+            .lazy()
             .select(
                 pl.col("publication_number"),
                 pl.col("entities").apply(lambda e: e["term"]).alias("original_term"),  # type: ignore
@@ -163,7 +167,7 @@ class PatentEnricher:
                 .apply(lambda e: e["end_char"])  # type: ignore
                 .alias("character_offset_end"),
             )
-            # .collect()
+            .collect()
         )
         return flattened_df
 
@@ -176,7 +180,7 @@ class PatentEnricher:
         """
         logging.info(f"Upserting %s", df)
 
-        upsert_df_into_bg_table(
+        self.db.upsert_df_into_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
             id_fields=[ID_FIELD, "original_term", "domain"],
@@ -225,7 +229,9 @@ class PatentEnricher:
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m scripts.patents.extract_entities [starting_id]\nLoads NER data for patents"
+            """
+            Usage: python3 -m scripts.patents.extract_entities [starting_id]\nLoads NER data for patents
+            """
         )
         sys.exit()
 

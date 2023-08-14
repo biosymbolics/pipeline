@@ -2,8 +2,7 @@
 Functions for copying around subsets of the patents database
 """
 from clients.low_level.big_query import (
-    delete_bg_table,
-    query_to_bg_table,
+    DatabaseClient,
     BQ_DATASET_ID,
 )
 from scripts.patents.copy_psql import copy_patent_approvals
@@ -19,14 +18,15 @@ def __copy_gpr_publications():
     Copy publications from GPR to a local table
     """
     table_id = "gpr_publications"
-    delete_bg_table(table_id)
+    client = DatabaseClient()
+    client.delete_table(table_id)
 
     query = f"""
         SELECT * FROM `patents-public-data.google_patents_research.publications`
         WHERE EXISTS
         (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
     """
-    query_to_bg_table(query, table_id)
+    client.query_to_table(query, table_id)
 
 
 def __copy_gpr_annotations():
@@ -55,7 +55,8 @@ def __copy_gpr_annotations():
     ```
     """
     table_id = "gpr_annotations"
-    delete_bg_table(table_id)
+    client = DatabaseClient()
+    client.delete_table(table_id)
 
     query = f"""
         SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
@@ -65,7 +66,7 @@ def __copy_gpr_annotations():
         AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
         AND domain not in {SUPPRESSED_DOMAINS}
     """
-    query_to_bg_table(query, table_id)
+    client.query_to_table(query, table_id)
 
 
 def __copy_publications():
@@ -75,7 +76,8 @@ def __copy_publications():
     NOTE: this has not been tested
     """
     table_id = "publications"
-    delete_bg_table(table_id)
+    client = DatabaseClient()
+    client.delete_table(table_id)
 
     # add to this all publication_numbers with the same family_id
     query = f"""
@@ -98,7 +100,7 @@ def __copy_publications():
         FROM numbered_rows
         WHERE row_number = 1
     """
-    query_to_bg_table(query, table_id)
+    client.query_to_table(query, table_id)
 
 
 def copy_patent_tables():

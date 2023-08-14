@@ -11,9 +11,7 @@ from system import initialize
 initialize()
 
 from clients.low_level.big_query import (
-    create_bq_table,
-    delete_bg_table,
-    insert_into_bg_table,
+    DatabaseClient,
     execute_with_retries,
 )
 
@@ -43,8 +41,9 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         new_table_name (str): name of the new table
         database (str): name of the database
     """
+    client = DatabaseClient()
     # delete if exists
-    delete_bg_table(new_table_name)
+    client.delete_table(new_table_name)
 
     conn = psycopg2.connect(
         database=database,
@@ -56,12 +55,12 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
     columns, data = fetch_data_from_postgres(conn, sql_query)
 
     # recreate
-    create_bq_table(new_table_name, columns)
+    client.create_table(new_table_name, columns)
     time.sleep(20)  # such a hack
 
     # add records
     records = [dict(zip(columns, row)) for row in data]
-    execute_with_retries(lambda: insert_into_bg_table(records, new_table_name))
+    execute_with_retries(lambda: client.insert_into_table(records, new_table_name))
 
 
 def copy_patent_approvals():

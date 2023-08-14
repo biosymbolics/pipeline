@@ -6,7 +6,7 @@ import logging
 from typing import Sequence, Union, cast
 from pydash import compact
 
-from clients.low_level.big_query import select_from_bg
+from clients.low_level.big_query import DatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings import ApprovedPatentApplication, PatentApplication
 
@@ -200,7 +200,7 @@ def search(
 
     query = select_query + where
     logger.info("Running query: %s", query)
-    results = select_from_bg(query)
+    results = DatabaseClient(use_service_account=True).select(query)
     return format_search_result(results)
 
 
@@ -225,5 +225,5 @@ def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC
     """
-    results = select_from_bg(query)
+    results = DatabaseClient(use_service_account=True).select(query)
     return [format_term(cast(TermResult, result)) for result in results]
