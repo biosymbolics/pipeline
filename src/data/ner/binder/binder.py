@@ -9,11 +9,14 @@ import logging
 from spacy.vocab import Vocab
 from spacy.tokens import Doc
 
+from data.ner.spacy import Spacy
+
 from .constants import NER_TYPES
 from .types import Annotation
 from .utils import extract_predictions, remove_overlapping_spans, prepare_features
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 DOC_STRIDE = 16
 MAX_LENGTH = 128  # max??
@@ -33,6 +36,7 @@ class BinderNlp:
         self.model = torch.load(model_file)
         self.model.to(device)
         self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
+        self.nlp = Spacy.get_instance()
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)
@@ -62,8 +66,7 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    @staticmethod
-    def __get_doc(doc: Union[str, Doc], annotations: list[Annotation]) -> Doc:
+    def get_doc(self, doc: Union[str, Doc], annotations: list[Annotation]) -> Doc:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
@@ -72,21 +75,33 @@ class BinderNlp:
         Args:
             doc (Union[str, Doc]): text or SpaCy Doc
             annotations (list[Annotation]): list of annotations
+
+        ```
+        from data.ner.binder.binder import BinderNlp
+        b = BinderNlp("model.pt")
+        text="Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+        b.extract(text).ents
+        ```
         """
-        new_doc = Doc(
-            vocab=doc.vocab if isinstance(doc, Doc) else Vocab(),
-            words=doc.text.split() if isinstance(doc, Doc) else doc.split(),
-        )
+        # TODO: have this use tokenization identical to the model (biobert)
+        new_doc = self.nlp(doc) if not isinstance(doc, Doc) else doc
+
         new_ents = [
             Doc.char_span(
                 new_doc,
                 a["start_char"],
                 a["end_char"],
                 label=a["entity_type"],
-                alignment_mode="expand",
+                # alignment_mode="expand", # results in "," captured
             )
             for a in annotations
         ]
+
+        if len(new_ents) < len(annotations):
+            missed = [a for i, a in enumerate(annotations) if new_ents[i] is None]
+            logger.warning(
+                "Some entities were dropped creating Spacy Spans: %s", missed
+            )
 
         # re-create the existing ents, to reset ent start/end indexes
         existing_ents = [
@@ -147,7 +162,7 @@ class BinderNlp:
         annotations = extract_predictions(
             features, predictions.__dict__["span_scores"], self.type_map
         )
-        return self.__get_doc(doc, annotations)
+        return self.get_doc(doc, annotations)
 
     def pipe(
         self,
@@ -160,7 +175,7 @@ class BinderNlp:
         Args:
             texts (Iterable[Union[str, Doc]]): The texts to annotate.
         """
-        logging.info("Starting binder NER extraction")
+        logger.info("Starting binder NER extraction")
 
         for text in texts:
             yield self.extract(text)

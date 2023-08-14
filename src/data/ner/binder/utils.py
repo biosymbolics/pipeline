@@ -16,6 +16,7 @@ import polars as pl
 from .types import Feature, Annotation
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def generate_word_indices(text: str) -> list[tuple[int, int]]:
@@ -92,9 +93,8 @@ def extract_predictions(
             return pred
 
         start_time = time.time()
-        cpu_span_logits = (
-            span_logits.detach().cpu().clone().numpy()
-        )  # https://github.com/pytorch/pytorch/issues/77764
+        # https://github.com/pytorch/pytorch/issues/77764
+        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
         start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
         logger.debug(
             "Extracted predictions in %s seconds", round(time.time() - start_time, 2)
@@ -200,9 +200,10 @@ def remove_overlapping_spans(spans: list[Span]) -> list[Span]:
     If overlap, leave the longest.
 
     Args:
-        spans: the spans to remove overlaps from
+        spans: the spans from which to remove overlaps
     """
     sorted_spans = sorted(spans, key=lambda e: e.end_char - e.start_char, reverse=True)
+
     return [
         span
         for idx, span in enumerate(sorted_spans)
