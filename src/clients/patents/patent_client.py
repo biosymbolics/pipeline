@@ -3,16 +3,15 @@ Patent client
 """
 from functools import partial
 import logging
-from typing import Sequence, Union, cast
+from typing import Sequence, cast
 from pydash import compact
 
 from clients.low_level.big_query import DatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
-from typings import ApprovedPatentApplication, PatentApplication
 
 from .constants import RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .types import AutocompleteTerm, RelevancyThreshold, TermResult
+from .types import AutocompleteTerm, RelevancyThreshold, SearchResults, TermResult
 from .utils import get_max_priority_date
 
 logger = logging.getLogger(__name__)
@@ -98,7 +97,7 @@ def search(
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
-) -> Union[Sequence[PatentApplication], Sequence[ApprovedPatentApplication]]:
+) -> SearchResults:
     """
     Search patents by terms
     Filters on
@@ -199,7 +198,6 @@ def search(
     """
 
     query = select_query + where
-    logger.info("Running query: %s", query)
     results = DatabaseClient(use_service_account=True).select(query)
     return format_search_result(results)
 

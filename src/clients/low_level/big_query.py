@@ -85,6 +85,7 @@ class DatabaseClient:
         Args:
             query (str): SQL query
         """
+        logger.debug("Running query: %s", query)
         results = self.execute_query(query)
         rows = [dict(row) for row in results]
 
