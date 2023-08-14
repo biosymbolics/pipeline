@@ -274,6 +274,10 @@ class NerTagger:
         if not isinstance(content, list):
             raise Exception("Content must be a list")
 
+        logger.warning(
+            "As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars"
+        )
+
         start_time = time.time()
         logger.debug("Starting NER pipeline with %s docs", len(content))
 
