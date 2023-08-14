@@ -15,6 +15,8 @@ import polars as pl
 
 from .types import Feature, Annotation
 
+logger = logging.getLogger(__name__)
+
 
 def generate_word_indices(text: str) -> list[tuple[int, int]]:
     """
@@ -94,7 +96,7 @@ def extract_predictions(
             span_logits.detach().cpu().clone().numpy()
         )  # https://github.com/pytorch/pytorch/issues/77764
         start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
-        logging.info(
+        logger.info(
             "Extracted predictions in %s seconds", round(time.time() - start_time, 2)
         )
 

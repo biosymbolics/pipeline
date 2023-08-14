@@ -11,8 +11,8 @@ from spacy.language import Language
 from utils.args import make_hashable
 
 
-# small model lemmatizes antibodies as antibodies, large model as antibody
-DEFAULT_MODEL: str = "en_core_web_md"
+# sm & med model lemmatizes antibodies as `antibodie`, large model as `antibody`
+DEFAULT_MODEL: str = "en_core_web_lg"
 
 
 class Spacy:

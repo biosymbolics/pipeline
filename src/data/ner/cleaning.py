@@ -125,9 +125,9 @@ class EntityCleaner:
 
         only parallelize if
             1) parallelize is set to true and
-            2) there are more than 50 entities (otherwise the overhead way exceeds the benefits)
+            2) there are more than 1000 entities (otherwise the overhead probably exceeds the benefits)
         """
-        parallelize = self.parallelize and num_entries > 50
+        parallelize = self.parallelize and num_entries > 1000
         return MAX_N_PROCESS if parallelize else 1
 
     @property
@@ -252,7 +252,7 @@ class EntityCleaner:
                 yield reduce(lambda x, func: func(x), steps, term)
 
         def exec_func(func, x):
-            logging.debug("Executing function: %s", func)
+            logging.info("Executing function: %s", func)
             return func(x)
 
         cleaning_steps = [
@@ -343,6 +343,7 @@ class EntityCleaner:
             raise ValueError("Entities must be a list")
 
         num_processes = self.get_n_process(len(entities))
+        logging.info("Using %s processes for count %s", num_processes, len(entities))
 
         cleaning_steps: list[CleanFunction] = [
             lambda terms, n_process: self.__suppress(terms),

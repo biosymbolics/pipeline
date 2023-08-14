@@ -259,9 +259,9 @@ class NerTagger:
         Examples:
             >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
             >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
-            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"]) # as of 08/08/2023, il-6 not captured
+            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"])
             >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"], link=False)
-            >>> tagger.extract(["zuranolone for treatment of major depression, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)"]) # as of 08/08/2023, some entities not captured
+            >>> tagger.extract(["zuranolone for treatment of major depression, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)"])
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")
