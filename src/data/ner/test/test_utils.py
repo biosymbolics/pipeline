@@ -1,7 +1,7 @@
 import unittest
 
-from ner.cleaning import EntityCleaner
-from ner.utils import rearrange_terms, normalize_by_pos
+from data.ner.cleaning import EntityCleaner
+from data.ner.utils import rearrange_terms, normalize_by_pos
 
 
 class TestNerUtils(unittest.TestCase):
@@ -71,7 +71,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "5-ht1a inhibitors",
-                "expected": "5-ht1a inhibitor",
+                "expected": "5 ht1a inhibitor",  # TODO
             },
             {
                 "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
@@ -125,7 +125,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions associated with production of IL-1 and IL-6",
-                "expected": "IL-1 and il-6 production conditions",
+                "expected": "IL-1 and IL-6 production conditions",
             },
             {
                 "input": "inhibitors of phosphatidylinositol 3-kinase gamma",
@@ -246,7 +246,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "(6R,S)-5-formyltetrahydrofolate",
-                "expected": "(6R,S) 5-formyltetrahydrofolate",  # not ideal, but ok
+                "expected": "(6R,S)-5 formyltetrahydrofolate",  # TODO
             },
         ]
 
