@@ -275,7 +275,7 @@ class NerTagger:
             raise Exception("Content must be a list")
 
         start_time = time.time()
-        logger.info("Starting NER pipeline with %s docs", len(content))
+        logger.debug("Starting NER pipeline with %s docs", len(content))
 
         prepped_content = self.__prep_for_extract(content.copy())
         entity_sets = self.__extract(prepped_content)

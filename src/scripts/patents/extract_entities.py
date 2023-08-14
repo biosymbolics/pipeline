@@ -20,7 +20,7 @@ ID_FIELD = "publication_number"
 TEXT_FIELDS = frozenset(["title", "abstract"])
 ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 BATCH_SIZE = 2000
-MAX_TEXT_LENGTH = 500
+MAX_TEXT_LENGTH = 750
 PROCESSED_PUBS_FILE = "data/processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
 
@@ -83,11 +83,18 @@ class PatentEnricher:
         Get patent descriptions (title + abstract)
         Concatenates title and abstract into `text` column, trucates to MAX_TEXT_LENGTH
         """
-        df = patents.with_columns(
-            pl.concat_str(TEXT_FIELDS, separator="\n").alias("text"),
-        )
+        titles = patents["title"].to_list()
+        abstracts = patents["abstract"].to_list()
 
-        return [text[0:MAX_TEXT_LENGTH] for text in df["text"].to_list()]
+        def format(title, abstract) -> str:
+            if not title.endswith("."):
+                title = title + "."  # more sentence-like, which improves NER.
+            text = "\n".join([title, abstract])
+            return text[0:MAX_TEXT_LENGTH]
+
+        texts = [format(title, abstract) for title, abstract in zip(titles, abstracts)]
+
+        return texts
 
     def __enrich_patents(self, patents: pl.DataFrame) -> Optional[pl.DataFrame]:
         """

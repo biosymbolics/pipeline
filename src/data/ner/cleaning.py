@@ -242,6 +242,7 @@ class EntityCleaner:
                 "related diseases?": "associated disease",
                 "antibodies?": "antibody",
                 "diarrhoea": "diarrhea",
+                "faecal": "fecal",
             }
             steps = [
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)
@@ -271,7 +272,7 @@ class EntityCleaner:
             reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
         )
 
-        logging.info(
+        logging.debug(
             "Normalized %s terms in %s seconds",
             len(terms),
             round(time.time() - start, 2),
@@ -343,7 +344,11 @@ class EntityCleaner:
             raise ValueError("Entities must be a list")
 
         num_processes = self.get_n_process(len(entities))
-        logging.info("Using %s processes for count %s", num_processes, len(entities))
+
+        if num_processes > 1:
+            logging.info(
+                "Using %s processes for count %s", num_processes, len(entities)
+            )
 
         cleaning_steps: list[CleanFunction] = [
             lambda terms, n_process: self.__suppress(terms),
@@ -359,7 +364,7 @@ class EntityCleaner:
             lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
         )
 
-        logging.info(
+        logging.debug(
             "Cleaned %s entities in %s seconds",
             len(entities),
             round(time.time() - start, 2),

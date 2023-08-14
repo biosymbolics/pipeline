@@ -175,7 +175,7 @@ class BinderNlp:
         Args:
             texts (Iterable[Union[str, Doc]]): The texts to annotate.
         """
-        logger.info("Starting binder NER extraction")
+        logger.debug("Starting binder NER extraction")
 
         for text in texts:
             yield self.extract(text)

@@ -5,6 +5,11 @@ from data.ner.utils import rearrange_terms, normalize_by_pos
 
 
 class TestNerUtils(unittest.TestCase):
+    """
+    TODO:
+    - poly(lactide-co-glycolide) (PLGA)
+    """
+
     def setUp(self):
         self.cleaner = EntityCleaner()
 
