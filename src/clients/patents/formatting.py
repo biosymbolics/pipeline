@@ -38,7 +38,7 @@ def summarize_patents(
             return cast(list[PatentsSummaryRecord], grouped.to_dicts())
         else:
             logger.error("Column %s is empty", column)
-            return None
+            return []
 
     return [
         {"column": column, "data": aggregate(patent_df, column)} for column in columns
