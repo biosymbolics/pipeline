@@ -42,7 +42,7 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
         suppressions = (
             COMPANY_SUPPRESSIONS_DEFINITE if only_definite else COMPANY_SUPPRESSIONS
         )
-        suppress_re = "\\b" + get_or_re(suppressions) + "\\b"
+        suppress_re = r"\b" + get_or_re(suppressions) + r"\b"
 
         for term in terms:
             yield re.sub("(?i)" + suppress_re, "", term).rstrip("&[ ]*")
@@ -84,8 +84,11 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
         TODO: make longer (4-5 chars) but check for common word or not
         """
         exceptions = [
-            len(term) < 3 or term.lower() in EXCEPTION_TERMS for term in terms
+            (len(term) < 3 or term.lower() in EXCEPTION_TERMS) for term in terms
         ]
+
+        if not any(exceptions):
+            return terms
 
         steps = [
             partial(remove_suppressions, only_definite=True),
@@ -104,10 +107,11 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
     cleaning_steps = [
         remove_suppressions,
         remove_extra_spaces,
-        handle_exception,
+        # handle_exception, # TODO
         title,
     ]
-    cleaned = reduce(lambda x, func: func(x), cleaning_steps, assignees)
+    cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, assignees))
     lookup_map = dict(zip(cleaned, assignees))
 
-    return rewrite(cleaned, lookup_map)
+    rewrites = rewrite(cleaned, lookup_map)
+    return rewrites
