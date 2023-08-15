@@ -30,13 +30,13 @@ def search(event: SearchEvent, context):
     Search patents by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
-    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
+    - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/patents/search?terms=asthma`
     """
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")
-    terms_list = terms.split(",") if terms else []
+    terms_list = terms.split(";") if terms else []
 
     if not params or not terms or not all([len(t) > 1 for t in terms_list]):
         logger.error(

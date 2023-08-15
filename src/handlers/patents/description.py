@@ -21,15 +21,15 @@ def describe(event: DescribeEvent, context):
     Get GPT description of terms
 
     Invocation:
-    - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
-    - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma,melanoma" }}'`
+    - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/terms/describe?terms=asthma`
     """
     gpt_client = GptApiClient(model="gpt-3.5-turbo")
 
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")
-    terms_list = terms.split(",") if terms else []
+    terms_list = terms.split(";") if terms else []
 
     if not params or not terms or not all([len(t) > 1 for t in terms_list]):
         logger.error(
