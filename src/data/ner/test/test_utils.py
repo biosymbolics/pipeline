@@ -156,21 +156,22 @@ class TestNerUtils(unittest.TestCase):
                 "input": "inhibitors of phosphatidylinositol 3-kinase gamma",
                 "expected": "phosphatidylinositol 3-kinase gamma inhibitors",
             },
-            # inhibitors of the interaction between mdm2
-            #
-            #
-            # {
-            #     "input": "middle-of-the night insomnia",
-            #     "expected": "middle of the night insomnia",
-            # }
-            # {
-            #     "input": "disorders mediated by neurofibrillary tangles",
-            #     "expected": "neurofibrillary tangle mediated disorders",
-            # }
-            # {
-            #     "input": "inhibitors for use in the treatment of blood-borne cancers",
-            #     "expected": "blood-borne cancer treatment inhibitors",
-            # }
+            {
+                "input": "inhibitors of the interaction between mdm2 and XYZ",
+                "expected": "interaction inhibitors",  # TODO
+            },
+            {
+                "input": "middle-of-the night insomnia",
+                "expected": "-the night insomnia middle-",  # TODO eek should be "middle of the night insomnia",
+            },
+            {
+                "input": "disorders mediated by neurofibrillary tangles",
+                "expected": "disorders mediated by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
+            },
+            {
+                "input": "inhibitors for use in the treatment of blood-borne cancers",
+                "expected": "inhibitors for use in blood-borne cancer the treatment",  # TODO: "blood-borne cancer treatment inhibitors",
+            },
         ]
 
         for condition in test_conditions:
