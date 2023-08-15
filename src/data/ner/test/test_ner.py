@@ -135,6 +135,23 @@ class TestNerUtils(unittest.TestCase):
                     # oxidized sulfur- or selenium-containing amino acids (SSAA) # TODO
                 ],
             },
+            {
+                "text": """
+                Antagonistic peptide targeting il-2, il-9, and il-15 signaling for the treatment of cytokine-release syndrome and cytokine storm associated disorders
+                The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15) cytokines are associated with important human diseases, such as cytokine-release syndrome and cytokine storm associated disorders. Compositions, methods, and kits to modulate signaling by at least one IL-2, IL-9, or IL-15 γc-cytokine family members for inhibiting, ameliorating, reducing a severity of, treating, delaying the onset of, or preventing at least one cytokine storm related disorder are described.
+                """,
+                "expected_output": [
+                    "antagonistic peptide",  # TODO: targeting il-2, il-9, and il-15
+                    "cytokine release syndrome",
+                    "cytokine storm associated disorder",
+                    "cytokine",
+                    "cytokine release syndrome",
+                    "cytokine storm",
+                    "il15 γc cytokine family member",
+                    "cytokine storm related disorder",
+                    # γc-family Interleukin-2 (IL-2) # TODO
+                ],
+            },
         ]
 
         for condition in test_conditions:
