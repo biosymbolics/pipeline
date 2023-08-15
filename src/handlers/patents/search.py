@@ -63,8 +63,8 @@ def search(event: SearchEvent, context):
         max_results,
     )
 
-    patents = patent_client.search(
+    results = patent_client.search(
         terms_list, fetch_approval, min_patent_years, relevancy_threshold, max_results
     )
 
-    return {"statusCode": 200, "body": json.dumps(patents, default=str)}
+    return {"statusCode": 200, "body": json.dumps(results, default=str)}
