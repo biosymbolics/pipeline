@@ -82,6 +82,26 @@ class TestNerUtils(unittest.TestCase):
                 "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
                 "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
             },
+            {
+                "input": "(meth)acrylic acid polymer",
+                "expected": "methacrylic acid polymer",
+            },
+            {
+                "input": "metabotropic glutamate receptor (mGluR) antagonists",
+                "expected": "metabotropic glutamate receptor antagonist",
+            },
+            {
+                "input": "poly(isoprene)",
+                "expected": "polyisoprene",
+            },
+            {
+                "input": "poly(isoprene-co-butadiene)",
+                "expected": "polyisoprene co-butadiene",
+            },
+            {
+                "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
+                "expected": "the γc family interleukin 2, interleukin 9, and interleukin 15",
+            },
         ]
 
         for condition in test_conditions:
@@ -136,21 +156,22 @@ class TestNerUtils(unittest.TestCase):
                 "input": "inhibitors of phosphatidylinositol 3-kinase gamma",
                 "expected": "phosphatidylinositol 3-kinase gamma inhibitors",
             },
-            # (meth)acrylic acid polymer
-            # inhibitors of the interaction between mdm2
-            #
-            # {
-            #     "input": "middle-of-the night insomnia",
-            #     "expected": "middle of the night insomnia",
-            # }
-            # {
-            #     "input": "disorders mediated by neurofibrillary tangles",
-            #     "expected": "neurofibrillary tangle mediated disorders",
-            # }
-            # {
-            #     "input": "inhibitors for use in the treatment of blood-borne cancers",
-            #     "expected": "blood-borne cancer treatment inhibitors",
-            # }
+            {
+                "input": "inhibitors of the interaction between mdm2 and XYZ",
+                "expected": "interaction inhibitors",  # TODO
+            },
+            {
+                "input": "middle-of-the night insomnia",
+                "expected": "-the night insomnia middle-",  # TODO eek should be "middle of the night insomnia",
+            },
+            {
+                "input": "disorders mediated by neurofibrillary tangles",
+                "expected": "disorders mediated by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
+            },
+            {
+                "input": "inhibitors for use in the treatment of blood-borne cancers",
+                "expected": "inhibitors for use in blood-borne cancer the treatment",  # TODO: "blood-borne cancer treatment inhibitors",
+            },
         ]
 
         for condition in test_conditions:

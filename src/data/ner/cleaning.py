@@ -10,6 +10,8 @@ import logging
 import html
 from typing_extensions import Protocol
 
+from constants.patterns.iupac import is_iupac
+from data.ner.binder.constants import PHRASE_MAP
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 from typings.core import is_string_list
 
@@ -214,53 +216,31 @@ class EntityCleaner:
 
         def unwrap(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
-                yield term.strip("()[]")
+                if term.startswith("(") and term.endswith(")"):
+                    yield term.strip("()")
+                yield term
+
+        def format_parentheticals(_terms: list[str]) -> Iterable[str]:
+            for term in _terms:
+                # if iupac term, don't mess with its parens
+                if is_iupac(term):
+                    print("IS IUPAC", term)
+                    yield term
+                    continue
+
+                # removes from Interleukin-2 (IL-2) inhibitor
+                no_parenth = re.sub(
+                    r"(?i)(?<=[ ,])(\([a-z-0-9]+\))(?=(?: |,|$))", "", term
+                )
+                # poly(isoprene) -> polyisoprene
+                no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", r"\1", no_parenth)
+                print(term, "->", no_parens)
+                yield no_parens
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
-            phrases = {
-                "diseases and conditions?": "diseases",
-                "conditions and diseases?": "diseases",
-                "diseases and disorders?": "diseases",
-                "disorders and diseases?": "diseases",
-                "analogues?": "analog",
-                "drug delivery": "delivery",
-                "tumours?": "tumor",
-                "agonist activity": "agonist",
-                "antagonist activity": "antagonist",
-                "binding antagonist": "antagonist",
-                "modulator activity": "modulator",
-                "pathway inhibitor": "inhibitor",
-                "receptor agonists?": "agonist",  # ??
-                "receptor antagonists?": "antagonist",  # ??
-                "receptor modulators?": "modulator",
-                "activity modulators?": "modulator",
-                "binding modulators?": "modulator",
-                "binding activity": "binder",
-                "inhibit(?:ing|ory?) (?:agent|compound|composition|peptide|factor)s?": "inhibitor",
-                "inhibit(?:ion|ory)$": "inhibitor",
-                "blocking agent": "blocker",
-                "activity modulators?": "modulator",
-                "small molecule inhibitors?": "inhibitor",
-                "associated proteins?": "protein",
-                "transporter inhibitors?": "transport inhibitor",
-                # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
-                "mediated conditions?": "associated disease",
-                "mediated diseases?": "associated disease",
-                "related conditions?": "associated disease",
-                "related diseases?": "associated disease",
-                "antibodies?": "antibody",
-                "diarrhoea": "diarrhea",
-                "faecal": "fecal",
-                "therapy agent": "therapy",
-                "biologic(?:al)? response modifiers?": "immunomodulator",
-                "antibody construct": "antibody",
-                "antibody drug": "antibody",
-                "peptide complex(?:es)?": "peptide",
-                "family member": "family",
-            }
             steps = [
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)
-                for dup, canonical in phrases.items()
+                for dup, canonical in PHRASE_MAP.items()
             ]
 
             for term in _terms:
@@ -274,6 +254,7 @@ class EntityCleaner:
             decode_html,
             remove_chars,
             unwrap,
+            format_parentheticals,  # order matters (after unwrap)
             remove_extra_spaces,
             normalize_phrasing,
             partial(rearrange_terms, n_process=n_process),

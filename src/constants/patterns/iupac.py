@@ -3,6 +3,7 @@ Patterns related to IUPAC nomenclature
 """
 
 import re
+import logging
 
 from utils.re import get_or_re, ALPHA_CHARS
 
@@ -386,3 +387,18 @@ def extract_iupac(string: str) -> list[str]:
         >>> extract_iupac("3-alkylamido-3-deoxy-ingenols")
     """
     return [match.strip() for match in re.findall(IUPAC_RE, string)]
+
+
+def is_iupac(term: str) -> bool:
+    """
+    Checks if term is IUPAC
+    """
+    matches_iupac = re.match(IUPAC_RE, term) is not None
+
+    # simple hack to avoid futzing with things like '1-(3-aminophenyl)-6,8-dimethyl-5-...'
+    simple_check = len(term.split("-")) > 3 and re.match(r"[0-9]+", term) is not None
+
+    if not matches_iupac and simple_check:
+        logging.info("Term '%s' matches simple check but not IUPAC re", term)
+
+    return matches_iupac or simple_check

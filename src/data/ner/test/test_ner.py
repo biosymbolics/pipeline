@@ -152,6 +152,23 @@ class TestNerUtils(unittest.TestCase):
                     # γc-family Interleukin-2 (IL-2) # TODO
                 ],
             },
+            {
+                "text": """
+                Combination drug containing probucol and a tetrazolylalkoxy-dihydrocarbostyril derivative with superoxide supressant effects
+                This invention relates to a combination drug comprising a combination of a tetrazolylalkoxy-dihydrocarbostyril derivative of the formula: wherein R is cycloalkyl, A is lower alkylene, and the bond between 3-and 4-positions of carbostyril nucleus is single bond or double bond, or a salt thereof and Probucol, which is useful for preventing and treating cerebral infarction including acute cerebral infarction and chronic cerebral infarction, arteriosclerosis, renal diseases (e.g. diabetic nephropathy, renal failure, nephritis), and diabetes owing to synergistic superoxide suppressant effects of the combination.
+                """,
+                "expected_output": [
+                    "probucol",
+                    "tetrazolylalkoxy dihydrocarbostyril derivative",
+                    "superoxide supressant effect",
+                    "tetrazolylalkoxy dihydrocarbostyril derivative",
+                    "cerebral infarction",
+                    "chronic cerebral infarction",
+                    "renal disease",
+                    "renal failure"
+                    # arteriosclerosis, diabetic nephropathy, nephritis, diabetes # TODO
+                ],
+            },
         ]
 
         for condition in test_conditions:
