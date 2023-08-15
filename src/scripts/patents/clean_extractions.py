@@ -179,6 +179,11 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "dosing": "leading",
     "dosing regimen": "trailing",
     "preferred": "leading",
+    "conventional": "leading",
+    "combination": "leading",
+    "clinically[ -]?proven": "leading",
+    "proven": "leading",
+    "contemplated": "leading",
 }
 
 DELETION_TERMS = [

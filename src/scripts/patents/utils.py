@@ -53,7 +53,7 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
         """
         to_check = [clean_assignee, og_assignee]
         has_mapping = any(
-            [re.findall("(?i)" + "\\b" + key + "\\b", check) for check in to_check]
+            [re.findall("(?i)" + r"\b" + key + r"\b", check) for check in to_check]
         )
         if has_mapping:
             return key

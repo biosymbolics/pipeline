@@ -51,7 +51,7 @@ def search(event: SearchEvent, context):
     fetch_approval = params.get("fetch_approval") or True
     min_patent_years = params.get("min_patent_years") or 10
     relevancy_threshold = params.get("relevancy_threshold") or "high"
-    max_results = params.get("max_results") or 100
+    max_results = params.get("max_results") or 1000
 
     logger.info(
         "Fetching patents for terms: %s (%s, %s, %s, %s, params %s)",

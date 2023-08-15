@@ -20,7 +20,7 @@ from ._constants import BIOSYM_ANNOTATIONS_TABLE
 from .gpr_constants import SYNONYM_MAP
 from .utils import clean_assignees
 
-MIN_ASSIGNEE_COUNT = 10
+MIN_ASSIGNEE_COUNT = 5
 TERMS_FILE = "terms.json"
 
 BaseTermRecord = TypedDict(

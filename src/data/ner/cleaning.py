@@ -218,19 +218,27 @@ class EntityCleaner:
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             phrases = {
-                "diseases and conditions": "diseases",
-                "conditions and diseases": "diseases",
-                "diseases and disorders": "diseases",
-                "disorders and diseases": "diseases",
+                "diseases and conditions?": "diseases",
+                "conditions and diseases?": "diseases",
+                "diseases and disorders?": "diseases",
+                "disorders and diseases?": "diseases",
                 "analogues?": "analog",
                 "drug delivery": "delivery",
                 "tumours?": "tumor",
+                "agonist activity": "agonist",
+                "antagonist activity": "antagonist",
+                "binding antagonist": "antagonist",
+                "modulator activity": "modulator",
+                "pathway inhibitor": "inhibitor",
                 "receptor agonists?": "agonist",  # ??
                 "receptor antagonists?": "antagonist",  # ??
                 "receptor modulators?": "modulator",
                 "activity modulators?": "modulator",
                 "binding modulators?": "modulator",
-                "inhibitor compounds?": "inhibitor",
+                "binding activity": "binder",
+                "inhibit(?:ing|ory?) (?:agent|compound|composition|peptide|factor)s?": "inhibitor",
+                "inhibit(?:ion|ory)$": "inhibitor",
+                "blocking agent": "blocker",
                 "activity modulators?": "modulator",
                 "small molecule inhibitors?": "inhibitor",
                 "associated proteins?": "protein",
@@ -243,6 +251,12 @@ class EntityCleaner:
                 "antibodies?": "antibody",
                 "diarrhoea": "diarrhea",
                 "faecal": "fecal",
+                "therapy agent": "therapy",
+                "biologic(?:al)? response modifiers?": "immunomodulator",
+                "antibody construct": "antibody",
+                "antibody drug": "antibody",
+                "peptide complex(?:es)?": "peptide",
+                "family member": "family",
             }
             steps = [
                 lambda s: re.sub(rf"\b{dup}\b", canonical, s)

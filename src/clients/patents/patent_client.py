@@ -17,7 +17,7 @@ from .utils import get_max_priority_date
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MIN_TERM_FREQUENCY = 20
+MIN_TERM_FREQUENCY = 2
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 
@@ -36,7 +36,7 @@ SEARCH_RETURN_FIELDS = [
     "abstract",
     # "application_kind",
     "application_number",
-    "assignees",
+    # "assignees",
     # "cited_by",
     "country",
     "family_id",
@@ -129,6 +129,7 @@ def search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                _get_term_query("assignee", "assignees"),
                 _get_term_query("attributes", "attributes"),
                 _get_term_query("compounds", "compounds"),
                 _get_term_query("diseases", "diseases"),
