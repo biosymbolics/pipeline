@@ -216,6 +216,16 @@ class EntityCleaner:
             for term in _terms:
                 yield term.strip("()[]")
 
+        def format_parentheticals(_terms: list[str]) -> Iterable[str]:
+            for term in _terms:
+                # removes from Interleukin-2 (IL-2) inhibitor
+                no_parenth = re.sub(
+                    r"(?i)(?<=[ ,])\([a-z-0-9]+\)(?=(?: |,|$))", "", term
+                )
+                # poly(isoprene) -> polyisoprene
+                no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", "\1", no_parenth)
+                yield no_parens
+
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             phrases = {
                 "diseases and conditions?": "diseases",

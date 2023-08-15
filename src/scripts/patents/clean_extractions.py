@@ -184,6 +184,11 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "clinically[ -]?proven": "leading",
     "proven": "leading",
     "contemplated": "leading",
+    "is indicative of": "all",
+    "via": "leading",
+    "effective": "all",
+    "(?:high|low)[ -]?dose": "all",
+    "effects of": "all",
 }
 
 DELETION_TERMS = [
