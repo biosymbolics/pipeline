@@ -7,6 +7,7 @@ import re
 import time
 from typing import Iterable
 from spacy.tokens import Doc, Span
+from constants.patterns.iupac import is_iupac
 
 from utils.re import (
     get_or_re,
@@ -230,7 +231,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logging.info("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
@@ -242,7 +243,7 @@ def __normalize_by_pos(doc: Doc):
         if t.text == DASH:
             if t.pos_ == "ADJ":
                 return " "
-            if t.pos_ == "PUNCT":
+            if t.pos_ in ["PUNCT", "SYM"]:
                 if prev_t.pos_ == "PUNCT":
                     # "(-)-ditoluoyltartaric acid" unchnaged
                     return DASH
@@ -287,7 +288,7 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
             - APoE-4 -> apoe4 (NOUN(PUNCT)NUM)
             - HIV-1 -> hiv1 (NOUN(PUNCT)NUM)
 
-        Remove and replace with **space** if Spacy considers it PUNCT or ADJ:
+        Remove and replace with **space** if Spacy considers it PUNCT, ADJ or SYM:
         - sodium channel-mediated diseases (NOUN(PUNCT)VERB)
         - neuronal hypo-kinetic disease (NOUN(PUNCT)ADJ) # TODO: better if ""
         - Loeys-Dietz syndrome (PROPN(PUNCT)NOUN)
@@ -300,6 +301,7 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
         - Bcr-Abl (NOUN(ADJ)ADJ) -> Bcr-Abl # TODO
         - HIV-1 (NOUN(PUNCT)PROPN) -> HIV-1 # TODO
         - (-)-ditoluoyltartaric acid ((PUNCT)(PUNCT)(PUNCT)(PUNCT)NOUN) -> (-)-ditoluoyltartaric acid
+        - Interleukin-9 for some reason is PROPN(SYM)NUM
 
         Keep if Spacy considers is a NOUN
         - HLA-C (NOUN(NOUN)NOUN) -> HLA-C # TODO??
@@ -310,20 +312,16 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
     nlp = Spacy.get_instance()
 
-    def skip(term: str) -> bool:
-        # simple hack to avoid futzing with things like '1-(3-aminophenyl)-6,8-dimethyl-5-...'
-        return len(term.split(DASH)) > 3 and re.match(r"[0-9]+", term) is not None
-
     # avoid spacy keeping terms with - as a single token
     def sep_dash(term: str) -> str:
-        return re.sub(DASHES_RE, rf" {DASH} ", term) if not skip(term) else term
+        return re.sub(DASHES_RE, rf" {DASH} ", term) if not is_iupac(term) else term
 
     sep_dash_terms = [sep_dash(term) for term in terms]
     docs = nlp.pipe(sep_dash_terms, n_process=n_process)
 
     for doc in docs:
-        if skip(doc.text):
-            yield doc.text
+        if is_iupac(doc.text):
+            yield doc.text  # if iupac format, don't touch its parens
             continue
 
         yield __normalize_by_pos(doc)

@@ -83,12 +83,12 @@ class TestNerUtils(unittest.TestCase):
                 "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
             },
             {
-                "input": "metabotropic glutamate receptor (mGluR) antagonists",
-                "expected": "metabotropic glutamate receptor antagonist",
-            },
-            {
                 "input": "(meth)acrylic acid polymer",
                 "expected": "methacrylic acid polymer",
+            },
+            {
+                "input": "metabotropic glutamate receptor (mGluR) antagonists",
+                "expected": "metabotropic glutamate receptor antagonist",
             },
             {
                 "input": "poly(isoprene)",
@@ -96,11 +96,11 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "poly(isoprene-co-butadiene)",
-                "expected": "polyisoprene cobutadiene",
+                "expected": "polyisoprene co-butadiene",
             },
             {
-                input: "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
-                expected: "The γc-family Interleukin-2, Interleukin-9, and Interleukin-15",
+                "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
+                "expected": "the γc family interleukin 2, interleukin 9, and interleukin 15",
             },
         ]
 
