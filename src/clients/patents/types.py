@@ -1,7 +1,7 @@
 """
 Patent types
 """
-from typing import Literal, Sequence, TypeGuard, TypedDict, Union
+from typing import Any, Literal, Sequence, TypeGuard, TypedDict, Union
 import typing
 
 from typings.patents import PatentApplication
@@ -11,9 +11,14 @@ TermResult = TypedDict("TermResult", {"term": str, "count": int})
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
 
+PatentsSummaryRecord = TypedDict("PatentsSummaryRecord", {"count": int, "term": str})
+PatentsSummary = TypedDict(
+    "PatentsSummary", {"column": str, "data": list[PatentsSummaryRecord] | None}
+)
+
 SearchResults = TypedDict(
     "SearchResults",
-    {"data": Sequence[PatentApplication], "summaries": list[list[dict]]},
+    {"patents": Sequence[PatentApplication], "summaries": list[PatentsSummary]},
 )
 
 
