@@ -17,9 +17,11 @@ from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
 
+
+APPLICATIONS_TABLE = "applications"
 EXPORT_TABLES = {
     "biosym_annotations_source": None,
-    "applications_tmp": "priority_date",
+    APPLICATIONS_TABLE: "priority_date",
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -67,7 +69,7 @@ FIELDS = [
 ]
 
 
-def create_applications_table(table_name: str = "applications"):
+def create_applications_table():
     """
     Create a table of patent applications in BigQuery
     (then exported and pulled into psql)
@@ -75,7 +77,7 @@ def create_applications_table(table_name: str = "applications"):
     logging.info("Create a table of patent applications for use in app queries")
 
     client = BQDatabaseClient()
-    client.delete_table(table_name)
+    client.delete_table(APPLICATIONS_TABLE)
 
     applications = f"""
         SELECT
@@ -84,7 +86,7 @@ def create_applications_table(table_name: str = "applications"):
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
-    client.select_to_table(applications, table_name)
+    client.select_to_table(applications, APPLICATIONS_TABLE)
 
 
 def export_bq_tables():
@@ -92,7 +94,7 @@ def export_bq_tables():
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_applications_table("applications")
+    create_applications_table()
     start_date = datetime(2000, 1, 1)
     end_date = datetime(2023, 1, 1)
 
@@ -121,9 +123,6 @@ def export_bq_tables():
 
                 db_client.delete_table(shared_table_name)
                 current_date = shard_end_date
-            db_client.delete_table(shared_table_name)
-
-    db_client.delete_table("applications_tmp")
 
 
 def determine_data_type(value):
@@ -189,6 +188,13 @@ def import_into_psql():
 def copy_bq_to_psql():
     export_bq_tables()
     import_into_psql()
+    PsqlDatabaseClient().add_indices(
+        [
+            "alter table {APPLICATIONS_TABLE} add index idx_publication_number (publication_number)",
+            "CREATE INDEX trgm_index_applications_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
+            "CREATE INDEX trgm_index_applications_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+        ]
+    )
 
 
 if __name__ == "__main__":

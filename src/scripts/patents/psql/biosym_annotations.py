@@ -820,10 +820,18 @@ def create_working_biosym_annotations():
     - Copies biosym annotations from source table
     - Performs various cleanups and deletions
     """
+    client = DatabaseClient()
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    DatabaseClient().select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
+    client.select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
+
+    client.add_indices(
+        [
+            "alter table {WORKING_TABLE} add index idx_publication_number (publication_number)",
+            "alter table {WORKING_TABLE} add index idx_original_term (original_term)",
+        ]
+    )
 
     fix_of_for_annotations()
     fix_unmatched()

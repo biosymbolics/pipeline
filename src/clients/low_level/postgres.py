@@ -123,3 +123,17 @@ class PsqlDatabaseClient(DatabaseClient):
 
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         self.execute_query(query)
+
+    def add_indices(self, index_sql: list[str]):
+        """
+        Add indices
+        """
+        try:
+            self.execute_query("CREATE EXTENSION pg_trgm")
+        except Exception as e:
+            logger.info(
+                "Error creating pg_trgm extension, probably already enabled: %s", e
+            )
+
+        for sql in index_sql:
+            self.execute_query(sql)
