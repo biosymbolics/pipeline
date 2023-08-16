@@ -93,6 +93,10 @@ class BQDatabaseClient(DatabaseClient):
         return {"data": results, "columns": []}
 
     @overrides(DatabaseClient)
+    def _insert(self, table_name: str, records: list[T]):
+        self.client.insert_rows(self.get_table(table_name), records)
+
+    @overrides(DatabaseClient)
     def _create(
         self, table_name: str, columns: list[str] | dict[str, str]
     ) -> bigquery.Table:

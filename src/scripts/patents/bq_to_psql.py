@@ -189,9 +189,9 @@ def copy_bq_to_psql():
     import_into_psql()
     PsqlDatabaseClient().add_indices(
         [
-            "alter table {APPLICATIONS_TABLE} add index idx_publication_number (publication_number)",
-            "CREATE INDEX trgm_index_applications_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
-            "CREATE INDEX trgm_index_applications_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+            f"CREATE INDEX idx_publication_number ON applications ({APPLICATIONS_TABLE})",
+            f"CREATE INDEX trgm_index_applications_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
+            f"CREATE INDEX trgm_index_applications_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
         ]
     )
 

@@ -4,7 +4,8 @@ Low-level Postgres client
 from typing import Mapping, TypeVar
 import logging
 import psycopg2
-import psycopg2.extras
+from psycopg2 import pool
+from psycopg2.extras import DictCursor, execute_values
 
 from clients.low_level.database import DatabaseClient, ExecuteResult
 from typings.core import is_string_list
@@ -14,6 +15,13 @@ T = TypeVar("T", bound=Mapping)
 
 
 logger = logging.getLogger(__name__)
+
+MIN_CONNECTIONS = 2
+MAX_CONNECTIONS = 20
+
+
+class NoResults(Exception):
+    pass
 
 
 class PsqlClient:
@@ -33,17 +41,24 @@ class PsqlClient:
             if user is not None or password is not None
             else {}
         )
-        conn = psycopg2.connect(
+        self.conn_pool = pool.SimpleConnectionPool(
+            minconn=MIN_CONNECTIONS,
+            maxconn=MAX_CONNECTIONS,
             database=database_name,
             host=host,
             port=port,
-            cursor_factory=psycopg2.extras.DictCursor,
-            *auth_args,
+            cursor_factory=DictCursor,
+            **auth_args,
         )
-        self.conn = conn
 
-    def cursor(self):
-        return self.conn.cursor()
+    def get_conn(self):
+        return self.conn_pool.getconn()
+
+    def put_conn(self, conn):
+        self.conn_pool.putconn(conn)
+
+    def close_all(self):
+        self.conn_pool.closeall()
 
 
 class PsqlDatabaseClient(DatabaseClient):
@@ -77,10 +92,25 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         try:
             res = self.execute_query(query)
-            return res["data"][1][0][0]
+            return res["data"][0][0]
         except Exception as e:
             logger.error("Error checking table exists: %s", e)
             return False
+
+    def handle_error(
+        self, conn, e: Exception, is_rollback: bool = False
+    ) -> ExecuteResult:
+        if isinstance(e, NoResults):
+            logging.debug("No results executing query")
+        else:
+            logging.error(
+                "Error executing query (%s). Rolling back? %s", e, is_rollback
+            )
+
+        if is_rollback:
+            conn.rollback()
+        self.client.put_conn(conn)
+        return {"data": [], "columns": []}
 
     @overrides(DatabaseClient)
     def execute_query(self, query: str) -> ExecuteResult:
@@ -92,17 +122,40 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         logging.info("Starting query: %s", query)
 
-        with self.client.cursor() as cursor:
-            cursor.execute(query)
+        conn = self.client.get_conn()
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(query)
+            except Exception as e:
+                return self.handle_error(conn, e, is_rollback=True)
 
             try:
+                if cursor.rowcount < 1:
+                    raise NoResults("Query returned no rows")
+
                 data = list(cursor.fetchall())
                 columns = [desc[0] for desc in cursor.description]
+                self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
             except Exception as e:
-                logging.error("Error fetching data: %s", e)
+                return self.handle_error(conn, e)
 
-        return {"data": [], "columns": []}
+    @overrides(DatabaseClient)
+    def _insert(self, table_name: str, records: list[T]) -> ExecuteResult:
+        columns = list(records[0].keys())
+        values = [tuple(record.values()) for record in records]
+        query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES %s"
+        values = [tuple(item[col] for col in columns) for item in records]
+
+        conn = self.client.get_conn()
+        with conn.cursor() as cursor:
+            try:
+                execute_values(cursor, query, values)
+                conn.commit()
+                self.client.put_conn(conn)
+                return {"data": [], "columns": columns}
+            except Exception as e:
+                return self.handle_error(conn, e, is_rollback=True)
 
     @overrides(DatabaseClient)
     def _create(self, table_name: str, columns: list[str] | dict[str, str]):
@@ -128,12 +181,7 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         Add indices
         """
-        try:
-            self.execute_query("CREATE EXTENSION pg_trgm")
-        except Exception as e:
-            logger.info(
-                "Error creating pg_trgm extension, probably already enabled: %s", e
-            )
+        self.execute_query("CREATE EXTENSION pg_trgm")
 
         for sql in index_sql:
             self.execute_query(sql)

@@ -826,10 +826,11 @@ def create_working_biosym_annotations():
     )
     client.select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
 
+    # add indices after initial load
     client.add_indices(
         [
-            "alter table {WORKING_TABLE} add index idx_publication_number (publication_number)",
-            "alter table {WORKING_TABLE} add index idx_original_term (original_term)",
+            f"CREATE INDEX index_publication_number on {WORKING_TABLE} (publication_number)",
+            f"CREATE INDEX trgm_index_original_term on {WORKING_TABLE} USING gin (lower(original_term) gin_trgm_ops)",
         ]
     )
 

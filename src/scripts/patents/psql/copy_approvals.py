@@ -8,7 +8,6 @@ from system import initialize
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.low_level.database import execute_with_retries
 
 
 def copy_from_psql(sql_query: str, new_table_name: str, database: str):
@@ -35,7 +34,6 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
 
     # add records
     client.insert_into_table(records, new_table_name)
-    execute_with_retries(lambda: client.insert_into_table(records, new_table_name))
 
 
 def copy_patent_approvals():

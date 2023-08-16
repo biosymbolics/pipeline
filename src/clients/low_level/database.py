@@ -19,19 +19,19 @@ class DatabaseClient:
     @staticmethod
     @abstractmethod
     def get_table_id(table_name: str) -> str:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def execute_query(self, query: str) -> ExecuteResult:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def is_table_exists(self, table_name: str) -> bool:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def _insert(self, table_name: str, records: list[T]):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def _create(
@@ -39,7 +39,7 @@ class DatabaseClient:
         table_name: str,
         columns: list[str] | dict[str, str],
     ):
-        pass
+        raise NotImplementedError
 
     def select_to_table(self, query: str, new_table_name: str):
         """
