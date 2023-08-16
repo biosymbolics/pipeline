@@ -39,7 +39,7 @@ class PsqlDatabaseClient(DatabaseClient):
     ```
     """
 
-    def __init__(self, database_name: str):
+    def __init__(self, database_name: str = "patents"):
         self.client = PsqlClient(database_name)
 
     @staticmethod
@@ -69,7 +69,7 @@ class PsqlDatabaseClient(DatabaseClient):
     @overrides(DatabaseClient)
     def execute_query(self, query: str):
         """
-        Execute BigQuery query
+        Execute query
 
         Args:
             query (str): SQL query

@@ -10,16 +10,17 @@ from system import initialize
 initialize()
 
 from clients.low_level.big_query import (
-    DatabaseClient,
+    BQDatabaseClient,
     BQ_DATASET_ID,
 )
+from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
-
-from .copy_tables import copy_patent_tables
-from .terms import create_patent_terms
+from scripts.patents.bq.copy_tables import copy_patent_tables
+from scripts.patents.bq_to_psql import bq_to_psql
+from scripts.patents.psql.terms import create_patent_terms
 
 logging.basicConfig(level=logging.INFO)
 
@@ -70,7 +71,7 @@ def create_applications_table(table_name: str = "applications"):
     """
     logging.info("Create a table of patent applications for use in app queries")
 
-    client = DatabaseClient()
+    client = BQDatabaseClient()
     client.delete_table(table_name)
 
     applications = f"""
@@ -90,29 +91,11 @@ def __create_annotations_table():
     logging.info("Create a table of annotations for use in app queries")
     table_name = "annotations"
 
-    client = DatabaseClient()
+    client = PsqlDatabaseClient()
     client.delete_table(table_name)
 
     entity_query = f"""
         WITH ranked_terms AS (
-                --- existing annotations
-                SELECT
-                    publication_number,
-                    ocid,
-                    LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name)) as term,
-                    domain,
-                    confidence,
-                    source,
-                    character_offset_start,
-                    ROW_NUMBER() OVER(
-                        PARTITION BY publication_number, LOWER(IF(map.term IS NOT NULL, map.term, a.preferred_name))
-                        ORDER BY character_offset_start
-                    ) as rank
-                FROM `{BQ_DATASET_ID}.gpr_annotations` a
-                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(a.preferred_name) = map.synonym
-
-                UNION ALL
-
                 --- assignees as annotations
                 SELECT
                     publication_number,
@@ -156,7 +139,7 @@ def __create_annotations_table():
                     character_offset_start,
                     1 as rank
                 FROM `{WORKING_BIOSYM_ANNOTATIONS_TABLE}` a
-                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
+                LEFT JOIN `synonym_map` syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
         )
         SELECT
             publication_number,
@@ -178,7 +161,7 @@ def __create_biosym_annotations_tables():
     """
     table_names = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
 
-    client = DatabaseClient()
+    client = BQDatabaseClient()
 
     for table_name in table_names:
         schema = [
@@ -205,20 +188,22 @@ def main(copy_tables: bool = False):
         >>> python3 -m scripts.patents.initialize_patents -copy_tables
         >>> python3 -m scripts.patents.initialize_patents
     """
+    # bigquery
     # __create_biosym_annotations_tables()
 
     if copy_tables:
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
+        # bigquery
         copy_patent_tables()
 
-    # create small-ish table of patent applications
-    create_applications_table()
+    # create patent applications etc in postgres
+    bq_to_psql()
 
-    # create patent terms
+    # create patent terms (psql)
     create_patent_terms()
 
-    # create annotations
+    # create annotations (psql)
     __create_annotations_table()
 
 

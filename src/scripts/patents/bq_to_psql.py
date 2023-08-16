@@ -27,10 +27,11 @@ GCS_BUCKET = "biosym-patents"
 SHARD_SIZE = timedelta(days=730)
 
 
-def export_tables():
+def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
+    logging.info("Exporting BigQuery tables to GCS")
     create_applications_table("applications_tmp")
     start_date = datetime(2000, 1, 1)
     end_date = datetime(2023, 1, 1)
@@ -81,10 +82,11 @@ def determine_data_type(value):
         return "TEXT"
 
 
-def import_files():
+def import_into_psql():
     """
     Load data from a JSON file into a psql table
     """
+    logging.info("Importing applications table (etc) into postgres")
     conn = psycopg2.connect(
         database="patents",
         host="localhost",
@@ -153,15 +155,18 @@ def import_files():
     conn.close()
 
 
+def bq_to_psql():
+    export_bq_tables()
+    import_into_psql()
+
+
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")
         sys.exit()
 
     if "-export" in sys.argv:
-        logging.info("Exporting")
-        export_tables()
+        export_bq_tables()
 
     if "-import" in sys.argv:
-        logging.info("Importing")
-        import_files()
+        import_into_psql()

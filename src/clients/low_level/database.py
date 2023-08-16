@@ -34,7 +34,9 @@ class DatabaseClient:
         pass
 
     @abstractmethod
-    def _create(self, table_name: str, columns: list[str] | list[bigquery.SchemaField]):
+    def _create(
+        self, table_name: str, columns: dict[str, str] | list[bigquery.SchemaField]
+    ):
         pass
 
     def select_to_table(self, query: str, new_table_name: str):
@@ -106,7 +108,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        columns: list[str] | list[bigquery.SchemaField],
+        columns: dict[str, str] | list[bigquery.SchemaField],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):
