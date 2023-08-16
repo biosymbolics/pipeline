@@ -95,18 +95,18 @@ class BQDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     def _create(
-        self, table_name: str, schema_or_cols: list[str] | list[bigquery.SchemaField]
+        self, table_name: str, columns: list[str] | list[bigquery.SchemaField]
     ) -> bigquery.Table:
         """
         Simple create table function, makes up schema based on column names
 
         Args:
             table_name (str): name of the table
-            schema_or_cols (list[str] | list[bigquery.SchemaField]): list of columns or schema
+            columns (list[str] | list[bigquery.SchemaField]): list of columns or schema
         """
         table_id = self.get_table_id(table_name)
-        if is_string_list(schema_or_cols):
-            columns = schema_or_cols
+        if is_string_list(columns):
+            columns = columns
             schema = [
                 bigquery.SchemaField(
                     field_name, "DATE" if field_name.endswith("_date") else "STRING"
@@ -114,7 +114,7 @@ class BQDatabaseClient(DatabaseClient):
                 for field_name in columns
             ]
         else:
-            schema = schema_or_cols
+            schema = columns
 
         new_table = bigquery.Table(table_id, schema)
         return self.client.create_table(new_table)

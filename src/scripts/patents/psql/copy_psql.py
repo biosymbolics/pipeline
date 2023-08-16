@@ -10,10 +10,8 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import (
-    DatabaseClient,
-    execute_with_retries,
-)
+from clients.low_level.big_query import BQDatabaseClient
+from clients.low_level.database import execute_with_retries
 
 
 def fetch_data_from_postgres(conn, sql_query: str):
@@ -41,7 +39,7 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         new_table_name (str): name of the new table
         database (str): name of the database
     """
-    client = DatabaseClient()
+    client = BQDatabaseClient()
     # delete if exists
     client.delete_table(new_table_name)
 

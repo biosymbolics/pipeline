@@ -16,8 +16,8 @@ class DatabaseClient:
     def __init__(self):
         self.client = None  # Override
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def get_table_id(table_name: str) -> str:
         pass
 
@@ -34,9 +34,7 @@ class DatabaseClient:
         pass
 
     @abstractmethod
-    def _create(
-        self, table_name: str, schema_or_cols: list[str] | list[bigquery.SchemaField]
-    ):
+    def _create(self, table_name: str, columns: list[str] | list[bigquery.SchemaField]):
         pass
 
     def select_to_table(self, query: str, new_table_name: str):
@@ -108,7 +106,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        schema: list[str] | list[bigquery.SchemaField],
+        columns: list[str] | list[bigquery.SchemaField],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):
@@ -117,7 +115,7 @@ class DatabaseClient:
 
         Args:
             table_name (str): name of the table (with or without dataset prefix)
-            schema (list[str] | list[bigquery.SchemaField]): list of column names or list of SchemaField objects
+            columns (list[str] | list[bigquery.SchemaField]): list of column names or list of SchemaField objects
             exists_ok (bool): if True, do not raise an error if the table already exists
             truncate_if_exists (bool): if True, truncate the table if it already exists
         """
@@ -132,7 +130,7 @@ class DatabaseClient:
             else:
                 logging.info("Table %s already exists", table_name)
 
-        self._create(table_name, schema)
+        self._create(table_name, columns)
 
     def delete_table(self, table_name: str):
         """
