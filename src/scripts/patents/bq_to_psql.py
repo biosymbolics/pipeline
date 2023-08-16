@@ -4,7 +4,6 @@ import sys
 from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
-import psycopg2
 from pydash import compact
 from clients.low_level.postgres import PsqlDatabaseClient
 
