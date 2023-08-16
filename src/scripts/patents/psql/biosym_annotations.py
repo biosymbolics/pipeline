@@ -637,11 +637,11 @@ def fix_of_for_annotations():
             re_term = term + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            SET original_term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
-            AND REGEXP_CONTAINS(original_term, '^(?i)(?:{prefix_re})*{re_term}$')
-            AND REGEXP_CONTAINS(a.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
+            AND original_term ~* '^(?:{prefix_re})*{re_term}$'
+            AND a.{field} ~* '.*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*'
         """
         return sql
 
@@ -649,11 +649,11 @@ def fix_of_for_annotations():
         re_term = term + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET original_term=(REGEXP_EXTRACT(title, '(?i)([A-Za-z0-9]+-{re_term})'))
+            SET original_term=(substring(title, '(?i)([A-Za-z0-9]+-{re_term})'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
-            AND REGEXP_CONTAINS(original_term, '^(?i){re_term}$')
-            AND REGEXP_CONTAINS(a.{field}, '(?i).*[A-Za-z0-9]+-{re_term}.*')
+            AND original_term ~* '^{re_term}$'
+            AND a.{field} ~* '.*[A-Za-z0-9]+-{re_term}.*'
         """
         return sql
 
@@ -689,14 +689,14 @@ def remove_junk():
                 words_re = get_or_re(words, "+")
                 return f"""
                     update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', ''))
-                    where regexp_contains(original_term, '(?i).*{words_re}$')
+                    where original_term ~* '.*{words_re}$'
                 """
             elif place == "leading":
                 words = [t[0] + "s?[ ]" for t in REMOVAL_WORDS.items() if t[1] == place]
                 words_re = get_or_re(words, "+")
                 return f"""
                     update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', ''))
-                    where regexp_contains(original_term, '(?i)^{words_re}.*')
+                    where original_term ~* '^{words_re}.*'
                 """
             elif place == "all":
                 words = [
@@ -705,14 +705,14 @@ def remove_junk():
                 words_re = get_or_re(words, "+")
                 return rf"""
                     update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' '))
-                    where regexp_contains(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )')
+                    where original_term ~* '(?:^|$| ){words_re}(?:^|$| )'
                 """
             else:
                 raise ValueError(f"Unknown place: {place}")
 
         return [get_sql(place) for place in ["leading", "trailing", "all"]]
 
-    delete_term_re = "(?i)^" + get_or_re([f"{dt}s?" for dt in DELETION_TERMS]) + "$"
+    delete_term_re = "^" + get_or_re([f"{dt}s?" for dt in DELETION_TERMS]) + "$"
     mechanism_terms = [
         f"{t}s?"
         for t in [
@@ -725,38 +725,37 @@ def remove_junk():
 
     queries = [
         f"update `{WORKING_TABLE}` "
-        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where regexp_contains(original_term, '^[(][^)(]+[)]$')",
+        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
         *get_remove_words(),
         f"update `{WORKING_TABLE}` "
-        + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where regexp_contains(original_term, '[ ]{2,}')",
-        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where regexp_contains(original_term, '^[ ]+')",
-        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where regexp_contains(original_term, '[ ]$')",
-        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, r'^\"', '')) where regexp_contains(original_term, r'^\"')",
+        + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where original_term ~ '[ ]{2,}'",
+        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where original_term ~ '[ ]$'",
+        f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, r'^\"', '')) where original_term ~ r'^\"'",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
         f"update `{WORKING_TABLE}` set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term like '% disease factor';",
         f"update `{WORKING_TABLE}` set "
-        + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where regexp_contains(original_term, '.{10,}[.] [A-Z][A-Za-z0-9]{3,}')",
+        + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
         f"delete FROM `{WORKING_TABLE}` "
-        + r"where regexp_contains(original_term, '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$')",
-        f"delete FROM `{WORKING_TABLE}` "
-        + r"where regexp_contains(original_term, '^[0-9., ]+$')",
+        + r"where original_term ~ '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
+        f"delete FROM `{WORKING_TABLE}` " + r"where roriginal_term ~ '^[0-9., ]+$'",
         f"delete FROM `{WORKING_TABLE}` where original_term like 'said %'",
-        f"delete from `{WORKING_TABLE}` where domain='compounds' AND (regexp_contains(original_term, '(?i).*(?:.*tor$)')) and not regexp_contains(original_term, '(?i)(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)')",
+        f"delete from `{WORKING_TABLE}` where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)')",
         f"delete FROM `{WORKING_TABLE}` where length(original_term) < 3 or original_term is null",
-        f"delete from `{WORKING_TABLE}` where regexp_contains(original_term, {delete_term_re})",
-        f"update `{WORKING_TABLE}` set domain='mechanisms' where domain<>'mechanisms' AND regexp_contains(original_term, '(?i).*{mechanism_re}$')",
+        f"delete from `{WORKING_TABLE}` where original_term ~* {delete_term_re}",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
-        f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or regexp_contains(original_term, '.* diseases?$')",
+        f"update `{WORKING_TABLE}` set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
         f"update `{WORKING_TABLE}` set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
-        f"update `{WORKING_TABLE}` set domain='compounds' where regexp_contains(original_term, '(?i)(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$') and not regexp_contains(original_term, '(?i)(anti|receptor|degrade|disease|syndrome|condition)') and domain<>'compounds'",
+        f"update `{WORKING_TABLE}` set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% receptor' and domain='compounds'",
         f"update `{WORKING_TABLE}` set domain='compounds' where original_term like '% acid' and domain='mechanism'",
         f"update `{WORKING_TABLE}` set domain='compounds' where original_term like '%quinolones' and domain='mechanism'",
         f"update `{WORKING_TABLE}` set domain='compounds' where original_term='manganese' and domain<>'compounds'",
-        f"update `{WORKING_TABLE}` set domain='diseases' where regexp_contains(original_term, '(?i)(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$') and not regexp_contains(original_term, '(?i)(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)') and domain<>'diseases'",
-        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='diseases' and not regexp_contains(original_term, '(?i)(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)')",
+        f"update `{WORKING_TABLE}` set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% gene' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
         f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term like '% factor' and original_term not like '%risk%' and original_term not like '%disease%' and domain='diseases'",
-        f"update `{WORKING_TABLE}` set domain='mechanisms' where regexp_contains(original_term, 'receptors?$') and domain='diseases'",
+        f"update `{WORKING_TABLE}` set domain='mechanisms' where original_term ~ 'receptors?$' and domain='diseases'",
     ]
     client = DatabaseClient()
     for sql in queries:
@@ -771,10 +770,10 @@ def fix_unmatched():
     def get_query(field, char_set):
         sql = rf"""
             UPDATE {WORKING_TABLE} ab
-            set original_term=REGEXP_EXTRACT(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            set original_term=substring(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
             from applications a
             WHERE ab.publication_number=a.publication_number
-            AND REGEXP_EXTRACT(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
+            AND substring(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
             AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
             AND {field} like '%{char_set[0]}%{char_set[1]}%'
         """
@@ -807,7 +806,7 @@ def remove_common_terms():
     )
     re_match = " OR ".join(
         [
-            f"regexp_contains(original_term, '^{term.lower()}s?$')"
+            f"original_term ~ '^{term.lower()}s?$'"
             for term in common_terms
             if "?" in term
         ]
