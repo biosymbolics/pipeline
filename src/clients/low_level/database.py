@@ -51,10 +51,10 @@ class DatabaseClient:
         """
         logging.info("Creating table %s", new_table_name)
         new_table_id = self.get_table_id(new_table_name)
-
-        self.delete_table(new_table_name)
-        time.sleep(20)  # hack
-        create_table_query = f"CREATE table {new_table_id} AS {query};"
+        create_table_query = f"""
+            DROP TABLE IF EXISTS {new_table_id};
+            CREATE TABLE {new_table_id} AS {query};
+        """
         self.execute_query(create_table_query)
 
     def select(self, query: str) -> list[dict]:

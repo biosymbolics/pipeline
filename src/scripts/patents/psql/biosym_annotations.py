@@ -640,7 +640,7 @@ def fix_of_for_annotations():
             SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
-            AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{re_term}$")
+            AND REGEXP_CONTAINS(original_term, '^(?i)(?:{prefix_re})*{re_term}$')
             AND REGEXP_CONTAINS(a.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
         """
         return sql
