@@ -3,13 +3,13 @@ Functions to initialize the patents database
 """
 import logging
 import sys
-from scripts.patents.psql.copy_psql import copy_patent_approvals
+from scripts.patents.psql.copy_approvals import copy_patent_approvals
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
+from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,

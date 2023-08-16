@@ -28,13 +28,15 @@ BASE_DIR = "data/ner_enriched"
 class PatentEnricher:
     """
     Enriches patents with NER tags
+
+    ** runs on bigquery database (but can be moved) **
     """
 
     def __init__(self):
         """
         Initialize the enricher
         """
-        self.db = DatabaseClient()
+        self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES)
 
     def __get_processed_pubs(self) -> list[str]:

@@ -54,7 +54,7 @@ class DatabaseClient:
 
         self.delete_table(new_table_name)
         time.sleep(20)  # hack
-        create_table_query = f"CREATE {new_table_id} AS {query};"
+        create_table_query = f"CREATE table {new_table_id} AS {query};"
         self.execute_query(create_table_query)
 
     def select(self, query: str) -> list[dict]:

@@ -641,7 +641,7 @@ def fix_of_for_annotations():
             FROM applications a
             WHERE ba.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{re_term}$")
-            AND REGEXP_CONTAINS(p.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
+            AND REGEXP_CONTAINS(a.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
         """
         return sql
 
@@ -653,7 +653,7 @@ def fix_of_for_annotations():
             FROM applications a
             WHERE ba.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, '^(?i){re_term}$')
-            AND REGEXP_CONTAINS(p.{field}, '(?i).*[A-Za-z0-9]+-{re_term}.*')
+            AND REGEXP_CONTAINS(a.{field}, '(?i).*[A-Za-z0-9]+-{re_term}.*')
         """
         return sql
 
@@ -770,11 +770,11 @@ def fix_unmatched():
 
     def get_query(field, char_set):
         sql = rf"""
-            UPDATE {WORKING_TABLE} a
-            set original_term=REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            UPDATE {WORKING_TABLE} ab
+            set original_term=REGEXP_EXTRACT(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
             from applications a
-            WHERE p.publication_number=a.publication_number
-            AND REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
+            WHERE ab.publication_number=a.publication_number
+            AND REGEXP_EXTRACT(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
             AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
             AND {field} like '%{char_set[0]}%{char_set[1]}%'
         """
@@ -816,18 +816,15 @@ def remove_common_terms():
     DatabaseClient().execute_query(query)
 
 
-if __name__ == "__main__":
-    if "-h" in sys.argv:
-        print(
-            "Usage: python3 -m scripts.patents.clean_extractions \nCleans up extracted annotations"
-        )
-        sys.exit()
-
-    # copy to destination table
+def create_working_biosym_annotations():
+    """
+    - Copies biosym annotations from source table
+    - Performs various cleanups and deletions
+    """
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    DatabaseClient().select_to_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
+    DatabaseClient().select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
 
     fix_of_for_annotations()
     fix_unmatched()
@@ -835,3 +832,13 @@ if __name__ == "__main__":
     remove_junk()
     remove_substrings()
     remove_common_terms()  # final step - remove one-off generic terms
+
+
+if __name__ == "__main__":
+    if "-h" in sys.argv:
+        print(
+            "Usage: python3 -m scripts.patents.clean_extractions \nCleans up extracted annotations"
+        )
+        sys.exit()
+
+    create_working_biosym_annotations()

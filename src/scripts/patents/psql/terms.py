@@ -12,6 +12,8 @@ from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
 
+from .biosym_annotations import create_working_biosym_annotations
+
 from .._constants import BIOSYM_ANNOTATIONS_TABLE
 from ..bq.gpr_constants import SYNONYM_MAP
 from ..utils import clean_assignees
@@ -288,4 +290,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
+    create_working_biosym_annotations()
+
     TermAssembler.run()
