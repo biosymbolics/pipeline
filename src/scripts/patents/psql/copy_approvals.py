@@ -1,5 +1,5 @@
 """
-Utils for copying psql data to BigQuery
+Utils for copying approvals data
 """
 import sys
 
