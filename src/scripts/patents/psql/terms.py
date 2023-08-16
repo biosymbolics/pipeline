@@ -9,16 +9,16 @@ import logging
 from clients.low_level.big_query import (
     DatabaseClient,
     BQ_DATASET_ID,
-    execute_with_retries,
 )
+from clients.low_level.database import execute_with_retries
 from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
 
-from ._constants import BIOSYM_ANNOTATIONS_TABLE
-from .gpr_constants import SYNONYM_MAP
-from .utils import clean_assignees
+from .._constants import BIOSYM_ANNOTATIONS_TABLE
+from ..bq.gpr_constants import SYNONYM_MAP
+from ..utils import clean_assignees
 
 MIN_ASSIGNEE_COUNT = 5
 TERMS_FILE = "terms.json"

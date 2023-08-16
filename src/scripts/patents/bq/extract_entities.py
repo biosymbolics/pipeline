@@ -10,7 +10,7 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import DatabaseClient
+from clients.low_level.big_query import BQDatabaseClient
 from constants.patents import PATENT_ATTRIBUTE_MAP
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import NerTagger

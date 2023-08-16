@@ -6,7 +6,7 @@ import logging
 from typing import Sequence, cast
 from pydash import compact
 
-from clients.low_level.big_query import DatabaseClient
+from clients.low_level.big_query import BQDatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 
 from .constants import RELEVANCY_THRESHOLD_MAP
@@ -199,7 +199,7 @@ def search(
     """
 
     query = select_query + where
-    results = DatabaseClient(use_service_account=True).select(query)
+    results = BQDatabaseClient(use_service_account=True).select(query)
     return format_search_result(results)
 
 
@@ -224,5 +224,5 @@ def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC
     """
-    results = DatabaseClient(use_service_account=True).select(query)
+    results = BQDatabaseClient(use_service_account=True).select(query)
     return [format_term(cast(TermResult, result)) for result in results]

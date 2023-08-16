@@ -80,7 +80,7 @@ def create_applications_table(table_name: str = "applications"):
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
-    client.query_to_table(applications, table_name)
+    client.select_to_table(applications, table_name)
 
 
 def __create_annotations_table():
@@ -168,7 +168,7 @@ def __create_annotations_table():
         WHERE rank = 1
         GROUP BY publication_number
     """
-    client.query_to_table(entity_query, table_name)
+    client.select_to_table(entity_query, table_name)
 
 
 def __create_biosym_annotations_tables():

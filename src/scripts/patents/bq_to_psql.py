@@ -11,11 +11,11 @@ import system
 
 system.initialize()
 
-from clients.low_level.big_query import DatabaseClient, BQ_DATASET_ID
+from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from scripts.patents.initialize_patents import create_applications_table
 
 storage_client = storage.Client()
-db_client = DatabaseClient()
+db_client = BQDatabaseClient()
 
 EXPORT_TABLES = {
     "biosym_annotations_source": None,
@@ -52,7 +52,7 @@ def export_tables():
                     WHERE {date_column} >= {int(current_date.strftime('%Y%m%d'))}
                     AND {date_column} < {int(shard_end_date.strftime('%Y%m%d'))}
                 """
-                db_client.query_to_table(shard_query, shared_table_name)
+                db_client.select_to_table(shard_query, shared_table_name)
 
                 # Define the destination in GCS
                 destination_uri = f"gs://{GCS_BUCKET}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"

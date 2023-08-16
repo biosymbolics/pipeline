@@ -20,7 +20,7 @@ from constants.core import (
 )
 from utils.re import get_or_re
 
-from ._constants import (
+from .._constants import (
     MECHANISM_BASE_TERMS,
     MECHANISM_BASE_TERM_SETS,
     INTERVENTION_BASE_TERMS,
@@ -830,7 +830,7 @@ if __name__ == "__main__":
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    DatabaseClient().query_to_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
+    DatabaseClient().select_to_table(f"SELECT * from `{SOURCE_TABLE}`", WORKING_TABLE)
 
     fix_of_for_annotations()
     fix_unmatched()

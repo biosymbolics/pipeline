@@ -1,7 +1,7 @@
 """
 Low-level BigQuery client
 """
-from typing import Any, Callable, Mapping, TypeVar
+from typing import Mapping, TypeVar
 from google.cloud import bigquery
 from google.cloud.bigquery import job
 from google.cloud.bigquery.table import RowIterator
@@ -14,8 +14,10 @@ import polars as pl
 import json
 
 from clients.low_level.boto3 import get_boto_client
-from utils.list import batch
 from typings.core import is_string_list
+
+from clients.low_level.database import DatabaseClient
+from utils.classes import overrides, nonoverride
 
 T = TypeVar("T", bound=Mapping)
 
@@ -47,11 +49,12 @@ class BigQueryClient(bigquery.Client):
         return creds
 
 
-class DatabaseClient:
+class BQDatabaseClient(DatabaseClient):
     def __init__(self, use_service_account: bool = False):
         self.client = BigQueryClient(use_service_account=use_service_account)
 
     @staticmethod
+    @overrides(DatabaseClient)
     def get_table_id(table_name: str) -> str:
         """
         Get the full table name (including project and dataset) from a table name
@@ -62,6 +65,18 @@ class DatabaseClient:
             else table_name
         )
 
+    @overrides(DatabaseClient)
+    def is_table_exists(self, table_name: str) -> bool:
+        """
+        Check if a table exists
+        """
+        try:
+            self.get_table(table_name)
+            return True
+        except NotFound:
+            return False
+
+    @overrides(DatabaseClient)
     def execute_query(self, query: str) -> RowIterator:
         """
         Execute BigQuery query
@@ -78,34 +93,33 @@ class DatabaseClient:
         logging.info("Query complete")
         return results
 
-    def select(self, query: str) -> list[dict]:
+    @overrides(DatabaseClient)
+    def _create(
+        self, table_name: str, schema_or_cols: list[str] | list[bigquery.SchemaField]
+    ) -> bigquery.Table:
         """
-        Execute a query and return the results as a list of dicts
-        (must include provide fully qualified table name in query)
+        Simple create table function, makes up schema based on column names
 
         Args:
-            query (str): SQL query
+            table_name (str): name of the table
+            schema_or_cols (list[str] | list[bigquery.SchemaField]): list of columns or schema
         """
-        logger.debug("Running query: %s", query)
-        results = self.execute_query(query)
-        rows = [dict(row) for row in results]
+        table_id = self.get_table_id(table_name)
+        if is_string_list(schema_or_cols):
+            columns = schema_or_cols
+            schema = [
+                bigquery.SchemaField(
+                    field_name, "DATE" if field_name.endswith("_date") else "STRING"
+                )
+                for field_name in columns
+            ]
+        else:
+            schema = schema_or_cols
 
-        logging.info("Rows returned: %s", len(rows))
-        return rows
+        new_table = bigquery.Table(table_id, schema)
+        return self.client.create_table(new_table)
 
-    def query_to_table(self, query: str, new_table_name: str):
-        """
-        Create a new table from a query
-
-        Args:
-            query (str): SQL query
-            new_table_name (str): name of the new table
-        """
-        logging.info("Creating table %s", new_table_name)
-        new_table_id = self.get_table_id(new_table_name)
-        create_table_query = f"CREATE or REPLACE TABLE `{new_table_id}` AS {query};"
-        self.execute_query(create_table_query)
-
+    @nonoverride
     def get_table(self, table_name: str) -> bigquery.Table:
         """
         Check if a table exists,
@@ -116,19 +130,7 @@ class DatabaseClient:
         table = self.client.get_table(table_id)
         return table
 
-    def select_insert_into_table(self, select_query: str, table_name: str):
-        """
-        Insert rows into a table from a select query
-
-        Args:
-            select_query (str): select query
-            table_name (str): name of the table
-        """
-        table_id = self.get_table_id(table_name)
-        query = f"INSERT INTO `{table_id}` {select_query}"
-        logging.info("Inserting via query (%s) into table %s", query, table_id)
-        self.execute_query(query)
-
+    @nonoverride
     def insert_df_into_table(self, df: pl.DataFrame, table_name: str):
         """
         Insert rows into a table from a dataframe
@@ -145,39 +147,7 @@ class DatabaseClient:
         # insert the df rows into the table
         self.client.insert_rows_from_dataframe(table_id, df.to_pandas())
 
-    def insert_into_table(
-        self, records: list[T], table_name: str, batch_size: int = 1000
-    ):
-        """
-        Insert rows into a table from a list of records
-
-        Args:
-            records (list[dict]): list of records to insert
-            table_name (str): name of the table
-            batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
-        """
-
-        def __insert_into_table(records: list[T], table: bigquery.Table):
-            """
-            Insert records into a table
-            """
-            try:
-                errors = self.client.insert_rows(table, records)
-                if errors:
-                    raise Exception("Error inserting rows")
-            except Exception as e:
-                logging.error("Error inserting rows: %s", e)
-                raise e
-
-            logging.info("Successfully inserted %s rows", len(records))
-
-        batched = batch(records, batch_size)
-        table = self.get_table(table_name)
-
-        for i, b in enumerate(batched):
-            logging.info("Inserting batch %s into table %s", i, table_name)
-            __insert_into_table(b, table)
-
+    @nonoverride
     def upsert_df_into_table(
         self,
         df: pl.DataFrame,
@@ -243,62 +213,7 @@ class DatabaseClient:
             # Delete the temporary table
             self.delete_table(tmp_table_id)
 
-    def delete_table(self, table_name: str):
-        """
-        Delete a table (if exists)
-
-        Args:
-            table_name (str): name of the table
-        """
-        table_id = self.get_table_id(table_name)
-        logging.info("Deleting table %s", table_name)
-        delete_table_query = f"DROP TABLE IF EXISTS `{table_id}`;"
-        self.execute_query(delete_table_query)
-
-    def truncate_table(self, table_name: str):
-        """
-        Truncate a table (if exists)
-
-        Args:
-            table_name (str): name of the table
-        """
-        exists = self.does_table_exist(table_name)
-        if not exists:
-            logging.warning(
-                "Table %s does not exist and thus not truncating", table_name
-            )
-            return
-
-        table_id = self.get_table_id(table_name)
-        logging.info("Truncating table %s", table_id)
-        truncate_table_query = f"TRUNCATE TABLE `{table_id}`;"
-        self.execute_query(truncate_table_query)
-
-    def __create_table(
-        self, table_name: str, schema_or_cols: list[str] | list[bigquery.SchemaField]
-    ) -> bigquery.Table:
-        """
-        Simple create table function, makes up schema based on column names
-
-        Args:
-            table_name (str): name of the table
-            schema_or_cols (list[str] | list[bigquery.SchemaField]): list of columns or schema
-        """
-        table_id = self.get_table_id(table_name)
-        if is_string_list(schema_or_cols):
-            columns = schema_or_cols
-            schema = [
-                bigquery.SchemaField(
-                    field_name, "DATE" if field_name.endswith("_date") else "STRING"
-                )
-                for field_name in columns
-            ]
-        else:
-            schema = schema_or_cols
-
-        new_table = bigquery.Table(table_id, schema)
-        return self.client.create_table(new_table)
-
+    @nonoverride
     def export_table_to_storage(self, table_name: str, destination_uri: str):
         """
         Export a table to storage (GCS for now, as CSV)
@@ -315,67 +230,3 @@ class DatabaseClient:
             self.get_table(table_name), destination_uri, job_config=job_config
         )
         extract_job.result()  # Wait for the job to complete
-
-    ##### Higher level functions #####
-
-    def does_table_exist(self, table_name: str) -> bool:
-        """
-        Check if a table exists
-        """
-        try:
-            self.get_table(table_name)
-            return True
-        except NotFound:
-            return False
-
-    def create_table(
-        self,
-        table_name: str,
-        schema: list[str] | list[bigquery.SchemaField],
-        exists_ok: bool = True,
-        truncate_if_exists: bool = False,
-    ) -> bigquery.Table:
-        """
-        Create a BigQuery table
-
-        Args:
-            table_name (str): name of the table (with or without dataset prefix)
-            schema (list[str] | list[bigquery.SchemaField]): list of column names or list of SchemaField objects
-            exists_ok (bool): if True, do not raise an error if the table already exists
-            truncate_if_exists (bool): if True, truncate the table if it already exists
-        """
-        if truncate_if_exists and not exists_ok:
-            raise Exception("Cannot truncate if exists if exists_ok is False")
-
-        if self.does_table_exist(table_name):
-            if truncate_if_exists:
-                self.truncate_table(table_name)
-            elif not exists_ok:
-                raise Exception(f"Table {table_name} already exists")
-            else:
-                logging.info("Table %s already exists", table_name)
-
-            return self.get_table(table_name)
-
-        return self.__create_table(table_name, schema)
-
-
-def execute_with_retries(db_func: Callable[[], Any]):
-    """
-    Retry a function that interacts with BigQuery if it fails with a NotFound error
-
-    Args:
-        db_func (function): function that interacts with BigQuery
-    """
-    retries = 0
-    max_retries = 5
-    while retries < max_retries:
-        try:
-            db_func()
-            break
-        except NotFound as e:
-            if retries < max_retries - 1:  # don't wait on last iteration
-                time.sleep(1 * retries + 1)  # backoff
-            retries += 1
-        except Exception as e:
-            raise e
