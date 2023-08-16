@@ -5,6 +5,7 @@ from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
 import psycopg2
+from pydash import compact
 
 import system
 
@@ -27,7 +28,10 @@ SHARD_SIZE = timedelta(days=730)
 
 
 def export_tables():
-    # create_applications_table("applications_tmp")
+    """
+    Export tables from BigQuery to GCS
+    """
+    create_applications_table("applications_tmp")
     start_date = datetime(2000, 1, 1)
     end_date = datetime(2023, 1, 1)
 
@@ -61,7 +65,6 @@ def export_tables():
     db_client.delete_table("applications_tmp")
 
 
-# Function to determine PostgreSQL data type from JSON value
 def determine_data_type(value):
     if isinstance(value, int):
         return "INTEGER"
@@ -79,6 +82,9 @@ def determine_data_type(value):
 
 
 def import_files():
+    """
+    Load data from a JSON file into a psql table
+    """
     conn = psycopg2.connect(
         database="patents",
         host="localhost",
@@ -101,31 +107,31 @@ def import_files():
 
     def transform(s):
         if isinstance(s, dict):
-            return list(s.values())[0]
-        elif (isinstance(s, list) or isinstance(s, pl.Series)) and len(s) > 0:
-            if isinstance(s, pl.Series):
-                s = s.to_list()
+            return compact(s.values())[0]
+        elif isinstance(s, list) or isinstance(s, pl.Series) and len(s) > 0:
             if isinstance(s[0], dict):
-                return [list(s1.values())[0] for s1 in s]
-            return s
+                return [compact(s1.values())[0] for s1 in s if len(s1) > 0]
         return s
 
-    # Function to load and insert data from a JSON file
     def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
-        df = df.select(*[pl.col(c).apply(lambda s: transform(s)) for c in df.columns])
-        print(df)
+        nono_columns = ["cited_by", "citation"]  # polars borks on these
+        df = df.select(
+            *[
+                pl.col(c).apply(lambda s: transform(s))
+                for c in df.columns
+                if c not in nono_columns
+            ]
+        )
         create_table_if_not_exists(records, table_name)
 
         for record in df.to_dicts():
-            print(record)
-            # Assuming each record in your JSON is a dictionary
             columns = record.keys()
             values = [record[column] for column in columns]
             insert_statement = f"""
-                INSERT INTO {table_name}({', '.join(columns)})
+                INSERT INTO {table_name}({', '.join(['"' + c + '"' for c in columns])})
                 VALUES ({', '.join(['%s'] * len(values))})
             """
             cursor.execute(insert_statement, tuple(values))
