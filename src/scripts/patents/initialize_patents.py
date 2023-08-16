@@ -164,15 +164,16 @@ def __create_biosym_annotations_tables():
     client = BQDatabaseClient()
 
     for table_name in table_names:
-        schema = [
-            bigquery.SchemaField("publication_number", "STRING"),
-            bigquery.SchemaField("original_term", "STRING"),
-            bigquery.SchemaField("domain", "STRING"),
-            bigquery.SchemaField("confidence", "FLOAT"),
-            bigquery.SchemaField("source", "STRING"),
-            bigquery.SchemaField("character_offset_start", "INTEGER"),
-            bigquery.SchemaField("character_offset_end", "INTEGER"),
-        ]
+        schema = {
+            "publication_number": "STRING",
+            "original_term": "STRING",
+            "canonical_term": "STRING",
+            "domain": "STRING",
+            "confidence": "FLOAT",
+            "source": "STRING",
+            "character_offset_start": "INTEGER",
+            "character_offset_end": "INTEGER",
+        }
         client.create_table(
             table_name, schema, exists_ok=True, truncate_if_exists=False
         )

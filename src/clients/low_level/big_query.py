@@ -95,14 +95,14 @@ class BQDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     def _create(
-        self, table_name: str, columns: list[str] | list[bigquery.SchemaField]
+        self, table_name: str, columns: list[str] | dict[str, str]
     ) -> bigquery.Table:
         """
         Simple create table function, makes up schema based on column names
 
         Args:
             table_name (str): name of the table
-            columns (list[str] | list[bigquery.SchemaField]): list of columns or schema
+            columns (list[str] | dict): list of columns or schema
         """
         table_id = self.get_table_id(table_name)
         if is_string_list(columns):
@@ -113,8 +113,10 @@ class BQDatabaseClient(DatabaseClient):
                 )
                 for field_name in columns
             ]
+        elif isinstance(columns, dict):
+            schema = [bigquery.SchemaField(c, t) for c, t in columns.items()]
         else:
-            schema = columns
+            raise Exception("Invalid columns")
 
         new_table = bigquery.Table(table_id, schema)
         return self.client.create_table(new_table)

@@ -35,7 +35,9 @@ class DatabaseClient:
 
     @abstractmethod
     def _create(
-        self, table_name: str, columns: dict[str, str] | list[bigquery.SchemaField]
+        self,
+        table_name: str,
+        columns: list[str] | dict[str, str],
     ):
         pass
 
@@ -108,7 +110,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        columns: dict[str, str] | list[bigquery.SchemaField],
+        columns: list[str] | dict[str, str],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):
@@ -117,7 +119,7 @@ class DatabaseClient:
 
         Args:
             table_name (str): name of the table (with or without dataset prefix)
-            columns (list[str] | list[bigquery.SchemaField]): list of column names or list of SchemaField objects
+            columns: list of column names or dict (column name -> type)
             exists_ok (bool): if True, do not raise an error if the table already exists
             truncate_if_exists (bool): if True, truncate the table if it already exists
         """
