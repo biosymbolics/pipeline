@@ -20,8 +20,6 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         database (str): name of the database
     """
     client = PsqlDatabaseClient()
-    # truncate if exists
-    client.truncate_table(new_table_name)
 
     # pull records from other db
     results = PsqlDatabaseClient(database).execute_query(sql_query)

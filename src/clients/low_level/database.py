@@ -101,9 +101,7 @@ class DatabaseClient:
         for i, b in enumerate(batched):
             logging.info("Inserting batch %s into table %s", i, table_name)
             try:
-                errors = self._insert(table_name, records=b)
-                if errors:
-                    raise Exception("Error inserting rows")
+                self._insert(table_name, records=b)
             except Exception as e:
                 logging.error("Error inserting rows: %s", e)
                 raise e
@@ -138,8 +136,8 @@ class DatabaseClient:
                 raise Exception(f"Table {table_name} already exists")
             else:
                 logging.info("Table %s already exists", table_name)
-
-        self._create(table_name, columns)
+        else:
+            self._create(table_name, columns)
 
     def delete_table(self, table_name: str):
         """
@@ -169,7 +167,7 @@ class DatabaseClient:
 
         table_id = self.get_table_id(table_name)
         logger.info("Truncating table %s", table_id)
-        truncate_table_query = f"TRUNCATE TABLE `{table_id}`;"
+        truncate_table_query = f"TRUNCATE TABLE {table_id};"
         self.execute_query(truncate_table_query)
 
 

@@ -126,6 +126,7 @@ class PsqlDatabaseClient(DatabaseClient):
         with conn.cursor() as cursor:
             try:
                 cursor.execute(query)
+                conn.commit()
             except Exception as e:
                 return self.handle_error(conn, e, is_rollback=True)
 
