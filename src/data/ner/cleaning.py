@@ -218,13 +218,13 @@ class EntityCleaner:
             for term in _terms:
                 if term.startswith("(") and term.endswith(")"):
                     yield term.strip("()")
+                    continue
                 yield term
 
         def format_parentheticals(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
                 # if iupac term, don't mess with its parens
                 if is_iupac(term):
-                    print("IS IUPAC", term)
                     yield term
                     continue
 
@@ -234,7 +234,6 @@ class EntityCleaner:
                 )
                 # poly(isoprene) -> polyisoprene
                 no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", r"\1", no_parenth)
-                print(term, "->", no_parens)
                 yield no_parens
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
