@@ -10,10 +10,7 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import (
-    DatabaseClient,
-    BQ_DATASET_ID,
-)
+from clients.low_level.postgres import PsqlDatabaseClient as DatabaseClient
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
@@ -592,7 +589,7 @@ def remove_substrings():
     Removes substrings from annotations
     """
     query = f"""
-        CREATE OR REPLACE TABLE {BQ_DATASET_ID}.names_to_remove AS
+        CREATE OR REPLACE TABLE names_to_remove AS
             SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
             FROM {WORKING_TABLE} t1
             JOIN {WORKING_TABLE} t2
@@ -608,7 +605,7 @@ def remove_substrings():
         DELETE FROM {WORKING_TABLE}
         WHERE (publication_number, original_term) IN (
             SELECT (publication_number, removal_term)
-            FROM {BQ_DATASET_ID}.names_to_remove
+            FROM names_to_remove
         )
     """
 
@@ -639,10 +636,10 @@ def fix_of_for_annotations():
         else:
             re_term = term + "s?"
         sql = f"""
-            UPDATE {WORKING_TABLE} a
+            UPDATE {WORKING_TABLE} ba
             SET original_term=(REGEXP_EXTRACT({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
-            FROM `{BQ_DATASET_ID}.gpr_publications` p
-            WHERE p.publication_number=a.publication_number
+            FROM applications a
+            WHERE ba.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, "^(?i)(?:{prefix_re})*{re_term}$")
             AND REGEXP_CONTAINS(p.{field}, '(?i).*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*')
         """
@@ -651,10 +648,10 @@ def fix_of_for_annotations():
     def get_hyphen_query(term, field: TextField):
         re_term = term + "s?"
         sql = f"""
-            UPDATE {WORKING_TABLE} a
+            UPDATE {WORKING_TABLE} ba
             SET original_term=(REGEXP_EXTRACT(title, '(?i)([A-Za-z0-9]+-{re_term})'))
-            FROM `{BQ_DATASET_ID}.gpr_publications` p
-            WHERE p.publication_number=a.publication_number
+            FROM applications a
+            WHERE ba.publication_number=a.publication_number
             AND REGEXP_CONTAINS(original_term, '^(?i){re_term}$')
             AND REGEXP_CONTAINS(p.{field}, '(?i).*[A-Za-z0-9]+-{re_term}.*')
         """
@@ -774,10 +771,10 @@ def fix_unmatched():
     def get_query(field, char_set):
         sql = rf"""
             UPDATE {WORKING_TABLE} a
-            set original_term=REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', `{BQ_DATASET_ID}.escape_regex_chars`(original_term), ')'))
-            from `{BQ_DATASET_ID}.gpr_publications` p
+            set original_term=REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            from applications a
             WHERE p.publication_number=a.publication_number
-            AND REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', `{BQ_DATASET_ID}.escape_regex_chars`(original_term), ')')) is not null
+            AND REGEXP_EXTRACT(p.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
             AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
             AND {field} like '%{char_set[0]}%{char_set[1]}%'
         """

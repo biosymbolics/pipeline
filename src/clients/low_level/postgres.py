@@ -6,11 +6,12 @@ import logging
 import psycopg2
 import psycopg2.extras
 
-from clients.low_level.database import DatabaseClient
+from clients.low_level.database import DatabaseClient, ExecuteResult
 from typings.core import is_string_list
 from utils.classes import overrides
 
 T = TypeVar("T", bound=Mapping)
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +77,13 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         try:
             res = self.execute_query(query)
-            return res[1][0][0]
+            return res["data"][1][0][0]
         except Exception as e:
             logger.error("Error checking table exists: %s", e)
             return False
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str):
+    def execute_query(self, query: str) -> ExecuteResult:
         """
         Execute query
 
@@ -97,11 +98,11 @@ class PsqlDatabaseClient(DatabaseClient):
             try:
                 data = list(cursor.fetchall())
                 columns = [desc[0] for desc in cursor.description]
+                return {"data": data, "columns": columns}
             except Exception as e:
                 logging.error("Error fetching data: %s", e)
-                return [], []
 
-        return data  # columns
+        return {"data": [], "columns": []}
 
     @overrides(DatabaseClient)
     def _create(self, table_name: str, columns: list[str] | dict[str, str]):
@@ -121,4 +122,4 @@ class PsqlDatabaseClient(DatabaseClient):
             raise Exception("Invalid columns")
 
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
-        return self.execute_query(query)
+        self.execute_query(query)

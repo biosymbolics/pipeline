@@ -188,7 +188,7 @@ class TermAssembler:
                 FROM
                 (
                     SELECT original_term as term, canonical_id as original_id, domain
-                    FROM `{BIOSYM_ANNOTATIONS_TABLE}`
+                    FROM {BIOSYM_ANNOTATIONS_TABLE}
                     where length(original_term) > 1
                 ) AS all_annotations
                 group by lower(term), original_id, domain

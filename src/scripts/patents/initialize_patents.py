@@ -44,9 +44,9 @@ def __create_annotations_table():
                     "record" as source,
                     1 as character_offset_start,
                     1 as rank
-                FROM `{BQ_DATASET_ID}.publications` p,
-                unnest(p.assignee_harmonized) as assignee
-                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(assignee.name) = map.synonym
+                FROM applications` a,
+                unnest(a.assignee_harmonized) as assignee
+                LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
 
                 UNION ALL
 
@@ -60,9 +60,9 @@ def __create_annotations_table():
                     "record" as source,
                     1 as character_offset_start,
                     1 as rank
-                FROM `{BQ_DATASET_ID}.publications` p,
-                unnest(p.inventor_harmonized) as inventor
-                LEFT JOIN `{BQ_DATASET_ID}.synonym_map` map ON LOWER(inventor.name) = map.synonym
+                FROM applications a,
+                unnest(a.inventor_harmonized) as inventor
+                LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
 
                 UNION ALL
 
@@ -76,8 +76,8 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     1 as rank
-                FROM `{WORKING_BIOSYM_ANNOTATIONS_TABLE}` a
-                LEFT JOIN `synonym_map` syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
+                LEFT JOIN synonym_map syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
         )
         SELECT
             publication_number,
@@ -116,6 +116,18 @@ def __create_biosym_annotations_source_table():
         truncate_if_exists=False,
     )
     logging.info(f"(Maybe) created table {SOURCE_BIOSYM_ANNOTATIONS_TABLE}")
+
+
+def create_funcs():
+    sql = r"""
+        CREATE OR REPLACE FUNCTION escape_regex_chars(text)
+        RETURNS text
+        LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS
+        $func$
+        SELECT regexp_replace($1, '([!$()*+.:<=>?[\\\]^{|}-])', '\\\1', 'g')
+        $func$;
+    """
+    PsqlDatabaseClient().execute_query(sql)
 
 
 def main(bootstrap: bool = False):

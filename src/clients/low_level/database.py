@@ -1,8 +1,7 @@
 from abc import abstractmethod
 import logging
 import time
-from typing import Any, Callable, Mapping, TypeVar
-from google.cloud import bigquery
+from typing import Any, Callable, Mapping, TypeVar, TypedDict
 import logging
 
 from utils.list import batch
@@ -10,6 +9,7 @@ from utils.list import batch
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Mapping)
+ExecuteResult = TypedDict("ExecuteResult", {"columns": list[str], "data": list[tuple]})
 
 
 class DatabaseClient:
@@ -22,7 +22,7 @@ class DatabaseClient:
         pass
 
     @abstractmethod
-    def execute_query(self, query: str) -> list:
+    def execute_query(self, query: str) -> ExecuteResult:
         pass
 
     @abstractmethod
@@ -54,7 +54,7 @@ class DatabaseClient:
 
         self.delete_table(new_table_name)
         time.sleep(20)  # hack
-        create_table_query = f"CREATE `{new_table_id}` AS {query};"
+        create_table_query = f"CREATE {new_table_id} AS {query};"
         self.execute_query(create_table_query)
 
     def select(self, query: str) -> list[dict]:
@@ -67,10 +67,10 @@ class DatabaseClient:
         """
         logger.debug("Running query: %s", query)
         results = self.execute_query(query)
-        rows = [dict(row) for row in results]
+        records = [dict(row) for row in results["data"]]
 
-        logging.info("Rows returned: %s", len(rows))
-        return rows
+        logging.info("Records returned: %s", len(records))
+        return records
 
     def select_insert_into_table(self, select_query: str, table_name: str):
         """
@@ -81,7 +81,7 @@ class DatabaseClient:
             table_name (str): name of the table
         """
         table_id = self.get_table_id(table_name)
-        query = f"INSERT INTO `{table_id}` {select_query}"
+        query = f"INSERT INTO {table_id} {select_query}"
         logger.info("Inserting via query (%s) into table %s", query, table_id)
         self.execute_query(query)
 
@@ -150,7 +150,7 @@ class DatabaseClient:
         """
         table_id = self.get_table_id(table_name)
         logger.info("Deleting table %s", table_name)
-        delete_table_query = f"DROP TABLE IF EXISTS `{table_id}`;"
+        delete_table_query = f"DROP TABLE IF EXISTS {table_id};"
         self.execute_query(delete_table_query)
 
     def truncate_table(self, table_name: str):

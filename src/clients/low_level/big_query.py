@@ -4,7 +4,6 @@ Low-level BigQuery client
 from typing import Mapping, TypeVar
 from google.cloud import bigquery
 from google.cloud.bigquery import job
-from google.cloud.bigquery.table import RowIterator
 from google.api_core.exceptions import NotFound
 from google.oauth2.service_account import Credentials
 import time
@@ -16,7 +15,7 @@ import json
 from clients.low_level.boto3 import get_boto_client
 from typings.core import is_string_list
 
-from clients.low_level.database import DatabaseClient
+from clients.low_level.database import DatabaseClient, ExecuteResult
 from utils.classes import overrides, nonoverride
 
 T = TypeVar("T", bound=Mapping)
@@ -77,7 +76,7 @@ class BQDatabaseClient(DatabaseClient):
             return False
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str) -> RowIterator:
+    def execute_query(self, query: str) -> ExecuteResult:
         """
         Execute BigQuery query
 
@@ -89,9 +88,9 @@ class BQDatabaseClient(DatabaseClient):
         query_job = self.client.query(query)
 
         # Wait for the job to complete
-        results = query_job.result()
+        results = list(query_job.result())
         logging.info("Query complete")
-        return results
+        return {"data": results, "columns": []}
 
     @overrides(DatabaseClient)
     def _create(
