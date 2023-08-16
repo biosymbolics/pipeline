@@ -3,85 +3,23 @@ Functions to initialize the patents database
 """
 import logging
 import sys
-from google.cloud import bigquery
+from scripts.patents.psql.copy_psql import copy_patent_approvals
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import (
-    BQDatabaseClient,
-    BQ_DATASET_ID,
-)
+from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.patents.bq.copy_tables import copy_patent_tables
-from scripts.patents.bq_to_psql import bq_to_psql
+from scripts.patents.bq_to_psql import copy_bq_to_psql
 from scripts.patents.psql.terms import create_patent_terms
 
 logging.basicConfig(level=logging.INFO)
-
-
-FIELDS = [
-    # gpr_publications
-    "gpr_pubs.publication_number as publication_number",
-    "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
-    "abstract",
-    "application_number",
-    "cited_by",
-    "country",
-    "embedding_v1 as embeddings",
-    "similar",
-    "title",
-    "top_terms",
-    "url",
-    # publications
-    "application_kind",
-    "assignee as assignee_raw",
-    "assignee_harmonized",
-    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
-    "citation",
-    "claims_localized as claims",
-    "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
-    "family_id",
-    "filing_date",
-    "grant_date",
-    "inventor as inventor_raw",
-    "inventor_harmonized",
-    "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
-    "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
-    "kind_code",
-    "pct_number",
-    "priority_claim",
-    "priority_date",
-    "publication_date",
-    "spif_application_number",
-    "spif_publication_number",
-    "all_publication_numbers",
-    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
-]
-
-
-def create_applications_table(table_name: str = "applications"):
-    """
-    Create a table of patent applications for use in app queries
-    """
-    logging.info("Create a table of patent applications for use in app queries")
-
-    client = BQDatabaseClient()
-    client.delete_table(table_name)
-
-    applications = f"""
-        SELECT
-        {','.join(FIELDS)}
-        FROM `{BQ_DATASET_ID}.publications` as pubs,
-        `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
-        WHERE pubs.publication_number = gpr_pubs.publication_number
-    """
-    client.select_to_table(applications, table_name)
 
 
 def __create_annotations_table():
@@ -154,52 +92,53 @@ def __create_annotations_table():
     client.select_to_table(entity_query, table_name)
 
 
-def __create_biosym_annotations_tables():
+def __create_biosym_annotations_source_table():
     """
-    Creates biosym annotations tables if need be
-    (NOTE: does not check schema if exists)
+    Creates biosym annotations table if need be
+    (NOTE: does not check schema)
     """
-    table_names = [SOURCE_BIOSYM_ANNOTATIONS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE]
-
     client = BQDatabaseClient()
 
-    for table_name in table_names:
-        schema = {
-            "publication_number": "STRING",
-            "original_term": "STRING",
-            "canonical_term": "STRING",
-            "domain": "STRING",
-            "confidence": "FLOAT",
-            "source": "STRING",
-            "character_offset_start": "INTEGER",
-            "character_offset_end": "INTEGER",
-        }
-        client.create_table(
-            table_name, schema, exists_ok=True, truncate_if_exists=False
-        )
-        logging.info(f"(Maybe) created table {table_name}")
+    schema = {
+        "publication_number": "STRING",
+        "original_term": "STRING",
+        "canonical_term": "STRING",
+        "domain": "STRING",
+        "confidence": "FLOAT",
+        "source": "STRING",
+        "character_offset_start": "INTEGER",
+        "character_offset_end": "INTEGER",
+    }
+    client.create_table(
+        SOURCE_BIOSYM_ANNOTATIONS_TABLE,
+        schema,
+        exists_ok=True,
+        truncate_if_exists=False,
+    )
+    logging.info(f"(Maybe) created table {SOURCE_BIOSYM_ANNOTATIONS_TABLE}")
 
 
-def main(copy_tables: bool = False):
+def main(bootstrap: bool = False):
     """
     Copy tables from patents-public-data to a local dataset.
     Order matters.
 
     Usage:
-        >>> python3 -m scripts.patents.initialize_patents -copy_tables
+        >>> python3 -m scripts.patents.initialize_patents -bootstrap
         >>> python3 -m scripts.patents.initialize_patents
     """
-    # bigquery
-    # __create_biosym_annotations_tables()
-
-    if copy_tables:
+    if bootstrap:
+        # bigquery
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
-        # bigquery
+        __create_biosym_annotations_source_table()
         copy_patent_tables()
 
     # create patent applications etc in postgres
-    bq_to_psql()
+    # copy_bq_to_psql()
+
+    # copy data about approvals
+    copy_patent_approvals()
 
     # create patent terms (psql)
     create_patent_terms()
@@ -211,9 +150,9 @@ def main(copy_tables: bool = False):
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m scripts.patents.initialize_patents [-copy_tables]\nCopies and transforms patent data"
+            "Usage: python3 -m scripts.patents.initialize_patents [-bootstrap]\nCopies and transforms patent data"
         )
         sys.exit()
 
-    copy_tables: bool = "copy_tables" in sys.argv
-    main(copy_tables)
+    bootstrap: bool = "bootstrap" in sys.argv
+    main(bootstrap)

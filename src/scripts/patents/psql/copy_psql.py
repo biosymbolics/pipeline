@@ -10,7 +10,7 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import BQDatabaseClient
+from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.database import execute_with_retries
 
 
@@ -39,9 +39,9 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         new_table_name (str): name of the new table
         database (str): name of the database
     """
-    client = BQDatabaseClient()
-    # delete if exists
-    client.delete_table(new_table_name)
+    client = PsqlDatabaseClient()
+    # truncate if exists
+    client.truncate_table(new_table_name)
 
     conn = psycopg2.connect(
         database=database,
@@ -50,11 +50,12 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         host="localhost",
         port="5432",
     )
-    columns, data = fetch_data_from_postgres(conn, sql_query)
+    columns, data = fetch_data_from_postgres(conn, sql_query)  # TODO move to client
 
     # recreate
-    client.create_table(new_table_name, columns)
-    time.sleep(20)  # such a hack
+    client.create_table(
+        new_table_name, columns, exists_ok=True, truncate_if_exists=True
+    )
 
     # add records
     records = [dict(zip(columns, row)) for row in data]

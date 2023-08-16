@@ -145,15 +145,15 @@ class TermAssembler:
         Creates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT assignee name, "assignee" as domain, count(*) as count
-            FROM `applications` a,
+            SELECT assignee as name, "assignee" as domain, count(*) as count
+            FROM applications a,
             unnest(a.assignee_harmonized) as assignee
             group by name
 
             UNION ALL
 
-            SELECT inventor name, "inventor" as domain, count(*) as count
-            FROM  `applications` a,
+            SELECT inventor as name, "inventor" as domain, count(*) as count
+            FROM  applications a,
             unnest(a.inventor_harmonized) as inventor
             group by name
         """

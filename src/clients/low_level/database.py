@@ -51,7 +51,10 @@ class DatabaseClient:
         """
         logging.info("Creating table %s", new_table_name)
         new_table_id = self.get_table_id(new_table_name)
-        create_table_query = f"CREATE or REPLACE TABLE `{new_table_id}` AS {query};"
+
+        self.delete_table(new_table_name)
+        time.sleep(20)  # hack
+        create_table_query = f"CREATE `{new_table_id}` AS {query};"
         self.execute_query(create_table_query)
 
     def select(self, query: str) -> list[dict]:
@@ -123,6 +126,8 @@ class DatabaseClient:
             exists_ok (bool): if True, do not raise an error if the table already exists
             truncate_if_exists (bool): if True, truncate the table if it already exists
         """
+        logging.info("Creating table: %s", table_name)
+
         if truncate_if_exists and not exists_ok:
             raise Exception("Cannot truncate if exists if exists_ok is False")
 

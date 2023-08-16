@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 import polars as pl
 import psycopg2
 from pydash import compact
+from clients.low_level.postgres import PsqlDatabaseClient
 
 import system
 
 system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
-from scripts.patents.initialize_patents import create_applications_table
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
@@ -27,12 +27,72 @@ GCS_BUCKET = "biosym-patents"
 SHARD_SIZE = timedelta(days=730)
 
 
+FIELDS = [
+    # gpr_publications
+    "gpr_pubs.publication_number as publication_number",
+    "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
+    "abstract",
+    "application_number",
+    "cited_by",
+    "country",
+    "embedding_v1 as embeddings",
+    "similar",
+    "title",
+    "top_terms",
+    "url",
+    # publications
+    "application_kind",
+    "assignee as assignee_raw",
+    "assignee_harmonized",
+    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
+    "citation",
+    "claims_localized as claims",
+    "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
+    "family_id",
+    "filing_date",
+    "grant_date",
+    "inventor as inventor_raw",
+    "inventor_harmonized",
+    "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
+    "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
+    "kind_code",
+    "pct_number",
+    "priority_claim",
+    "priority_date",
+    "publication_date",
+    "spif_application_number",
+    "spif_publication_number",
+    "all_publication_numbers",
+    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
+]
+
+
+def create_applications_table(table_name: str = "applications"):
+    """
+    Create a table of patent applications in BigQuery
+    (then exported and pulled into psql)
+    """
+    logging.info("Create a table of patent applications for use in app queries")
+
+    client = BQDatabaseClient()
+    client.delete_table(table_name)
+
+    applications = f"""
+        SELECT
+        {','.join(FIELDS)}
+        FROM `{BQ_DATASET_ID}.publications` as pubs,
+        `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
+        WHERE pubs.publication_number = gpr_pubs.publication_number
+    """
+    client.select_to_table(applications, table_name)
+
+
 def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_applications_table("applications_tmp")
+    create_applications_table("applications")
     start_date = datetime(2000, 1, 1)
     end_date = datetime(2023, 1, 1)
 
@@ -87,25 +147,7 @@ def import_into_psql():
     Load data from a JSON file into a psql table
     """
     logging.info("Importing applications table (etc) into postgres")
-    conn = psycopg2.connect(
-        database="patents",
-        host="localhost",
-        port="5432",
-    )
-    cursor = conn.cursor()
-
-    def create_table_if_not_exists(records, table_name: str):
-        first_record = records[0]
-        columns = []
-        for key, value in first_record.items():
-            pg_data_type = determine_data_type(value)
-            columns.append(f'"{key}" {pg_data_type}')
-        columns_str = ", ".join(columns)
-
-        create_table_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_str});"
-        logging.info("Creating table: %s", create_table_query)
-        cursor.execute(create_table_query)
-        conn.commit()
+    client = PsqlDatabaseClient()
 
     def transform(s):
         if isinstance(s, dict):
@@ -127,18 +169,11 @@ def import_into_psql():
                 if c not in nono_columns
             ]
         )
-        create_table_if_not_exists(records, table_name)
 
-        for record in df.to_dicts():
-            columns = record.keys()
-            values = [record[column] for column in columns]
-            insert_statement = f"""
-                INSERT INTO {table_name}({', '.join(['"' + c + '"' for c in columns])})
-                VALUES ({', '.join(['%s'] * len(values))})
-            """
-            cursor.execute(insert_statement, tuple(values))
-
-        conn.commit()
+        first_record = records[0]
+        columns = dict([(k, determine_data_type(v)) for k, v in first_record.items()])
+        client.create_table(table_name, columns, exists_ok=True)
+        client.insert_into_table(df.to_dicts(), table_name)
 
     bucket = storage_client.bucket(GCS_BUCKET)
     blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json
@@ -150,12 +185,8 @@ def import_into_psql():
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
         load_data_from_json(blob, table_name)
 
-    # Close the cursor and connection
-    cursor.close()
-    conn.close()
 
-
-def bq_to_psql():
+def copy_bq_to_psql():
     export_bq_tables()
     import_into_psql()
 

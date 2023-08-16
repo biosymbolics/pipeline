@@ -4,6 +4,7 @@ Low-level Postgres client
 from typing import Mapping, TypeVar
 import logging
 import psycopg2
+import psycopg2.extras
 
 from clients.low_level.database import DatabaseClient
 from typings.core import is_string_list
@@ -15,16 +16,30 @@ logger = logging.getLogger(__name__)
 
 
 class PsqlClient:
-    def __init__(self, database_name: str, host: str = "localhost", port: int = 5432):
+    def __init__(
+        self,
+        database_name: str,
+        host: str = "localhost",
+        port: int = 5432,
+        user: str | None = None,
+        password: str | None = None,
+    ):
+        auth_args = (
+            {
+                "user": user or "",
+                "password": password or "",
+            }
+            if user is not None or password is not None
+            else {}
+        )
         conn = psycopg2.connect(
             database=database_name,
-            # user='your_username',
-            # password='your_password',
             host=host,
             port=port,
+            cursor_factory=psycopg2.extras.DictCursor,
+            *auth_args,
         )
         self.conn = conn
-        # conn.close()
 
     def cursor(self):
         return self.conn.cursor()
@@ -78,13 +93,18 @@ class PsqlDatabaseClient(DatabaseClient):
 
         with self.client.cursor() as cursor:
             cursor.execute(query)
-            data = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
 
-        return columns, data
+            try:
+                data = list(cursor.fetchall())
+                columns = [desc[0] for desc in cursor.description]
+            except Exception as e:
+                logging.error("Error fetching data: %s", e)
+                return [], []
+
+        return data  # columns
 
     @overrides(DatabaseClient)
-    def _create(self, table_name: str, columns: list[str]):
+    def _create(self, table_name: str, columns: list[str] | dict[str, str]):
         """
         Simple create table function, makes up schema based on column names
 
@@ -94,9 +114,11 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         table_id = self.get_table_id(table_name)
         if is_string_list(columns):
-            schema = [f"{c} TEXT" for c in columns]  # TODO
+            schema = [f"{c} TEXT" for c in columns]
+        elif isinstance(columns, dict):
+            schema = [f"{c} {t}" for c, t in columns.items()]
         else:
-            raise ValueError("Schema must be a list of strings")
+            raise Exception("Invalid columns")
 
-        query = f"CREATE OR REPLACE TABLE {table_id} ({schema});"
+        query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         return self.execute_query(query)
