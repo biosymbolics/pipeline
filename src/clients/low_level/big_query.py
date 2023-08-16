@@ -3,6 +3,7 @@ Low-level BigQuery client
 """
 from typing import Any, Callable, Mapping, TypeVar
 from google.cloud import bigquery
+from google.cloud.bigquery import job
 from google.cloud.bigquery.table import RowIterator
 from google.api_core.exceptions import NotFound
 from google.oauth2.service_account import Credentials
@@ -297,6 +298,23 @@ class DatabaseClient:
 
         new_table = bigquery.Table(table_id, schema)
         return self.client.create_table(new_table)
+
+    def export_table_to_storage(self, table_name: str, destination_uri: str):
+        """
+        Export a table to storage (GCS for now, as CSV)
+
+        Args:
+            table_name (str): name of the table
+            destination_uri (str): storage destination URI
+        """
+        job_config = job.ExtractJobConfig()
+        job_config.destination_format = (
+            bigquery.DestinationFormat.NEWLINE_DELIMITED_JSON
+        )
+        extract_job = self.client.extract_table(
+            self.get_table(table_name), destination_uri, job_config=job_config
+        )
+        extract_job.result()  # Wait for the job to complete
 
     ##### Higher level functions #####
 

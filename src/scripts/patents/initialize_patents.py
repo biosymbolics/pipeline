@@ -64,13 +64,12 @@ FIELDS = [
 ]
 
 
-def __create_applications_table():
+def create_applications_table(table_name: str = "applications"):
     """
     Create a table of patent applications for use in app queries
     """
     logging.info("Create a table of patent applications for use in app queries")
 
-    table_name = "applications"
     client = DatabaseClient()
     client.delete_table(table_name)
 
@@ -214,7 +213,7 @@ def main(copy_tables: bool = False):
         copy_patent_tables()
 
     # create small-ish table of patent applications
-    # __create_applications_table()
+    create_applications_table()
 
     # create patent terms
     create_patent_terms()

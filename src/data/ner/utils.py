@@ -231,7 +231,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.info("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
