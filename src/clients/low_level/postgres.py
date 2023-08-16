@@ -131,7 +131,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 return self.handle_error(conn, e, is_rollback=True)
 
             try:
-                if cursor.rowcount < 1:
+                if cursor.rowcount < 1 or cursor.pgresult_ptr is None:
                     raise NoResults("Query returned no rows")
 
                 data = list(cursor.fetchall())
