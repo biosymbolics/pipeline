@@ -1,23 +1,44 @@
 """
 Low-level Postgres client
 """
-import os
-from typing import Mapping, TypeVar
+from typing_extensions import NotRequired
+from typing import Mapping, Optional, TypeGuard, TypeVar, TypedDict
 import logging
 from psycopg2 import pool
 from psycopg2.extras import DictCursor, execute_values
 from urllib.parse import urlparse
 
 from clients.low_level.database import DatabaseClient, ExecuteResult
+from constants.core import DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides
 
 T = TypeVar("T", bound=Mapping)
+IndexCreateDef = TypedDict(
+    "IndexCreateDef",
+    {
+        "table": str,
+        "column": str,
+        "is_trgm": NotRequired[bool],
+        "is_uniq": NotRequired[bool],
+    },
+)
+IndexSql = TypedDict("IndexSql", {"sql": str})
+
+
+def is_index_sql(index_def: IndexCreateDef | IndexSql) -> TypeGuard[IndexSql]:
+    return index_def.get("sql") is not None
+
+
+def is_index_create_def(
+    index_def: IndexCreateDef | IndexSql,
+) -> TypeGuard[IndexCreateDef]:
+    return index_def.get("sql") is None
 
 
 logger = logging.getLogger(__name__)
 
-PSQL_URL = os.environ["DATABASE_URL"]
+
 MIN_CONNECTIONS = 2
 MAX_CONNECTIONS = 20
 
@@ -29,7 +50,7 @@ class NoResults(Exception):
 class PsqlClient:
     def __init__(
         self,
-        uri: str = PSQL_URL,
+        uri: str = DATABASE_URL,
     ):
         parsed = urlparse(uri)
         username = parsed.username or ""
@@ -71,7 +92,7 @@ class PsqlDatabaseClient(DatabaseClient):
     ```
     """
 
-    def __init__(self, uri: str = PSQL_URL):
+    def __init__(self, uri: str = DATABASE_URL):
         self.client = PsqlClient(uri)
 
     @staticmethod
@@ -180,11 +201,29 @@ class PsqlDatabaseClient(DatabaseClient):
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         self.execute_query(query)
 
-    def add_indices(self, index_sql: list[str]):
+    def add_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """
         Add indices
         """
         self.execute_query("CREATE EXTENSION pg_trgm")
 
-        for sql in index_sql:
-            self.execute_query(sql)
+        for index_def in index_defs:
+            if is_index_sql(index_def):
+                self.execute_query(index_def["sql"])
+                continue
+
+            if is_index_create_def(index_def):
+                table = index_def["table"]
+                column = index_def["column"]
+                is_tgrm = index_def.get("is_tgrm", False)
+                is_uniq = index_def.get("is_uniq", False)
+
+                if is_tgrm:
+                    sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin (lower({column}) gin_trgm_ops)"
+                else:
+                    sql = f"CREATE INDEX {'UNIQUE' if is_uniq else ''} index_{table}_{column} ON {table} ({column})"
+
+                self.execute_query(sql)
+
+            else:
+                raise Exception("Invalid index def")

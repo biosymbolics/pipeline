@@ -5,6 +5,9 @@ import json
 import logging
 from typing import TypedDict
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 from clients import patents as patent_client
 
 
@@ -43,7 +46,7 @@ def autocomplete(event: AutocompleteEvent, context):
     term = params.get("term")
 
     if not params or not term:
-        logging.error(
+        logger.error(
             "Missing query or param `term`, params: %s",
             params,
         )

@@ -212,12 +212,23 @@ def copy_bq_to_psql():
 
     export_bq_tables()
     import_into_psql()
-    index_base = "index_applications"
     client.add_indices(
         [
-            f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
-            f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
-            f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "publication_number",
+                "is_uniq": True,
+            },
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "abstract",
+                "is_trgm": True,
+            },
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "title",
+                "is_trgm": True,
+            },
         ]
     )
 

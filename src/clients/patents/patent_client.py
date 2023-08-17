@@ -4,6 +4,7 @@ Patent client
 from functools import partial
 import logging
 import os
+import time
 from typing import Sequence, cast
 from pydash import compact
 
@@ -158,9 +159,10 @@ def search(
                         ELSE 0
                     END
                 ) as search_rank, --- exp decay scaling; higher is better
-            FROM patents.annotations a,
-            patents.applications AS apps,
-            UNNEST(a.annotations) as annotation
+            FROM
+                annotations a,
+                applications AS apps,
+                UNNEST(a.annotations) as annotation
             WHERE apps.publication_number = a.publication_number
             AND (
                 lower(annotation.term) IN UNNEST({lower_terms})
@@ -170,8 +172,8 @@ def search(
             GROUP BY publication_number
         )
         SELECT {fields}
-        FROM patents.applications AS apps
-        JOIN patents.annotations a on a.publication_number = apps.publication_number
+        FROM applications AS apps
+        JOIN annotations a on a.publication_number = apps.publication_number
         JOIN matches ON (
             apps.publication_number = matches.publication_number
             and
@@ -181,7 +183,7 @@ def search(
 
     if fetch_approval:
         select_query += """
-            LEFT JOIN `patents.patent_approvals` approvals
+            LEFT JOIN patent_approvals approvals
             ON approvals.publication_number in unnest(apps.all_base_publication_numbers)
         """
 
@@ -201,7 +203,7 @@ def search(
 
 def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
     """
-    Fetch all terms from patents.terms
+    Fetch all terms from table `terms`
     Sort by term, then by count. Terms must have a count > MIN_TERM_FREQUENCY
 
     Args:
@@ -209,16 +211,25 @@ def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
 
     Returns: a list of matching terms
     """
+    start = time.time()
 
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
     query = f"""
         SELECT *
-        FROM patents.terms
+        FROM terms
         WHERE term LIKE '%{string}%'
         AND count > {MIN_TERM_FREQUENCY}
         ORDER BY term ASC, count DESC
     """
     results = PsqlDatabaseClient().select(query)
-    return [format_term(cast(TermResult, result)) for result in results]
+    formatted = [format_term(cast(TermResult, result)) for result in results]
+
+    logger.info(
+        "Autocomplete for string %s took %s seconds",
+        string,
+        round(time.time() - start, 2),
+    )
+
+    return formatted

@@ -65,7 +65,7 @@ class SynonymMapper:
         logging.info("Adding default/hard-coded synonym map entries")
         self.add_map(synonym_map)
 
-    def add_terms(
+    def add_synonyms(
         self,
         existing_terms: Optional[list[AggregatedTermRecord]] = None,
     ):
@@ -249,9 +249,9 @@ class TermAssembler:
         terms = assignee_terms + entity_terms
         return terms
 
-    def create_terms(self):
+    def create_and_persist_terms(self):
         """
-        Fetches terms and persists them to a table
+        Extracts/generates terms and persists them to a table
 
         - pulls distinct annotation and assigee values
         - normalizes the terms
@@ -276,6 +276,15 @@ class TermAssembler:
         save_json_as_file(terms, TERMS_FILE)
 
         self.client.insert_into_table(terms, table_name)
+        self.client.add_indices(
+            [
+                {
+                    "table": table_name,
+                    "column": "term",
+                    "is_trgm": True,
+                },
+            ]
+        )
         logging.info(f"Inserted %s rows into terms table", len(terms))
 
     @staticmethod
@@ -286,8 +295,8 @@ class TermAssembler:
         Idempotent (all tables are dropped and recreated)
         """
         sm = SynonymMapper(SYNONYM_MAP)
-        # TermAssembler().create_terms()
-        sm.add_terms()
+        TermAssembler().create_and_persist_terms()
+        sm.add_synonyms()
 
 
 def create_patent_terms():

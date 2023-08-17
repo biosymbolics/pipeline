@@ -2,6 +2,7 @@
 Handler for patents search
 """
 import json
+import time
 from typing_extensions import NotRequired
 from typing import TypedDict
 import logging
@@ -34,6 +35,7 @@ def search(event: SearchEvent, context):
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/patents/search?terms=asthma`
     """
+    start = time.time()
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")
     terms_list = terms.split(";") if terms else []
@@ -66,5 +68,7 @@ def search(event: SearchEvent, context):
     results = patent_client.search(
         terms_list, fetch_approval, min_patent_years, relevancy_threshold, max_results
     )
+
+    logger.info("Search took %s seconds", round(time.time() - start, 2))
 
     return {"statusCode": 200, "body": json.dumps(results, default=str)}
