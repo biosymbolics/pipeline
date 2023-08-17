@@ -76,19 +76,11 @@ plugins:
 package:
   # individually: true
   patterns:
-    - "!patent_model_checkpoints/**"
-    - "!lib/**"
-    - "!data/**"
-    - "!storage/**"
-    - "!.mypy_cache/**"
+    - "!**"
+    - "src/**"
     - "!**/__pycache__/**"
-    - "!.pytest_cache/**"
-    - "!node_modules/**"
-    - "!package-lock.json"
     - "!src/scripts/**"
     - "!**/test/**"
-    - "!*.pt"
-    - "!10000words.txt"
 
 custom:
   pythonRequirements:
@@ -102,3 +94,21 @@ custom:
     layer: true
     noDeploy:
       - pytest
+
+resources:
+  Resources:
+    RDSCluster:
+      Type: AWS::RDS::DBCluster
+      Properties:
+        MasterUsername: ${ssm:/biosymbolics/pipeline/database/patents/main_username}
+        MasterUserPassword: ${ssm:/biosymbolics/pipeline/database/patents/main_password}
+        DatabaseName: ${ssm:/biosymbolics/pipeline/database/patents/db_name}
+        Engine: aurora-postgresql
+        EngineMode: serverless
+        ScalingConfiguration:
+          AutoPause: true
+          MaxCapacity: 4
+          MinCapacity: 2
+          SecondsUntilAutoPause: 300
+        EnableHttpEndpoint: true
+        StorageEncrypted: true
