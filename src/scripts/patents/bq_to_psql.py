@@ -125,9 +125,14 @@ def export_bq_tables():
                 current_date = shard_end_date
 
 
+# alter table applications alter column priority_date type date USING priority_date::date;
 OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
+    "publication_date": "DATE",
+    "filing_date": "DATE",
+    "grant_date": "DATE",
+    "priority_date": "DATE",
 }
 
 

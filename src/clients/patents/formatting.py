@@ -47,7 +47,7 @@ def summarize_patents(
 
 def format_search_result(results: Sequence[dict[str, Any]]) -> SearchResults:
     """
-    Format BigQuery patent search results and adds scores
+    Format patent search results and adds scores
 
     Args:
         results (SearchResults): patents search results & summaries
@@ -57,14 +57,6 @@ def format_search_result(results: Sequence[dict[str, Any]]) -> SearchResults:
         raise ValueError("No results returned. Try adjusting parameters.")
 
     df = pl.from_dicts(results)
-
-    df = df.with_columns(
-        pl.col("priority_date")
-        .cast(str)
-        .str.strptime(pl.Date, "%Y%m%d")
-        .alias("priority_date"),
-    )
-
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
     df = calculate_score(df).sort("search_score").reverse()
 
