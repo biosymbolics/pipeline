@@ -99,6 +99,7 @@ class TermLinker:
 
         canonical_map = self.generate_map(terms)
 
+        # TODO: what is parallelism offering here??
         with ThreadPoolExecutor(max_workers=4) as executor:
             linked_entities = list(executor.map(lambda e: canonical_map.get(e), terms))
             logging.info("Completed linking batch of %s terms", len(terms))

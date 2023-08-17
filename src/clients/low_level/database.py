@@ -106,7 +106,7 @@ class DatabaseClient:
                 logging.error("Error inserting rows: %s", e)
                 raise e
 
-            logging.info("Successfully inserted %s rows", len(records))
+            logging.info("Successfully inserted %s rows", len(b))
 
     def create_table(
         self,

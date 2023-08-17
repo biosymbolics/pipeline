@@ -836,10 +836,12 @@ def create_working_biosym_annotations():
     # alter table biosym_annotations alter column character_offset_end set data type int USING character_offset_end::integer;
 
     # add indices after initial load
+    index_base = f"index_{WORKING_TABLE}"
     client.add_indices(
         [
-            f"CREATE INDEX index_publication_number on {WORKING_TABLE} (publication_number)",
-            f"CREATE INDEX trgm_index_original_term on {WORKING_TABLE} USING gin (lower(original_term) gin_trgm_ops)",
+            f"CREATE INDEX {index_base}_publication_number on {WORKING_TABLE} (publication_number)",
+            f"CREATE INDEX trgm_{index_base}_original_term on {WORKING_TABLE} USING gin (lower(original_term) gin_trgm_ops)",
+            f"CREATE UNIQUE INDEX {index_base}_uniq on {WORKING_TABLE} (publication_number, original_term, domain, character_offset_start, character_offset_end)",
         ]
     )
 

@@ -37,7 +37,7 @@ FIELDS = [
     "cited_by",
     "country",
     "embedding_v1 as embeddings",
-    "similar",
+    '"similar"',
     "title",
     "top_terms",
     "url",
@@ -169,8 +169,12 @@ def import_into_psql():
         )
 
         first_record = records[0]
-        columns = dict([(k, determine_data_type(v)) for k, v in first_record.items()])
-        client.create_table(table_name, columns, exists_ok=True)
+        columns = dict(
+            [(f'"{k}"', determine_data_type(v)) for k, v in first_record.items()]
+        )
+        client.create_table(
+            table_name, columns, exists_ok=True, truncate_if_exists=True
+        )
         client.insert_into_table(df.to_dicts(), table_name)
 
     bucket = storage_client.bucket(GCS_BUCKET)
@@ -185,13 +189,14 @@ def import_into_psql():
 
 
 def copy_bq_to_psql():
-    export_bq_tables()
+    # export_bq_tables()
     import_into_psql()
+    index_base = "index_applications"
     PsqlDatabaseClient().add_indices(
         [
-            f"CREATE INDEX idx_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
-            f"CREATE INDEX trgm_index_applications_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
-            f"CREATE INDEX trgm_index_applications_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+            f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
+            f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
+            f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
         ]
     )
 

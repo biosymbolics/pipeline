@@ -101,14 +101,14 @@ class PsqlDatabaseClient(DatabaseClient):
         self, conn, e: Exception, is_rollback: bool = False
     ) -> ExecuteResult:
         if isinstance(e, NoResults):
-            logging.debug("No results executing query")
+            logging.debug("No results executing query (not an error)")
         else:
             logging.error(
                 "Error executing query (%s). Rolling back? %s", e, is_rollback
             )
+            if is_rollback:
+                conn.rollback()
 
-        if is_rollback:
-            conn.rollback()
         self.client.put_conn(conn)
         return {"data": [], "columns": []}
 
@@ -143,9 +143,10 @@ class PsqlDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     def _insert(self, table_name: str, records: list[T]) -> ExecuteResult:
-        columns = list(records[0].keys())
+        columns = [c for c in list(records[0].keys())]
         values = [tuple(record.values()) for record in records]
-        query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES %s"
+        insert_cols = ", ".join([f'"{c}"' for c in columns])
+        query = f"INSERT INTO {table_name} ({insert_cols}) VALUES %s"
         values = [tuple(item[col] for col in columns) for item in records]
 
         conn = self.client.get_conn()
