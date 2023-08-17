@@ -6,7 +6,6 @@ from typing import Optional, TypedDict
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.low_level.database import execute_with_retries
 from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
@@ -56,13 +55,15 @@ class SynonymMapper:
         self.client = PsqlDatabaseClient()
 
         logging.info("Creating synonym map (truncating if exists)")
-        self.client.truncate_table(SYNONYM_TABLE_NAME)
         self.client.create_table(
-            SYNONYM_TABLE_NAME, {"synonym": "TEXT", "term": "TEXT"}
+            SYNONYM_TABLE_NAME,
+            {"synonym": "TEXT", "term": "TEXT"},
+            exists_ok=True,
+            truncate_if_exists=True,
         )
 
         logging.info("Adding default/hard-coded synonym map entries")
-        execute_with_retries(lambda: self.add_map(synonym_map))
+        self.add_map(synonym_map)
 
     def add_terms(
         self,
@@ -89,6 +90,8 @@ class SynonymMapper:
             if len(row["term"]) > 1
         }
 
+        logging.info("Adding %s terms to synonym map", len(synonym_map))
+
         self.add_map(synonym_map)
 
     def add_map(self, synonym_map: dict[str, str]):
@@ -98,17 +101,21 @@ class SynonymMapper:
         Args:
             synonym_map: a map of synonyms to canonical names
         """
-        data = [
+        records = [
             {
                 "synonym": entry[0].lower(),
                 "term": entry[1].lower(),
             }
             for entry in synonym_map.items()
-            if entry[1] is not None and entry[0] is not None and entry[0] != entry[1]
+            if len(entry[1]) > 0 and len(entry[0]) > 0 and entry[0] != entry[1]
         ]
 
-        self.client.insert_into_table(data, SYNONYM_TABLE_NAME)
-        logging.info("Inserted %s rows into synonym_map", len(data))
+        self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
+        logging.info(
+            "Inserted %s rows into synonym_map (%s)",
+            len(records),
+            len(list(synonym_map.keys())),
+        )
 
 
 class TermAssembler:
@@ -147,15 +154,15 @@ class TermAssembler:
         Creates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT assignee as name, "assignee" as domain, count(*) as count
+            SELECT assignee as name, 'assignee' as domain, count(*) as count
             FROM applications a,
             unnest(a.assignee_harmonized) as assignee
             group by name
 
             UNION ALL
 
-            SELECT inventor as name, "inventor" as domain, count(*) as count
-            FROM  applications a,
+            SELECT inventor as name, 'inventor' as domain, count(*) as count
+            FROM applications a,
             unnest(a.inventor_harmonized) as inventor
             group by name
         """
@@ -186,14 +193,14 @@ class TermAssembler:
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT term, original_id, domain, COUNT(*) as count
+                SELECT lower(term) as term, domain, COUNT(*) as count
                 FROM
                 (
-                    SELECT original_term as term, canonical_id as original_id, domain
+                    SELECT original_term as term, domain
                     FROM {BIOSYM_ANNOTATIONS_TABLE}
                     where length(original_term) > 1
                 ) AS all_annotations
-                group by lower(term), original_id, domain
+                group by lower(term), domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -219,7 +226,7 @@ class TermAssembler:
                 ),
                 "domain": row["domain"],
                 "original_term": row["term"],
-                "original_id": row["original_id"],
+                "original_id": "",  # row["original_id"],
             }
             for row in rows
         ]
@@ -268,9 +275,8 @@ class TermAssembler:
         terms = self.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
-        rows = [row for row in terms if len(row["term"]) > 1]
-        self.client.insert_into_table(rows, table_name)
-        logging.info(f"Inserted %s rows into terms table", len(rows))
+        self.client.insert_into_table(terms, table_name)
+        logging.info(f"Inserted %s rows into terms table", len(terms))
 
     @staticmethod
     def run():
@@ -290,6 +296,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    create_working_biosym_annotations()
+    # create_working_biosym_annotations()
 
     TermAssembler.run()

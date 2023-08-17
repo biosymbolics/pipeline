@@ -609,6 +609,7 @@ def remove_substrings():
         )
     """
 
+    logging.info("Removing substrings")
     client = DatabaseClient()
 
     client.execute_query(query)
@@ -621,7 +622,7 @@ def fix_of_for_annotations():
     Handles "inhibitors of XYZ" and the like, which neither GPT or SpaCyNER were good at finding
     (but high hopes for binder)
     """
-    # Define terms
+    logging.info("Fixing of/for annotations")
 
     terms = INTERVENTION_BASE_TERMS
     term_sets = INTERVENTION_BASE_TERM_SETS
@@ -663,7 +664,7 @@ def fix_of_for_annotations():
             sql = get_query(term, field)
             client.execute_query(sql)
 
-    for term in [*terms, *[t for term_set in term_sets for t in term_set]]:
+    for term in [*terms, *flatten(term_sets)]:
         for field in TEXT_FIELDS:
             sql = get_hyphen_query(term, field)
             client.execute_query(sql)
@@ -679,6 +680,7 @@ def remove_junk():
     """
     Remove trailing junk and silly matches
     """
+    logging.info("Removing junk")
 
     def get_remove_words():
         def get_sql(place):
@@ -767,6 +769,8 @@ def fix_unmatched():
     Example: 3 -d]pyrimidine derivatives -> Pyrrolo [2, 3 -d]pyrimidine derivatives
     """
 
+    logging.info("Fixing unmatched parens")
+
     def get_query(field, char_set):
         sql = rf"""
             UPDATE {WORKING_TABLE} ab
@@ -790,6 +794,7 @@ def remove_common_terms():
     """
     Remove common original terms
     """
+    logging.info("Removing common terms")
     # regex in here, effectively ignored
     common_terms = [
         *flatten(INTERVENTION_BASE_TERM_SETS),
@@ -826,6 +831,10 @@ def create_working_biosym_annotations():
     )
     client.select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
 
+    # TODO
+    # alter table biosym_annotations alter column character_offset_start set data type int USING character_offset_start::integer;
+    # alter table biosym_annotations alter column character_offset_end set data type int USING character_offset_end::integer;
+
     # add indices after initial load
     client.add_indices(
         [
@@ -843,6 +852,18 @@ def create_working_biosym_annotations():
 
 
 if __name__ == "__main__":
+    """
+    Checks:
+
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
+    (593,431 -> 496,633)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
+    (1,515,400 -> 1,512,181) (1000 - 1,923,243 -> 1,911,521)
+    select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
+    (1,866,211 -> 1,861,891)
+    select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
+    (2,497,766 -> 2,408,154)
+    """
     if "-h" in sys.argv:
         print(
             "Usage: python3 -m scripts.patents.clean_extractions \nCleans up extracted annotations"

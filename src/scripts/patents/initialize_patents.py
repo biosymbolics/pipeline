@@ -33,18 +33,16 @@ def __create_annotations_table():
     client.delete_table(table_name)
 
     entity_query = f"""
-        WITH ranked_terms AS (
+        WITH terms AS (
                 --- assignees as annotations
                 SELECT
                     publication_number,
-                    0 as ocid,
-                    LOWER(IF(map.term IS NOT NULL, map.term, assignee.name)) as term,
-                    "assignee" as domain,
-                    1.0 as confidence,
-                    "record" as source,
+                    LOWER(case when map.term is null then assignee else map.term end) as term,
+                    'assignee' as domain,
+                    'record' as source,
                     1 as character_offset_start,
-                    1 as rank
-                FROM applications` a,
+                    1 as character_offset_end
+                FROM applications a,
                 unnest(a.assignee_harmonized) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
 
@@ -53,13 +51,11 @@ def __create_annotations_table():
                 --- inventors as annotations
                 SELECT
                     publication_number,
-                    0 as ocid,
-                    LOWER(IF(map.term IS NOT NULL, map.term, inventor.name)) as term,
-                    "inventor" as domain,
-                    1.0 as confidence,
-                    "record" as source,
+                    LOWER(case when map.term is null then inventor else map.term end) as term,
+                    'inventor' as domain,
+                    'record' as source,
                     1 as character_offset_start,
-                    1 as rank
+                    1 as character_offset_end
                 FROM applications a,
                 unnest(a.inventor_harmonized) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -69,25 +65,24 @@ def __create_annotations_table():
                 --- biosym (our) annotations
                 SELECT
                     publication_number,
-                    0 as ocid,
-                    LOWER(COALESCE(NULLIF(syn_map.term, ''), NULLIF(a.canonical_term, ''), a.original_term)) as term,
+                    LOWER(case when syn_map.term is null then ba.original_term else syn_map.term end) as term,
                     domain,
-                    confidence,
                     source,
                     character_offset_start,
-                    1 as rank
+                    character_offset_end
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                LEFT JOIN synonym_map syn_map ON LOWER(COALESCE(NULLIF(a.canonical_term, ''), a.original_term)) = syn_map.synonym
+                LEFT JOIN synonym_map syn_map ON LOWER(ba.original_term) = syn_map.synonym
+                WHERE length(ba.original_term) > 0
         )
         SELECT
             publication_number,
-            ARRAY_AGG(
-                struct(ocid, term, domain, confidence, source, character_offset_start)
-                ORDER BY character_offset_start
-            ) as annotations
-        FROM ranked_terms
-        WHERE rank = 1
-        GROUP BY publication_number
+            term,
+            domain,
+            source,
+            character_offset_start,
+            character_offset_end
+        FROM terms
+        ORDER BY character_offset_start
     """
     client.select_to_table(entity_query, table_name)
 
@@ -143,6 +138,7 @@ def main(bootstrap: bool = False):
         # bigquery
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
+        create_funcs()
         __create_biosym_annotations_source_table()
         copy_patent_tables()
 
@@ -150,7 +146,7 @@ def main(bootstrap: bool = False):
     # copy_bq_to_psql()
 
     # copy data about approvals
-    copy_patent_approvals()
+    # copy_patent_approvals()
 
     # create patent terms (psql)
     create_patent_terms()
