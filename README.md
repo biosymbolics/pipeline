@@ -17,6 +17,8 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
 CREATE USER patents with password PASSWORD;
 GRANT readaccess TO patents;
+
+aws s3 cp patents.psql s3://biosympatentsdbInfo/patents.psql
 ```
 
 ### Deploy
