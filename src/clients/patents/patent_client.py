@@ -3,6 +3,7 @@ Patent client
 """
 from functools import partial
 import logging
+import os
 from typing import Sequence, cast
 from pydash import compact
 
@@ -37,19 +38,14 @@ SEARCH_RETURN_FIELDS = [
     # "application_kind",
     "application_number",
     # "assignees",
-    # "cited_by",
     "country",
     "family_id",
-    # "cpc_codes",
-    # "embedding_v1 as embeddings",
-    # "filing_date",
+    # "embeddings",
     # "grant_date",
     "inventors",
     "ipc_codes",
     "search_rank",
-    # "publication_date",
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s where s.publication_number like 'WO%') as similar",  # limit to WO patents
-    # "top_terms",
     "url",
 ]
 

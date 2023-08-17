@@ -8,6 +8,16 @@ provider:
   name: aws
   runtime: python3.10
   timeout: 300
+  vpc:
+    securityGroupIds:
+      -  sg-0970987c8996d7c41 # default
+    subnetIds:
+      - subnet-097d7452bff44a9bc
+      - subnet-0af5fe0054c832df3
+      - subnet-0dd6c80089140ec77
+      - subnet-0d81aad61a0e216d9
+      - subnet-063ab146c30e74e8a
+      - subnet-072abb215bce7b322
   iam:
     role:
       statements:
@@ -37,6 +47,7 @@ provider:
     PYTHONPATH: ./src:./:/opt/python:/opt/python/lib/python3.10/site-packages
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
+    DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
 
 
 functions:

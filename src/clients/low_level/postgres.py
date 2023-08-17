@@ -1,11 +1,12 @@
 """
 Low-level Postgres client
 """
+import os
 from typing import Mapping, TypeVar
 import logging
-import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import DictCursor, execute_values
+from urllib.parse import urlparse
 
 from clients.low_level.database import DatabaseClient, ExecuteResult
 from typings.core import is_string_list
@@ -16,6 +17,7 @@ T = TypeVar("T", bound=Mapping)
 
 logger = logging.getLogger(__name__)
 
+PSQL_URL = os.environ["DATABASE_URL"]
 MIN_CONNECTIONS = 2
 MAX_CONNECTIONS = 20
 
@@ -27,24 +29,23 @@ class NoResults(Exception):
 class PsqlClient:
     def __init__(
         self,
-        database_name: str,
-        host: str = "localhost",
-        port: int = 5432,
-        user: str | None = None,
-        password: str | None = None,
+        uri: str = PSQL_URL,
     ):
+        parsed = urlparse(uri)
+        username = parsed.username or ""
+        password = parsed.password or ""
+        database = parsed.path[1:]
+        host = parsed.hostname
+        port = parsed.port
         auth_args = (
-            {
-                "user": user or "",
-                "password": password or "",
-            }
-            if user is not None or password is not None
+            {"user": username, "password": password}
+            if username is not None or password is not None
             else {}
         )
         self.conn_pool = pool.SimpleConnectionPool(
             minconn=MIN_CONNECTIONS,
             maxconn=MAX_CONNECTIONS,
-            database=database_name,
+            database=database,
             host=host,
             port=port,
             cursor_factory=DictCursor,
@@ -70,8 +71,8 @@ class PsqlDatabaseClient(DatabaseClient):
     ```
     """
 
-    def __init__(self, database_name: str = "patents"):
-        self.client = PsqlClient(database_name)
+    def __init__(self, uri: str = PSQL_URL):
+        self.client = PsqlClient(uri)
 
     @staticmethod
     @overrides(DatabaseClient)
