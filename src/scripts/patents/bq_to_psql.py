@@ -125,7 +125,16 @@ def export_bq_tables():
                 current_date = shard_end_date
 
 
-def determine_data_type(value):
+OVERRIDES = {
+    "character_offset_start": "INTEGER",
+    "character_offset_end": "INTEGER",
+}
+
+
+def determine_data_type(value, field: str | None = None):
+    if field and field in OVERRIDES:
+        return OVERRIDES[field]
+
     if isinstance(value, int):
         return "INTEGER"
     elif isinstance(value, float):
@@ -171,7 +180,7 @@ def import_into_psql():
 
         first_record = records[0]
         columns = dict(
-            [(f'"{k}"', determine_data_type(v)) for k, v in first_record.items()]
+            [(f'"{k}"', determine_data_type(v, k)) for k, v in first_record.items()]
         )
         client.create_table(table_name, columns, exists_ok=True)
         execute_with_retries(
@@ -201,16 +210,16 @@ def copy_bq_to_psql():
     for table in EXPORT_TABLES.keys():
         client.truncate_table(table)
 
-    # export_bq_tables()
+    export_bq_tables()
     import_into_psql()
     index_base = "index_applications"
-    # client.add_indices(
-    #     [
-    #         f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
-    #         f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
-    #         f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
-    #     ]
-    # )
+    client.add_indices(
+        [
+            f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
+            f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
+            f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+        ]
+    )
 
 
 if __name__ == "__main__":

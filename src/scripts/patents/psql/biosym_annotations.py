@@ -831,10 +831,6 @@ def create_working_biosym_annotations():
     )
     client.create_from_select(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
 
-    # TODO
-    # alter table biosym_annotations alter column character_offset_start set data type int USING character_offset_start::integer;
-    # alter table biosym_annotations alter column character_offset_end set data type int USING character_offset_end::integer;
-
     # add indices after initial load
     index_base = f"index_{WORKING_TABLE}"
     client.add_indices(
@@ -857,14 +853,15 @@ if __name__ == "__main__":
     """
     Checks:
 
+    08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (593,431 -> 496,633)
+    (876,827)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (1,515,400 -> 1,512,181) (1000 - 1,923,243 -> 1,911,521)
+    (3,018,730)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (1,866,211 -> 1,861,891)
+    (3,617,012)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (2,497,766 -> 2,408,154)
+    (4,632,587)
     """
     if "-h" in sys.argv:
         print(
