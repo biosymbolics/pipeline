@@ -137,12 +137,16 @@ def main(bootstrap: bool = False):
         Followed by:
         ```
         # from local machine
-        pg_dump patents > patents.psql
-        aws s3 mv patents.psql s3://biosympatentsdb/patents.psql.back-$(date +%Y-%m-%d)
-        aws s3 cp patents.psql s3://biosympatentsdb/patents.psql
+        pg_dump --no-owner patents > patents.psql
+        zip patents.psql.zip patents.psql
+        aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
+        aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
+        rm patents.psql
 
         # from ec2
-        aws s3 cp s3://biosympatentsdb/patents.psql patents.psql
+        aws configure sso
+        aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
+        unzip patents.psql.zip
         export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
         echo "
     CREATE ROLE readaccess;
@@ -152,7 +156,7 @@ def main(bootstrap: bool = False):
     CREATE USER patents with password $PASSWORD;
     GRANT readaccess TO patents;
         " >> patents.psql
-        psql -h 172.31.14.226 -p 5432 --username postgres < patents.psql
+        psql -h 172.31.14.226 -p 5432 --username postgres --password $PASSWORD < patents.psql
         ```
     """
     if bootstrap:

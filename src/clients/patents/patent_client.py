@@ -189,8 +189,7 @@ def search(
         """
 
     where = f"""
-        WHERE
-        priority_date > '{max_priority_date}'::date
+        WHERE priority_date > '{max_priority_date}'::date
         AND {COM_FILTER}
         AND search_rank > {threshold}
         ORDER BY {"randomizer desc, " if fetch_approval else ""}search_rank DESC
