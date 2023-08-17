@@ -2,7 +2,7 @@
 Low-level Postgres client
 """
 from typing_extensions import NotRequired
-from typing import Mapping, Optional, TypeGuard, TypeVar, TypedDict
+from typing import Mapping, TypeGuard, TypeVar, TypedDict
 import logging
 from psycopg2 import pool
 from psycopg2.extras import DictCursor, execute_values
