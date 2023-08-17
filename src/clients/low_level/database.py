@@ -41,7 +41,7 @@ class DatabaseClient:
     ):
         raise NotImplementedError
 
-    def select_to_table(self, query: str, new_table_name: str):
+    def create_from_select(self, query: str, new_table_name: str):
         """
         Create a new table from a query
 

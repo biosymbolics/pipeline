@@ -84,7 +84,7 @@ def __create_annotations_table():
         FROM terms
         ORDER BY character_offset_start
     """
-    client.select_to_table(entity_query, table_name)
+    client.create_from_select(entity_query, table_name)
 
 
 def __create_biosym_annotations_source_table():
@@ -127,12 +127,33 @@ def create_funcs():
 
 def main(bootstrap: bool = False):
     """
-    Copy tables from patents-public-data to a local dataset.
-    Order matters.
+        Copy tables from patents-public-data to a local dataset.
+        Order matters.
 
-    Usage:
-        >>> python3 -m scripts.patents.initialize_patents -bootstrap
-        >>> python3 -m scripts.patents.initialize_patents
+        Usage:
+            >>> python3 -m scripts.patents.initialize_patents -bootstrap
+            >>> python3 -m scripts.patents.initialize_patents
+
+        Followed by:
+        ```
+        # from local machine
+        pg_dump patents > patents.psql
+        aws s3 mv patents.psql s3://biosympatentsdb/patents.psql.back-$(date +%Y-%m-%d)
+        aws s3 cp patents.psql s3://biosympatentsdb/patents.psql
+
+        # from ec2
+        aws s3 cp s3://biosympatentsdb/patents.psql patents.psql
+        export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
+        echo "
+    CREATE ROLE readaccess;
+    GRANT USAGE ON SCHEMA public TO readaccess;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
+    CREATE USER patents with password $PASSWORD;
+    GRANT readaccess TO patents;
+        " >> patents.psql
+        psql -h 172.31.14.226 -p 5432 --username postgres < patents.psql
+        ```
     """
     if bootstrap:
         # bigquery
@@ -143,7 +164,7 @@ def main(bootstrap: bool = False):
         copy_patent_tables()
 
     # create patent applications etc in postgres
-    # copy_bq_to_psql()
+    copy_bq_to_psql()
 
     # copy data about approvals
     # copy_patent_approvals()

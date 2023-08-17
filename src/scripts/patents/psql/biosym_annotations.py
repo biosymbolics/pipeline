@@ -829,7 +829,7 @@ def create_working_biosym_annotations():
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    client.select_to_table(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
+    client.create_from_select(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
 
     # TODO
     # alter table biosym_annotations alter column character_offset_start set data type int USING character_offset_start::integer;

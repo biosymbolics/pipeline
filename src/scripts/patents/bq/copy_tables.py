@@ -25,7 +25,7 @@ def __copy_gpr_publications():
         WHERE EXISTS
         (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
     """
-    client.select_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def __copy_gpr_annotations():
@@ -65,7 +65,7 @@ def __copy_gpr_annotations():
         AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
         AND domain not in {SUPPRESSED_DOMAINS}
     """
-    client.select_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def __copy_publications():
@@ -99,7 +99,7 @@ def __copy_publications():
         FROM numbered_rows
         WHERE row_number = 1
     """
-    client.select_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def copy_patent_tables():

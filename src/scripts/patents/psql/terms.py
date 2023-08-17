@@ -286,7 +286,7 @@ class TermAssembler:
         Idempotent (all tables are dropped and recreated)
         """
         sm = SynonymMapper(SYNONYM_MAP)
-        TermAssembler().create_terms()
+        # TermAssembler().create_terms()
         sm.add_terms()
 
 

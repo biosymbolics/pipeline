@@ -21,7 +21,7 @@ db_client = BQDatabaseClient()
 APPLICATIONS_TABLE = "applications"
 EXPORT_TABLES = {
     "biosym_annotations_source": None,
-    APPLICATIONS_TABLE: "priority_date",
+    # APPLICATIONS_TABLE: "priority_date",
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -86,7 +86,7 @@ def create_applications_table():
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
-    client.select_to_table(applications, APPLICATIONS_TABLE)
+    client.create_from_select(applications, APPLICATIONS_TABLE)
 
 
 def export_bq_tables():
@@ -115,7 +115,7 @@ def export_bq_tables():
                     WHERE {date_column} >= {int(current_date.strftime('%Y%m%d'))}
                     AND {date_column} < {int(shard_end_date.strftime('%Y%m%d'))}
                 """
-                db_client.select_to_table(shard_query, shared_table_name)
+                db_client.create_from_select(shard_query, shared_table_name)
 
                 # Define the destination in GCS
                 destination_uri = f"gs://{GCS_BUCKET}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"
@@ -156,9 +156,7 @@ def import_into_psql():
                 return [compact(s1.values())[0] for s1 in s if len(s1) > 0]
         return s
 
-    def load_data_from_json(
-        file_blob: storage.Blob, table_name: str, is_first: bool = False
-    ):
+    def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
@@ -175,9 +173,7 @@ def import_into_psql():
         columns = dict(
             [(f'"{k}"', determine_data_type(v)) for k, v in first_record.items()]
         )
-        client.create_table(
-            table_name, columns, exists_ok=True, truncate_if_exists=is_first
-        )
+        client.create_table(table_name, columns, exists_ok=True)
         execute_with_retries(
             lambda: client.insert_into_table(df.to_dicts(), table_name)
         )
@@ -187,23 +183,34 @@ def import_into_psql():
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
 
-    for idx, blob in enumerate(blobs):
-        table_name = [t for t in EXPORT_TABLES.keys() if t in str(blob.name)][0]
+    for blob in blobs:
+        matching_tables = [t for t in EXPORT_TABLES.keys() if t in str(blob.name)]
+        table_name = matching_tables[0] if len(matching_tables) > 0 else None
+
+        if not table_name:
+            logging.info("Skipping blob %s", blob.name)
+            continue
+
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
-        load_data_from_json(blob, table_name, idx == 0)
+        load_data_from_json(blob, table_name)
 
 
 def copy_bq_to_psql():
+    client = PsqlDatabaseClient()
+
+    for table in EXPORT_TABLES.keys():
+        client.truncate_table(table)
+
     # export_bq_tables()
     import_into_psql()
     index_base = "index_applications"
-    PsqlDatabaseClient().add_indices(
-        [
-            f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
-            f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
-            f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
-        ]
-    )
+    # client.add_indices(
+    #     [
+    #         f"CREATE UNIQUE INDEX {index_base}_publication_number ON {APPLICATIONS_TABLE} (publication_number)",
+    #         f"CREATE INDEX trgm_{index_base}_abstract ON {APPLICATIONS_TABLE} USING gin (lower(abstract) gin_trgm_ops)",
+    #         f"CREATE INDEX trgm_{index_base}_title ON {APPLICATIONS_TABLE} USING gin (lower(title) gin_trgm_ops)",
+    #     ]
+    # )
 
 
 if __name__ == "__main__":
