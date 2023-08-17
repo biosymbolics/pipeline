@@ -155,7 +155,9 @@ def import_into_psql():
                 return [compact(s1.values())[0] for s1 in s if len(s1) > 0]
         return s
 
-    def load_data_from_json(file_blob: storage.Blob, table_name: str):
+    def load_data_from_json(
+        file_blob: storage.Blob, table_name: str, is_first: bool = False
+    ):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
@@ -173,7 +175,7 @@ def import_into_psql():
             [(f'"{k}"', determine_data_type(v)) for k, v in first_record.items()]
         )
         client.create_table(
-            table_name, columns, exists_ok=True, truncate_if_exists=True
+            table_name, columns, exists_ok=True, truncate_if_exists=is_first
         )
         client.insert_into_table(df.to_dicts(), table_name)
 
@@ -182,10 +184,10 @@ def import_into_psql():
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
 
-    for blob in blobs:
+    for idx, blob in enumerate(blobs):
         table_name = [t for t in EXPORT_TABLES.keys() if t in str(blob.name)][0]
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
-        load_data_from_json(blob, table_name)
+        load_data_from_json(blob, table_name, idx == 0)
 
 
 def copy_bq_to_psql():
