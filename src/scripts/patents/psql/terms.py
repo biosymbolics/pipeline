@@ -194,7 +194,7 @@ class TermAssembler:
         """
         terms_query = f"""
                 SELECT lower(original_term) as term, domain, COUNT(*) as count
-                FROM{WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
                 where length(original_term) > 1
                 group by lower(original_term), domain
             """
