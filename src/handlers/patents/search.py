@@ -73,9 +73,11 @@ def search(event: SearchEvent, context):
             relevancy_threshold,
             max_results,
         )
-        logger.info("Search took %s seconds", round(time.time() - start, 2))
+        logger.info(
+            "Search took %s seconds (%s)", round(time.time() - start, 2), len(results)
+        )
     except Exception as e:
-        logger.error("Error searching patents: %s", e)
-        return {"statusCode": 500, "message": e}
+        logger.error("Error searching patents: %s (%s)", e, str(type(e)))
+        return {"statusCode": 500, "message": str(e)}
 
     return {"statusCode": 200, "body": json.dumps(results, default=str)}

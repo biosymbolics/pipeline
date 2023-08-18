@@ -187,7 +187,6 @@ def search(
     query = select_query + where
 
     logger.debug("Query: %s", query)
-    print(query)
     results = PsqlDatabaseClient().select(query)
     return format_search_result(results)
 
