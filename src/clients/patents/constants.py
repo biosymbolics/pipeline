@@ -14,3 +14,12 @@ RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
 }
 
 MAX_PATENT_LIFE = 20
+
+DOMAINS_OF_INTEREST = [
+    "assignees",
+    "compounds",
+    "diseases",
+    "genes",
+    "inventors",
+    "mechanisms",
+]

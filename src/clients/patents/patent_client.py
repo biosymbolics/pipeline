@@ -11,7 +11,7 @@ from pydash import compact
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 
-from .constants import RELEVANCY_THRESHOLD_MAP
+from .constants import DOMAINS_OF_INTEREST, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
 from .types import AutocompleteTerm, RelevancyThreshold, SearchResults, TermResult
 from .utils import get_max_priority_date
@@ -31,14 +31,6 @@ Usage:
 """
 DECAY_RATE = 1 / 2000
 
-DOMAINS_OF_INTERST = [
-    "assignee",
-    "inventor",
-    "diseases",
-    "mechanisms",
-    "genes",
-    "compounds",
-]
 
 SEARCH_RETURN_FIELDS = [
     "apps.publication_number",
@@ -161,7 +153,7 @@ def search(
             FROM annotations
             JOIN matches ON annotations.publication_number = matches.publication_number
             WHERE EXP(-character_offset_start * {DECAY_RATE}) > {threshold}
-            AND domain in ({', '.join([f"'{d}'" for d in DOMAINS_OF_INTERST])})
+            AND domain in ({', '.join([f"'{d}'" for d in DOMAINS_OF_INTEREST])})
             GROUP BY annotations.publication_number, domain
         )
         SELECT {fields}, terms, domains

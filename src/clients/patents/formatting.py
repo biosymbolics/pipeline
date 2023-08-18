@@ -4,6 +4,7 @@ Patent client
 from typing import Any, Sequence, cast
 import polars as pl
 import logging
+from clients.patents.constants import DOMAINS_OF_INTEREST
 
 from clients.patents.types import SearchResults
 
@@ -58,18 +59,25 @@ def format_search_result(results: Sequence[dict[str, Any]]) -> SearchResults:
 
     df = pl.from_dicts(results)
     df = df.with_columns(get_patent_years("priority_date").alias("patent_years"))
+    df = df.with_columns(
+        *[
+            pl.struct(["terms", "domains"])
+            .apply(
+                lambda rec: [
+                    z[0] for z in zip(rec["terms"], rec["domains"]) if z[1] == d  # type: ignore
+                ]
+            )
+            .alias(d)
+            for d in DOMAINS_OF_INTEREST
+        ]  # type: ignore
+    )
     df = calculate_score(df).sort("search_score").reverse()
 
     summaries = summarize_patents(
         df,
         [
-            "assignees",
-            "compounds",
-            "diseases",
-            "genes",
-            "inventors",
+            *DOMAINS_OF_INTEREST,
             "ipc_codes",
-            "mechanisms",
             "similar",
         ],
     )

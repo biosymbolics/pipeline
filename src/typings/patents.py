@@ -3,7 +3,7 @@ Patent types
 """
 
 from datetime import date
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 
 class PatentBasicInfo(TypedDict):
