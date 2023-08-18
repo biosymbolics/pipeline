@@ -34,6 +34,8 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "method": "all",
     "obtainable": "all",
     "the": "leading",
+    "properties": "trailing",
+    "library": "trailing",
     "more": "leading",
     "classic": "leading",
     "excellent": "all",
@@ -47,11 +49,15 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "specific": "leading",
     "recombinant": "leading",
     "novel": "leading",
-    "human": "all",  # ??
+    "human(?:ized)": "all",  # ??
     "non[ -]?toxic": "leading",
     "improved": "leading",
+    # "attenuated": "leading",
     "improving": "trailing",
     "new": "leading",
+    "-targeted": "all",
+    "functions": "trailing",
+    "long[ -]?acting": "leading",
     "potent": "trailing",
     "inventive": "leading",
     "other": "leading",
@@ -123,6 +129,8 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "solution": "trailing",
     "production": "trailing",
     "solution": "trailing",
+    "level": "trailing",
+    "processing": "trailing",
     "lead candidate": "all",
     "candidate": "trailing",
     "molecule": "trailing",
@@ -193,6 +201,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "effective": "all",
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
+    "soluble": "leading",
 }
 
 DELETION_TERMS = [
