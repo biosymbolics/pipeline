@@ -86,7 +86,7 @@ def __create_annotations_table():
     """
     client.create_from_select(entity_query, table_name)
 
-    client.add_indices(
+    client.create_indices(
         [
             {
                 "table": table_name,

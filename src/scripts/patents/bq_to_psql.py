@@ -217,7 +217,7 @@ def copy_bq_to_psql():
 
     export_bq_tables()
     import_into_psql()
-    client.add_indices(
+    client.create_indices(
         [
             {
                 "table": APPLICATIONS_TABLE,

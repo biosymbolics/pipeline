@@ -833,7 +833,7 @@ def create_working_biosym_annotations():
 
     # add indices after initial load
     index_base = f"index_{WORKING_TABLE}"
-    client.add_indices(
+    client.create_indices(
         [
             {
                 "table": WORKING_TABLE,

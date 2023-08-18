@@ -99,8 +99,12 @@ def search(
     if not isinstance(terms, list):
         raise ValueError("Terms must be a list")
 
-    terms_count = len(terms)
-    lower_terms = ", ".join([f"'{term.lower()}'" for term in terms])
+    # only checks for global patents
+    is_id_search = any([t.startswith("WO-") for t in terms])
+
+    if is_id_search and not all([t.startswith("WO-") for t in terms]):
+        raise ValueError("Cannot mix id and term search")
+
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     max_priority_date = get_max_priority_date(int(min_patent_years))
 
@@ -116,34 +120,40 @@ def search(
         )
     )
 
-    select_query = f"""
-        WITH matches AS (
+    if is_id_search:
+        terms_sql = ", ".join([f"'{term}'" for term in terms])
+        terms_count = 0  # enables an OR
+        search_query = f"""
             SELECT
-                apps.publication_number as publication_number,
+                publication_number,
+                [] as matched_domains,
+                [] as matched_terms,
+                1 as search_rank
+            from applications
+            WHERE publication_number in ({terms_sql})
+        """
+    else:
+        terms_sql = ", ".join([f"'{term.lower()}'" for term in terms])
+        terms_count = len(terms)  # enables an AND
+        search_query = f"""
+            SELECT
+                a.publication_number as publication_number,
                 ARRAY_AGG(distinct a.domain) as matched_domains,
-                ARRAY_AGG(
-                    DISTINCT
-                    CASE
-                        WHEN a.term IN ({lower_terms}) THEN a.term
-                        WHEN lower(apps.publication_number) IN ({lower_terms}) THEN apps.publication_number
-                        ELSE ''::text
-                    END
-                ) as matched_terms,
-                AVG(
-                    CASE
-                        WHEN a.term IN ({lower_terms}) THEN EXP(-a.character_offset_start * {DECAY_RATE})
-                        WHEN lower(apps.publication_number) IN ({lower_terms}) THEN 1.0
-                        ELSE 0
-                    END
-                ) as search_rank --- exp decay scaling; higher is better
-            FROM annotations a, applications AS apps
-            WHERE apps.publication_number = a.publication_number
-            AND (
-                lower(a.term) IN ({lower_terms})
-                OR lower(apps.publication_number) IN ({lower_terms})
-            )
-            GROUP BY apps.publication_number
-        ),
+                ARRAY_AGG(DISTINCT a.term) as matched_terms,
+                AVG(EXP(-a.character_offset_start * {DECAY_RATE})) as search_rank --- exp decay scaling; higher is better
+            FROM annotations a
+            WHERE lower(a.term) in ({terms_sql})
+            GROUP BY a.publication_number
+        """
+
+    match_join = f"""
+        annotations.publication_number = matches.publication_number
+        AND
+        ARRAY_LENGTH(matched_terms, 1) >= {terms_count}
+    """
+
+    select_query = f"""
+        WITH matches AS ({search_query}),
         annotations AS (
             SELECT
                 annotations.publication_number,
@@ -151,19 +161,15 @@ def search(
                 ARRAY_AGG(term) AS terms,
                 ARRAY_AGG(domain) AS domains
             FROM annotations
-            JOIN matches ON annotations.publication_number = matches.publication_number
-            WHERE EXP(-character_offset_start * {DECAY_RATE}) > {threshold}
-            AND domain in ({', '.join([f"'{d}'" for d in DOMAINS_OF_INTEREST])})
+            -- early filter for perf
+            JOIN matches ON ({match_join})
+            WHERE domain in ({", ".join([f"'{d}'" for d in DOMAINS_OF_INTEREST])})
             GROUP BY annotations.publication_number, domain
         )
         SELECT {fields}, terms, domains
         FROM applications AS apps
-        JOIN annotations a on a.publication_number = apps.publication_number
-        JOIN matches ON (
-            apps.publication_number = matches.publication_number
-            and
-            ARRAY_LENGTH(matched_terms, 1) = {terms_count}
-        )
+        JOIN annotations on annotations.publication_number = apps.publication_number
+        JOIN matches ON ({match_join})
     """
 
     if fetch_approval:
@@ -182,6 +188,7 @@ def search(
     query = select_query + where
 
     logger.debug("Query: %s", query)
+    print(query)
     results = PsqlDatabaseClient().select(query)
     return format_search_result(results)
 

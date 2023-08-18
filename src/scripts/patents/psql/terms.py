@@ -276,7 +276,7 @@ class TermAssembler:
         save_json_as_file(terms, TERMS_FILE)
 
         self.client.insert_into_table(terms, table_name)
-        self.client.add_indices(
+        self.client.create_indices(
             [
                 {
                     "table": table_name,

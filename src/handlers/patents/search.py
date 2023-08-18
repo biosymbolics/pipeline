@@ -65,10 +65,17 @@ def search(event: SearchEvent, context):
         max_results,
     )
 
-    results = patent_client.search(
-        terms_list, fetch_approval, min_patent_years, relevancy_threshold, max_results
-    )
-
-    logger.info("Search took %s seconds", round(time.time() - start, 2))
+    try:
+        results = patent_client.search(
+            terms_list,
+            fetch_approval,
+            min_patent_years,
+            relevancy_threshold,
+            max_results,
+        )
+        logger.info("Search took %s seconds", round(time.time() - start, 2))
+    except Exception as e:
+        logger.error("Error searching patents: %s", e)
+        return {"statusCode": 500, "message": e}
 
     return {"statusCode": 200, "body": json.dumps(results, default=str)}
