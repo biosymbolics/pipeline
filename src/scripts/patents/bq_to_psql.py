@@ -21,7 +21,7 @@ db_client = BQDatabaseClient()
 APPLICATIONS_TABLE = "applications"
 EXPORT_TABLES = {
     "biosym_annotations_source": None,
-    # APPLICATIONS_TABLE: "priority_date",
+    APPLICATIONS_TABLE: "priority_date",  # shard by priority date
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -34,6 +34,8 @@ FIELDS = [
     "gpr_pubs.publication_number as publication_number",
     "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
     "abstract",
+    "all_publication_numbers",
+    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
     "application_number",
     "cited_by",
     "country",
@@ -44,8 +46,8 @@ FIELDS = [
     "url",
     # publications
     "application_kind",
-    "assignee as assignee_raw",
-    "assignee_harmonized",
+    # "assignee as assignee_raw",
+    # "assignee_harmonized",
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
     "citation",
     "claims_localized as claims",
@@ -53,8 +55,8 @@ FIELDS = [
     "family_id",
     "filing_date",
     "grant_date",
-    "inventor as inventor_raw",
-    "inventor_harmonized",
+    # "inventor as inventor_raw",
+    # "inventor_harmonized",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
     "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
     "kind_code",
@@ -64,8 +66,6 @@ FIELDS = [
     "publication_date",
     "spif_application_number",
     "spif_publication_number",
-    "all_publication_numbers",
-    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
 ]
 
 
@@ -126,7 +126,7 @@ def export_bq_tables():
 
 
 # alter table applications alter column priority_date type date USING priority_date::date;
-OVERRIDES = {
+TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
     "publication_date": "DATE",
@@ -137,8 +137,8 @@ OVERRIDES = {
 
 
 def determine_data_type(value, field: str | None = None):
-    if field and field in OVERRIDES:
-        return OVERRIDES[field]
+    if field and field in TYPE_OVERRIDES:
+        return TYPE_OVERRIDES[field]
 
     if isinstance(value, int):
         return "INTEGER"

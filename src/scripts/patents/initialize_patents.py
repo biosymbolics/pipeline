@@ -38,12 +38,12 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then assignee else map.term end) as term,
-                    'assignee' as domain,
+                    'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end
                 FROM applications a,
-                unnest(a.assignee_harmonized) as assignee
+                unnest(a.assignees) as assignees
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
 
                 UNION ALL
@@ -52,12 +52,12 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then inventor else map.term end) as term,
-                    'inventor' as domain,
+                    'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end
                 FROM applications a,
-                unnest(a.inventor_harmonized) as inventor
+                unnest(a.inventors) as inventors
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
 
                 UNION ALL
@@ -128,7 +128,7 @@ def __create_biosym_annotations_source_table():
 
 
 def create_funcs():
-    sql = r"""
+    re_escape_sql = r"""
         CREATE OR REPLACE FUNCTION escape_regex_chars(text)
         RETURNS text
         LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS
@@ -136,7 +136,7 @@ def create_funcs():
         SELECT regexp_replace($1, '([!$()*+.:<=>?[\\\]^{|}-])', '\\\1', 'g')
         $func$;
     """
-    PsqlDatabaseClient().execute_query(sql)
+    PsqlDatabaseClient().execute_query(re_escape_sql)
 
 
 def main(bootstrap: bool = False):

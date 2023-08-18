@@ -14,7 +14,7 @@ class PatentBasicInfo(TypedDict):
     abstract: str
     application_number: str
     assignees: list[str]
-    attributes: list[str]  # keyof typeof PATENT_ATTRIBUTE_MAP
+    attributes: list[str]  # keyof typeof PATENT_ATTRIBUTE_MAP # ATTRIBUTE_FIELD
     family_id: str
     ipc_codes: list[str]
     patent_years: int

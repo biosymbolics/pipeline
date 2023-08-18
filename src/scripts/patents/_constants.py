@@ -17,6 +17,7 @@ MECHANISM_BASE_TERMS = [
     "dilator",
     "disinfectant",
     "analgesic",
+    "anaesthetic",
     "agent",
     "emitter",
     "lubricant",

@@ -1,5 +1,7 @@
 import torch
 
+from constants.patents import ATTRIBUTE_FIELD
+
 
 LR = 1e-6  # learning rate
 CHECKPOINT_PATH = "patent_model_checkpoints"
@@ -13,7 +15,7 @@ MAX_CATS_PER_LIST = 20
 TRUE_THRESHOLD = 0.5
 
 CATEGORICAL_FIELDS = [
-    "attributes",
+    ATTRIBUTE_FIELD,
     "compounds",
     "country",
     "diseases",

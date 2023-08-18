@@ -311,3 +311,6 @@ PATENT_ATTRIBUTE_MAP = {
 }
 
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
+
+
+ATTRIBUTE_FIELD = "attributes"

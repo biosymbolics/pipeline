@@ -11,7 +11,7 @@ from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
 
-from .biosym_annotations import create_working_biosym_annotations
+from .biosym_annotations import populate_working_biosym_annotations
 
 from .._constants import BIOSYM_ANNOTATIONS_TABLE
 from ..bq.gpr_constants import SYNONYM_MAP
@@ -156,14 +156,14 @@ class TermAssembler:
         owner_query = f"""
             SELECT assignee as name, 'assignee' as domain, count(*) as count
             FROM applications a,
-            unnest(a.assignee_harmonized) as assignee
+            unnest(a.assignees) as assignees
             group by name
 
             UNION ALL
 
             SELECT inventor as name, 'inventor' as domain, count(*) as count
             FROM applications a,
-            unnest(a.inventor_harmonized) as inventor
+            unnest(a.inventors) as inventors
             group by name
         """
         rows = self.client.select(owner_query)
@@ -172,7 +172,7 @@ class TermAssembler:
 
         normalized: list[TermRecord] = [
             {
-                "term": assignee if row["domain"] == "assignee" else row["name"],
+                "term": assignee if row["domain"] == "assignees" else row["name"],
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
@@ -305,6 +305,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    create_working_biosym_annotations()
+    populate_working_biosym_annotations()
 
     TermAssembler.run()
