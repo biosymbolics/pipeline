@@ -41,8 +41,7 @@ provider:
             limit: 100
             period: DAY
   environment:
-    ENV: ${env:ENV, 'dev'}
-    GOOGLE_CLOUD_PROJECT: fair-abbey-386416
+    ENV: ${param:ENV, 'dev'}
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
     PYTHONPATH: ./src:./:/opt/python:/opt/python/lib/python3.10/site-packages

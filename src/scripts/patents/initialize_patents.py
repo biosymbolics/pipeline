@@ -152,11 +152,13 @@ def main(bootstrap: bool = False):
     CREATE ROLE readaccess;
     GRANT USAGE ON SCHEMA public TO readaccess;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
+    GRANT CONNECT ON DATABASE patents TO readaccess;
+    GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO readaccess;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
     CREATE USER patents with password $PASSWORD;
     GRANT readaccess TO patents;
         " >> patents.psql
-        psql -h 172.31.14.226 -p 5432 --username postgres < patents.psql
+        psql -h 172.31.14.226 -p 5432 --username postgres patents < patents.psql
         ```
     """
     if bootstrap:
