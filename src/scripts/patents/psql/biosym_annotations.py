@@ -34,7 +34,10 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "method": "all",
     "obtainable": "all",
     "the": "leading",
+    "more": "leading",
+    "classic": "leading",
     "excellent": "all",
+    "construct": "trailing",
     "particular": "leading",
     "useful": "all",
     "uses(?: thereof| of)": "all",
@@ -42,7 +45,10 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "thereof": "all",
     "capable": "trailing",
     "specific": "leading",
+    "recombinant": "leading",
     "novel": "leading",
+    "human": "all",  # ??
+    "non[ -]?toxic": "leading",
     "improved": "leading",
     "improving": "trailing",
     "new": "leading",
@@ -53,10 +59,18 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "of": "trailing",
     "be": "trailing",
     "use": "trailing",
+    "activity": "trailing",
     "therapeutically": "trailing",
+    "therapeutic procedure": "all",
+    "therapeutic": "leading",
+    "therapeutic": "trailing",
     "(?:co[ -]?)?therapy": "trailing",
     "drug": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
+    "treatment method": "trailing",
+    "treatment": "trailing",
+    "(?:combination )?treatment": "trailing",
+    "treating": "trailing",
     "component": "trailing",
     "complexe?": "trailing",
     "portion": "trailing",
@@ -68,15 +82,8 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "acceptable": "all",
     "thereto": "trailing",
     "certain": "leading",
-    "therapeutic procedure": "all",
-    "therapeutic": "leading",
-    "therapeutic": "leading",
-    "treatment": "trailing",
     "exemplary": "all",
     "against": "trailing",
-    "treatment method": "trailing",
-    "(?:combination )?treatment": "trailing",
-    "treating": "trailing",
     "usable": "trailing",
     "other": "leading",
     "suitable": "trailing",
@@ -589,33 +596,33 @@ def remove_substrings():
     Removes substrings from annotations
     (annotations that are substrings of other annotations for that publication_number)
     """
+    temp_table = "names_to_remove"
     query = f"""
-        CREATE OR REPLACE TABLE names_to_remove AS
-            SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
-            FROM {WORKING_TABLE} t1
-            JOIN {WORKING_TABLE} t2
-            ON t1.publication_number = t2.publication_number
-            WHERE t2.original_term<>t1.original_term
-            AND t1.original_term ilike CONCAT('%', t2.original_term, '%')
-            AND length(t1.original_term) > length(t2.original_term)
-            AND array_length(SPLIT(t2.original_term, ' ')) < 3
-            ORDER BY length(t2.original_term) DESC
+        SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
+        FROM {WORKING_TABLE} t1
+        JOIN {WORKING_TABLE} t2
+        ON t1.publication_number = t2.publication_number
+        WHERE t2.original_term<>t1.original_term
+        AND t1.original_term ilike CONCAT('%', t2.original_term, '%')
+        AND length(t1.original_term) > length(t2.original_term)
+        AND array_length(regexp_split_to_array(t2.original_term, ' '), 1) < 3
+        ORDER BY length(t2.original_term) DESC
     """
 
     delete_query = f"""
         DELETE FROM {WORKING_TABLE}
-        WHERE (publication_number, original_term) IN (
-            SELECT (publication_number, removal_term)
-            FROM names_to_remove
+        WHERE ARRAY[publication_number, original_term] IN (
+            SELECT ARRAY[publication_number, removal_term]
+            FROM {temp_table}
         )
     """
 
     logging.info("Removing substrings")
     client = DatabaseClient()
 
-    client.execute_query(query)
+    client.create_from_select(query, temp_table)
     client.execute_query(delete_query)
-    client.delete_table("names_to_remove")
+    client.delete_table(temp_table)
 
 
 def fix_of_for_annotations():
@@ -742,7 +749,7 @@ def remove_junk():
         + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
         f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
         f"delete FROM {WORKING_TABLE} where original_term ilike 'said %'",
-        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)')",
+        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
         f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
         f"delete from {WORKING_TABLE} where original_term ~* '{delete_term_re}'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
@@ -771,7 +778,7 @@ def fix_unmatched():
     def get_query(field, char_set):
         sql = rf"""
             UPDATE {WORKING_TABLE} ab
-            set original_term=substring(a.{field}, CONCAT(r'(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
             from applications a
             WHERE ab.publication_number=a.publication_number
             AND substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
@@ -806,10 +813,14 @@ def remove_common_terms():
     str_match = ", ".join(
         [f"'{term.lower()}'" for term in with_plurals if "?" not in term]
     )
-    re_match = " OR ".join(
-        [f"original_term *~ '^{term}s?$'" for term in common_terms if "?" in term]
-    )
-    query = f"delete from {WORKING_TABLE} where lower(original_term) in ({str_match}) OR {re_match}"
+    or_re = get_or_re([f"{t}s?" for t in common_terms if "?" in t])
+    query = f"""
+        delete from {WORKING_TABLE}
+        where
+        original_term=''
+        OR lower(original_term) in ({str_match})
+        OR original_term ~* '^{or_re}$'
+    """
     DatabaseClient().execute_query(query)
 
 
@@ -870,10 +881,10 @@ def populate_working_biosym_annotations():
         ]
     )
 
+    remove_junk()
     fix_of_for_annotations()
     fix_unmatched()
 
-    remove_junk()
     remove_substrings()
     normalize_domains()
     remove_common_terms()  # final step - remove one-off generic terms
@@ -885,13 +896,25 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (876,827)
+    (859,910)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (3,018,730)
+    (2,729,816)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,617,012)
+    (3,076,729)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (4,632,587)
+    (4,311,915)
+    select domain, count(*) from biosym_annotations group by domain;
+    attribute  | 2483967
+    compounds  | 1385073
+    diseases   |  911542
+    mechanisms | 2018962
+
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s
+    (18,572)
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s
+    (44,342)
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
+    (74,417)
     """
     if "-h" in sys.argv:
         print(

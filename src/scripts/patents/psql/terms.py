@@ -6,6 +6,7 @@ from typing import Optional, TypedDict
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
@@ -13,16 +14,17 @@ from utils.list import dedup
 
 from .biosym_annotations import populate_working_biosym_annotations
 
-from .._constants import BIOSYM_ANNOTATIONS_TABLE
 from ..bq.gpr_constants import SYNONYM_MAP
 from ..utils import clean_assignees
 
-MIN_ASSIGNEE_COUNT = 5
+MIN_ASSIGNEE_COUNT = 2
 TERMS_FILE = "terms.json"
 
-BaseTermRecord = TypedDict(
-    "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
-)
+
+class BaseTermRecord(TypedDict):
+    term: str
+    count: int
+    canonical_id: Optional[str]
 
 
 class TermRecord(BaseTermRecord):
@@ -149,19 +151,19 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
         return agg_terms
 
-    def __fetch_owner_terms(self) -> list[AggregatedTermRecord]:
+    def __generate_owner_terms(self) -> list[AggregatedTermRecord]:
         """
-        Creates owner terms (assignee/inventor) from the applications table
+        Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT assignee as name, 'assignee' as domain, count(*) as count
+            SELECT assignee as name, 'assignees' as domain, count(*) as count
             FROM applications a,
             unnest(a.assignees) as assignees
             group by name
 
             UNION ALL
 
-            SELECT inventor as name, 'inventor' as domain, count(*) as count
+            SELECT inventor as name, 'inventors' as domain, count(*) as count
             FROM applications a,
             unnest(a.inventors) as inventors
             group by name
@@ -193,14 +195,10 @@ class TermAssembler:
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT lower(term) as term, domain, COUNT(*) as count
-                FROM
-                (
-                    SELECT original_term as term, domain
-                    FROM {BIOSYM_ANNOTATIONS_TABLE}
-                    where length(original_term) > 1
-                ) AS all_annotations
-                group by lower(term), domain
+                SELECT lower(original_term) as term, domain, COUNT(*) as count
+                FROM{WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                where length(original_term) > 1
+                group by lower(original_term), domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -211,15 +209,15 @@ class TermAssembler:
 
         logging.info("Finished creating normalization_map")
 
-        def __normalize(row):
-            entry = normalization_map.get(row["term"])
+        def __normalize(term: str) -> str:
+            entry = normalization_map.get(term)
             if not entry:
-                return SYNONYM_MAP.get(row["term"]) or row["term"]
+                return SYNONYM_MAP.get(term) or term
             return entry.name
 
         term_records: list[TermRecord] = [
             {
-                "term": __normalize(row),
+                "term": __normalize(row["term"]),
                 "count": row["count"] or 0,
                 "canonical_id": getattr(
                     normalization_map.get(row["term"]) or (), "concept_id", None
@@ -241,7 +239,7 @@ class TermAssembler:
         - applications (assignees + inventors)
         """
         logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = self.__fetch_owner_terms()
+        assignee_terms = self.__generate_owner_terms()
 
         logging.info("Generating entity terms")
         entity_terms = self.__generate_entity_terms()

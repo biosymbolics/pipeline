@@ -142,7 +142,7 @@ def get_entity_indices(
             # copy of words inclusive of entity
             # then hack to avoid getting indexes that include EOS punctuation (e.g. we want "septic shock" not "septic shock.")
             words_inclusive = words[: start_idx + len(entity_words)]
-            words_inclusive[-1] = re.sub("[.,;]$", "", words_inclusive[-1])
+            words_inclusive[-1] = re.sub("[.,;]$", "", words_inclusive[-1])  # add ) ?
             start_char = sum([len(word) + 1 for word in words[:start_idx]])
             end_char = sum([len(word) + 1 for word in words_inclusive]) - 1
             return (

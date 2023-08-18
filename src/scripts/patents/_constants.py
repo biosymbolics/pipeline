@@ -1,6 +1,4 @@
-BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
-
-MECHANISM_BASE_TERMS = [
+MECHANISM_BASE_TERMS: list[str] = [
     "mimetic",
     "co[- ]?factor",
     "(?:cross[ -]?)?linker",
@@ -41,7 +39,7 @@ MECHANISM_BASE_TERMS = [
     "pro[ -]?drug",
     "pathway",
 ]
-BIOLOGIC_BASE_TERMS = [
+BIOLOGIC_BASE_TERMS: list[str] = [
     "antigen",
     "neoantigen",
     "antibodie",
@@ -75,7 +73,7 @@ BIOLOGIC_BASE_TERMS = [
     "decomposition",
     "clone",
 ]
-COMPOUND_BASE_TERMS = [
+COMPOUND_BASE_TERMS: list[str] = [
     "reagent",
     "derivative",
     "composition",
@@ -157,9 +155,9 @@ COMPOUND_BASE_TERM_SETS: list[list[str]] = [
     ["molecule", "molecules? binding"],
 ]
 
-INTERVENTION_BASE_TERM_SETS = [
+INTERVENTION_BASE_TERM_SETS: list[list[str]] = [
     *MECHANISM_BASE_TERM_SETS,
-    *BIOLOGIC_BASE_TERMS,
+    *BIOLOGIC_BASE_TERM_SETS,
     *COMPOUND_BASE_TERM_SETS,
 ]
 

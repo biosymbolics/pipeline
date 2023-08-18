@@ -1,9 +1,7 @@
 """
 Patent client
 """
-from functools import partial
 import logging
-import os
 import time
 from typing import Sequence, cast
 from pydash import compact
@@ -60,6 +58,7 @@ APPROVED_SERACH_RETURN_FIELDS = [
 ]
 
 # composition of matter filter
+# TODO: Keep? it is slow
 COM_FILTER = f"""
     (
         SELECT COUNT(1) FROM UNNEST(ipc_codes) AS ipc
@@ -191,10 +190,12 @@ def search(
     return format_search_result(results)
 
 
-def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
+def autocomplete_terms(
+    string: str, min_term_frequency: int = 1
+) -> list[AutocompleteTerm]:
     """
     Fetch all terms from table `terms`
-    Sort by term, then by count. Terms must have a count > MIN_TERM_FREQUENCY
+    Sort by term, then by count. Terms must have a count > min_term_frequency
 
     Args:
         string (str): string to search for
@@ -209,8 +210,8 @@ def autocomplete_terms(string: str) -> list[AutocompleteTerm]:
     query = f"""
         SELECT *
         FROM terms
-        WHERE term LIKE '%{string}%'
-        AND count > {MIN_TERM_FREQUENCY}
+        WHERE term ilike '%{string}%' -- TODO: psql search
+        AND count > {min_term_frequency}
         ORDER BY term ASC, count DESC
     """
     results = PsqlDatabaseClient().select(query)

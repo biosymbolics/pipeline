@@ -69,6 +69,7 @@ functions:
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:
+    vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
           path: terms/describe
