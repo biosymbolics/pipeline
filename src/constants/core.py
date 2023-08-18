@@ -9,7 +9,7 @@ DEFAULT_MODEL_NAME = "ChatGPT"
 SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
 
-logger.info("Envinroment is: %s", os.environ.get("ENV", "unknown"))
+logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
 IS_LOCAL = os.environ.get("ENV") == "local"
 IS_DEPLOYED = not IS_LOCAL

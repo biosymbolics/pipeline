@@ -49,7 +49,6 @@ provider:
     TOKENIZERS_PARALLELISM: False
     DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
 
-
 functions:
   search-patents:
     events:

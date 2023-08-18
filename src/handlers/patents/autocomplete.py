@@ -22,7 +22,7 @@ def autocomplete(event: AutocompleteEvent, context):
     Autocomplete term for patents (used in patent term autocomplete)
 
     Invocation:
-    - Local: `serverless invoke local --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
+    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "term":"asthm" }}'`
     - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
     - API: `curl https://api.biosymbolics.ai/terms/search?term=asthm`
 

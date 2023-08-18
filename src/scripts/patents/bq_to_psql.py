@@ -234,6 +234,10 @@ def copy_bq_to_psql():
                 "column": "title",
                 "is_trgm": True,
             },
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "priority_date",
+            },
         ]
     )
 

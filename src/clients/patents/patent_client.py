@@ -31,6 +31,15 @@ Usage:
 """
 DECAY_RATE = 1 / 2000
 
+DOMAINS_OF_INTERST = [
+    "assignee",
+    "inventor",
+    "diseases",
+    "mechanisms",
+    "genes",
+    "compounds",
+]
+
 SEARCH_RETURN_FIELDS = [
     "apps.publication_number",
     "priority_date",
@@ -68,33 +77,13 @@ COM_FILTER = f"""
 """
 
 
-def get_term_query(domain: str, new_domain: str, threshold: float) -> str:
-    """
-    Returns a query for a given domain
-
-    Args:
-        domain (str): domain to query
-        new_domain (str): new domain name
-        threshold (float): threshold for search rank
-    """
-    return f"""
-        ARRAY(
-            SELECT distinct a.term FROM annotations a
-            where a.domain = '{domain}'
-            and length(a.term) > 1
-            and EXP(-a.character_offset_start * {DECAY_RATE}) > {threshold}
-            limit {MAX_ARRAY_LENGTH}
-        )
-        as {new_domain}
-    """
-
-
 def search(
     terms: Sequence[str],
     fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
+    is_randomized: bool = False,
 ) -> SearchResults:
     """
     Search patents by terms
@@ -122,21 +111,15 @@ def search(
     lower_terms = ", ".join([f"'{term.lower()}'" for term in terms])
     threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     max_priority_date = get_max_priority_date(int(min_patent_years))
-    _get_term_query = partial(get_term_query, threshold=threshold)
-    fields = ",".join(
+
+    fields = ", ".join(
         compact(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
-                _get_term_query("assignee", "assignees"),
-                _get_term_query("attributes", "attributes"),
-                _get_term_query("compounds", "compounds"),
-                _get_term_query("diseases", "diseases"),
-                _get_term_query("humangenes", "genes"),
-                _get_term_query("mechanisms", "mechanisms"),
                 "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
-                if fetch_approval
-                else None,  # for randomizing approved patents
+                if is_randomized and fetch_approval
+                else "1 as randomizer",  # for randomizing approved patents
             ]
         )
     )
@@ -145,15 +128,15 @@ def search(
         WITH matches AS (
             SELECT
                 apps.publication_number as publication_number,
+                ARRAY_AGG(distinct a.domain) as matched_domains,
                 ARRAY_AGG(
                     DISTINCT
                     CASE
                         WHEN a.term IN ({lower_terms}) THEN a.term
-                        WHEN lower(apps.publication_number) IN({lower_terms}) THEN apps.publication_number
+                        WHEN lower(apps.publication_number) IN ({lower_terms}) THEN apps.publication_number
                         ELSE ''::text
                     END
                 ) as matched_terms,
-                ARRAY_AGG(distinct a.domain) as matched_domains,
                 AVG(
                     CASE
                         WHEN a.term IN ({lower_terms}) THEN EXP(-a.character_offset_start * {DECAY_RATE})
@@ -161,18 +144,27 @@ def search(
                         ELSE 0
                     END
                 ) as search_rank --- exp decay scaling; higher is better
-            FROM
-                annotations a,
-                applications AS apps
+            FROM annotations a, applications AS apps
             WHERE apps.publication_number = a.publication_number
             AND (
                 lower(a.term) IN ({lower_terms})
-                OR
-                lower(apps.publication_number) IN ({lower_terms})
+                OR lower(apps.publication_number) IN ({lower_terms})
             )
             GROUP BY apps.publication_number
+        ),
+        annotations AS (
+            SELECT
+                annotations.publication_number,
+                domain,
+                ARRAY_AGG(term) AS terms,
+                ARRAY_AGG(domain) AS domains
+            FROM annotations
+            JOIN matches ON annotations.publication_number = matches.publication_number
+            WHERE EXP(-character_offset_start * {DECAY_RATE}) > {threshold}
+            AND domain in ({', '.join([f"'{d}'" for d in DOMAINS_OF_INTERST])})
+            GROUP BY annotations.publication_number, domain
         )
-        SELECT {fields}
+        SELECT {fields}, terms, domains
         FROM applications AS apps
         JOIN annotations a on a.publication_number = apps.publication_number
         JOIN matches ON (
@@ -190,13 +182,14 @@ def search(
 
     where = f"""
         WHERE priority_date > '{max_priority_date}'::date
-        AND {COM_FILTER}
         AND search_rank > {threshold}
-        ORDER BY {"randomizer desc, " if fetch_approval else ""}search_rank DESC
+        ORDER BY randomizer desc, search_rank DESC
         limit {max_results}
     """
 
     query = select_query + where
+
+    logger.debug("Query: %s", query)
     results = PsqlDatabaseClient().select(query)
     return format_search_result(results)
 
