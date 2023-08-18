@@ -223,7 +223,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 if is_tgrm:
                     sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin (lower({column}) gin_trgm_ops)"
                 else:
-                    sql = f"CREATE INDEX {'UNIQUE' if is_uniq else ''} index_{table}_{column} ON {table} ({column})"
+                    sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({column})"
 
                 self.execute_query(sql)
 

@@ -86,6 +86,20 @@ def __create_annotations_table():
     """
     client.create_from_select(entity_query, table_name)
 
+    client.add_indices(
+        [
+            {
+                "table": table_name,
+                "column": "publication_number",
+            },
+            {
+                "table": table_name,
+                "column": "term",
+                "is_trgm": True,
+            },
+        ]
+    )
+
 
 def __create_biosym_annotations_source_table():
     """
