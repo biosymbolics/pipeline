@@ -130,6 +130,8 @@ class PsqlDatabaseClient(DatabaseClient):
             )
             if is_rollback:
                 conn.rollback()
+            self.client.put_conn(conn)
+            raise e
 
         self.client.put_conn(conn)
         return {"data": [], "columns": []}

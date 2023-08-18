@@ -136,23 +136,6 @@ class BQDatabaseClient(DatabaseClient):
         return table
 
     @nonoverride
-    def insert_df_into_table(self, df: pl.DataFrame, table_name: str):
-        """
-        Insert rows into a table from a dataframe
-        - validate that the table exists
-        - insert the df rows into the table
-
-        Args:
-            df (pl.DataFrame): dataframe to insert
-            table_name (str): name of the table
-        """
-        table_id = self.get_table_id(table_name)
-        logging.info("Inserting into table %s", table_id)
-
-        # insert the df rows into the table
-        self.client.insert_rows_from_dataframe(table_id, df.to_pandas())
-
-    @nonoverride
     def upsert_df_into_table(
         self,
         df: pl.DataFrame,

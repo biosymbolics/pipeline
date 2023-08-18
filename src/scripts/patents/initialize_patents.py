@@ -151,12 +151,12 @@ def main(bootstrap: bool = False):
         echo "
     CREATE ROLE readaccess;
     GRANT USAGE ON SCHEMA public TO readaccess;
-    GRANT SELECT ON ALL TABLES IN SCHEcharacter_offset_startMA public TO readaccess;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
     CREATE USER patents with password $PASSWORD;
     GRANT readaccess TO patents;
         " >> patents.psql
-        psql -h 172.31.14.226 -p 5432 --username postgres --password $PASSWORD < patents.psql
+        psql -h 172.31.14.226 -p 5432 --username postgres < patents.psql
         ```
     """
     if bootstrap:

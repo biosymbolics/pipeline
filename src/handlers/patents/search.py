@@ -33,7 +33,7 @@ def search(event: SearchEvent, context):
     Invocation:
     - Local: `serverless invoke local --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/patents/search?terms=asthma`
+    - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     """
     start = time.time()
     params = event.get("queryStringParameters", {})
