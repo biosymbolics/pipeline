@@ -156,16 +156,14 @@ class TermAssembler:
         Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT assignee as name, 'assignees' as domain, count(*) as count
-            FROM applications a,
-            unnest(a.assignees) as assignees
+            SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+            FROM applications a
             group by name
 
             UNION ALL
 
-            SELECT inventor as name, 'inventors' as domain, count(*) as count
-            FROM applications a,
-            unnest(a.inventors) as inventors
+            SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+            FROM applications a
             group by name
         """
         rows = self.client.select(owner_query)
@@ -303,6 +301,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    populate_working_biosym_annotations()
+    # populate_working_biosym_annotations()
 
     TermAssembler.run()
