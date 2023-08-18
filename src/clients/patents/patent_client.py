@@ -157,14 +157,13 @@ def search(
         annotations AS (
             SELECT
                 annotations.publication_number,
-                domain,
                 ARRAY_AGG(term) AS terms,
                 ARRAY_AGG(domain) AS domains
             FROM annotations
             -- early filter for perf
             JOIN matches ON ({match_join})
             WHERE domain in ({", ".join([f"'{d}'" for d in DOMAINS_OF_INTEREST])})
-            GROUP BY annotations.publication_number, domain
+            GROUP BY annotations.publication_number
         )
         SELECT {fields}, terms, domains
         FROM applications AS apps
