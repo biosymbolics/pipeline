@@ -55,6 +55,10 @@ def autocomplete(event: AutocompleteEvent, context):
             "message": "Missing parameter(s)",
         }
 
+    if len(term) < 3:
+        logger.info("Term too short, skipping autocomplete")
+        return {"statusCode": 200, "body": json.dumps({"terms": []})}
+
     terms = patent_client.autocomplete_terms(term)
 
     return {"statusCode": 200, "body": json.dumps({"terms": terms})}

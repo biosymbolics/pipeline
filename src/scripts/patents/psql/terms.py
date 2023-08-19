@@ -301,6 +301,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
-    # populate_working_biosym_annotations()
+    populate_working_biosym_annotations()
 
     TermAssembler.run()

@@ -102,6 +102,10 @@ class TestNerUtils(unittest.TestCase):
                 "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
                 "expected": "the γc family interleukin 2, interleukin 9, and interleukin 15",
             },
+            {
+                "input": "Familial Alzheimer Disease (FAD)",
+                "expected": "familial alzheimer disease",
+            }
             # GLP-1 receptor agonists, tgf-beta 1 accessory receptor, β1-receptor functions
             # angiotensin-ii, igf-i receptor signaling,  receptor activator of NF-kB ligand
             # chimeric antibody-T cell receptor, β1-adrenoreceptor gene
@@ -278,6 +282,10 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "(6R,S)-5-formyltetrahydrofolate",
                 "expected": "(6R,S)-5 formyltetrahydrofolate",  # TODO
+            },
+            {
+                "input": "mild-to-moderate alzheimer's disease",
+                "expected": "mildto moderate alzheimer disease",  # TODO
             },
         ]
 

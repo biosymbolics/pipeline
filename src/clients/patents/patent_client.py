@@ -212,7 +212,7 @@ def autocomplete_terms(
         FROM terms
         WHERE term ilike '%{string}%' -- TODO: psql search
         AND count > {min_term_frequency}
-        ORDER BY term ASC, count DESC
+        ORDER BY count DESC, term ASC
     """
     results = PsqlDatabaseClient().select(query)
     formatted = [format_term(cast(TermResult, result)) for result in results]

@@ -120,9 +120,12 @@ class PsqlDatabaseClient(DatabaseClient):
             return False
 
     def handle_error(
-        self, conn, e: Exception, is_rollback: bool = False
+        self, conn, e: Exception, is_rollback: bool = False, ignore_error: bool = False
     ) -> ExecuteResult:
-        if isinstance(e, NoResults):
+        if ignore_error:
+            logging.info("Acceptable error executing query: %s", e)
+            return {"data": [], "columns": []}
+        elif isinstance(e, NoResults):
             logging.debug("No results executing query (not an error)")
         else:
             logging.error(
@@ -137,12 +140,13 @@ class PsqlDatabaseClient(DatabaseClient):
         return {"data": [], "columns": []}
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str) -> ExecuteResult:
+    def execute_query(self, query: str, ignore_error: bool = False) -> ExecuteResult:
         """
         Execute query
 
         Args:
             query (str): SQL query
+            ignore_error (bool): if True, will not raise an error if the query fails
         """
         logging.info("Starting query: %s", query)
 
@@ -152,7 +156,9 @@ class PsqlDatabaseClient(DatabaseClient):
                 cursor.execute(query)
                 conn.commit()
             except Exception as e:
-                return self.handle_error(conn, e, is_rollback=True)
+                return self.handle_error(
+                    conn, e, is_rollback=True, ignore_error=ignore_error
+                )
 
             try:
                 if cursor.rowcount < 1 or cursor.pgresult_ptr is None:
@@ -163,7 +169,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
             except Exception as e:
-                return self.handle_error(conn, e)
+                return self.handle_error(conn, e, ignore_error=ignore_error)
 
     @overrides(DatabaseClient)
     def _insert(self, table_name: str, records: list[T]) -> ExecuteResult:
@@ -207,7 +213,7 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         Add indices
         """
-        self.execute_query("CREATE EXTENSION pg_trgm")
+        self.execute_query("CREATE EXTENSION pg_trgm", ignore_error=True)
 
         for index_def in index_defs:
             if is_index_sql(index_def):

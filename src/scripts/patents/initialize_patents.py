@@ -157,7 +157,7 @@ def main(bootstrap: bool = False):
         aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
         rm patents.psql
 
-        # from ec2
+        # then proceeding in ec2
         aws configure sso
         aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
         unzip patents.psql.zip
@@ -169,10 +169,14 @@ def main(bootstrap: bool = False):
     GRANT CONNECT ON DATABASE patents TO readaccess;
     GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO readaccess;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
-    CREATE USER patents with password $PASSWORD;
+    CREATE USER patents with password '$PASSWORD';
     GRANT readaccess TO patents;
+
+    analyze annotations;
+    analyze applications;
+    reindex database patents;
         " >> patents.psql
-        psql -h 172.31.14.226 -p 5432 --username postgres patents < patents.psql
+        pg_restore --clean -d patents -h 172.31.14.226 -p 5432 --username postgres --password patents.psql
         ```
     """
     if bootstrap:
@@ -184,10 +188,10 @@ def main(bootstrap: bool = False):
         copy_patent_tables()
 
     # create patent applications etc in postgres
-    # copy_bq_to_psql()
+    copy_bq_to_psql()
 
     # copy data about approvals
-    # copy_patent_approvals()
+    copy_patent_approvals()
 
     # create patent terms (psql)
     create_patent_terms()
