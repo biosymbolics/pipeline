@@ -125,8 +125,8 @@ def search(
         search_query = f"""
             SELECT
                 publication_number,
-                [] as matched_domains,
-                [] as matched_terms,
+                ARRAY[]::TEXT[] as matched_domains,
+                ARRAY[]::TEXT[] as matched_terms,
                 1 as search_rank
             from applications
             WHERE publication_number in ({terms_sql})
