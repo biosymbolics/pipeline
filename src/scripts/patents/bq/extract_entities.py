@@ -10,8 +10,8 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import DatabaseClient
-from constants.patents import PATENT_ATTRIBUTE_MAP
+from clients.low_level.big_query import BQDatabaseClient
+from constants.patents import ATTRIBUTE_FIELD, PATENT_ATTRIBUTE_MAP
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import NerTagger
 
@@ -28,13 +28,15 @@ BASE_DIR = "data/ner_enriched"
 class PatentEnricher:
     """
     Enriches patents with NER tags
+
+    ** runs on bigquery database (but can be moved) **
     """
 
     def __init__(self):
         """
         Initialize the enricher
         """
-        self.db = DatabaseClient()
+        self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES)
 
     def __get_processed_pubs(self) -> list[str]:
@@ -136,7 +138,7 @@ class PatentEnricher:
 
         patent_attributes: list[DocEntities] = [
             [
-                DocEntity(a_set, "attribute", 0, 0, a_set, None)
+                DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, a_set, None)
                 for a_set in attribute_set
             ]
             for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)

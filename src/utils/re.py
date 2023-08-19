@@ -77,6 +77,7 @@ def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
     extra_space_patterns = {
         r"\s{2,}": " ",
         r"\s{1,},": ",",  # e.g. to address "OPSUMIT , other product"
+        r"' s(\b)": r"'s\1",  # alzheimer' s disease -> alzheimer's disease
     }
 
     def __remove(term: str):

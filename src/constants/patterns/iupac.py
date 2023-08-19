@@ -395,10 +395,10 @@ def is_iupac(term: str) -> bool:
     """
     matches_iupac = re.match(IUPAC_RE, term) is not None
 
-    # simple hack to avoid futzing with things like '1-(3-aminophenyl)-6,8-dimethyl-5-...'
+    # matches some IUPACs missed by the more complex re.
     simple_check = len(term.split("-")) > 3 and re.match(r"[0-9]+", term) is not None
 
     if not matches_iupac and simple_check:
-        logging.info("Term '%s' matches simple check but not IUPAC re", term)
+        logging.debug("Term '%s' matches simple check but not IUPAC re", term)
 
     return matches_iupac or simple_check

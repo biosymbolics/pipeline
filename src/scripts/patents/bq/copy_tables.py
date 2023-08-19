@@ -5,7 +5,6 @@ from clients.low_level.big_query import (
     DatabaseClient,
     BQ_DATASET_ID,
 )
-from scripts.patents.copy_psql import copy_patent_approvals
 
 from .gpr_constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
 
@@ -26,7 +25,7 @@ def __copy_gpr_publications():
         WHERE EXISTS
         (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
     """
-    client.query_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def __copy_gpr_annotations():
@@ -66,7 +65,7 @@ def __copy_gpr_annotations():
         AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
         AND domain not in {SUPPRESSED_DOMAINS}
     """
-    client.query_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def __copy_publications():
@@ -100,7 +99,7 @@ def __copy_publications():
         FROM numbered_rows
         WHERE row_number = 1
     """
-    client.query_to_table(query, table_id)
+    client.create_from_select(query, table_id)
 
 
 def copy_patent_tables():
@@ -118,6 +117,3 @@ def copy_patent_tables():
 
     # copy gpr_annotations table
     __copy_gpr_annotations()
-
-    # copy data about approvals
-    copy_patent_approvals()

@@ -1,9 +1,9 @@
 boto3
-google-cloud-bigquery
-google-cloud-core
 langchain
+llama_index
 openai
 polars
+psycopg2-binary
 pydash
 python-dotenv
 requests

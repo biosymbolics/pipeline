@@ -2,6 +2,7 @@
 Constants for the patents client.
 """
 
+from constants.patents import ATTRIBUTE_FIELD
 from .types import RelevancyThreshold
 
 
@@ -14,3 +15,13 @@ RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
 }
 
 MAX_PATENT_LIFE = 20
+
+DOMAINS_OF_INTEREST = [
+    "assignees",
+    ATTRIBUTE_FIELD,
+    "compounds",
+    "diseases",
+    "genes",
+    "inventors",
+    "mechanisms",
+]

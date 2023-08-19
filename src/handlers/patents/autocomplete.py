@@ -5,6 +5,9 @@ import json
 import logging
 from typing import TypedDict
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 from clients import patents as patent_client
 
 
@@ -19,9 +22,9 @@ def autocomplete(event: AutocompleteEvent, context):
     Autocomplete term for patents (used in patent term autocomplete)
 
     Invocation:
-    - Local: `serverless invoke local --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
+    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "term":"asthm" }}'`
     - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
-    - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/terms/search?term=asthm`
+    - API: `curl https://api.biosymbolics.ai/terms/search?term=asthm`
 
     Output (for string "asthm"):
     ```json
@@ -43,7 +46,7 @@ def autocomplete(event: AutocompleteEvent, context):
     term = params.get("term")
 
     if not params or not term:
-        logging.error(
+        logger.error(
             "Missing query or param `term`, params: %s",
             params,
         )
@@ -51,6 +54,10 @@ def autocomplete(event: AutocompleteEvent, context):
             "statusCode": 400,
             "message": "Missing parameter(s)",
         }
+
+    if len(term) < 3:
+        logger.info("Term too short, skipping autocomplete")
+        return {"statusCode": 200, "body": json.dumps({"terms": []})}
 
     terms = patent_client.autocomplete_terms(term)
 

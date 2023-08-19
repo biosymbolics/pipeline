@@ -8,6 +8,8 @@
 - `python3 -m spacy download en_core_web_md`
 - Create/copy model.pt for non-GPT NER
 - AWS authenticate if needed: `aws configure sso`
+- psql
+  - psql -h 172.31.14.226 -p 5432 --username postgres
 
 
 ### Deploy

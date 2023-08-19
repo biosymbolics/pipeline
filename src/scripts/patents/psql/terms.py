@@ -3,29 +3,28 @@ Functions to initialize the terms and synonym tables
 """
 from itertools import groupby
 from typing import Optional, TypedDict
-from google.cloud import bigquery
 import logging
 
-from clients.low_level.big_query import (
-    DatabaseClient,
-    BQ_DATASET_ID,
-    execute_with_retries,
-)
+from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
 from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
 
-from ._constants import BIOSYM_ANNOTATIONS_TABLE
-from .gpr_constants import SYNONYM_MAP
-from .utils import clean_assignees
+from .biosym_annotations import populate_working_biosym_annotations
 
-MIN_ASSIGNEE_COUNT = 5
+from ..bq.gpr_constants import SYNONYM_MAP
+from ..utils import clean_assignees
+
+MIN_ASSIGNEE_COUNT = 2
 TERMS_FILE = "terms.json"
 
-BaseTermRecord = TypedDict(
-    "BaseTermRecord", {"term": str, "count": int, "canonical_id": Optional[str]}
-)
+
+class BaseTermRecord(TypedDict):
+    term: str
+    count: int
+    canonical_id: Optional[str]
 
 
 class TermRecord(BaseTermRecord):
@@ -48,26 +47,28 @@ class SynonymMapper:
     Static class for synonym mapping functions
     """
 
-    @staticmethod
-    def init(synonym_map: dict[str, str]):
+    def __init__(self, synonym_map: dict[str, str]):
         """
         Create a table of synonyms
 
         Args:
             synonym_map: a map of synonyms to canonical names
         """
-        logging.info("Creating synonym map (truncating if exists)")
+        self.client = PsqlDatabaseClient()
 
-        client = DatabaseClient()
-        # truncate and (re)create the table
-        client.truncate_table(SYNONYM_TABLE_NAME)
-        client.create_table(SYNONYM_TABLE_NAME, ["synonym", "term"])
+        logging.info("Creating synonym map (truncating if exists)")
+        self.client.create_table(
+            SYNONYM_TABLE_NAME,
+            {"synonym": "TEXT", "term": "TEXT"},
+            exists_ok=True,
+            truncate_if_exists=True,
+        )
 
         logging.info("Adding default/hard-coded synonym map entries")
-        execute_with_retries(lambda: SynonymMapper.add_map(synonym_map))
+        self.add_map(synonym_map)
 
-    @staticmethod
-    def add_terms(
+    def add_synonyms(
+        self,
         existing_terms: Optional[list[AggregatedTermRecord]] = None,
     ):
         """
@@ -91,33 +92,41 @@ class SynonymMapper:
             if len(row["term"]) > 1
         }
 
-        execute_with_retries(lambda: SynonymMapper.add_map(synonym_map))
+        logging.info("Adding %s terms to synonym map", len(synonym_map))
 
-    @staticmethod
-    def add_map(synonym_map: dict[str, str]):
+        self.add_map(synonym_map)
+
+    def add_map(self, synonym_map: dict[str, str]):
         """
         Add common entity names to the synonym map, taking in a map of form {synonym: term}
 
         Args:
             synonym_map: a map of synonyms to canonical names
         """
-        data = [
+        records = [
             {
                 "synonym": entry[0].lower(),
                 "term": entry[1].lower(),
             }
             for entry in synonym_map.items()
-            if entry[1] is not None and entry[0] is not None and entry[0] != entry[1]
+            if len(entry[1]) > 0 and len(entry[0]) > 0 and entry[0] != entry[1]
         ]
 
-        DatabaseClient().insert_into_table(data, SYNONYM_TABLE_NAME)
-        logging.info("Inserted %s rows into synonym_map", len(data))
+        self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
+        logging.info(
+            "Inserted %s rows into synonym_map (%s)",
+            len(records),
+            len(list(synonym_map.keys())),
+        )
 
 
 class TermAssembler:
     """
     Static class for assembling terms and synonyms
     """
+
+    def __init__(self):
+        self.client = PsqlDatabaseClient()
 
     @staticmethod
     def __aggregate(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
@@ -142,31 +151,28 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
         return agg_terms
 
-    @staticmethod
-    def __fetch_owner_terms() -> list[AggregatedTermRecord]:
+    def __generate_owner_terms(self) -> list[AggregatedTermRecord]:
         """
-        Creates owner terms (assignee/inventor) from the publications table
+        Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT assignee.name as name, "assignee" as domain, count(*) as count
-            FROM `{BQ_DATASET_ID}.publications` p,
-            unnest(p.assignee_harmonized) as assignee
+            SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+            FROM applications a
             group by name
 
             UNION ALL
 
-            SELECT inventor.name as name, "inventor" as domain, count(*) as count
-            FROM  `{BQ_DATASET_ID}.publications` p,
-            unnest(p.inventor_harmonized) as inventor
+            SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+            FROM applications a
             group by name
         """
-        rows = DatabaseClient().select(owner_query)
+        rows = self.client.select(owner_query)
         names = [row["name"] for row in rows]
         cleaned = clean_assignees(names)
 
         normalized: list[TermRecord] = [
             {
-                "term": assignee if row["domain"] == "assignee" else row["name"],
+                "term": assignee if row["domain"] == "assignees" else row["name"],
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
@@ -181,31 +187,18 @@ class TermAssembler:
         )
         return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
 
-    @staticmethod
-    def __generate_entity_terms() -> list[AggregatedTermRecord]:
+    def __generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations table
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT term, original_id, domain, COUNT(*) as count
-                FROM
-                (
-                    -- gpr annotations
-                    SELECT lower(preferred_name) as term, CAST(ocid as STRING) as original_id, domain
-                    FROM `{BQ_DATASET_ID}.gpr_annotations`
-                    where length(preferred_name) > 1
-
-                    UNION ALL
-
-                    -- biosym annotations
-                    SELECT lower(original_term) as term, canonical_id as original_id, domain
-                    FROM `{BQ_DATASET_ID}.{BIOSYM_ANNOTATIONS_TABLE}`
-                    where length(original_term) > 1
-                ) AS all_annotations
-                group by lower(term), original_id, domain
+                SELECT lower(original_term) as term, domain, COUNT(*) as count
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                where length(original_term) > 1
+                group by lower(original_term), domain
             """
-        rows = DatabaseClient().select(terms_query)
+        rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
 
         logging.info("Normalizing/linking %s terms", len(rows))
@@ -214,75 +207,81 @@ class TermAssembler:
 
         logging.info("Finished creating normalization_map")
 
-        def __normalize(row):
-            entry = normalization_map.get(row["term"])
+        def __normalize(term: str) -> str:
+            entry = normalization_map.get(term)
             if not entry:
-                return SYNONYM_MAP.get(row["term"]) or row["term"]
+                return SYNONYM_MAP.get(term) or term
             return entry.name
 
         term_records: list[TermRecord] = [
             {
-                "term": __normalize(row),
+                "term": __normalize(row["term"]),
                 "count": row["count"] or 0,
                 "canonical_id": getattr(
                     normalization_map.get(row["term"]) or (), "concept_id", None
                 ),
                 "domain": row["domain"],
                 "original_term": row["term"],
-                "original_id": row["original_id"],
+                "original_id": "",  # row["original_id"],
             }
             for row in rows
         ]
 
         return TermAssembler.__aggregate(term_records)
 
-    @staticmethod
-    def generate_terms():
+    def generate_terms(self):
         """
         Collects and forms terms for the terms table
         From
-        - gpr_annotations
         - biosym_annotations
-        - publications (assignee_harmonized)
+        - applications (assignees + inventors)
         """
         logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = TermAssembler.__fetch_owner_terms()
+        assignee_terms = self.__generate_owner_terms()
 
         logging.info("Generating entity terms")
-        entity_terms = TermAssembler.__generate_entity_terms()
+        entity_terms = self.__generate_entity_terms()
 
         terms = assignee_terms + entity_terms
         return terms
 
-    @staticmethod
-    def create_terms():
+    def create_and_persist_terms(self):
         """
-        Fetches terms and persists them to a table
+        Extracts/generates terms and persists them to a table
 
         - pulls distinct annotation and assigee values
         - normalizes the terms
         - inserts them into a new table
         - adds synonym entries for the original terms
         """
-        client = DatabaseClient()
         table_name = "terms"
-        schema = [
-            bigquery.SchemaField("term", "STRING"),
-            bigquery.SchemaField("canonical_id", "STRING"),
-            bigquery.SchemaField("count", "INTEGER"),
-            bigquery.SchemaField("domains", "STRING", mode="REPEATED"),
-            bigquery.SchemaField("synonyms", "STRING", mode="REPEATED"),
-            bigquery.SchemaField("synonym_ids", "STRING", mode="REPEATED"),
-        ]
-        client.create_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
+        schema = {
+            "term": "TEXT",
+            "canonical_id": "TEXT",
+            "count": "INTEGER",
+            "domains": "TEXT[]",
+            "synonyms": "TEXT[]",
+            "synonym_ids": "TEXT[]",
+        }
+        self.client.create_table(
+            table_name, schema, exists_ok=True, truncate_if_exists=True
+        )
 
         # grab terms from annotation tables (slow!!)
-        terms = TermAssembler.generate_terms()
+        terms = self.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
-        rows = [row for row in terms if len(row["term"]) > 1]
-        client.insert_into_table(rows, table_name)
-        logging.info(f"Inserted %s rows into terms table", len(rows))
+        self.client.insert_into_table(terms, table_name)
+        self.client.create_indices(
+            [
+                {
+                    "table": table_name,
+                    "column": "term",
+                    "is_trgm": True,
+                },
+            ]
+        )
+        logging.info(f"Inserted %s rows into terms table", len(terms))
 
     @staticmethod
     def run():
@@ -291,9 +290,9 @@ class TermAssembler:
 
         Idempotent (all tables are dropped and recreated)
         """
-        SynonymMapper.init(SYNONYM_MAP)
-        TermAssembler.create_terms()
-        SynonymMapper.add_terms()
+        sm = SynonymMapper(SYNONYM_MAP)
+        TermAssembler().create_and_persist_terms()
+        sm.add_synonyms()
 
 
 def create_patent_terms():
@@ -302,4 +301,6 @@ def create_patent_terms():
 
     Idempotent (all tables are dropped and recreated)
     """
+    populate_working_biosym_annotations()
+
     TermAssembler.run()

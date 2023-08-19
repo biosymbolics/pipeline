@@ -32,9 +32,8 @@ def score_patents(
         """
         score: float = sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
         total_possible: float = sum(map(math.exp, score_map.values()))
-        score = (
-            score / total_possible if len(attributes) > 0 else 0.1
-        )  # if no attributes, let's give it a small non-zero score
+        # if no attributes, let's give it a small non-zero score
+        score = score / total_possible if len(attributes) > 0 else 0.1
 
         return score
 
@@ -50,10 +49,10 @@ def score_patents(
         ]
         return {"score": score, "explanation": ", ".join(explanations)}
 
-    scores = pl.col(attributes_column).apply(__score_and_explain)
-
     # score and explanation are in the same column, so we need to unnest
-    df = df.with_columns(scores.alias("result")).unnest("result")
+    df = df.with_columns(
+        pl.col(attributes_column).apply(__score_and_explain).alias("result")
+    ).unnest("result")
 
     # multiply score by pct patent life remaining
     df = df.with_columns(

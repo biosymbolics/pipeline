@@ -1,7 +1,5 @@
-BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
-
-MECHANISM_BASE_TERMS = [
-    "mimetics",
+MECHANISM_BASE_TERMS: list[str] = [
+    "mimetic",
     "co[- ]?factor",
     "(?:cross[ -]?)?linker",
     "introducer",
@@ -16,13 +14,13 @@ MECHANISM_BASE_TERMS = [
     "introducer",
     "dilator",
     "disinfectant",
-    "analgesics",
+    "analgesic",
+    "anaesthetic",
     "agent",
     "emitter",
     "lubricant",
     "phototherapy",
     "diuretic",
-    "analgesic",
     "anti[ -]?microbial",
     "anti[ -]?biotic" "anti[ -]?infective",
     "anti[ -]?inflammatory",
@@ -41,7 +39,7 @@ MECHANISM_BASE_TERMS = [
     "pro[ -]?drug",
     "pathway",
 ]
-BIOLOGIC_BASE_TERMS = [
+BIOLOGIC_BASE_TERMS: list[str] = [
     "antigen",
     "neoantigen",
     "antibodie",
@@ -75,7 +73,7 @@ BIOLOGIC_BASE_TERMS = [
     "decomposition",
     "clone",
 ]
-COMPOUND_BASE_TERMS = [
+COMPOUND_BASE_TERMS: list[str] = [
     "reagent",
     "derivative",
     "composition",
@@ -87,7 +85,7 @@ COMPOUND_BASE_TERMS = [
     "homologue",
     "drug",
     "therapy",
-    "therapies",
+    "therapie",
     "regimen",
     "particle",
     "nanoparticle",
@@ -157,9 +155,9 @@ COMPOUND_BASE_TERM_SETS: list[list[str]] = [
     ["molecule", "molecules? binding"],
 ]
 
-INTERVENTION_BASE_TERM_SETS = [
+INTERVENTION_BASE_TERM_SETS: list[list[str]] = [
     *MECHANISM_BASE_TERM_SETS,
-    *BIOLOGIC_BASE_TERMS,
+    *BIOLOGIC_BASE_TERM_SETS,
     *COMPOUND_BASE_TERM_SETS,
 ]
 
@@ -176,7 +174,7 @@ INTERVENTION_BASE_PREFIXES = [
     "receptor",
     "(?:ion )?channel",
     "encoding",
-    "encoders",
+    "encoders?",
     "positive",
     "negative",
     "allosteric",

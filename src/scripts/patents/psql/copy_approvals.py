@@ -1,35 +1,13 @@
 """
-Utils for copying psql data to BigQuery
+Utils for copying approvals data
 """
 import sys
-import time
-import psycopg2
-import logging
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.big_query import (
-    DatabaseClient,
-    execute_with_retries,
-)
-
-
-def fetch_data_from_postgres(conn, sql_query: str):
-    """
-    Fetch data from Postgres
-
-    Args:
-        conn (psycopg2.connection): Postgres connection
-        sql_query (str): SQL query
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(sql_query)
-        data = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-    conn.close()
-    return columns, data
+from clients.low_level.postgres import PsqlDatabaseClient
 
 
 def copy_from_psql(sql_query: str, new_table_name: str, database: str):
@@ -41,26 +19,19 @@ def copy_from_psql(sql_query: str, new_table_name: str, database: str):
         new_table_name (str): name of the new table
         database (str): name of the database
     """
-    client = DatabaseClient()
-    # delete if exists
-    client.delete_table(new_table_name)
+    client = PsqlDatabaseClient()
 
-    conn = psycopg2.connect(
-        database=database,
-        # user='your_username',
-        # password='your_password',
-        host="localhost",
-        port="5432",
-    )
-    columns, data = fetch_data_from_postgres(conn, sql_query)
+    # pull records from other db
+    results = PsqlDatabaseClient(database).execute_query(sql_query)
+    records = [dict(row) for row in results["data"]]
 
     # recreate
-    client.create_table(new_table_name, columns)
-    time.sleep(20)  # such a hack
+    client.create_table(
+        new_table_name, results["columns"], exists_ok=True, truncate_if_exists=True
+    )
 
     # add records
-    records = [dict(zip(columns, row)) for row in data]
-    execute_with_retries(lambda: client.insert_into_table(records, new_table_name))
+    client.insert_into_table(records, new_table_name)
 
 
 def copy_patent_approvals():
