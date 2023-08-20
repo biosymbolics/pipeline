@@ -22,7 +22,7 @@ class DatabaseClient:
         raise NotImplementedError
 
     @abstractmethod
-    def execute_query(self, query: str) -> ExecuteResult:
+    def execute_query(self, query: str, values: list = []) -> ExecuteResult:
         raise NotImplementedError
 
     @abstractmethod
@@ -57,7 +57,7 @@ class DatabaseClient:
         """
         self.execute_query(create_table_query)
 
-    def select(self, query: str) -> list[dict]:
+    def select(self, query: str, values: list) -> list[dict]:
         """
         Execute a query and return the results as a list of dicts
         (must include provide fully qualified table name in query)
@@ -66,7 +66,7 @@ class DatabaseClient:
             query (str): SQL query
         """
         logger.debug("Running query: %s", query)
-        results = self.execute_query(query)
+        results = self.execute_query(query, values)
         records = [dict(row) for row in results["data"]]
 
         logging.info("Records returned: %s", len(records))

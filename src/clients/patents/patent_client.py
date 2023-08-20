@@ -120,7 +120,7 @@ def search(
     )
 
     if is_id_search:
-        terms_sql = ", ".join([f"'{term}'" for term in terms])
+        _terms = terms
         terms_count = 0  # enables an OR
         search_query = f"""
             SELECT
@@ -129,10 +129,10 @@ def search(
                 ARRAY[]::TEXT[] as matched_terms,
                 1 as search_rank
             from applications
-            WHERE publication_number in ({terms_sql})
+            WHERE publication_number = any(%s)
         """
     else:
-        terms_sql = ", ".join([f"'{term.lower()}'" for term in terms])
+        _terms = [term.lower() for term in terms]
         terms_count = len(terms)  # enables an AND
         search_query = f"""
             SELECT
@@ -141,7 +141,7 @@ def search(
                 ARRAY_AGG(DISTINCT a.term) as matched_terms,
                 AVG(EXP(-a.character_offset_start * {DECAY_RATE})) as search_rank --- exp decay scaling; higher is better
             FROM annotations a
-            WHERE lower(a.term) in ({terms_sql})
+            WHERE lower(a.term) = any(%s)
             GROUP BY a.publication_number
         """
 
@@ -186,7 +186,8 @@ def search(
     query = select_query + where
 
     logger.debug("Query: %s", query)
-    results = PsqlDatabaseClient().select(query)
+    print(query)
+    results = PsqlDatabaseClient().select(query, [_terms])
     return format_search_result(results)
 
 
@@ -207,14 +208,15 @@ def autocomplete_terms(
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
+    search_sql = f"%{string.lower()}%"
     query = f"""
         SELECT *
         FROM terms
-        WHERE term ilike '%{string}%' -- TODO: psql search
+        WHERE term ilike %s -- TODO: psql search
         AND count > {min_term_frequency}
         ORDER BY count DESC, term ASC
     """
-    results = PsqlDatabaseClient().select(query)
+    results = PsqlDatabaseClient().select(query, [search_sql])
     formatted = [format_term(cast(TermResult, result)) for result in results]
 
     logger.info(
