@@ -4,9 +4,8 @@ Low-level Postgres client
 from typing_extensions import NotRequired
 from typing import Mapping, TypeGuard, TypeVar, TypedDict
 import logging
-from psycopg2 import pool
-from psycopg2.extras import DictCursor, execute_values
-from urllib.parse import urlparse
+from psycopg_pool import ConnectionPool
+from psycopg.rows import dict_row
 
 from clients.low_level.database import DatabaseClient, ExecuteResult
 from constants.core import DATABASE_URL
@@ -52,25 +51,11 @@ class PsqlClient:
         self,
         uri: str = DATABASE_URL,
     ):
-        parsed = urlparse(uri)
-        username = parsed.username or ""
-        password = parsed.password or ""
-        database = parsed.path[1:]
-        host = parsed.hostname
-        port = parsed.port
-        auth_args = (
-            {"user": username, "password": password}
-            if username is not None or password is not None
-            else {}
-        )
-        self.conn_pool = pool.SimpleConnectionPool(
-            minconn=MIN_CONNECTIONS,
-            maxconn=MAX_CONNECTIONS,
-            database=database,
-            host=host,
-            port=port,
-            cursor_factory=DictCursor,
-            **auth_args,
+        self.conn_pool = ConnectionPool(
+            min_size=MIN_CONNECTIONS,
+            max_size=MAX_CONNECTIONS,
+            conninfo=uri,
+            kwargs={"row_factory": dict_row},
         )
 
     def get_conn(self):
@@ -80,7 +65,7 @@ class PsqlClient:
         self.conn_pool.putconn(conn)
 
     def close_all(self):
-        self.conn_pool.closeall()
+        self.conn_pool.close()
 
 
 class PsqlDatabaseClient(DatabaseClient):
@@ -113,7 +98,7 @@ class PsqlDatabaseClient(DatabaseClient):
             );
         """
         try:
-            res = self.execute_query(query)
+            res = self.execute_query(query, [])
             return res["data"][0][0]
         except Exception as e:
             logger.error("Error checking table exists: %s", e)
@@ -140,7 +125,9 @@ class PsqlDatabaseClient(DatabaseClient):
         return {"data": [], "columns": []}
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str, ignore_error: bool = False) -> ExecuteResult:
+    def execute_query(
+        self, query: str, values: list = [], ignore_error: bool = False
+    ) -> ExecuteResult:
         """
         Execute query
 
@@ -153,7 +140,7 @@ class PsqlDatabaseClient(DatabaseClient):
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
             try:
-                cursor.execute(query)
+                cursor.execute(query, values)  # type: ignore
                 conn.commit()
             except Exception as e:
                 return self.handle_error(
@@ -161,11 +148,11 @@ class PsqlDatabaseClient(DatabaseClient):
                 )
 
             try:
-                if cursor.rowcount < 1 or cursor.pgresult_ptr is None:
+                if cursor.rowcount < 1 or cursor.pgresult is None:
                     raise NoResults("Query returned no rows")
 
-                data = list(cursor.fetchall())
-                columns = [desc[0] for desc in cursor.description]
+                data: list[tuple] = list(cursor.fetchall())
+                columns = [desc[0] for desc in (cursor.description or [])]
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
             except Exception as e:
@@ -182,7 +169,7 @@ class PsqlDatabaseClient(DatabaseClient):
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
             try:
-                execute_values(cursor, query, values)
+                cursor.execute(query, values)  # type: ignore
                 conn.commit()
                 self.client.put_conn(conn)
                 return {"data": [], "columns": columns}
@@ -206,18 +193,18 @@ class PsqlDatabaseClient(DatabaseClient):
         else:
             raise Exception("Invalid columns")
 
-        query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
-        self.execute_query(query)
+        query = f"CREATE TABLE {table_id} (%s);"
+        self.execute_query(query, [(", ").join(schema)])
 
     def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """
         Add indices
         """
-        self.execute_query("CREATE EXTENSION pg_trgm", ignore_error=True)
+        self.execute_query("CREATE EXTENSION pg_trgm", [], ignore_error=True)
 
         for index_def in index_defs:
             if is_index_sql(index_def):
-                self.execute_query(index_def["sql"])
+                self.execute_query(index_def["sql"], [])
                 continue
 
             if is_index_create_def(index_def):
@@ -231,7 +218,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 else:
                     sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({column})"
 
-                self.execute_query(sql)
+                self.execute_query(sql, [])
 
             else:
                 raise Exception("Invalid index def")

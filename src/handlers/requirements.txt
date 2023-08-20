@@ -3,7 +3,8 @@ langchain
 llama_index
 openai
 polars
-psycopg2-binary
+psycopg[binary]
+psycopg_pool
 pydash
 python-dotenv
 requests

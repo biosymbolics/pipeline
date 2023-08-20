@@ -23,7 +23,7 @@ def autocomplete(event: AutocompleteEvent, context):
 
     Invocation:
     - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "term":"asthm" }}'`
-    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"asthm" }}'`
+    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"alzheim" }}'`
     - API: `curl https://api.biosymbolics.ai/terms/search?term=asthm`
 
     Output (for string "asthm"):
