@@ -140,7 +140,6 @@ class PsqlDatabaseClient(DatabaseClient):
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
             try:
-                print("VALUES", values)
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
             except Exception as e:
@@ -153,7 +152,6 @@ class PsqlDatabaseClient(DatabaseClient):
                     raise NoResults("Query returned no rows")
 
                 data: list[tuple] = list(cursor.fetchall())
-                print("RES", data)
                 columns = [desc[0] for desc in (cursor.description or [])]
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
