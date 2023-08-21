@@ -7,25 +7,32 @@ import re
 from typing import Any, Mapping, TypeGuard, Union
 
 
-def get_id(string: str | list[str] | dict[str, str | int | list[str]]) -> str:
+_Idable = str | list[str] | int
+Idable = _Idable | Mapping[str, _Idable]
+
+
+def get_id(value: Idable) -> str:
     """
-    Returns the id of a string
+    Returns the id of a value
 
     Args:
         string (str or list[str]): string to get id of
     """
-    if isinstance(string, dict):
-        string = "_".join(
+    if isinstance(value, Mapping):
+        value = "_".join(
             [
-                f"{key}={str(value)}"
-                for key, value in sorted(string.items(), key=lambda item: item[0])
+                f"{key}={get_id(value)}"
+                for key, value in sorted(value.items(), key=lambda item: item[0])
             ]
         )
 
-    if isinstance(string, list):
-        string = "_".join(string)
+    if isinstance(value, list):
+        value = "_".join(value)
 
-    return string.replace(" ", "_").lower()
+    if isinstance(value, int):
+        value = str(value)
+
+    return value.replace(" ", "_").lower()
 
 
 def remove_comment_syntax(text: str) -> str:

@@ -87,6 +87,27 @@ def search(
 ) -> Sequence[PatentApplication]:
     """
     Search patents by terms
+    Filters on
+    - lower'd terms
+    - priority date
+    - at least one composition of matter IPC code
+
+    Args:
+        terms (Sequence[str]): list of terms to search for
+        fetch_approval (bool, optional): whether to fetch approval info. Defaults to False.
+        min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
+        relevancy_threshold (RelevancyThreshold, optional): relevancy threshold. Defaults to "high".
+        max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        is_randomized (bool, optional): whether to randomize results. Defaults to False.
+        skip_cache (bool, optional): whether to skip cache. Defaults to False.
+
+    Returns: a list of matching patent applications
+
+    Example:
+    ```
+    from clients.patents import patent_client
+    patent_client.search(['asthma', 'astrocytoma'])
+    ```
     """
 
     args = {
@@ -97,10 +118,13 @@ def search(
         "max_results": max_results,
         "is_randomized": is_randomized,
     }
-    key = get_id(list(args.values()))
-    search_partial = partial(_search, *args)
-    apps = retrieve_with_cache_check(search_partial, key)
-    return apps
+    key = get_id(args)
+    search_partial = partial(_search, **args)
+
+    if skip_cache:
+        return search_partial()
+
+    return retrieve_with_cache_check(search_partial, key=key)
 
 
 def _search(
@@ -110,30 +134,14 @@ def _search(
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
-    skip_cache: bool = False,
 ) -> Sequence[PatentApplication]:
     """
     Search patents by terms
-    Filters on
-    - lower'd terms
-    - priority date
-    - at least one composition of matter IPC code
-
-    Args:
-        terms (Sequence[str]): list of terms to search for
-
-    Returns: a list of matching patent applications
-
-    Example:
-    ```
-    import system; system.initialize()
-    from clients.patents import patent_client
-    patent_client.search(['asthma', 'astrocytoma'])
-    ```
     """
     start = time.time()
 
     if not isinstance(terms, list):
+        logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
     # only checks for global patents
