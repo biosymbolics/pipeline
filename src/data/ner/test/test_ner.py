@@ -3,6 +3,15 @@ import unittest
 from data.ner import NerTagger
 
 
+# PROTEIN BINDING TO Akt2
+# Acetylated hmgb1 protein
+# Hla-a24-restricted cancer antigen peptide
+# Smg-1-binding protein and method of screening substance controlling its activity
+# Pablo, a polypeptide that interacts with bcl-xl, and uses related thereto
+# Antibody capable of recognizing 8-nitroguanine
+# Abc transporter-associated gene abcc13
+# Use of poly-alpha2,8-sialic acid mimetic peptides to modulate ncam functions.
+# Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
 class TestNerUtils(unittest.TestCase):
     """
     from data.ner import NerTagger; tagger=NerTagger()

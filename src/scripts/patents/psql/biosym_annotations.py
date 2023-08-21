@@ -205,7 +205,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
 
 DELETION_TERMS = [
     "cell",
-    "wherein(?: a}?",
+    "wherein(?: a)?",
     "computer-readable",
     "pharmaceutical composition",
     "compound i",
@@ -756,6 +756,10 @@ def remove_junk():
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
         *get_remove_words(),
+        # leading whitespace
+        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+        # trailing whitespace
+        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]+$', '')) where original_term ~ '[ ]+$'",
         # f"update {WORKING_TABLE} set "
         # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
@@ -827,7 +831,6 @@ def remove_common_terms():
         + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
         f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
         f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
-        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
         f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
     ]
     for del_query in del_queries:
