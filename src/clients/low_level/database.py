@@ -57,7 +57,7 @@ class DatabaseClient:
         """
         self.execute_query(create_table_query)
 
-    def select(self, query: str, values: list) -> list[dict]:
+    def select(self, query: str, values: list = []) -> list[dict]:
         """
         Execute a query and return the results as a list of dicts
         (must include provide fully qualified table name in query)

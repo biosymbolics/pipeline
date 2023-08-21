@@ -1,6 +1,7 @@
 """
 Low-level Postgres client
 """
+import time
 from typing_extensions import NotRequired
 from typing import Mapping, TypeGuard, TypeVar, TypedDict
 import logging
@@ -135,6 +136,7 @@ class PsqlDatabaseClient(DatabaseClient):
             query (str): SQL query
             ignore_error (bool): if True, will not raise an error if the query fails
         """
+        start = time.time()
         logging.info("Starting query: %s", query)
 
         conn = self.client.get_conn()
@@ -142,13 +144,18 @@ class PsqlDatabaseClient(DatabaseClient):
             try:
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
+                logging.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
                 return self.handle_error(
                     conn, e, is_rollback=True, ignore_error=ignore_error
                 )
 
+            execute_time = round(time.time() - start, 2)
+            if execute_time > 60:
+                logging.info("Query took %s minutes", round(execute_time / 60, 2))
+
             try:
-                if cursor.rowcount < 1 or cursor.pgresult is None:
+                if cursor.rowcount < 1 or cursor.rownumber is None:
                     raise NoResults("Query returned no rows")
 
                 data: list[tuple] = list(cursor.fetchall())

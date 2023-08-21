@@ -611,7 +611,7 @@ def remove_substrings():
         JOIN {WORKING_TABLE} t2
         ON t1.publication_number = t2.publication_number
         WHERE t2.original_term<>t1.original_term
-        AND t1.original_term ilike CONCAT('%', t2.original_term, '%')
+        AND t1.original_term ~* CONCAT('.*', t2.original_term, '.*')
         AND length(t1.original_term) > length(t2.original_term)
         AND array_length(regexp_split_to_array(t2.original_term, ' '), 1) < 3
         ORDER BY length(t2.original_term) DESC
@@ -749,14 +749,14 @@ def remove_junk():
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where original_term ~ '[ ]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term like '%)' and original_term not like '%(%';",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term ilike '% disease factor';",
+        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
+        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term ~* '.*disease factor';",
         # f"update {WORKING_TABLE} set "
         # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
         f"delete FROM {WORKING_TABLE} "
         + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
         f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
-        f"delete FROM {WORKING_TABLE} where original_term ilike 'said %'",
+        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
         f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
         f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
         f"delete from {WORKING_TABLE} where original_term ~* '{delete_term_re}'",
@@ -765,10 +765,10 @@ def remove_junk():
         f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
         f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
         f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ilike '% receptor' and domain='compounds'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
         f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ilike '% gene' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ilike '% factor' and original_term not ilike '%risk%' and original_term not ilike '%disease%' and domain='diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
         f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
     ]
     client = DatabaseClient()
@@ -826,6 +826,7 @@ def remove_common_terms():
         delete from {WORKING_TABLE}
         where
         original_term=''
+        OR original_term is null
         OR lower(original_term) in ({str_match})
         OR original_term ~* '^{or_re}$'
     """
@@ -837,23 +838,25 @@ def normalize_domains():
     Normalizes domains - if the same term is used for multiple domains, pick the most common one
     """
     normalize_sql = f"""
-        update {WORKING_TABLE} ut set domain=ss.new_domain
-        from
-        (
+        WITH ranked_domains AS (
             SELECT
-                b.lot as lot,
-                ARRAY_AGG(distinct concat(cnt, '-', b.domain)) AS dds,
-                REGEXP_REPLACE(((ARRAY_AGG(concat(cnt, '-', b.domain) order by cnt desc))[0]), '[0-9]+-', '') AS new_domain
-            FROM {WORKING_TABLE} a
-            JOIN (
-                SELECT lower(original_term) as lot, domain, COUNT(*) as cnt
-                FROM {WORKING_TABLE}
-                GROUP BY lot, domain
-                order by count(*) desc
-            ) b
-            ON lower(a.original_term) = b.lot
-            GROUP BY b.lot
-        ) ss where lower(ut.original_term)=ss.lot
+                lower(original_term) as lot,
+                domain,
+                ROW_NUMBER() OVER (PARTITION BY lower(original_term) ORDER BY COUNT(*) DESC) as rank
+            FROM {WORKING_TABLE}
+            GROUP BY lower(original_term), domain
+        )
+        , max_domain AS (
+            SELECT
+                lot,
+                domain AS new_domain
+            FROM ranked_domains
+            WHERE rank = 1
+        )
+        UPDATE {WORKING_TABLE} ut
+        SET domain = md.new_domain
+        FROM max_domain md
+        WHERE lower(ut.original_term) = md.lot and ut.domain <> md.new_domain;
     """
     DatabaseClient().execute_query(normalize_sql)
 
@@ -876,7 +879,6 @@ def populate_working_biosym_annotations():
             {
                 "table": WORKING_TABLE,
                 "column": "publication_number",
-                "is_uniq": True,
             },
             {
                 "table": WORKING_TABLE,
