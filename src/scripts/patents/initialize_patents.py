@@ -43,7 +43,7 @@ def __create_annotations_table():
                     1 as character_offset_start,
                     1 as character_offset_end
                 FROM applications a,
-                unnest(a.assignees) as assignees
+                unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
 
                 UNION ALL
@@ -57,7 +57,7 @@ def __create_annotations_table():
                     1 as character_offset_start,
                     1 as character_offset_end
                 FROM applications a,
-                unnest(a.inventors) as inventors
+                unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
 
                 UNION ALL
