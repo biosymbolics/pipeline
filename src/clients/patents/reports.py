@@ -46,7 +46,7 @@ def aggregate(
     ```
     """
 
-    def aggregate(
+    def _aggregate(
         df: pl.DataFrame, x_dim: str, y_dim: str, LIMIT: int = 100
     ) -> list[PatentsReportRecord]:
         if len(y_dim) > 0:
@@ -59,7 +59,7 @@ def aggregate(
                     pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
                     pl.col("y"),
                 )
-                .explode(x_dim)
+                .explode("x")
             )
         else:
             col_df = df.select(
@@ -85,7 +85,7 @@ def aggregate(
 
     patent_df = pl.DataFrame(patents)
     summaries = [
-        {"x": x_dim, "y": y_dim, "data": aggregate(patent_df, x_dim, y_dim)}
+        {"x": x_dim, "y": y_dim, "data": _aggregate(patent_df, x_dim, y_dim)}
         for x_dim in x_dimensions
         for y_dim in (y_dimensions or [""])
     ]
