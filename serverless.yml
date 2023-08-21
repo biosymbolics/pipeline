@@ -71,10 +71,19 @@ functions:
   summarize-patents:
     events:
       - http:
-          path: patents/report/summarize
+          path: patents/reports/summarize
           method: get
           cors: true
-    handler: src.handlers.patents.report
+    handler: src.handlers.patents.reports.summarize
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
+  patents-over-time:
+    events:
+      - http:
+          path: patents/reports/time
+          method: get
+          cors: true
+    handler: src.handlers.patents.reports.time
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:

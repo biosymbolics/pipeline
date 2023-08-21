@@ -1,19 +1,23 @@
 """
 Patent types
 """
-from typing import Any, Literal, Sequence, TypeGuard, TypedDict, Union
+from typing_extensions import NotRequired
+from typing import Literal, TypeGuard, TypedDict, Union
 import typing
 
-from typings.patents import PatentApplication
 
 AutocompleteTerm = TypedDict("AutocompleteTerm", {"id": str, "label": str})
 TermResult = TypedDict("TermResult", {"term": str, "count": int})
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
 
-PatentsSummaryRecord = TypedDict("PatentsSummaryRecord", {"count": int, "term": str})
-PatentsSummary = TypedDict(
-    "PatentsSummary", {"column": str, "data": list[PatentsSummaryRecord] | None}
+PatentsReportRecord = TypedDict(
+    "PatentsReportRecord",
+    {"count": int, "x": str, "y": NotRequired[int | str]},
+)
+PatentsReport = TypedDict(
+    "PatentsReport",
+    {"x": str, "y": str | None, "data": list[PatentsReportRecord] | None},
 )
 
 

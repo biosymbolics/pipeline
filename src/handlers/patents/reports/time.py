@@ -1,5 +1,5 @@
 """
-Handler for patents search
+Handler for patent timewise reports
 """
 import json
 from typing import TypedDict
@@ -7,9 +7,9 @@ import logging
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
-from clients.patents.reports import generate_summaries
+from clients.patents.reports import aggregate
 
-from .types import PatentSearchParams
+from ..types import PatentSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -19,14 +19,14 @@ class ReportEvent(TypedDict):
     queryStringParameters: PatentSearchParams
 
 
-def summarize(event: ReportEvent, context):
+def aggregate_over_time(event: ReportEvent, context):
     """
-    Summarize patents by terms (diseases, compounds, etc)
+    Aggregate patents trends over time
 
     Invocation:
-    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
+    - Local: `serverless invoke local --function patents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")
@@ -41,18 +41,21 @@ def summarize(event: ReportEvent, context):
     fetch_approval = params.get("fetch_approval") or True
     min_patent_years = params.get("min_patent_years") or 10
     relevancy_threshold = params.get("relevancy_threshold") or "high"
-    max_results = params.get("max_results") or 1000
+    max_results = params.get("max_results") or 10000  # higher limit for reports
 
     try:
-        results = patent_client.search(
+        patents = patent_client.search(
             terms_list,
             fetch_approval,
             min_patent_years,
             relevancy_threshold,
             max_results,
         )
-        summaries = generate_summaries(
-            results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar"]
+        summaries = aggregate(
+            patents,
+            x_dimensions=[*DOMAINS_OF_INTEREST, "ipc_codes", "similar"],
+            y_dimensions=["priority_date"],
+            y_transform=lambda y: y.year,
         )
     except Exception as e:
         logger.error("Error generating reports for patents: %s (%s)", e, str(type(e)))
