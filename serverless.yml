@@ -158,4 +158,8 @@ resources:
         AccessControl: Private
         VersioningConfiguration:
           Status: Enabled
-        ExpirationInDays: 30
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteAfter30Days
+              Status: 'Enabled'
+              ExpirationInDays: 30

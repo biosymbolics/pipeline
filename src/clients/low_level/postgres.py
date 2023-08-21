@@ -231,7 +231,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 else:
                     sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({column})"
 
-                self.execute_query(sql, [])
+                self.execute_query(sql, [], ignore_error=True)
 
             else:
                 raise Exception("Invalid index def")
