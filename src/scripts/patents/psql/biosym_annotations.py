@@ -34,6 +34,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "method": "all",
     "obtainable": "all",
     "the": "leading",
+    "encoding": "trailing",
     "properties": "trailing",
     "library": "trailing",
     "more": "leading",
@@ -66,6 +67,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "activity": "trailing",
+    "efficacy": "trailing",
     "therapeutic procedure": "all",
     "therapeutic(?:ally)?": "leading",
     "therapeutic(?:ally)?": "trailing",
@@ -117,7 +119,6 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "system": "trailing",
     "[.]": "trailing",
     "analysis": "trailing",
-    "method": "trailing",
     "management": "trailing",
     "below": "trailing",
     "fixed": "leading",
@@ -204,7 +205,9 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
 }
 
 DELETION_TERMS = [
-    "wherein a",
+    "cell",
+    "wherein(?: a}?",
+    "computer-readable",
     "pharmaceutical composition",
     "compound i",
     "wherein said compound",
@@ -285,6 +288,9 @@ DELETION_TERMS = [
     "aromatic",
     "propylene",
     "biocompatible",
+    "recombinant",
+    "composition comprising",
+    "computer-readable medium",
     "single nucleotide polymorphism",
     "popical",
     "transgene",
@@ -369,8 +375,10 @@ DELETION_TERMS = [
     "(?:.* )?microprocessor",
     "(?:.* )?balloon",
     "(?:.* )?stapler",
+    "internal combustion engine",
     "capsule",
     "valve",
+    "solubility",
     "compressor",
     "forcep",
     "beam splitter",
@@ -520,6 +528,7 @@ DELETION_TERMS = [
     "heart valve",
     "nonwoven",
     "detergent",
+    "curable",
     "sanitary napkin",
     ".*catheter.*",
     "extracellular vesicle",
@@ -728,9 +737,8 @@ def remove_junk():
             else:
                 raise ValueError(f"Unknown place: {place}")
 
-        return [get_sql(place) for place in ["leading", "trailing", "all"]]
+        return [get_sql(place) for place in ["all", "leading", "trailing"]]
 
-    delete_term_re = "^" + get_or_re([f"{dt}s?" for dt in DELETION_TERMS]) + "$"
     mechanism_terms = [
         f"{t}s?"
         for t in [
@@ -743,23 +751,15 @@ def remove_junk():
     queries = [
         f"update {WORKING_TABLE} "
         + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
-        *get_remove_words(),
         f"update {WORKING_TABLE} "
         + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where original_term ~ '[ ]{2,}'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where original_term ~ '[ ]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term ~* '.*disease factor';",
+        *get_remove_words(),
         # f"update {WORKING_TABLE} set "
         # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
-        f"delete FROM {WORKING_TABLE} "
-        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
-        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
-        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
-        f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
-        f"delete from {WORKING_TABLE} where original_term ~* '{delete_term_re}'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
         f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
@@ -809,28 +809,31 @@ def remove_common_terms():
     logging.info("Removing common terms")
     # regex in here, effectively ignored
     common_terms = [
+        *DELETION_TERMS,
         *flatten(INTERVENTION_BASE_TERM_SETS),
         *INTERVENTION_BASE_TERMS,
     ]
-    with_plurals = [
-        *common_terms,
-        *[f"{term}s" for term in common_terms],
-    ]
 
-    # hack regex check
-    str_match = ", ".join(
-        [f"'{term.lower()}'" for term in with_plurals if "?" not in term]
-    )
-    or_re = get_or_re([f"{t}s?" for t in common_terms if "?" in t])
-    query = f"""
+    or_re = get_or_re([f"{t}s?" for t in common_terms])
+    common_del_query = f"""
         delete from {WORKING_TABLE}
         where
         original_term=''
         OR original_term is null
-        OR lower(original_term) in ({str_match})
         OR original_term ~* '^{or_re}$'
     """
-    DatabaseClient().execute_query(query)
+
+    del_queries = [
+        common_del_query,
+        f"delete FROM {WORKING_TABLE} "
+        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
+        f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
+        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
+        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
+        f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
+    ]
+    for del_query in del_queries:
+        DatabaseClient().execute_query(del_query)
 
 
 def normalize_domains():
