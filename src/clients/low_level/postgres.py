@@ -8,11 +8,7 @@ import logging
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
-from clients.low_level.database import (
-    DatabaseClient,
-    ExecuteResult,
-    execute_with_retries,
-)
+from clients.low_level.database import DatabaseClient, ExecuteResult
 from constants.core import DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides
