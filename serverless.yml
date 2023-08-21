@@ -149,3 +149,10 @@ resources:
           SecondsUntilAutoPause: 300
         EnableHttpEndpoint: true
         StorageEncrypted: true
+    S3:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: "biosym-patents-${self:provider.stage}"
+        AccessControl: Private
+        VersioningConfiguration:
+          Status: Enabled

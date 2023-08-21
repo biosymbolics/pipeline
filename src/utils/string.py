@@ -4,16 +4,24 @@ String utilities
 
 
 import re
-from typing import Mapping, TypeGuard, Union
+from typing import Any, Mapping, TypeGuard, Union
 
 
-def get_id(string: Union[str, list[str]]) -> str:
+def get_id(string: str | list[str] | dict[str, str | int | list[str]]) -> str:
     """
     Returns the id of a string
 
     Args:
         string (str or list[str]): string to get id of
     """
+    if isinstance(string, dict):
+        string = "_".join(
+            [
+                f"{key}={str(value)}"
+                for key, value in sorted(string.items(), key=lambda item: item[0])
+            ]
+        )
+
     if isinstance(string, list):
         string = "_".join(string)
 

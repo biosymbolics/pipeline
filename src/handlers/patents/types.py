@@ -13,3 +13,4 @@ class PatentSearchParams(TypedDict):
     min_patent_years: NotRequired[int]
     relevancy_threshold: NotRequired[RelevancyThreshold]
     max_results: NotRequired[int]
+    skip_cache: NotRequired[bool]

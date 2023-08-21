@@ -42,6 +42,7 @@ def aggregate_over_time(event: ReportEvent, context):
     min_patent_years = params.get("min_patent_years") or 10
     relevancy_threshold = params.get("relevancy_threshold") or "high"
     max_results = params.get("max_results") or 10000  # higher limit for reports
+    skip_cache = params.get("skip_cache") or False
 
     try:
         patents = patent_client.search(
@@ -49,7 +50,8 @@ def aggregate_over_time(event: ReportEvent, context):
             fetch_approval,
             min_patent_years,
             relevancy_threshold,
-            max_results,
+            max_results=max_results,
+            skip_cache=skip_cache,
         )
         if len(patents) == 0:
             logging.info("No patents found for terms: %s", terms)

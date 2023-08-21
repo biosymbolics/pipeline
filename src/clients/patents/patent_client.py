@@ -1,14 +1,17 @@
 """
 Patent client
 """
+from functools import partial
 import logging
 import time
 from typing import Sequence, cast
 from pydash import compact
+from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings.patents import PatentApplication
+from utils.string import get_id
 
 from .constants import DOMAINS_OF_INTEREST, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
@@ -80,6 +83,34 @@ def search(
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
+    skip_cache: bool = False,
+) -> Sequence[PatentApplication]:
+    """
+    Search patents by terms
+    """
+
+    args = {
+        "terms": terms,
+        "fetch_approval": fetch_approval,
+        "min_patent_years": min_patent_years,
+        "relevancy_threshold": relevancy_threshold,
+        "max_results": max_results,
+        "is_randomized": is_randomized,
+    }
+    key = get_id(list(args.values()))
+    search_partial = partial(_search, *args)
+    apps = retrieve_with_cache_check(search_partial, key)
+    return apps
+
+
+def _search(
+    terms: Sequence[str],
+    fetch_approval: bool = False,
+    min_patent_years: int = 10,
+    relevancy_threshold: RelevancyThreshold = "high",
+    max_results: int = MAX_SEARCH_RESULTS,
+    is_randomized: bool = False,
+    skip_cache: bool = False,
 ) -> Sequence[PatentApplication]:
     """
     Search patents by terms
