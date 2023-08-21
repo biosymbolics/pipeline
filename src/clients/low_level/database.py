@@ -9,7 +9,7 @@ from utils.list import batch
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Mapping)
-ExecuteResult = TypedDict("ExecuteResult", {"columns": list[str], "data": list[tuple]})
+ExecuteResult = TypedDict("ExecuteResult", {"columns": list[str], "data": list[dict]})
 
 
 class DatabaseClient:
@@ -69,7 +69,6 @@ class DatabaseClient:
         results = self.execute_query(query, values)
         records = [dict(row) for row in results["data"]]
 
-        logging.info("Records returned: %s", len(records))
         return records
 
     def select_insert_into_table(self, select_query: str, table_name: str):

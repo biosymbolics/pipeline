@@ -104,7 +104,7 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         try:
             res = self.execute_query(query, [])
-            return res["data"][0][0]
+            return res["data"][0]["exists"]
         except Exception as e:
             logger.error("Error checking table exists: %s", e)
             return False
@@ -135,7 +135,6 @@ class PsqlDatabaseClient(DatabaseClient):
         query: str,
         values: list = [],
         ignore_error: bool = False,
-        retry_on_fail: bool = True,
     ) -> ExecuteResult:
         """
         Execute query
@@ -149,16 +148,9 @@ class PsqlDatabaseClient(DatabaseClient):
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
-
-            def execute():
+            try:
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
-
-            try:
-                if retry_on_fail:
-                    execute_with_retries(execute)
-                else:
-                    execute()
                 logging.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
                 return self.handle_error(
@@ -170,10 +162,10 @@ class PsqlDatabaseClient(DatabaseClient):
                 logging.info("Query took %s minutes", round(execute_time / 60, 2))
 
             try:
-                if cursor.rowcount < 1 or cursor.rownumber is None:
+                if cursor.rownumber is None:
                     raise NoResults("Query returned no rows")
 
-                data: list[tuple] = list(cursor.fetchall())
+                data = list(cursor.fetchall())
                 columns = [desc[0] for desc in (cursor.description or [])]
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
@@ -183,15 +175,14 @@ class PsqlDatabaseClient(DatabaseClient):
     @overrides(DatabaseClient)
     def _insert(self, table_name: str, records: list[T]) -> ExecuteResult:
         columns = [c for c in list(records[0].keys())]
-        values = [tuple(record.values()) for record in records]
         insert_cols = ", ".join([f'"{c}"' for c in columns])
-        query = f"INSERT INTO {table_name} ({insert_cols}) VALUES %s"
-        values = [tuple(item[col] for col in columns) for item in records]
+        query = f"INSERT INTO {table_name} ({insert_cols}) VALUES ({(', ').join(['%s' for _ in range(len(columns)) ])})"
+        values = [[item[col] for col in columns] for item in records]
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
             try:
-                cursor.execute(query, values)  # type: ignore
+                cursor.executemany(query, values)  # type: ignore
                 conn.commit()
                 self.client.put_conn(conn)
                 return {"data": [], "columns": columns}
@@ -215,8 +206,8 @@ class PsqlDatabaseClient(DatabaseClient):
         else:
             raise Exception("Invalid columns")
 
-        query = f"CREATE TABLE {table_id} (%s);"
-        self.execute_query(query, [(", ").join(schema)])
+        query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
+        self.execute_query(query)
 
     def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """

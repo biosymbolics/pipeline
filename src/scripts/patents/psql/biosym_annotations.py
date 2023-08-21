@@ -605,15 +605,15 @@ def remove_substrings():
     (annotations that are substrings of other annotations for that publication_number)
     """
     temp_table = "names_to_remove"
-    query = f"""
+    query = rf"""
         SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
         FROM {WORKING_TABLE} t1
         JOIN {WORKING_TABLE} t2
         ON t1.publication_number = t2.publication_number
         WHERE t2.original_term<>t1.original_term
-        AND t1.original_term ~* CONCAT('.*', t2.original_term, '.*')
+        AND t1.original_term ~* CONCAT('.*', escape_regex_chars(t2.original_term), '.*')
         AND length(t1.original_term) > length(t2.original_term)
-        AND array_length(regexp_split_to_array(t2.original_term, ' '), 1) < 3
+        AND array_length(regexp_split_to_array(t2.original_term, '\s+'), 1) < 3
         ORDER BY length(t2.original_term) DESC
     """
 
@@ -784,20 +784,20 @@ def fix_unmatched():
     logging.info("Fixing unmatched parens")
 
     def get_query(field, char_set):
-        sql = rf"""
+        sql = f"""
             UPDATE {WORKING_TABLE} ab
-            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')'))
             from applications a
             WHERE ab.publication_number=a.publication_number
-            AND substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
-            AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
-            AND {field} like '%{char_set[0]}%{char_set[1]}%'
+            AND substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
+            AND original_term ~* '.*{char_set[1]}.*' AND not original_term ~* '.*{char_set[0]}.*'
+            AND {field} ~* '.*{char_set[0]}.*{char_set[1]}.*'
         """
         return sql
 
     client = DatabaseClient()
     for field in TEXT_FIELDS:
-        for char_set in [("{", "}"), ("[", "]"), ("(", ")")]:
+        for char_set in [(r"\[", r"\]"), (r"\(", r"\)")]:
             sql = get_query(field, char_set)
             client.execute_query(sql)
 
@@ -906,25 +906,24 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (859,910)
+    (554,555)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,729,816)
+    (2,731,275)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,076,729)
+    (3,224,555)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (4,311,915)
+    (3,919,589)
     select domain, count(*) from biosym_annotations group by domain;
-    attribute  | 2483967
-    compounds  | 1385073
-    diseases   |  911542
-    mechanisms | 2018962
-
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s
-    (18,572)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s
-    (44,342)
+    attribute  | 2462930
+    compounds  | 1249384
+    diseases   |  840063
+    mechanisms | 1830142
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
+    (14,419)
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
+    (37,776)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (74,417)
+    (71,656)
     """
     if "-h" in sys.argv:
         print(
