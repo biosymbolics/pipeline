@@ -7,7 +7,7 @@ import logging
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
-from clients.patents.reports import aggregate_by_term
+from clients.patents.reports import aggregate
 
 from ..types import PatentSearchParams
 
@@ -51,9 +51,7 @@ def summarize(event: ReportEvent, context):
             relevancy_threshold,
             max_results,
         )
-        summaries = aggregate_by_term(
-            results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar"]
-        )
+        summaries = aggregate(results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar"])
     except Exception as e:
         logger.error("Error generating reports for patents: %s (%s)", e, str(type(e)))
         return {"statusCode": 500, "message": str(e)}

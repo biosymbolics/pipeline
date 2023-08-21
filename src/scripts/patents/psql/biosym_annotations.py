@@ -660,7 +660,7 @@ def fix_of_for_annotations():
             # term set
             re_term = "(?:" + "|".join([f"{ts}s?" for ts in term_or_term_set]) + ")"
         else:
-            re_term = term + "s?"
+            re_term = term_or_term_set + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
             SET original_term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
@@ -684,21 +684,23 @@ def fix_of_for_annotations():
         return sql
 
     client = DatabaseClient()
-    for term in terms:
-        for field in TEXT_FIELDS:
-            sql = get_query(term, field)
-            client.execute_query(sql)
 
-    for term in [*terms, *flatten(term_sets)]:
-        for field in TEXT_FIELDS:
-            sql = get_hyphen_query(term, field)
-            client.execute_query(sql)
+    # for term in [*terms, *flatten(term_sets)]:
+    #     for field in TEXT_FIELDS:
+    #         try:
+    #             sql = get_hyphen_query(term, field)
+    #             client.execute_query(sql)
+    #         except Exception as e:
+    #             logging.error(e)
 
     # loop over term sets, in which the original_term may be in another form than the title variant
-    for term_set in term_sets:
+    for term_or_term_set in [*terms, *term_sets]:
         for field in TEXT_FIELDS:
-            sql = get_query(term_set, field)
-            client.execute_query(sql)
+            try:
+                sql = get_query(term_or_term_set, field)
+                client.execute_query(sql)
+            except Exception as e:
+                logging.error(e)
 
 
 def remove_junk():
@@ -749,12 +751,9 @@ def remove_junk():
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [
+        # unwrap
         f"update {WORKING_TABLE} "
         + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
-        f"update {WORKING_TABLE} "
-        + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where original_term ~ '[ ]{2,}'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where original_term ~ '[ ]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
         *get_remove_words(),
