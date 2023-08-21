@@ -36,7 +36,7 @@ def summarize(event: ReportEvent, context):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "message": "Missing params(s)"}
 
-    logger.info("Fetching reports forparams: %s", params)
+    logger.info("Fetching reports for params: %s", params)
 
     fetch_approval = params.get("fetch_approval") or True
     min_patent_years = params.get("min_patent_years") or 10

@@ -83,7 +83,7 @@ functions:
           path: patents/reports/time
           method: get
           cors: true
-    handler: src.handlers.patents.reports.time
+    handler: src.handlers.patents.reports.aggregate_over_time
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:

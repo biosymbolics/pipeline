@@ -47,30 +47,41 @@ def aggregate(
     """
 
     def aggregate(
-        df: pl.DataFrame, x_dim: str, y_dim: str | None, LIMIT: int = 100
+        df: pl.DataFrame, x_dim: str, y_dim: str, LIMIT: int = 100
     ) -> list[PatentsReportRecord]:
-        col_df = (
-            df.with_columns(
-                pl.col(y_dim).apply(y_transform).alias("y") if y_dim else pl.lit(None),
+        if len(y_dim) > 0:
+            col_df = (
+                # apply y_transform; keep y around
+                df.with_columns(
+                    pl.col(y_dim).drop_nulls().apply(y_transform).alias("y")
+                )
+                .select(
+                    pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
+                    pl.col("y"),
+                )
+                .explode(x_dim)
             )
-            .explode(x_dim)
-            .select(
-                pl.col(x_dim).drop_nulls().apply(x_transform).alias("x"),
-                pl.col("y"),
-            )
-        )
-        if col_df.shape[0] > 0:
-            grouped = (
-                col_df.groupby(["x", "y"])
-                .agg(pl.count())
-                .sort("count")
-                .reverse()
-                .limit(LIMIT)
-            )
-            return cast(list[PatentsReportRecord], grouped.to_dicts())
         else:
+            col_df = df.select(
+                pl.col(x_dim)
+                .explode()
+                .drop_nulls()
+                .apply(x_transform, skip_nulls=False)
+                .alias("x")
+            )
+
+        if col_df.shape[0] == 0:
             logger.debug("X %s is empty", x_dim)
             return []
+
+        grouped = (
+            col_df.groupby(["x", "y"] if len(y_dim) > 0 else ["x"])
+            .agg(pl.count())
+            .sort("count")
+            .reverse()
+            .limit(LIMIT)
+        )
+        return cast(list[PatentsReportRecord], grouped.to_dicts())
 
     patent_df = pl.DataFrame(patents)
     summaries = [

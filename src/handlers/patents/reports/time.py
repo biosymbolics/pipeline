@@ -51,6 +51,10 @@ def aggregate_over_time(event: ReportEvent, context):
             relevancy_threshold,
             max_results,
         )
+        if len(patents) == 0:
+            logging.info("No patents found for terms: %s", terms)
+            return {"statusCode": 200, "body": json.dumps([])}
+
         summaries = aggregate(
             patents,
             x_dimensions=[*DOMAINS_OF_INTEREST, "ipc_codes", "similar"],
