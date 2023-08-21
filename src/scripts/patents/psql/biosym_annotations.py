@@ -910,11 +910,11 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (554,555)
+    (1,038,200)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,731,275)
+    (2,755,711)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,224,555)
+    (3,199,104)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
     (3,919,589)
     select domain, count(*) from biosym_annotations group by domain;

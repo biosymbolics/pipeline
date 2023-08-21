@@ -42,7 +42,7 @@ def aggregate(
     from clients.patents.constants import DOMAINS_OF_INTEREST
     from clients.patents.reports import aggregate
     summaries = aggregate(patents, DOMAINS_OF_INTEREST)
-    disease_over_time = aggregate(patents, ["diseases"], ["priority_date"], y_transform=lambda y: y.year)
+    disease_over_time = aggregate(patents, DOMAINS_OF_INTEREST, ["priority_date"], y_transform=lambda y: y.year)
     ```
     """
 
@@ -52,14 +52,13 @@ def aggregate(
         if len(y_dim) > 0:
             col_df = (
                 # apply y_transform; keep y around
-                df.with_columns(
-                    pl.col(y_dim).drop_nulls().apply(y_transform).alias("y")
-                )
+                df.with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
                 .select(
                     pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
                     pl.col("y"),
                 )
                 .explode("x")
+                .drop_nulls()
             )
         else:
             col_df = df.select(
