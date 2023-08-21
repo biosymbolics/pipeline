@@ -8,10 +8,15 @@ from pydash import compact
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
+from typings.patents import PatentApplication
 
 from .constants import DOMAINS_OF_INTEREST, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .types import AutocompleteTerm, RelevancyThreshold, SearchResults, TermResult
+from .types import (
+    AutocompleteTerm,
+    RelevancyThreshold,
+    TermResult,
+)
 from .utils import get_max_priority_date
 
 logger = logging.getLogger(__name__)
@@ -75,7 +80,7 @@ def search(
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
-) -> SearchResults:
+) -> Sequence[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -95,6 +100,8 @@ def search(
     patent_client.search(['asthma', 'astrocytoma'])
     ```
     """
+    start = time.time()
+
     if not isinstance(terms, list):
         raise ValueError("Terms must be a list")
 
@@ -184,9 +191,13 @@ def search(
     """
 
     query = select_query + where
-
-    logger.debug("Query: %s", query)
     results = PsqlDatabaseClient().select(query, [_terms])
+
+    logger.debug("Patent search query: %s", query)
+    logger.info(
+        "Search took %s seconds (%s)", round(time.time() - start, 2), len(results)
+    )
+
     return format_search_result(results)
 
 
@@ -208,10 +219,11 @@ def autocomplete_terms(
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
     search_sql = f"%{string.lower()}%"
+    # TODO: psql search
     query = f"""
         SELECT *
         FROM terms
-        WHERE term ilike %s -- TODO: psql search
+        WHERE term ilike %s
         AND count > {min_term_frequency}
         ORDER BY count DESC, term ASC
     """

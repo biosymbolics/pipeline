@@ -16,11 +16,6 @@ PatentsSummary = TypedDict(
     "PatentsSummary", {"column": str, "data": list[PatentsSummaryRecord] | None}
 )
 
-SearchResults = TypedDict(
-    "SearchResults",
-    {"patents": Sequence[PatentApplication], "summaries": list[PatentsSummary]},
-)
-
 
 def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThreshold]:
     """

@@ -5,7 +5,6 @@ from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
 from pydash import compact
-from clients.low_level.database import execute_with_retries
 from clients.low_level.postgres import PsqlDatabaseClient
 
 import system
@@ -188,9 +187,7 @@ def import_into_psql():
             [(f'"{k}"', determine_data_type(v, k)) for k, v in first_record.items()]
         )
         client.create_table(table_name, columns, exists_ok=True)
-        execute_with_retries(
-            lambda: client.insert_into_table(df.to_dicts(), table_name)
-        )
+        client.insert_into_table(df.to_dicts(), table_name)
 
     bucket = storage_client.bucket(GCS_BUCKET)
     blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json

@@ -8,7 +8,11 @@ import logging
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
-from clients.low_level.database import DatabaseClient, ExecuteResult
+from clients.low_level.database import (
+    DatabaseClient,
+    ExecuteResult,
+    execute_with_retries,
+)
 from constants.core import DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides
@@ -127,7 +131,11 @@ class PsqlDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     def execute_query(
-        self, query: str, values: list = [], ignore_error: bool = False
+        self,
+        query: str,
+        values: list = [],
+        ignore_error: bool = False,
+        retry_on_fail: bool = True,
     ) -> ExecuteResult:
         """
         Execute query
@@ -141,9 +149,16 @@ class PsqlDatabaseClient(DatabaseClient):
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
-            try:
+
+            def execute():
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
+
+            try:
+                if retry_on_fail:
+                    execute_with_retries(execute)
+                else:
+                    execute()
                 logging.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
                 return self.handle_error(

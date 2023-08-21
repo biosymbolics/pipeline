@@ -68,6 +68,15 @@ functions:
     handler: src.handlers.patents.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  summarize-patents:
+    events:
+      - http:
+          path: patents/report/summarize
+          method: get
+          cors: true
+    handler: src.handlers.patents.report
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   describe-terms:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
