@@ -188,7 +188,7 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "(?:de)?sensitizing",
         "(?:de)?sensitize",
     ],
-    ["suppressor", "suppression", "suppressing", "suppress"],
+    ["suppressor", "suppression", "suppressing", "suppress", "suppressant"],
     ["stimulator", "stimulation", "stimulating", "stimulate"],
     [
         "(?:(?:neuro|immuno)[- ]?)?modulate",
@@ -205,6 +205,7 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
     ["promoter", "promoting", "promote", "promotion"],
     ["blocker", "blockade", "blocking", "block"],
     ["transporter", "transporting", "transport", "transportation"],
+    ["disruptor", "disruption", "disrupting", "disrupt"],
 ]
 
 BIOLOGIC_BASE_TERM_SETS: list[list[str]] = [

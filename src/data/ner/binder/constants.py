@@ -21,6 +21,7 @@ NER_TYPES = [
 
 PHRASE_MAP = {
     "activity modulator": "modulator",
+    "activated protein": "protein",
     "agonist ligand": "agonist",
     "analogue": "analog",
     "antibodie": "antibody",
@@ -39,6 +40,7 @@ PHRASE_MAP = {
     "chimeric[ -]?(?:antigen|antibody)[ -]?receptor": "chimeric antigen receptor",
     "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell ) receptor": "chimeric antigen receptor t-cell",
     "car[ -]t": "chimeric antigen receptor t-cell",
+    "compound inhibiting": "inhibitor",
     "conditions and disease": "diseases",
     "disease factors": "diseases",
     "diseases and disorder": "diseases",
@@ -56,15 +58,18 @@ PHRASE_MAP = {
     "homologue": "homolog",
     "inhibit(?:ing|ory?) (?:agent|compound|composition|pathway|peptide|protein|factor)": "inhibitor",
     "inhibit(?:ion|ory)?": "inhibitor",
+    "kinases": "kinase",
     "mediated condition": "associated disease",
     "mediated disease": "associated disease",
     "non[ -]?steroidal": "nonsteroidal",
     "pathway inhibitor": "inhibitor",
+    "protein kinase": "kinase",
     "peptide complex(?:es)?": "peptide",
     # we might want to undo this in the future (but note that the info isn't lost to the user)
     "(?:ligand )?receptor activator": "activator",
     "receptor agonist": "agonist",  # ??
     "receptor antagonist": "antagonist",  # ??
+    "receptor antibody": "antibody",
     "receptor bind(?:ing|er)": "binder",
     "receptor inhibitor": "inhibitor",
     "receptor ligand": "ligand",
@@ -75,9 +80,11 @@ PHRASE_MAP = {
     # end
     "related condition": "associated disease",
     "related disease": "associated disease",
+    "responsive protein": "protein",
     "re[ -]?uptake": "reuptake",
     "small molecule inhibitor": "inhibitor",
     "therapy agent": "therapy",
+    "target(?:ing)? protein": "protein",
     "toll[ -]?like": "toll-like",
     "tumour": "tumor",
     "transporter inhibitor": "transport inhibitor",

@@ -154,6 +154,14 @@ class TestNerUtils(unittest.TestCase):
                 "input": "T-cell receptor CD-28",
                 "expected": "t-cell receptor cd28",
             },
+            {
+                "input": "abl kinase inhibition",
+                "expected": "abl kinase inhibitor",
+            },
+            {
+                "input": "akt (protein kinase b) inhibitor",
+                "expected": "akt (kinase b) inhibitor",  # TODO
+            },
         ]
 
         for condition in test_conditions:
@@ -223,6 +231,10 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",
                 "expected": "inhibitors for use in blood-borne cancer the treatment",  # TODO: "blood-borne cancer treatment inhibitors",
+            },
+            {
+                "input": "antibody against urokinase receptor",
+                "expected": "urokinase receptor antibody",
             },
         ]
 

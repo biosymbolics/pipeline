@@ -228,11 +228,11 @@ class EntityCleaner:
                     yield term
                     continue
 
-                # removes from Interleukin-2 (IL-2) inhibitor
+                # removes `(IL-2)` from `Interleukin-2 (IL-2) inhibitor`
                 no_parenth = re.sub(
                     r"(?i)(?<=[ ,])(\([a-z-0-9]+\))(?=(?: |,|$))", "", term
                 )
-                # poly(isoprene) -> polyisoprene
+                # `poly(isoprene)` -> `polyisoprene``
                 no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", r"\1", no_parenth)
                 yield no_parens
 

@@ -150,6 +150,12 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "aforesaid": "leading",
     "efficient": "leading",
     "first": "leading",
+    "second": "leading",
+    "interaction": "trailing",
+    "abnormal": "leading",
+    "atypical": "leading",
+    "inappropriate": "leading",
+    "compounds as": "leading",
     "formula [(][ivxab]{1,3}[)]": "trailing",
     "is": "leading",
     "engineered": "leading",
@@ -179,18 +185,20 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "dosing regimen": "trailing",
+    "mutant": "leading",
+    "mutated": "leading",
     # model/source
     "murine": "all",
     "mouse": "all",
     "mice": "all",
     "human(?:ized)?": "all",  # ??
-    "human": "all",
     "rat": "all",
     "rodent": "all",
     "rabbit": "all",
     "porcine": "all",
     "bovine": "all",
     "equine": "all",
+    "mammal(?:ian)?": "all",
 }
 
 REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
@@ -720,7 +728,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 ]
                 words_re = get_or_re(words, "+")
                 return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', ''))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', '', 'g'))
                     where original_term ~* '.*{words_re}$'
                 """
             elif place == "leading":
@@ -729,7 +737,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 ]
                 words_re = get_or_re(words, "+")
                 return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', ''))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', '', 'g'))
                     where original_term ~* '^{words_re}.*'
                 """
             elif place == "all":
@@ -738,7 +746,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 ]
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' '))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' ', 'g'))
                     where original_term ~* '(?:^|$| ){words_re}(?:^|$| )'
                 """
             else:
@@ -769,7 +777,7 @@ def remove_junk():
     queries = [
         # unwrap
         f"update {WORKING_TABLE} "
-        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
+        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
         # leading whitespace

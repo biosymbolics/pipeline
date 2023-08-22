@@ -144,6 +144,8 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
+        "against": r"against\b",
+        "targeting": r"targeting\b",
         # "by": r"mediated by\b",
     }
 
