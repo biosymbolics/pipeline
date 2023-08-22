@@ -122,6 +122,7 @@ def search(
     search_partial = partial(_search, **args)
 
     if skip_cache:
+        logger.info("HIHIHI")
         return search_partial()
 
     return retrieve_with_cache_check(search_partial, key=key)

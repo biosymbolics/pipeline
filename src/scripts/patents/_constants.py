@@ -123,6 +123,7 @@ COMPOUND_BASE_TERMS: list[str] = [
     "nanoparticle",
     "nutraceutical",
     "ointment",
+    "ortholog",
     "particle",
     "patch",
     "pill",
@@ -190,6 +191,7 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
     ["inducer", "inducing", "induce", "induction"],
     ["promoter", "promoting", "promote", "promotion"],
     ["blocker", "blockade", "blocking", "block"],
+    ["transporter", "transporting", "transport", "transportation"],
 ]
 
 BIOLOGIC_BASE_TERM_SETS: list[list[str]] = [

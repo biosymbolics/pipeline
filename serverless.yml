@@ -7,18 +7,15 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: python3.10
+  region: us-east-1
   stage: ${opt:stage, 'dev'}
   timeout: 300
   vpc:
     securityGroupIds:
-      -  sg-0970987c8996d7c41 # default
+      - Ref: LambdaSecurityGroup
     subnetIds:
-      - subnet-097d7452bff44a9bc
-      - subnet-0af5fe0054c832df3
-      - subnet-0dd6c80089140ec77
-      - subnet-0d81aad61a0e216d9
-      - subnet-063ab146c30e74e8a
-      - subnet-072abb215bce7b322
+      - ${self:custom.subnetA}
+      - ${self:custom.subnetB}
   iam:
     role:
       statements:
@@ -26,6 +23,15 @@ provider:
           Action:
             - ssm:GetParameter
           Resource: "arn:aws:ssm:*:*:parameter/biosymbolics/pipeline/*"
+        - Effect: Allow
+          Action: 's3:ListBucket'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 's3:GetObject'
+            - 's3:PutObject'
+          Resource:
+            - 'arn:aws:s3:::biosym-patents-*/*'
   apiGateway:
     apiKeys:
       - free:
@@ -115,6 +121,10 @@ package:
     - "!**/test/**"
 
 custom:
+  vpcId: vpc-0cef10ce4b3f2955e
+  subnetA: subnet-097d7452bff44a9bc
+  subnetB: subnet-0af5fe0054c832df3
+  igw: igw-0cd81e264ec0cab9f
   pythonRequirements:
     dockerizePip: true
     slim: true
@@ -151,6 +161,16 @@ resources:
           SecondsUntilAutoPause: 300
         EnableHttpEndpoint: true
         StorageEncrypted: true
+    LambdaSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Allow all outbound traffic, no inbound for Lambdas
+        SecurityGroupEgress:
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            CidrIp: 0.0.0.0/0
+        VpcId: ${self:custom.vpcId}
     S3:
       Type: AWS::S3::Bucket
       Properties:
@@ -163,3 +183,34 @@ resources:
             - Id: DeleteAfter30Days
               Status: 'Enabled'
               ExpirationInDays: 30
+    StackRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: ${self:custom.vpcId}
+    # https://www.serverlessguru.com/blog/accessing-s3-using-lambda-inside-a-private-subnet-of-a-vpc
+    VpcEndpointS3:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        RouteTableIds:
+          - Ref: StackRouteTable
+        ServiceName: com.amazonaws.${self:provider.region}.s3
+        VpcId: ${self:custom.vpcId}
+    SubnetRouteTableAssociationPrivate1:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: ${self:custom.subnetA}
+        RouteTableId:
+          Ref: StackRouteTable
+    SubnetRouteTableAssociationPrivate2:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: ${self:custom.subnetB}
+        RouteTableId:
+          Ref: StackRouteTable
+    RoutePublic:
+      Type: AWS::EC2::Route
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: ${self:custom.igw}
+        RouteTableId:
+          Ref: StackRouteTable

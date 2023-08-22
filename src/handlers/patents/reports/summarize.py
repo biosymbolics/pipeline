@@ -24,8 +24,8 @@ def summarize(event: ReportEvent, context):
     Summarize patents by terms (diseases, compounds, etc)
 
     Invocation:
-    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": "True" }}'`
+    - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma", "skip_cache": "True" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
     """
     params = event.get("queryStringParameters", {})
