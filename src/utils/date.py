@@ -4,8 +4,26 @@ Utils related to dates
 
 from datetime import date, datetime
 import logging
+from typing import Any, TypeVar, cast
 
 DEFAULT_FORMATTER = "%Y-%m-%d"
+
+T = TypeVar("T", bound=dict[str, Any])
+
+
+def date_deserialier(_object: T) -> T:
+    """
+    Deserializes date strings into date objects
+    """
+    object = _object.copy()
+    for key, value in object.items():
+        if "date" not in key.lower() or not isinstance(value, str):
+            continue
+        try:
+            object[key] = parse_date(value)
+        except ValueError:
+            pass  # Not a date string, skip
+    return cast(T, object)
 
 
 def parse_date(date_str: str, formatter: str = DEFAULT_FORMATTER) -> date:

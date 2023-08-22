@@ -65,6 +65,7 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.search
+    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   autocomplete-patents:
@@ -83,6 +84,7 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.reports.summarize
+    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   patents-over-time:
@@ -92,6 +94,7 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.reports.aggregate_over_time
+    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:

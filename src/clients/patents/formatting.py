@@ -37,7 +37,10 @@ def format_search_result(
     if len(results) == 0:
         raise ValueError("No results returned. Try adjusting parameters.")
 
-    df = pl.from_dicts(results)
+    df = pl.from_dicts(
+        results,
+        infer_schema_length=None,  # slow
+    )
 
     # group terms by domain (type)
     df = df.with_columns(

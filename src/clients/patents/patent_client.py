@@ -48,9 +48,10 @@ SEARCH_RETURN_FIELDS = [
     # "assignees",
     "country",
     "family_id",
-    # "embeddings",
-    # "grant_date",
-    "inventors",
+    "filing_date",
+    "embeddings",
+    "grant_date",
+    # "inventors",
     "ipc_codes",
     "search_rank",
     # 'ARRAY(SELECT s.publication_number FROM "similar" as s where s.publication_number like \'WO%\') as "similar"',  # limit to WO patents
@@ -122,7 +123,6 @@ def search(
     search_partial = partial(_search, **args)
 
     if skip_cache:
-        logger.info("HIHIHI")
         return search_partial()
 
     return retrieve_with_cache_check(search_partial, key=key)
@@ -159,6 +159,7 @@ def _search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                # *DOMAINS_OF_INTEREST, # added in formatting from terms/domains
                 "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
                 if is_randomized and fetch_approval
                 else "1 as randomizer",  # for randomizing approved patents
