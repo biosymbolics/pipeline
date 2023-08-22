@@ -34,6 +34,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "method": "all",
     "obtainable": "all",
     "the": "leading",
+    "encoding": "trailing",
     "properties": "trailing",
     "library": "trailing",
     "more": "leading",
@@ -66,11 +67,12 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "activity": "trailing",
+    "efficacy": "trailing",
     "therapeutic procedure": "all",
     "therapeutic(?:ally)?": "leading",
     "therapeutic(?:ally)?": "trailing",
     "(?:co[ -]?)?therapy": "trailing",
-    "drug": "trailing",
+    # "drug": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
     "treatment method": "trailing",
     "treatment": "trailing",
@@ -93,7 +95,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "other": "leading",
     "suitable": "trailing",
     "preparation": "trailing",
-    "composition": "trailing",
+    # "composition": "trailing",
     "combination": "trailing",
     "pharmaceutical": "all",
     "dosage(?: form)?": "all",
@@ -117,7 +119,6 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "system": "trailing",
     "[.]": "trailing",
     "analysis": "trailing",
-    "method": "trailing",
     "management": "trailing",
     "below": "trailing",
     "fixed": "leading",
@@ -125,32 +126,31 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "acquisition": "trailing",
     "application": "trailing",
     "assembly": "trailing",
-    "solution": "trailing",
     "production": "trailing",
-    "solution": "trailing",
+    # "solution": "trailing",
     "level": "trailing",
     "processing": "trailing",
     "lead candidate": "all",
     "candidate": "trailing",
-    "molecule": "trailing",
-    "conjugate": "trailing",
-    "substrate": "trailing",
+    # "molecule": "trailing",
+    # "conjugate": "trailing",
+    # "substrate": "trailing",
     "particle": "trailing",
     "medium": "trailing",
-    "form": "trailing",
-    "compound": "trailing",
+    # "form": "trailing",
+    # "compound": "trailing",
     "control": "trailing",
     "modified": "leading",
     "variant": "trailing",
     "variety": "trailing",
     "varieties": "trailing",
     "salt": "trailing",
-    "analog": "trailing",
-    "analogue": "trailing",
+    # "analog": "trailing",
+    # "analogue": "trailing",
     "product": "trailing",
     "family": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    "derivative": "trailing",
+    # "derivative": "trailing",
     "pure": "leading",
     "specific": "trailing",
     "chemically (?:modified)?": "leading",
@@ -168,7 +168,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "first": "leading",
     "formula [(][ivxab]{1,3}[)]": "trailing",
     "formula": "leading",
-    "formulatio": "trailing",
+    # "formulation": "trailing",
     "material": "trailing",
     "biomaterial": "trailing",
     "is": "leading",
@@ -181,7 +181,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "due": "trailing",
     "locate": "trailing",
     "specification": "trailing",
-    "modality": "trailing",
+    # "modality": "trailing",
     "detect": "trailing",
     "similar": "trailing",
     "contemplated": "leading",
@@ -204,7 +204,9 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
 }
 
 DELETION_TERMS = [
-    "wherein a",
+    "cell",
+    "wherein(?: a)?",
+    "computer-readable",
     "pharmaceutical composition",
     "compound i",
     "wherein said compound",
@@ -285,6 +287,9 @@ DELETION_TERMS = [
     "aromatic",
     "propylene",
     "biocompatible",
+    "recombinant",
+    "composition comprising",
+    "computer-readable medium",
     "single nucleotide polymorphism",
     "popical",
     "transgene",
@@ -369,8 +374,10 @@ DELETION_TERMS = [
     "(?:.* )?microprocessor",
     "(?:.* )?balloon",
     "(?:.* )?stapler",
+    "internal combustion engine",
     "capsule",
     "valve",
+    "solubility",
     "compressor",
     "forcep",
     "beam splitter",
@@ -520,6 +527,7 @@ DELETION_TERMS = [
     "heart valve",
     "nonwoven",
     "detergent",
+    "curable",
     "sanitary napkin",
     ".*catheter.*",
     "extracellular vesicle",
@@ -605,15 +613,15 @@ def remove_substrings():
     (annotations that are substrings of other annotations for that publication_number)
     """
     temp_table = "names_to_remove"
-    query = f"""
+    query = rf"""
         SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
         FROM {WORKING_TABLE} t1
         JOIN {WORKING_TABLE} t2
         ON t1.publication_number = t2.publication_number
         WHERE t2.original_term<>t1.original_term
-        AND t1.original_term ~* CONCAT('.*', t2.original_term, '.*')
+        AND t1.original_term ~* CONCAT('.*', escape_regex_chars(t2.original_term), '.*')
         AND length(t1.original_term) > length(t2.original_term)
-        AND array_length(regexp_split_to_array(t2.original_term, ' '), 1) < 3
+        AND array_length(regexp_split_to_array(t2.original_term, '\s+'), 1) < 3
         ORDER BY length(t2.original_term) DESC
     """
 
@@ -651,7 +659,7 @@ def fix_of_for_annotations():
             # term set
             re_term = "(?:" + "|".join([f"{ts}s?" for ts in term_or_term_set]) + ")"
         else:
-            re_term = term + "s?"
+            re_term = term_or_term_set + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
             SET original_term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
@@ -675,21 +683,23 @@ def fix_of_for_annotations():
         return sql
 
     client = DatabaseClient()
-    for term in terms:
-        for field in TEXT_FIELDS:
-            sql = get_query(term, field)
-            client.execute_query(sql)
 
-    for term in [*terms, *flatten(term_sets)]:
-        for field in TEXT_FIELDS:
-            sql = get_hyphen_query(term, field)
-            client.execute_query(sql)
+    # for term in [*terms, *flatten(term_sets)]:
+    #     for field in TEXT_FIELDS:
+    #         try:
+    #             sql = get_hyphen_query(term, field)
+    #             client.execute_query(sql)
+    #         except Exception as e:
+    #             logging.error(e)
 
     # loop over term sets, in which the original_term may be in another form than the title variant
-    for term_set in term_sets:
+    for term_or_term_set in [*terms, *term_sets]:
         for field in TEXT_FIELDS:
-            sql = get_query(term_set, field)
-            client.execute_query(sql)
+            try:
+                sql = get_query(term_or_term_set, field)
+                client.execute_query(sql)
+            except Exception as e:
+                logging.error(e)
 
 
 def remove_junk():
@@ -728,9 +738,8 @@ def remove_junk():
             else:
                 raise ValueError(f"Unknown place: {place}")
 
-        return [get_sql(place) for place in ["leading", "trailing", "all"]]
+        return [get_sql(place) for place in ["all", "leading", "trailing"]]
 
-    delete_term_re = "^" + get_or_re([f"{dt}s?" for dt in DELETION_TERMS]) + "$"
     mechanism_terms = [
         f"{t}s?"
         for t in [
@@ -741,25 +750,18 @@ def remove_junk():
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [
+        # unwrap
         f"update {WORKING_TABLE} "
         + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
-        *get_remove_words(),
-        f"update {WORKING_TABLE} "
-        + "set original_term=(REGEXP_REPLACE(original_term, '[ ]{2,}', ' ')) where original_term ~ '[ ]{2,}'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]$', '')) where original_term ~ '[ ]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, 'disease factor', 'disease')) where original_term ~* '.*disease factor';",
+        *get_remove_words(),
+        # leading whitespace
+        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+        # trailing whitespace
+        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]+$', '')) where original_term ~ '[ ]+$'",
         # f"update {WORKING_TABLE} set "
         # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
-        f"delete FROM {WORKING_TABLE} "
-        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
-        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
-        f"delete from {WORKING_TABLE} where domain='compounds' AND (original_term ~* '.*(?:.*tor$)') and not original_term ~* '(?:vector|factor|receptor|initiator|inhibitor|activator|ivacaftor|oxygenator|regulator)'",
-        f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
-        f"delete from {WORKING_TABLE} where original_term ~* '{delete_term_re}'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
         f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
@@ -784,20 +786,20 @@ def fix_unmatched():
     logging.info("Fixing unmatched parens")
 
     def get_query(field, char_set):
-        sql = rf"""
+        sql = f"""
             UPDATE {WORKING_TABLE} ab
-            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')'))
             from applications a
             WHERE ab.publication_number=a.publication_number
-            AND substring(a.{field}, CONCAT('(?i)([^ ]*\{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
-            AND original_term like '%{char_set[1]}%' AND original_term not like '%{char_set[0]}%'
-            AND {field} like '%{char_set[0]}%{char_set[1]}%'
+            AND substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
+            AND original_term ~* '.*{char_set[1]}.*' AND not original_term ~* '.*{char_set[0]}.*'
+            AND {field} ~* '.*{char_set[0]}.*{char_set[1]}.*'
         """
         return sql
 
     client = DatabaseClient()
     for field in TEXT_FIELDS:
-        for char_set in [("{", "}"), ("[", "]"), ("(", ")")]:
+        for char_set in [(r"\[", r"\]"), (r"\(", r"\)")]:
             sql = get_query(field, char_set)
             client.execute_query(sql)
 
@@ -809,28 +811,30 @@ def remove_common_terms():
     logging.info("Removing common terms")
     # regex in here, effectively ignored
     common_terms = [
+        *DELETION_TERMS,
         *flatten(INTERVENTION_BASE_TERM_SETS),
         *INTERVENTION_BASE_TERMS,
     ]
-    with_plurals = [
-        *common_terms,
-        *[f"{term}s" for term in common_terms],
-    ]
 
-    # hack regex check
-    str_match = ", ".join(
-        [f"'{term.lower()}'" for term in with_plurals if "?" not in term]
-    )
-    or_re = get_or_re([f"{t}s?" for t in common_terms if "?" in t])
-    query = f"""
+    or_re = get_or_re([f"{t}s?" for t in common_terms])
+    common_del_query = f"""
         delete from {WORKING_TABLE}
         where
         original_term=''
         OR original_term is null
-        OR lower(original_term) in ({str_match})
         OR original_term ~* '^{or_re}$'
     """
-    DatabaseClient().execute_query(query)
+
+    del_queries = [
+        common_del_query,
+        f"delete FROM {WORKING_TABLE} "
+        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
+        f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
+        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
+        f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
+    ]
+    for del_query in del_queries:
+        DatabaseClient().execute_query(del_query)
 
 
 def normalize_domains():
@@ -906,25 +910,24 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (859,910)
+    (1,038,200)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,729,816)
+    (2,755,711)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,076,729)
+    (3,199,104)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (4,311,915)
+    (3,919,589)
     select domain, count(*) from biosym_annotations group by domain;
-    attribute  | 2483967
-    compounds  | 1385073
-    diseases   |  911542
-    mechanisms | 2018962
-
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s
-    (18,572)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s
-    (44,342)
+    attribute  | 2462930
+    compounds  | 1249384
+    diseases   |  840063
+    mechanisms | 1830142
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
+    (14,419)
+    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
+    (37,776)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (74,417)
+    (71,656)
     """
     if "-h" in sys.argv:
         print(

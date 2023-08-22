@@ -37,6 +37,7 @@ PHRASE_MAP = {
     "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell ) receptor": "chimeric antigen receptor t-cell",
     "car[ -]t": "chimeric antigen receptor t-cell",
     "conditions and diseases?": "diseases",
+    "disease factors?": "diseases",
     "diseases and disorders?": "diseases",
     "disorders and diseases?": "diseases",
     "disease states?": "diseases",

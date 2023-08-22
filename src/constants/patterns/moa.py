@@ -49,9 +49,9 @@ ACTIONS = [
 ]
 
 CONJUGATE_TYPES = [
-    "antibody[-\\s]?drug conjugate",
+    r"antibody[-\s]?drug conjugate",
     "adc",
-    "peptide[-\\s]?drug conjugate",
+    r"peptide[-\s]?drug conjugate",
     "prodrug conjugate",
     "nanoparticle conjugate",
 ]

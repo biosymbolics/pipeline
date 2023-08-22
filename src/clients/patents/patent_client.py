@@ -1,17 +1,25 @@
 """
 Patent client
 """
+from functools import partial
 import logging
 import time
 from typing import Sequence, cast
 from pydash import compact
+from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
+from typings.patents import PatentApplication
+from utils.string import get_id
 
 from .constants import DOMAINS_OF_INTEREST, RELEVANCY_THRESHOLD_MAP
 from .formatting import format_search_result
-from .types import AutocompleteTerm, RelevancyThreshold, SearchResults, TermResult
+from .types import (
+    AutocompleteTerm,
+    RelevancyThreshold,
+    TermResult,
+)
 from .utils import get_max_priority_date
 
 logger = logging.getLogger(__name__)
@@ -40,9 +48,10 @@ SEARCH_RETURN_FIELDS = [
     # "assignees",
     "country",
     "family_id",
-    # "embeddings",
-    # "grant_date",
-    "inventors",
+    "filing_date",
+    "embeddings",
+    "grant_date",
+    # "inventors",
     "ipc_codes",
     "search_rank",
     # 'ARRAY(SELECT s.publication_number FROM "similar" as s where s.publication_number like \'WO%\') as "similar"',  # limit to WO patents
@@ -75,7 +84,8 @@ def search(
     relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
-) -> SearchResults:
+    skip_cache: bool = False,
+) -> Sequence[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -85,17 +95,54 @@ def search(
 
     Args:
         terms (Sequence[str]): list of terms to search for
+        fetch_approval (bool, optional): whether to fetch approval info. Defaults to False.
+        min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
+        relevancy_threshold (RelevancyThreshold, optional): relevancy threshold. Defaults to "high".
+        max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        is_randomized (bool, optional): whether to randomize results. Defaults to False.
+        skip_cache (bool, optional): whether to skip cache. Defaults to False.
 
     Returns: a list of matching patent applications
 
     Example:
     ```
-    import system; system.initialize()
     from clients.patents import patent_client
     patent_client.search(['asthma', 'astrocytoma'])
     ```
     """
+
+    args = {
+        "terms": terms,
+        "fetch_approval": fetch_approval,
+        "min_patent_years": min_patent_years,
+        "relevancy_threshold": relevancy_threshold,
+        "max_results": max_results,
+        "is_randomized": is_randomized,
+    }
+    key = get_id(args)
+    search_partial = partial(_search, **args)
+
+    if skip_cache:
+        return search_partial()
+
+    return retrieve_with_cache_check(search_partial, key=key)
+
+
+def _search(
+    terms: Sequence[str],
+    fetch_approval: bool = False,
+    min_patent_years: int = 10,
+    relevancy_threshold: RelevancyThreshold = "high",
+    max_results: int = MAX_SEARCH_RESULTS,
+    is_randomized: bool = False,
+) -> Sequence[PatentApplication]:
+    """
+    Search patents by terms
+    """
+    start = time.time()
+
     if not isinstance(terms, list):
+        logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
     # only checks for global patents
@@ -112,6 +159,7 @@ def search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                # *DOMAINS_OF_INTEREST, # added in formatting from terms/domains
                 "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
                 if is_randomized and fetch_approval
                 else "1 as randomizer",  # for randomizing approved patents
@@ -184,9 +232,13 @@ def search(
     """
 
     query = select_query + where
-
-    logger.debug("Query: %s", query)
     results = PsqlDatabaseClient().select(query, [_terms])
+
+    logger.debug("Patent search query: %s", query)
+    logger.info(
+        "Search took %s seconds (%s)", round(time.time() - start, 2), len(results)
+    )
+
     return format_search_result(results)
 
 
@@ -208,10 +260,11 @@ def autocomplete_terms(
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
     search_sql = f"%{string.lower()}%"
+    # TODO: psql search
     query = f"""
         SELECT *
         FROM terms
-        WHERE term ilike %s -- TODO: psql search
+        WHERE term ilike %s
         AND count > {min_term_frequency}
         ORDER BY count DESC, term ASC
     """

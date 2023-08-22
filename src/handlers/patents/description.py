@@ -23,7 +23,7 @@ def describe(event: DescribeEvent, context):
     Invocation:
     - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - API: `curl https://v8v4ij0xs4.execute-api.us-east-1.amazonaws.com/dev/terms/describe?terms=asthma`
+    - API: `curl https://api.biosymbolics.ai/terms/describe?terms=asthma`
     """
     gpt_client = GptApiClient(model="gpt-3.5-turbo")
 
