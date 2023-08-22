@@ -894,17 +894,17 @@ def populate_working_biosym_annotations():
         ]
     )
 
+    fix_unmatched()
     remove_junk()
-    remove_trailing_leading(
-        REMOVAL_WORDS_PRE
-    )  # round 1 (leaves in stuff used by for/of)
+
+    # round 1 (leaves in stuff used by for/of)
+    remove_trailing_leading(REMOVAL_WORDS_PRE)
     fix_of_for_annotations()
 
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
-    fix_unmatched()
 
-    remove_substrings()
+    remove_substrings()  # less specific terms in set with more specific terms
     normalize_domains()
     remove_common_terms()  # final step - remove one-off generic terms
 
