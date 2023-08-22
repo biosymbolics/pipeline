@@ -249,18 +249,19 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
         string (str): string to search for
 
     Returns: a list of matching terms
+
+    TODO: tsvector
     """
     start = time.time()
 
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
-    search_sql = f"%{string.lower()}%"
-    # TODO: psql search
+    search_sql = f".*{string}.*"
     query = f"""
         SELECT *
         FROM terms
-        WHERE term ilike %s
+        WHERE term ~* %s
         ORDER BY count DESC
         limit {limit}
     """

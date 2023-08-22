@@ -26,6 +26,10 @@ IndexCreateDef = TypedDict(
 IndexSql = TypedDict("IndexSql", {"sql": str})
 
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 def is_index_sql(index_def: IndexCreateDef | IndexSql) -> TypeGuard[IndexSql]:
     return index_def.get("sql") is not None
 
@@ -34,9 +38,6 @@ def is_index_create_def(
     index_def: IndexCreateDef | IndexSql,
 ) -> TypeGuard[IndexCreateDef]:
     return index_def.get("sql") is None
-
-
-logger = logging.getLogger(__name__)
 
 
 MIN_CONNECTIONS = 2
@@ -54,6 +55,11 @@ class PsqlClient:
         self,
         uri: str = DATABASE_URL,
     ):
+        logger.info(
+            "Creating new psql connection pool (min: %s, max: %s)",
+            MIN_CONNECTIONS,
+            MAX_CONNECTIONS,
+        )
         self.conn_pool = ConnectionPool(
             min_size=MIN_CONNECTIONS,
             max_size=MAX_CONNECTIONS,
@@ -62,7 +68,8 @@ class PsqlClient:
         )
 
     def get_conn(self):
-        return self.conn_pool.getconn()
+        conn = self.conn_pool.getconn()
+        return conn
 
     def put_conn(self, conn):
         self.conn_pool.putconn(conn)
@@ -122,14 +129,12 @@ class PsqlDatabaseClient(DatabaseClient):
         self, conn, e: Exception, is_rollback: bool = False, ignore_error: bool = False
     ) -> ExecuteResult:
         if ignore_error:
-            logging.info("Acceptable error executing query: %s", e)
+            logger.info("Acceptable error executing query: %s", e)
             return {"data": [], "columns": []}
         elif isinstance(e, NoResults):
-            logging.debug("No results executing query (not an error)")
+            logger.debug("No results executing query (not an error)")
         else:
-            logging.error(
-                "Error executing query (%s). Rolling back? %s", e, is_rollback
-            )
+            logger.error("Error executing query (%s). Rolling back? %s", e, is_rollback)
             if is_rollback:
                 conn.rollback()
             self.client.put_conn(conn)
@@ -153,22 +158,26 @@ class PsqlDatabaseClient(DatabaseClient):
             ignore_error (bool): if True, will not raise an error if the query fails
         """
         start = time.time()
-        logging.info("Starting query: %s", query)
+        logger.info("Starting query: %s", query)
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
             try:
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
-                logging.info("Row count for query: %s", cursor.rowcount)
+
+                logger.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
                 return self.handle_error(
-                    conn, e, is_rollback=True, ignore_error=ignore_error
+                    conn,
+                    e,
+                    is_rollback=True,
+                    ignore_error=ignore_error,
                 )
 
             execute_time = round(time.time() - start, 2)
-            if execute_time > 60:
-                logging.info("Query took %s minutes", round(execute_time / 60, 2))
+            if execute_time > 100:
+                logger.info("Query took %s minutes", round(execute_time / 60, 2))
 
             try:
                 if cursor.rownumber is None:
