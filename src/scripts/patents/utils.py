@@ -45,7 +45,9 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
         suppress_re = r"\b" + get_or_re(suppressions) + r"\b"
 
         for term in terms:
-            yield re.sub("(?i)" + suppress_re, "", term).rstrip("&[ ]*")
+            yield re.sub("(?i)" + suppress_re, "", term, flags=re.DOTALL).rstrip(
+                "&[ ]*"
+            )
 
     def get_mapping(clean_assignee: str, og_assignee: str, key: str) -> str | None:
         """

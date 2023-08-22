@@ -18,6 +18,7 @@ from constants.core import (
 from utils.re import get_or_re
 
 from .._constants import (
+    COMPOUND_BASE_TERMS_GENERIC,
     MECHANISM_BASE_TERMS,
     MECHANISM_BASE_TERM_SETS,
     INTERVENTION_BASE_TERMS,
@@ -29,13 +30,17 @@ TextField = Literal["title", "abstract"]
 WordPlace = Literal["leading", "trailing", "all"]
 
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
-REMOVAL_WORDS: dict[str, WordPlace] = {
+REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "such": "all",
     "method": "all",
     "obtainable": "all",
+    "different": "leading",
+    "stable": "leading",
     "the": "leading",
     "encoding": "trailing",
+    "discreet": "leading",
     "properties": "trailing",
+    "derived": "all",
     "library": "trailing",
     "more": "leading",
     "classic": "leading",
@@ -50,14 +55,11 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "specific": "leading",
     "recombinant": "leading",
     "novel": "leading",
-    "human(?:ized)": "all",  # ??
     "non[ -]?toxic": "leading",
     "improved": "leading",
-    # "attenuated": "leading",
     "improving": "trailing",
     "new": "leading",
     "-targeted": "all",
-    "functions": "trailing",
     "long[ -]?acting": "leading",
     "potent": "trailing",
     "inventive": "leading",
@@ -66,13 +68,11 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "of": "trailing",
     "be": "trailing",
     "use": "trailing",
-    "activity": "trailing",
     "efficacy": "trailing",
     "therapeutic procedure": "all",
     "therapeutic(?:ally)?": "leading",
     "therapeutic(?:ally)?": "trailing",
     "(?:co[ -]?)?therapy": "trailing",
-    # "drug": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
     "treatment method": "trailing",
     "treatment": "trailing",
@@ -84,6 +84,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "intermediate": "trailing",
     "suitable": "all",
     "procedure": "trailing",
+    "relevant": "leading",
     "patient": "leading",
     "patient": "trailing",
     "acceptable": "all",
@@ -94,9 +95,6 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "usable": "trailing",
     "other": "leading",
     "suitable": "trailing",
-    "preparation": "trailing",
-    # "composition": "trailing",
-    "combination": "trailing",
     "pharmaceutical": "all",
     "dosage(?: form)?": "all",
     "use of": "leading",
@@ -120,6 +118,7 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "[.]": "trailing",
     "analysis": "trailing",
     "management": "trailing",
+    "accelerated": "leading",
     "below": "trailing",
     "fixed": "leading",
     "pharmacological": "all",
@@ -127,68 +126,52 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "application": "trailing",
     "assembly": "trailing",
     "production": "trailing",
-    # "solution": "trailing",
     "level": "trailing",
     "processing": "trailing",
     "lead candidate": "all",
-    "candidate": "trailing",
-    # "molecule": "trailing",
-    # "conjugate": "trailing",
-    # "substrate": "trailing",
-    "particle": "trailing",
-    "medium": "trailing",
-    # "form": "trailing",
-    # "compound": "trailing",
     "control": "trailing",
     "modified": "leading",
     "variant": "trailing",
     "variety": "trailing",
     "varieties": "trailing",
-    "salt": "trailing",
-    # "analog": "trailing",
-    # "analogue": "trailing",
     "product": "trailing",
     "family": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    # "derivative": "trailing",
     "pure": "leading",
     "specific": "trailing",
     "chemically (?:modified)?": "leading",
     "based": "trailing",
     "an?": "leading",
-    "ingredient": "trailing",
     "active": "leading",
     "additional": "leading",
     "additive": "leading",
     "advantageous": "leading",
     "aforementioned": "leading",
     "aforesaid": "leading",
-    "candidate": "leading",
     "efficient": "leading",
     "first": "leading",
+    "second": "leading",
+    "interaction": "trailing",
+    "abnormal": "leading",
+    "atypical": "leading",
+    "inappropriate": "leading",
+    "compounds as": "leading",
     "formula [(][ivxab]{1,3}[)]": "trailing",
-    "formula": "leading",
-    # "formulation": "trailing",
-    "material": "trailing",
-    "biomaterial": "trailing",
     "is": "leading",
     "engineered": "leading",
     "medicament": "trailing",
     "medicinal": "leading",
-    "variant": "leading",
     "precipitation": "trailing",
     "sufficient": "trailing",
     "due": "trailing",
     "locate": "trailing",
     "specification": "trailing",
-    # "modality": "trailing",
     "detect": "trailing",
     "similar": "trailing",
     "contemplated": "leading",
     "predictable": "leading",
     "convenient": "leading",
     "dosing": "leading",
-    "dosing regimen": "trailing",
     "preferred": "leading",
     "conventional": "leading",
     "combination": "leading",
@@ -201,7 +184,36 @@ REMOVAL_WORDS: dict[str, WordPlace] = {
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
     "soluble": "leading",
+    "dosing regimen": "trailing",
+    "mutant": "leading",
+    "mutated": "leading",
+    # model/source
+    "murine": "all",
+    "mouse": "all",
+    "mice": "all",
+    "human(?:ized)?": "all",  # ??
+    "rat": "all",
+    "rodent": "all",
+    "rabbit": "all",
+    "porcine": "all",
+    "bovine": "all",
+    "equine": "all",
+    "mammal(?:ian)?": "all",
 }
+
+REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
+    [
+        (t, "trailing")
+        for t in [
+            *COMPOUND_BASE_TERMS_GENERIC,
+            "activity",
+            "agent",
+            "effect",
+            "pro[ -]?drug",
+        ]
+    ]
+)
+
 
 DELETION_TERMS = [
     "cell",
@@ -257,6 +269,7 @@ DELETION_TERMS = [
     "excipient",
     "amide",
     "amine",
+    "single chain",
     "recombinantly",
     "aperture",
     "scaffold",
@@ -702,43 +715,55 @@ def fix_of_for_annotations():
                 logging.error(e)
 
 
-def remove_junk():
-    """
-    Remove trailing junk and silly matches
-    """
-    logging.info("Removing junk")
+def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
+    logging.info("Removing trailing/leading words")
 
     def get_remove_words():
         def get_sql(place):
             if place == "trailing":
                 words = [
-                    "[ ]" + t[0] + "s?" for t in REMOVAL_WORDS.items() if t[1] == place
+                    "[ ]" + t[0] + "s?"
+                    for t in removal_word_set.items()
+                    if t[1] == place
                 ]
                 words_re = get_or_re(words, "+")
                 return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', ''))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', '', 'g'))
                     where original_term ~* '.*{words_re}$'
                 """
             elif place == "leading":
-                words = [t[0] + "s?[ ]" for t in REMOVAL_WORDS.items() if t[1] == place]
+                words = [
+                    t[0] + "s?[ ]" for t in removal_word_set.items() if t[1] == place
+                ]
                 words_re = get_or_re(words, "+")
                 return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', ''))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', '', 'g'))
                     where original_term ~* '^{words_re}.*'
                 """
             elif place == "all":
                 words = [
-                    t[0] + "s?[ ]?" for t in REMOVAL_WORDS.items() if t[1] == place
+                    t[0] + "s?[ ]?" for t in removal_word_set.items() if t[1] == place
                 ]
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' '))
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' ', 'g'))
                     where original_term ~* '(?:^|$| ){words_re}(?:^|$| )'
                 """
             else:
                 raise ValueError(f"Unknown place: {place}")
 
         return [get_sql(place) for place in ["all", "leading", "trailing"]]
+
+    client = DatabaseClient()
+    for sql in get_remove_words():
+        client.execute_query(sql)
+
+
+def remove_junk():
+    """
+    Remove trailing junk and silly matches
+    """
+    logging.info("Removing junk")
 
     mechanism_terms = [
         f"{t}s?"
@@ -752,10 +777,9 @@ def remove_junk():
     queries = [
         # unwrap
         f"update {WORKING_TABLE} "
-        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '')) where original_term ~ '^[(][^)(]+[)]$'",
+        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
-        *get_remove_words(),
         # leading whitespace
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
         # trailing whitespace
@@ -895,11 +919,17 @@ def populate_working_biosym_annotations():
         ]
     )
 
-    remove_junk()
-    fix_of_for_annotations()
     fix_unmatched()
+    remove_junk()
 
-    remove_substrings()
+    # round 1 (leaves in stuff used by for/of)
+    remove_trailing_leading(REMOVAL_WORDS_PRE)
+    fix_of_for_annotations()
+
+    # round 2 (removes trailing "compound" etc)
+    remove_trailing_leading(REMOVAL_WORDS_POST)
+
+    remove_substrings()  # less specific terms in set with more specific terms
     normalize_domains()
     remove_common_terms()  # final step - remove one-off generic terms
 

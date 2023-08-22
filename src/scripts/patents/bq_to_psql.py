@@ -28,7 +28,7 @@ GCS_BUCKET = "biosym-patents"
 SHARD_SIZE = timedelta(days=730)
 
 
-FIELDS = [
+INITIAL_COPY_FIELDS = [
     # gpr_publications
     "gpr_pubs.publication_number as publication_number",
     "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
@@ -80,7 +80,7 @@ def create_applications_table():
 
     applications = f"""
         SELECT
-        {','.join(FIELDS)}
+        {','.join(INITIAL_COPY_FIELDS)}
         FROM `{BQ_DATASET_ID}.publications` as pubs,
         `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number

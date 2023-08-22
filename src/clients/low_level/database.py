@@ -7,6 +7,7 @@ import logging
 from utils.list import batch
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 T = TypeVar("T", bound=Mapping)
 ExecuteResult = TypedDict("ExecuteResult", {"columns": list[str], "data": list[dict]})

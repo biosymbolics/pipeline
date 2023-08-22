@@ -25,7 +25,6 @@ from .utils import get_max_priority_date
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MIN_TERM_FREQUENCY = 2
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 
@@ -35,7 +34,7 @@ Larger decay rates will result in more matches
 Usage:
     EXP(-a.character_offset_start * {DECAY_RATE}) > {threshold})
 """
-DECAY_RATE = 1 / 2000
+DECAY_RATE = 1 / 20000
 
 
 SEARCH_RETURN_FIELDS = [
@@ -159,7 +158,6 @@ def _search(
             [
                 *SEARCH_RETURN_FIELDS,
                 *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
-                # *DOMAINS_OF_INTEREST, # added in formatting from terms/domains
                 "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
                 if is_randomized and fetch_approval
                 else "1 as randomizer",  # for randomizing approved patents
@@ -242,31 +240,30 @@ def _search(
     return format_search_result(results)
 
 
-def autocomplete_terms(
-    string: str, min_term_frequency: int = 1
-) -> list[AutocompleteTerm]:
+def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
     """
     Fetch all terms from table `terms`
-    Sort by term, then by count. Terms must have a count > min_term_frequency
+    Sort by term, then by count.
 
     Args:
         string (str): string to search for
 
     Returns: a list of matching terms
+
+    TODO: tsvector
     """
     start = time.time()
 
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
-    search_sql = f"%{string.lower()}%"
-    # TODO: psql search
+    search_sql = f".*{string}.*"
     query = f"""
         SELECT *
         FROM terms
-        WHERE term ilike %s
-        AND count > {min_term_frequency}
-        ORDER BY count DESC, term ASC
+        WHERE term ~* %s
+        ORDER BY count DESC
+        limit {limit}
     """
     results = PsqlDatabaseClient().select(query, [search_sql])
     formatted = [format_term(cast(TermResult, result)) for result in results]

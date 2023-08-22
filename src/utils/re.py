@@ -82,7 +82,7 @@ def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
 
     def __remove(term: str):
         for pattern, replacement in extra_space_patterns.items():
-            term = re.sub(pattern, replacement, term)
+            term = re.sub(pattern, replacement, term, flags=re.DOTALL)
         return term.strip()
 
     for term in terms:

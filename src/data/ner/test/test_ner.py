@@ -178,6 +178,20 @@ class TestNerUtils(unittest.TestCase):
                     # arteriosclerosis, diabetic nephropathy, nephritis, diabetes # TODO
                 ],
             },
+            {
+                "text": """
+                    5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivatives and their use as dual inhibitors of phosphatidylinositol 3-kinase delta &amp; gamma
+                    There are disclosed certain novel compounds (including pharmaceutically acceptable salts thereof) (I) that inhibit phosphatidylinositol 3-kinase gamma (PI3Kδ) and phosphatidylinositol 3-kinase gamma (ΡΙ3Κγ) activity, to their utility in treating and/or preventing clinical conditions including respiratory diseases, such as asthma and chronic obstructive pulmonary disease (COPD), to their use in therapy, to pharmaceutical compositions containing them and to processes for preparing such compounds.
+                """,
+                "expected_output": [
+                    "5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivative",
+                    "dual inhibitors of phosphatidylinositol 3-kinase delta and gamma",
+                    "chronic obstructive pulmonary disease",
+                    "asthma",
+                    "respiratory disease",
+                    "inhibit phosphatidylinositol 3-kinase gamma",
+                ],
+            },
         ]
 
         for condition in test_conditions:

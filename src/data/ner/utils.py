@@ -144,11 +144,13 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
+        "against": r"against\b",
+        "targeting": r"targeting\b",
         # "by": r"mediated by\b",
     }
 
     def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
-        subbed = [re.sub(adp_ext, adp_term, t) for t in _terms]
+        subbed = [re.sub(adp_ext, adp_term, t, flags=re.DOTALL) for t in _terms]
         final = __rearrange_adp(subbed, adp_term=adp_term, n_process=n_process)
         return final
 
@@ -314,7 +316,11 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     # avoid spacy keeping terms with - as a single token
     def sep_dash(term: str) -> str:
-        return re.sub(DASHES_RE, rf" {DASH} ", term) if not is_iupac(term) else term
+        return (
+            re.sub(DASHES_RE, rf" {DASH} ", term, flags=re.DOTALL)
+            if not is_iupac(term)
+            else term
+        )
 
     sep_dash_terms = [sep_dash(term) for term in terms]
     docs = nlp.pipe(sep_dash_terms, n_process=n_process)
