@@ -1,3 +1,5 @@
+TEXT_FIELDS = frozenset(["title", "abstract"])
+
 MECHANISM_BASE_TERMS: list[str] = [
     "activity",
     "adjuvant",

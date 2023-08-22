@@ -3,6 +3,7 @@ Handler for patents autocomplete
 """
 import json
 import logging
+from typing_extensions import NotRequired
 from typing import TypedDict
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,9 @@ logger.setLevel(logging.INFO)
 from clients import patents as patent_client
 
 
-AutocompleteParams = TypedDict("AutocompleteParams", {"term": str})
+AutocompleteParams = TypedDict(
+    "AutocompleteParams", {"term": str, "limit": NotRequired[int]}
+)
 AutocompleteEvent = TypedDict(
     "AutocompleteEvent", {"queryStringParameters": AutocompleteParams}
 )
@@ -44,6 +47,7 @@ def autocomplete(event: AutocompleteEvent, context):
     """
     params = event.get("queryStringParameters", {})
     term = params.get("term")
+    limit = params.get("limit") or 25
 
     if not params or not term:
         logger.error(
@@ -59,6 +63,6 @@ def autocomplete(event: AutocompleteEvent, context):
         logger.info("Term too short, skipping autocomplete")
         return {"statusCode": 200, "body": json.dumps({"terms": []})}
 
-    terms = patent_client.autocomplete_terms(term)
+    terms = patent_client.autocomplete_terms(term, limit)
 
     return {"statusCode": 200, "body": json.dumps({"terms": terms})}

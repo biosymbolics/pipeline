@@ -17,7 +17,6 @@ from data.ner import NerTagger
 
 
 ID_FIELD = "publication_number"
-TEXT_FIELDS = frozenset(["title", "abstract"])
 ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 BATCH_SIZE = 2000
 MAX_TEXT_LENGTH = 750

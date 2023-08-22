@@ -3,7 +3,7 @@ Low-level Postgres client
 """
 import time
 from typing_extensions import NotRequired
-from typing import Mapping, TypeGuard, TypeVar, TypedDict
+from typing import Any, Mapping, TypeGuard, TypeVar, TypedDict
 import logging
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
@@ -48,6 +48,8 @@ class NoResults(Exception):
 
 
 class PsqlClient:
+    _instances: dict[tuple, Any] = {}
+
     def __init__(
         self,
         uri: str = DATABASE_URL,
@@ -68,6 +70,17 @@ class PsqlClient:
     def close_all(self):
         self.conn_pool.close()
 
+    @classmethod
+    def get_instance(cls, **kwargs) -> "PsqlClient":
+        # Convert kwargs to a hashable type
+        kwargs_tuple = tuple(sorted(kwargs.items()))
+        if kwargs_tuple not in cls._instances:
+            logger.info("Creating new instance of %s", cls)
+            cls._instances[kwargs_tuple] = cls(**kwargs)
+        else:
+            logger.info("Using existing instance of %s", cls)
+        return cls._instances[kwargs_tuple]
+
 
 class PsqlDatabaseClient(DatabaseClient):
     """
@@ -79,7 +92,7 @@ class PsqlDatabaseClient(DatabaseClient):
     """
 
     def __init__(self, uri: str = DATABASE_URL):
-        self.client = PsqlClient(uri)
+        self.client = PsqlClient.get_instance(uri=uri)
 
     @staticmethod
     @overrides(DatabaseClient)
