@@ -200,7 +200,7 @@ class EntityCleaner:
         def remove_chars(_terms: list[str]) -> Iterable[str]:
             def __remove_chars(term):
                 for pattern, replacement in self.char_suppressions.items():
-                    term = re.sub(pattern, replacement, term)
+                    term = re.sub(pattern, replacement, term, flags=re.DOTALL)
                 return term
 
             for term in _terms:
@@ -237,9 +237,12 @@ class EntityCleaner:
                 yield no_parens
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
+            def _map(s, syn, canonical):
+                return re.sub(rf"(?i)\b{syn}s?\b", canonical, s, flags=re.DOTALL)
+
             steps = [
-                lambda s: re.sub(rf"\b{dup}s?\b", canonical, s)
-                for dup, canonical in PHRASE_MAP.items()
+                partial(_map, syn=syn, canonical=canonical)
+                for syn, canonical in PHRASE_MAP.items()
             ]
 
             for term in _terms:
@@ -255,10 +258,10 @@ class EntityCleaner:
             unwrap,
             format_parentheticals,  # order matters (after unwrap)
             remove_extra_spaces,
-            normalize_phrasing,
             partial(rearrange_terms, n_process=n_process),
             partial(lemmatize_tails, n_process=n_process),
             partial(normalize_by_pos, n_process=n_process),
+            normalize_phrasing,  # order matters (after rearrange)
             lower,
         ]
 

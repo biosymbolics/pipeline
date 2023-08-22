@@ -88,7 +88,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "metabotropic glutamate receptor (mGluR) antagonists",
-                "expected": "metabotropic glutamate receptor antagonist",
+                "expected": "metabotropic glutamate antagonist",
             },
             {
                 "input": "poly(isoprene)",
@@ -100,17 +100,60 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
-                "expected": "the γc family interleukin 2, interleukin 9, and interleukin 15",
+                "expected": "the γc family il2, il9, and il15",
             },
             {
                 "input": "Familial Alzheimer Disease (FAD)",
                 "expected": "familial alzheimer disease",
-            }
-            # GLP-1 receptor agonists, tgf-beta 1 accessory receptor, β1-receptor functions
-            # angiotensin-ii, igf-i receptor signaling,  receptor activator of NF-kB ligand
-            # chimeric antibody-T cell receptor, β1-adrenoreceptor gene
-            # glucagon-like peptide-2 receptors,  5-hydroxytryptamine-3 receptor antagonist
-            # T-cell receptor CD-28
+            },
+            {
+                "input": "il36 pathway inhibitors",
+                "expected": "il36 inhibitor",
+            },
+            {
+                "input": "anti-il36r antibodies",
+                "expected": "anti il36r antibody",
+            },
+            {
+                "input": "human il-36r agonist ligands il36α",
+                "expected": "human il36r agonist il36α",  # TODO
+            },
+            {
+                "input": "GLP-1 receptor agonists",
+                "expected": "glp1 agonist",
+            },
+            {
+                "input": "tgf-beta 1 accessory receptor",
+                "expected": "tgf β 1 accessory receptor",
+            },
+            {
+                "input": "angiotensin-ii",
+                "expected": "angiotensin ii",
+            },
+            {
+                "input": "receptor activator of NF-kB ligand",
+                "expected": "nfkb activator",
+            },
+            {
+                "input": "chimeric antibody-T cell receptor",
+                "expected": "chimeric antibody t-cell receptor",
+            },
+            {
+                "input": "β1-adrenoreceptor gene",
+                "expected": "β1 adrenoreceptor gene",
+            },
+            {
+                "input": "5-hydroxytryptamine-3 receptor antagonist",
+                "expected": "5 hydroxytryptamine 3 antagonist",
+            },
+            {
+                "input": "glucagon-like peptide-2 receptors",
+                "expected": "glucagon like peptide 2 receptor",
+            },
+            {
+                "input": "T-cell receptor CD-28",
+                "expected": "t-cell receptor cd28",
+            },
         ]
 
         for condition in test_conditions:

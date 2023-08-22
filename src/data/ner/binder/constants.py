@@ -62,6 +62,7 @@ PHRASE_MAP = {
     "pathway inhibitor": "inhibitor",
     "peptide complex(?:es)?": "peptide",
     # we might want to undo this in the future (but note that the info isn't lost to the user)
+    "(?:ligand )?receptor activator": "activator",
     "receptor agonist": "agonist",  # ??
     "receptor antagonist": "antagonist",  # ??
     "receptor bind(?:ing|er)": "binder",
