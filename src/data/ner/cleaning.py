@@ -238,7 +238,7 @@ class EntityCleaner:
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             steps = [
-                lambda s: re.sub(rf"\b{dup}\b", canonical, s)
+                lambda s: re.sub(rf"\b{dup}s?\b", canonical, s)
                 for dup, canonical in PHRASE_MAP.items()
             ]
 

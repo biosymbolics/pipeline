@@ -34,9 +34,13 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "such": "all",
     "method": "all",
     "obtainable": "all",
+    "different": "leading",
+    "stable": "leading",
     "the": "leading",
     "encoding": "trailing",
+    "discreet": "leading",
     "properties": "trailing",
+    "derived": "all",
     "library": "trailing",
     "more": "leading",
     "classic": "leading",
@@ -51,7 +55,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "specific": "leading",
     "recombinant": "leading",
     "novel": "leading",
-    "human(?:ized)": "all",  # ??
     "non[ -]?toxic": "leading",
     "improved": "leading",
     "improving": "trailing",
@@ -81,6 +84,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "intermediate": "trailing",
     "suitable": "all",
     "procedure": "trailing",
+    "relevant": "leading",
     "patient": "leading",
     "patient": "trailing",
     "acceptable": "all",
@@ -175,6 +179,18 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "dosing regimen": "trailing",
+    # model/source
+    "murine": "all",
+    "mouse": "all",
+    "mice": "all",
+    "human(?:ized)?": "all",  # ??
+    "human": "all",
+    "rat": "all",
+    "rodent": "all",
+    "rabbit": "all",
+    "porcine": "all",
+    "bovine": "all",
+    "equine": "all",
 }
 
 REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
@@ -245,6 +261,7 @@ DELETION_TERMS = [
     "excipient",
     "amide",
     "amine",
+    "single chain",
     "recombinantly",
     "aperture",
     "scaffold",
