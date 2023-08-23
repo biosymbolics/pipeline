@@ -11,10 +11,9 @@ from data.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-
 from .biosym_annotations import populate_working_biosym_annotations
 
-from ..bq.gpr_constants import SYNONYM_MAP
+from .._constants import SYNONYM_MAP
 from ..utils import clean_assignees
 
 MIN_ASSIGNEE_COUNT = 2
@@ -207,7 +206,9 @@ class TermAssembler:
 
         logging.info("Finished creating normalization_map")
 
-        def __normalize(term: str) -> str:
+        def __normalize(term: str, domain: str) -> str:
+            if domain == "attributes":
+                return term  # leave attributes alone
             entry = normalization_map.get(term)
             if not entry:
                 return SYNONYM_MAP.get(term) or term
@@ -215,7 +216,7 @@ class TermAssembler:
 
         term_records: list[TermRecord] = [
             {
-                "term": __normalize(row["term"]),
+                "term": __normalize(row["term"], row["domain"]),
                 "count": row["count"] or 0,
                 "canonical_id": getattr(
                     normalization_map.get(row["term"]) or (), "concept_id", None

@@ -898,7 +898,9 @@ def populate_working_biosym_annotations():
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    client.create_from_select(f"SELECT * from {SOURCE_TABLE}", WORKING_TABLE)
+    client.create_from_select(
+        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'", WORKING_TABLE
+    )
 
     # add indices after initial load
     index_base = f"index_{WORKING_TABLE}"
@@ -933,6 +935,10 @@ def populate_working_biosym_annotations():
     normalize_domains()
     remove_common_terms()  # final step - remove one-off generic terms
 
+    client.select_insert_into_table(
+        f"SELECT * from {SOURCE_TABLE} where domain='attributes'", WORKING_TABLE
+    )
+
 
 if __name__ == "__main__":
     """
@@ -940,24 +946,29 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (1,038,200)
+    (1,038,200 -> 2,267,432)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,755,711)
+    (2,755,711 -> 2,562,352)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,199,104)
+    (3,199,104 -> 5,491,727)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (3,919,589)
+    (3,919,589 -> 5,491,727)
     select domain, count(*) from biosym_annotations group by domain;
     attribute  | 2462930
     compounds  | 1249384
     diseases   |  840063
     mechanisms | 1830142
+    -- ->
+    attributes | 1673936
+    compounds  | 1463527
+    diseases   |  834919
+    mechanisms | 1519345
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,419)
+    (14,419 -> 15,389)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (37,776)
+    (37,776 -> 39,325)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (71,656)
+    (71,656 -> 69,491)
     """
     if "-h" in sys.argv:
         print(
