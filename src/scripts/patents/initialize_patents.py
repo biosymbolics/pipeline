@@ -187,12 +187,10 @@ def main(bootstrap: bool = False):
         create_funcs()
         __create_biosym_annotations_source_table()
         copy_patent_tables()
-
-    # create patent applications etc in postgres
-    copy_bq_to_psql()
-
-    # copy data about approvals
-    copy_patent_approvals()
+        # create patent applications etc in postgres
+        copy_bq_to_psql()
+        # copy data about approvals
+        copy_patent_approvals()
 
     # create patent terms (psql)
     create_patent_terms()

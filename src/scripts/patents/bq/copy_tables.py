@@ -6,7 +6,6 @@ from clients.low_level.big_query import (
     BQ_DATASET_ID,
 )
 
-from .gpr_constants import COMMON_ENTITY_NAMES, SUPPRESSED_DOMAINS
 
 BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
 IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
@@ -24,46 +23,6 @@ def __copy_gpr_publications():
         SELECT * FROM `patents-public-data.google_patents_research.publications`
         WHERE EXISTS
         (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
-    """
-    client.create_from_select(query, table_id)
-
-
-def __copy_gpr_annotations():
-    """
-    Copy annotations from GPR to a local table
-
-    To remove annotations after load:
-    ``` sql
-    UPDATE `patents.entities`
-    SET annotations = ARRAY(
-        SELECT AS STRUCT *
-        FROM UNNEST(annotations) as annotation
-        WHERE annotation.domain NOT IN ('chemClass', 'chemGroup', 'anatomy')
-    )
-    WHERE EXISTS(
-        SELECT 1
-        FROM UNNEST(annotations) AS annotation
-        WHERE annotation.domain IN ('chemClass', 'chemGroup', 'anatomy')
-    )
-    ```
-
-    or from gpr_annotations:
-    ``` sql
-    DELETE FROM `fair-abbey-386416.patents.gpr_annotations` where domain in
-    ('chemClass', 'chemGroup', 'anatomy') OR preferred_name in ("seasonal", "behavioural", "mental health")
-    ```
-    """
-    table_id = "gpr_annotations"
-    client = DatabaseClient()
-    client.delete_table(table_id)
-
-    query = f"""
-        SELECT annotations.* FROM `patents-public-data.google_patents_research.annotations` as annotations
-        JOIN `{BQ_DATASET_ID}.publications` AS local_publications
-        ON local_publications.publication_number = annotations.publication_number
-        WHERE annotations.confidence > 0.69
-        AND LOWER(preferred_name) not in {COMMON_ENTITY_NAMES}
-        AND domain not in {SUPPRESSED_DOMAINS}
     """
     client.create_from_select(query, table_id)
 
@@ -114,6 +73,3 @@ def copy_patent_tables():
 
     # copy publications table
     __copy_publications()
-
-    # copy gpr_annotations table
-    __copy_gpr_annotations()

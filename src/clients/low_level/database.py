@@ -99,14 +99,14 @@ class DatabaseClient:
         batched = batch(records, batch_size)
 
         for i, b in enumerate(batched):
-            logging.info("Inserting batch %s into table %s", i, table_name)
+            logging.debug("Inserting batch %s into table %s", i, table_name)
             try:
                 self._insert(table_name, records=b)
             except Exception as e:
                 logging.error("Error inserting rows: %s", e)
                 raise e
 
-            logging.info("Successfully inserted %s rows", len(b))
+            logging.debug("Successfully inserted %s rows", len(b))
 
     def create_table(
         self,
@@ -150,6 +150,7 @@ class DatabaseClient:
         logger.info("Deleting table %s", table_name)
         delete_table_query = f"DROP TABLE IF EXISTS {table_id};"
         self.execute_query(delete_table_query)
+        logging.info("Deleted table %s", table_name)
 
     def truncate_table(self, table_name: str):
         """
@@ -169,6 +170,7 @@ class DatabaseClient:
         logger.info("Truncating table %s", table_id)
         truncate_table_query = f"TRUNCATE TABLE {table_id};"
         self.execute_query(truncate_table_query)
+        logging.info("Truncated table %s", table_name)
 
 
 def execute_with_retries(db_func: Callable[[], Any]):

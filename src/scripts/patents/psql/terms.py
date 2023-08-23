@@ -112,7 +112,7 @@ class SynonymMapper:
         ]
 
         self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
-        logging.info(
+        logging.debug(
             "Inserted %s rows into synonym_map (%s)",
             len(records),
             len(list(synonym_map.keys())),
