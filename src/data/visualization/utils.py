@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 import numpy.typing as npt
 from sklearn.base import TransformerMixin
 
-from data.ner.spacy import Spacy
+from core.ner.spacy import Spacy
 from utils.dataframe import find_text_columns
 
 MAX_FEATURES = 10000

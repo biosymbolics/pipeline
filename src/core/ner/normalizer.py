@@ -1,6 +1,6 @@
-from data.ner.cleaning import EntityCleaner
-from data.ner.linker import TermLinker
-from data.ner.types import CanonicalEntity
+from core.ner.cleaning import EntityCleaner
+from core.ner.linker import TermLinker
+from core.ner.types import CanonicalEntity
 
 
 class TermNormalizer:

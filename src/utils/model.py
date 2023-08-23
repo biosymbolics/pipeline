@@ -7,12 +7,12 @@ from clients.low_level.boto3 import fetch_s3_obj
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-DEFAULT_LOCATION = "../../models"
+DEFAULT_LOCATION = os.path.join(os.getcwd(), "models")
 
 
-def fetch_model(model: str, dest: str = DEFAULT_LOCATION) -> str:
+def get_model_path(model: str, dest: str = DEFAULT_LOCATION) -> str:
     """
-    Fetch model from disk, downloading from S3 if necessary
+    Get model path from disk, downloading from S3 if necessary
     """
 
     filename = os.path.join(Path(dest), model)
@@ -21,10 +21,9 @@ def fetch_model(model: str, dest: str = DEFAULT_LOCATION) -> str:
     if not os.path.exists(filename):
         logger.info("Not in disk, downloading from S3 bucket")
         filename = download_model_from_s3(model, dest)
+        return filename
 
-    dirname = model.split("-")[0]
-    model_full_path = os.path.join(filename, dirname, model)
-    return model_full_path
+    return filename
 
 
 def download_model_from_s3(model: str, dest: str = DEFAULT_LOCATION) -> str:

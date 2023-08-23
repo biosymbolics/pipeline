@@ -1,6 +1,6 @@
 import unittest
 
-from data.ner import NerTagger
+from core.ner import NerTagger
 
 
 # PROTEIN BINDING TO Akt2
@@ -14,7 +14,7 @@ from data.ner import NerTagger
 # Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
 class TestNerUtils(unittest.TestCase):
     """
-    from data.ner import NerTagger; tagger=NerTagger()
+    from core.ner import NerTagger; tagger=NerTagger()
     t = tagger.extract([text], link=False)[0]
     [(t1[0], t1.start_char, t1.end_char) for t1 in t]
     """

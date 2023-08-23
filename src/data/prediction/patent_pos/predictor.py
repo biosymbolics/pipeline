@@ -1,12 +1,12 @@
 import logging
 import sys
-from typing import Sequence, cast
+from typing import cast
 import torch
 from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
 from utils.tensor import pad_or_truncate_to_size
-from core.models.patent_pos.core import CombinedModel
+from data.prediction.patent_pos.core import CombinedModel
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
 from .constants import (

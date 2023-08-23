@@ -6,10 +6,9 @@ from pydash import compact
 import torch
 from transformers import AutoTokenizer
 import logging
-from spacy.vocab import Vocab
 from spacy.tokens import Doc
 
-from data.ner.spacy import Spacy
+from core.ner.spacy import Spacy
 
 from .constants import NER_TYPES
 from .types import Annotation
@@ -77,7 +76,7 @@ class BinderNlp:
             annotations (list[Annotation]): list of annotations
 
         ```
-        from data.ner.binder.binder import BinderNlp
+        from core.ner.binder.binder import BinderNlp
         b = BinderNlp("model.pt")
         text="Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
         b.extract(text).ents

@@ -1,7 +1,7 @@
 import unittest
 
-from data.ner.cleaning import EntityCleaner
-from data.ner.utils import rearrange_terms, normalize_by_pos
+from core.ner.cleaning import EntityCleaner
+from core.ner.utils import rearrange_terms, normalize_by_pos
 
 
 class TestNerUtils(unittest.TestCase):

@@ -1,7 +1,7 @@
 import json
 import unittest
 from unittest.mock import patch, MagicMock
-from ner.synonyms import SynonymStore  # replace with the actual module name
+from ..synonyms import SynonymStore  # replace with the actual module name
 
 
 # class TestSynonymStore(unittest.TestCase):

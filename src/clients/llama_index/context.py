@@ -31,7 +31,8 @@ class ModelInfo(TypedDict):
     model: str
 
 
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 MONGO_URI = os.environ["MONGO_URI"]
 
@@ -48,17 +49,17 @@ def get_storage_context(
         index_name (str): name of the index
         kwargs (Mapping[str, Any]): kwargs for vector store
     """
-    logging.info("Loading storage context for %s", index_name)
+    logger.info("Loading storage context for %s", index_name)
 
     if storage_type == "pinecone":
-        logging.info("Loading pinecone vector store context")
+        logger.info("Loading pinecone vector store context")
         pinecone_index = get_vector_store(index_name)
         vector_store = PineconeVectorStore(pinecone_index, **kwargs)
         context = StorageContext.from_defaults(vector_store=vector_store)
         return context
 
     elif storage_type == "mongodb":
-        logging.info(
+        logger.info(
             "Loading mongodb doc and index store context, chromadb vector store"
         )
         chroma_client = chromadb.PersistentClient(
@@ -67,7 +68,7 @@ def get_storage_context(
 
         chroma_collection = chroma_client.get_or_create_collection(index_name)
 
-        logging.info(
+        logger.info(
             "Loaded chroma collection; contains %s docs", chroma_collection.count()
         )
 
@@ -126,7 +127,7 @@ def get_service_context(
     llm_predictor = LLMPredictor(llm=llm)
     prompt_helper = PromptHelper.from_llm_metadata(llm_predictor.metadata)
 
-    logging.info("Prompt helper: %s", prompt_helper.__dict__.items())
+    logger.info("Prompt helper: %s", prompt_helper.__dict__.items())
 
     service_context = ServiceContext.from_defaults(
         **kwargs,

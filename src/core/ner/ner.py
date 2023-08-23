@@ -15,7 +15,7 @@ import spacy
 from spacy.tokens import Span, Doc
 
 from utils.extraction.html import extract_text
-from utils.model import fetch_model
+from utils.model import get_model_path
 from utils.re import remove_extra_spaces
 from utils.string import chunk_list
 
@@ -108,8 +108,8 @@ class NerTagger:
             if not self.model.endswith(".pt"):
                 raise ValueError("Model must be torch")
 
-            fetch_model(self.model)
-            self.nlp = BinderNlp(self.model)
+            model_filename = get_model_path(self.model)
+            self.nlp = BinderNlp(model_filename)
 
             if len(self.rule_sets) > 0:
                 # rules catch a few things the binder model misses

@@ -18,7 +18,7 @@ from clients.llama_index.context import StorageArgs
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.stores.pinecone import get_metadata_filters
-from data.ner import NerTagger
+from core.ner import NerTagger
 from utils.misc import dict_to_named_tuple
 from utils.namespace import get_namespace_id
 from utils.string import get_id

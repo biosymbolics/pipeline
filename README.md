@@ -146,7 +146,7 @@ si = core.indices.source_doc_index.SourceDocIndex()
 ```
 import system
 system.initialize()
-from data.ner import NerTagger
+from core.ner import NerTagger
 tagger = NerTagger()
 text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
 tagger.extract([text], link=False)

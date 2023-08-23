@@ -1,7 +1,6 @@
 """
 Loss functions for patent_pos model.
 """
-import logging
 import torch
 from torch import nn
 from torch.nn import functional as F

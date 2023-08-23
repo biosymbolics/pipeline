@@ -15,12 +15,12 @@ import polars as pl
 from torch import nn
 import torch.nn.functional as F
 
-from data.ner.spacy import Spacy
-from utils.list import batch
-from utils.tensor import batch_as_tensors
-from core.models.patent_pos.types import AllInput, DnnInput, GnnInput
+from core.ner.spacy import Spacy
+from data.prediction.patent_pos.types import AllInput, DnnInput, GnnInput
 from typings.core import Primitive
 from typings.patents import ApprovedPatentApplication as PatentApplication
+from utils.list import batch
+from utils.tensor import batch_as_tensors
 
 from .constants import EMBEDDING_DIM, MAX_STRING_LEN, MAX_CATS_PER_LIST, TEXT_FEATURES
 

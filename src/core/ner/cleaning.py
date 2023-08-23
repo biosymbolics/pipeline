@@ -11,7 +11,7 @@ import html
 from typing_extensions import Protocol
 
 from constants.patterns.iupac import is_iupac
-from data.ner.binder.constants import PHRASE_MAP
+from core.ner.binder.constants import PHRASE_MAP
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
 from typings.core import is_string_list
 

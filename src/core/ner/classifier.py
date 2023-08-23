@@ -1,14 +1,11 @@
 """
 Text classifiers
 """
-from functools import partial
 from pydash import compact
-import spacy
 from typing import Mapping, Union
 import logging
-import polars as pl
-from data.ner.spacy import Spacy
 
+from core.ner.spacy import Spacy
 from utils.list import dedup
 
 
