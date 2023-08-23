@@ -16,7 +16,6 @@ from .biosym_annotations import populate_working_biosym_annotations
 from .._constants import SYNONYM_MAP
 from ..utils import clean_assignees
 
-MIN_ASSIGNEE_COUNT = 2
 TERMS_FILE = "terms.json"
 
 
@@ -139,7 +138,7 @@ class TermAssembler:
         def __get_term_record(_group) -> AggregatedTermRecord:
             group = list(_group)
             return {
-                "term": group[0]["term"],  # non-lowered-term
+                "term": group[0]["term"],
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
@@ -184,7 +183,7 @@ class TermAssembler:
         terms = TermAssembler.__aggregate(
             [row for row in normalized if len(row["term"]) > 1]
         )
-        return [term for term in terms if term["count"] > MIN_ASSIGNEE_COUNT]
+        return terms
 
     def __generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """

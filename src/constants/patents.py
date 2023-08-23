@@ -246,6 +246,7 @@ COMPANY_MAP = {
     "koninklijke philips": "Philips",
     "max planck": "Max Planck",
     "novartis": "Novartis",
+    "pfizer": "Pfizer",
     "gilead": "Gilead",
     "dow": "Dow",
 }
