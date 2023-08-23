@@ -243,8 +243,13 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
     search_sql = f".*{string}.*"
     query = f"""
         SELECT *
-        FROM terms
-        WHERE term ~* %s
+        FROM terms,
+        unnest(synonyms) as synonym
+        WHERE (
+            term ~* %s
+            OR
+            synonym ~* %s
+        )
         ORDER BY count DESC
         limit {limit}
     """
