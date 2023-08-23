@@ -716,7 +716,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
 
     # \y === \b in postgres re
     def get_remove_words():
-        def get_sql(place):
+        def get_sql(place: str):
             if place == "trailing":
                 words = [
                     t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place
@@ -766,15 +766,6 @@ def remove_junk():
     """
     logging.info("Removing junk")
 
-    mechanism_terms = [
-        f"{t}s?"
-        for t in [
-            *flatten(MECHANISM_BASE_TERM_SETS),
-            *MECHANISM_BASE_TERMS,
-        ]
-    ]
-    mechanism_re = get_or_re(mechanism_terms)
-
     queries = [
         # unwrap
         f"update {WORKING_TABLE} "
@@ -787,16 +778,6 @@ def remove_junk():
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]+$', '')) where original_term ~ '[ ]+$'",
         # f"update {WORKING_TABLE} set "
         # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia|deficiency)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
     ]
     client = DatabaseClient()
     for sql in queries:
@@ -868,8 +849,35 @@ def remove_common_terms():
 
 def normalize_domains():
     """
-    Normalizes domains - if the same term is used for multiple domains, pick the most common one
+    Normalizes domains
+        - by rules
+        - if the same term is used for multiple domains, pick the most common one
     """
+    mechanism_terms = [
+        f"{t}s?"
+        for t in [
+            *flatten(MECHANISM_BASE_TERM_SETS),
+            *MECHANISM_BASE_TERMS,
+        ]
+    ]
+    mechanism_re = get_or_re(mechanism_terms)
+
+    queries = [
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
+        f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
+        f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
+    ]
+    client = DatabaseClient()
+    for sql in queries:
+        client.execute_query(sql)
+
     normalize_sql = f"""
         WITH ranked_domains AS (
             SELECT
@@ -891,7 +899,7 @@ def normalize_domains():
         FROM max_domain md
         WHERE lower(ut.original_term) = md.lot and ut.domain <> md.new_domain;
     """
-    DatabaseClient().execute_query(normalize_sql)
+    client.execute_query(normalize_sql)
 
 
 def populate_working_biosym_annotations():
@@ -910,15 +918,8 @@ def populate_working_biosym_annotations():
     # add indices after initial load
     client.create_indices(
         [
-            {
-                "table": WORKING_TABLE,
-                "column": "publication_number",
-            },
-            {
-                "table": WORKING_TABLE,
-                "column": "original_term",
-                "is_tgrm": True,
-            },
+            {"table": WORKING_TABLE, "column": "publication_number"},
+            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
         ]
     )
 
@@ -932,8 +933,9 @@ def populate_working_biosym_annotations():
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
 
-    remove_substrings()  # less specific terms in set with more specific terms
     remove_common_terms()  # remove one-off generic terms
+    remove_substrings()  # less specific terms in set with more specific terms
+    normalize_domains()
 
     # normalize_domains is **much** faster w/o this index
     client.execute_query("drop index trgm_index_biosym_annotations_original_term")
