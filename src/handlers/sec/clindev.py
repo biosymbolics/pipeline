@@ -25,6 +25,7 @@ def query_clindev(event: ClinDevEvent, context):
     - Remote: `serverless invoke --function query-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/sec/query/clindev?indication=asthma`
     """
+
     sec_chat = SecChatClient()
 
     params = event.get("queryStringParameters", {})

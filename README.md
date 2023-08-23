@@ -36,10 +36,6 @@ serverless invoke local --function search-patents
 
 ### Running
 
-#### UI
-
-- `streamlit run src/app/Hello.py`
-
 #### Patents
 
 ##### NER

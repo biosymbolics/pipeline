@@ -9,5 +9,7 @@ pydash
 python-dotenv
 requests
 sec_api
-torch
+torch==2.1.0.dev20230823
+torchaudio==2.1.0.dev20230823
+torchdata==0.6.1
 typing_extensions

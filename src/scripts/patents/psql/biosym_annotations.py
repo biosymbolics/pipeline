@@ -935,6 +935,7 @@ def populate_working_biosym_annotations():
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
+    # select original_term from biosym_annotations where length(original_term) > 150 and original_term like '%and%';
     clean_up_junk()
 
     remove_common_terms()  # remove one-off generic terms
