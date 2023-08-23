@@ -168,7 +168,7 @@ def main(bootstrap: bool = False):
         zip patents.psql.zip patents.psql
         aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
         aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
-        rm patents.psql.*
+        rm patents.psql*
 
         # then proceeding in ec2
         aws configure sso
@@ -191,6 +191,7 @@ def main(bootstrap: bool = False):
         " >> patents.psql
     # pg_restore --clean -d patents -h 172.31.14.226 -p 5432 --username postgres --password patents.psql
     psql -d patents -h 172.31.14.226 -p 5432 --username postgres --password -f patents.psql
+    rm patents.psql*
     ```
     """
     if bootstrap:
