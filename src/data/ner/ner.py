@@ -13,10 +13,9 @@ import warnings
 import html
 import spacy
 from spacy.tokens import Span, Doc
-import spacy_llm
-from spacy_llm.util import assemble
 
 from utils.extraction.html import extract_text
+from utils.model import fetch_model
 from utils.re import remove_extra_spaces
 from utils.string import chunk_list
 
@@ -35,11 +34,6 @@ T = TypeVar("T", bound=Union[Span, str])
 ContentType = Literal["text", "html"]
 CHUNK_SIZE = 10000
 
-warnings.filterwarnings(
-    "ignore", category=UserWarning, module="torch.amp.autocast_mode"
-)
-spacy_llm.logger.addHandler(logging.StreamHandler())
-spacy_llm.logger.setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -56,7 +50,7 @@ class NerTagger:
         self,
         use_llm: Optional[bool] = False,
         llm_config: Optional[str] = "configs/patents/config.cfg",
-        model: Optional[str] = "model.pt",  # ignored if use_llm is True
+        model: Optional[str] = "binder.pt",  # ignored if use_llm is True
         content_type: Optional[ContentType] = "text",
         entity_types: Optional[frozenset[str]] = None,
         rule_sets: list[SpacyPatterns] = list(
@@ -88,7 +82,7 @@ class NerTagger:
         self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.entity_types = entity_types
-        self.linker: Optional[TermLinker] = None  # lazy initialization
+        self.linker: TermLinker | None = None  # lazy initialization
         self.cleaner = EntityCleaner(parallelize=parallelize)
         start_time = time.time()
 
@@ -96,6 +90,16 @@ class NerTagger:
             raise ValueError("entity_types must be a frozenset")
 
         if self.use_llm:
+            # lazy imports / inits
+            import spacy_llm
+            from spacy_llm.util import assemble
+
+            spacy_llm.logger.addHandler(logging.StreamHandler())
+            spacy_llm.logger.setLevel(logging.INFO)
+            warnings.filterwarnings(
+                "ignore", category=UserWarning, module="torch.amp.autocast_mode"
+            )
+
             if not self.llm_config:
                 raise ValueError("Must provide llm_config if use_llm is True")
             self.nlp = assemble(self.llm_config)
@@ -103,6 +107,8 @@ class NerTagger:
         elif self.model:
             if not self.model.endswith(".pt"):
                 raise ValueError("Model must be torch")
+
+            fetch_model(self.model)
             self.nlp = BinderNlp(self.model)
 
             if len(self.rule_sets) > 0:
@@ -138,12 +144,13 @@ class NerTagger:
             logger.info("Lazy-loading linker...")
             self.linker = TermLinker()
 
-        linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
+        if self.linker is not None:
+            linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
+            linked = [DocEntity(*e[0:5], linked_entity_map.get(e[0])) for e in entities]
 
-        # canonicalization, synonymization
-        linked = [DocEntity(*e[0:5], linked_entity_map.get(e[0])) for e in entities]
+            return linked
 
-        return linked
+        raise Exception("Linker not initialized")
 
     @staticmethod
     def __get_string_entity(entity: DocEntity) -> str:
@@ -266,7 +273,6 @@ class NerTagger:
             >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
             >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"], link=False)
             >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"], link=False)
-            >>> tagger.extract(["zuranolone for treatment of major depression, of BIIB124 (SAGE-324) for essential tremor, and BIIB111 (timrepigene emparvovec)"], link=False)
         """
         if not self.nlp:
             raise Exception("NER tagger not initialized")

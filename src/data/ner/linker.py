@@ -6,11 +6,7 @@ import logging
 import time
 from typing import Union
 import torch
-from scispacy.candidate_generation import (
-    CandidateGenerator,
-    UmlsKnowledgeBase,
-    MentionCandidate,
-)
+from scispacy.candidate_generation import MentionCandidate
 
 from .types import KbLinker, CanonicalEntity
 
@@ -38,6 +34,13 @@ class TermLinker:
         Initialize term normalizer using existing model
         """
         torch.device("mps")  # does this work?
+
+        # lazy (Umls is big)
+        from scispacy.candidate_generation import (
+            CandidateGenerator,
+            UmlsKnowledgeBase,
+        )
+
         self.candidate_generator = CandidateGenerator()
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
 

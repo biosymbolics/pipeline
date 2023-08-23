@@ -21,9 +21,9 @@ def chat(event: SecChatEvent, context):
     Query SEC docs
 
     Invocation:
-    - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "question": "What drugs were in Biogen's pipeline in 2023?" }}'`
-    - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "question": "What drugs were in Biogen's pipeline in 2023?" }}'`
-    - API: `curl https://api.biosymbolics.ai/terms/describe?question=asthma`
+    - Local: `serverless invoke local --function ask-sec --data='{"queryStringParameters": { "question": "What drugs were in the Biogen pipeline in 2023?" }}'`
+    - Remote: `serverless invoke --function ask-sec --data='{"queryStringParameters": { "question": "What drugs were in Biogen's pipeline in 2023?" }}'`
+    - API: `curl https://api.biosymbolics.ai/sec/ask?question=asthma`
     """
     sec_chat = SecChatClient()
 

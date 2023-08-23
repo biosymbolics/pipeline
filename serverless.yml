@@ -109,11 +109,11 @@ functions:
     handler: src.handlers.patents.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  sec-question:
+  ask-sec:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
-          path: sec/ask_question
+          path: sec/ask
           method: get
           cors: true
     handler: src.handlers.sec.chat
