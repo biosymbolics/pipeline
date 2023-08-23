@@ -21,7 +21,7 @@ def get_id(value: Idable) -> str:
     if isinstance(value, Mapping):
         value = "_".join(
             [
-                f"{key}={get_id(value)}"
+                f"{key}={get_id(value or '')}"
                 for key, value in sorted(value.items(), key=lambda item: item[0])
             ]
         )

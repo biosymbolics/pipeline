@@ -95,6 +95,7 @@ def search(
 
     Args:
         terms (Sequence[str]): list of terms to search for
+        domains (Sequence[str], optional): list of domains to filter on. Defaults to None.
         fetch_approval (bool, optional): whether to fetch approval info. Defaults to False.
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         relevancy_threshold (RelevancyThreshold, optional): relevancy threshold. Defaults to "high".
@@ -110,9 +111,9 @@ def search(
     patent_client.search(['asthma', 'astrocytoma'])
     ```
     """
-
     args = {
         "terms": terms,
+        "domains": domains,
         "fetch_approval": fetch_approval,
         "min_patent_years": min_patent_years,
         "relevancy_threshold": relevancy_threshold,
@@ -130,6 +131,7 @@ def search(
 
 def _search(
     terms: Sequence[str],
+    domains: Sequence[str] | None = None,
     fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",
@@ -181,6 +183,7 @@ def _search(
     else:
         _terms = [term.lower() for term in terms]
         terms_count = len(terms)  # enables an AND
+        domain_where = f"AND domain = any(%s)" if domains else ""
         search_query = f"""
             SELECT
                 a.publication_number as publication_number,
@@ -189,6 +192,7 @@ def _search(
                 AVG(EXP(-a.character_offset_start * {DECAY_RATE})) as search_rank --- exp decay scaling; higher is better
             FROM annotations a
             WHERE lower(a.term) = any(%s)
+            {domain_where}
             GROUP BY a.publication_number
         """
 
@@ -231,7 +235,7 @@ def _search(
     """
 
     query = select_query + where
-    results = PsqlDatabaseClient().select(query, [_terms])
+    results = PsqlDatabaseClient().select(query, compact([_terms, domains]))
 
     logger.debug("Patent search query: %s", query)
     logger.info(
