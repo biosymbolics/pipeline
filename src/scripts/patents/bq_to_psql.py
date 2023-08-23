@@ -224,12 +224,12 @@ def copy_bq_to_psql():
             {
                 "table": APPLICATIONS_TABLE,
                 "column": "abstract",
-                "is_trgm": True,
+                "is_tgrm": True,
             },
             {
                 "table": APPLICATIONS_TABLE,
                 "column": "title",
-                "is_trgm": True,
+                "is_tgrm": True,
             },
             {
                 "table": APPLICATIONS_TABLE,

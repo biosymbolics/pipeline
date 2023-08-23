@@ -8,6 +8,7 @@ DEFAULT_MODEL_NAME = "ChatGPT"
 
 SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
+AGGREGATED_ANNOTATIONS_TABLE = "aggregated_annotations"  # a mat view
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 

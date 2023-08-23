@@ -277,7 +277,7 @@ class TermAssembler:
                 {
                     "table": table_name,
                     "column": "term",
-                    "is_trgm": True,
+                    "is_tgrm": True,
                 },
             ]
         )

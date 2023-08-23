@@ -12,6 +12,7 @@ initialize()
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
+    AGGREGATED_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
@@ -95,10 +96,22 @@ def __create_annotations_table():
             {
                 "table": table_name,
                 "column": "term",
-                "is_trgm": True,
+                "is_tgrm": True,
             },
         ]
     )
+
+    mat_view_query = f"""
+        DROP MATERIALIZED VIEW IF EXISTS {AGGREGATED_ANNOTATIONS_TABLE};
+        CREATE MATERIALIZED VIEW {AGGREGATED_ANNOTATIONS_TABLE} AS
+        SELECT
+            publication_number,
+            ARRAY_AGG(term) AS terms,
+            ARRAY_AGG(domain) AS domains
+        FROM {table_name}
+        GROUP BY publication_number;
+    """
+    client.execute_query(mat_view_query)
 
 
 def __create_biosym_annotations_source_table():

@@ -913,7 +913,7 @@ def populate_working_biosym_annotations():
             {
                 "table": WORKING_TABLE,
                 "column": "original_term",
-                "is_trgm": True,
+                "is_tgrm": True,
             },
             {
                 "sql": f"CREATE UNIQUE INDEX {index_base}_uniq on {WORKING_TABLE} (publication_number, original_term, domain, character_offset_start, character_offset_end)",

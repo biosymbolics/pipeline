@@ -19,7 +19,7 @@ IndexCreateDef = TypedDict(
     {
         "table": str,
         "column": str,
-        "is_trgm": NotRequired[bool],
+        "is_tgrm": NotRequired[bool],
         "is_uniq": NotRequired[bool],
     },
 )

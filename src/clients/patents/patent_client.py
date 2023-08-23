@@ -9,6 +9,7 @@ from pydash import compact
 from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import AGGREGATED_ANNOTATIONS_TABLE
 from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings.patents import PatentApplication
 from utils.string import get_id
@@ -187,29 +188,16 @@ def _search(
             GROUP BY a.publication_number
         """
 
-    match_join = f"""
-        annotations.publication_number = matches.publication_number
-        AND
-        ARRAY_LENGTH(matched_terms, 1) >= {terms_count}
-    """
-
     select_query = f"""
-        WITH matches AS ({search_query}),
-        annotations AS (
-            SELECT
-                annotations.publication_number,
-                ARRAY_AGG(term) AS terms,
-                ARRAY_AGG(domain) AS domains
-            FROM annotations
-            -- early filter for perf
-            JOIN matches ON ({match_join})
-            WHERE domain in ({", ".join([f"'{d}'" for d in DOMAINS_OF_INTEREST])})
-            GROUP BY annotations.publication_number
-        )
+        WITH matches AS ({search_query})
         SELECT {fields}, terms, domains
         FROM applications AS apps
-        JOIN annotations on annotations.publication_number = apps.publication_number
-        JOIN matches ON ({match_join})
+        JOIN matches ON (
+            apps.publication_number = matches.publication_number
+            AND
+            ARRAY_LENGTH(matched_terms, 1) >= {terms_count}
+        )
+        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
     """
 
     if fetch_approval:
