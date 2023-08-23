@@ -1,3 +1,4 @@
+from typings.patents import SuitabilityScoreMap
 from .patterns import MOA_ACTIONS
 
 COMPOSITION_OF_MATTER_IPC_CODES = [
@@ -310,7 +311,23 @@ PATENT_ATTRIBUTE_MAP = {
     ],
 }
 
+
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
+
+SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
+    "COMBINATION": 0,
+    "COMPOUND_OR_MECHANISM": 2,
+    "DIAGNOSTIC": -1.5,
+    "DISEASE_MODIFYING": 1,
+    "FORMULATION": -0.5,
+    "NOVEL": 1.5,
+    "PALLIATIVE": 0,
+    "PREPARATION": -1,
+    "PREVENTATIVE": 1,
+    "PROCESS": -1,
+    "METHOD": -1.5,
+    "TREATMENT": 0,
+}
 
 
 ATTRIBUTE_FIELD = "attributes"

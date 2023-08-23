@@ -49,3 +49,6 @@ class ApprovedPatentApplication(PatentApplication):
     generic_name: str
     approval_date: date
     indication: str
+
+
+SuitabilityScoreMap = dict[str, float]

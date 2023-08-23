@@ -13,13 +13,9 @@ from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings.patents import PatentApplication
 from utils.string import get_id
 
-from .constants import DOMAINS_OF_INTEREST, RELEVANCY_THRESHOLD_MAP
+from .constants import DOMAINS_OF_INTEREST
 from .formatting import format_search_result
-from .types import (
-    AutocompleteTerm,
-    RelevancyThreshold,
-    TermResult,
-)
+from .types import AutocompleteTerm, TermResult
 from .utils import get_max_priority_date
 
 logger = logging.getLogger(__name__)
@@ -34,7 +30,7 @@ Larger decay rates will result in more matches
 Usage:
     EXP(-a.character_offset_start * {DECAY_RATE}) > {threshold})
 """
-DECAY_RATE = 1 / 20000
+DECAY_RATE = 1 / 35
 
 
 SEARCH_RETURN_FIELDS = [
@@ -81,7 +77,6 @@ def search(
     domains: Sequence[str] | None = None,
     fetch_approval: bool = False,
     min_patent_years: int = 10,
-    relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
     skip_cache: bool = False,
@@ -98,7 +93,6 @@ def search(
         domains (Sequence[str], optional): list of domains to filter on. Defaults to None.
         fetch_approval (bool, optional): whether to fetch approval info. Defaults to False.
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        relevancy_threshold (RelevancyThreshold, optional): relevancy threshold. Defaults to "high".
         max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         is_randomized (bool, optional): whether to randomize results. Defaults to False.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
@@ -116,7 +110,6 @@ def search(
         "domains": domains,
         "fetch_approval": fetch_approval,
         "min_patent_years": min_patent_years,
-        "relevancy_threshold": relevancy_threshold,
         "max_results": max_results,
         "is_randomized": is_randomized,
     }
@@ -134,7 +127,6 @@ def _search(
     domains: Sequence[str] | None = None,
     fetch_approval: bool = False,
     min_patent_years: int = 10,
-    relevancy_threshold: RelevancyThreshold = "high",
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
 ) -> Sequence[PatentApplication]:
@@ -153,7 +145,6 @@ def _search(
     if is_id_search and not all([t.startswith("WO-") for t in terms]):
         raise ValueError("Cannot mix id and term search")
 
-    threshold = RELEVANCY_THRESHOLD_MAP[relevancy_threshold]
     max_priority_date = get_max_priority_date(int(min_patent_years))
 
     fields = ", ".join(
@@ -189,7 +180,7 @@ def _search(
                 a.publication_number as publication_number,
                 ARRAY_AGG(distinct a.domain) as matched_domains,
                 ARRAY_AGG(DISTINCT a.term) as matched_terms,
-                AVG(EXP(-a.character_offset_start * {DECAY_RATE})) as search_rank --- exp decay scaling; higher is better
+                ROUND(AVG(EXP(-a.character_offset_start * {DECAY_RATE})), 5) as search_rank --- exp decay scaling; higher is better
             FROM annotations a
             WHERE lower(a.term) = any(%s)
             {domain_where}
@@ -229,7 +220,6 @@ def _search(
 
     where = f"""
         WHERE priority_date > '{max_priority_date}'::date
-        AND search_rank > {threshold}
         ORDER BY randomizer desc, search_rank DESC
         limit {max_results}
     """

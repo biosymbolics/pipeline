@@ -10,7 +10,6 @@ from clients.patents import RelevancyThreshold
 class BasePatentSearchParams(TypedDict):
     fetch_approval: NotRequired[bool]
     min_patent_years: NotRequired[int]
-    relevancy_threshold: NotRequired[RelevancyThreshold]
     max_results: NotRequired[int]
     skip_cache: NotRequired[bool]
 

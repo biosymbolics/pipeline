@@ -2,15 +2,24 @@ from typing import TypedDict
 import polars as pl
 import math
 import logging
+from constants.patents import SUITABILITY_SCORE_MAP
+
+from typings.patents import SuitabilityScoreMap
 
 from .constants import MAX_PATENT_LIFE
 
 ExplainedScore = TypedDict("ExplainedScore", {"explanation": str, "score": float})
-ScoreMap = dict[str, float]
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def score_patents(
-    df: pl.DataFrame, attributes_column: str, years_column: str, score_map: ScoreMap
+    df: pl.DataFrame,
+    attributes_column: str,
+    years_column: str,
+    score_map: SuitabilityScoreMap,
 ) -> pl.DataFrame:
     """
     Score patents based on given attributes and score map.
@@ -41,10 +50,11 @@ def score_patents(
         """
         Calculate the patent score & generate explanation
         """
-        score = __calc_score(attributes)
+        upper_attributes = [attr.upper() for attr in attributes]
+        score = __calc_score(upper_attributes)
         explanations = [
             f"{attr}: {score_map.get(attr, 0)}"
-            for attr in attributes
+            for attr in upper_attributes
             if attr in score_map
         ]
         return {"score": score, "explanation": ", ".join(explanations)}
@@ -68,18 +78,6 @@ def score_patents(
     )
 
     return df
-
-
-SUITABILITY_SCORE_MAP: ScoreMap = {
-    "COMBINATION": 0,
-    "COMPOUND_OR_MECHANISM": 2,
-    "DIAGNOSTIC": -1.5,
-    "FORMULATION": -0.5,
-    "NOVEL": 1.5,
-    "PREPARATION": -1,
-    "PROCESS": -1,
-    "METHOD": -1.5,
-}
 
 
 def calculate_score(df: pl.DataFrame) -> pl.DataFrame:

@@ -11,7 +11,6 @@ def parse_params(
 
     fetch_approval = params.get("fetch_approval") or True
     min_patent_years = params.get("min_patent_years") or 10
-    relevancy_threshold = params.get("relevancy_threshold") or "high"
     max_results = params.get("max_results") or default_max_results
     skip_cache = params.get("skip_cache") or False
 
@@ -20,7 +19,6 @@ def parse_params(
         "domains": domains_list,
         "fetch_approval": fetch_approval,
         "min_patent_years": min_patent_years,
-        "relevancy_threshold": relevancy_threshold,
         "max_results": max_results,
         "skip_cache": skip_cache,
     }
