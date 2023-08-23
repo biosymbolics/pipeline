@@ -4,7 +4,9 @@ Client for querying SEC docs
 from datetime import date
 from llama_index import Prompt
 from llama_index.prompts.prompt_type import PromptType
+from langchain.output_parsers import ResponseSchema
 
+from clients.openai.gpt_client import GptApiClient
 from core import SourceDocIndex
 from utils.misc import dict_to_named_tuple
 from utils.date import format_date
@@ -56,3 +58,32 @@ class SecChatClient:
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
         si_answer = self.source_index.query(prompt, source)
         return si_answer
+
+    def query_clindev(self, indication: str) -> list[dict]:
+        prompt = (
+            f"What is the typical clinical development timeline for indication {indication}? "
+            "Return the answer as an array of json objects with the following fields: stage, offset, median_duration, iqr. "
+        )
+
+        response_schemas = [
+            ResponseSchema(name="stage", description="e.g. Phase 1"),
+            ResponseSchema(
+                name="offset",
+                description="equal to cumulative median duration of previous stages, 0 for the first stage.",
+                type="float",
+            ),
+            ResponseSchema(
+                name="median_duration",
+                description="median duration of this stage in years (e.g. 2.5)",
+                type="float",
+            ),
+            ResponseSchema(
+                name="iqr",
+                description="interquartile range of this stage's duration in years (e.g. 0.8)",
+                type="float",
+            ),
+        ]
+
+        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-4")
+        answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
+        return answer_as_array

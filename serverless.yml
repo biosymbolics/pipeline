@@ -119,6 +119,16 @@ functions:
     handler: src.handlers.sec.chat
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  query-clindev:
+    vpc: ~ # no need to be in VPC; needs OB access
+    events:
+      - http:
+          path: sec/ask/clindev
+          method: get
+          cors: true
+    handler: src.handlers.sec.clindev
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 
 plugins:
   - serverless-python-requirements
