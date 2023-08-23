@@ -9,4 +9,5 @@ pydash
 python-dotenv
 requests
 sec_api
+torch
 typing_extensions

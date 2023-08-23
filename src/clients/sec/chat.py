@@ -33,7 +33,7 @@ class SecChatClient:
     """
 
     def __init__(self):
-        self.source_index = SourceDocIndex(model_name="GPT4")
+        self.source_index = SourceDocIndex(model_name="ChatGPT")
 
     def ask_question(self, question: str) -> str:
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})

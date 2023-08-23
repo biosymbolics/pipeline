@@ -76,7 +76,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-              Usage: python3 -m  workflows.enpv.build
+              Usage: python3 -m  data.workflows.enpv.build
               Load eNVP SEC data
         """
         )

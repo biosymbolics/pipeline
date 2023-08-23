@@ -34,7 +34,7 @@ def extract_keywords(
         tagger (NerTagger): NER tagger
         max_keywords (int): max number of keywords to extract
     """
-    entities = tagger.extract_strings([text], link=True)
+    entities = tagger.extract_strings([text], link=False)
     keywords = entities[0]
     return set(keywords[0:max_keywords])
 

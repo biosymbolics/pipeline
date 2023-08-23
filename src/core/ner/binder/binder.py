@@ -32,6 +32,8 @@ class BinderNlp:
 
     def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_MODEL):
         device = torch.device(DEFAULT_DEVICE)
+
+        logger.info("Loading torch model from: %s", model_file)
         self.model = torch.load(model_file)
         self.model.to(device)
         self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
@@ -77,7 +79,7 @@ class BinderNlp:
 
         ```
         from core.ner.binder.binder import BinderNlp
-        b = BinderNlp("model.pt")
+        b = BinderNlp("binder.pt")
         text="Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
         b.extract(text).ents
         ```

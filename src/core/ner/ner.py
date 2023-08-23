@@ -68,7 +68,7 @@ class NerTagger:
         Args:
             use_llm (Optional[bool], optional): Use LLM model. Defaults to False. If true, no rules or anything are used.
             llm_config (Optional[str], optional): LLM config file. Defaults to "configs/patents/config.cfg".
-            model (str, optional): torch NER model. Defaults to "model.pt".
+            model (str, optional): torch NER model. Defaults to "binder.pt".
             content_type (Optional[ContentType], optional): Content type. Defaults to "text".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
             parallelize (bool, optional): Parallelize. Defaults to True. Even if true, will only parallelize for sufficiently large batches.

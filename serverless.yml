@@ -53,7 +53,7 @@ provider:
     ENV: ${param:ENV, 'dev'}
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
-    PYTHONPATH: ./src:./:/opt/python:/opt/python/lib/python3.10/site-packages
+    PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.10/site-packages
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
 
