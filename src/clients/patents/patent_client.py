@@ -242,7 +242,7 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
 
     search_sql = f".*{string}.*"
     query = f"""
-        SELECT *
+        SELECT DISTINCT ON (count, term) term, count
         FROM terms,
         unnest(synonyms) as synonym
         WHERE (
