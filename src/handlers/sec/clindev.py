@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def ask_about_clindev(event: ClinDevEvent, context):
+def query_clindev(event: ClinDevEvent, context):
     """
     Query GPT about clindev timelines
 
     Invocation:
-    - Local: `serverless invoke local --function ask-sec --data='{"queryStringParameters": { "question": "asthma" }}'`
-    - Remote: `serverless invoke --function ask-sec --data='{"queryStringParameters": { "indication": "asthma" }}'`
-    - API: `curl https://api.biosymbolics.ai/sec/ask/clindev?indication=asthma`
+    - Local: `serverless invoke local --function query-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
+    - Remote: `serverless invoke --function query-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
+    - API: `curl https://api.biosymbolics.ai/sec/query/clindev?indication=asthma`
     """
     sec_chat = SecChatClient()
 

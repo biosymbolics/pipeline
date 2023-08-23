@@ -123,10 +123,10 @@ functions:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
-          path: sec/ask/clindev
+          path: sec/query/clindev
           method: get
           cors: true
-    handler: src.handlers.sec.clindev
+    handler: src.handlers.sec.query_clindev
     layers:
       - Ref: PythonRequirementsLambdaLayer
 
