@@ -76,6 +76,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "other": "leading",
     "more": "leading",
     "of": "trailing",
+    "symptom": "trailing",
+    "condition": "trailing",
     "be": "trailing",
     "use": "trailing",
     "efficacy": "all",
