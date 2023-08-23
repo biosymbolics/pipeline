@@ -3,8 +3,8 @@ import sys
 from typing import Any, Optional
 import polars as pl
 from pydash import flatten
-from data.ner.classifier import classify_by_keywords
-from data.ner.types import DocEntities, DocEntity
+from core.ner.classifier import classify_by_keywords
+from core.ner.types import DocEntities, DocEntity
 
 from system import initialize
 
@@ -13,7 +13,7 @@ initialize()
 from clients.low_level.big_query import BQDatabaseClient
 from constants.patents import ATTRIBUTE_FIELD, PATENT_ATTRIBUTE_MAP
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
-from data.ner import NerTagger
+from core.ner import NerTagger
 
 
 ID_FIELD = "publication_number"

@@ -760,7 +760,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
         client.execute_query(sql)
 
 
-def remove_junk():
+def clean_up_junk():
     """
     Remove trailing junk and silly matches
     """
@@ -924,7 +924,7 @@ def populate_working_biosym_annotations():
     )
 
     fix_unmatched()
-    remove_junk()
+    clean_up_junk()
 
     # round 1 (leaves in stuff used by for/of)
     remove_trailing_leading(REMOVAL_WORDS_PRE)
@@ -933,8 +933,14 @@ def populate_working_biosym_annotations():
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
 
+    # clean up junk again (e.g. leading ws)
+    # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
+    clean_up_junk()
+
     remove_common_terms()  # remove one-off generic terms
     remove_substrings()  # less specific terms in set with more specific terms
+
+    # slow... seems to go faster with dropped tgrm / fresh btree on original_term
     normalize_domains()
 
     # normalize_domains is **much** faster w/o this index
@@ -952,30 +958,25 @@ if __name__ == "__main__":
     Checks:
 
     08/17/2023, after
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (1,038,200 -> 2,267,432 -> 4,035,641)
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,755,711 -> 2,562,352 -> 2,888,796)
-    select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,199,104 -> 5,491,727 => 4,660,954)
-    select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (3,919,589 -> 5,491,727 -> 7,693,416)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
+    (556,711 -> 567,398)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
+    (2,555,158 -> 2,539,723)
+    select count(*) from biosym_annotations where domain<>'attributes' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
+    (2,812,965 -> 2,786,428)
+    select count(*) from biosym_annotations where domain<>'attributes' and original_term<>'';
+    (3,748,417 -> 3,748,417)
     select domain, count(*) from biosym_annotations group by domain;
-    attribute  | 2462930
-    compounds  | 1249384
-    diseases   |  840063
-    mechanisms | 1830142
-    -- ->
     attributes | 3032462
-    compounds  | 1805652
-    diseases   |  917086
-    mechanisms | 1938216
+    compounds  | 1474950
+    diseases   |  829121
+    mechanisms | 1444346
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,419 -> 15,389 -> 26,551)
+    (14,910 -> 15,206)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (37,776 -> 39,325 -> 52,445)
+    (38,315 -> 39,039)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (71,656 -> 69,491 -> 75,128)
+    (70,439 -> 69,715)
     """
     if "-h" in sys.argv:
         print(
