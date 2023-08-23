@@ -253,7 +253,7 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
         ORDER BY count DESC
         limit {limit}
     """
-    results = PsqlDatabaseClient().select(query, [search_sql])
+    results = PsqlDatabaseClient().select(query, [search_sql, search_sql])
     formatted = [format_term(cast(TermResult, result)) for result in results]
 
     logger.info(
