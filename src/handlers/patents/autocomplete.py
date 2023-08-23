@@ -56,7 +56,7 @@ def autocomplete(event: AutocompleteEvent, context):
         )
         return {
             "statusCode": 400,
-            "message": "Missing parameter(s)",
+            "body": "Missing parameter(s)",
         }
 
     if len(term) < 3:

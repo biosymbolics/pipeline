@@ -38,7 +38,7 @@ def search(event: SearchEvent, context):
         or not all([len(t) > 1 for t in params["terms"]])
     ):
         logger.error("Missing or malformed params: %s", params)
-        return {"statusCode": 400, "message": "Missing params(s)"}
+        return {"statusCode": 400, "body": "Missing params(s)"}
 
     logger.info("Fetching patents for params: %s", params)
 
@@ -46,7 +46,8 @@ def search(event: SearchEvent, context):
         results = patent_client.search(**params)
 
     except Exception as e:
-        logger.error("Error searching patents: %s (%s)", e, str(type(e)))
-        return {"statusCode": 500, "message": str(e)}
+        message = f"Error searching patents: {e}"
+        logger.error(message)
+        return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(results, default=str)}

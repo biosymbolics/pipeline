@@ -38,7 +38,7 @@ def describe(event: DescribeEvent, context):
         )
         return {
             "statusCode": 400,
-            "message": "Missing parameter(s)",
+            "body": "Missing parameter(s)",
         }
 
     logger.info(

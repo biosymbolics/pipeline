@@ -37,7 +37,7 @@ def aggregate_over_time(event: ReportEvent, context):
         or not all([len(t) > 1 for t in params["terms"]])
     ):
         logger.error("Missing or malformed params: %s", params)
-        return {"statusCode": 400, "message": "Missing params(s)"}
+        return {"statusCode": 400, "body": "Missing params(s)"}
 
     logger.info("Fetching reports forparams: %s", params)
 
@@ -54,7 +54,8 @@ def aggregate_over_time(event: ReportEvent, context):
             y_transform=lambda y: y.year,
         )
     except Exception as e:
-        logger.error("Error generating reports for patents: %s (%s)", e, str(type(e)))
-        return {"statusCode": 500, "message": str(e)}
+        message = f"Error generating patent reports: {e}"
+        logger.error(message)
+        return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(summaries, default=str)}

@@ -37,7 +37,7 @@ def summarize(event: ReportEvent, context):
         or not all([len(t) > 1 for t in params["terms"]])
     ):
         logger.error("Missing or malformed params: %s", params)
-        return {"statusCode": 400, "message": "Missing params(s)"}
+        return {"statusCode": 400, "body": "Missing params(s)"}
 
     logger.info("Fetching reports for params: %s", params)
 
@@ -45,7 +45,8 @@ def summarize(event: ReportEvent, context):
         results = patent_client.search(**params)
         summaries = aggregate(results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar"])
     except Exception as e:
-        logger.error("Error generating reports for patents: %s (%s)", e, str(type(e)))
-        return {"statusCode": 500, "message": str(e)}
+        message = f"Error reporting on patents: {e}"
+        logger.error(message)
+        return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(summaries, default=str)}
