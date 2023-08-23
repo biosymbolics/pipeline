@@ -4,7 +4,7 @@ To run after NER is complete
 import sys
 import logging
 from typing import Literal
-from pydash import flatten
+from pydash import compact, flatten
 
 from system import initialize
 
@@ -106,7 +106,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "and ": "leading",
     "the": "trailing",
     "with": "trailing",
-    "a": "trailing",
     "of": "trailing",
     "for": "trailing",
     "=": "trailing",
@@ -142,6 +141,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "chemically (?:modified)?": "leading",
     "based": "trailing",
     "an?": "leading",
+    "an?": "trailing",
     "active": "leading",
     "additional": "leading",
     "additive": "leading",
@@ -726,6 +726,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                     for t in removal_word_set.items()
                     if t[1] == place
                 ]
+                if len(words) == 0:
+                    return None
                 words_re = get_or_re(words, "+")
                 return f"""
                     update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', '', 'g'))
@@ -735,6 +737,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 words = [
                     t[0] + "s?[ ]" for t in removal_word_set.items() if t[1] == place
                 ]
+                if len(words) == 0:
+                    return None
                 words_re = get_or_re(words, "+")
                 return f"""
                     update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', '', 'g'))
@@ -744,6 +748,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 words = [
                     t[0] + "s?[ ]?" for t in removal_word_set.items() if t[1] == place
                 ]
+                if len(words) == 0:
+                    return None
                 words_re = get_or_re(words, "+")
                 return rf"""
                     update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' ', 'g'))
@@ -752,7 +758,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
             else:
                 raise ValueError(f"Unknown place: {place}")
 
-        return [get_sql(place) for place in ["all", "leading", "trailing"]]
+        return compact([get_sql(place) for place in ["all", "leading", "trailing"]])
 
     client = DatabaseClient()
     for sql in get_remove_words():
@@ -935,6 +941,7 @@ def populate_working_biosym_annotations():
     normalize_domains()
     remove_common_terms()  # final step - remove one-off generic terms
 
+    # do this last to minimize mucking with it
     client.select_insert_into_table(
         f"SELECT * from {SOURCE_TABLE} where domain='attributes'", WORKING_TABLE
     )
@@ -946,29 +953,29 @@ if __name__ == "__main__":
 
     08/17/2023, after
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (1,038,200 -> 2,267,432)
+    (1,038,200 -> 2,267,432 -> 4,035,641)
     select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attribute' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,755,711 -> 2,562,352)
+    (2,755,711 -> 2,562,352 -> 2,888,796)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (3,199,104 -> 5,491,727)
+    (3,199,104 -> 5,491,727 => 4,660,954)
     select count(*) from biosym_annotations where domain<>'attribute' and original_term<>'';
-    (3,919,589 -> 5,491,727)
+    (3,919,589 -> 5,491,727 -> 7,693,416)
     select domain, count(*) from biosym_annotations group by domain;
     attribute  | 2462930
     compounds  | 1249384
     diseases   |  840063
     mechanisms | 1830142
     -- ->
-    attributes | 1673936
-    compounds  | 1463527
-    diseases   |  834919
-    mechanisms | 1519345
+    attributes | 3032462
+    compounds  | 1805652
+    diseases   |  917086
+    mechanisms | 1938216
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,419 -> 15,389)
+    (14,419 -> 15,389 -> 26,551)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (37,776 -> 39,325)
+    (37,776 -> 39,325 -> 52,445)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (71,656 -> 69,491)
+    (71,656 -> 69,491 -> 75,128)
     """
     if "-h" in sys.argv:
         print(

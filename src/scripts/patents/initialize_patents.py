@@ -189,8 +189,8 @@ def main(bootstrap: bool = False):
     analyze applications;
     reindex database patents;
         " >> patents.psql
-    # pg_restore --clean -d patents -h 172.31.14.226 -p 5432 --username postgres --password patents.psql
-    psql -d patents -h 172.31.14.226 -p 5432 --username postgres --password -f patents.psql
+    # pg_restore --clean -d patents -h 172.31.55.68 -p 5432 --username postgres --password patents.psql
+    psql -d patents -h 172.31.55.68 -p 5432 --username postgres --password -f patents.psql
     rm patents.psql*
     ```
     """
