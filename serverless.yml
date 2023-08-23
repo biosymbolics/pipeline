@@ -109,6 +109,16 @@ functions:
     handler: src.handlers.patents.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  sec-question:
+    vpc: ~ # no need to be in VPC; needs OB access
+    events:
+      - http:
+          path: sec/ask_question
+          method: get
+          cors: true
+    handler: src.handlers.sec.chat
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 
 plugins:
   - serverless-python-requirements
