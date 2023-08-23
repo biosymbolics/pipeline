@@ -78,6 +78,7 @@ COM_FILTER = f"""
 
 def search(
     terms: Sequence[str],
+    domains: Sequence[str] | None = None,
     fetch_approval: bool = False,
     min_patent_years: int = 10,
     relevancy_threshold: RelevancyThreshold = "high",

@@ -8,6 +8,7 @@ import logging
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import aggregate
+from handlers.patents.utils import parse_params
 
 from ..types import PatentSearchParams
 
@@ -28,33 +29,22 @@ def aggregate_over_time(event: ReportEvent, context):
     - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
-    params = event.get("queryStringParameters", {})
-    terms = params.get("terms")
-    terms_list = terms.split(";") if terms else []
+    params = parse_params(event.get("queryStringParameters", {}), 10000)
 
-    if not params or not terms or not all([len(t) > 1 for t in terms_list]):
+    if (
+        not params
+        or len(params["terms"]) < 1
+        or not all([len(t) > 1 for t in params["terms"]])
+    ):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "message": "Missing params(s)"}
 
     logger.info("Fetching reports forparams: %s", params)
 
-    fetch_approval = params.get("fetch_approval") or True
-    min_patent_years = params.get("min_patent_years") or 10
-    relevancy_threshold = params.get("relevancy_threshold") or "high"
-    max_results = params.get("max_results") or 10000  # higher limit for reports
-    skip_cache = params.get("skip_cache") or False
-
     try:
-        patents = patent_client.search(
-            terms_list,
-            fetch_approval,
-            min_patent_years,
-            relevancy_threshold,
-            max_results=max_results,
-            skip_cache=skip_cache,
-        )
+        patents = patent_client.search(**params)
         if len(patents) == 0:
-            logging.info("No patents found for terms: %s", terms)
+            logging.info("No patents found for terms: %s", params["terms"])
             return {"statusCode": 200, "body": json.dumps([])}
 
         summaries = aggregate(

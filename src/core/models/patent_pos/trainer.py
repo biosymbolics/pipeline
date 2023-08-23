@@ -151,7 +151,7 @@ class ModelTrainer:
     def train_from_patents():
         patents = cast(
             Sequence[PatentApplication],
-            patent_client.search(["asthma"], True, 0, "low", max_results=100000),
+            patent_client.search(["asthma"], None, True, 0, "low", max_results=100000),
         )
         input_dict = prepare_inputs(
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS

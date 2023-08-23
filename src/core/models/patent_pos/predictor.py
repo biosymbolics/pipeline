@@ -28,7 +28,7 @@ class ModelPredictor:
     Example:
     ```
     from core.models.patent_pos import ModelPredictor; from clients.patents import patent_client
-    patents = patent_client.search(["asthma"], True, 0, "medium", max_results=1000)
+    patents = patent_client.search(["asthma"], None, True, 0, "medium", max_results=1000)
     predictor = ModelPredictor()
     preds = predictor(patents)
     ```
@@ -139,7 +139,7 @@ class ModelPredictor:
 def main(terms: list[str]):
     patents = cast(
         list[PatentApplication],
-        patent_client.search(terms, True, 0, "medium", max_results=1000),
+        patent_client.search(terms, None, True, 0, "medium", max_results=1000),
     )
     predictor = ModelPredictor()
     preds, metrics = predictor.predict(patents)

@@ -6,6 +6,7 @@ from typing import TypedDict
 import logging
 
 from clients import patents as patent_client
+from handlers.patents.utils import parse_params
 
 from .types import PatentSearchParams
 
@@ -28,29 +29,20 @@ def search(event: SearchEvent, context):
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     """
 
-    params = event.get("queryStringParameters", {})
-    terms = params.get("terms")
-    terms_list = terms.split(";") if terms else []
+    params = parse_params(event.get("queryStringParameters", {}))
 
-    if not params or not terms or not all([len(t) > 1 for t in terms_list]):
+    if (
+        not params
+        or len(params["terms"]) < 1
+        or not all([len(t) > 1 for t in params["terms"]])
+    ):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "message": "Missing params(s)"}
-
-    fetch_approval = params.get("fetch_approval") or True
-    min_patent_years = params.get("min_patent_years") or 10
-    relevancy_threshold = params.get("relevancy_threshold") or "high"
-    max_results = params.get("max_results") or 1000
 
     logger.info("Fetching patents for params: %s", params)
 
     try:
-        results = patent_client.search(
-            terms_list,
-            fetch_approval,
-            min_patent_years,
-            relevancy_threshold,
-            max_results,
-        )
+        results = patent_client.search(**params)
 
     except Exception as e:
         logger.error("Error searching patents: %s (%s)", e, str(type(e)))
