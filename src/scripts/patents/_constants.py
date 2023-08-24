@@ -101,6 +101,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "stereoisomer",
 ]
 
+
 COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "administration(?: of)?",
     "aerosol",
@@ -115,10 +116,12 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "combination",
     "complex(?:e)?",
     "composition",
+    "component",
     "(?:binding )?compound",
     "cream",
     "derivative",
     "detergent",
+    "dosage form",
     "drop",
     "drug",
     "element",
@@ -128,6 +131,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "function",
     "gel",
     "group",
+    "herb",
     "homologue",
     "infusion",
     "ingredient",
@@ -164,6 +168,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "suppository",
     "tablet",
     "therap(?:y|ie)",
+    "therapeutical",
     "treatment",
     "trailing",
     "variant",
