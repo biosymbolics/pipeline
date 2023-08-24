@@ -139,7 +139,7 @@ class ModelPredictor:
 def main(terms: list[str]):
     patents = cast(
         list[PatentApplication],
-        patent_client.search(terms, None, True, 0, max_results=1000),
+        patent_client.search(terms, None, 0, max_results=1000),
     )
     predictor = ModelPredictor()
     preds, metrics = predictor.predict(patents)

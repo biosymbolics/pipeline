@@ -37,46 +37,33 @@ DECAY_RATE = 1 / 35
 SEARCH_RETURN_FIELDS = [
     "apps.publication_number",
     "priority_date",
-    "title",
     "abstract",
     # "application_kind",
     "application_number",
-    # "assignees",
     "country",
+    "embeddings",
     "family_id",
     "filing_date",
-    "embeddings",
     "grant_date",
-    # "inventors",
     "ipc_codes",
     "search_rank",
-    # 'ARRAY(SELECT s.publication_number FROM "similar" as s where s.publication_number like \'WO%\') as "similar"',  # limit to WO patents
     '"similar"',
+    "title",
     "url",
 ]
 
-APPROVED_SERACH_RETURN_FIELDS = [
+APPROVED_SEARCH_RETURN_FIELDS = [
+    "approval_date",
     "brand_name",
     "generic_name",
-    "approval_date",
+    "(CASE WHEN approval_date IS NOT NULL THEN True ELSE False END) as is_approved",
     "patent_indication as indication",
 ]
-
-# composition of matter filter
-# TODO: Keep? it is slow
-COM_FILTER = f"""
-    (
-        SELECT COUNT(1) FROM UNNEST(ipc_codes) AS ipc
-        JOIN unnest(ARRAY{COMPOSITION_OF_MATTER_IPC_CODES}) AS com_code
-        ON starts_with(ipc, com_code)
-    ) > 0
-"""
 
 
 def search(
     terms: Sequence[str],
     domains: Sequence[str] | None = None,
-    fetch_approval: bool = False,
     min_patent_years: int = 10,
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
@@ -92,7 +79,6 @@ def search(
     Args:
         terms (Sequence[str]): list of terms to search for
         domains (Sequence[str], optional): list of domains to filter on. Defaults to None.
-        fetch_approval (bool, optional): whether to fetch approval info. Defaults to False.
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         is_randomized (bool, optional): whether to randomize results. Defaults to False.
@@ -109,7 +95,6 @@ def search(
     args = {
         "terms": terms,
         "domains": domains,
-        "fetch_approval": fetch_approval,
         "min_patent_years": min_patent_years,
         "max_results": max_results,
         "is_randomized": is_randomized,
@@ -126,7 +111,6 @@ def search(
 def _search(
     terms: Sequence[str],
     domains: Sequence[str] | None = None,
-    fetch_approval: bool = False,
     min_patent_years: int = 10,
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
@@ -152,9 +136,9 @@ def _search(
         compact(
             [
                 *SEARCH_RETURN_FIELDS,
-                *(APPROVED_SERACH_RETURN_FIELDS if fetch_approval else []),
+                *APPROVED_SEARCH_RETURN_FIELDS,
                 "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
-                if is_randomized and fetch_approval
+                if is_randomized
                 else "1 as randomizer",  # for randomizing approved patents
             ]
         )
@@ -198,13 +182,8 @@ def _search(
             coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
         )
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
+        LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
     """
-
-    if fetch_approval:
-        select_query += """
-            LEFT JOIN patent_approvals approvals
-            ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
-        """
 
     if is_id_search:
         # don't constrain what's returned for id-only

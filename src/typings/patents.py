@@ -45,6 +45,7 @@ class PatentApplication(PatentBasicInfo):
 
 
 class ApprovedPatentApplication(PatentApplication):
+    is_approved: str
     brand_name: str
     generic_name: str
     approval_date: date
