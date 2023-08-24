@@ -3,7 +3,6 @@ Functions to initialize the patents database
 """
 import logging
 import sys
-from scripts.patents.psql.copy_approvals import copy_patent_approvals
 
 from system import initialize
 
@@ -16,9 +15,12 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from scripts.patents.psql.copy_approvals import copy_patent_approvals
 from scripts.patents.bq.copy_tables import copy_patent_tables
 from scripts.patents.bq_to_psql import copy_bq_to_psql
 from scripts.patents.psql.terms import create_patent_terms
+
+from ._constants import APPLICATIONS_TABLE, TEXT_FIELDS
 
 logging.basicConfig(level=logging.INFO)
 
@@ -152,6 +154,30 @@ def create_funcs():
     PsqlDatabaseClient().execute_query(re_escape_sql)
 
 
+def add_application_search():
+    client = PsqlDatabaseClient()
+    try:
+        vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
+        client.execute_query(
+            f"""
+                ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
+                UPDATE {APPLICATIONS_TABLE} SET text_search = to_tsvector('english', {vector_sql});
+            """
+        )
+        client.create_index(
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "text_search",
+                "is_tgrm": True,
+                "is_lower": False,
+            }
+        )
+    except Exception as e:
+        logging.warning(
+            "Error creating application search stuff. May already exist. %s", e
+        )
+
+
 def main(bootstrap: bool = False):
     """
         Copy tables from patents-public-data to a local dataset.
@@ -207,6 +233,9 @@ def main(bootstrap: bool = False):
         copy_bq_to_psql()
         # copy data about approvals
         copy_patent_approvals()
+
+        # adds column & index for application search
+        add_application_search()
 
     # create patent terms (psql)
     create_patent_terms()

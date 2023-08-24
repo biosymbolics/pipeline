@@ -21,6 +21,7 @@ IndexCreateDef = TypedDict(
         "column": str,
         "is_tgrm": NotRequired[bool],
         "is_uniq": NotRequired[bool],
+        "is_lower": NotRequired[bool],
     },
 )
 IndexSql = TypedDict("IndexSql", {"sql": str})
@@ -249,11 +250,13 @@ class PsqlDatabaseClient(DatabaseClient):
                 column = index_def["column"]
                 is_tgrm = index_def.get("is_tgrm", False)
                 is_uniq = index_def.get("is_uniq", False)
+                is_lower = index_def.get("is_lower", is_tgrm)
+                col = f"lower({column})" if is_lower else column
 
                 if is_tgrm:
-                    sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin (lower({column}) gin_trgm_ops)"
+                    sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin ({col} gin_trgm_ops)"
                 else:
-                    sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({column})"
+                    sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({col})"
 
                 self.execute_query(sql, [], ignore_error=True)
 

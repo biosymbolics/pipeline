@@ -13,11 +13,12 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 
+from ._constants import APPLICATIONS_TABLE
+
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
 
 
-APPLICATIONS_TABLE = "applications"
 EXPORT_TABLES = {
     "biosym_annotations_source": None,
     APPLICATIONS_TABLE: "priority_date",  # shard by priority date
@@ -214,6 +215,7 @@ def copy_bq_to_psql():
 
     export_bq_tables()
     import_into_psql()
+
     client.create_indices(
         [
             {

@@ -1,4 +1,6 @@
 TEXT_FIELDS = frozenset(["title", "abstract"])
+APPLICATIONS_TABLE = "applications"
+
 
 MECHANISM_BASE_TERMS: list[str] = [
     "activity",
@@ -45,6 +47,7 @@ MECHANISM_BASE_TERMS: list[str] = [
     "pathway",
     "solvent",
     "surfactant",
+    "target",  # ??
     "transfer",
     "toxin",
     "vaccine",
@@ -109,6 +112,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "analog(?:ue)?",
     "assembly",
     "base",
+    "(?di|nano)?bodie",  # ??
     "(?:bio)?material",
     "candidate",
     "capsule",
@@ -256,7 +260,7 @@ INTERVENTION_BASE_PREFIXES = [
     "allosteric",
     "anti",
     "aromatic",
-    "bi-?specific",
+    "bi[- ]?specific",
     "chimeric",
     "cyclic",
     "dual",
@@ -268,11 +272,13 @@ INTERVENTION_BASE_PREFIXES = [
     "(?:ion )?channel",
     "inventive",
     "monoclonal",
+    "multi[- ]?specific",
     "negative",
     "novel",
     "new",
     "partial",
     "polyclonal",
+    "poly[- ]?specific",
     "positive",
     "potent",
     "optionally",

@@ -206,6 +206,7 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
             "agent",
             "effect",
             "pro[ -]?drug",
+            "mediated?",
         ]
     ]
 )
