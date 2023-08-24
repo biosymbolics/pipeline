@@ -275,7 +275,12 @@ class TermAssembler:
         self.client.create_index(
             {"table": table_name, "column": "term", "is_tgrm": True}
         )
-        self.client.create_index({"table": "synonym_map", "column": "synonym"})
+        self.client.create_indices(
+            [
+                {"table": "synonym_map", "column": "synonym"},
+                {"table": "synonym_map", "column": "synonym", "is_tgrm": True},
+            ]
+        )
         logging.info(f"Inserted %s rows into terms table", len(terms))
 
     @staticmethod
