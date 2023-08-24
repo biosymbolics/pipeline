@@ -272,15 +272,10 @@ class TermAssembler:
         save_json_as_file(terms, TERMS_FILE)
 
         self.client.insert_into_table(terms, table_name)
-        self.client.create_indices(
-            [
-                {
-                    "table": table_name,
-                    "column": "term",
-                    "is_tgrm": True,
-                },
-            ]
+        self.client.create_index(
+            {"table": table_name, "column": "term", "is_tgrm": True}
         )
+        self.client.create_index({"table": "synonym_map", "column": "synonym"})
         logging.info(f"Inserted %s rows into terms table", len(terms))
 
     @staticmethod

@@ -159,6 +159,7 @@ def _search(
             GROUP BY a.publication_number
         """
 
+    # TODO: duplicates on approvals
     select_query = f"""
         WITH matches AS ({search_query})
         SELECT {fields}, terms, domains
@@ -212,11 +213,11 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
 
     search_sql = f".*{string}.*"
     query = f"""
-        SELECT DISTINCT ON (count, term) term, count
-        FROM terms,
-        unnest(synonyms) as synonym
+        SELECT DISTINCT ON (count, term) terms.term, count
+        FROM terms
+        LEFT JOIN synonym_map ON terms.term = synonym_map.synonym
         WHERE (
-            term ~* %s
+            terms.term ~* %s
             OR
             synonym ~* %s
         )

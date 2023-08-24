@@ -227,6 +227,12 @@ class PsqlDatabaseClient(DatabaseClient):
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         self.execute_query(query)
 
+    def create_index(self, index_df: IndexCreateDef | IndexSql):
+        """
+        Add an index
+        """
+        self.create_indices([index_df])
+
     def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """
         Add indices
