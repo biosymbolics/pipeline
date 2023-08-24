@@ -66,15 +66,7 @@ def score_patents(
 
     # multiply score by pct patent life remaining
     df = df.with_columns(
-        pl.col("score")
-        .mul(df[years_column] / MAX_PATENT_LIFE)
-        .alias("suitability_score"),
-        pl.concat_list(pl.col(["score", "search_rank"])).alias("all_scores"),
-    )
-
-    # multiply score by search rank
-    df = df.with_columns(
-        pl.col("score").mul(df["search_rank"]).alias("search_score"),
+        pl.col("score").mul(df[years_column] / MAX_PATENT_LIFE).alias("score"),
     )
 
     return df

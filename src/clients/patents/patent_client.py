@@ -10,11 +10,9 @@ from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import AGGREGATED_ANNOTATIONS_TABLE
-from constants.patents import COMPOSITION_OF_MATTER_IPC_CODES
 from typings.patents import PatentApplication
 from utils.string import get_id
 
-from .constants import DOMAINS_OF_INTEREST
 from .formatting import format_search_result
 from .types import AutocompleteTerm, TermResult
 from .utils import get_max_priority_date
@@ -24,14 +22,6 @@ logger.setLevel(logging.INFO)
 
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
-
-"""
-Larger decay rates will result in more matches
-
-Usage:
-    EXP(-a.character_offset_start * {DECAY_RATE}) > {threshold})
-"""
-DECAY_RATE = 1 / 35
 
 
 SEARCH_RETURN_FIELDS = [
@@ -46,7 +36,6 @@ SEARCH_RETURN_FIELDS = [
     "filing_date",
     "grant_date",
     "ipc_codes",
-    "search_rank",
     '"similar"',
     "title",
     "url",
@@ -152,7 +141,6 @@ def _search(
                 publication_number,
                 ARRAY[]::TEXT[] as matched_domains,
                 ARRAY[]::TEXT[] as matched_terms,
-                1 as search_rank
             from applications
             WHERE publication_number = any(%s)
         """
@@ -164,8 +152,7 @@ def _search(
             SELECT
                 a.publication_number as publication_number,
                 ARRAY_AGG(distinct a.domain) as matched_domains,
-                ARRAY_AGG(DISTINCT a.term) as matched_terms,
-                ROUND(AVG(EXP(-a.character_offset_start * {DECAY_RATE})), 5) as search_rank --- exp decay scaling; higher is better
+                ARRAY_AGG(DISTINCT a.term) as matched_terms
             FROM annotations a
             WHERE lower(a.term) = any(%s)
             {domain_where}
@@ -191,7 +178,7 @@ def _search(
     else:
         where = f"""
             WHERE priority_date > '{max_priority_date}'::date
-            ORDER BY randomizer desc, search_rank DESC
+            ORDER BY randomizer desc
             limit {max_results}
         """
 

@@ -21,7 +21,6 @@ class PatentBasicInfo(TypedDict):
     priority_date: date
     publication_number: str
     score: float
-    search_rank: float
     title: str
     url: str
 

@@ -35,7 +35,6 @@ def format_search_result(
     Format patent search results and adds scores
 
     Adds:
-    - search_score
     - patent_years
     - *DOMAINS_OF_INTEREST
 
@@ -65,7 +64,7 @@ def format_search_result(
         ],
     ).drop("terms", "domains")
 
-    df = calculate_score(df).sort("search_score").reverse()
+    df = calculate_score(df).sort("score").reverse()
 
     logging.info(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
