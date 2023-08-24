@@ -195,7 +195,7 @@ def _search(
         JOIN matches ON (
             apps.publication_number = matches.publication_number
             AND
-            ARRAY_LENGTH(matched_terms, 1) >= {terms_count}
+            coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
         )
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
     """
@@ -206,11 +206,15 @@ def _search(
             ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
         """
 
-    where = f"""
-        WHERE priority_date > '{max_priority_date}'::date
-        ORDER BY randomizer desc, search_rank DESC
-        limit {max_results}
-    """
+    if is_id_search:
+        # don't constrain what's returned for id-only
+        where = ""
+    else:
+        where = f"""
+            WHERE priority_date > '{max_priority_date}'::date
+            ORDER BY randomizer desc, search_rank DESC
+            limit {max_results}
+        """
 
     query = select_query + where
     results = PsqlDatabaseClient().select(query, compact([_terms, domains]))

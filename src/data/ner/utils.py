@@ -311,6 +311,9 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
+
+    TODO:
+    - antiil36r antibody / {"anti-il-36r antibody","anti-il-36r antibodies"}
     """
     nlp = Spacy.get_instance()
 
