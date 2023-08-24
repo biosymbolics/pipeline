@@ -185,11 +185,13 @@ def main(bootstrap: bool = False):
     CREATE USER patents with password '$PASSWORD';
     GRANT readaccess TO patents;
 
-    analyze annotations;
-    analyze applications;
-    reindex database patents;
+    -- analyze annotations;
+    -- analyze applications;
+    -- reindex database patents;
         " >> patents.psql
     # pg_restore --clean -d patents -h 172.31.55.68 -p 5432 --username postgres --password patents.psql
+    dropdb patents --force  -h 172.31.55.68 -p 5432 --username postgres
+    createdb patents -h 172.31.55.68 -p 5432 --username postgres
     psql -d patents -h 172.31.55.68 -p 5432 --username postgres --password -f patents.psql
     rm patents.psql*
     ```
