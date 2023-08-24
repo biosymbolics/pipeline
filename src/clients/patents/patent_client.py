@@ -32,6 +32,7 @@ SEARCH_RETURN_FIELDS = [
     "application_number",
     "country",
     "embeddings",
+    "explanation",
     "family_id",
     "filing_date",
     "grant_date",
