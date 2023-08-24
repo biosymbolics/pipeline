@@ -102,12 +102,13 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
 ]
 
 COMPOUND_BASE_TERMS_GENERIC: list[str] = [
-    "(?:bio)?material",
+    "administration(?: of)?",
     "aerosol",
     "application",
     "analog(?:ue)?",
     "assembly",
     "base",
+    "(?:bio)?material",
     "candidate",
     "capsule",
     "chemical",
