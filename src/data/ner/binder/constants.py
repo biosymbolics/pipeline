@@ -64,6 +64,7 @@ PHRASE_MAP = {
     "non[ -]?steroidal": "nonsteroidal",
     "pathway inhibitor": "inhibitor",
     "protein kinase": "kinase",
+    "protein degrader": "degrader",
     "peptide complex(?:es)?": "peptide",
     # we might want to undo this in the future (but note that the info isn't lost to the user)
     "(?:ligand )?receptor activator": "activator",
@@ -77,6 +78,7 @@ PHRASE_MAP = {
     "receptor peptide": "peptide",
     "receptor polypeptide": "polypeptide",
     "receptor protein": "protein",
+    "receptor degrad[a-z]{1,5}": "degrader",
     # end
     "related condition": "associated disease",
     "related disease": "associated disease",

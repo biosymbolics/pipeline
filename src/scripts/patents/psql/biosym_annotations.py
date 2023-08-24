@@ -29,6 +29,7 @@ from .._constants import (
 TextField = Literal["title", "abstract"]
 WordPlace = Literal["leading", "trailing", "all"]
 
+
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
 REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "such": "all",
@@ -36,7 +37,13 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "obtainable": "all",
     "different": "all",
     "stable": "all",
+    "various": "all",
     "the": "leading",
+    "unwanted": "leading",
+    "contagious": "leading",
+    "recognition": "trailing",
+    "binding": "trailing",
+    "prevention": "leading",
     "encoding": "trailing",
     "discreet": "all",
     "properties": "trailing",
@@ -51,14 +58,16 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "uses(?: thereof| of)": "all",
     "designer": "all",
     "thereof": "all",
-    "capable": "trailing",
-    "specific": "leading",
+    "capable": "all",
+    "specific": "all",
+    "in": "leading",
     "recombinant": "all",
     "novel": "all",
     "non[ -]?toxic": "leading",
     "improved": "all",
     "improving": "all",
     "new": "leading",
+    r"\y[(]?e[.]?g[.]?,?": "all",
     "-targeted": "all",
     "long[ -]?acting": "leading",
     "potent": "all",
@@ -69,7 +78,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "efficacy": "all",
-    "therapy": "leading",
     "therapeutic procedure": "all",
     "therapeautic?": "all",
     "therapeutic(?:ally)?": "all",
@@ -78,15 +86,13 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "(?:co[ -]?)?therapy": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
     "treatment method": "all",
-    "treatment": "all",  # TODO: MOve
     "treating": "all",
     "component": "all",
-    "complexe?": "all",  # TODO: move
     "portion": "trailing",
     "intermediate": "all",
     "suitable": "all",
     "procedure": "all",
-    "relevant": "leading",
+    "relevant": "all",
     "patient": "all",
     "acceptable": "all",
     "thereto": "all",
@@ -111,7 +117,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "for": "trailing",
     "=": "trailing",
     "unit(?:[(]s[)])?": "trailing",
-    "formation": "all",
     "measurement": "all",
     "measuring": "all",
     "system": "trailing",
@@ -123,8 +128,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "fixed": "leading",
     "pharmacological": "all",
     "acquisition": "all",
-    "application": "all",
-    "assembly": "trailing",
     "production": "all",
     "level": "trailing",
     "processing(?: of)?": "all",
@@ -134,15 +137,12 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "variant": "trailing",
     "variety": "trailing",
     "varieties": "trailing",
-    "product": "trailing",
     "family": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
     "pure": "all",
-    "specific": "trailing",
     "chemically (?:modified)?": "all",
     "based": "trailing",
     "an?": "leading",
-    "an?": "trailing",
     "active": "all",
     "additional": "all",
     "additive": "all",
@@ -152,7 +152,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "efficient": "all",
     "first": "all",
     "second": "all",
-    "interaction": "trailing",
     "abnormal": "all",
     "atypical": "all",
     "inappropriate": "all",
@@ -162,7 +161,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "engineered": "all",
     "medicament": "all",
     "medicinal": "all",
-    "precipitation": "all",
     "sufficient": "all",
     "due": "trailing",
     "locate": "all",
@@ -175,7 +173,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "dosing": "leading",
     "preferred": "leading",
     "conventional": "leading",
-    "combination": "leading",
     "clinically[ -]?proven": "all",
     "proven": "all",
     "contemplated": "all",
@@ -185,7 +182,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
     "soluble": "leading",
-    "dosing regimen": "all",
     "mutant": "leading",
     "mutated": "leading",
     # model/source
@@ -724,7 +720,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
         def get_sql(place):
             if place == "trailing":
                 words = [
-                    t[0] + "s?[ ]?" for t in removal_word_set.items() if t[1] == place
+                    t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place
                 ]
                 if len(words) == 0:
                     return None
@@ -735,7 +731,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 """
             elif place == "leading":
                 words = [
-                    t[0] + r"s?[ ]?" for t in removal_word_set.items() if t[1] == place
+                    t[0] + r"s?[ ]*" for t in removal_word_set.items() if t[1] == place
                 ]
                 if len(words) == 0:
                     return None
@@ -746,7 +742,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                 """
             elif place == "all":
                 words = [
-                    t[0] + "s?[ ]?" for t in removal_word_set.items() if t[1] == place
+                    t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place
                 ]
                 if len(words) == 0:
                     return None
@@ -807,6 +803,8 @@ def remove_junk():
     for sql in queries:
         client.execute_query(sql)
 
+    # rf"update biosym_annotations set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+
 
 def fix_unmatched():
     """
@@ -860,6 +858,8 @@ def remove_common_terms():
         f"delete FROM {WORKING_TABLE} "
         + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
         f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
+        rf"delete from {WORKING_TABLE} where length(original_term) > 150 and original_term ~* '\y(?:and|or)\y';",  # sentences
+        rf"delete from {WORKING_TABLE}  where length(original_term) > 150 and original_term ~* '.*[.;] .*';",
         f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
         f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
     ]

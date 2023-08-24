@@ -300,6 +300,8 @@ def create_patent_terms():
     Create the terms and synonym map tables
 
     Idempotent (all tables are dropped and recreated)
+
+    $ jq '.[] | select(.name == "therapeutically")' terms.json
     """
     populate_working_biosym_annotations()
 
