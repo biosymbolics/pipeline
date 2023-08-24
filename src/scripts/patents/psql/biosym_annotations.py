@@ -34,71 +34,72 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "such": "all",
     "method": "all",
     "obtainable": "all",
-    "different": "leading",
-    "stable": "leading",
+    "different": "all",
+    "stable": "all",
     "the": "leading",
     "encoding": "trailing",
-    "discreet": "leading",
+    "discreet": "all",
     "properties": "trailing",
     "derived": "all",
-    "library": "trailing",
+    "library": "all",
     "more": "leading",
-    "classic": "leading",
+    "classic": "all",
     "excellent": "all",
     "construct": "trailing",
-    "particular": "leading",
+    "particular": "all",
     "useful": "all",
     "uses(?: thereof| of)": "all",
-    "designer": "leading",
+    "designer": "all",
     "thereof": "all",
     "capable": "trailing",
     "specific": "leading",
-    "recombinant": "leading",
-    "novel": "leading",
+    "recombinant": "all",
+    "novel": "all",
     "non[ -]?toxic": "leading",
-    "improved": "leading",
-    "improving": "trailing",
+    "improved": "all",
+    "improving": "all",
     "new": "leading",
     "-targeted": "all",
     "long[ -]?acting": "leading",
-    "potent": "trailing",
-    "inventive": "leading",
+    "potent": "all",
+    "inventive": "all",
     "other": "leading",
     "more": "leading",
     "of": "trailing",
     "be": "trailing",
     "use": "trailing",
-    "efficacy": "trailing",
+    "efficacy": "all",
+    "therapy": "leading",
     "therapeutic procedure": "all",
-    "therapeutic(?:ally)?": "leading",
-    "therapeutic(?:ally)?": "trailing",
+    "therapeautic?": "all",
+    "therapeutic(?:ally)?": "all",
+    "therefor": "all",
+    "prophylactic": "all",
     "(?:co[ -]?)?therapy": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
-    "treatment method": "trailing",
-    "treatment": "trailing",
-    "(?:combination )?treatment": "trailing",
-    "treating": "trailing",
-    "component": "trailing",
-    "complexe?": "trailing",
+    "treatment method": "all",
+    "treatment": "all",  # TODO: MOve
+    "treating": "all",
+    "component": "all",
+    "complexe?": "all",  # TODO: move
     "portion": "trailing",
-    "intermediate": "trailing",
+    "intermediate": "all",
     "suitable": "all",
-    "procedure": "trailing",
+    "procedure": "all",
     "relevant": "leading",
-    "patient": "leading",
-    "patient": "trailing",
+    "patient": "all",
     "acceptable": "all",
-    "thereto": "trailing",
-    "certain": "leading",
+    "thereto": "all",
     "exemplary": "all",
     "against": "trailing",
-    "usable": "trailing",
+    "usable": "all",
     "other": "leading",
-    "suitable": "trailing",
+    "suitable": "all",
     "pharmaceutical": "all",
+    "therapeutical": "all",
     "dosage(?: form)?": "all",
     "use of": "leading",
-    "certain": "leading",
+    "certain": "all",
     "working": "leading",
     "on": "trailing",
     "in(?: a)?": "trailing",
@@ -110,81 +111,81 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "for": "trailing",
     "=": "trailing",
     "unit(?:[(]s[)])?": "trailing",
-    "formation": "trailing",
-    "measurement": "trailing",
-    "measuring": "trailing",
+    "formation": "all",
+    "measurement": "all",
+    "measuring": "all",
     "system": "trailing",
     "[.]": "trailing",
-    "analysis": "trailing",
-    "management": "trailing",
-    "accelerated": "leading",
+    "analysis": "all",
+    "management": "all",
+    "accelerated": "all",
     "below": "trailing",
     "fixed": "leading",
     "pharmacological": "all",
-    "acquisition": "trailing",
-    "application": "trailing",
+    "acquisition": "all",
+    "application": "all",
     "assembly": "trailing",
-    "production": "trailing",
+    "production": "all",
     "level": "trailing",
-    "processing": "trailing",
+    "processing(?: of)?": "all",
     "lead candidate": "all",
     "control": "trailing",
-    "modified": "leading",
+    "modified": "all",
     "variant": "trailing",
     "variety": "trailing",
     "varieties": "trailing",
     "product": "trailing",
     "family": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    "pure": "leading",
+    "pure": "all",
     "specific": "trailing",
-    "chemically (?:modified)?": "leading",
+    "chemically (?:modified)?": "all",
     "based": "trailing",
     "an?": "leading",
     "an?": "trailing",
-    "active": "leading",
-    "additional": "leading",
-    "additive": "leading",
-    "advantageous": "leading",
-    "aforementioned": "leading",
-    "aforesaid": "leading",
-    "efficient": "leading",
-    "first": "leading",
-    "second": "leading",
+    "active": "all",
+    "additional": "all",
+    "additive": "all",
+    "advantageous": "all",
+    "aforementioned": "all",
+    "aforesaid": "all",
+    "efficient": "all",
+    "first": "all",
+    "second": "all",
     "interaction": "trailing",
-    "abnormal": "leading",
-    "atypical": "leading",
-    "inappropriate": "leading",
-    "compounds as": "leading",
+    "abnormal": "all",
+    "atypical": "all",
+    "inappropriate": "all",
+    "compounds as": "all",
     "formula [(][ivxab]{1,3}[)]": "trailing",
     "is": "leading",
-    "engineered": "leading",
-    "medicament": "trailing",
-    "medicinal": "leading",
-    "precipitation": "trailing",
-    "sufficient": "trailing",
+    "engineered": "all",
+    "medicament": "all",
+    "medicinal": "all",
+    "precipitation": "all",
+    "sufficient": "all",
     "due": "trailing",
-    "locate": "trailing",
-    "specification": "trailing",
-    "detect": "trailing",
-    "similar": "trailing",
-    "contemplated": "leading",
-    "predictable": "leading",
-    "convenient": "leading",
+    "locate": "all",
+    "specification": "all",
+    "detect": "all",
+    "similar": "all",
+    "contemplated": "all",
+    "predictable": "all",
+    "convenient": "all",
     "dosing": "leading",
     "preferred": "leading",
     "conventional": "leading",
     "combination": "leading",
-    "clinically[ -]?proven": "leading",
-    "proven": "leading",
-    "contemplated": "leading",
+    "clinically[ -]?proven": "all",
+    "proven": "all",
+    "contemplated": "all",
     "is indicative of": "all",
     "via": "leading",
     "effective": "all",
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
     "soluble": "leading",
-    "dosing regimen": "trailing",
+    "dosing regimen": "all",
     "mutant": "leading",
     "mutated": "leading",
     # model/source
@@ -718,31 +719,30 @@ def fix_of_for_annotations():
 def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
     logging.info("Removing trailing/leading words")
 
+    # \y === \b in postgres re
     def get_remove_words():
         def get_sql(place):
             if place == "trailing":
                 words = [
-                    "[ ]" + t[0] + "s?"
-                    for t in removal_word_set.items()
-                    if t[1] == place
+                    t[0] + "s?[ ]?" for t in removal_word_set.items() if t[1] == place
                 ]
                 if len(words) == 0:
                     return None
                 words_re = get_or_re(words, "+")
-                return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i){words_re}$', '', 'g'))
-                    where original_term ~* '.*{words_re}$'
+                return rf"""
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}$', '', 'gi'))
+                    where original_term ~* '.*\y{words_re}$'
                 """
             elif place == "leading":
                 words = [
-                    t[0] + "s?[ ]" for t in removal_word_set.items() if t[1] == place
+                    t[0] + r"s?[ ]?" for t in removal_word_set.items() if t[1] == place
                 ]
                 if len(words) == 0:
                     return None
                 words_re = get_or_re(words, "+")
-                return f"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)^{words_re}', '', 'g'))
-                    where original_term ~* '^{words_re}.*'
+                return rf"""
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^{words_re}\y', '', 'gi'))
+                    where original_term ~* '^{words_re}\y.*'
                 """
             elif place == "all":
                 words = [
@@ -752,8 +752,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                     return None
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '(?i)(?:^|$| ){words_re}(?:^|$| )', ' ', 'g'))
-                    where original_term ~* '(?:^|$| ){words_re}(?:^|$| )'
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}\y', ' ', 'gi'))
+                    where original_term ~* '.*\y{words_re}\y.*'
                 """
             else:
                 raise ValueError(f"Unknown place: {place}")

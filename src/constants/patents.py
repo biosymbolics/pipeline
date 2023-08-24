@@ -294,7 +294,7 @@ PATENT_ATTRIBUTE_MAP = {
     "FORMULATION": ["formulation", "form", "salt"],
     "METHOD": ["method", "procedure"],  # preparation method, method of use
     "NOVEL": ["novel"],
-    "PREVENTATIVE": ["prevention", "prophylaxis"],
+    "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
     "PROCESS": [
         "preparation",
         "process",
