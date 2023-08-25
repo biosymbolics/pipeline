@@ -22,6 +22,7 @@ from scripts.patents.psql.terms import create_patent_terms
 
 from ._constants import APPLICATIONS_TABLE, TEXT_FIELDS
 
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
@@ -29,7 +30,7 @@ def __create_annotations_table():
     """
     Create a table of annotations for use in app queries
     """
-    logging.info("Create a table of annotations for use in app queries")
+    logger.info("Create a table of annotations for use in app queries")
     table_name = "annotations"
 
     client = PsqlDatabaseClient()
@@ -139,7 +140,7 @@ def __create_biosym_annotations_source_table():
         exists_ok=True,
         truncate_if_exists=False,
     )
-    logging.info(f"(Maybe) created table {SOURCE_BIOSYM_ANNOTATIONS_TABLE}")
+    logger.info(f"(Maybe) created table {SOURCE_BIOSYM_ANNOTATIONS_TABLE}")
 
 
 def create_funcs():
@@ -156,26 +157,21 @@ def create_funcs():
 
 def add_application_search():
     client = PsqlDatabaseClient()
-    try:
-        vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
-        client.execute_query(
-            f"""
-                ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
-                UPDATE {APPLICATIONS_TABLE} SET text_search = to_tsvector('english', {vector_sql});
-            """
-        )
-        client.create_index(
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "text_search",
-                "is_tgrm": True,
-                "is_lower": False,
-            }
-        )
-    except Exception as e:
-        logging.warning(
-            "Error creating application search stuff. May already exist. %s", e
-        )
+    vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
+    client.execute_query(
+        f"""
+            ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
+            UPDATE {APPLICATIONS_TABLE} SET text_search = to_tsvector('english', {vector_sql});
+        """
+    )
+    client.create_index(
+        {
+            "table": APPLICATIONS_TABLE,
+            "column": "text_search",
+            "is_gin": True,
+            "is_lower": False,
+        }
+    )
 
 
 def main(bootstrap: bool = False):
