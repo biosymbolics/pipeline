@@ -32,7 +32,6 @@ SEARCH_RETURN_FIELDS = [
     "application_number",
     "country",
     "embeddings",
-    "explanation",
     "family_id",
     # "filing_date",
     # "grant_date",
@@ -171,7 +170,7 @@ def _search(
             AND (
                 coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
                 OR
-                text_search @@ to_tsquery('english', '{(" & ").join(_terms)}') # full text search alernative
+                text_search @@ to_tsquery('english', %s)
             )
         )
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
@@ -189,7 +188,9 @@ def _search(
         """
 
     query = select_query + where
-    results = PsqlDatabaseClient().select(query, compact([_terms, domains]))
+    results = PsqlDatabaseClient().select(
+        query, compact([_terms, domains, (" & ").join(_terms)])
+    )
 
     logger.debug("Patent search query: %s", query)
     logger.info(
