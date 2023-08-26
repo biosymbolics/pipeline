@@ -10,6 +10,11 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   timeout: 300
+  ecr:
+    images:
+      chat_torch_container:
+        # 469840476741 / ${AWS::AccountId}
+        uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
   vpc:
     securityGroupIds:
       - Ref: LambdaSecurityGroup
@@ -48,6 +53,7 @@ provider:
             limit: 100
             period: DAY
   environment:
+    AWS_ACCOUNT_ID: ${AWS::AccountId}
     CACHE_BUCKET: biosym-patents-${self:provider.stage}
     DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
     ENV: ${param:ENV, 'dev'}
@@ -110,23 +116,24 @@ functions:
     layers:
       - Ref: PythonRequirementsLambdaLayer
   ask-sec:
+    ## requirements updates requires rebuild/push of image! ##
     vpc: ~ # no need to be in VPC; needs OB access
+    image:
+      name: chat_torch_container
     events:
       - http:
           path: sec/ask
           method: get
           cors: true
-    handler: src.handlers.sec.chat
-    layers:
-      - Ref: PythonRequirementsLambdaLayer
-  query-clindev:
+  predict-clindev:
+    ## requirements updates requires rebuild/push of image! ##
     vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
           path: sec/query/clindev
           method: get
           cors: true
-    handler: src.handlers.sec.query_clindev
+    handler: src.handlers.clindev.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer
 
@@ -150,6 +157,7 @@ custom:
   igw: igw-0cd81e264ec0cab9f
   pythonRequirements:
     dockerizePip: true
+    # dockerImage: public.ecr.aws/sam/build-python3.10:latest-arm64
     slim: true
     strip: true
     slimPatternsAppendDefaults: true

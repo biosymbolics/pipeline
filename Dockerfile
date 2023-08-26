@@ -1,8 +1,14 @@
-# for use if wanting a local whl in the python layer
-FROM public.ecr.aws/sam/build-python3.10
+FROM public.ecr.aws/lambda/python:3.10
+
+WORKDIR /var/task
+
+COPY . .
+RUN pip install -r requirements-torch-inference.txt
 
 # Copy modules whl
-RUN echo "Copying data module whl..."
-COPY ./*.whl /tmp/
-RUN ls .
-RUN pwd
+# RUN echo "Copying data module whl..."
+# COPY ./*.whl /tmp/
+# RUN ls .
+# RUN pwd
+
+CMD ["src.handlers.sec.chat"]

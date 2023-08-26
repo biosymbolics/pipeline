@@ -5,7 +5,6 @@ SpaCy client
 import logging
 from typing import Any
 
-# import torch
 import spacy
 from spacy.language import Language
 

@@ -1,0 +1,15 @@
+--prefer-binary
+torch --index-url https://download.pytorch.org/whl/cpu
+llama_index
+
+boto3
+bs4
+langchain
+openai
+polars
+psycopg[binary]
+psycopg_pool
+pydash
+requests
+sec_api
+typing_extensions

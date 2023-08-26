@@ -116,3 +116,37 @@ class GptApiClient:
             + "\n".join(topic_features)
         )
         return self.query(query)
+
+    def query_clindev(self, indication: str) -> list[dict]:
+        """
+        Query GPT about clindev timelines
+
+        (TODO: move to a separate client)
+        """
+        prompt = (
+            f"What is the typical clinical development timeline for indication {indication}? "
+            "Return the answer as an array of json objects with the following fields: stage, offset, median_duration, iqr. "
+        )
+
+        response_schemas = [
+            ResponseSchema(name="stage", description="e.g. Phase 1"),
+            ResponseSchema(
+                name="offset",
+                description="equal to cumulative median duration of previous stages, 0 for the first stage.",
+                type="float",
+            ),
+            ResponseSchema(
+                name="median_duration",
+                description="median duration of this stage in years (e.g. 2.5)",
+                type="float",
+            ),
+            ResponseSchema(
+                name="iqr",
+                description="interquartile range of this stage's duration in years (e.g. 0.8)",
+                type="float",
+            ),
+        ]
+
+        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-4")
+        answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
+        return answer_as_array

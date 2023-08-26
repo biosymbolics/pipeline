@@ -1,7 +1,7 @@
 from typing import TypedDict
 import logging
 
-from clients.sec.chat import SecChatClient
+from clients.openai.gpt_client import GptApiClient
 
 
 class ClinDevParams(TypedDict):
@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def query_clindev(event: ClinDevEvent, context):
+def predict_timelines(event: ClinDevEvent, context):
     """
     Query GPT about clindev timelines
 
     Invocation:
-    - Local: `serverless invoke local --function query-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
-    - Remote: `serverless invoke --function query-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
-    - API: `curl https://api.biosymbolics.ai/sec/query/clindev?indication=asthma`
+    - Local: `serverless invoke local --function predict-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
+    - Remote: `serverless invoke --function predict-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
+    - API: `curl https://api.biosymbolics.ai/clindev/predict?indication=asthma`
     """
 
-    sec_chat = SecChatClient()
+    gpt_api = GptApiClient()
 
     params = event.get("queryStringParameters", {})
     indication = params.get("indication")
@@ -46,6 +46,6 @@ def query_clindev(event: ClinDevEvent, context):
         indication,
     )
 
-    answer = sec_chat.query_clindev(indication)
+    answer = gpt_api.query_clindev(indication)
 
     return {"statusCode": 200, "body": answer}

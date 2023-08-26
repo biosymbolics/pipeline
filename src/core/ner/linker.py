@@ -5,7 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from typing import Union
-import torch
+
+# import torch
 from scispacy.candidate_generation import MentionCandidate
 
 from .types import KbLinker, CanonicalEntity
@@ -33,7 +34,7 @@ class TermLinker:
         """
         Initialize term normalizer using existing model
         """
-        torch.device("mps")  # does this work?
+        # torch.device("mps")  # does this work?
 
         # lazy (Umls is big)
         from scispacy.candidate_generation import (
