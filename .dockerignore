@@ -1,0 +1,15 @@
+**/__pycache__/**
+.env
+.env.local
+lib/**
+storage
+storage/**
+data/**
+patent_model_checkpoints/**
+models/
+model*.pt
+node_modules
+.serverless/**
+s_*.py
+serverless_sdk
+.requirements.zip
