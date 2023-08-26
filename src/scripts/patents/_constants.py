@@ -112,7 +112,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "analog(?:ue)?",
     "assembly",
     "base",
-    "(?di|nano)?bodie",  # ??
+    "(?:di|nano)?bodie",  # ??
     "(?:bio)?material",
     "candidate",
     "capsule",

@@ -906,7 +906,6 @@ def populate_working_biosym_annotations():
     )
 
     # add indices after initial load
-    index_base = f"index_{WORKING_TABLE}"
     client.create_indices(
         [
             {
@@ -917,9 +916,6 @@ def populate_working_biosym_annotations():
                 "table": WORKING_TABLE,
                 "column": "original_term",
                 "is_tgrm": True,
-            },
-            {
-                "sql": f"CREATE UNIQUE INDEX {index_base}_uniq on {WORKING_TABLE} (publication_number, original_term, domain, character_offset_start, character_offset_end)",
             },
         ]
     )
@@ -935,10 +931,13 @@ def populate_working_biosym_annotations():
     remove_trailing_leading(REMOVAL_WORDS_POST)
 
     remove_substrings()  # less specific terms in set with more specific terms
-    normalize_domains()
-    remove_common_terms()  # final step - remove one-off generic terms
+    remove_common_terms()  # remove one-off generic terms
 
-    # do this last to minimize mucking with it
+    # normalize_domains is **much** faster w/o this index
+    client.execute_query("drop index trgm_index_biosym_annotations_original_term")
+    normalize_domains()
+
+    # do this last to minimize mucking with attribute annotations
     client.select_insert_into_table(
         f"SELECT * from {SOURCE_TABLE} where domain='attributes'", WORKING_TABLE
     )

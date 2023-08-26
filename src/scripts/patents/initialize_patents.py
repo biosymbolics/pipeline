@@ -160,8 +160,8 @@ def add_application_search():
     vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
     client.execute_query(
         f"""
-            ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
-            UPDATE {APPLICATIONS_TABLE} SET text_search = to_tsvector('english', {vector_sql});
+            ALTER TABLE applications ADD COLUMN text_search tsvector;
+            UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
         """
     )
     client.create_index(
