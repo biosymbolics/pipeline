@@ -29,6 +29,8 @@ PHRASE_MAP = {
     "antibody drug": "antibody",
     "associated protein": "protein",
     "binding antagonist": "antagonist",
+    "binding antibody": "antibody",
+    "binding protein": "protein",
     "binding modulator": "modulator",
     "binding activity": "binder",
     "binding agent": "binder",

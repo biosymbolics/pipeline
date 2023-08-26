@@ -5,6 +5,7 @@ import time
 from typing_extensions import NotRequired
 from typing import Any, Mapping, TypeGuard, TypeVar, TypedDict
 import logging
+import psycopg
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
@@ -19,6 +20,8 @@ IndexCreateDef = TypedDict(
     {
         "table": str,
         "column": str,
+        "is_gin": NotRequired[bool],
+        "is_lower": NotRequired[bool],
         "is_tgrm": NotRequired[bool],
         "is_uniq": NotRequired[bool],
     },
@@ -227,35 +230,44 @@ class PsqlDatabaseClient(DatabaseClient):
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         self.execute_query(query)
 
-    def create_index(self, index_df: IndexCreateDef | IndexSql):
+    def create_index(self, index_def: IndexCreateDef | IndexSql):
         """
         Add an index
         """
-        self.create_indices([index_df])
-
-    def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
-        """
-        Add indices
-        """
         self.execute_query("CREATE EXTENSION pg_trgm", [], ignore_error=True)
-
-        for index_def in index_defs:
+        try:
             if is_index_sql(index_def):
+                logger.info("Creating index: %s", index_def["sql"])
                 self.execute_query(index_def["sql"], [])
-                continue
+                return
 
             if is_index_create_def(index_def):
                 table = index_def["table"]
                 column = index_def["column"]
                 is_tgrm = index_def.get("is_tgrm", False)
                 is_uniq = index_def.get("is_uniq", False)
+                is_gin = index_def.get("is_gin", False)
+                is_lower = index_def.get("is_lower", is_tgrm)
+                col = f"lower({column})" if is_lower else column
 
                 if is_tgrm:
-                    sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin (lower({column}) gin_trgm_ops)"
+                    sql = f"CREATE INDEX trgm_index_{table}_{column} ON {table} USING gin ({col} gin_trgm_ops)"
+                elif is_gin:
+                    sql = f"CREATE INDEX gin_index_{table}_{column} ON {table} USING gin ({col})"
                 else:
-                    sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({column})"
+                    sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({col})"
 
-                self.execute_query(sql, [], ignore_error=True)
+                logger.info("Creating index: %s", sql)
+                self.execute_query(sql, [])
 
             else:
                 raise Exception("Invalid index def")
+        except psycopg.errors.DuplicateTable as e:
+            logger.warning("Index already exists: %s", e)
+
+    def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
+        """
+        Add indices
+        """
+        for index_def in index_defs:
+            self.create_index(index_def)

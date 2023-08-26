@@ -167,8 +167,11 @@ def _search(
         FROM applications AS apps
         JOIN matches ON (
             apps.publication_number = matches.publication_number
-            AND
-            coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
+            AND (
+                coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
+                OR
+                textsearch @@ to_tsquery('english', '{(" & ").join(_terms)}') # full text search alernative
+            )
         )
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
