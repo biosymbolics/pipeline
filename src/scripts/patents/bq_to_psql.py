@@ -5,22 +5,25 @@ from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
 from pydash import compact
-from clients.low_level.postgres import PsqlDatabaseClient
+import logging
 
 import system
 
 system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
+from clients.low_level.postgres import PsqlDatabaseClient
 
 from ._constants import APPLICATIONS_TABLE
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": None,
+    # "biosym_annotations_source": None,
     APPLICATIONS_TABLE: "priority_date",  # shard by priority date
 }
 
@@ -53,8 +56,9 @@ INITIAL_COPY_FIELDS = [
     "claims_localized as claims",
     "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
     "family_id",
-    "filing_date",
-    "grant_date",
+    # "filing_date",
+    # "grant_date",
+    # "publication_date",
     # "inventor as inventor_raw",
     # "inventor_harmonized",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
@@ -63,7 +67,7 @@ INITIAL_COPY_FIELDS = [
     "pct_number",
     "priority_claim",
     "priority_date",
-    "publication_date",
+    # "publication_date",
     "spif_application_number",
     "spif_publication_number",
 ]
@@ -129,9 +133,9 @@ def export_bq_tables():
 TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
-    "publication_date": "DATE",
-    "filing_date": "DATE",
-    "grant_date": "DATE",
+    # "publication_date": "DATE",
+    # "filing_date": "DATE",
+    # "grant_date": "DATE",
     "priority_date": "DATE",
 }
 
@@ -162,8 +166,15 @@ def import_into_psql():
     logging.info("Importing applications table (etc) into postgres")
     client = PsqlDatabaseClient()
 
-    def transform(s):
+    def transform(s, c: str):
+        # if isinstance(s, int):
+        # if c.endswith("_date") and s > 19000101 and s < 30000101:
+        #     return datetime.strptime(str(s), "%Y%m%d").date()
+        if c.endswith("_date") and s == 0:
+            logger.info("RETURNING NONE for %s %s", c, s)
+            return None
         if isinstance(s, dict):
+            # TODO: this is a hack, only works because the first value is currently always the one we want
             return compact(s.values())[0]
         elif isinstance(s, list) or isinstance(s, pl.Series) and len(s) > 0:
             if isinstance(s[0], dict):
@@ -174,10 +185,14 @@ def import_into_psql():
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
-        nono_columns = ["cited_by", "citation"]  # polars borks on these
+        nono_columns = [
+            "cited_by",
+            "citation",
+            "publication_date",
+        ]  # requires work on transformation
         df = df.select(
             *[
-                pl.col(c).apply(lambda s: transform(s))
+                pl.col(c).apply(lambda s: transform(s, c))
                 for c in df.columns
                 if c not in nono_columns
             ]
