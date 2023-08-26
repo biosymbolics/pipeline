@@ -171,7 +171,7 @@ def _search(
             AND (
                 coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
                 OR
-                textsearch @@ to_tsquery('english', '{(" & ").join(_terms)}') # full text search alernative
+                text_search @@ to_tsquery('english', '{(" & ").join(_terms)}') # full text search alernative
             )
         )
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
