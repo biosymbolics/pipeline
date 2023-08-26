@@ -130,7 +130,7 @@ functions:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
-          path: sec/query/clindev
+          path: clindev/predict/timelines
           method: get
           cors: true
     handler: src.handlers.clindev.predict_timelines

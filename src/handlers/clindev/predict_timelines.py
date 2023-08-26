@@ -23,7 +23,7 @@ def predict_timelines(event: ClinDevEvent, context):
     Invocation:
     - Local: `serverless invoke local --function predict-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
     - Remote: `serverless invoke --function predict-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
-    - API: `curl https://api.biosymbolics.ai/clindev/predict?indication=asthma`
+    - API: `curl https://api.biosymbolics.ai/clindev/predict/timelines?indication=asthma`
     """
 
     gpt_api = GptApiClient()
@@ -46,6 +46,6 @@ def predict_timelines(event: ClinDevEvent, context):
         indication,
     )
 
-    answer = gpt_api.query_clindev(indication)
+    answer = gpt_api.clindev_timelines(indication)
 
     return {"statusCode": 200, "body": answer}

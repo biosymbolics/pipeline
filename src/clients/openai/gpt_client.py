@@ -117,7 +117,7 @@ class GptApiClient:
         )
         return self.query(query)
 
-    def query_clindev(self, indication: str) -> list[dict]:
+    def clindev_timelines(self, indication: str) -> list[dict]:
         """
         Query GPT about clindev timelines
 

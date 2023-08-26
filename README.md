@@ -12,11 +12,12 @@
   - psql -h 172.31.14.226 -p 5432 --username postgres
 - Docker - new ECR for lambda
 ```
-docker build -t biosym_lambda-repo .
 aws ecr create-repository --repository-name biosym_lambda-repo
+
+docker build -t biosym_lambda-repo:chat_torch_latest .
 aws ecr get-login-password --region region | docker login --username AWS --password-stdin 469840476741.dkr.ecr.us-east-1.amazonaws.com
-docker tag lambda-repo:latest 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:latest
-docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:latest
+docker tag biosym_lambda-repo:chat_torch_latest 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 ```
 
 
