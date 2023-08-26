@@ -1,3 +1,5 @@
+--prefer-binary
+
 boto3
 langchain
 llama_index
@@ -6,10 +8,8 @@ polars
 psycopg[binary]
 psycopg_pool
 pydash
-python-dotenv
 requests
 sec_api
-torch==2.1.0.dev20230823
-torchaudio==2.1.0.dev20230823
-torchdata==0.6.1
+# --index-url https://download.pytorch.org/whl/cpu
+torch
 typing_extensions

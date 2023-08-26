@@ -139,16 +139,19 @@ class DatabaseClient:
         else:
             self._create(table_name, columns)
 
-    def delete_table(self, table_name: str):
+    def delete_table(self, table_name: str, is_cascade: bool = False):
         """
         Delete a table (if exists)
 
         Args:
             table_name (str): name of the table
+            is_cascade (bool): if True, delete all tables that depend on this table
         """
         table_id = self.get_table_id(table_name)
         logger.info("Deleting table %s", table_name)
-        delete_table_query = f"DROP TABLE IF EXISTS {table_id};"
+        delete_table_query = (
+            f"DROP TABLE IF EXISTS {table_id} {'CASCADE' if is_cascade else ''};"
+        )
         self.execute_query(delete_table_query)
         logging.info("Deleted table %s", table_name)
 

@@ -4,7 +4,8 @@ SpaCy client
 
 import logging
 from typing import Any
-import torch
+
+# import torch
 import spacy
 from spacy.language import Language
 
@@ -34,7 +35,7 @@ class Spacy:
         # not using GPU/M1 right now, tho...
         # is_gpu_avail = prefer_gpu()
         # logging.info(f"GPU available: {is_gpu_avail}")
-        torch.device("mps")
+        # torch.device("mps")
 
         self.model = model
         self._nlp: Language = spacy.load(self.model, **kwargs)
