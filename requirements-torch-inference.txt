@@ -1,10 +1,10 @@
 --prefer-binary
 torch --index-url https://download.pytorch.org/whl/cpu
+chromadb-client
 llama_index
 
 boto3
 bs4
-chromadb
 langchain
 openai
 polars
