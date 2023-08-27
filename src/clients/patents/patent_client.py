@@ -19,7 +19,7 @@ from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
     "QueryPieces",
-    {"fields": list[str], "term_condition": str, "where": str, "params": list},
+    {"fields": list[str], "annotation_condition": str, "where": str, "params": list},
 )
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ def get_query_pieces(
     if is_id_search:
         return {
             "fields": fields,
-            "term_condition": f"publication_number = any(%s)",
+            "annotation_condition": f"publication_number = any(%s)",
             "where": "",  # don't constrain what's returned for id query
             "params": [terms],
         }
@@ -145,7 +145,7 @@ def get_query_pieces(
         ORDER BY randomizer desc
         limit {max_results}
     """
-    term_condition = f"""
+    annotation_condition = f"""
         terms @> %s -- terms contains all input terms
         {"AND domain = any(%s)" if domains else ""}
     """
@@ -157,15 +157,15 @@ def get_query_pieces(
 
         return {
             "fields": fields,
-            # text_search in term_condition so we can use JOIN instead of LEFT_JOIN
-            "term_condition": f"AND ({term_condition} OR text_search @@ to_tsquery('english', %s))",
+            # text_search in annotation_condition so we can use JOIN instead of LEFT_JOIN
+            "annotation_condition": f"AND ({annotation_condition} OR text_search @@ to_tsquery('english', %s))",
             "where": where,
             "params": compact([_terms, domains, ts_query_terms]),
         }
 
     return {
         "fields": fields,
-        "term_condition": f"AND {term_condition}",
+        "annotation_condition": f"AND {annotation_condition}",
         "where": where,
         "params": compact([_terms, domains]),
     }
@@ -197,7 +197,7 @@ def _search(
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
-            {qp["term_condition"]}
+            {qp["annotation_condition"]}
         )
         -- TODO: duplicates here
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
