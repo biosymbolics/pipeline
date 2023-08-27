@@ -66,7 +66,7 @@ class DatabaseClient:
         Args:
             query (str): SQL query
         """
-        logger.debug("Running query: %s", query)
+        logger.debug("Running query: %s (%s)", query, values)
         results = self.execute_query(query, values)
         records = [dict(row) for row in results["data"]]
 

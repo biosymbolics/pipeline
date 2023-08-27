@@ -4,7 +4,7 @@ Patent client
 from functools import partial
 import logging
 import time
-from typing import Sequence, cast
+from typing import Sequence, TypedDict, cast
 from pydash import compact, flatten
 from clients.low_level.boto3 import retrieve_with_cache_check
 
@@ -16,6 +16,11 @@ from utils.string import get_id
 from .formatting import format_search_result
 from .types import AutocompleteTerm, TermResult
 from .utils import get_max_priority_date
+
+QueryPieces = TypedDict(
+    "QueryPieces",
+    {"fields": list[str], "term_condition": str, "where": str, "params": list},
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -98,6 +103,74 @@ def search(
     return retrieve_with_cache_check(search_partial, key=key)
 
 
+def get_query_pieces(
+    terms: list[str],
+    domains: Sequence[str] | None,
+    min_patent_years: int,
+    max_results: int,
+    is_exhaustive: bool,
+    is_randomized: bool,
+) -> QueryPieces:
+    """
+    Helper to generate pieces of patent search query
+    """
+
+    # only checks for global patents
+    is_id_search = any([t.startswith("WO-") for t in terms])
+
+    if is_id_search and not all([t.startswith("WO-") for t in terms]):
+        raise ValueError("Cannot mix id and term search")
+
+    fields = compact(
+        [
+            *SEARCH_RETURN_FIELDS,
+            *APPROVED_SEARCH_RETURN_FIELDS,
+            "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
+            if is_randomized
+            else "1 as randomizer",  # for randomizing approved patents
+        ]
+    )
+
+    if is_id_search:
+        return {
+            "fields": fields,
+            "term_condition": f"publication_number = any(%s)",
+            "where": "",  # don't constrain what's returned for id query
+            "params": [terms],
+        }
+
+    max_priority_date = get_max_priority_date(int(min_patent_years))
+    where = f"""
+        WHERE priority_date > '{max_priority_date}'::date
+        ORDER BY randomizer desc
+        limit {max_results}
+    """
+    term_condition = f"""
+        terms @> %s -- terms contains all input terms
+        {"AND domain = any(%s)" if domains else ""}
+    """
+
+    _terms = [t.lower() for t in terms]
+
+    if is_exhaustive:  # aka do tsquery search too
+        ts_query_terms = (" & ").join(flatten([t.split(" ") for t in _terms]))
+
+        return {
+            "fields": fields,
+            # text_search in term_condition so we can use JOIN instead of LEFT_JOIN
+            "term_condition": f"AND ({term_condition} OR text_search @@ to_tsquery('english', %s))",
+            "where": where,
+            "params": compact([_terms, domains, ts_query_terms]),
+        }
+
+    return {
+        "fields": fields,
+        "term_condition": f"AND {term_condition}",
+        "where": where,
+        "params": compact([_terms, domains]),
+    }
+
+
 def _search(
     terms: Sequence[str],
     domains: Sequence[str] | None = None,
@@ -109,76 +182,29 @@ def _search(
     """
     Search patents by terms
     """
-    start = time.time()
+    start = time.monotonic()
 
     if not isinstance(terms, list):
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    # only checks for global patents
-    is_id_search = any([t.startswith("WO-") for t in terms])
-
-    if is_id_search and not all([t.startswith("WO-") for t in terms]):
-        raise ValueError("Cannot mix id and term search")
-
-    max_priority_date = get_max_priority_date(int(min_patent_years))
-
-    fields = ", ".join(
-        compact(
-            [
-                *SEARCH_RETURN_FIELDS,
-                *APPROVED_SEARCH_RETURN_FIELDS,
-                "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
-                if is_randomized
-                else "1 as randomizer",  # for randomizing approved patents
-            ]
-        )
+    qp = get_query_pieces(
+        terms, domains, min_patent_years, max_results, is_exhaustive, is_randomized
     )
 
-    if is_id_search:
-        term_condition = f"publication_number = any(%s)"
-        where = ""  # don't constrain what's returned for id query
-        params = [terms]
-    else:
-        _terms = [t.lower() for t in terms]
-        term_condition = f"""
-            terms @> %s -- terms contains all input terms
-            {"AND domain = any(%s)" if domains else ""}
-        """
-        where = f"""
-            WHERE priority_date > '{max_priority_date}'::date
-            ORDER BY randomizer desc
-            limit {max_results}
-        """
-
-        if is_exhaustive:
-            # do tsvector search too
-            ts_query_terms = (" & ").join(flatten([t.split(" ") for t in _terms]))
-            params = compact([_terms, domains, ts_query_terms])
-            # text_search here so we can use JOIN instead of LEFT_JOIN
-            term_condition = (
-                f"AND ({term_condition} OR text_search @@ to_tsquery('english', %s))"
-            )
-        else:
-            params = compact([_terms, domains])
-            term_condition = f"AND {term_condition}"
-
-    # TODO: duplicates on approvals
     query = f"""
-        SELECT {fields}, terms, domains
+        SELECT {", ".join(qp["fields"])}, terms, domains
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
-            {term_condition}
+            {qp["term_condition"]}
         )
+        -- TODO: duplicates here
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
-        {where}
+        {qp["where"]}
     """
 
-    results = PsqlDatabaseClient().select(query, params)
-
-    logger.debug("Patent search query: %s (%s)", query, params)
-
+    results = PsqlDatabaseClient().select(query, qp["params"])
     formatted_results = format_search_result(results)
 
     logger.info(
