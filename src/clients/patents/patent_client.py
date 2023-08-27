@@ -5,7 +5,7 @@ from functools import partial
 import logging
 import time
 from typing import Sequence, cast
-from pydash import compact
+from pydash import compact, flatten
 from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
@@ -188,16 +188,20 @@ def _search(
         """
 
     query = select_query + where
-    results = PsqlDatabaseClient().select(
-        query, compact([_terms, domains, (" & ").join(_terms)])
-    )
 
-    logger.debug("Patent search query: %s", query)
+    ts_query_terms = (" & ").join([t.replace(" ", " & ") for t in _terms])
+    params = compact([_terms, domains, ts_query_terms])
+    results = PsqlDatabaseClient().select(query, params)
+
+    logger.debug("Patent search query: %s (%s)", query, params)
+
+    formatted_results = format_search_result(results)
+
     logger.info(
         "Search took %s seconds (%s)", round(time.time() - start, 2), len(results)
     )
 
-    return format_search_result(results)
+    return formatted_results
 
 
 def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
