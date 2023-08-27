@@ -167,9 +167,6 @@ def import_into_psql():
     client = PsqlDatabaseClient()
 
     def transform(s, c: str):
-        # if isinstance(s, int):
-        # if c.endswith("_date") and s > 19000101 and s < 30000101:
-        #     return datetime.strptime(str(s), "%Y%m%d").date()
         if c.endswith("_date") and s == 0:
             logger.info("RETURNING NONE for %s %s", c, s)
             return None
