@@ -116,11 +116,11 @@ def __get_query_pieces(
 
     is_id_search = any([t.startswith("WO-") for t in terms])
 
-    if is_id_search and not all([t.startswith("WO-") for t in terms]):
-        raise ValueError("Cannot mix id and term search")
-
     # if ids, ignore most of the standard criteria
     if is_id_search:
+        if not all([t.startswith("WO-") for t in terms]):
+            raise ValueError("Cannot mix id and term search")
+
         return {
             "match_condition": f"publication_number = any(%s)",
             "where": "",
