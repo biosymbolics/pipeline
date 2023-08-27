@@ -136,44 +136,29 @@ def _search(
 
     if is_id_search:
         _terms = terms
-        terms_count = 0  # enables an OR
-        search_query = f"""
-            SELECT
-                publication_number,
-                ARRAY[]::TEXT[] as matched_domains,
-                ARRAY[]::TEXT[] as matched_terms,
-            from applications
-            WHERE publication_number = any(%s)
-        """
+        term_condition = f"publication_number = any(%s)"
     else:
-        _terms = [term.lower() for term in terms]
-        terms_count = len(terms)  # enables an AND
+        _terms = [t.lower() for t in terms]
         domain_where = f"AND domain = any(%s)" if domains else ""
-        search_query = f"""
-            SELECT
-                a.publication_number as publication_number,
-                ARRAY_AGG(distinct a.domain) as matched_domains,
-                ARRAY_AGG(DISTINCT a.term) as matched_terms
-            FROM annotations a
-            WHERE lower(a.term) = any(%s)
-            {domain_where}
-            GROUP BY a.publication_number
+        term_condition = f"""
+            AND (
+                (
+                    terms @> %s -- terms contains all input terms
+                    {domain_where}
+                )
+                OR
+                text_search @@ to_tsquery('english', %s)
+            )
         """
 
     # TODO: duplicates on approvals
     select_query = f"""
-        WITH matches AS ({search_query})
         SELECT {fields}, terms, domains
         FROM applications AS apps
-        JOIN matches ON (
-            apps.publication_number = matches.publication_number
-            AND (
-                coalesce(ARRAY_LENGTH(matched_terms, 1), 0) >= {terms_count}
-                OR
-                text_search @@ to_tsquery('english', %s)
-            )
+        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
+            annotations.publication_number = apps.publication_number
+            {term_condition}
         )
-        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON annotations.publication_number = apps.publication_number
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
     """
 
