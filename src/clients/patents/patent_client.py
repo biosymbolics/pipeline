@@ -143,6 +143,7 @@ def __get_query_pieces(
     lower_terms = [t.lower() for t in terms]
 
     if is_exhaustive:  # aka do tsquery search too
+        # AND all words in all supplied terms (TODO: this could obviously be more precise)
         ts_query_terms = (" & ").join(flatten([t.split(" ") for t in lower_terms]))
 
         return cast(
