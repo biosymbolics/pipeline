@@ -19,7 +19,7 @@ from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
     "QueryPieces",
-    {"fields": list[str], "annotation_condition": str, "where": str, "params": list},
+    {"match_condition": str, "where": str, "params": list},
 )
 
 logger = logging.getLogger(__name__)
@@ -103,72 +103,66 @@ def search(
     return retrieve_with_cache_check(search_partial, key=key)
 
 
-def get_query_pieces(
+def __get_query_pieces(
     terms: list[str],
     domains: Sequence[str] | None,
     min_patent_years: int,
     max_results: int,
     is_exhaustive: bool,
-    is_randomized: bool,
 ) -> QueryPieces:
     """
     Helper to generate pieces of patent search query
     """
 
-    # only checks for global patents
     is_id_search = any([t.startswith("WO-") for t in terms])
 
     if is_id_search and not all([t.startswith("WO-") for t in terms]):
         raise ValueError("Cannot mix id and term search")
 
-    fields = compact(
-        [
-            *SEARCH_RETURN_FIELDS,
-            *APPROVED_SEARCH_RETURN_FIELDS,
-            "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
-            if is_randomized
-            else "1 as randomizer",  # for randomizing approved patents
-        ]
-    )
-
+    # if ids, ignore most of the standard criteria
     if is_id_search:
         return {
-            "fields": fields,
-            "annotation_condition": f"publication_number = any(%s)",
-            "where": "",  # don't constrain what's returned for id query
+            "match_condition": f"publication_number = any(%s)",
+            "where": "",
             "params": [terms],
         }
 
     max_priority_date = get_max_priority_date(int(min_patent_years))
-    where = f"""
-        WHERE priority_date > '{max_priority_date}'::date
-        ORDER BY randomizer desc
-        limit {max_results}
-    """
-    annotation_condition = f"""
-        terms @> %s -- terms contains all input terms
-        {"AND domain = any(%s)" if domains else ""}
-    """
+    base_params = {
+        "where": f"""
+            WHERE priority_date > '{max_priority_date}'::date
+            ORDER BY randomizer desc
+            limit {max_results}
+        """,
+        "match_condition": f"""
+            terms @> %s -- terms contains all input terms
+            {"AND domain = any(%s)" if domains else ""}
+        """,
+    }
 
-    _terms = [t.lower() for t in terms]
+    lower_terms = [t.lower() for t in terms]
 
     if is_exhaustive:  # aka do tsquery search too
-        ts_query_terms = (" & ").join(flatten([t.split(" ") for t in _terms]))
+        ts_query_terms = (" & ").join(flatten([t.split(" ") for t in lower_terms]))
 
-        return {
-            "fields": fields,
-            # text_search in annotation_condition so we can use JOIN instead of LEFT_JOIN
-            "annotation_condition": f"AND ({annotation_condition} OR text_search @@ to_tsquery('english', %s))",
-            "where": where,
-            "params": compact([_terms, domains, ts_query_terms]),
-        }
+        return cast(
+            QueryPieces,
+            {
+                **base_params,
+                # text_search in match_condition so we can use JOIN instead of LEFT_JOIN
+                "match_condition": f"AND ({base_params['match_condition']} OR text_search @@ to_tsquery('english', %s))",
+                "params": compact([lower_terms, domains, ts_query_terms]),
+            },
+        )
 
-    return {
-        "fields": fields,
-        "annotation_condition": f"AND {annotation_condition}",
-        "where": where,
-        "params": compact([_terms, domains]),
-    }
+    return cast(
+        QueryPieces,
+        {
+            **base_params,
+            "match_condition": f"AND {base_params['match_condition']}",
+            "params": compact([lower_terms, domains]),
+        },
+    )
 
 
 def _search(
@@ -188,16 +182,26 @@ def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    qp = get_query_pieces(
-        terms, domains, min_patent_years, max_results, is_exhaustive, is_randomized
+    fields = compact(
+        [
+            *SEARCH_RETURN_FIELDS,
+            *APPROVED_SEARCH_RETURN_FIELDS,
+            "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
+            if is_randomized
+            else "1 as randomizer",  # for randomizing approved patents
+        ]
+    )
+
+    qp = __get_query_pieces(
+        terms, domains, min_patent_years, max_results, is_exhaustive
     )
 
     query = f"""
-        SELECT {", ".join(qp["fields"])}, terms, domains
+        SELECT {", ".join(fields)}, terms, domains
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
-            {qp["annotation_condition"]}
+            {qp["match_condition"]}
         )
         -- TODO: duplicates here
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
