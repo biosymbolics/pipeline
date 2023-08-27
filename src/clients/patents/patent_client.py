@@ -103,6 +103,7 @@ def _search(
     domains: Sequence[str] | None = None,
     min_patent_years: int = 10,
     max_results: int = MAX_SEARCH_RESULTS,
+    is_exhaustive: bool = False,  # will search via tsquery too (slow)
     is_randomized: bool = False,
 ) -> Sequence[PatentApplication]:
     """
@@ -135,24 +136,35 @@ def _search(
     )
 
     if is_id_search:
-        _terms = terms
         term_condition = f"publication_number = any(%s)"
+        where = ""  # don't constrain what's returned for id query
+        params = [terms]
     else:
         _terms = [t.lower() for t in terms]
-        domain_where = f"AND domain = any(%s)" if domains else ""
         term_condition = f"""
-            AND (
-                (
-                    terms @> %s -- terms contains all input terms
-                    {domain_where}
-                )
-                OR
-                text_search @@ to_tsquery('english', %s)
-            )
+            terms @> %s -- terms contains all input terms
+            {"AND domain = any(%s)" if domains else ""}
+        """
+        where = f"""
+            WHERE priority_date > '{max_priority_date}'::date
+            ORDER BY randomizer desc
+            limit {max_results}
         """
 
+        if is_exhaustive:
+            # do tsvector search too
+            ts_query_terms = (" & ").join(flatten([t.split(" ") for t in _terms]))
+            params = compact([_terms, domains, ts_query_terms])
+            # text_search here so we can use JOIN instead of LEFT_JOIN
+            term_condition = (
+                f"AND ({term_condition} OR text_search @@ to_tsquery('english', %s))"
+            )
+        else:
+            params = compact([_terms, domains])
+            term_condition = f"AND {term_condition}"
+
     # TODO: duplicates on approvals
-    select_query = f"""
+    query = f"""
         SELECT {fields}, terms, domains
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
@@ -160,22 +172,9 @@ def _search(
             {term_condition}
         )
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
+        {where}
     """
 
-    if is_id_search:
-        # don't constrain what's returned for id-only
-        where = ""
-    else:
-        where = f"""
-            WHERE priority_date > '{max_priority_date}'::date
-            ORDER BY randomizer desc
-            limit {max_results}
-        """
-
-    query = select_query + where
-
-    ts_query_terms = (" & ").join([t.replace(" ", " & ") for t in _terms])
-    params = compact([_terms, domains, ts_query_terms])
     results = PsqlDatabaseClient().select(query, params)
 
     logger.debug("Patent search query: %s (%s)", query, params)
