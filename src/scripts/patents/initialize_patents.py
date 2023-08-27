@@ -115,6 +115,12 @@ def __create_annotations_table():
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)
+    client.create_index(
+        {
+            "table": AGGREGATED_ANNOTATIONS_TABLE,
+            "column": "publication_number",
+        }
+    )
 
 
 def __create_biosym_annotations_source_table():
@@ -160,6 +166,7 @@ def add_application_search():
     vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
     client.execute_query(
         f"""
+            -- consider GENERATED ALWAYS AS/STORED
             ALTER TABLE applications ADD COLUMN text_search tsvector;
             UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
         """
