@@ -4,6 +4,7 @@ llama_index
 
 boto3
 bs4
+chromadb
 langchain
 openai
 polars

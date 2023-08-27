@@ -13,8 +13,10 @@ provider:
   ecr:
     images:
       chat_torch_container:
+        platform: linux/amd64
         # 469840476741 / ${AWS::AccountId}
-        uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+        # uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+        path: ./
   vpc:
     securityGroupIds:
       - Ref: LambdaSecurityGroup
