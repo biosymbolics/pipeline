@@ -1,16 +1,19 @@
 --prefer-binary
-torch --index-url https://download.pytorch.org/whl/cpu
-chromadb-client
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==2.0.1+cpu
 llama_index
 
 boto3
 bs4
 langchain
 openai
+pinecone-client
 polars
 psycopg[binary]
 psycopg_pool
 pydash
 requests
 sec_api
+spacy
+transformers
 typing_extensions

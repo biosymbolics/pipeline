@@ -4,10 +4,9 @@ Term Normalizer
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
-from typing import Union
+from typing import List, NamedTuple, Union
 
 # import torch
-from scispacy.candidate_generation import MentionCandidate
 
 from .types import KbLinker, CanonicalEntity
 
@@ -15,6 +14,13 @@ LinkedEntityMap = dict[str, CanonicalEntity]
 
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
+
+
+# copy from scispacy to avoid the import
+class MentionCandidate(NamedTuple):
+    concept_id: str
+    aliases: List[str]
+    similarities: List[float]
 
 
 class TermLinker:
@@ -81,7 +87,7 @@ class TermLinker:
         logging.info(
             "Finished generating candidates (took %s)", time.time() - start_time
         )
-        canonical_entities = [self.__get_canonical_entity(c) for c in candidates]
+        canonical_entities = [self.__get_canonical_entity(c) for c in candidates]  # type: ignore
         entity_map = dict(zip(terms, canonical_entities))
         return {
             key: value

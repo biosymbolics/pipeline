@@ -147,6 +147,7 @@ class GptApiClient:
             ),
         ]
 
-        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-4")
+        # gpt-4 too slow
+        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-3.5-turbo")
         answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
         return answer_as_array

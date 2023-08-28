@@ -22,9 +22,7 @@ from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, Refine
 
 INDEX_NAME = "source-docs"
 
-DEFAULT_STORAGE_ARGS: StorageArgs = {
-    "storage_type": "mongodb",
-}
+DEFAULT_STORAGE_ARGS: StorageArgs = {"storage_type": "pinecone"}  # "mongodb",
 
 DEFAULT_INDEX_ARGS = {
     "ner_options": {

@@ -16,7 +16,6 @@ from llama_index.vector_stores import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 from llama_index.vector_stores import ChromaVectorStore
-import chromadb
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
@@ -55,13 +54,23 @@ def get_storage_context(
         logger.info("Loading pinecone vector store context")
         pinecone_index = get_vector_store(index_name)
         vector_store = PineconeVectorStore(pinecone_index, **kwargs)
-        context = StorageContext.from_defaults(vector_store=vector_store)
-        return context
+        return StorageContext.from_defaults(
+            docstore=MongoDocumentStore.from_uri(
+                uri=MONGO_URI, db_name="db_docstore", namespace="docstore"
+            ),
+            index_store=MongoIndexStore.from_uri(
+                uri=MONGO_URI, db_name="db_docstore", namespace="index_store"
+            ),
+            vector_store=vector_store,
+        )
 
     elif storage_type == "mongodb":
         logger.info(
             "Loading mongodb doc and index store context, chromadb vector store"
         )
+        # lazy import (bloat!)
+        import chromadb
+
         chroma_client = chromadb.PersistentClient(
             path="./storage/vector_storage/chromadb/",
         )
@@ -119,7 +128,7 @@ def get_service_context(
             return VertexAI(**MODEL_TO_TOKENS[model_name], temperature=0.1)
         if model_name == "Anthropic":
             # untested, but used in https://colab.research.google.com/drive/1uuqvPI2_WNFMd7g-ahFoioSHV7ExB2GR?usp=sharing
-            return Anthropic(model="claude-v1.3-100k", temperature=0.1)
+            return Anthropic(model_name="claude-v1.3-100k", temperature=0.1)
 
         raise Exception(f"Unknown model {model_name}")
 

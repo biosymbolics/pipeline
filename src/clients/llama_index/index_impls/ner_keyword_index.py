@@ -131,7 +131,9 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             storage_context=storage_context,
             **kwargs,
         )
-        self.tagger = NerTagger.get_instance(**ner_options, parallelize=False)
+        self.tagger = NerTagger.get_instance(
+            **ner_options, parallelize=False, link=False
+        )
         self.vector_index = VectorStoreIndex.from_vector_store(
             storage_context.vector_store, service_context
         )
@@ -179,11 +181,11 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         response_synthesizer = get_response_synthesizer(
             service_context=self.service_context, **kwargs
         )
-        ktner_query_engine = RetrieverQueryEngine(
+        nerkt_query_engine = RetrieverQueryEngine(
             retriever=retriever, response_synthesizer=response_synthesizer
         )
 
-        return ktner_query_engine
+        return nerkt_query_engine
 
     def as_chat_engine(
         self, chat_mode: ChatMode = ChatMode.BEST, **kwargs: Any

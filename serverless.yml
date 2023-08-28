@@ -13,10 +13,11 @@ provider:
   ecr:
     images:
       chat_torch_container:
-        platform: linux/amd64
+        # platform: linux/amd64
         # 469840476741 / ${AWS::AccountId}
-        # uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
-        path: ./
+        # 'docker builder prune -a
+        uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+        # path: ./
   vpc:
     securityGroupIds:
       - Ref: LambdaSecurityGroup
@@ -61,6 +62,8 @@ provider:
     ENV: ${param:ENV, 'dev'}
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
+    PINECONE_API_KEY: ${ssm:/biosymbolics/pipeline/pinecone/api_key}
+    PINECONE_ENVIRONMENT: ${ssm:/biosymbolics/pipeline/pinecone/environment}
     PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.10/site-packages
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
@@ -135,6 +138,8 @@ functions:
           path: clindev/predict/timelines
           method: get
           cors: true
+    url:
+      invokeMode: RESPONSE_STREAM
     handler: src.handlers.clindev.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer

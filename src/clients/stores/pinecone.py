@@ -12,7 +12,7 @@ from typings.indices import NamespaceKey
 
 
 API_KEY = os.environ["PINECONE_API_KEY"]
-PINECONE_ENVIRONMENT = "us-west4-gcp-free"
+PINECONE_ENVIRONMENT = os.environ["PINECONE_ENVIRONMENT"]
 
 
 def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:

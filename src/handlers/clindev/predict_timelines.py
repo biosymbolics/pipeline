@@ -25,8 +25,7 @@ def predict_timelines(event: ClinDevEvent, context):
     - Remote: `serverless invoke --function predict-clindev --data='{"queryStringParameters": { "indication": "asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/clindev/predict/timelines?indication=asthma`
     """
-
-    gpt_api = GptApiClient()
+    gpt_client = GptApiClient(model="gpt-3.5-turbo")
 
     params = event.get("queryStringParameters", {})
     indication = params.get("indication")
@@ -46,6 +45,10 @@ def predict_timelines(event: ClinDevEvent, context):
         indication,
     )
 
-    answer = gpt_api.clindev_timelines(indication)
+    try:
+        answer = gpt_client.clindev_timelines(indication)
+    except Exception as e:
+        logger.error("Error fetching info for indication: %s", e)
+        return {"statusCode": 500, "body": "Error fetching info for indication"}
 
     return {"statusCode": 200, "body": answer}

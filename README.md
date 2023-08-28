@@ -15,7 +15,7 @@
 aws ecr create-repository --repository-name biosym_lambda-repo
 
 docker build --platform linux/amd64 -t biosym_lambda-repo:chat_torch_latest .
-aws ecr get-login-password --region region | docker login --username AWS --password-stdin 469840476741.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 469840476741.dkr.ecr.us-east-1.amazonaws.com
 docker tag biosym_lambda-repo:chat_torch_latest 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 ```
