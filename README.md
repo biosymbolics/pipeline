@@ -10,6 +10,8 @@
 - AWS authenticate if needed: `aws configure sso`
 - psql
   - psql -h 172.31.14.226 -p 5432 --username postgres
+- sls offlne
+  - https://github.com/dherault/serverless-offline/issues/1696
 - Docker - new ECR for lambda
 ```
 aws ecr create-repository --repository-name biosym_lambda-repo

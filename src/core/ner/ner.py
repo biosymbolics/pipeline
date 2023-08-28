@@ -14,6 +14,7 @@ import html
 import spacy
 from spacy.tokens import Span, Doc
 
+from utils.args import make_hashable
 from utils.extraction.html import extract_text
 from utils.model import get_model_path
 from utils.re import remove_extra_spaces
@@ -44,7 +45,7 @@ class NerTagger:
     Named-entity recognition using spacy and other means
     """
 
-    _instances: dict[tuple, Any] = {}
+    _instances: dict[str, Any] = {}
 
     def __init__(
         self,
@@ -112,6 +113,7 @@ class NerTagger:
             self.nlp = BinderNlp(model_filename)
 
             if len(self.rule_sets) > 0:
+                logger.info("Adding rule sets to NER pipeline")
                 # rules catch a few things the binder model misses
                 rule_nlp = spacy.load("en_core_sci_lg")
                 rule_nlp.add_pipe("merge_entities", after="ner")
@@ -280,9 +282,9 @@ class NerTagger:
         if not isinstance(content, list):
             raise Exception("Content must be a list")
 
-        logger.warning(
-            "As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars"
-        )
+        # logger.warning(
+        #     "As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars"
+        # )
 
         start_time = time.time()
         logger.debug("Starting NER pipeline with %s docs", len(content))
@@ -314,10 +316,11 @@ class NerTagger:
     @classmethod
     def get_instance(cls, **kwargs) -> "NerTagger":
         # Convert kwargs to a hashable type
-        kwargs_tuple = tuple(sorted(kwargs.items()))
-        if kwargs_tuple not in cls._instances:
+        args = sorted(kwargs.items())
+        args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
+        if args_hash not in cls._instances:
             logger.info("Creating new instance of %s", cls)
-            cls._instances[kwargs_tuple] = cls(**kwargs)
+            cls._instances[args_hash] = cls(**kwargs)
         else:
             logger.info("Using existing instance of %s", cls)
-        return cls._instances[kwargs_tuple]
+        return cls._instances[args_hash]

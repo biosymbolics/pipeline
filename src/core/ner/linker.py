@@ -10,6 +10,9 @@ from typing import List, NamedTuple, Union
 
 from .types import KbLinker, CanonicalEntity
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 LinkedEntityMap = dict[str, CanonicalEntity]
 
 MIN_SIMILARITY = 0.85
@@ -43,6 +46,7 @@ class TermLinker:
         # torch.device("mps")  # does this work?
 
         # lazy (Umls is big)
+        logger.info("Loading scispacy")
         from scispacy.candidate_generation import (
             CandidateGenerator,
             UmlsKnowledgeBase,

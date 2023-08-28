@@ -131,9 +131,7 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
             storage_context=storage_context,
             **kwargs,
         )
-        self.tagger = NerTagger.get_instance(
-            **ner_options, parallelize=False, link=False
-        )
+        self.tagger = NerTagger.get_instance(**ner_options, parallelize=False)
         self.vector_index = VectorStoreIndex.from_vector_store(
             storage_context.vector_store, service_context
         )

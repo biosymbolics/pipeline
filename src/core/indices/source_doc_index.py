@@ -29,6 +29,7 @@ DEFAULT_INDEX_ARGS = {
         "use_llm": False,
         "content_type": "text",  # converted to text upfront
         "entity_types": DEFAULT_ENTITY_TYPES,
+        "rule_sets": [],
     },
 }
 

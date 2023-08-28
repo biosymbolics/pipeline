@@ -13,6 +13,8 @@ psycopg[binary]
 psycopg_pool
 pydash
 requests
+# en-core-sci-lg @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_lg-0.5.1.tar.gz#sha256=b64746e84ca033bf4158fb811d93d50cfd8f75fead85c7261e4e6119bacded22
+# scispacy==0.5.2
 sec_api
 spacy
 transformers

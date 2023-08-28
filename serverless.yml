@@ -123,15 +123,17 @@ functions:
   ask-sec:
     ## requirements updates requires rebuild/push of image! ##
     vpc: ~ # no need to be in VPC; needs OB access
-    image:
-      name: chat_torch_container
+    # image:
+    #   name: chat_torch_container
     events:
       - http:
           path: sec/ask
           method: get
           cors: true
+    handler: src.handlers.sec.chat
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   predict-clindev:
-    ## requirements updates requires rebuild/push of image! ##
     vpc: ~ # no need to be in VPC; needs OB access
     events:
       - http:
@@ -146,6 +148,7 @@ functions:
 
 plugins:
   - serverless-python-requirements
+  - serverless-offline
 
 package:
   # individually: true
@@ -162,6 +165,8 @@ custom:
   subnetA: subnet-097d7452bff44a9bc
   subnetB: subnet-0af5fe0054c832df3
   igw: igw-0cd81e264ec0cab9f
+  serverless-offline:
+    httpPort: 3001
   pythonRequirements:
     dockerizePip: true
     # dockerImage: public.ecr.aws/sam/build-python3.10:latest-arm64

@@ -1,3 +1,4 @@
+import json
 from typing import TypedDict
 import logging
 
@@ -51,4 +52,4 @@ def predict_timelines(event: ClinDevEvent, context):
         logger.error("Error fetching info for indication: %s", e)
         return {"statusCode": 500, "body": "Error fetching info for indication"}
 
-    return {"statusCode": 200, "body": answer}
+    return {"statusCode": 200, "body": json.dumps(answer)}
