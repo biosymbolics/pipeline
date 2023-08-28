@@ -130,7 +130,7 @@ functions:
           path: sec/ask
           method: get
           cors: true
-    handler: src.handlers.sec.chat
+    handler: src.handlers.sec.ask
     layers:
       - Ref: PythonRequirementsLambdaLayer
   predict-clindev:

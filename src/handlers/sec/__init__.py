@@ -1,3 +1,3 @@
-from .chat import chat
+from .ask import ask
 
-__all__ = ["chat"]
+__all__ = ["ask"]

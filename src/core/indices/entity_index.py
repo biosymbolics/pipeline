@@ -2,8 +2,8 @@
 EntityIndex
 """
 from datetime import datetime
-from typing import Callable, Optional, cast
-from llama_index import GPTVectorStoreIndex, VectorStoreIndex
+from typing import Callable, Optional
+from llama_index import VectorStoreIndex
 from langchain.output_parsers import ResponseSchema
 from pydash import flatten
 import logging
@@ -11,7 +11,6 @@ import logging
 from clients.llama_index import (
     load_index,
     query_index,
-    parse_answer,
     upsert_index,
 )
 from clients.llama_index.context import StorageArgs
@@ -21,6 +20,7 @@ from clients.stores.pinecone import get_metadata_filters
 from core.ner import NerTagger
 from utils.misc import dict_to_named_tuple
 from utils.namespace import get_namespace_id
+from utils.parse import parse_answer
 from utils.string import get_id
 from constants.core import DEFAULT_MODEL_NAME
 from typings.indices import LlmModelType, NamespaceKey

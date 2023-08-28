@@ -1,22 +1,26 @@
-"""
-Utils for OpenAI client
-"""
-
 from functools import reduce
 from typing import Any
 from langchain.output_parsers import StructuredOutputParser
+from llama_index.output_parsers import LangchainOutputParser
 import json
 import re
 import logging
 
 from utils.string import remove_comment_syntax
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 def load_json_array(text: str) -> list[str]:
     """
     (For typing)
     """
-    array = json.loads(text)
+    try:
+        array = json.loads(text)
+    except json.JSONDecodeError:
+        # try this
+        array = json.loads("[" + text + "]")
     if not isinstance(array, list):
         raise Exception("Answer is not an array")
     return array
@@ -24,7 +28,7 @@ def load_json_array(text: str) -> list[str]:
 
 def parse_answer(
     text: str,
-    output_parser: StructuredOutputParser,
+    output_parser: StructuredOutputParser | LangchainOutputParser,
     is_array: bool = False,
     return_orig_on_fail: bool = True,
 ) -> Any:
@@ -40,7 +44,7 @@ def parse_answer(
 
     def __parse_answer_array(text: str, output_parser):
         # https://github.com/hwchase17/langchain/issues/1976
-        logging.info("Naively parsing answer as array")
+        logger.info("Naively parsing answer as array")
         try:
             parse_pipeline = [remove_comment_syntax, load_json_array]
             array = reduce(lambda x, f: f(x), parse_pipeline, text)  # type: ignore
@@ -49,7 +53,8 @@ def parse_answer(
                 for item in array
             ]
             return final
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.error("Could not parse answer as array: %s", e)
             raise Exception("Answer is not valid json")
 
     try:
@@ -58,7 +63,7 @@ def parse_answer(
 
         return output_parser.parse(text)
     except Exception as ex:
-        logging.error("Could not parse answer (%s): %s", text, ex)
+        logger.error("Could not parse answer (%s): %s", text, ex)
         if not return_orig_on_fail:
             raise ex
 

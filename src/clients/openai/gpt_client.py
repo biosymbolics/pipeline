@@ -8,7 +8,7 @@ from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Literal, Optional
 import logging
 
-from .utils import parse_answer
+from utils.parse import parse_answer
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DEFAULT_MAX_TOKENS = 1024

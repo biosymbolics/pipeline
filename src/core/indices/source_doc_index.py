@@ -10,8 +10,8 @@ from clients.llama_index import (
     load_index,
     query_index,
     upsert_index,
-    NerKeywordTableIndex,
 )
+from clients.llama_index.index_impls.ner_keyword_index import NerKeywordTableIndex
 from clients.llama_index.context import StorageArgs
 from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
@@ -29,7 +29,6 @@ DEFAULT_INDEX_ARGS = {
         "use_llm": False,
         "content_type": "text",  # converted to text upfront
         "entity_types": DEFAULT_ENTITY_TYPES,
-        "rule_sets": [],
     },
 }
 

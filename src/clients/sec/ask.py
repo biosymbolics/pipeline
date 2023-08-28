@@ -2,12 +2,17 @@
 Client for querying SEC docs
 """
 from datetime import date
+from typing import Any
 from llama_index import Prompt
 from llama_index.prompts.prompt_type import PromptType
+from langchain.output_parsers import ResponseSchema
 
+from clients.llama_index.parsing import get_prompts_and_parser
 from core import SourceDocIndex
-from utils.misc import dict_to_named_tuple
+from core.indices.entity_index import EntityIndex
 from utils.date import format_date
+from utils.misc import dict_to_named_tuple
+from utils.parse import parse_answer
 
 
 DEFAULT_TEXT_QA_PROMPT_TMPL = """
@@ -27,13 +32,14 @@ DEFAULT_TEXT_QA_PROMPT = Prompt(
 )
 
 
-class SecChatClient:
+class AskSecClient:
     """
     Client for querying SEC docs
     """
 
     def __init__(self):
         self.source_index = SourceDocIndex(model_name="ChatGPT")
+        self.entity_index = EntityIndex(model_name="ChatGPT")
 
     def ask_question(self, question: str) -> str:
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
@@ -42,17 +48,30 @@ class SecChatClient:
         )
         return si_answer
 
+    def ask_about_entity(self, question: str) -> str:
+        source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
+        si_answer = self.entity_index.query(question, source)
+        return si_answer
+
     def get_events(
         self, ticker: str, start_date: date, end_date: date = date.today()
-    ) -> str:
-        prompt = (
-            f"""
+    ) -> Any:
+        response_schemas = [
+            ResponseSchema(name="date", description=f"event date"),
+            ResponseSchema(name="details", description=f"details about this event"),
+        ]
+        prompts, parser = get_prompts_and_parser(response_schemas)
+        question = f"""
             For the pharma company represented by the stock symbol {ticker},
             list important events such as regulatory approvals, trial readouts, acquisitions, reorgs, etc.
-            that occurred between dates {format_date(start_date)} and {format_date(end_date)}
-            as json in the form """
-            + '{ "YYYY-MM-DD": "the event" }.'
-        )
+            that occurred between dates {format_date(start_date)} and {format_date(end_date)}.
+            """
         source = dict_to_named_tuple({"doc_source": "SEC", "doc_type": "10-K"})
-        si_answer = self.source_index.query(prompt, source)
-        return si_answer
+        si_answer = self.source_index.query(
+            question,
+            source,
+            prompt_template=prompts[0],
+        )
+
+        parsed = parse_answer(si_answer, parser, is_array=True)  # type: ignore
+        return parsed
