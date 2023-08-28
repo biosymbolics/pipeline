@@ -20,7 +20,8 @@ def load_json_array(text: str) -> list[str]:
         array = json.loads(text)
     except json.JSONDecodeError:
         # try this
-        array = json.loads("[" + text + "]")
+        with_commas = re.sub(r"(\}\s*\{)", r"},\n{", text)
+        array = json.loads("[" + with_commas + "]")
     if not isinstance(array, list):
         raise Exception("Answer is not an array")
     return array

@@ -2,21 +2,37 @@
 yfinance client
 """
 from datetime import date
+from typing import TypedDict
 import yfinance as yf
 import logging
 
 
-def __normalize(data):
+StockPrice = TypedDict(
+    "StockPrice", {"date": str, "close": float, "open": float, "volume": int}
+)
+
+
+def __normalize(data) -> list[StockPrice]:
     """
     Normalize data
     - turn date index into column of type str
     """
-    data = data.reset_index().rename(columns={"index": "Date"})
-    data["Date"] = data["Date"].dt.strftime("%Y-%m-%d")
-    return data
+    try:
+        data = data.reset_index().rename(columns={"index": "Date"})
+        data["date"] = data["Date"].dt.strftime("%Y-%m-%d")
+        data["close"] = data["Close"]
+        data["open"] = data["Open"]
+        data["volume"] = data["Volume"]
+        df = data[["date", "close", "open", "volume"]]
+        return df.to_dict("records")
+    except Exception as e:
+        logging.warning("Error normalizing data: %s (data: %s)", e, data)
+        raise e
 
 
-def fetch_yfinance_data(ticker: str, start_date: date, end_date: date):
+def fetch_yfinance_data(
+    ticker: str, start_date: date, end_date: date
+) -> list[StockPrice]:
     """
     Get yfinance data
 
@@ -32,4 +48,7 @@ def fetch_yfinance_data(ticker: str, start_date: date, end_date: date):
     )
     data = yf.download(ticker, start=start_date_str, end=end_date_str)
 
-    return __normalize(data)
+    if len(data) > 0:
+        return __normalize(data)
+
+    return []

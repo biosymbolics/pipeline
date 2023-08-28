@@ -47,7 +47,9 @@ def remove_comment_syntax(text: str) -> str:
         >>> json.loads(obj_str)
         {'k11': 't1', 'k12': 't2'}, {'k21': 't1', 'k22': 't2'}
     """
-    json_blocks = re.findall(r"\s*```json(.*?)```", text, re.DOTALL)
+    json_blocks = re.findall(
+        r"\s*(?:```)+[a-z]{4,}(?:\s|\n|\b)(.*?)(?:```)+", text, re.DOTALL
+    )
     if len(json_blocks) == 0:
         return text
     elif len(json_blocks) > 1:

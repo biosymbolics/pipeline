@@ -2,18 +2,20 @@
 Client for querying SEC docs
 """
 from datetime import date
-from typing import Any
+from typing import Any, TypedDict
 from llama_index import Prompt
 from llama_index.prompts.prompt_type import PromptType
 from langchain.output_parsers import ResponseSchema
+from clients.finance.yfinance_client import fetch_yfinance_data
 
 from clients.llama_index.parsing import get_prompts_and_parser
 from core import SourceDocIndex
 from core.indices.entity_index import EntityIndex
-from utils.date import format_date
+from utils.date import format_date, parse_date
 from utils.misc import dict_to_named_tuple
 from utils.parse import parse_answer
 
+StockPriceWithEvents = TypedDict("StockPriceWithEvents", {"stock": Any, "events": Any})
 
 DEFAULT_TEXT_QA_PROMPT_TMPL = """
     Context information is below.
@@ -55,9 +57,9 @@ class AskSecClient:
 
     def get_events(
         self, ticker: str, start_date: date, end_date: date = date.today()
-    ) -> Any:
+    ) -> StockPriceWithEvents:
         response_schemas = [
-            ResponseSchema(name="date", description=f"event date"),
+            ResponseSchema(name="date", description=f"event date (YYYY-MM-DD)"),
             ResponseSchema(name="details", description=f"details about this event"),
         ]
         prompts, parser = get_prompts_and_parser(response_schemas)
@@ -73,5 +75,7 @@ class AskSecClient:
             prompt_template=prompts[0],
         )
 
-        parsed = parse_answer(si_answer, parser, is_array=True)  # type: ignore
-        return parsed
+        events = parse_answer(si_answer, parser, is_array=True)  # type: ignore
+
+        stock_prices = fetch_yfinance_data(ticker, start_date, end_date)
+        return {"stock": stock_prices, "events": events}
