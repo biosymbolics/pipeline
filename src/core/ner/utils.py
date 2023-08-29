@@ -95,7 +95,7 @@ def get_suffix_entitiy_re(
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
 
 
-def lemmatize_tail(term: str | Doc) -> str:
+def lemmatize_tail(term: str | Doc, exceptions: list[str] = []) -> str:
     """
     Lemmatizes the tail of a term
 
@@ -115,7 +115,9 @@ def lemmatize_tail(term: str | Doc) -> str:
     # include all tokens as-is except for the last
     tail_lemmatized = "".join(
         [
-            token.text_with_ws if i < len(doc) - 1 else token.lemma_
+            token.text_with_ws
+            if i < len(doc) - 1 or token.lemma_ in exceptions
+            else token.lemma_
             for i, token in enumerate(doc)
         ]
     ).strip()
@@ -123,7 +125,9 @@ def lemmatize_tail(term: str | Doc) -> str:
     return tail_lemmatized
 
 
-def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
+def lemmatize_tails(
+    terms: list[str], n_process: int = 1, exceptions: list[str] = []
+) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
     """
@@ -131,7 +135,7 @@ def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
-        yield lemmatize_tail(doc)
+        yield lemmatize_tail(doc, exceptions)
 
 
 def lemmatize_all(term: str | Doc) -> str:

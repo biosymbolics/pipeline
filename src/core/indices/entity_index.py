@@ -30,7 +30,7 @@ from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
 INDEX_NAME = "entity-docs"
-from core.constants import DEFAULT_ENTITY_TYPES
+from constants.core import DEFAULT_ENTITY_TYPES
 
 
 class EntityIndex:

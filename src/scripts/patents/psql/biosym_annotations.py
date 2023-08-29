@@ -15,9 +15,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
-from utils.re import get_or_re
-
-from .._constants import (
+from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
     MECHANISM_BASE_TERMS,
     MECHANISM_BASE_TERM_SETS,
@@ -25,6 +23,8 @@ from .._constants import (
     INTERVENTION_BASE_TERM_SETS,
     INTERVENTION_BASE_PREFIXES,
 )
+from utils.re import get_or_re
+
 
 TextField = Literal["title", "abstract"]
 WordPlace = Literal["leading", "trailing", "all"]
@@ -81,6 +81,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "efficacy": "all",
+    "advanced": "all",
     "therapeutic procedure": "all",
     "therapeautic?": "all",
     "therapeutic(?:ally)?": "all",
