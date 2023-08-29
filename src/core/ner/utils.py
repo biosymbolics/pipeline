@@ -95,7 +95,7 @@ def get_suffix_entitiy_re(
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
 
 
-def lemmatize_tail(term: str | Doc, exceptions: list[str] = []) -> str:
+def lemmatize_tail(term: str | Doc, exception_pattern: str | None = None) -> str:
     """
     Lemmatizes the tail of a term
 
@@ -112,12 +112,13 @@ def lemmatize_tail(term: str | Doc, exceptions: list[str] = []) -> str:
     else:
         raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
+    if exception_pattern is not None and re.match(exception_pattern, doc.text):
+        return doc.text
+
     # include all tokens as-is except for the last
     tail_lemmatized = "".join(
         [
-            token.text_with_ws
-            if i < len(doc) - 1 or token.lemma_ in exceptions
-            else token.lemma_
+            token.text_with_ws if i < len(doc) - 1 else token.lemma_
             for i, token in enumerate(doc)
         ]
     ).strip()
@@ -126,7 +127,7 @@ def lemmatize_tail(term: str | Doc, exceptions: list[str] = []) -> str:
 
 
 def lemmatize_tails(
-    terms: list[str], n_process: int = 1, exceptions: list[str] = []
+    terms: list[str], n_process: int = 1, exception_pattern: str | None = None
 ) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
@@ -135,7 +136,7 @@ def lemmatize_tails(
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
-        yield lemmatize_tail(doc, exceptions)
+        yield lemmatize_tail(doc, exception_pattern)
 
 
 def lemmatize_all(term: str | Doc) -> str:

@@ -2,6 +2,9 @@
 Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
+from utils.re import get_or_re
+
+
 MECHANISM_BASE_TERMS: list[str] = [
     "activity",
     "adjuvant",
@@ -166,7 +169,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "solution",
     "spray",
     "strain",
-    "strand",  # bio
+    "strand",
     "substance",
     "substrate",
     "subunit",
@@ -266,6 +269,8 @@ ALL_INTERVENTION_BASE_TERMS = [
     *INTERVENTION_BASE_TERMS,
     *INTERVENTION_BASE_TERM_SETS,
 ]
+ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
+
 
 INTERVENTION_BASE_PREFIXES = [
     "acceptable",
