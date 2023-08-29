@@ -263,7 +263,7 @@ class EntityCleaner:
             partial(
                 lemmatize_tails,
                 n_process=n_process,
-                exception_pattern=ALL_INTERVENTION_BASE_TERMS_RE,
+                exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
             ),
             partial(normalize_by_pos, n_process=n_process),
             normalize_phrasing,  # order matters (after rearrange)

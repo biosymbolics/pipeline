@@ -257,10 +257,10 @@ class PatentEnricher(BaseEnricher):
         self.db.upsert_df_into_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
-            id_fields=[ID_FIELD, "original_term", "domain"],
+            id_fields=[ID_FIELD, "term", "domain"],
             insert_fields=[
                 ID_FIELD,
-                "original_term",
+                "term",
                 "domain",
                 "confidence",
                 "source",

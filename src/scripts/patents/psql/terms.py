@@ -27,7 +27,6 @@ class BaseTermRecord(TypedDict):
 
 class TermRecord(BaseTermRecord):
     domain: str
-    original_term: str
     original_id: Optional[str]
 
 
@@ -142,7 +141,7 @@ class TermAssembler:
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
-                "synonyms": dedup([row["original_term"] for row in group]),
+                "synonyms": dedup([row["term"] for row in group]),
                 "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
@@ -173,7 +172,7 @@ class TermAssembler:
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
-                "original_term": row["name"],
+                "term": row["name"],
                 "original_id": None,
             }
             for row, owner in zip(rows, owners)
@@ -190,10 +189,10 @@ class TermAssembler:
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT lower(original_term) as term, domain, COUNT(*) as count
+                SELECT lower(term) as term, domain, COUNT(*) as count
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(original_term) > 1
-                group by lower(original_term), domain
+                where length(term) > 1
+                group by lower(term), domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -220,7 +219,7 @@ class TermAssembler:
                     normalization_map.get(row["term"]) or (), "concept_id", None
                 ),
                 "domain": row["domain"],
-                "original_term": row["term"],
+                "term": row["term"],
                 "original_id": "",  # row["original_id"],
             }
             for row in rows

@@ -65,6 +65,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "recombinant": "all",
     "novel": "all",
     "non[ -]?toxic": "leading",
+    "(?:non )?selective": "leading",
+    "adequate": "leading",
     "improved": "all",
     "improving": "all",
     "new": "leading",
@@ -184,6 +186,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
     "soluble": "leading",
+    "competitive": "leading",
+    "peripheral": "all",
     "mutant": "leading",
     "mutated": "leading",
     "activatable": "all",
@@ -625,20 +629,20 @@ def remove_substrings():
     """
     temp_table = "names_to_remove"
     query = rf"""
-        SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
+        SELECT t1.publication_number AS publication_number, t2.term AS removal_term
         FROM {WORKING_TABLE} t1
         JOIN {WORKING_TABLE} t2
         ON t1.publication_number = t2.publication_number
-        WHERE t2.original_term<>t1.original_term
-        AND t1.original_term ~* CONCAT('.*', escape_regex_chars(t2.original_term), '.*')
-        AND length(t1.original_term) > length(t2.original_term)
-        AND array_length(regexp_split_to_array(t2.original_term, '\s+'), 1) < 3
-        ORDER BY length(t2.original_term) DESC
+        WHERE t2.term<>t1.term
+        AND t1.term ~* CONCAT('.*', escape_regex_chars(t2.term), '.*')
+        AND length(t1.term) > length(t2.term)
+        AND array_length(regexp_split_to_array(t2.term, '\s+'), 1) < 3
+        ORDER BY length(t2.term) DESC
     """
 
     delete_query = f"""
         DELETE FROM {WORKING_TABLE}
-        WHERE ARRAY[publication_number, original_term] IN (
+        WHERE ARRAY[publication_number, term] IN (
             SELECT ARRAY[publication_number, removal_term]
             FROM {temp_table}
         )
@@ -673,10 +677,10 @@ def fix_of_for_annotations():
             re_term = term_or_term_set + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET original_term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
-            AND original_term ~* '^(?:{prefix_re})*{re_term}$'
+            AND term ~* '^(?:{prefix_re})*{re_term}$'
             AND a.{field} ~* '.*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*'
         """
         return sql
@@ -685,10 +689,10 @@ def fix_of_for_annotations():
         re_term = term + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET original_term=(substring(title, '(?i)([A-Za-z0-9]+-{re_term})'))
+            SET term=(substring(title, '(?i)([A-Za-z0-9]+-{re_term})'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
-            AND original_term ~* '^{re_term}$'
+            AND term ~* '^{re_term}$'
             AND a.{field} ~* '.*[A-Za-z0-9]+-{re_term}.*'
         """
         return sql
@@ -703,7 +707,7 @@ def fix_of_for_annotations():
     #         except Exception as e:
     #             logging.error(e)
 
-    # loop over term sets, in which the original_term may be in another form than the title variant
+    # loop over term sets, in which the term may be in another form than the title variant
     for term_or_term_set in [*terms, *term_sets]:
         for field in TEXT_FIELDS:
             try:
@@ -727,8 +731,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                     return None
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}$', '', 'gi'))
-                    where original_term ~* '.*\y{words_re}$'
+                    update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '\y{words_re}$', '', 'gi'))
+                    where term ~* '.*\y{words_re}$'
                 """
             elif place == "leading":
                 words = [
@@ -738,8 +742,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                     return None
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^{words_re}\y', '', 'gi'))
-                    where original_term ~* '^{words_re}\y.*'
+                    update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^{words_re}\y', '', 'gi'))
+                    where term ~* '^{words_re}\y.*'
                 """
             elif place == "all":
                 words = [
@@ -749,8 +753,8 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
                     return None
                 words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}\y', ' ', 'gi'))
-                    where original_term ~* '.*\y{words_re}\y.*'
+                    update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '\y{words_re}\y', ' ', 'gi'))
+                    where term ~* '.*\y{words_re}\y.*'
                 """
             else:
                 raise ValueError(f"Unknown place: {place}")
@@ -771,21 +775,21 @@ def clean_up_junk():
     queries = [
         # unwrap
         f"update {WORKING_TABLE} "
-        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
-        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
+        + r"set term=(REGEXP_REPLACE(term, '[)(]', '', 'g')) where term ~ '^[(][^)(]+[)]$'",
+        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^\"', '')) where term ~ '^\"'",
+        f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
         # leading whitespace
-        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
         # trailing whitespace
-        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[ ]+$', '')) where original_term ~ '[ ]+$'",
+        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[ ]+$', '')) where term ~ '[ ]+$'",
         # f"update {WORKING_TABLE} set "
-        # + "original_term=regexp_extract(original_term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where original_term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
+        # + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
         client.execute_query(sql)
 
-    # rf"update biosym_annotations set original_term=(REGEXP_REPLACE(original_term, '^[ ]+', '')) where original_term ~ '^[ ]+'",
+    # rf"update biosym_annotations set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
 
 
 def fix_unmatched():
@@ -798,11 +802,11 @@ def fix_unmatched():
     def get_query(field, char_set):
         sql = f"""
             UPDATE {WORKING_TABLE} ab
-            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')'))
+            set term=substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(term), ')'))
             from applications a
             WHERE ab.publication_number=a.publication_number
-            AND substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
-            AND original_term ~* '.*{char_set[1]}.*' AND not original_term ~* '.*{char_set[0]}.*'
+            AND substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(term), ')')) is not null
+            AND term ~* '.*{char_set[1]}.*' AND not term ~* '.*{char_set[0]}.*'
             AND {field} ~* '.*{char_set[0]}.*{char_set[1]}.*'
         """
         return sql
@@ -830,20 +834,20 @@ def remove_common_terms():
     common_del_query = f"""
         delete from {WORKING_TABLE}
         where
-        original_term=''
-        OR original_term is null
-        OR original_term ~* '^{or_re}$'
+        term=''
+        OR term is null
+        OR term ~* '^{or_re}$'
     """
 
     del_queries = [
         common_del_query,
         f"delete FROM {WORKING_TABLE} "
-        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} " + r"where original_term ~ '^[0-9., ]+$'",
-        rf"delete from {WORKING_TABLE} where length(original_term) > 150 and original_term ~* '\y(?:and|or)\y';",  # sentences
-        rf"delete from {WORKING_TABLE}  where length(original_term) > 150 and original_term ~* '.*[.;] .*';",
-        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",
-        f"delete FROM {WORKING_TABLE} where length(original_term) < 3 or original_term is null",
+        + r"where term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
+        f"delete FROM {WORKING_TABLE} " + r"where term ~ '^[0-9., ]+$'",
+        rf"delete from {WORKING_TABLE} where length(term) > 150 and term ~* '\y(?:and|or)\y';",  # sentences
+        rf"delete from {WORKING_TABLE}  where length(term) > 150 and term ~* '.*[.;] .*';",
+        f"delete FROM {WORKING_TABLE} where term ~* '^said .*'",
+        f"delete FROM {WORKING_TABLE} where length(term) < 3 or term is null",
     ]
     for del_query in del_queries:
         DatabaseClient().execute_query(del_query)
@@ -865,16 +869,16 @@ def normalize_domains():
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND term ~* '.*{mechanism_re}$'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
+        f"update {WORKING_TABLE} set domain='diseases' where term in ('adrenoleukodystrophy', 'stents') or term ~ '.* diseases?$'",
+        f"update {WORKING_TABLE} set domain='compounds' where term in ('ethanol', 'isocyanates')",
+        f"update {WORKING_TABLE} set domain='compounds' where term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where term ~* '.*receptor$' and domain='compounds'",
+        f"update {WORKING_TABLE} set domain='diseases' where term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where term ~* '.*gene$' and domain='diseases' and not term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where term ~* '.* factor$' and not term ~* '.*(?:risk|disease).*' and domain='diseases'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where term ~* 'receptors?$' and domain='diseases'",
     ]
     client = DatabaseClient()
     for sql in queries:
@@ -883,11 +887,11 @@ def normalize_domains():
     normalize_sql = f"""
         WITH ranked_domains AS (
             SELECT
-                lower(original_term) as lot,
+                lower(term) as lot,
                 domain,
-                ROW_NUMBER() OVER (PARTITION BY lower(original_term) ORDER BY COUNT(*) DESC) as rank
+                ROW_NUMBER() OVER (PARTITION BY lower(term) ORDER BY COUNT(*) DESC) as rank
             FROM {WORKING_TABLE}
-            GROUP BY lower(original_term), domain
+            GROUP BY lower(term), domain
         )
         , max_domain AS (
             SELECT
@@ -899,7 +903,7 @@ def normalize_domains():
         UPDATE {WORKING_TABLE} ut
         SET domain = md.new_domain
         FROM max_domain md
-        WHERE lower(ut.original_term) = md.lot and ut.domain <> md.new_domain;
+        WHERE lower(ut.term) = md.lot and ut.domain <> md.new_domain;
     """
     client.execute_query(normalize_sql)
 
@@ -921,7 +925,7 @@ def populate_working_biosym_annotations():
     client.create_indices(
         [
             {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+            {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
         ]
     )
 
@@ -936,18 +940,18 @@ def populate_working_biosym_annotations():
     remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
-    # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
-    # select original_term from biosym_annotations where length(original_term) > 150 and original_term like '%and%';
+    # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
+    # select term from biosym_annotations where length(term) > 150 and term like '%and%';
     clean_up_junk()
 
     remove_common_terms()  # remove one-off generic terms
     remove_substrings()  # less specific terms in set with more specific terms
 
-    # slow... seems to go faster with dropped tgrm / fresh btree on original_term
+    # slow... seems to go faster with dropped tgrm / fresh btree on term
     normalize_domains()
 
     # normalize_domains is **much** faster w/o this index
-    client.execute_query("drop index trgm_index_biosym_annotations_original_term")
+    client.execute_query("drop index trgm_index_biosym_annotations_term")
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations
@@ -961,24 +965,24 @@ if __name__ == "__main__":
     Checks:
 
     08/17/2023, after
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
     (556,711 -> 567,398)
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
+    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
     (2,555,158 -> 2,539,723)
-    select count(*) from biosym_annotations where domain<>'attributes' and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
+    select count(*) from biosym_annotations where domain<>'attributes' and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
     (2,812,965 -> 2,786,428)
-    select count(*) from biosym_annotations where domain<>'attributes' and original_term<>'';
+    select count(*) from biosym_annotations where domain<>'attributes' and term<>'';
     (3,748,417 -> 3,748,417)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3032462
     compounds  | 1474950
     diseases   |  829121
     mechanisms | 1444346
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
     (14,910 -> 15,206)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
     (38,315 -> 39,039)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
     (70,439 -> 69,715)
     """
     if "-h" in sys.argv:
