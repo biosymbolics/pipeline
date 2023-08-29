@@ -19,6 +19,7 @@ class PatentBasicInfo(TypedDict):
     ipc_codes: list[str]
     patent_years: int
     priority_date: date
+    # publication_date: date
     publication_number: str
     score: float
     title: str
@@ -35,8 +36,8 @@ class PatentApplication(PatentBasicInfo):
     diseases: list[str]
     genes: list[str]  # remove?
     embeddings: list[float]
-    grant_date: date
-    filing_date: date
+    # grant_date: date
+    # filing_date: date
     inventors: list[str]
     mechanisms: list[str]
     similar: list[str]

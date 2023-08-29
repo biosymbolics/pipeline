@@ -49,9 +49,9 @@ ACTIONS = [
 ]
 
 CONJUGATE_TYPES = [
-    r"antibody[-\s]?drug conjugate",
+    "antibody[- ]?drug conjugate",
     "adc",
-    r"peptide[-\s]?drug conjugate",
+    "peptide[- ]?drug conjugate",
     "prodrug conjugate",
     "nanoparticle conjugate",
 ]
@@ -59,8 +59,7 @@ CONJUGATE_TYPES = [
 BIOLOGIC_SUFFIXES = [
     "adoptive cell transfer",
     # "adjuvant", # more likely to be indication (e.g. Stage IB-IIIA Adjuvant NSCLC)
-    "bispecific",
-    "bispecific antibody",
+    "bi[- ]?specific(?: antibody)?",
     "blockade",
     "cells",
     "cell therapy",
@@ -71,7 +70,7 @@ BIOLOGIC_SUFFIXES = [
     "factor [ivx]{1-3}",
     "fab(?: region)?",
     "fc",
-    "fc[-\\s]fusion(?: protein)?",
+    "fc[- ]fusion(?: protein)?",
     "fragment",
     "fusion protein",
     f"gene (?:{ALPHA_CHARS(4)}\\s?)?therapy",
@@ -80,22 +79,22 @@ BIOLOGIC_SUFFIXES = [
     "isoform",
     "ligand",
     "monoclonal antibody",
-    "mab",
+    "mono[- ]?specific(?: antibody)?",
     "mrna",
     "neoadjuvant",
     "peptide",
-    "peri[-\\s]?adjuvant",
+    "peri[- ]?adjuvant",
     "polypeptide",
     "protein",
     "sirna",
     "stem cell transplant",
     "substitute",
-    "tumor[-\\s]infiltrating lymphocyte",
-    "t[-\\s]?cell engager",
+    "tumor[- ]?infiltrating lymphocyte",
+    "t[- ]?cell engager",
     "tce",
-    "t[-\\s]?cell receptor",
+    "t[- ]?cell receptor",
     "tcr",
-    "t[-\\s]?cell engaging receptor",
+    "t[- ]?cell engaging receptor",
     "tcer",
     "transcription factor",
     "vaccine",
@@ -104,14 +103,14 @@ BIOLOGIC_SUFFIXES = [
 
 EFFECTS = [
     *ACTIONS,
-    *["dual[-\\s]?" + effect for effect in ACTIONS],
-    *["tri[-\\s]?" + effect for effect in ACTIONS],
-    *[f"anti[-\\s]?{ALPHA_CHARS('+')} {action}" for action in ACTIONS],
+    *["dual[- ]?" + effect for effect in ACTIONS],
+    *["tri[- ]?" + effect for effect in ACTIONS],
+    *[f"anti[- ]?{ALPHA_CHARS('+')} {action}" for action in ACTIONS],
 ]
 
 CAR_T_INFIXES = [
-    "car[-\\s]?t",
-    "car[-\\s]?nk",
+    "car[- ]?t",
+    "car[- ]?nk",
     "(?:targeting )?chimeric antigen receptor.*",
     "bcma nke",
     "nke",

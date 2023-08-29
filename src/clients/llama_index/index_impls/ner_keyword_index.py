@@ -18,7 +18,7 @@ from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
 from llama_index.retrievers import VectorIndexRetriever
 from llama_index.schema import NodeWithScore
 
-from data.ner import NerTagger
+from core.ner import NerTagger
 
 
 def extract_keywords(
@@ -34,7 +34,7 @@ def extract_keywords(
         tagger (NerTagger): NER tagger
         max_keywords (int): max number of keywords to extract
     """
-    entities = tagger.extract_strings([text], link=True)
+    entities = tagger.extract_strings([text], link=False)
     keywords = entities[0]
     return set(keywords[0:max_keywords])
 
@@ -179,11 +179,11 @@ class NerKeywordTableIndex(SimpleKeywordTableIndex):
         response_synthesizer = get_response_synthesizer(
             service_context=self.service_context, **kwargs
         )
-        ktner_query_engine = RetrieverQueryEngine(
+        nerkt_query_engine = RetrieverQueryEngine(
             retriever=retriever, response_synthesizer=response_synthesizer
         )
 
-        return ktner_query_engine
+        return nerkt_query_engine
 
     def as_chat_engine(
         self, chat_mode: ChatMode = ChatMode.BEST, **kwargs: Any

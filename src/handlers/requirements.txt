@@ -1,12 +1,12 @@
+--prefer-binary
+
 boto3
+bs4
 langchain
-llama_index
 openai
 polars
-psycopg[binary]
-psycopg_pool
+psycopg[binary,pool]
 pydash
-python-dotenv
 requests
 sec_api
 typing_extensions

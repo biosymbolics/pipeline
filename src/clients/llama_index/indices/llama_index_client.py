@@ -2,6 +2,7 @@
 Client for llama indexes
 """
 import logging
+import sys
 import time
 import traceback
 from typing import Any, Mapping, Optional, Type, TypeVar, Union

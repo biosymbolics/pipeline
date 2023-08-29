@@ -6,11 +6,24 @@
 - `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
 - `python3 -m spacy download en_core_web_md`
-- Create/copy model.pt for non-GPT NER
+- Create/copy binder.pt for non-GPT NER
 - AWS authenticate if needed: `aws configure sso`
 - psql
   - psql -h 172.31.14.226 -p 5432 --username postgres
+- sls offlne
+  - https://github.com/dherault/serverless-offline/issues/1696
+- Docker - new ECR for lambda
+```
+aws ecr create-repository --repository-name biosym_lambda-repo
 
+docker build --platform linux/amd64 -t biosym_lambda-repo:chat_torch_latest .
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 469840476741.dkr.ecr.us-east-1.amazonaws.com
+docker tag biosym_lambda-repo:chat_torch_latest 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
+```
+
+### Running locally
+- `sls offline`
 
 ### Deploy
 
@@ -35,10 +48,6 @@ serverless invoke local --function search-patents
 ```
 
 ### Running
-
-#### UI
-
-- `streamlit run src/app/Hello.py`
 
 #### Patents
 
@@ -146,7 +155,7 @@ si = core.indices.source_doc_index.SourceDocIndex()
 ```
 import system
 system.initialize()
-from data.ner import NerTagger
+from core.ner import NerTagger
 tagger = NerTagger()
 text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
 tagger.extract([text], link=False)

@@ -10,8 +10,8 @@ from clients.llama_index import (
     load_index,
     query_index,
     upsert_index,
-    NerKeywordTableIndex,
 )
+from clients.llama_index.index_impls.ner_keyword_index import NerKeywordTableIndex
 from clients.llama_index.context import StorageArgs
 from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
@@ -22,9 +22,7 @@ from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, Refine
 
 INDEX_NAME = "source-docs"
 
-DEFAULT_STORAGE_ARGS: StorageArgs = {
-    "storage_type": "mongodb",
-}
+DEFAULT_STORAGE_ARGS: StorageArgs = {"storage_type": "pinecone"}  # "mongodb",
 
 DEFAULT_INDEX_ARGS = {
     "ner_options": {

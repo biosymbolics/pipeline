@@ -11,8 +11,6 @@ from llama_index.prompts.default_prompts import (
     DEFAULT_REFINE_PROMPT_TMPL,
 )
 
-from utils.string import remove_comment_syntax
-
 
 def get_output_parser(schemas: list[ResponseSchema]) -> LangchainOutputParser:
     """
@@ -35,7 +33,9 @@ PromptsAndParser = NamedTuple(
 )
 
 
-def get_prompts_and_parser(schemas: list[ResponseSchema]) -> PromptsAndParser:
+def get_prompts_and_parser(
+    schemas: list[ResponseSchema], qa_template=DEFAULT_TEXT_QA_PROMPT_TMPL
+) -> PromptsAndParser:
     """
     Get prompts and parser for this entity, given response schemas
 
@@ -46,31 +46,8 @@ def get_prompts_and_parser(schemas: list[ResponseSchema]) -> PromptsAndParser:
         prompts (tuple[QuestionAnswerPrompt, RefinePrompt]): prompts
     """
     output_parser = get_output_parser(schemas)
-    fmt_qa_tmpl = output_parser.format(DEFAULT_TEXT_QA_PROMPT_TMPL)
+    fmt_qa_tmpl = output_parser.format(qa_template)
     fmt_refine_tmpl = output_parser.format(DEFAULT_REFINE_PROMPT_TMPL)
     qa_prompt = QuestionAnswerPrompt(fmt_qa_tmpl, output_parser=output_parser)
     refine_prompt = RefinePrompt(fmt_refine_tmpl, output_parser=output_parser)
     return PromptsAndParser((qa_prompt, refine_prompt), output_parser)
-
-
-def parse_answer(
-    text: str, output_parser: LangchainOutputParser, return_orig_on_fail: bool = True
-) -> Any:
-    """
-    Parses a text answer from llama index
-
-    Args:
-        text (str): text to parse
-        output_parser (OutputParser): output parser to use (optional)
-
-    TODO: handle typing
-    """
-    try:
-        parsed = output_parser.parse(text)
-        return parsed
-    except Exception as ex:
-        logging.error("Could not parse answer (%s): %s", text, ex)
-        if not return_orig_on_fail:
-            raise ex
-
-    return text

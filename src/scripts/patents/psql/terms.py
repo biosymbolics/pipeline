@@ -7,7 +7,7 @@ import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
-from data.ner import TermNormalizer
+from core.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 

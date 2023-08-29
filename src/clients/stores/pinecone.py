@@ -7,14 +7,12 @@ from typing import Any, Mapping
 import pinecone
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 import logging
-from dotenv import load_dotenv
 
 from typings.indices import NamespaceKey
 
-load_dotenv()
 
 API_KEY = os.environ["PINECONE_API_KEY"]
-PINECONE_ENVIRONMENT = "us-west4-gcp-free"
+PINECONE_ENVIRONMENT = os.environ["PINECONE_ENVIRONMENT"]
 
 
 def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:

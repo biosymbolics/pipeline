@@ -31,10 +31,10 @@ def __create_annotations_table():
     Create a table of annotations for use in app queries
     """
     logger.info("Create a table of annotations for use in app queries")
-    table_name = "annotations"
+    annotations_table = "annotations"
 
     client = PsqlDatabaseClient()
-    client.delete_table(table_name)
+    client.delete_table(annotations_table, is_cascade=True)
 
     entity_query = f"""
         WITH terms AS (
@@ -88,16 +88,16 @@ def __create_annotations_table():
         FROM terms
         ORDER BY character_offset_start
     """
-    client.create_from_select(entity_query, table_name)
+    client.create_from_select(entity_query, annotations_table)
 
     client.create_indices(
         [
             {
-                "table": table_name,
+                "table": annotations_table,
                 "column": "publication_number",
             },
             {
-                "table": table_name,
+                "table": annotations_table,
                 "column": "term",
                 "is_tgrm": True,
             },
@@ -111,10 +111,16 @@ def __create_annotations_table():
             publication_number,
             ARRAY_AGG(term) AS terms,
             ARRAY_AGG(domain) AS domains
-        FROM {table_name}
+        FROM {annotations_table}
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)
+    client.create_index(
+        {
+            "table": AGGREGATED_ANNOTATIONS_TABLE,
+            "column": "publication_number",
+        }
+    )
 
 
 def __create_biosym_annotations_source_table():
@@ -160,6 +166,7 @@ def add_application_search():
     vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
     client.execute_query(
         f"""
+            -- consider GENERATED ALWAYS AS/STORED
             ALTER TABLE applications ADD COLUMN text_search tsvector;
             UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
         """

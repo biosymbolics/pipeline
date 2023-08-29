@@ -16,7 +16,6 @@ from llama_index.vector_stores import PineconeVectorStore
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import Anthropic, VertexAI
 from llama_index.vector_stores import ChromaVectorStore
-import chromadb
 import logging
 
 from constants.core import DEFAULT_MODEL_NAME
@@ -31,7 +30,8 @@ class ModelInfo(TypedDict):
     model: str
 
 
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 MONGO_URI = os.environ["MONGO_URI"]
 
@@ -48,26 +48,36 @@ def get_storage_context(
         index_name (str): name of the index
         kwargs (Mapping[str, Any]): kwargs for vector store
     """
-    logging.info("Loading storage context for %s", index_name)
+    logger.info("Loading storage context for %s", index_name)
 
     if storage_type == "pinecone":
-        logging.info("Loading pinecone vector store context")
+        logger.info("Loading pinecone vector store context")
         pinecone_index = get_vector_store(index_name)
         vector_store = PineconeVectorStore(pinecone_index, **kwargs)
-        context = StorageContext.from_defaults(vector_store=vector_store)
-        return context
+        return StorageContext.from_defaults(
+            docstore=MongoDocumentStore.from_uri(
+                uri=MONGO_URI, db_name="db_docstore", namespace="docstore"
+            ),
+            index_store=MongoIndexStore.from_uri(
+                uri=MONGO_URI, db_name="db_docstore", namespace="index_store"
+            ),
+            vector_store=vector_store,
+        )
 
     elif storage_type == "mongodb":
-        logging.info(
+        logger.info(
             "Loading mongodb doc and index store context, chromadb vector store"
         )
+        # lazy import (bloat!)
+        import chromadb
+
         chroma_client = chromadb.PersistentClient(
             path="./storage/vector_storage/chromadb/",
         )
 
         chroma_collection = chroma_client.get_or_create_collection(index_name)
 
-        logging.info(
+        logger.info(
             "Loaded chroma collection; contains %s docs", chroma_collection.count()
         )
 
@@ -118,7 +128,7 @@ def get_service_context(
             return VertexAI(**MODEL_TO_TOKENS[model_name], temperature=0.1)
         if model_name == "Anthropic":
             # untested, but used in https://colab.research.google.com/drive/1uuqvPI2_WNFMd7g-ahFoioSHV7ExB2GR?usp=sharing
-            return Anthropic(model="claude-v1.3-100k", temperature=0.1)
+            return Anthropic(model_name="claude-v1.3-100k", temperature=0.1)
 
         raise Exception(f"Unknown model {model_name}")
 
@@ -126,7 +136,7 @@ def get_service_context(
     llm_predictor = LLMPredictor(llm=llm)
     prompt_helper = PromptHelper.from_llm_metadata(llm_predictor.metadata)
 
-    logging.info("Prompt helper: %s", prompt_helper.__dict__.items())
+    logger.info("Prompt helper: %s", prompt_helper.__dict__.items())
 
     service_context = ServiceContext.from_defaults(
         **kwargs,

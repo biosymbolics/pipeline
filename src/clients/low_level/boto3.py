@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 T = TypeVar("T")
 
-CACHE_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")
+DEFAULT_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")
 
 
 def get_boto_client(service: str):
@@ -30,13 +30,30 @@ def get_boto_client(service: str):
     return session.client(service)
 
 
+def fetch_s3_obj(
+    key: str, new_filename: str | None = None, bucket: str = DEFAULT_BUCKET
+) -> Any:
+    """
+    Fetch S3 object
+    """
+    s3 = boto3.client("s3")
+
+    if new_filename is not None:
+        logger.info("Downloading S3 object `%s` to `%s`", key, new_filename)
+        s3.download_file(bucket, key, new_filename)
+        return
+
+    response = s3.get_object(Bucket=bucket, Key=key)
+    return json.loads(response["Body"].read().decode("utf-8"))
+
+
 def retrieve_with_cache_check(
-    operation: Callable[[], T], key: str, cache_name: str = CACHE_BUCKET
+    operation: Callable[[], T], key: str, cache_name: str = DEFAULT_BUCKET
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.
     """
-    s3 = boto3.client("s3")
+    s3 = boto3.client("s3")  # get_boto_client("s3")?
     key = f"cache/{key}.json"
 
     # Check if the result exists in S3
@@ -49,6 +66,7 @@ def retrieve_with_cache_check(
         return data
     except s3.exceptions.NoSuchKey:
         logger.info("Checking miss for key: %s", key)
+
         # If not in cache, perform the operation
         data = operation()
 
