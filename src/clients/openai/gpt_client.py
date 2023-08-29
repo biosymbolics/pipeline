@@ -5,9 +5,10 @@ import os
 from langchain import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 import logging
 
+from typings.gpt import OutputParser
 from utils.parse import parse_answer
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -64,7 +65,9 @@ class GptApiClient:
     def __format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
             logging.debug("Formatting answer: %s", answer)
-            return parse_answer(answer, self.output_parser, is_array, True)
+            return parse_answer(
+                answer, cast(OutputParser, self.output_parser), is_array, True
+            )
 
         return answer
 

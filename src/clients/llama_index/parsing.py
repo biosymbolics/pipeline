@@ -2,7 +2,7 @@
 Utils for parsing llama index answers
 """
 import logging
-from typing import Any, NamedTuple
+from typing import NamedTuple, cast
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from llama_index.output_parsers import LangchainOutputParser
 from llama_index.prompts.prompts import QuestionAnswerPrompt, RefinePrompt
@@ -11,8 +11,10 @@ from llama_index.prompts.default_prompts import (
     DEFAULT_REFINE_PROMPT_TMPL,
 )
 
+from typings.gpt import OutputParser
 
-def get_output_parser(schemas: list[ResponseSchema]) -> LangchainOutputParser:
+
+def get_output_parser(schemas: list[ResponseSchema]) -> OutputParser:
     """
     Get output parser for this entity
 
@@ -21,14 +23,14 @@ def get_output_parser(schemas: list[ResponseSchema]) -> LangchainOutputParser:
     """
     output_parser = StructuredOutputParser.from_response_schemas(schemas)
     output_parser = LangchainOutputParser(output_parser)
-    return output_parser
+    return cast(OutputParser, output_parser)
 
 
 PromptsAndParser = NamedTuple(
     "PromptsAndParser",
     [
         ("prompts", tuple[QuestionAnswerPrompt, RefinePrompt]),
-        ("parser", LangchainOutputParser),
+        ("parser", OutputParser),
     ],
 )
 
