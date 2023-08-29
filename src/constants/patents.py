@@ -290,33 +290,35 @@ PATENT_ATTRIBUTE_MAP = {
         "diagnose",
         "detection",
         "imaging",
+        "in vitro",
+        "in vivo",
         "marker",
         "monitoring",
-        "mouse",  # in vivo models
+        "mouse",
         "predict",
         "prognosis",
         "prognostic",  # needed?
-        # "risk score",
+        "risk score",
         "scan",
         "sensor",
         "testing",
     ],
     "DISEASE_MODIFYING": [
-        # "disease modifying",
-        # "disease-modifying",
+        "disease modifying",
+        "disease-modifying",
     ],
     "FORMULATION": ["formulation", "form", "salt"],
     "IRRELEVANT": [
-        # complentary and alternative medicine
         "veterinary",
         "animal",
         "nutritional",
+        "food supplement",
         "primate",
         "traditional",
     ],
-    "METHOD": ["method", "procedure"],  # preparation method, method of use
+    "METHOD": ["method", "procedure", "preparation method", "method of use"],
     "METHOD_OF_ADMINISTRATION": [
-        "delivery",  # drurg delivery
+        "delivery",
         "dosing",
         "kit",
         "regimen",
@@ -325,11 +327,11 @@ PATENT_ATTRIBUTE_MAP = {
     "NOVEL": ["novel"],
     "PALLIATIVE": [
         "palliative",
-        # "reduction in symptoms",
+        "reduction in symptoms",
         "supportive",
-        # "symptom management",
-        # "symptom relief",
-        # "symptom relief"
+        "symptom management",
+        "symptom relief",
+        "symptom relief",
     ],
     "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
     "PROCEDURE": [
@@ -344,7 +346,10 @@ PATENT_ATTRIBUTE_MAP = {
         "synthesis",
         "system",
         "produce",
-    ],  # method of making, method for producing, production method
+        "method of making",
+        "method for producing",
+        "production method",
+    ],
     "TREATMENT": [
         "treatment",
         "therapeutic",
