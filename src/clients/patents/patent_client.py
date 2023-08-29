@@ -134,7 +134,7 @@ def __get_query_pieces(
     base_params = {
         "where": f"""
             WHERE priority_date > '{max_priority_date}'::date
-            ORDER BY randomizer desc
+            ORDER BY randomizer desc, priority_date desc
             limit {max_results}
         """,
         "match_condition": f"""
