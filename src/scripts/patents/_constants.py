@@ -20,6 +20,7 @@ MECHANISM_BASE_TERMS: list[str] = [
     "contraception",
     "co[- ]?factor",
     "(?:cross[ -]?)?linker",
+    "decoy",
     "diuretic",
     "donor",
     "differentiation",

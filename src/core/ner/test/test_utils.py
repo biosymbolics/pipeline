@@ -340,7 +340,11 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "mild-to-moderate alzheimer's disease",
-                "expected": "mildto moderate alzheimer disease",  # TODO
+                "expected": "mild to moderate alzheimer disease",
+            },
+            {
+                "input": "Anti-cd73, anti-pd-l1 antibodies and chemotherapy for treating tumors",
+                "expected": "Anti cd73, anti pdl1 antibodies and chemotherapy for treating tumors",
             },
         ]
 

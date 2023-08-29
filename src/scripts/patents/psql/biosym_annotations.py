@@ -185,11 +185,12 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "soluble": "leading",
     "mutant": "leading",
     "mutated": "leading",
+    "activatable": "all",
     # model/source
     "murine": "all",
     "mouse": "all",
     "mice": "all",
-    "human(?:ized)?": "all",  # ??
+    "human(?:ized|ised)?": "all",  # ??
     "rat": "all",
     "rodent": "all",
     "rabbit": "all",
