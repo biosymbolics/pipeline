@@ -268,6 +268,15 @@ PATENT_ATTRIBUTE_MAP = {
         "therapy",  # TODO: will probably over-match
         "therapeutic",  # TODO: will probably over-match
     ],
+    "DEVICE": [
+        "device",
+        "implant",
+        "instrument",
+        "prosthesis",
+        "scan",
+        "sensor",
+        "stent",
+    ],
     "DIAGNOSTIC": [
         "analysis",
         "biomarker",
@@ -295,14 +304,6 @@ PATENT_ATTRIBUTE_MAP = {
     "FORMULATION": ["formulation", "form", "salt"],
     "METHOD": ["method", "procedure"],  # preparation method, method of use
     "NOVEL": ["novel"],
-    "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
-    "PROCESS": [
-        "preparation",
-        "process",
-        "synthesis",
-        "system",
-        "produce",
-    ],  # method of making, method for producing
     "PALLIATIVE": [
         "palliative",
         # "reduction in symptoms",
@@ -310,6 +311,24 @@ PATENT_ATTRIBUTE_MAP = {
         # "symptom management",
         # "symptom relief",
         # "symptom relief"
+    ],
+    "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
+    "PROCEDURE": [
+        "procedure",
+        "surgery",
+        "surgical",
+    ],
+    "PROCESS": [
+        "preparation",
+        "process",
+        "synthesis",
+        "system",
+        "produce",
+    ],  # method of making, method for producing
+    "TREATMENT": [
+        "treatment",
+        "therapeutic",
+        "therapy",
     ],
 }
 
@@ -319,16 +338,17 @@ PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "COMBINATION": 0,
     "COMPOUND_OR_MECHANISM": 2,
+    "DEVICE": -2,
     "DIAGNOSTIC": -1.5,
-    "DISEASE_MODIFYING": 1,
-    "FORMULATION": -0.5,
+    "DISEASE_MODIFYING": 1.5,
+    "FORMULATION": -0.25,
+    "METHOD": -1.5,
     "NOVEL": 1.5,
     "PALLIATIVE": 0,
-    "PREPARATION": -1,
     "PREVENTATIVE": 1,
+    "PROCEDURE": -1.5,
     "PROCESS": -1,
-    "METHOD": -1.5,
-    "TREATMENT": 0,
+    "TREATMENT": 1,
 }
 
 
