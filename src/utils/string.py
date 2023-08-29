@@ -30,6 +30,9 @@ def get_id(value: Idable) -> str:
     if isinstance(value, list):
         value = "_".join(value)
 
+    if isinstance(value, bool):
+        value = str(value)
+
     if isinstance(value, date):
         value = value.isoformat()
 

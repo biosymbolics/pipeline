@@ -111,7 +111,7 @@ def __get_query_pieces(
     domains: Sequence[str] | None,
     min_patent_years: int,
     max_results: int,
-    is_exhaustive: bool,
+    is_exhaustive: bool = False,
 ) -> QueryPieces:
     """
     Helper to generate pieces of patent search query
@@ -216,7 +216,7 @@ def _search(
     formatted_results = format_search_result(results)
 
     logger.info(
-        "Search took %s seconds (%s)", round(time.time() - start, 2), len(results)
+        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
     )
 
     return formatted_results
