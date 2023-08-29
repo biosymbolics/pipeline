@@ -29,6 +29,16 @@ CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
 
 
+def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
+    return [
+        [
+            DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, a_set, None)
+            for a_set in attribute_set
+        ]
+        for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
+    ]
+
+
 class BaseEnricher:
     def __init__(
         self,
@@ -228,13 +238,7 @@ class PatentClassifier(BaseEnricher):
 
     @overrides(BaseEnricher)
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
-        return [
-            [
-                DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, a_set, None)
-                for a_set in attribute_set
-            ]
-            for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
-        ]
+        return extract_attributes(patent_docs)
 
 
 class PatentEnricher(BaseEnricher):
@@ -275,7 +279,8 @@ class PatentEnricher(BaseEnricher):
             patent_docs,
             link=False,
         )
-        return entities
+        attributes = extract_attributes(patent_docs)
+        return [*entities, *attributes]
 
 
 if __name__ == "__main__":
@@ -288,6 +293,6 @@ if __name__ == "__main__":
         sys.exit()
 
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
-    # enricher = PatentEnricher()
-    enricher = PatentClassifier()
+    enricher = PatentEnricher()
+    # enricher = PatentClassifier()
     enricher(starting_id)
