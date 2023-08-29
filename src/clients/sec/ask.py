@@ -75,7 +75,7 @@ class AskSecClient:
             prompt_template=prompts[0],
         )
 
-        events = parse_answer(si_answer, parser, is_array=True)  # type: ignore
+        events = parse_answer(si_answer, parser, is_array=True)
 
         stock_prices = fetch_yfinance_data(ticker, start_date, end_date)
         return {"stock": stock_prices, "events": events}

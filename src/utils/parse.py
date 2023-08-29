@@ -1,11 +1,10 @@
 from functools import reduce
 from typing import Any
-from langchain.output_parsers import StructuredOutputParser
-from llama_index.output_parsers import LangchainOutputParser
 import json
 import re
 import logging
 
+from typings.gpt import OutputParser
 from utils.string import remove_comment_syntax
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ def load_json_array(text: str) -> list[str]:
 
 def parse_answer(
     text: str,
-    output_parser: StructuredOutputParser | LangchainOutputParser,
+    output_parser: OutputParser,
     is_array: bool = False,
     return_orig_on_fail: bool = True,
 ) -> Any:
