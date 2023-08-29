@@ -29,6 +29,7 @@ ACTIONS = [
     "down-regulator",
     "downregulator",
     "engager",
+    "enhancer",
     "immunomodulator",
     "immuno-modulator",
     "immuno modulator",

@@ -134,6 +134,26 @@ def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
         yield lemmatize_tail(doc)
 
 
+def lemmatize_all(term: str | Doc) -> str:
+    """
+    Lemmatizes all words in a string
+    """
+    if isinstance(term, str):
+        nlp = Spacy.get_instance()
+        doc = nlp(term)  # turn into spacy doc (has lemma info)
+    elif isinstance(term, Doc):
+        doc = term
+    else:
+        raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
+
+    # include all tokens as-is except for the last
+    lemmatized = "".join(
+        [f"{token.lemma_}{token.whitespace_}" for token in doc]
+    ).strip()
+
+    return lemmatized
+
+
 def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.

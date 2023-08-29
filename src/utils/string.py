@@ -3,11 +3,12 @@ String utilities
 """
 
 
+from datetime import date
 import re
 from typing import Any, Mapping, TypeGuard, Union
 
 
-_Idable = str | list[str] | int
+_Idable = str | list[str] | int | date
 Idable = _Idable | Mapping[str, _Idable]
 
 
@@ -28,6 +29,9 @@ def get_id(value: Idable) -> str:
 
     if isinstance(value, list):
         value = "_".join(value)
+
+    if isinstance(value, date):
+        value = value.isoformat()
 
     if isinstance(value, int):
         value = str(value)

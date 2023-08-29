@@ -231,6 +231,12 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
     ["blocker", "blockade", "blocking", "block"],
     ["transporter", "transporting", "transport", "transportation"],
     ["disruptor", "disruption", "disrupting", "disrupt"],
+    [
+        "desiccation",
+        "desiccant",
+        "desiccator",
+        "desiccating",
+    ],
 ]
 
 BIOLOGIC_BASE_TERM_SETS: list[list[str]] = [

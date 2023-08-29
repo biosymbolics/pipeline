@@ -1,3 +1,4 @@
+from functools import partial
 from typing import TypedDict
 import polars as pl
 import math
@@ -13,6 +14,43 @@ ExplainedScore = TypedDict("ExplainedScore", {"explanation": str, "score": float
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def calc_patent_score(attributes: list[str], score_map: SuitabilityScoreMap) -> float:
+    """
+    Calculate the patent score based on its attributes.
+    Uses softmax-like normalization.
+    """
+    # math.exp(0) == 1, so we need to add a score for missing attributes
+    # (otherwise negative-scored patents will appear more suitable)
+    missing_attr_score = len(score_map.keys()) - len(attributes)
+
+    score: float = (
+        sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
+        + missing_attr_score
+    )
+    total_possible: float = sum(map(math.exp, score_map.values()))
+
+    # if no attributes, let's give it a small non-zero score
+    score = (score / total_possible) if len(attributes) > 0 else 0.1
+
+    return score
+
+
+def calc_and_explain_patent_score(
+    attributes: list[str], score_map: SuitabilityScoreMap
+) -> ExplainedScore:
+    """
+    Calculate the patent score & generate explanation
+    """
+    upper_attributes = [attr.upper() for attr in attributes]
+    score = calc_patent_score(upper_attributes, score_map)
+    explanations = [
+        f"{attr}: {score_map.get(attr, 0)}"
+        for attr in upper_attributes
+        if attr in score_map
+    ]
+    return {"score": score, "explanation": ", ".join(explanations)}
 
 
 def score_patents(
@@ -34,34 +72,11 @@ def score_patents(
         pl.DataFrame: The DataFrame with the patent scores and explanations.
     """
 
-    def __calc_score(attributes: list[str]) -> float:
-        """
-        Calculate the patent score based on its attributes.
-        Uses softmax-like normalization.
-        """
-        score: float = sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
-        total_possible: float = sum(map(math.exp, score_map.values()))
-        # if no attributes, let's give it a small non-zero score
-        score = score / total_possible if len(attributes) > 0 else 0.1
-
-        return score
-
-    def __score_and_explain(attributes: list[str]) -> ExplainedScore:
-        """
-        Calculate the patent score & generate explanation
-        """
-        upper_attributes = [attr.upper() for attr in attributes]
-        score = __calc_score(upper_attributes)
-        explanations = [
-            f"{attr}: {score_map.get(attr, 0)}"
-            for attr in upper_attributes
-            if attr in score_map
-        ]
-        return {"score": score, "explanation": ", ".join(explanations)}
-
     # score and explanation are in the same column, so we need to unnest
     df = df.with_columns(
-        pl.col(attributes_column).apply(__score_and_explain).alias("result")
+        pl.col(attributes_column)
+        .apply(partial(calc_and_explain_patent_score, score_map=score_map))
+        .alias("result")
     ).unnest("result")
 
     # multiply score by pct patent life remaining

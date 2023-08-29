@@ -63,6 +63,7 @@ def search(
     max_results: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
     skip_cache: bool = False,
+    is_exhaustive: bool = False,
 ) -> Sequence[PatentApplication]:
     """
     Search patents by terms
@@ -78,6 +79,7 @@ def search(
         max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         is_randomized (bool, optional): whether to randomize results. Defaults to False.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
+        is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
 
     Returns: a list of matching patent applications
 
@@ -93,6 +95,7 @@ def search(
         "min_patent_years": min_patent_years,
         "max_results": max_results,
         "is_randomized": is_randomized,
+        "is_exhaustive": is_exhaustive,
     }
     key = get_id(args)
     search_partial = partial(_search, **args)

@@ -252,7 +252,7 @@ COMPANY_MAP = {
 }
 
 PATENT_ATTRIBUTE_MAP = {
-    "COMBINATION": ["combination"],
+    "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [
         *MOA_ACTIONS,
         "composition",
@@ -265,51 +265,95 @@ PATENT_ATTRIBUTE_MAP = {
         "molecule",
         "receptor",
         "substitute",
-        "therapy",  # TODO: will probably over-match
         "therapeutic",  # TODO: will probably over-match
+    ],
+    "DEVICE": [
+        "apparatus",
+        "computer",
+        "device",
+        "implant",
+        "instrument",
+        "prosthesis",
+        "scan",
+        "sensor",
+        "stent",
     ],
     "DIAGNOSTIC": [
         "analysis",
+        "biomaker",  # IRL
         "biomarker",
+        "biometric",
+        "biopsy",
+        "characterize",
         "diagnosis",
         "diagnostic",
         "diagnose",
-        "biomarker",
         "detection",
         "imaging",
+        "in vitro",
+        "in vivo",
         "marker",
         "monitoring",
-        "mouse",  # in vivo models
+        "mouse",
         "predict",
         "prognosis",
         "prognostic",  # needed?
-        # "risk score",
+        "risk score",
         "scan",
         "sensor",
         "testing",
     ],
     "DISEASE_MODIFYING": [
-        # "disease modifying",
-        # "disease-modifying",
+        "disease modifying",
+        "disease-modifying",
     ],
     "FORMULATION": ["formulation", "form", "salt"],
-    "METHOD": ["method", "procedure"],  # preparation method, method of use
+    "IRRELEVANT": [
+        "veterinary",
+        "animal",
+        "nutritional",
+        "food supplement",
+        "primate",
+        "traditional",
+    ],
+    "METHOD": ["method", "procedure", "preparation method", "method of use"],
+    "METHOD_OF_ADMINISTRATION": [
+        "delivery",
+        "dosing",
+        "kit",
+        "regimen",
+        "administration",
+    ],
     "NOVEL": ["novel"],
+    "PALLIATIVE": [
+        "palliative",
+        "reduction in symptoms",
+        "supportive",
+        "symptom management",
+        "symptom relief",
+        "symptom relief",
+    ],
     "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
+    "PROCEDURE": [
+        "procedure",
+        "surgery",
+        "surgical",
+    ],
     "PROCESS": [
+        "manufacture",
         "preparation",
         "process",
         "synthesis",
         "system",
         "produce",
-    ],  # method of making, method for producing
-    "PALLIATIVE": [
-        "palliative",
-        # "reduction in symptoms",
-        "supportive",
-        # "symptom management",
-        # "symptom relief",
-        # "symptom relief"
+        "method of making",
+        "method for producing",
+        "production method",
+    ],
+    "TREATMENT": [
+        "treatment",
+        "therapeutic",
+        "therapy",
     ],
 }
 
@@ -318,17 +362,20 @@ PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "COMBINATION": 0,
-    "COMPOUND_OR_MECHANISM": 2,
+    "COMPOUND_OR_MECHANISM": 3,
+    "DEVICE": -2,
     "DIAGNOSTIC": -1.5,
-    "DISEASE_MODIFYING": 1,
-    "FORMULATION": -0.5,
+    "DISEASE_MODIFYING": 1.5,
+    "FORMULATION": -0.25,
+    "IRRELEVANT": -5,
+    "METHOD": -0.25,  # really only a prob if not COM
+    "METHOD_OF_ADMINISTRATION": -0.5,
     "NOVEL": 1.5,
     "PALLIATIVE": 0,
-    "PREPARATION": -1,
     "PREVENTATIVE": 1,
+    "PROCEDURE": -1.5,
     "PROCESS": -1,
-    "METHOD": -1.5,
-    "TREATMENT": 0,
+    "TREATMENT": 1,
 }
 
 
