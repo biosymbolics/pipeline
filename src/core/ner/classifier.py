@@ -49,6 +49,7 @@ def classify_string(
     """
     Classify a string by keywords + lookup map.
     Assumes lookup map has lemmatized keywords.
+    Sorts for consistency.
 
     Args:
         string (str): string to classify
@@ -57,7 +58,7 @@ def classify_string(
     """
     tokens = Spacy.nlp(string.lower())
     categories = [lookup_map.get(token.lemma_, nx_name) for token in tokens]
-    return dedup(compact(categories))
+    return sorted(dedup(compact(categories)))
 
 
 def classify_by_keywords(
@@ -68,6 +69,7 @@ def classify_by_keywords(
     """
     Classify a string by keywords + keyword map.
     Uses lemmatization.
+    Output indexed by input
 
     Args:
         strings (list[str]): strings to classify

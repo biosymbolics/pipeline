@@ -252,7 +252,7 @@ COMPANY_MAP = {
 }
 
 PATENT_ATTRIBUTE_MAP = {
-    "COMBINATION": ["combination"],
+    "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [
         *MOA_ACTIONS,
         "composition",
@@ -265,10 +265,11 @@ PATENT_ATTRIBUTE_MAP = {
         "molecule",
         "receptor",
         "substitute",
-        "therapy",  # TODO: will probably over-match
         "therapeutic",  # TODO: will probably over-match
     ],
     "DEVICE": [
+        "apparatus",
+        "computer",
         "device",
         "implant",
         "instrument",
@@ -279,11 +280,14 @@ PATENT_ATTRIBUTE_MAP = {
     ],
     "DIAGNOSTIC": [
         "analysis",
+        "biomaker",  # IRL
         "biomarker",
+        "biometric",
+        "biopsy",
+        "characterize",
         "diagnosis",
         "diagnostic",
         "diagnose",
-        "biomarker",
         "detection",
         "imaging",
         "marker",
@@ -302,7 +306,22 @@ PATENT_ATTRIBUTE_MAP = {
         # "disease-modifying",
     ],
     "FORMULATION": ["formulation", "form", "salt"],
+    "IRRELEVANT": [
+        # complentary and alternative medicine
+        "veterinary",
+        "animal",
+        "nutritional",
+        "primate",
+        "traditional",
+    ],
     "METHOD": ["method", "procedure"],  # preparation method, method of use
+    "METHOD_OF_ADMINISTRATION": [
+        "delivery",  # drurg delivery
+        "dosing",
+        "kit",
+        "regimen",
+        "administration",
+    ],
     "NOVEL": ["novel"],
     "PALLIATIVE": [
         "palliative",
@@ -319,12 +338,13 @@ PATENT_ATTRIBUTE_MAP = {
         "surgical",
     ],
     "PROCESS": [
+        "manufacture",
         "preparation",
         "process",
         "synthesis",
         "system",
         "produce",
-    ],  # method of making, method for producing
+    ],  # method of making, method for producing, production method
     "TREATMENT": [
         "treatment",
         "therapeutic",
@@ -337,12 +357,14 @@ PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "COMBINATION": 0,
-    "COMPOUND_OR_MECHANISM": 2,
+    "COMPOUND_OR_MECHANISM": 3,
     "DEVICE": -2,
     "DIAGNOSTIC": -1.5,
     "DISEASE_MODIFYING": 1.5,
     "FORMULATION": -0.25,
-    "METHOD": -1.5,
+    "IRRELEVANT": -5,
+    "METHOD": -0.25,  # really only a prob if not COM
+    "METHOD_OF_ADMINISTRATION": -0.5,
     "NOVEL": 1.5,
     "PALLIATIVE": 0,
     "PREVENTATIVE": 1,
