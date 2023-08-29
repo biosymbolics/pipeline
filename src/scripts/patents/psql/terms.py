@@ -14,7 +14,7 @@ from utils.list import dedup
 from .biosym_annotations import populate_working_biosym_annotations
 
 from .._constants import SYNONYM_MAP
-from ..utils import clean_assignees
+from ..utils import clean_owners
 
 TERMS_FILE = "terms.json"
 
@@ -132,8 +132,8 @@ class TermAssembler:
         Aggregates terms by term and canonical id
         """
         # sort required for groupby
-        sorted_terms = sorted(terms, key=lambda row: row["term"].lower())
-        grouped_terms = groupby(sorted_terms, key=lambda row: row["term"].lower())
+        sorted_terms = sorted(terms, key=lambda row: row["term"])
+        grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
 
         def __get_term_record(_group) -> AggregatedTermRecord:
             group = list(_group)
@@ -165,19 +165,18 @@ class TermAssembler:
             group by name
         """
         rows = self.client.select(owner_query)
-        names = [row["name"] for row in rows]
-        cleaned = clean_assignees(names)
+        owners = clean_owners([row["name"] for row in rows])
 
         normalized: list[TermRecord] = [
             {
-                "term": assignee if row["domain"] == "assignees" else row["name"],
+                "term": owner,
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
                 "original_term": row["name"],
                 "original_id": None,
             }
-            for row, assignee in zip(rows, cleaned)
+            for row, owner in zip(rows, owners)
         ]
 
         terms = TermAssembler.__aggregate(

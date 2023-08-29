@@ -21,15 +21,15 @@ EXCEPTION_TERMS = [
 ]
 
 
-def clean_assignees(assignees: list[str]) -> Iterable[str]:
+def clean_owners(owners: list[str]) -> Iterable[str]:
     """
-    Clean an assignee name
+    Clean owner names
     - removes suppressions
     - removes 2x+ and trailing spaces
     - title cases
 
     Args:
-        assignees (list[str]): List of assignee names
+        owners (list[tuple[str, str]]): List of owner names
     """
 
     def remove_suppressions(terms: list[str], only_definite=False) -> Iterable[str]:
@@ -112,8 +112,8 @@ def clean_assignees(assignees: list[str]) -> Iterable[str]:
         # handle_exception, # TODO
         title,
     ]
-    cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, assignees))
-    lookup_map = dict(zip(cleaned, assignees))
+    cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
+    lookup_map = dict(zip(cleaned, owners))
 
     rewrites = rewrite(cleaned, lookup_map)
     return rewrites
