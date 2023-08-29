@@ -22,6 +22,8 @@ docker tag biosym_lambda-repo:chat_torch_latest 469840476741.dkr.ecr.us-east-1.a
 docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 ```
 
+### Running locally
+- `sls offline`
 
 ### Deploy
 
