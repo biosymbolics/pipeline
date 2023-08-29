@@ -10,14 +10,11 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   timeout: 300
-  ecr:
-    images:
-      chat_torch_container:
-        # platform: linux/amd64
-        # 469840476741 / ${AWS::AccountId}
-        # 'docker builder prune -a
-        uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
-        # path: ./
+  # ecr:
+  #   images:
+  #     chat_torch_container:
+  #       # 'docker builder prune -a
+  #       uri: 469840476741.dkr.ecr.${self:provider.region}.amazonaws.com/biosym_lambda-repo:chat_torch_latest
   vpc:
     securityGroupIds:
       - Ref: LambdaSecurityGroup
@@ -76,7 +73,6 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.search
-    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   autocomplete-patents:
@@ -95,7 +91,6 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.reports.summarize
-    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   patents-over-time:
@@ -105,7 +100,6 @@ functions:
           method: get
           cors: true
     handler: src.handlers.patents.reports.aggregate_over_time
-    url: true
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:
@@ -115,8 +109,6 @@ functions:
           path: terms/describe
           method: get
           cors: true
-    url:
-      invokeMode: RESPONSE_STREAM
     handler: src.handlers.patents.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer
@@ -140,8 +132,6 @@ functions:
           path: clindev/predict/timelines
           method: get
           cors: true
-    url:
-      invokeMode: RESPONSE_STREAM
     handler: src.handlers.clindev.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer
