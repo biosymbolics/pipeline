@@ -133,7 +133,7 @@ class PsqlDatabaseClient(DatabaseClient):
     ) -> ExecuteResult:
         if ignore_error:
             logger.info("Acceptable error executing query: %s", e)
-            return {"data": [], "columns": []}
+            return {"data": [], "columns": {}}
         elif isinstance(e, NoResults):
             logger.debug("No results executing query (not an error)")
         else:
@@ -144,7 +144,7 @@ class PsqlDatabaseClient(DatabaseClient):
             raise e
 
         self.client.put_conn(conn)
-        return {"data": [], "columns": []}
+        return {"data": [], "columns": {}}
 
     @overrides(DatabaseClient)
     def execute_query(
@@ -187,7 +187,14 @@ class PsqlDatabaseClient(DatabaseClient):
                     raise NoResults("Query returned no rows")
 
                 data = list(cursor.fetchall())
-                columns = [desc[0] for desc in (cursor.description or [])]
+                columns = dict(
+                    [
+                        (desc.name, desc._type_display())
+                        for desc in (cursor.description or [])
+                    ]
+                )
+
+                print(cursor.description, columns)
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
             except Exception as e:
@@ -206,7 +213,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 cursor.executemany(query, values)  # type: ignore
                 conn.commit()
                 self.client.put_conn(conn)
-                return {"data": [], "columns": columns}
+                return {"data": [], "columns": {}}
             except Exception as e:
                 return self.handle_error(conn, e, is_rollback=True)
 
