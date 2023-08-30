@@ -966,26 +966,43 @@ if __name__ == "__main__":
     """
     Checks:
 
-    08/17/2023, after
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398)
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723)
-    select count(*) from biosym_annotations where domain<>'attributes' and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428)
-    select count(*) from biosym_annotations where domain<>'attributes' and term<>'';
-    (3,748,417 -> 3,748,417)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
+    (556,711 -> 567,398 -> 908,930)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
+    (2,555,158 -> 2,539,723 -> 3,697,848)
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
+    (2,812,965 -> 2,786,428 -> 4,405,141)
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
+    (3,748,417 -> 3,748,417 -> 5,552,648)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3032462
     compounds  | 1474950
     diseases   |  829121
     mechanisms | 1444346
+    --
+    assignees  | 3288088
+    attributes | 3021418
+    compounds  | 3056458
+    diseases   | 1776624
+    inventors  | 3984539
+    mechanisms | 3895219
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206)
+    (14,910 -> 15,206 -> 37,283)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039)
+    (38,315 -> 39,039 -> 76,872)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715)
+    (70,439 -> 69,715 -> 103,874)
+
+    alter table annotations ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM annotations
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
+            ORDER BY id ) AS row_num
+            FROM annotations ) t
+            WHERE t.row_num > 1 );
     """
     if "-h" in sys.argv:
         print(

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    # "biosym_annotations_source": None,
+    "biosym_annotations_source": None,
     APPLICATIONS_TABLE: "priority_date",  # shard by priority date
 }
 

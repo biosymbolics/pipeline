@@ -42,8 +42,10 @@ def copy_trials():
     """
 
     source_sql = f"""
-        select {", ".join(FIELDS)}
-        from studies, interventions
+        select {", ".join(FIELDS)},
+        from
+        studies,
+        interventions
         where studies.nct_id = interventions.nct_id
         AND study_type = 'Interventional'
         AND interventions.intervention_type = 'Drug'
@@ -77,14 +79,34 @@ if __name__ == "__main__":
 
 
 """
-        select
-            (array_agg(studies.nct_id))[1] as nct_id, (array_agg(studies.source))[1] as sponsor,
-            (array_agg(studies.start_date))[1] as start_date, (array_agg(studies.completion_date))[0] as end_date,
-            array_agg(interventions.name) as intervention_names
-        from studies, interventions
-        where studies.nct_id = interventions.nct_id
-        AND study_type = 'Interventional'
-        AND interventions.intervention_type = 'Drug'
-        AND interventions.name <> 'Placebo'
-        group by studies.nct_id
+select * from trials t, aggregated_annotations anns where t.sponsor=any(anns.terms) and anns.terms && lower(t.intervention_names::text[]) limit 100;
+
+
+select
+LOWER(case when syn_map.term is null then intervention else syn_map.term end) as intervention_name,
+t.nct_id, t.sponsor, anns.publication_number
+from
+trials t,
+annotations anns,
+aggregated_annotations aaggs,
+unnest(t.intervention_names) as intervention
+LEFT JOIN synonym_map syn_map on syn_map.synonym = lower(intervention)
+where
+anns.publication_number = aaggs.publication_number
+and t.sponsor=anns.term and anns.domain='assignees'
+and LOWER(case when syn_map.term is null then intervention else syn_map.term end) = any(aaggs.terms)
+;
+
+
+select
+LOWER(case when syn_map.term is null then intervention else syn_map.term end) as intervention_name,
+t.nct_id, t.sponsor, aaggs.publication_number
+from
+trials t,
+aggregated_annotations aaggs,
+unnest(t.intervention_names) as intervention
+LEFT JOIN synonym_map syn_map on syn_map.synonym = lower(intervention)
+where
+LOWER(case when syn_map.term is null then intervention else syn_map.term end) = any(aaggs.terms)
+;
 """
