@@ -46,7 +46,7 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         suppress_re = r"\b" + get_or_re(suppressions) + r"\b"
 
         for term in terms:
-            yield re.sub("(?i)" + suppress_re, "", term, flags=re.DOTALL).rstrip(
+            yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
                 "&[ ]*"
             )
 
@@ -56,7 +56,10 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         """
         to_check = [clean_assignee, og_assignee]
         has_mapping = any(
-            [re.findall("(?i)" + r"\b" + key + r"\b", check) for check in to_check]
+            [
+                re.findall(r"\b" + key + r"\b", check, flags=re.IGNORECASE)
+                for check in to_check
+            ]
         )
         if has_mapping:
             return key
@@ -74,7 +77,10 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
                 _assignee = assignee
                 for term in terms_to_rewrite:
                     _assignee = re.sub(
-                        rf"\y{term}\y", f" {OWNER_TERM_MAP[term]} ", cleaned
+                        rf"\y{term}\y",
+                        f" {OWNER_TERM_MAP[term]} ",
+                        cleaned,
+                        flags=re.DOTALL | re.IGNORECASE,
                     ).strip()
                 return _assignee
 
