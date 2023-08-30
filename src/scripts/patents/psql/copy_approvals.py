@@ -62,7 +62,7 @@ def main():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 copy_psql.py\nCopies psql data to BigQuery")
+        print("Usage: python3 copy_psql.py\nCopies approvals data to postgres")
         sys.exit()
 
     main()

@@ -251,6 +251,12 @@ COMPANY_MAP = {
     "dow": "Dow",
 }
 
+OWNER_TERM_MAP = {
+    "lab": "laboratory",
+    "labs": "laboratories",
+    "univ": "university",
+}
+
 PATENT_ATTRIBUTE_MAP = {
     "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [

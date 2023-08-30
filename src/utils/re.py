@@ -3,7 +3,7 @@ Regex utilities
 """
 
 import re
-from typing import Iterable, Literal, Optional, Union
+from typing import Iterable, Literal, Optional, Sequence, Union
 
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
@@ -23,7 +23,7 @@ ReCount = Union[Literal["*", "+", "?"], int]
 
 
 def get_or_re(
-    re_strs: list[str], count: Optional[ReCount] = None, upper: Optional[int] = None
+    re_strs: Sequence[str], count: Optional[ReCount] = None, upper: Optional[int] = None
 ) -> str:
     """
     Gets a regex that ORs a list of regexes

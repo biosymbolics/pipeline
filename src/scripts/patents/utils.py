@@ -8,6 +8,7 @@ from constants.patents import (
     COMPANY_MAP,
     COMPANY_SUPPRESSIONS,
     COMPANY_SUPPRESSIONS_DEFINITE,
+    OWNER_TERM_MAP,
 )
 
 
@@ -61,7 +62,28 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
             return key
         return None
 
-    def rewrite(assignees: list[str], lookup_map) -> Iterable[str]:
+    def normalize_terms(assignees: list[str]) -> Iterable[str]:
+        """
+        Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "uni")
+        """
+        term_map_set = set(OWNER_TERM_MAP.keys())
+
+        def __normalize(cleaned: str):
+            terms_to_rewrite = list(term_map_set.intersection(cleaned.split()))
+            if len(terms_to_rewrite) > 0:
+                _assignee = assignee
+                for term in terms_to_rewrite:
+                    _assignee = re.sub(
+                        rf"\y{term}\y", f" {OWNER_TERM_MAP[term]} ", cleaned
+                    ).strip()
+                return _assignee
+
+            return assignee
+
+        for assignee in assignees:
+            yield __normalize(assignee)
+
+    def rewrite_by_lookup(assignees: list[str], lookup_map) -> Iterable[str]:
         def __map(cleaned: str):
             og_assignee = lookup_map[cleaned]
             mappings = [
@@ -79,41 +101,17 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         for assignee in assignees:
             yield __map(assignee)
 
-    def handle_exception(terms: list[str]) -> Iterable[str]:
-        """
-        Avoid reducing names to near nothing
-        e.g. "Med Inst", "Lt Mat"
-        TODO: make longer (4-5 chars) but check for common word or not
-        """
-        exceptions = [
-            (len(term) < 3 or term.lower() in EXCEPTION_TERMS) for term in terms
-        ]
-
-        if not any(exceptions):
-            return terms
-
-        steps = [
-            partial(remove_suppressions, only_definite=True),
-            remove_extra_spaces,
-        ]
-        for term, is_exception in zip(terms, exceptions):
-            _term = reduce(
-                lambda x, func: (func(x) if is_exception else term), steps, term
-            )
-            yield _term
-
     def title(assignees: list[str]) -> Iterable[str]:
         for assignee in assignees:
             yield assignee.title()
 
     cleaning_steps = [
         remove_suppressions,
+        normalize_terms,  # order matters
         remove_extra_spaces,
-        # handle_exception, # TODO
         title,
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
     lookup_map = dict(zip(cleaned, owners))
 
-    rewrites = rewrite(cleaned, lookup_map)
-    return rewrites
+    return rewrite_by_lookup(cleaned, lookup_map)
