@@ -258,7 +258,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.info("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
@@ -339,9 +339,6 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
-
-    TODO:
-    - antiil36r antibody / {"anti-il-36r antibody","anti-il-36r antibodies"}
     """
     nlp = Spacy.get_instance()
 
