@@ -7,14 +7,14 @@ from typing_extensions import NotRequired
 
 class BasePatentSearchParams(TypedDict):
     min_patent_years: NotRequired[int]
-    max_results: NotRequired[int]
+    limit: NotRequired[int]
 
 
 class PatentSearchParams(BasePatentSearchParams):
-    is_exhaustive: NotRequired[str]
+    is_exhaustive: NotRequired[str | bool]
     terms: str
     domains: NotRequired[str]
-    skip_cache: NotRequired[str]
+    skip_cache: NotRequired[str | bool]
 
 
 class ParsedPatentSearchParams(BasePatentSearchParams):

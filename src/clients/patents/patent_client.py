@@ -60,7 +60,7 @@ def search(
     terms: Sequence[str],
     domains: Sequence[str] | None = None,
     min_patent_years: int = 10,
-    max_results: int = MAX_SEARCH_RESULTS,
+    limit: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
     skip_cache: bool = False,
     is_exhaustive: bool = False,
@@ -76,7 +76,7 @@ def search(
         terms (Sequence[str]): list of terms to search for
         domains (Sequence[str], optional): list of domains to filter on. Defaults to None.
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        max_results (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         is_randomized (bool, optional): whether to randomize results. Defaults to False.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
         is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
@@ -93,7 +93,6 @@ def search(
         "terms": terms,
         "domains": domains,
         "min_patent_years": min_patent_years,
-        "max_results": max_results,
         "is_randomized": is_randomized,
         "is_exhaustive": is_exhaustive,
     }
@@ -101,16 +100,16 @@ def search(
     search_partial = partial(_search, **args)
 
     if skip_cache:
-        return search_partial()
+        return search_partial(limit=limit)
 
-    return retrieve_with_cache_check(search_partial, key=key)
+    return retrieve_with_cache_check(search_partial, key=key, limit=limit)
 
 
 def __get_query_pieces(
     terms: list[str],
     domains: Sequence[str] | None,
     min_patent_years: int,
-    max_results: int,
+    limit: int,
     is_exhaustive: bool = False,
 ) -> QueryPieces:
     """
@@ -135,7 +134,7 @@ def __get_query_pieces(
         "where": f"""
             WHERE priority_date > '{max_priority_date}'::date
             ORDER BY randomizer desc, priority_date desc
-            limit {max_results}
+            limit {limit}
         """,
         "match_condition": f"""
             terms @> %s -- terms contains all input terms
@@ -173,7 +172,7 @@ def _search(
     terms: Sequence[str],
     domains: Sequence[str] | None = None,
     min_patent_years: int = 10,
-    max_results: int = MAX_SEARCH_RESULTS,
+    limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
     is_randomized: bool = False,
 ) -> Sequence[PatentApplication]:
@@ -196,9 +195,7 @@ def _search(
         ]
     )
 
-    qp = __get_query_pieces(
-        terms, domains, min_patent_years, max_results, is_exhaustive
-    )
+    qp = __get_query_pieces(terms, domains, min_patent_years, limit, is_exhaustive)
 
     query = f"""
         SELECT {", ".join(fields)}, terms, domains
