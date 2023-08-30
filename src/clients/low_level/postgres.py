@@ -271,3 +271,31 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         for index_def in index_defs:
             self.create_index(index_def)
+
+    @staticmethod
+    def copy_between_db(
+        source_db: str, source_sql: str, dest_db: str, dest_table_name: str
+    ):
+        """
+        Copy data from one psql db to another
+
+        Args:
+            source_db (str): source db name
+            source_sql (str): source sql query
+            dest_db (str): destination db name
+            dest_table (str): destination table name
+        """
+        dest_client = PsqlDatabaseClient(dest_db)
+        source_client = PsqlDatabaseClient(source_db)
+
+        # pull records from source db
+        results = source_client.execute_query(source_sql)
+        records = [dict(row) for row in results["data"]]
+
+        # recreate
+        dest_client.create_table(
+            dest_table_name, results["columns"], exists_ok=True, truncate_if_exists=True
+        )
+
+        # add records
+        dest_client.insert_into_table(records, dest_table_name)
