@@ -194,7 +194,6 @@ class PsqlDatabaseClient(DatabaseClient):
                     ]
                 )
 
-                print(cursor.description, columns)
                 self.client.put_conn(conn)
                 return {"data": data, "columns": columns}
             except Exception as e:

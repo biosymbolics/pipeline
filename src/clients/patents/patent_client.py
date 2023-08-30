@@ -231,28 +231,21 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
         string (str): string to search for
 
     Returns: a list of matching terms
-
-    TODO: tsvector
     """
     start = time.time()
 
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
-    search_sql = f".*{string}.*"
+    search_sql = f"{string}:*"
     query = f"""
         SELECT DISTINCT ON (count, term) terms.term, count
         FROM terms
-        LEFT JOIN synonym_map ON terms.term = synonym_map.synonym
-        WHERE (
-            terms.term ~* %s
-            OR
-            synonym ~* %s
-        )
+        WHERE text_search @@ to_tsquery('english', %s)
         ORDER BY count DESC
         limit {limit}
     """
-    results = PsqlDatabaseClient().select(query, [search_sql, search_sql])
+    results = PsqlDatabaseClient().select(query, [search_sql])
     formatted = [format_term(cast(TermResult, result)) for result in results]
 
     logger.info(

@@ -116,6 +116,14 @@ class SynonymMapper:
             len(list(synonym_map.keys())),
         )
 
+    def index(self):
+        self.client.create_indices(
+            [
+                {"table": "synonym_map", "column": "synonym"},
+                {"table": "synonym_map", "column": "synonym", "is_tgrm": True},
+            ]
+        )
+
 
 class TermAssembler:
     """
@@ -252,7 +260,7 @@ class TermAssembler:
         - inserts them into a new table
         - adds synonym entries for the original terms
         """
-        table_name = "terms"
+        term_table = "terms"
         schema = {
             "term": "TEXT",
             "canonical_id": "TEXT",
@@ -260,23 +268,34 @@ class TermAssembler:
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
             "synonym_ids": "TEXT[]",
+            "text_search": "tsvector",
         }
         self.client.create_table(
-            table_name, schema, exists_ok=True, truncate_if_exists=True
+            term_table, schema, exists_ok=True, truncate_if_exists=True
         )
 
         # grab terms from annotation tables (slow!!)
         terms = self.generate_terms()
         save_json_as_file(terms, TERMS_FILE)
 
-        self.client.insert_into_table(terms, table_name)
-        self.client.create_index(
-            {"table": table_name, "column": "term", "is_tgrm": True}
+        self.client.insert_into_table(terms, term_table)
+
+        self.client.execute_query(
+            f"""
+                ALTER TABLE {term_table} ADD COLUMN text_search tsvector;
+                UPDATE {term_table} SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
+            """
         )
+
         self.client.create_indices(
             [
-                {"table": "synonym_map", "column": "synonym"},
-                {"table": "synonym_map", "column": "synonym", "is_tgrm": True},
+                {"table": term_table, "column": "term", "is_tgrm": True},
+                {
+                    "table": term_table,
+                    "column": "text_search",
+                    "is_gin": True,
+                    "is_lower": False,
+                },
             ]
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
@@ -291,6 +310,7 @@ class TermAssembler:
         sm = SynonymMapper(SYNONYM_MAP)
         TermAssembler().create_and_persist_terms()
         sm.add_synonyms()
+        sm.index()
 
 
 def create_patent_terms():
