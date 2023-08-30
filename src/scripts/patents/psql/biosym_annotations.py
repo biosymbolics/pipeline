@@ -861,6 +861,8 @@ def normalize_domains():
         - by rules
         - if the same term is used for multiple domains, pick the most common one
     """
+    client = DatabaseClient()
+
     mechanism_terms = [
         f"{t}s?"
         for t in [
@@ -882,7 +884,6 @@ def normalize_domains():
         f"update {WORKING_TABLE} set domain='mechanisms' where term ~* '.* factor$' and not term ~* '.*(?:risk|disease).*' and domain='diseases'",
         f"update {WORKING_TABLE} set domain='mechanisms' where term ~* 'receptors?$' and domain='diseases'",
     ]
-    client = DatabaseClient()
     for sql in queries:
         client.execute_query(sql)
 
@@ -907,6 +908,9 @@ def normalize_domains():
         FROM max_domain md
         WHERE lower(ut.term) = md.lot and ut.domain <> md.new_domain;
     """
+
+    # update is much faster w/o this index, and it isn't needed from here on out anyway
+    client.execute_query("drop index trgm_index_biosym_annotations_term")
     client.execute_query(normalize_sql)
 
 
@@ -949,11 +953,7 @@ def populate_working_biosym_annotations():
     remove_common_terms()  # remove one-off generic terms
     remove_substrings()  # less specific terms in set with more specific terms
 
-    # slow... seems to go faster with dropped tgrm / fresh btree on term
-    normalize_domains()
-
     # normalize_domains is **much** faster w/o this index
-    client.execute_query("drop index trgm_index_biosym_annotations_term")
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations

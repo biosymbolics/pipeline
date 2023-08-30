@@ -124,15 +124,7 @@ class SourceDocIndex:
 
         Args:
             query_string (str): query string
-            source (NamespaceKey): source namespace that acts as filter, e.g.
-                ``` python
-                {
-                    "company": "BIBB",
-                    "doc_source": "SEC",
-                    "doc_type": "10-K",
-                    "period": "2020-12-31",
-                }
-                ```
+            source (NamespaceKey): source namespace that acts as filter
             prompt_template (Prompt, optional): prompt. Defaults to None.
             refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """
