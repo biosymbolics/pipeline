@@ -274,7 +274,11 @@ class PsqlDatabaseClient(DatabaseClient):
 
     @staticmethod
     def copy_between_db(
-        source_db: str, source_sql: str, dest_db: str, dest_table_name: str
+        source_db: str,
+        source_sql: str,
+        dest_db: str,
+        dest_table_name: str,
+        truncate_if_exists: bool = True,
     ):
         """
         Copy data from one psql db to another
@@ -294,7 +298,10 @@ class PsqlDatabaseClient(DatabaseClient):
 
         # recreate
         dest_client.create_table(
-            dest_table_name, results["columns"], exists_ok=True, truncate_if_exists=True
+            dest_table_name,
+            results["columns"],
+            exists_ok=True,
+            truncate_if_exists=truncate_if_exists,
         )
 
         # add records
