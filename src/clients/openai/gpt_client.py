@@ -105,7 +105,8 @@ class GptApiClient:
         )
         multiple_query = " and how they relate" if len(terms) > 1 else ""
         query = f"""
-            Provide succinct, technical information about the following{context_query}{multiple_query}:
+            Provide succinct, technical information about the following{context_query}{multiple_query},
+            including wikipedia links for these and related terms in markdown:
             {", ".join(terms)}
         """
         return self.query(query)

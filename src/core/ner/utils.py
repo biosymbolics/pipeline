@@ -95,7 +95,7 @@ def get_suffix_entitiy_re(
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
 
 
-def lemmatize_tail(term: str | Doc) -> str:
+def lemmatize_tail(term: str | Doc, exception_pattern: str | None = None) -> str:
     """
     Lemmatizes the tail of a term
 
@@ -112,6 +112,9 @@ def lemmatize_tail(term: str | Doc) -> str:
     else:
         raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
+    if exception_pattern is not None and re.match(exception_pattern, doc.text):
+        return doc.text
+
     # include all tokens as-is except for the last
     tail_lemmatized = "".join(
         [
@@ -123,7 +126,9 @@ def lemmatize_tail(term: str | Doc) -> str:
     return tail_lemmatized
 
 
-def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
+def lemmatize_tails(
+    terms: list[str], n_process: int = 1, exception_pattern: str | None = None
+) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
     """
@@ -131,7 +136,7 @@ def lemmatize_tails(terms: list[str], n_process: int = 1) -> Iterable[str]:
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
-        yield lemmatize_tail(doc)
+        yield lemmatize_tail(doc, exception_pattern)
 
 
 def lemmatize_all(term: str | Doc) -> str:
@@ -253,7 +258,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logging.info("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
@@ -271,7 +276,10 @@ def __normalize_by_pos(doc: Doc):
                     return DASH
                 if (
                     next_t is not None
-                    and (next_t.pos_ == "NUM" or len(next_t.text) < 3)
+                    and (
+                        (next_t.pos_ == "NUM" or len(next_t.text) < 3)
+                        and prev_t.pos_ != "ADJ"  # avoid anti-pd1 -> antipd1
+                    )
                     and len(prev_t.text) < 5
                 ):
                     # ApoE-4 -> apoe4

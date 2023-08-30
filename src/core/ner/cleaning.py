@@ -9,6 +9,7 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
+from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS_RE
 
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
@@ -259,7 +260,11 @@ class EntityCleaner:
             format_parentheticals,  # order matters (after unwrap)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
-            partial(lemmatize_tails, n_process=n_process),
+            partial(
+                lemmatize_tails,
+                n_process=n_process,
+                exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
+            ),
             partial(normalize_by_pos, n_process=n_process),
             normalize_phrasing,  # order matters (after rearrange)
             lower,

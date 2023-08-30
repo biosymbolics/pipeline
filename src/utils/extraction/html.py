@@ -16,6 +16,13 @@ DEFAULT_REMOVE_TAGS: list[str] = [
 MAX_RECURSION_DEPTH = 100
 
 
+def join(texts, separator=" "):
+    """
+    Join a list of strings with a separator
+    """
+    return separator.join(text for text in texts if text)
+
+
 class ContentExtractor:
     """
     Content extractor for HTML
@@ -28,27 +35,19 @@ class ContentExtractor:
         """
         self.remove_tags = remove_tags or DEFAULT_REMOVE_TAGS
 
-    def __join(self, texts, separator=" "):
-        """
-        Join a list of strings with a separator
-        """
-        return separator.join(text for text in texts if text)
-
     def __table_to_text(self, node):
         """
         Convert a table to text
         """
         rows = node.find_all("tr")
-        return self.__join([self.__row_to_text(row) for row in rows], ".\n ")
+        return join([self.__row_to_text(row) for row in rows], ".\n ")
 
     def __row_to_text(self, node):
         """
         Convert a row to text
         """
         cells = node.find_all("td")
-        return self.__join(
-            [self.__text_node_to_text(cell, ", ") for cell in cells], ", "
-        )
+        return join([self.__text_node_to_text(cell, ", ") for cell in cells], ", ")
 
     def __text_node_to_text(self, node, separator=" "):
         """
@@ -79,7 +78,7 @@ class ContentExtractor:
             if not children:
                 text = self.__text_node_to_text(node)
             else:
-                text = self.__join(
+                text = join(
                     [self.__element_to_text(child, depth + 1) for child in children]
                 )
         else:

@@ -69,14 +69,14 @@ def __create_annotations_table():
                 --- biosym (our) annotations
                 SELECT
                     publication_number,
-                    LOWER(case when syn_map.term is null then ba.original_term else syn_map.term end) as term,
+                    LOWER(case when syn_map.term is null then ba.term else syn_map.term end) as term,
                     domain,
                     source,
                     character_offset_start,
                     character_offset_end
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                LEFT JOIN synonym_map syn_map ON LOWER(ba.original_term) = syn_map.synonym
-                WHERE length(ba.original_term) > 0
+                LEFT JOIN synonym_map syn_map ON LOWER(ba.term) = syn_map.synonym
+                WHERE length(ba.term) > 0
         )
         SELECT
             publication_number,
@@ -132,7 +132,7 @@ def __create_biosym_annotations_source_table():
 
     schema = {
         "publication_number": "STRING",
-        "original_term": "STRING",
+        "term": "STRING",
         "canonical_term": "STRING",
         "domain": "STRING",
         "confidence": "FLOAT",

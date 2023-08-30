@@ -16,8 +16,7 @@ from clients.llama_index.context import StorageArgs
 from clients.llama_index.types import DocMetadata
 from clients.stores import pinecone
 from utils.namespace import get_namespace_id
-from constants.core import DEFAULT_MODEL_NAME
-from core.constants import DEFAULT_ENTITY_TYPES
+from constants.core import DEFAULT_MODEL_NAME, DEFAULT_ENTITY_TYPES
 from typings.indices import LlmIndex, LlmModelType, NamespaceKey, Prompt, RefinePrompt
 
 INDEX_NAME = "source-docs"
@@ -125,15 +124,7 @@ class SourceDocIndex:
 
         Args:
             query_string (str): query string
-            source (NamespaceKey): source namespace that acts as filter, e.g.
-                ``` python
-                {
-                    "company": "BIBB",
-                    "doc_source": "SEC",
-                    "doc_type": "10-K",
-                    "period": "2020-12-31",
-                }
-                ```
+            source (NamespaceKey): source namespace that acts as filter
             prompt_template (Prompt, optional): prompt. Defaults to None.
             refine_prompt (RefinePrompt, optional): refine prompt. Defaults to None.
         """

@@ -94,12 +94,12 @@ def get_entity_indices(
     # export stored query https://console.cloud.google.com/bigquery?sq=1056123862280:06dfa28ce71c45f19755ee3d5f631843
     export_file = "ner_training.csv"
     csv_df = pl.read_csv(export_file)
-    df = csv_df.with_columns(csv_df.select(pl.struct(["text", "original_term"])
-        .apply(lambda rec: get_entity_indices(rec["text"], rec["original_term"])).alias("indices")))
+    df = csv_df.with_columns(csv_df.select(pl.struct(["text", "term"])
+        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"])).alias("indices")))
     ```
 
     To check:
-        df.filter(pl.col("indices").is_not_null()).select(pl.struct(["text", "original_term", "indices"])
+        df.filter(pl.col("indices").is_not_null()).select(pl.struct(["text", "term", "indices"])
             .apply(lambda rec: print(rec["text"][rec["indices"][1][0]:rec["indices"][1][1]] if len(rec["indices"]) > 0 else "hi"))
             .alias("check"))
 

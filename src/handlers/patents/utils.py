@@ -1,3 +1,4 @@
+import json
 from handlers.patents.types import PatentSearchParams, ParsedPatentSearchParams
 
 
@@ -9,13 +10,15 @@ def parse_params(
     domains = params.get("domains") or None
     domains_list = domains.split(";") if domains else None
 
+    is_exhaustive = json.loads(params.get("is_exhaustive", "false").lower()) or False
     min_patent_years = params.get("min_patent_years") or 10
     max_results = params.get("max_results") or default_max_results
-    skip_cache = params.get("skip_cache") or False
+    skip_cache = json.loads(params.get("skip_cache", "false").lower()) or False
 
     return {
         "terms": terms_list,
         "domains": domains_list,
+        "is_exhaustive": is_exhaustive,
         "min_patent_years": min_patent_years,
         "max_results": max_results,
         "skip_cache": skip_cache,

@@ -28,6 +28,7 @@ DEFAULT_TEXT_QA_PROMPT_TMPL = """
     Given the context information and not prior knowledge,
     provided a detailed, scientific and accurate answer to the question below.
     Format the answer in markdown, and include tables, lists and links where appropriate.
+    Tag entities (compounds, drugs and diseases) with [E].
     ---------------------
     {query_str}
     ---------------------
@@ -43,7 +44,7 @@ class AskSecClient:
     """
 
     def __init__(self):
-        self.source_index = SourceDocIndex(model_name="ChatGPT")
+        self.source_index = SourceDocIndex(model_name="GPT4")
         self.entity_index = EntityIndex(model_name="ChatGPT")
         self.source = {"doc_source": "SEC", "doc_type": "10-K"}
 
