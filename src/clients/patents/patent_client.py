@@ -237,7 +237,7 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
     def format_term(entity: TermResult) -> AutocompleteTerm:
         return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
-    search_sql = f"{string}:*"
+    search_sql = f"{' & '.join(string.split(' '))}:*"
     query = f"""
         SELECT DISTINCT ON (count, term) terms.term, count
         FROM terms
