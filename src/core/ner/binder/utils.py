@@ -141,14 +141,14 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     num_features = len(tokenized["input_ids"])  # type: ignore
     offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
 
-    def process_feature(text: str, offset_mapping, i: int):
+    def process_feature(text: str, i: int):
         sequence_ids = tokenized.sequence_ids(i)
 
         df = pl.DataFrame(
             {
-                "start": list([om[0] for om in offset_mapping[i]]),
-                "end": list([om[1] for om in offset_mapping[i]]),
-                "sequence_ids": list(sequence_ids),
+                "start": [om[0] for om in offset_mapping[i]],
+                "end": [om[1] for om in offset_mapping[i]],
+                "sequence_ids": sequence_ids,
             }
         )
 
@@ -173,7 +173,7 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
 
         return feature
 
-    features = [process_feature(text, offset_mapping, i) for i in range(num_features)]
+    features = [process_feature(text, i) for i in range(num_features)]
     return features
 
 

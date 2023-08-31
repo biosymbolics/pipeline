@@ -165,6 +165,11 @@ class BinderNlp:
             **self.__type_descriptions,
         )
 
+        if len(predictions[0]) != len(features):
+            raise ValueError(
+                f"Got {len(predictions[0])} predictions and {len(features)} features."
+            )
+
         annotations = extract_predictions(
             features, predictions.__dict__["span_scores"], self.type_map
         )
