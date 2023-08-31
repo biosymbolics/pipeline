@@ -76,9 +76,6 @@ def extract_prediction(
             offset_mapping[start][0],  # type: ignore
             offset_mapping[end][1],  # type: ignore
         )
-        print(
-            f"feat {index}, start: {start}, end: {end}, {feature['text'][start_char:end_char]}"
-        )
         pred = Annotation(
             id=f"{feature['id']}-{idx}",
             entity_type=type_map[type],
@@ -114,7 +111,8 @@ def extract_predictions(
     """
     all_predictions = flatten(
         [
-            extract_prediction(predictions[0], feature, i, type_map)
+            # span_logits = all_span_logits[feature_index] ??
+            extract_prediction(predictions[i], feature, i, type_map)
             for i, feature in enumerate(features)
         ]
     )
@@ -166,8 +164,8 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
             .to_series()
             .to_list(),
             "offset_mapping": [
-                o if sequence_ids[k] == 0 else None
-                for k, o in enumerate(offset_mapping[i])
+                om if sequence_ids[k] == 0 else None
+                for k, om in enumerate(offset_mapping[i])
             ],
         }
 
