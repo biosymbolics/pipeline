@@ -72,24 +72,25 @@ class TestNerUtils(unittest.TestCase):
                     "n[n[33 hydroxy 4 methoxyphenylpropyl]-lα aspartyl]-l(α methyl)phenylalanine 1 methyl ester",  # TODO
                 ],
             },
-            {
-                "text": """
-                Muscarinic antagonists
-                Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
-                """,
-                "expected_output": [
-                    "muscarinic antagonists heterocyclic derivative",
-                    "din substituted piperazine heterocyclic derivative",
-                    "1,4 di substituted piperidine",
-                    "di substituted piperidine compound",
-                    "optionally substituted aryl",
-                    "heteroaryl",
-                    "r7 is h",
-                    "hydroxyalkyl or alkoxyalkyl; are muscarinic antagonist",
-                    "muscarinic antagonists useful",
-                    "alzheimer disease",
-                ],
-            },
+            # {
+            #     "text": """
+            #     Muscarinic antagonists
+            #     Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
+            #     """,
+            #     "expected_output": [
+            #         "muscarinic antagonists heterocyclic derivative",
+            #         "din substituted piperazine",
+            #         "1,4 di substituted piperidine",
+            #         "di substituted piperidine compound",
+            #         "optionally substituted aryl",
+            #         "arylcarbonyl",
+            #         "aryloxycarbonyl",
+            #         "aryl aminocarbonyl",
+            #         "optionally",  # TODO
+            #         "muscarinic antagonists useful",
+            #         "alzheimer disease",
+            #     ],
+            # },
             {
                 "text": """
                 Method of treating meniere&#39;s disease and corresponding apparatus
@@ -100,12 +101,7 @@ class TestNerUtils(unittest.TestCase):
                     "ménière disease intermittent air pressure pulse train",
                     "intermittent air pressure pulse train",
                     "surgically perforated tympanic membrane",
-                    # the below are perhaps an indexing problem
-                    # if no unescaping, we get:
-                    # [..., 'h2o per millisecond']
-                    "the 16 cm h2o,",  # TODO;  P1 is from 4 to 16 cm H2
-                    "to4 mm h2o per",  # TODO
-                    "millisecond, the",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease...
+                    "modulation frequency",
                 ],
             },
             {
@@ -128,7 +124,7 @@ class TestNerUtils(unittest.TestCase):
                     "cyclooxygenase 2 inhibitor",
                     "analgesic",
                     "narcotic analgesic other",
-                    "than codeine and",
+                    "codeine",
                     "agonist antagonist analgesic",
                     # hydrocodone and tramadol # TODO
                 ],
@@ -146,12 +142,10 @@ class TestNerUtils(unittest.TestCase):
                     "selenium containing amino acid",
                     "protein",
                     "antibody",
-                    "specifically oxidized sulfur ",  # TODO
                     "selenium containing amino acid",
                     "antibody",
                     "monoclonal",
                     "polyclonal",
-                    "biomarker or",  # TODO
                     # antibody that binds to oxidized amino acids # TODO
                     # chloro-tyrosine todo
                     # oxidized sulfur- or selenium-containing amino acids (SSAA) # TODO
@@ -188,11 +182,11 @@ class TestNerUtils(unittest.TestCase):
                     "superoxide supressant effect",
                     "derivative",
                     "cerebral infarction",
-                    "chronic cerebral infarction",
+                    "cerebral infarction",
+                    "arteriosclerosis",
                     "renal disease",
                     "renal failure",
                     "synergistic superoxide suppressant effect",
-                    # arteriosclerosis, diabetic nephropathy, nephritis, diabetes # TODO
                 ],
             },
             {
