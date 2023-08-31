@@ -166,6 +166,8 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
+
+    # "useful in the treatment of disorders responsive to the (inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
     adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",

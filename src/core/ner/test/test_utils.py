@@ -236,6 +236,10 @@ class TestNerUtils(unittest.TestCase):
                 "input": "antibody against urokinase receptor",
                 "expected": "urokinase receptor antibody",
             },
+            # {
+            #     "input": "useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
+            #     "expected": "disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
+            # },
         ]
 
         for condition in test_conditions:

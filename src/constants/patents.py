@@ -1,5 +1,5 @@
+from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
-from .patterns import MOA_ACTIONS
 
 COMPOSITION_OF_MATTER_IPC_CODES = [
     "C01",  # inorganic chemistry
@@ -58,8 +58,8 @@ COMPANY_SUPPRESSIONS_DEFINITE = [
     "PATENTS",
     "THE",
     "OF$",
-    "^\\s*-",
-    "^\\s*&",
+    r"^\s*-",
+    r"^\s*&",
 ]
 
 COMPANY_SUPPRESSIONS_MAYBE = [
@@ -260,7 +260,7 @@ OWNER_TERM_MAP = {
 PATENT_ATTRIBUTE_MAP = {
     "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [
-        *MOA_ACTIONS,
+        *ALL_INTERVENTION_BASE_TERMS,
         "composition",
         "compound",
         "composition",

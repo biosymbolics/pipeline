@@ -43,7 +43,7 @@ def dedup_interactive(
         fieldnames = ["id", "company_name", "Cluster ID", "confidence_score"]
 
         writer = csv.DictWriter(f_output, fieldnames=fieldnames)
-        writer.writeheader()
+        writer.writeheader()  # # TypeError: 'int' object is not subscriptable
 
         for row in data_d:
             row_id = int(row["id"])

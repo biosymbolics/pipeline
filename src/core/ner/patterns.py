@@ -15,10 +15,12 @@ from constants.patterns import (
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
+from constants.patterns.intervention import ALL_COMPOUND_BASE_TERMS_RE
 
 from utils.re import get_or_re, wrap, ALPHA_CHARS
 from .types import SpacyPatterns
 from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
+
 
 MOA_PATTERNS: list = [
     *[
@@ -49,7 +51,7 @@ MOA_PATTERNS: list = [
                 "OP": "*",
             },
         ]
-        for moa_suffix in MOA_SUFFIXES
+        for moa_suffix in MOA_SUFFIXES  # includes ALL_BIOLOGIC_BASE_TERMS
     ],
     *[
         [
@@ -129,6 +131,7 @@ SMALL_MOLECULE_REGEXES = [
     get_suffix_entitiy_re(list(SMALL_MOLECULE_SUFFIXES.keys()), prefix_count="+"),
     get_infix_entity_re(list(SMALL_MOLECULE_INFIXES.keys()), count="+"),
     IUPAC_RE,
+    ALL_COMPOUND_BASE_TERMS_RE + ".*",
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [

@@ -671,6 +671,7 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
+    # inhibition of apoptosis signal-regulating kinase 1 (ASK1)
     def get_query(term_or_term_set: str | list[str], field: TextField):
         if isinstance(term_or_term_set, list):
             # term set
@@ -679,7 +680,7 @@ def fix_of_for_annotations():
             re_term = term_or_term_set + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+(?:(?:the|a) )?.*?)(?:and|useful|for|,|.|$)'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
             AND term ~* '^(?:{prefix_re})*{re_term}$'
@@ -828,7 +829,7 @@ def remove_common_terms():
     # regex in here, effectively ignored
     common_terms = [
         *DELETION_TERMS,
-        *flatten(INTERVENTION_BASE_TERM_SETS),
+        *flatten(INTERVENTION_BASE_TERMS),
         *INTERVENTION_BASE_TERMS,
     ]
 
@@ -993,8 +994,8 @@ if __name__ == "__main__":
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
     (70,439 -> 69,715 -> 103,874)
 
-    alter table annotations ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM annotations
+    alter table biosym_annotations_source ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM biosym_annotations_source
     WHERE id IN
         (SELECT id
         FROM

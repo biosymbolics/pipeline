@@ -16,8 +16,7 @@ SINGLE_FIELDS = {
     "studies.start_date": "start_date",
     "studies.completion_date": "end_date",  # Actual or est.
     "studies.last_update_posted_date": "last_updated_date",
-    "studies.target_duration": "duration",
-    "studies.why_stopped": "termination_reason",
+    "studies.why_stopped": "why_stopped",
     "studies.brief_title": "title",
     "studies.phase": "phase",
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
@@ -26,7 +25,7 @@ SINGLE_FIELDS = {
 }
 
 MULTI_FIELDS = {
-    "interventions.name": "intervention_names",
+    "interventions.name": "interventions",
 }
 
 SINGLE_FIELDS_SQL = [
@@ -36,7 +35,7 @@ MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.ite
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def copy_trials():
+def copy_trials(new_database: str = "patents", new_table_name: str = "aact"):
     """
     Copy patent clinical trials from ctgov to patents
     """
@@ -52,14 +51,13 @@ def copy_trials():
         AND interventions.name <> 'Placebo'
         group by studies.nct_id
     """
-    source_db = f"{BASE_DATABASE_URL}/aact"
-    dest_db = f"{BASE_DATABASE_URL}/patents"
-    dest_table_name = "trials"
+    source_db = f"{BASE_DATABASE_URL}/studies"
+    dest_db = f"{BASE_DATABASE_URL}/{new_database}"
     PsqlDatabaseClient.copy_between_db(
         source_db=source_db,
         source_sql=source_sql,
         dest_db=dest_db,
-        dest_table_name=dest_table_name,
+        dest_table_name=new_table_name,
     )
 
 
@@ -95,18 +93,5 @@ where
 anns.publication_number = aaggs.publication_number
 and t.sponsor=anns.term and anns.domain='assignees'
 and LOWER(case when syn_map.term is null then intervention else syn_map.term end) = any(aaggs.terms)
-;
-
-
-select
-LOWER(case when syn_map.term is null then intervention else syn_map.term end) as intervention_name,
-t.nct_id, t.sponsor, aaggs.publication_number
-from
-trials t,
-aggregated_annotations aaggs,
-unnest(t.intervention_names) as intervention
-LEFT JOIN synonym_map syn_map on syn_map.synonym = lower(intervention)
-where
-LOWER(case when syn_map.term is null then intervention else syn_map.term end) = any(aaggs.terms)
 ;
 """
