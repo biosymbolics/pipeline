@@ -49,13 +49,6 @@ class TestNerUtils(unittest.TestCase):
                 "text": """
                 Pharmaceutical composition in particular for preventing and treating mucositis induced by radiotherapy or chemotherapy.
                 The invention concerns a pharmaceutical composition designed to adhere to a mucous membrane in particular for preventing or treating radiotherapy-related and chemotherapy-related mucositis, induced by radiotherapy or combined radiochemotherapy, comprising an efficient amount of an antiradical compound mixed with a vehicle which is liquid at room temperature and gels at the mucous membrane temperature and capable of adhering to the mucous membrane by its gelled state.
-                 Bioenhanced formulations comprising eprosartan in oral solid dosage form.
-                                 Biomarkers for oxidative stress:
-                This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
-                This invention relates generally to methods of detecting and quantifying biomarkers of oxidative stress in proteins. The biomarker may be any amino acid that has undergone oxidation (or other modification, e.g. chloro-tyrosine, dityrosine). Emphasis is given herein on oxidized sulfur- or selenium-containing amino acids (SSAA). The biomarker of oxidative stress in proteins may be detected with an antibody that binds to oxidized amino acids, specifically oxidized sulfur- or selenium-containing amino acids. The antibody may be monoclonal or polyclonal. The presence of biomarker or amount of biomarker present in a sample may be used to aid in assessing the efficacy of environmental, nutritional and therapeutic interventions, among other uses.
-                From here, we can see that we get a set of three activation values for each chunk. These activation values are not our output probabilities yet. To transform these into output probabilities, we must apply a softmax function to the output tensor.
-                Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
-                Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
                 """,
                 "expected_output": [
                     "radiotherapy",
@@ -79,31 +72,28 @@ class TestNerUtils(unittest.TestCase):
                     "n[n[33 hydroxy 4 methoxyphenylpropyl]-lα aspartyl]-l(α methyl)phenylalanine 1 methyl ester",  # TODO
                 ],
             },
-            # {
-            #     "text": """
-            #     Muscarinic antagonists
-            #     Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
-            #     """,
-            #     "expected_output": [
-            #         "muscarinic antagonists heterocyclic derivative",
-            #         "din substituted piperazine heterocyclic derivative",
-            #         "1,4 di substituted piperidine",
-            #         "di substituted piperidine compound",
-            #         "optionally substituted aryl",
-            #         "heteroaryl",
-            #         "r7 is h",
-            #         "hydroxyalkyl or alkoxyalkyl; are muscarinic antagonist",
-            #         "muscarinic antagonists useful",
-            #         "alzheimer disease",
-            #     ],
-            # },
             {
                 "text": """
-                A method of alleviating a pain state not associated with a cough condition is provided which comprises administering a cyclooxygenase-2 inhibitor and a centrally active analgesic selected from the group consisting of a narcotic analgesic selected from the group consisitng of codeine and hydrocodone; an agonist-antagonist analgesic and tramadol. A method and analgesic composition therefor is also provided for treating all pain states which comprises administering a cyclooxygenase-2 inhibitor and a centrally acting analgesic selected from the group consisting of a narcotic analgesic other than codeine and hydrocodone; an agonist-antagonist analgesic and tramadol.
+                Muscarinic antagonists
+                Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
+                """,
+                "expected_output": [
+                    "muscarinic antagonists heterocyclic derivative",
+                    "din substituted piperazine heterocyclic derivative",
+                    "1,4 di substituted piperidine",
+                    "di substituted piperidine compound",
+                    "optionally substituted aryl",
+                    "heteroaryl",
+                    "r7 is h",
+                    "hydroxyalkyl or alkoxyalkyl; are muscarinic antagonist",
+                    "muscarinic antagonists useful",
+                    "alzheimer disease",
+                ],
+            },
+            {
+                "text": """
                 Method of treating meniere&#39;s disease and corresponding apparatus
                 In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
-                Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
-                There are disclosed certain novel compounds (including pharmaceutically acceptable salts thereof) (I) that inhibit phosphatidylinositol 3-kinase gamma (PI3Kδ) and phosphatidylinositol 3-kinase gamma (ΡΙ3Κγ) activity, to their utility in treating and/or preventing clinical conditions including respiratory diseases, such as asthma and chronic obstructive pulmonary disease (COPD), to their use in therapy, to pharmaceutical compositions containing them and to processes for preparing such compounds.
                 """,
                 "expected_output": [
                     "meniere disease",
@@ -184,18 +174,6 @@ class TestNerUtils(unittest.TestCase):
                     "inhibiting",
                     "cytokine storm related disorder",
                     # γc-family Interleukin-2 (IL-2) # TODO
-                ],
-                "t": [
-                    "antagonistic peptide targeting il2",
-                    "cytokine release syndrome",
-                    "cytokine storm associated disorder",
-                    "cytokine",
-                    "cytokine release syndrome",
-                    "cytokine storm",
-                    "modulate signaling by at least",
-                    "il15 γc cytokine family for",
-                    "inhibiting",
-                    "cytokine storm related disorder",
                 ],
             },
             {
