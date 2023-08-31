@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DOC_STRIDE = 16
-MAX_LENGTH = 500  # max??
+MAX_LENGTH = 384  # max??
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_DEVICE = "mps"
 
@@ -158,6 +158,7 @@ class BinderNlp:
         text = doc.text if isinstance(doc, Doc) else doc
         inputs = self.tokenize(text)
         features = prepare_features(text, inputs)
+        inputs.pop("overflow_to_sample_mapping")  # ugh mutation
 
         predictions = self.model(
             **inputs,

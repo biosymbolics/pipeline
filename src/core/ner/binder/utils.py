@@ -39,7 +39,7 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
 
 
 def extract_prediction(
-    span_logits, feature: Feature, type_map: dict[int, str]
+    span_logits, feature: Feature, index: int, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a single feature.
@@ -77,7 +77,7 @@ def extract_prediction(
             offset_mapping[end][1],  # type: ignore
         )
         print(
-            f"feat {idx}, start: {start}, end: {end}, {feature['text'][start_char:end_char]}"
+            f"feat {index}, start: {start}, end: {end}, {feature['text'][start_char:end_char]}"
         )
         pred = Annotation(
             id=f"{feature['id']}-{idx}",
@@ -100,7 +100,9 @@ def extract_prediction(
 
 
 def extract_predictions(
-    features: list[Feature], predictions: npt.NDArray, type_map: dict[int, str]
+    features: list[Feature],
+    predictions: npt.NDArray,
+    type_map: dict[int, str],
 ) -> list[Annotation]:
     """
     Extract predictions from a list of features.
@@ -111,7 +113,10 @@ def extract_predictions(
         type_map: the type map for reconstituting the NER types
     """
     all_predictions = flatten(
-        [extract_prediction(predictions[0], feature, type_map) for feature in features]
+        [
+            extract_prediction(predictions[0], feature, i, type_map)
+            for i, feature in enumerate(features)
+        ]
     )
 
     return all_predictions
@@ -134,19 +139,11 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     word_end_chars = [word[1] for word in word_idx]
 
     num_features = len(tokenized["input_ids"])  # type: ignore
-    offset_mapping = tokenized["offset_mapping"]
+    offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
 
     def process_feature(text: str, offset_mapping, i: int):
-        feature: Feature = {
-            "id": f"feat-{str(i + 1)}",
-            "text": text,
-            "token_start_mask": [],
-            "token_end_mask": [],
-            "offset_mapping": offset_mapping[i],
-        }
         sequence_ids = tokenized.sequence_ids(i)
 
-        # Create a DataFrame
         df = pl.DataFrame(
             {
                 "start": list([om[0] for om in offset_mapping[i]]),
@@ -155,26 +152,24 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
             }
         )
 
-        # Split offset_mapping into two separate columns for start and end
-        df = df.with_columns(
-            (
-                pl.col("start").is_in(word_start_chars)
-                & ((pl.col("sequence_ids") == 0))
-            ).alias("start_mask"),
-            (
-                pl.col("end").is_in(word_end_chars) & ((pl.col("sequence_ids") == 0))
-            ).alias("end_mask"),
-        )
-
-        print(df)
-
-        feature["token_start_mask"] = (
-            df.select(pl.col("start_mask")).to_series().to_list()
-        )
-        feature["token_end_mask"] = df.select(pl.col("end_mask")).to_series().to_list()
-        feature["offset_mapping"] = [
-            o if sequence_ids[k] == 0 else None for k, o in enumerate(offset_mapping[i])
-        ]
+        feature: Feature = {
+            "id": f"feat-{str(i + 1)}",
+            "text": text,
+            "token_start_mask": df.select(
+                pl.col("start").is_in(word_start_chars) & (pl.col("sequence_ids") == 0)
+            )
+            .to_series()
+            .to_list(),
+            "token_end_mask": df.select(
+                pl.col("end").is_in(word_end_chars) & (pl.col("sequence_ids") == 0)
+            )
+            .to_series()
+            .to_list(),
+            "offset_mapping": [
+                o if sequence_ids[k] == 0 else None
+                for k, o in enumerate(offset_mapping[i])
+            ],
+        }
 
         return feature
 
