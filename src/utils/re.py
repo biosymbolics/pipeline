@@ -74,6 +74,9 @@ def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
     Args:
         terms: list of terms from which to remove extra spaces
     """
+    if not isinstance(terms, list):
+        raise Exception("terms must be a list")
+
     extra_space_patterns = {
         r"\s{2,}": " ",
         r"\s{1,},": ",",  # e.g. to address "OPSUMIT , other product"
