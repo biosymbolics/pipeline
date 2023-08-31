@@ -90,24 +90,26 @@ class TestNerUtils(unittest.TestCase):
             #         "alzheimer disease",
             #     ],
             # },
-            # {
-            #     "text": """
-            #     Method of treating meniere&#39;s disease and corresponding apparatus
-            #     In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
-            #     """,
-            #     "expected_output": [
-            #         "meniere disease",
-            #         "ménière disease intermittent air pressure pulse train",
-            #         "intermittent air pressure pulse train",
-            #         "surgically perforated tympanic membrane",
-            #         # the below are perhaps an indexing problem
-            #         # if no unescaping, we get:
-            #         # [..., 'h2o per millisecond']
-            #         "the 16 cm h2o,",  # TODO;  P1 is from 4 to 16 cm H2
-            #         "to4 mm h2o per",  # TODO
-            #         "millisecond, the",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease...
-            #     ],
-            # },
+            {
+                "text": """
+                Method of treating meniere&#39;s disease and corresponding apparatus
+                In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
+                Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
+                A method of alleviating a pain state not associated with a cough condition is provided which comprises administering a cyclooxygenase-2 inhibitor and a centrally active analgesic selected from the group consisting of a narcotic analgesic selected from the group consisitng of codeine and hydrocodone; an agonist-antagonist analgesic and tramadol. A method and analgesic composition therefor is also provided for treating all pain states which comprises administering a cyclooxygenase-2 inhibitor and a centrally acting analgesic selected from the group consisting of a narcotic analgesic other than codeine and hydrocodone; an agonist-antagonist analgesic and tramadol.
+                """,
+                "expected_output": [
+                    "meniere disease",
+                    "ménière disease intermittent air pressure pulse train",
+                    "intermittent air pressure pulse train",
+                    "surgically perforated tympanic membrane",
+                    # the below are perhaps an indexing problem
+                    # if no unescaping, we get:
+                    # [..., 'h2o per millisecond']
+                    "the 16 cm h2o,",  # TODO;  P1 is from 4 to 16 cm H2
+                    "to4 mm h2o per",  # TODO
+                    "millisecond, the",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease...
+                ],
+            },
             {
                 "text": """
                 Cox-2 inhibitors in combination with centrally acting analgesics

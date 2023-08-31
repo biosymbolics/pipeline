@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DOC_STRIDE = 16
-MAX_LENGTH = 384  # max??
+MAX_LENGTH = 500  # max??
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_DEVICE = "mps"
 
@@ -83,8 +83,8 @@ class BinderNlp:
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
             "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-            for i in range(5)
-        ])
+            for i in range(20)
+        ]) + " and some melanoma."
         b.extract(text).ents
         ```
         """
@@ -156,8 +156,8 @@ class BinderNlp:
             doc (Union[str, Doc]): The Spacy Docs (or strings) to annotate.
         """
         text = doc.text if isinstance(doc, Doc) else doc
-        features = prepare_features(text, self.tokenize(text))
-        inputs = self.tokenize(text, {"return_tensors": "pt"})
+        inputs = self.tokenize(text)
+        features = prepare_features(text, inputs)
 
         predictions = self.model(
             **inputs,

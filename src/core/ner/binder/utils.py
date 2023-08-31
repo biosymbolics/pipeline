@@ -25,13 +25,6 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
 
     Args:
         text (str): text to generate word indices for
-
-    import re
-    from utils.re import remove_extra_spaces
-    text2=list(remove_extra_spaces([text]))[0]
-    ides = generate_word_indices(text2)
-    for s, e in ides:
-        print(text2[s:e])
     """
     word_indices = []
     token_re = re.compile(r"[\s\n]")
@@ -45,81 +38,80 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
     return word_indices
 
 
+def extract_prediction(
+    span_logits, feature: Feature, type_map: dict[int, str]
+) -> list[Annotation]:
+    """
+    Extract predictions from a single feature.
+    """
+
+    def start_end_types(
+        feature: Feature,
+    ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        """
+        Extracts predictions from the tensor
+        """
+        # https://github.com/pytorch/pytorch/issues/77764
+        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
+        token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
+        token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
+
+        # using the [CLS] logits as thresholds
+        span_preds = np.triu(cpu_span_logits > cpu_span_logits[:, 0:1, 0:1])
+
+        type_ids, start_indexes, end_indexes = (
+            token_start_mask[np.newaxis, :, np.newaxis]
+            & token_end_mask[np.newaxis, np.newaxis, :]
+            & span_preds
+        ).nonzero()
+
+        return (start_indexes, end_indexes, type_ids)
+
+    def create_annotation(start, end, type, feature: Feature, idx: int):
+        """
+        Applies offset and creates an annotation.
+        """
+        offset_mapping = feature["offset_mapping"]
+        start_char, end_char = (
+            offset_mapping[start][0],  # type: ignore
+            offset_mapping[end][1],  # type: ignore
+        )
+        print(
+            f"feat {idx}, start: {start}, end: {end}, {feature['text'][start_char:end_char]}"
+        )
+        pred = Annotation(
+            id=f"{feature['id']}-{idx}",
+            entity_type=type_map[type],
+            start_char=int(start_char),
+            end_char=int(end_char),
+            text=feature["text"][start_char:end_char],
+        )
+        return pred
+
+    start_indexes, end_indexes, type_ids = start_end_types(feature)
+
+    annotations = compact(
+        [
+            create_annotation(*tup, feature, idx)
+            for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
+        ]
+    )
+    return annotations
+
+
 def extract_predictions(
     features: list[Feature], predictions: npt.NDArray, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a list of features.
 
-    TODO: convoluted; refactor. Also might be reasonable to return Spans instead of Annotations
-
     Args:
         features: the features from which to extract predictions.
         predictions: the span predictions from the model.
         type_map: the type map for reconstituting the NER types
     """
-
-    def __extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
-        """
-        Extract predictions from a single feature.
-        """
-
-        def start_end_types(
-            span_logits: torch.Tensor, feature: Feature
-        ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
-            """
-            Extracts predictions from the tensor
-            """
-            token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
-            token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
-
-            # using the [CLS] logits as thresholds
-            span_preds = np.triu(span_logits > span_logits[:, 0:1, 0:1])
-
-            type_ids, start_indexes, end_indexes = (
-                token_start_mask[np.newaxis, :, np.newaxis]
-                & token_end_mask[np.newaxis, np.newaxis, :]
-                & span_preds
-            ).nonzero()
-
-            return (start_indexes, end_indexes, type_ids)
-
-        def create_annotation(tup: tuple[int, int, int], feature: Feature, idx: int):
-            """
-            Applies offset and creates an annotation.
-            """
-            offset_mapping = feature["offset_mapping"]
-            start_char, end_char = (
-                offset_mapping[tup[0]][0],  # type: ignore
-                offset_mapping[tup[1]][1],  # type: ignore
-            )
-            pred = Annotation(
-                id=f"{feature['id']}-{idx}",
-                entity_type=type_map[tup[2]],
-                start_char=int(start_char),
-                end_char=int(end_char),
-                text=feature["text"][start_char:end_char],
-            )
-            return pred
-
-        start_time = time.time()
-        # https://github.com/pytorch/pytorch/issues/77764
-        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
-        start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
-        logger.debug(
-            "Extracted predictions in %s seconds", round(time.time() - start_time, 2)
-        )
-
-        annotations = compact(
-            [
-                create_annotation(tup, feature, idx)
-                for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
-            ]
-        )
-        return annotations
-
     all_predictions = flatten(
-        [__extract_prediction(predictions[0], feature) for feature in features]
+        [extract_prediction(predictions[0], feature, type_map) for feature in features]
     )
 
     return all_predictions
