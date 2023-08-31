@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DOC_STRIDE = 16
-MAX_LENGTH = 128  # max??
+MAX_LENGTH = 384  # max??
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_DEVICE = "mps"
 
@@ -78,9 +78,13 @@ class BinderNlp:
             annotations (list[Annotation]): list of annotations
 
         ```
+        import system; system.initialize()
         from core.ner.binder.binder import BinderNlp
-        b = BinderNlp("binder.pt")
-        text="Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+        b = BinderNlp("models/binder.pt")
+        text="\n ".join([
+            "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+            for i in range(5)
+        ])
         b.extract(text).ents
         ```
         """
