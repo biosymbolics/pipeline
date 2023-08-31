@@ -138,7 +138,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "complex(?:e)?",
     "composition",
     "component",
-    "(?:binding )?compound",
+    "(?:binding )?(?:compound|molecule}",
     "cream",
     "derivative",
     "detergent",
