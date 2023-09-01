@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.patents.utils import clean_assignees
+from scripts.patents.utils import clean_owners
 
 
 class TestPatentScriptUtils(unittest.TestCase):
@@ -10,12 +10,16 @@ class TestPatentScriptUtils(unittest.TestCase):
                 "terms": [
                     "Pfizer Inc",
                     "Bobs Pharmacy LLC",
-                    "Bobs Pharmacy LLC INC CO",
+                    "Bobs Pharmacy LLC inc CO",
+                    "Biogen Ma",
+                    "Charles River Laboratories Inc",
                 ],
                 "expected_output": [
                     "Pfizer",
                     "Bobs Pharmacy",
                     "Bobs Pharmacy",
+                    "Biogen",
+                    "Charles River Laboratories",
                 ],
             },
         ]
@@ -24,7 +28,7 @@ class TestPatentScriptUtils(unittest.TestCase):
             terms = condition["terms"]
             expected_output = condition["expected_output"]
 
-            result = list(clean_assignees(terms))
+            result = list(clean_owners(terms))
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
