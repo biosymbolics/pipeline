@@ -2,7 +2,7 @@
 Low-level Postgres client
 """
 import time
-from typing import Any, Mapping, TypeVar
+from typing import Any, Callable, Mapping, TypeVar
 import logging
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -266,6 +266,8 @@ class PsqlDatabaseClient(DatabaseClient):
         dest_db: str,
         dest_table_name: str,
         truncate_if_exists: bool = True,
+        transform: Callable[[list[dict]], list[dict]] | None = None,
+        transform_schema: Callable[[dict], dict] | None = None,
     ):
         """
         Copy data from one psql db to another
@@ -279,14 +281,24 @@ class PsqlDatabaseClient(DatabaseClient):
         dest_client = PsqlDatabaseClient(dest_db)
         source_client = PsqlDatabaseClient(source_db)
 
-        # pull records from source db
         results = source_client.execute_query(source_sql)
-        records = [dict(row) for row in results["data"]]
 
-        # recreate
+        # transform data if method provided
+        if transform:
+            records = transform(results["data"])
+        else:
+            records = results["data"]
+
+        # transform schema if method provided
+        if transform_schema:
+            schema = transform_schema(results["columns"])
+        else:
+            schema = results["columns"]
+
+        # create table
         dest_client.create_table(
             dest_table_name,
-            results["columns"],
+            schema,
             exists_ok=True,
             truncate_if_exists=truncate_if_exists,
         )

@@ -88,7 +88,11 @@ class DatabaseClient:
         self.execute_query(query)
 
     def create_and_insert(
-        self, records: list[T], table_name: str, batch_size: int = 1000
+        self,
+        records: list[T],
+        table_name: str,
+        columns: list[str] | dict[str, str] | None = None,
+        batch_size: int = 1000,
     ):
         """
         Create a table and insert rows into it
@@ -98,8 +102,8 @@ class DatabaseClient:
             table_name (str): name of the table
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
-        columns = list(records[0].keys())
-        self.create_table(table_name, columns, exists_ok=True, truncate_if_exists=True)
+        schema = columns or list(records[0].keys())
+        self.create_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
         self.insert_into_table(records, table_name, batch_size)
 
     def insert_into_table(
@@ -128,7 +132,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        columns: list[str] | dict[str, str],
+        schema: list[str] | dict[str, str],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):
@@ -137,7 +141,7 @@ class DatabaseClient:
 
         Args:
             table_name (str): name of the table (with or without dataset prefix)
-            columns: list of column names or dict (column name -> type)
+            schema: list of column names or dict (column name -> type)
             exists_ok (bool): if True, do not raise an error if the table already exists
             truncate_if_exists (bool): if True, truncate the table if it already exists
         """
@@ -154,7 +158,7 @@ class DatabaseClient:
             else:
                 logging.info("Table %s already exists", table_name)
         else:
-            self._create(table_name, columns)
+            self._create(table_name, schema)
 
     def delete_table(self, table_name: str, is_cascade: bool = False):
         """

@@ -109,9 +109,9 @@ def l2reg_contrastive_loss(
 
 @dataclass
 class BinderModelOutput(ModelOutput):
-    start_scores: torch.FloatTensor
-    end_scores: torch.FloatTensor
-    span_scores: torch.FloatTensor
+    start_scores: torch.FloatTensor | None = None  # otherwise "should not have more than one required field" from transformers
+    end_scores: torch.FloatTensor | None = None
+    span_scores: torch.FloatTensor | None = None
     loss: Optional[torch.FloatTensor] = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
@@ -400,10 +400,10 @@ class Binder(PreTrainedModel):
             return ((total_loss,) + output) if total_loss is not None else output
 
         return BinderModelOutput(
-            loss=total_loss,
             start_scores=start_scores,
             end_scores=end_scores,
             span_scores=span_scores,
+            loss=total_loss,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )

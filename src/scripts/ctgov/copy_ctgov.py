@@ -2,13 +2,13 @@
 Utils for copying approvals data
 """
 import sys
-from core.ner.ner import NerTagger
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.postgres.postgres import PsqlDatabaseClient
+from core.ner.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
 
 SINGLE_FIELDS = {
@@ -36,31 +36,20 @@ MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.ite
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def get_trials():
+def transform_ct_records(ctgov_records):
     """
-    Copy patent clinical trials from ctgov to patents
+    Transform ctgov records
+
+    - normalizes/extracts intervention names
+
+    TODO:
+    - status
+    - ??
     """
-
-    source_sql = f"""
-        select {", ".join(FIELDS)},
-        from
-        studies,
-        interventions
-        where studies.nct_id = interventions.nct_id
-        AND study_type = 'Interventional'
-        AND interventions.intervention_type = 'Drug'
-        AND interventions.name <> 'Placebo'
-        group by studies.nct_id
-    """
-    ctgov_records = PsqlDatabaseClient(f"{BASE_DATABASE_URL}/studies").select(
-        source_sql,
-    )
-    return ctgov_records
-
-
-def normalize_trials(ctgov_records):
     tagger = NerTagger()
-    intervention_sets = [rec["interventions"] for rec in ctgov_records]
+
+    # TODO: list[list[str]]
+    intervention_sets = [" ".join((rec["interventions"])) for rec in ctgov_records]
     normalized = tagger.extract_strings(intervention_sets)
     return [
         {**rec, "intervention_names": normalized}
@@ -69,8 +58,27 @@ def normalize_trials(ctgov_records):
 
 
 def ingest_trials():
-    ctgov_records = get_trials()
-    normalized = normalize_trials(ctgov_records)
+    """
+    Copy patent clinical trials from ctgov to patents
+    """
+
+    source_sql = f"""
+        select {", ".join(FIELDS)}
+        from studies, interventions
+        where studies.nct_id = interventions.nct_id
+        AND study_type = 'Interventional'
+        AND interventions.intervention_type = 'Drug'
+        AND interventions.name <> 'Placebo'
+        group by studies.nct_id
+    """
+    PsqlDatabaseClient.copy_between_db(
+        f"{BASE_DATABASE_URL}/aact",
+        source_sql,
+        f"{BASE_DATABASE_URL}/patents",
+        "trials",
+        truncate_if_exists=True,
+        transform=lambda records: transform_ct_records(records),
+    )
 
 
 def main():
@@ -82,7 +90,7 @@ def main():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 copy_psql.py\nCopies ctgov to patents")
+        print("Usage: python3 -m scripts.ctgov.copy_ctgov\nCopies ctgov to patents")
         sys.exit()
 
     main()
