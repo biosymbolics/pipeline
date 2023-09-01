@@ -7,7 +7,7 @@ from system import initialize
 
 initialize()
 
-from clients.low_level.postgres.postgres import PsqlDatabaseClient
+from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
 
@@ -23,10 +23,12 @@ SINGLE_FIELDS = {
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
     "studies.overall_status": "status",  # vs last_known_status
     "studies.acronym": "acronym",
+    # conditions
 }
 
 MULTI_FIELDS = {
     "interventions.name": "interventions",
+    "conditions.name": "conditions",
 }
 
 SINGLE_FIELDS_SQL = [
@@ -52,7 +54,7 @@ def transform_ct_records(ctgov_records):
     intervention_sets = [" ".join((rec["interventions"])) for rec in ctgov_records]
     normalized = tagger.extract_strings(intervention_sets)
     return [
-        {**rec, "intervention_names": normalized}
+        {**rec, "interventions": normalized}
         for rec, normalized in zip(ctgov_records, normalized)
     ]
 
@@ -64,8 +66,9 @@ def ingest_trials():
 
     source_sql = f"""
         select {", ".join(FIELDS)}
-        from studies, interventions
+        from studies, interventions, conditions
         where studies.nct_id = interventions.nct_id
+        AND studies.nct_id = conditions.nct_id
         AND study_type = 'Interventional'
         AND interventions.intervention_type = 'Drug'
         AND interventions.name <> 'Placebo'
