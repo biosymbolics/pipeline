@@ -87,6 +87,21 @@ class DatabaseClient:
         logger.info("Inserting via query (%s) into table %s", query, table_id)
         self.execute_query(query)
 
+    def create_and_insert(
+        self, records: list[T], table_name: str, batch_size: int = 1000
+    ):
+        """
+        Create a table and insert rows into it
+
+        Args:
+            records (list[dict]): list of records to insert
+            table_name (str): name of the table
+            batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
+        """
+        columns = list(records[0].keys())
+        self.create_table(table_name, columns, exists_ok=True, truncate_if_exists=True)
+        self.insert_into_table(records, table_name, batch_size)
+
     def insert_into_table(
         self, records: list[T], table_name: str, batch_size: int = 1000
     ):

@@ -315,7 +315,6 @@ class NerTagger:
 
     @classmethod
     def get_instance(cls, **kwargs) -> "NerTagger":
-        # Convert kwargs to a hashable type
         args = sorted(kwargs.items())
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:

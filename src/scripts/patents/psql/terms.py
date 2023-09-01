@@ -107,7 +107,7 @@ class SynonymMapper:
                 "term": entry[1].lower(),
             }
             for entry in synonym_map.items()
-            if len(entry[1]) > 0 and len(entry[0]) > 0 and entry[0] != entry[1]
+            if len(entry[0]) > 0 and entry[0] != entry[1]
         ]
 
         self.client.insert_into_table(records, SYNONYM_TABLE_NAME)

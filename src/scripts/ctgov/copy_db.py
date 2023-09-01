@@ -2,6 +2,7 @@
 Utils for copying approvals data
 """
 import sys
+from core.ner.ner import NerTagger
 
 from system import initialize
 
@@ -35,7 +36,7 @@ MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.ite
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def copy_trials(new_database: str = "patents", new_table_name: str = "aact"):
+def get_trials():
     """
     Copy patent clinical trials from ctgov to patents
     """
@@ -51,21 +52,32 @@ def copy_trials(new_database: str = "patents", new_table_name: str = "aact"):
         AND interventions.name <> 'Placebo'
         group by studies.nct_id
     """
-    source_db = f"{BASE_DATABASE_URL}/studies"
-    dest_db = f"{BASE_DATABASE_URL}/{new_database}"
-    PsqlDatabaseClient.copy_between_db(
-        source_db=source_db,
-        source_sql=source_sql,
-        dest_db=dest_db,
-        dest_table_name=new_table_name,
+    ctgov_records = PsqlDatabaseClient(f"{BASE_DATABASE_URL}/studies").select(
+        source_sql,
     )
+    return ctgov_records
+
+
+def normalize_trials(ctgov_records):
+    tagger = NerTagger()
+    intervention_sets = [rec["interventions"] for rec in ctgov_records]
+    normalized = tagger.extract_strings(intervention_sets)
+    return [
+        {**rec, "intervention_names": normalized}
+        for rec, normalized in zip(ctgov_records, normalized)
+    ]
+
+
+def ingest_trials():
+    ctgov_records = get_trials()
+    normalized = normalize_trials(ctgov_records)
 
 
 def main():
     """
     Copy data from ctgov to patents
     """
-    copy_trials()
+    ingest_trials()
 
 
 if __name__ == "__main__":

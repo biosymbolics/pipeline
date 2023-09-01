@@ -8,6 +8,26 @@ class TermNormalizer:
     Normalizes and attempts to link entities.
     If no canonical entity found, then normalized term is returned
     Note that original term should always be preserved in order to keep association to original source.
+
+    Usage:
+        normalizer = TermNormalizer()
+        terms = normalizer.normalize([
+            "Tipranavir (TPV)",
+            "BILR 355 - D4",
+            "bivatuzumab mertansine",
+            "BIBT 986 BS - single rising dose",
+            "RDEA3170 10 mg",
+            "Minoxidil Solution 5%",
+            "ASP2151 400mg + 100mg ciclosporin",
+            "Misoprostol 600 mcg 90 minutes prior to procedure",
+            "BI 409306 10 mg QD",
+            "DA-5204",
+            "SAGE-547",
+            "GSK2838232 PIB (API)",
+            "Revusiran (ALN-TTRSC)",
+            "Placebo matching atosiban",
+        ])
+        [(t[0], t[1].name) for t in terms]
     """
 
     def __init__(self):
