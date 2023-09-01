@@ -110,7 +110,7 @@ class SynonymMapper:
         ]
 
         self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
-        logging.debug(
+        logging.info(
             "Inserted %s rows into synonym_map (%s)",
             len(records),
             len(list(synonym_map.keys())),
@@ -230,9 +230,9 @@ class TermAssembler:
 
         return TermAssembler.__aggregate(term_records)
 
-    def generate_terms(self):
+    def generate_terms(self) -> list[AggregatedTermRecord]:
         """
-        Collects and forms terms for the terms table
+        Collects and forms terms for the terms table; persists to TERMS_FILE
         From
         - biosym_annotations
         - applications (assignees + inventors)
@@ -244,17 +244,18 @@ class TermAssembler:
         entity_terms = self.__generate_entity_terms()
 
         terms = assignee_terms + entity_terms
+
+        save_json_as_file(terms, TERMS_FILE)
         return terms
 
-    def create_and_persist_terms(self):
+    def persist_terms(
+        self, existing_terms: Optional[list[AggregatedTermRecord]] = None
+    ):
         """
-        Extracts/generates terms and persists them to a table
+        Persists terms to a table
+        """
+        terms = existing_terms or load_json_from_file(TERMS_FILE)
 
-        - pulls distinct annotation and assigee values
-        - normalizes the terms
-        - inserts them into a new table
-        - adds synonym entries for the original terms
-        """
         term_table = "terms"
         schema = {
             "term": "TEXT",
@@ -269,31 +270,32 @@ class TermAssembler:
             term_table, schema, exists_ok=True, truncate_if_exists=True
         )
 
-        # grab terms from annotation tables (slow!!)
-        terms = self.generate_terms()
-        save_json_as_file(terms, TERMS_FILE)
-
         self.client.insert_into_table(terms, term_table)
 
+        # add text_search column
         self.client.execute_query(
             f"""
-                ALTER TABLE {term_table} ADD COLUMN text_search tsvector;
-                UPDATE {term_table} SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
+            UPDATE {term_table}
+            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
             """
         )
 
-        self.client.create_indices(
-            [
-                {"table": term_table, "column": "term", "is_tgrm": True},
-                {
-                    "table": term_table,
-                    "column": "text_search",
-                    "is_gin": True,
-                    "is_lower": False,
-                },
-            ]
+        self.client.create_index(
+            {
+                "table": term_table,
+                "column": "text_search",
+                "is_gin": True,
+                "is_lower": False,
+            },
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
+
+    def generate_and_persist_terms(self):
+        """
+        Generate and persist terms
+        """
+        self.generate_terms()
+        self.persist_terms()
 
     @staticmethod
     def run():
@@ -302,8 +304,8 @@ class TermAssembler:
 
         Idempotent (all tables are dropped and recreated)
         """
+        TermAssembler().generate_and_persist_terms()
         sm = SynonymMapper(SYNONYM_MAP)
-        TermAssembler().create_and_persist_terms()
         sm.add_synonyms()
         sm.index()
 
@@ -316,6 +318,6 @@ def create_patent_terms():
 
     $ jq '.[] | select(.name == "therapeutically")' terms.json
     """
-    populate_working_biosym_annotations()
+    # populate_working_biosym_annotations()
 
     TermAssembler.run()

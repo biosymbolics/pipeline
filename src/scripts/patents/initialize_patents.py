@@ -169,7 +169,8 @@ def add_application_search():
             -- consider GENERATED ALWAYS AS/STORED
             ALTER TABLE applications ADD COLUMN text_search tsvector;
             UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
-        """
+        """,
+        ignore_error=True,
     )
     client.create_index(
         {

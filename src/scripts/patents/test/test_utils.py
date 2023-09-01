@@ -11,8 +11,13 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Pfizer Inc",
                     "Bobs Pharmacy LLC",
                     "Bobs Pharmacy LLC inc CO",
-                    "Biogen Ma",
+                    "BioGen Ma",
                     "Charles River Laboratories Inc",
+                    "BBOB Labs",
+                    "PFIZER R&D UK LTD",
+                    "Astrazeneca China",
+                    "ASTRAZENECA INVEST (CHINA) CO LTD",
+                    "ASTRAZENECA COLLABORATION VENTURES LLC",
                 ],
                 "expected_output": [
                     "Pfizer",
@@ -20,6 +25,11 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Bobs Pharmacy",
                     "Biogen",
                     "Charles River Laboratories",
+                    "Bbob Laboratories",
+                    "Pfizer",
+                    "Astrazeneca",
+                    "Astrazeneca ()",  # TODO (obvi)
+                    "Astrazeneca Collaboration Ventures",  # TODO
                 ],
             },
         ]

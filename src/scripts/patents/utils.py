@@ -12,16 +12,6 @@ from constants.patents import (
 )
 
 
-EXCEPTION_TERMS = [
-    "agency",
-    "council",
-    "gen",
-    "korea",
-    "life",
-    "univ",
-]
-
-
 def clean_owners(owners: list[str]) -> Iterable[str]:
     """
     Clean owner names
@@ -50,37 +40,22 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
                 "&[ ]*"
             )
 
-    def get_mapping(clean_assignee: str, og_assignee: str, key: str) -> str | None:
-        """
-        See if there is an explicit name mapping on cleaned or original assignee
-        """
-        to_check = [clean_assignee, og_assignee]
-        has_mapping = any(
-            [
-                re.findall(r"\b" + key + r"\b", check, flags=re.IGNORECASE)
-                for check in to_check
-            ]
-        )
-        if has_mapping:
-            return key
-        return None
-
     def normalize_terms(assignees: list[str]) -> Iterable[str]:
         """
-        Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "uni")
+        Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
         """
         term_map_set = set(OWNER_TERM_MAP.keys())
 
         def __normalize(cleaned: str):
-            terms_to_rewrite = list(term_map_set.intersection(cleaned.split()))
+            terms_to_rewrite = list(term_map_set.intersection(cleaned.lower().split()))
             if len(terms_to_rewrite) > 0:
                 _assignee = assignee
                 for term in terms_to_rewrite:
                     _assignee = re.sub(
                         rf"\b{term}\b",
-                        f" {OWNER_TERM_MAP[term]} ",
+                        f" {OWNER_TERM_MAP[term.lower()]} ",
                         cleaned,
-                        flags=re.DOTALL | re.IGNORECASE,
+                        flags=re.IGNORECASE | re.DOTALL,
                     ).strip()
                 return _assignee
 
@@ -89,13 +64,32 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         for assignee in assignees:
             yield __normalize(assignee)
 
-    def rewrite_by_lookup(assignees: list[str], lookup_map) -> Iterable[str]:
+    def get_lookup_mapping(
+        clean_assignee: str, og_assignee: str, key: str
+    ) -> str | None:
+        """
+        See if there is an explicit name mapping on cleaned or original assignee
+        """
+        to_check = [clean_assignee, og_assignee]
+        has_mapping = any(
+            [
+                re.findall(rf"\b{key}\b", check, flags=re.IGNORECASE)
+                for check in to_check
+            ]
+        )
+        if has_mapping:
+            return key
+        return None
+
+    def rewrite_by_lookup(
+        assignees: list[str], cleaned_orig_map: dict[str, str]
+    ) -> Iterable[str]:
         def __map(cleaned: str):
-            og_assignee = lookup_map[cleaned]
+            og_assignee = cleaned_orig_map[cleaned]
             mappings = [
                 key
                 for key in COMPANY_MAP.keys()
-                if get_mapping(cleaned, og_assignee, key)
+                if get_lookup_mapping(cleaned, og_assignee, key)
             ]
             if len(mappings) > 0:
                 logging.debug(
@@ -118,6 +112,6 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         title,
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
-    lookup_map = dict(zip(cleaned, owners))
+    cleaned_orig_map = dict(zip(cleaned, owners))
 
-    return rewrite_by_lookup(cleaned, lookup_map)
+    return rewrite_by_lookup(cleaned, cleaned_orig_map)
