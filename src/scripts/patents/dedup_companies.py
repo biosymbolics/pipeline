@@ -1,3 +1,4 @@
+import os
 import sys
 from typing import Collection
 import csv
@@ -20,7 +21,12 @@ def dedup_interactive(
     settings_file="company_dedup_settings",
 ):
     deduper = dedupe.Dedupe(variables)
-    deduper.prepare_training(data_d)
+
+    if os.path.isfile(training_file):
+        with open(training_file) as tf:
+            deduper.prepare_training(data_d, tf)
+    else:
+        deduper.prepare_training(data_d)
     dedupe.console_label(deduper)
     deduper.train()
 
@@ -41,27 +47,28 @@ def dedup_interactive(
 
     with open(output_file, "w") as f_output:
         fieldnames = ["id", "company_name", "Cluster ID", "confidence_score"]
-
         writer = csv.DictWriter(f_output, fieldnames=fieldnames)
         writer.writeheader()  # # TypeError: 'int' object is not subscriptable
 
-        for row in data_d:
+        for row in data_d.values():
             row_id = int(row["id"])
-            row.update(cluster_membership[row_id])
+            row.update({"id": row_id, **cluster_membership[row_id]})
             writer.writerow(row)
 
 
 def dedup_companies():
     query = """
-        select distinct company_name from (
+        select lower(company_name) as company_name from (
             select distinct sponsor as company_name from trials
 
             UNION ALL
 
-            select distinct assignee.name as company_name
+            select assignee.name as company_name
             FROM applications a,
             unnest(a.assignees) as assignee
         ) s
+        group by lower(company_name)
+        having count(*) > 100
     """
     records = PsqlDatabaseClient().select(query)
     company_map = dict([(i, {**record, "id": i}) for i, record in enumerate(records)])
@@ -94,7 +101,7 @@ def main():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 dedup_companies.py")
+        print("Usage: python3 -m scripts.patents.dedup_companies")
         sys.exit()
 
     main()
