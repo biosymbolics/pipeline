@@ -74,12 +74,14 @@ def ingest_trials():
         AND interventions.name <> 'Placebo'
         group by studies.nct_id
     """
+    trial_db = f"{BASE_DATABASE_URL}/aact"
+    PsqlDatabaseClient(trial_db).truncate_table("trials")
+
     PsqlDatabaseClient.copy_between_db(
-        f"{BASE_DATABASE_URL}/aact",
+        trial_db,
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        truncate_if_exists=True,
         transform=lambda records: transform_ct_records(records),
     )
 

@@ -92,6 +92,7 @@ class DatabaseClient:
         records: list[T],
         table_name: str,
         columns: list[str] | dict[str, str] | None = None,
+        transform: Callable[[list[T]], list[T]] | None = None,
         batch_size: int = 1000,
     ):
         """
@@ -104,10 +105,14 @@ class DatabaseClient:
         """
         schema = columns or list(records[0].keys())
         self.create_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
-        self.insert_into_table(records, table_name, batch_size)
+        self.insert_into_table(records, table_name, transform, batch_size)
 
     def insert_into_table(
-        self, records: list[T], table_name: str, batch_size: int = 1000
+        self,
+        records: list[T],
+        table_name: str,
+        transform: Callable[[list[T]], list[T]] | None = None,
+        batch_size: int = 1000,
     ):
         """
         Insert rows into a table from a list of records
@@ -122,7 +127,8 @@ class DatabaseClient:
         for i, b in enumerate(batched):
             logging.debug("Inserting batch %s into table %s", i, table_name)
             try:
-                self._insert(table_name, records=b)
+                _records = transform(b) if transform else b
+                self._insert(table_name, _records)
             except Exception as e:
                 logging.error("Error inserting rows: %s", e)
                 raise e

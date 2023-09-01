@@ -282,12 +282,7 @@ class PsqlDatabaseClient(DatabaseClient):
         source_client = PsqlDatabaseClient(source_db)
 
         results = source_client.execute_query(source_sql)
-
-        # transform data if method provided
-        if transform:
-            records = transform(results["data"])
-        else:
-            records = results["data"]
+        records = results["data"]
 
         # transform schema if method provided
         if transform_schema:
