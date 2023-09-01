@@ -197,6 +197,7 @@ COUNTRIES = [
     "NA",
     "IRELAND",
     "JAPAN",
+    "MA",
     "PALO ALTO",
     "SAN DIEGO",
     "UK",
@@ -214,6 +215,7 @@ COMPANY_SUPPRESSIONS = [
 COMPANY_MAP = {
     "massachusetts inst technology": "Massachusetts Institute of Technology",
     "roche": "Roche",
+    "biogen": "Biogen",
     "boston scient": "Boston Scientific",
     "boston scimed": "Boston Scientific",
     "lilly co eli": "Eli Lilly",
