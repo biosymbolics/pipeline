@@ -92,6 +92,7 @@ class DatabaseClient:
         records: list[T],
         table_name: str,
         columns: list[str] | dict[str, str] | None = None,
+        truncate_if_exists: bool = True,
         transform: Callable[[list[T]], list[T]] | None = None,
         batch_size: int = 1000,
     ):
@@ -104,7 +105,9 @@ class DatabaseClient:
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
         schema = columns or list(records[0].keys())
-        self.create_table(table_name, schema, exists_ok=True, truncate_if_exists=True)
+        self.create_table(
+            table_name, schema, exists_ok=True, truncate_if_exists=truncate_if_exists
+        )
         self.insert_into_table(records, table_name, transform, batch_size)
 
     def insert_into_table(

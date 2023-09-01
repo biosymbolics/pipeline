@@ -290,13 +290,11 @@ class PsqlDatabaseClient(DatabaseClient):
         else:
             schema = results["columns"]
 
-        # create table
-        dest_client.create_table(
+        # add records
+        dest_client.create_and_insert(
+            records,
             dest_table_name,
             schema,
-            exists_ok=True,
             truncate_if_exists=truncate_if_exists,
+            transform=transform,
         )
-
-        # add records
-        dest_client.insert_into_table(records, dest_table_name)
