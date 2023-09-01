@@ -247,7 +247,6 @@ class NerTagger:
     def extract(
         self,
         content: list[str] | list[list[str]],
-        link: bool = True,
     ) -> list[DocEntities]:
         """
         Extract named entities from a list of content
