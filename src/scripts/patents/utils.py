@@ -12,7 +12,7 @@ from constants.patents import (
 )
 
 
-def clean_owners(owners: list[str]) -> Iterable[str]:
+def clean_owners(owners: list[str]) -> list[str]:
     """
     Clean owner names
     - removes suppressions
@@ -23,17 +23,15 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         owners (list[tuple[str, str]]): List of owner names
     """
 
-    def remove_suppressions(terms: list[str], only_definite=False) -> Iterable[str]:
+    def remove_suppressions(terms: list[str]) -> Iterable[str]:
         """
         Remove suppressions (generic terms like LLC, country, etc),
         Examples:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
         """
-        suppressions = (
-            COMPANY_SUPPRESSIONS_DEFINITE if only_definite else COMPANY_SUPPRESSIONS
-        )
-        suppress_re = r"\b" + get_or_re(suppressions) + r"\b"
+        suppressions = COMPANY_SUPPRESSIONS
+        suppress_re = rf"(?:(?:\s+|,){get_or_re(suppressions)}\b|\(.+\))"
 
         for term in terms:
             yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
@@ -81,7 +79,7 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
             return key
         return None
 
-    def rewrite_by_lookup(
+    def apply_overrides(
         assignees: list[str], cleaned_orig_map: dict[str, str]
     ) -> Iterable[str]:
         def __map(cleaned: str):
@@ -114,4 +112,11 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
     cleaned_orig_map = dict(zip(cleaned, owners))
 
-    return rewrite_by_lookup(cleaned, cleaned_orig_map)
+    final = list(apply_overrides(cleaned, cleaned_orig_map))
+
+    if len(final) != len(owners):
+        raise ValueError(
+            f"Length of cleaned assignees ({len(final)}) does not match length of original assignees ({len(owners)})"
+        )
+
+    return final

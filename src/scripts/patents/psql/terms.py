@@ -28,6 +28,7 @@ class BaseTermRecord(TypedDict):
 class TermRecord(BaseTermRecord):
     domain: str
     original_id: Optional[str]
+    original_term: Optional[str]
 
 
 class AggregatedTermRecord(BaseTermRecord):
@@ -144,7 +145,7 @@ class TermAssembler:
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
-                "synonyms": dedup([row["term"] for row in group]),
+                "synonyms": dedup([row["original_term"] for row in group]),
                 "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
@@ -175,15 +176,14 @@ class TermAssembler:
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
-                "term": row["name"],
+                "original_term": row["name"],
                 "original_id": None,
             }
             for row, owner in zip(rows, owners)
+            if len(owner) > 1
         ]
 
-        terms = TermAssembler.__aggregate(
-            [row for row in normalized if len(row["term"]) > 1]
-        )
+        terms = TermAssembler.__aggregate(normalized)
         return terms
 
     def __generate_entity_terms(self) -> list[AggregatedTermRecord]:
@@ -222,8 +222,8 @@ class TermAssembler:
                     normalization_map.get(row["term"]) or (), "concept_id", None
                 ),
                 "domain": row["domain"],
-                "term": row["term"],
-                "original_id": "",  # row["original_id"],
+                "original_term": row["original_term"],
+                "original_id": row["original_id"] or "",
             }
             for row in rows
         ]

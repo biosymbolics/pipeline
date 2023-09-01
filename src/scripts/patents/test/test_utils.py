@@ -18,6 +18,11 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Astrazeneca China",
                     "ASTRAZENECA INVEST (CHINA) CO LTD",
                     "ASTRAZENECA COLLABORATION VENTURES LLC",
+                    "JAPAN PHARMA CO LTD",
+                    "Matsushita Electric Ind Co Ltd",
+                    "US GOV CT DISEASE CONTR & PREV",
+                    "US GOV NAT INST HEALTH",
+                    "THE US GOV",
                 ],
                 "expected_output": [
                     "Pfizer",
@@ -28,8 +33,13 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Bbob Laboratories",
                     "Pfizer",
                     "Astrazeneca",
-                    "Astrazeneca ()",  # TODO (obvi)
+                    "Astrazeneca",
                     "Astrazeneca Collaboration Ventures",  # TODO
+                    "Japan",
+                    "Matsushita",
+                    "US Government",
+                    "US Government",
+                    "US Government",
                 ],
             },
         ]

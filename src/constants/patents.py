@@ -28,6 +28,8 @@ METHOD_OF_USE_IPC_CODES = [
 ]
 
 COMPANY_SUPPRESSIONS_DEFINITE = [
+    "»",
+    "«",
     "LTD",
     "INC",
     "CORP",
@@ -181,10 +183,8 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "TECHNOLOGY SERVICES",
     "TECHNOLOGIES",
     "THERAPEUTIC",
-    "»",
-    "«",
-    "\\(.+\\)",  # remove any parantheticals
 ]
+
 
 COUNTRIES = [
     "CALISTOGA",
@@ -211,7 +211,7 @@ COUNTRIES = [
 COMPANY_SUPPRESSIONS = [
     *COMPANY_SUPPRESSIONS_DEFINITE,
     *COMPANY_SUPPRESSIONS_MAYBE,
-    *COUNTRIES,
+    *[c for c in COUNTRIES],
 ]
 
 
