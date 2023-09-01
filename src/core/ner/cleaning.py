@@ -366,7 +366,7 @@ class EntityCleaner:
             lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
         )
 
-        logging.debug(
+        logging.info(
             "Cleaned %s entities in %s seconds",
             len(entities),
             round(time.time() - start, 2),

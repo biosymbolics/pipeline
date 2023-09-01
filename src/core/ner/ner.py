@@ -13,6 +13,7 @@ import warnings
 import html
 import spacy
 from spacy.tokens import Span, Doc
+from core.ner.normalizer import TermNormalizer
 
 from utils.args import make_hashable
 from utils.extraction.html import extract_text
@@ -21,8 +22,6 @@ from utils.re import remove_extra_spaces
 from utils.string import chunk_list
 
 from .binder import BinderNlp
-from .cleaning import EntityCleaner
-from .linker import TermLinker
 from .patterns import (
     INDICATION_SPACY_PATTERNS,
     INTERVENTION_SPACY_PATTERNS,
@@ -61,6 +60,7 @@ class NerTagger:
                 MECHANISM_SPACY_PATTERNS,
             ]
         ),
+        link: bool = True,
         parallelize: bool = True,
     ):
         """
@@ -83,8 +83,7 @@ class NerTagger:
         self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.entity_types = entity_types
-        self.linker: TermLinker | None = None  # lazy initialization
-        self.cleaner = EntityCleaner(parallelize=parallelize)
+        self.normalizer = TermNormalizer(link=link)
         start_time = time.time()
 
         if entity_types is not None and not isinstance(entity_types, frozenset):
@@ -136,24 +135,6 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __link(self, entities: DocEntities) -> DocEntities:
-        """
-        Link entities for a single doc
-        Args:
-            entities (DocEntities): Entities to link
-        """
-        if self.linker is None:
-            logger.info("Lazy-loading linker...")
-            self.linker = TermLinker()
-
-        if self.linker is not None:
-            linked_entity_map = dict(self.linker([tup[0] for tup in entities]))
-            linked = [DocEntity(*e[0:5], linked_entity_map.get(e[0])) for e in entities]
-
-            return linked
-
-        raise Exception("Linker not initialized")
-
     @staticmethod
     def __get_string_entity(entity: DocEntity) -> str:
         """
@@ -197,7 +178,6 @@ class NerTagger:
         and combine them.
 
         - If the same entity is found in both docs, use the longest one.
-        - Hacks: entit
         """
         # Create a new list combining entities from both docs
         all_ents = [*doc1.ents, *doc2.ents]
@@ -232,9 +212,8 @@ class NerTagger:
 
     def __normalize(
         self,
-        entity_set: DocEntities,
-        link: bool = True,
-    ) -> DocEntities:
+        entity_sets: list[DocEntities],
+    ) -> list[DocEntities]:
         """
         Normalize entity set
 
@@ -242,20 +221,32 @@ class NerTagger:
             entity_set (DocEntities): Entities to normalize
             link (bool, optional): Whether to link entities. Defaults to True.
         """
-        normalized = self.cleaner.clean(entity_set, remove_suppressed=True)
+        terms = [e[0] for e in flatten(entity_sets)]
+        normalization_map = dict(self.normalizer.normalize(terms))
+
+        def get_doc_entity(e: DocEntity) -> DocEntity:
+            linked_entity = normalization_map.get(e.term)
+            return DocEntity(
+                *e[0:4],
+                normalized_term=linked_entity.name if linked_entity else None,
+                linked_entity=linked_entity,
+            )
 
         # filter by entity types, if provided
-        if self.entity_types:
-            normalized = [e for e in normalized if e[1] in self.entity_types]
+        entities = [
+            [
+                get_doc_entity(e)
+                for e in es
+                if (self.entity_types is None) or (e[1] in self.entity_types)
+            ]
+            for es in entity_sets
+        ]
 
-        if link and len(normalized) > 0:
-            return self.__link(normalized)
-
-        return normalized
+        return entities
 
     def extract(
         self,
-        content: list[str],
+        content: list[str] | list[list[str]],
         link: bool = True,
     ) -> list[DocEntities]:
         """
@@ -271,39 +262,43 @@ class NerTagger:
             link (bool, optional): whether to link entities. Defaults to True.
 
         Examples:
-            >>> tagger.extract(["Inhibitors of beta secretase"], link=False)
-            >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"], link=False)
-            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"], link=False)
-            >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"], link=False)
+            >>> tagger.extract(["Inhibitors of beta secretase"])
+            >>> tagger.extract(["This patent is about novel anti-ab monoclonal antibodies"])
+            >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"])
+            >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"])
+
+        NOTE: As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars
         """
+
+        def do_extract(c):
+            start_time = time.time()
+            prepped_content = self.__prep_for_extract(c.copy())
+            entity_sets = self.__extract(prepped_content)
+            normalized_entity_sets = self.__normalize(entity_sets)
+            logger.info(
+                "Full entity extraction took %s seconds for %s docs, yielded %s",
+                round(time.time() - start_time, 2),
+                len(content),
+                normalized_entity_sets,
+            )
+            return normalized_entity_sets
+
         if not self.nlp:
             raise Exception("NER tagger not initialized")
 
         if not isinstance(content, list):
             raise Exception("Content must be a list")
 
-        # logger.warning(
-        #     "As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars"
-        # )
-
-        start_time = time.time()
-        logger.debug("Starting NER pipeline with %s docs", len(content))
-
-        prepped_content = self.__prep_for_extract(content.copy())
-        entity_sets = self.__extract(prepped_content)
-        normalized_entity_sets = [
-            self.__normalize(e_set, link) for e_set in entity_sets
-        ]
-
-        logger.info(
-            "Full entity extraction took %s seconds, yielded %s",
-            round(time.time() - start_time, 2),
-            normalized_entity_sets,
-        )
+        if not isinstance(content[0], list):
+            normalized_entity_sets = do_extract(content)
+        else:
+            normalized_entity_sets = flatten([do_extract(c) for c in content])
 
         return normalized_entity_sets
 
-    def extract_strings(self, content: list[str], **kwargs) -> list[list[str]]:
+    def extract_strings(
+        self, content: list[str] | list[list[str]], **kwargs
+    ) -> list[list[str]]:
         """
         Extract named entities from a list of content, returning a list of strings
         """

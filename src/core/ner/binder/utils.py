@@ -6,10 +6,8 @@ import re
 import numpy as np
 import numpy.typing as npt
 from pydash import compact, flatten
-import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
-import time
 import logging
 import polars as pl
 
@@ -111,7 +109,6 @@ def extract_predictions(
     """
     all_predictions = flatten(
         [
-            # span_logits = all_span_logits[feature_index] ??
             extract_prediction(predictions[i], feature, i, type_map)
             for i, feature in enumerate(features)
         ]

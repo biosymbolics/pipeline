@@ -17,13 +17,14 @@ from core.ner import NerTagger
 class TestNerUtils(unittest.TestCase):
     """
     from core.ner import NerTagger; tagger=NerTagger()
-    t = tagger.extract([text], link=False)[0]
+    t = tagger.extract([text])[0]
     [(t1[0], t1.start_char, t1.end_char) for t1 in t]
     """
 
     def setUp(self):
         self.tagger = NerTagger(
             entity_types=frozenset(["compounds", "diseases", "mechanisms"]),
+            link=False
             # rule_sets=[],
         )
 
@@ -237,7 +238,7 @@ class TestNerUtils(unittest.TestCase):
             text = condition["text"]
             expected_output = condition["expected_output"]
 
-            result = self.tagger.extract_strings([text], link=False)[0]
+            result = self.tagger.extract_strings([text])[0]
 
             if result != expected_output:
                 print("Actual", result, "expected", expected_output)

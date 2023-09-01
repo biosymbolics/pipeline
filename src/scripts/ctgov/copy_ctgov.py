@@ -23,7 +23,6 @@ SINGLE_FIELDS = {
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
     "studies.overall_status": "status",  # vs last_known_status
     "studies.acronym": "acronym",
-    # conditions
 }
 
 MULTI_FIELDS = {
@@ -38,7 +37,7 @@ MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.ite
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def transform_ct_records(ctgov_records):
+def transform_ct_records(ctgov_records, tagger: NerTagger):
     """
     Transform ctgov records
 
@@ -48,10 +47,8 @@ def transform_ct_records(ctgov_records):
     - status
     - ??
     """
-    tagger = NerTagger()
 
-    # TODO: list[list[str]]
-    intervention_sets = [" ".join((rec["interventions"])) for rec in ctgov_records]
+    intervention_sets: list[str] = [rec["interventions"] for rec in ctgov_records]
     normalized = tagger.extract_strings(intervention_sets)
     return [
         {**rec, "interventions": normalized}
@@ -71,9 +68,10 @@ def ingest_trials():
         AND studies.nct_id = conditions.nct_id
         AND study_type = 'Interventional'
         AND interventions.intervention_type = 'Drug'
-        AND interventions.name <> 'Placebo'
+        AND interventions.name not in ('Placebo', 'placebo')
         group by studies.nct_id
     """
+    tagger = NerTagger(entity_types=frozenset(["compound", "mechanism"]))
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -82,7 +80,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records),
+        transform=lambda records: transform_ct_records(records, tagger),
     )
 
 
