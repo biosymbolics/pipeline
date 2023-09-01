@@ -52,7 +52,8 @@ class TermNormalizer:
             - if no linking is found, then normalized term is as canonical_name, with an empty id
             - will return fewer terms than input, if term meets conditions for suppression
         """
-        normalized = self.cleaner.clean(terms)
+        # removed_suppressed must be false to properly index against original terms
+        normalized = self.cleaner.clean(terms, remove_suppressed=False)
 
         if self.term_linker is not None:
             links = self.term_linker.link(normalized)

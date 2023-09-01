@@ -18,3 +18,20 @@ def is_string_list(obj: Any) -> TypeGuard[list[str]]:
         bool: True if the object is a list of strings
     """
     return isinstance(obj, list) and all(isinstance(x, str) for x in obj)
+
+
+def is_string_list_list(obj: Any) -> TypeGuard[list[list[str]]]:
+    """
+    Checks if an object is a list of string lists
+
+    Args:
+        obj (Any): object to check
+
+    Returns:
+        bool: True if the object is a list of string lists
+    """
+    return (
+        isinstance(obj, list)
+        and all(isinstance(x, list) for x in obj)
+        and all(isinstance(x, str) for x in obj[0])
+    )

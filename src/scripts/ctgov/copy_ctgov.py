@@ -48,7 +48,7 @@ def transform_ct_records(ctgov_records, tagger: NerTagger):
     - ??
     """
 
-    intervention_sets: list[str] = [rec["interventions"] for rec in ctgov_records]
+    intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
     normalized = tagger.extract_strings(intervention_sets)
     return [
         {**rec, "interventions": normalized}
