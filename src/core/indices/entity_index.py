@@ -17,20 +17,29 @@ from clients.llama_index.context import StorageArgs
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.llama_index.types import DocMetadata
 from clients.stores.pinecone import get_metadata_filters
+from constants.core import DEFAULT_ENTITY_TYPES, DEFAULT_MODEL_NAME
 from core.ner import NerTagger
 from utils.misc import dict_to_named_tuple
 from utils.namespace import get_namespace_id
 from utils.parse import parse_answer
 from utils.string import get_id
-from constants.core import DEFAULT_MODEL_NAME
 from typings.indices import LlmModelType, NamespaceKey
-from prompts import GET_BIOMEDICAL_ENTITY_TEMPLATE
 
 from .source_doc_index import SourceDocIndex
 from .types import is_entity_obj, EntityObj
 
 INDEX_NAME = "entity-docs"
-from constants.core import DEFAULT_ENTITY_TYPES
+
+
+def GET_BIOMEDICAL_ENTITY_TEMPLATE(entity: str) -> str:
+    return (
+        f"Assuming '{entity}' is a pharmaceutical compound, mechanism of action or other intervention, do as follows: "
+        "Return information about this intervention, such as its name, "
+        "drug class, mechanism of action, target(s), indication(s), status, competition, novelty etc. "
+        "- If investigational, include details about its phase of development and probability of success. "
+        "- If approved, include details about its regulatory status, commercialization, revenue and prospects. "
+        "- If discontinued, include the reasons for discontinuation. "
+    )
 
 
 class EntityIndex:
