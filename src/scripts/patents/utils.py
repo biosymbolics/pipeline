@@ -77,7 +77,7 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
                 _assignee = assignee
                 for term in terms_to_rewrite:
                     _assignee = re.sub(
-                        rf"\y{term}\y",
+                        rf"\b{term}\b",
                         f" {OWNER_TERM_MAP[term]} ",
                         cleaned,
                         flags=re.DOTALL | re.IGNORECASE,
