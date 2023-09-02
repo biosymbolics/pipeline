@@ -1,15 +1,15 @@
 from functools import reduce
 from typing import Iterable
 import re
-import polars as pl
 import logging
 
-from utils.re import get_or_re, remove_extra_spaces
 from constants.patents import (
     COMPANY_MAP,
     COMPANY_SUPPRESSIONS,
     OWNER_TERM_MAP,
 )
+from core.ner.utils import cluster_terms
+from utils.re import get_or_re, remove_extra_spaces
 
 
 def clean_owners(owners: list[str]) -> list[str]:
@@ -112,11 +112,14 @@ def clean_owners(owners: list[str]) -> list[str]:
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
     cleaned_orig_map = dict(zip(cleaned, owners))
 
-    final = list(apply_overrides(cleaned, cleaned_orig_map))
+    with_overides = list(apply_overrides(cleaned, cleaned_orig_map))
+
+    norm_map: dict = cluster_terms(with_overides, return_dict=True)  # type: ignore
+    final = [norm_map.get(owner) or owner for owner in with_overides]
 
     if len(final) != len(owners):
         raise ValueError(
-            f"Length of cleaned assignees ({len(final)}) does not match length of original assignees ({len(owners)})"
+            f"Length of cleaned assignees ({len(with_overides)}) does not match length of original assignees ({len(owners)})"
         )
 
     return final

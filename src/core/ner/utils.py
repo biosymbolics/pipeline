@@ -377,7 +377,9 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
     return entity_set
 
 
-def cluster_terms(terms: list[str]) -> list[SynonymRecord]:
+def cluster_terms(
+    terms: list[str], return_dict: bool = False
+) -> list[SynonymRecord] | dict[str, str]:
     """
     Clusters terms using TF-IDF and DBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair)
@@ -409,4 +411,7 @@ def cluster_terms(terms: list[str]) -> list[SynonymRecord]:
         for members_terms in terms_by_cluster_id
         for m in members_terms[1:]
     ]
+
+    if return_dict:
+        return {synonym["synonym"]: synonym["term"] for synonym in synonyms}
     return synonyms
