@@ -229,7 +229,7 @@ class TermAssembler:
                 ),
                 "domain": row["domain"],
                 "original_term": row["term"],
-                "original_id": row["original_id"] or "",
+                "original_id": None,
             }
             for row in rows
         ]
