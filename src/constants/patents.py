@@ -372,10 +372,10 @@ PATENT_ATTRIBUTE_MAP = {
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
-    "COMBINATION": 0,
+    "COMBINATION": -1,
     "COMPOUND_OR_MECHANISM": 3,
     "DEVICE": -2,
-    "DIAGNOSTIC": -1.5,
+    "DIAGNOSTIC": -2,
     "DISEASE_MODIFYING": 1.5,
     "FORMULATION": -0.25,
     "IRRELEVANT": -5,
@@ -386,7 +386,7 @@ SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "PREVENTATIVE": 1,
     "PROCEDURE": -1.5,
     "PROCESS": -1,
-    "TREATMENT": 1,
+    "TREATMENT": 0,
 }
 
 
