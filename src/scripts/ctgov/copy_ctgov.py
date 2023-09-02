@@ -2,6 +2,7 @@
 Utils for copying approvals data
 """
 import sys
+import logging
 
 from system import initialize
 
@@ -10,6 +11,10 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
+from utils.list import dedup
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 SINGLE_FIELDS = {
     "studies.nct_id": "nct_id",
@@ -49,7 +54,8 @@ def transform_ct_records(ctgov_records, tagger: NerTagger):
     """
 
     intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
-    normalized = tagger.extract_strings(intervention_sets)
+    logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
+    normalized = tagger.extract_strings([dedup(i_set) for i_set in intervention_sets])
     return [
         {**rec, "interventions": normalized}
         for rec, normalized in zip(ctgov_records, normalized)
@@ -71,7 +77,7 @@ def ingest_trials():
         AND interventions.name not in ('Placebo', 'placebo')
         group by studies.nct_id
     """
-    tagger = NerTagger(entity_types=frozenset(["compound", "mechanism"]))
+    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]))
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 

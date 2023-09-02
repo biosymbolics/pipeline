@@ -128,9 +128,12 @@ class EntityCleaner:
 
         only parallelize if
             1) parallelize is set to true and
-            2) there are more than 800 entities (otherwise the overhead probably exceeds the benefits)
+            2) there are more than 10000 entities (otherwise the overhead probably exceeds the benefits)
+
+        TODO: it might never make sense to parallelize.
+        Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
         """
-        parallelize = self.parallelize and num_entries > 800
+        parallelize = self.parallelize and num_entries > 10000
         return MAX_N_PROCESS if parallelize else 1
 
     @property
