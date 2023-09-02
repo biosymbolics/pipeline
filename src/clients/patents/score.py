@@ -1,4 +1,5 @@
 from functools import partial
+import random
 from typing import TypedDict
 import polars as pl
 import math
@@ -81,7 +82,11 @@ def score_patents(
 
     # multiply score by pct patent life remaining
     df = df.with_columns(
-        pl.col("score").mul(df[years_column] / MAX_PATENT_LIFE).alias("score"),
+        pl.col("score")
+        .mul(df[years_column] / MAX_PATENT_LIFE)
+        .alias("score"),  # suitability score
+        pl.lit(random.betavariate(2, 8)).alias("availability_score"),
+        pl.lit(random.betavariate(2, 10)).alias("probability_of_success"),
     )
 
     return df

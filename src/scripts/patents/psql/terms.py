@@ -157,22 +157,21 @@ class TermAssembler:
         Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            select lower(company_name) as company_name from (
-                select sponsor as name, 'sponsors' as domain, count(*) as count from trials
+            select lower(sponsor) as name, 'sponsors' as domain, count(*) as count
+            from trials
+            group by lower(sponsor)
 
-                UNION ALL
+            UNION ALL
 
-                SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
-                FROM applications a
-                group by name
+            SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+            FROM applications a
+            group by name
 
-                UNION ALL
+            UNION ALL
 
-                SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
-                FROM applications a
-                group by name
-            ) s
-            group by lower(company_name)
+            SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+            FROM applications a
+            group by name
         """
         rows = self.client.select(owner_query)
         owners = clean_owners([row["name"] for row in rows])
@@ -229,7 +228,7 @@ class TermAssembler:
                     normalization_map.get(row["term"]) or (), "concept_id", None
                 ),
                 "domain": row["domain"],
-                "original_term": row["original_term"],
+                "original_term": row["term"],
                 "original_id": row["original_id"] or "",
             }
             for row in rows
