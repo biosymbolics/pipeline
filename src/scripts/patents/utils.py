@@ -1,13 +1,13 @@
 from functools import reduce
 from typing import Iterable
 import re
+import polars as pl
 import logging
 
 from utils.re import get_or_re, remove_extra_spaces
 from constants.patents import (
     COMPANY_MAP,
     COMPANY_SUPPRESSIONS,
-    COMPANY_SUPPRESSIONS_DEFINITE,
     OWNER_TERM_MAP,
 )
 

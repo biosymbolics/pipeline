@@ -16,7 +16,7 @@ from utils.re import (
 )
 
 from .spacy import Spacy
-from .types import DocEntities, DocEntity
+from .types import DocEntities, DocEntity, SynonymRecord
 
 
 # end-of-entity regex
@@ -375,3 +375,38 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
         for span in spans
     ]
     return entity_set
+
+
+def cluster_terms(terms: list[str]) -> list[SynonymRecord]:
+    """
+    Clusters terms using TF-IDF and DBSCAN.
+    Returns a synonym record mapping between the canonical term and the synonym (one per pair)
+
+    Args:
+        terms (list[str]): list of terms to cluster
+    """
+    # lazy loading
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import DBSCAN
+    import polars as pl
+
+    vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
+    X = vectorizer.fit_transform(terms)
+    clustering = DBSCAN(eps=0.8, min_samples=2).fit(X)
+    labels = clustering.labels_
+
+    df = pl.DataFrame({"cluster_id": labels, "name": terms})
+    terms_by_cluster_id = (
+        df.filter(pl.col("cluster_id") > -1)
+        .groupby("cluster_id")
+        .agg(pl.col("name"))
+        .drop("cluster_id")
+        .to_series()
+        .to_list()
+    )
+    synonyms = [
+        SynonymRecord({"term": members_terms[0], "synonym": m})
+        for members_terms in terms_by_cluster_id
+        for m in members_terms[1:]
+    ]
+    return synonyms

@@ -157,15 +157,22 @@ class TermAssembler:
         Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
-            SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
-            FROM applications a
-            group by name
+            select lower(company_name) as company_name from (
+                select sponsor as name, 'sponsors' as domain, count(*) as count from trials
 
-            UNION ALL
+                UNION ALL
 
-            SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
-            FROM applications a
-            group by name
+                SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+                FROM applications a
+                group by name
+
+                UNION ALL
+
+                SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+                FROM applications a
+                group by name
+            ) s
+            group by lower(company_name)
         """
         rows = self.client.select(owner_query)
         owners = clean_owners([row["name"] for row in rows])
@@ -180,7 +187,7 @@ class TermAssembler:
                 "original_id": None,
             }
             for row, owner in zip(rows, owners)
-            if len(owner) > 1
+            if len(owner) > 0
         ]
 
         terms = TermAssembler.__aggregate(normalized)
@@ -266,11 +273,9 @@ class TermAssembler:
             "synonym_ids": "TEXT[]",
             "text_search": "tsvector",
         }
-        self.client.create_table(
-            term_table, schema, exists_ok=True, truncate_if_exists=True
+        self.client.create_and_insert(
+            terms, term_table, schema, truncate_if_exists=True
         )
-
-        self.client.insert_into_table(terms, term_table)
 
         # add text_search column
         self.client.execute_query(
