@@ -85,8 +85,14 @@ def score_patents(
         pl.col("score")
         .mul(df[years_column] / MAX_PATENT_LIFE)
         .alias("score"),  # suitability score
-        pl.lit(random.betavariate(2, 8)).alias("availability_score"),
-        pl.lit(random.betavariate(2, 10)).alias("probability_of_success"),
+        pl.Series(
+            name="availability_score",
+            values=[random.betavariate(2, 7) for _ in range(len(df))],
+        ),
+        pl.Series(
+            name="probability_of_success",
+            values=[random.betavariate(2, 9) for _ in range(len(df))],
+        ),
     )
 
     return df
