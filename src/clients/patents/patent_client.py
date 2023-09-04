@@ -138,7 +138,7 @@ def __get_query_pieces(
         """,
         "match_condition": f"""
             terms @> %s -- terms contains all input terms
-            {"AND domain = any(%s)" if domains else ""}
+            {"AND domains @> %s" if domains else ""}
         """,
     }
 
