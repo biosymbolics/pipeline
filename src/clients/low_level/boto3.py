@@ -3,7 +3,7 @@ Boto3 client
 """
 import json
 import os
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, cast
 import boto3
 import logging
 
@@ -84,7 +84,7 @@ def get_cache_with_all_check(
 
 
 def retrieve_with_cache_check(
-    operation: Callable[[int], T],
+    operation: Callable[[int], T] | Callable[[], T],
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
@@ -111,7 +111,10 @@ def retrieve_with_cache_check(
         logger.info("Checking miss for key: %s", key)
 
         # If not in cache, perform the operation
-        data = operation(limit=(limit or -1))  # type: ignore
+        if limit:
+            data: T = operation(limit=limit)  # type: ignore
+        else:
+            data: T = operation()  # type: ignore
 
         # if limit is set and result is list, see if the result size is less than limit.
         # if so, adjust the cache key to indicate that this is all the results.
@@ -125,4 +128,4 @@ def retrieve_with_cache_check(
             ContentType="application/json",
         )
 
-        return data
+        return cast(T, data)

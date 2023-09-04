@@ -56,7 +56,7 @@ def describe(event: DescribeEvent, context):
     else:
         key = f"gpt-description-{get_id(terms_list)}"
         description = retrieve_with_cache_check(
-            lambda l: gpt_client.describe_terms(terms_list), key=key
+            lambda: gpt_client.describe_terms(terms_list), key=key
         )
 
     return {"statusCode": 200, "body": description}
