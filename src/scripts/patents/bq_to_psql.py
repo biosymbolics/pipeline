@@ -249,6 +249,11 @@ def copy_bq_to_psql():
                 "table": APPLICATIONS_TABLE,
                 "column": "priority_date",
             },
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "all_base_publication_numbers",
+                "is_gin": True,
+            },
         ]
     )
 

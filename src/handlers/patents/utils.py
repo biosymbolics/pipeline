@@ -1,4 +1,5 @@
 import json
+
 from handlers.patents.types import PatentSearchParams, ParsedPatentSearchParams
 
 
@@ -13,6 +14,7 @@ def parse_params(
 ) -> ParsedPatentSearchParams:
     terms = params.get("terms")
     terms_list = terms.split(";") if terms else []
+
     domains = params.get("domains") or None
     domains_list = domains.split(";") if domains else None
 

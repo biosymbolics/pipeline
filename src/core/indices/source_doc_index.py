@@ -26,7 +26,6 @@ DEFAULT_STORAGE_ARGS: StorageArgs = {"storage_type": "pinecone"}  # "mongodb",
 DEFAULT_INDEX_ARGS = {
     "ner_options": {
         "use_llm": False,
-        "content_type": "text",  # converted to text upfront
         "entity_types": DEFAULT_ENTITY_TYPES,
     },
 }
