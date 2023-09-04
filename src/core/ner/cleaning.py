@@ -234,15 +234,25 @@ class EntityCleaner:
 
                 # removes `(IL-2)` from `Interleukin-2 (IL-2) inhibitor`
                 no_parenth = re.sub(
-                    r"(?i)(?<=[ ,])(\([a-z-0-9]+\))(?=(?: |,|$))", "", term
+                    r"(?<=[ ,])(\([a-z-0-9 ]+\))(?=(?: |,|$))",
+                    "",
+                    term,
+                    flags=re.DOTALL | re.IGNORECASE,
                 )
                 # `poly(isoprene)` -> `polyisoprene``
-                no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", r"\1", no_parenth)
+                no_parens = re.sub(
+                    r"\(([a-z-0-9]+)\)",
+                    r"\1",
+                    no_parenth,
+                    flags=re.DOTALL | re.IGNORECASE,
+                )
                 yield no_parens
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
-                return re.sub(rf"(?i)\b{syn}s?\b", canonical, s, flags=re.DOTALL)
+                return re.sub(
+                    rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
+                )
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
@@ -260,7 +270,7 @@ class EntityCleaner:
             decode_html,
             remove_chars,
             unwrap,
-            format_parentheticals,  # order matters (after unwrap)
+            format_parentheticals,  # order matters (run after unwrap)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
             partial(

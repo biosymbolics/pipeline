@@ -782,19 +782,16 @@ def clean_up_junk():
         f"update {WORKING_TABLE} "
         + r"set term=(REGEXP_REPLACE(term, '[)(]', '', 'g')) where term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^\"', '')) where term ~ '^\"'",
+        # orphaned closing parens
         f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
-        # leading whitespace
-        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
-        # trailing whitespace
-        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[ ]+$', '')) where term ~ '[ ]+$'",
+        # leading/trailing whitespace
+        rf"update {WORKING_TABLE} set term=trim(term) where trim(term) <> term",
         # f"update {WORKING_TABLE} set "
         # + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
         client.execute_query(sql)
-
-    # rf"update biosym_annotations set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
 
 
 def fix_unmatched():
@@ -848,11 +845,12 @@ def remove_common_terms():
         common_del_query,
         f"delete FROM {WORKING_TABLE} "
         + r"where term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} " + r"where term ~ '^[0-9., ]+$'",
+        f"delete FROM {WORKING_TABLE} "
+        + r"where term ~ '^[0-9., ]+$'",  # only numbers . and ,
         rf"delete from {WORKING_TABLE} where length(term) > 150 and term ~* '\y(?:and|or)\y';",  # sentences
-        rf"delete from {WORKING_TABLE}  where length(term) > 150 and term ~* '.*[.;] .*';",
-        f"delete FROM {WORKING_TABLE} where term ~* '^said .*'",
-        f"delete FROM {WORKING_TABLE} where length(term) < 3 or term is null",
+        rf"delete from {WORKING_TABLE}  where length(term) > 150 and term ~* '.*[.;] .*';",  # sentences
+        f"delete FROM {WORKING_TABLE} where term ~* '^said .*'",  # arg
+        f"delete FROM {WORKING_TABLE} where length(trim(term)) < 3 or term is null",
     ]
     for del_query in del_queries:
         DatabaseClient().execute_query(del_query)

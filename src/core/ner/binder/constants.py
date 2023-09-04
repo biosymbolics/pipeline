@@ -20,7 +20,14 @@ NER_TYPES = [
 ]
 
 PHRASE_MAP = {
+    "activity inhibitor": "inhibitor",
     "activity modulator": "modulator",
+    "activity antagonist": "antagonist",
+    "activity agonist": "agonist",
+    "activation agonist": "agonist",
+    "activation antagonist": "antagonist",
+    "activation inhibitor": "inhibitor",
+    "activation modulator": "modulator",
     "activated protein": "protein",
     "agonist ligand": "agonist",
     "analogue": "analog",

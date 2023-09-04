@@ -200,7 +200,7 @@ class TermAssembler:
         terms_query = f"""
                 SELECT lower(term) as term, domain, COUNT(*) as count
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(term) > 1
+                where length(term) > 0
                 group by lower(term), domain
             """
         rows = self.client.select(terms_query)
@@ -322,6 +322,6 @@ def create_patent_terms():
 
     $ jq '.[] | select(.name == "therapeutically")' terms.json
     """
-    # populate_working_biosym_annotations()
+    populate_working_biosym_annotations()
 
     TermAssembler.run()
