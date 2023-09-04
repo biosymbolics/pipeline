@@ -106,21 +106,33 @@ if __name__ == "__main__":
 
 
 """
-select * from trials t, aggregated_annotations anns where t.sponsor=any(anns.terms) and anns.terms && lower(t.intervention_names::text[]) limit 100;
+
+select apps.publication_number, apps.title as patent,
+LOWER(case when syn_map_spon.term is null then t.sponsor else syn_map_spon.term end) as assignees,
+t.title as trial, t.sponsor as sponsor, t.interventions from
+aggregated_annotations a,
+applications apps,
+trials t
+LEFT JOIN synonym_map syn_map_spon on syn_map_spon.synonym = lower(t.sponsor)
+where apps.publication_number=a.publication_number
+and LOWER(case when syn_map_spon.term is null then t.sponsor else syn_map_spon.term end) = any(a.terms)
+AND interventions::text[] && a.terms
+limit 100;
 
 
-select
-LOWER(case when syn_map.term is null then intervention else syn_map.term end) as intervention_name,
-t.nct_id, t.sponsor, anns.publication_number
+update trials set normalized_sponsor=sm.term from
+synonym_map sm where sm.synonym = lower(sponsor)
+
+create index index_trials_interventions ON trials using gin(interventions);
+
+select apps.publication_number, apps.title as patent, apps.assignees as patent_owner,
+t.title as trial, t.sponsor as sponsor, t.interventions
 from
 trials t,
-annotations anns,
-aggregated_annotations aaggs,
-unnest(t.intervention_names) as intervention
-LEFT JOIN synonym_map syn_map on syn_map.synonym = lower(intervention)
-where
-anns.publication_number = aaggs.publication_number
-and t.sponsor=anns.term and anns.domain='assignees'
-and LOWER(case when syn_map.term is null then intervention else syn_map.term end) = any(aaggs.terms)
-;
+aggregated_annotations a,
+applications apps
+where apps.publication_number=a.publication_number
+AND t.normalized_sponsor = any(a.terms)
+AND t.interventions && a.terms
+limit 100;
 """

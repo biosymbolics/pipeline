@@ -994,15 +994,38 @@ if __name__ == "__main__":
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
     (70,439 -> 69,715 -> 103,874)
 
-    alter table biosym_annotations_source ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM biosym_annotations_source
+
+        alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
     WHERE id IN
         (SELECT id
         FROM
             (SELECT id,
             ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
             ORDER BY id ) AS row_num
-            FROM annotations ) t
+            FROM terms ) t
+            WHERE t.row_num > 1 );
+
+    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
+            ORDER BY id ) AS row_num
+            FROM terms ) t
+            WHERE t.row_num > 1 );
+
+    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term
+            ORDER BY id ) AS row_num
+            FROM terms ) t
             WHERE t.row_num > 1 );
     """
     if "-h" in sys.argv:

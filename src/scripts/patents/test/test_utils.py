@@ -23,6 +23,9 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "US GOV CT DISEASE CONTR & PREV",
                     "US GOV NAT INST HEALTH",
                     "THE US GOV",
+                    # "Diabetes Center Of Southwest", wtf op
+                    # Dicerna Pharmaceuticals, Inc., a Novo Nordisk company
+                    # "Genentech, Inc.",
                 ],
                 "expected_output": [
                     "Pfizer",
