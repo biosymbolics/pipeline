@@ -173,6 +173,7 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
         "with": r"associated with\b",
         "against": r"against\b",
         "targeting": r"targeting\b",
+        # antibody to
         # "by": r"mediated by\b",
     }
 

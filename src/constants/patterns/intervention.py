@@ -335,6 +335,7 @@ ALL_INTERVENTION_BASE_TERMS = [
 ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 
 
+# TODO split generic and specific; remove generic
 INTERVENTION_BASE_PREFIXES = [
     "acceptable",
     "allosteric",

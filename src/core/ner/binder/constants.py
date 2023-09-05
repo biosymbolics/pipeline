@@ -40,6 +40,7 @@ PHRASE_MAP = {
     "antibody construct": "antibody",
     "antibody drug": "antibody",
     "associated protein": "protein",
+    "associated illness": "associated disease",
     "axis antagonist": "antagonist",
     "axis inhibitor": "inhibitor",
     "axis modulator": "modulator",
@@ -124,6 +125,7 @@ PHRASE_MAP = {
     "therapy agent": "therapy",
     "therapeutic agent": "therapy",
     "target(?:ing)? protein": "protein",
+    "target(?:ed|ing) (?:antibody|antibody conjugate)": "antibody",  # TODO - keep ADC? but often abbr as antibody, antibody conjugate, etc.
     "toll[ -]?like": "toll-like",
     "tumour": "tumor",
     "transporter inhibitor": "transport inhibitor",

@@ -29,7 +29,7 @@ def describe(event: DescribeEvent, context):
     - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://api.biosymbolics.ai/terms/describe?terms=asthma`
     """
-    gpt_client = GptApiClient(model="gpt-4")  # gpt-3.5-turbo
+    gpt_client = GptApiClient(model="gpt-3.5-turbo")  # gpt-4 too slow
 
     params = event.get("queryStringParameters", {})
     terms = params.get("terms")

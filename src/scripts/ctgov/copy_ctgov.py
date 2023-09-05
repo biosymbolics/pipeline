@@ -77,6 +77,11 @@ def ingest_trials():
         AND interventions.name not in ('Placebo', 'placebo')
         group by studies.nct_id
     """
+
+    # TODO!
+    # update trials set normalized_sponsor=sm.term from
+    # synonym_map sm where sm.synonym = lower(sponsor)
+
     tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]))
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
@@ -88,6 +93,8 @@ def ingest_trials():
         "trials",
         transform=lambda records: transform_ct_records(records, tagger),
     )
+
+    # TODO create index index_trials_interventions ON trials using gin(interventions);
 
 
 def main():
@@ -107,26 +114,8 @@ if __name__ == "__main__":
 
 """
 
-select apps.publication_number, apps.title as patent,
-LOWER(case when syn_map_spon.term is null then t.sponsor else syn_map_spon.term end) as assignees,
-t.title as trial, t.sponsor as sponsor, t.interventions from
-aggregated_annotations a,
-applications apps,
-trials t
-LEFT JOIN synonym_map syn_map_spon on syn_map_spon.synonym = lower(t.sponsor)
-where apps.publication_number=a.publication_number
-and LOWER(case when syn_map_spon.term is null then t.sponsor else syn_map_spon.term end) = any(a.terms)
-AND interventions::text[] && a.terms
-limit 100;
-
-
-update trials set normalized_sponsor=sm.term from
-synonym_map sm where sm.synonym = lower(sponsor)
-
-create index index_trials_interventions ON trials using gin(interventions);
-
-select apps.publication_number, apps.title as patent, apps.assignees as patent_owner,
-t.title as trial, t.sponsor as sponsor, t.interventions
+select apps.publication_number, apps.title as patent, apps.priority_date,
+apps.assignees as patent_owner, t.phase as phase, t.interventions
 from
 trials t,
 aggregated_annotations a,
@@ -134,5 +123,6 @@ applications apps
 where apps.publication_number=a.publication_number
 AND t.normalized_sponsor = any(a.terms)
 AND t.interventions && a.terms
+order by apps.priority_date desc
 limit 100;
 """

@@ -252,12 +252,16 @@ def main(bootstrap: bool = False):
     # update terms set term= regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
     # update terms set term=regexp_replace(term, '(?i) (?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$'
     # update terms set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
+    # update synonym_map set term=regexp_replace(term, '[0-9a-z]{0,1}\)[ ](.*)', '\1') where term ~* '^[0-9a-z]{0,1}\)[ ]' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '(?i)(.*), A .*', '\1') where term ~* ', A ';
     # update terms set term=regexp_replace(term, '(?i)(.*), an?d? .*', '\1') where term ~* ', an?d? ';
     # update terms set term=regexp_replace(term, '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|the[ ,]|in[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|its[ ,]|be[ ,])+', '') where term ~ '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|the[ ,]|in[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|its[ ,]|be[ ,])+'
     # update terms set term=regexp_replace(term, '(.*)[ ]?(?:\(.*)', '\1') where term like '%(%' and term not like '%)%' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '(.*)[ ]?(?:.*\))', '\1') where term like '%)%' and term not like '%(%' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
+    # update terms set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
+    # update synonym_map set term=regexp_replace(term, '(?:target(?:ed|ing) adc)', 'adc') where term ~* '\y(?:target(?:ed|ing) adc)\y';
+    # update terms set term=regexp_replace(term, '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| its| be| which)+$', '') where term ~* '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| its| be| which)+$'
 
 
 if __name__ == "__main__":
