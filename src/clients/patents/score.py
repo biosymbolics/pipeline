@@ -25,21 +25,17 @@ def calc_suitability_score(
 ) -> float:
     """
     Calculate the suitability score based on its attributes.
-    Uses softmax-like normalization.
+    (min/max)
+
+    Example:
+        >>> calc_suitability_score(['DEVICE', 'COMPOUND_OR_MECHANISM', 'METHOD', 'DIAGNOSTIC'], SUITABILITY_SCORE_MAP)
+        >>> calc_suitability_score(['DEVICE', 'COMPOUND_OR_MECHANISM'], SUITABILITY_SCORE_MAP)
+        >>> calc_suitability_score(['DEVICE'], SUITABILITY_SCORE_MAP)
     """
-    # math.exp(0) == 1, so we need to add a score for missing attributes
-    # (otherwise negative-scored patents will appear more suitable)
-    missing_attr_score = len(score_map.keys()) - len(attributes)
-
-    score: float = (
-        sum([math.exp(score_map.get(attr, 0)) for attr in attributes])
-        + missing_attr_score
-    )
-    total_possible: float = sum(map(math.exp, score_map.values()))
-
-    # if no attributes, let's give it a small non-zero score
-    score = (score / total_possible) if len(attributes) > 0 else 0.1
-
+    min = sum([v for v in score_map.values() if v <= 0])
+    max = sum([v for v in score_map.values() if v >= 0])
+    score: float = sum([(score_map.get(attr, 0)) for attr in attributes])
+    score = (score - min) / (max - min)
     return score
 
 
