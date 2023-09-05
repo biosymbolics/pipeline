@@ -98,6 +98,7 @@ PHRASE_MAP = {
     "protein kinase": "kinase",
     "protein degrader": "degrader",
     "peptide complex(?:es)?": "peptide",
+    "(?:poly)?peptide chain": "polypeptide",
     # we might want to undo this in the future (but note that the info isn't lost to the user)
     "(?:ligand )?receptor activator": "activator",
     "receptor agonist": "agonist",  # ??

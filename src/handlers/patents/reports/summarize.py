@@ -43,9 +43,7 @@ def summarize(event: ReportEvent, context):
 
     try:
         results = patent_client.search(**params)
-        summaries = aggregate(
-            results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar_patents"]
-        )
+        summaries = aggregate(results, [*DOMAINS_OF_INTEREST, "similar_patents"])
     except Exception as e:
         message = f"Error reporting on patents: {e}"
         logger.error(message)
