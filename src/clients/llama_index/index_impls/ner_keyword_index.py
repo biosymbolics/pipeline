@@ -35,7 +35,7 @@ def extract_keywords(
         max_keywords (int): max number of keywords to extract
     """
     entities = tagger.extract_strings([text])
-    keywords = entities[0]
+    keywords = entities[0] if len(entities) > 0 else []
     return set(keywords[0:max_keywords])
 
 
