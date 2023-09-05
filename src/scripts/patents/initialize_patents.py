@@ -237,7 +237,6 @@ def main(bootstrap: bool = False):
         copy_bq_to_psql()
         # copy data about approvals
         copy_patent_approvals()
-
         # adds column & index for application search
         add_application_search()
 
@@ -255,13 +254,29 @@ def main(bootstrap: bool = False):
     # update synonym_map set term=regexp_replace(term, '[0-9a-z]{0,1}\)[ ](.*)', '\1') where term ~* '^[0-9a-z]{0,1}\)[ ]' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '(?i)(.*), A .*', '\1') where term ~* ', A ';
     # update terms set term=regexp_replace(term, '(?i)(.*), an?d? .*', '\1') where term ~* ', an?d? ';
-    # update terms set term=regexp_replace(term, '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|the[ ,]|in[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|its[ ,]|be[ ,])+', '') where term ~ '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|the[ ,]|in[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|its[ ,]|be[ ,])+'
+    # update terms set term=regexp_replace(term, '^(?:\.\s?|\,\s?|;\s?|to[ ,]|tha(?:n|t)[ ,]|for[ ,]|or[ ,]|then?[ ,]|in[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+', '') where term ~ '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|then?[ ,]|in[ ,]|are[ ,]|tha(?:n|t)[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+'
     # update terms set term=regexp_replace(term, '(.*)[ ]?(?:\(.*)', '\1') where term like '%(%' and term not like '%)%' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '(.*)[ ]?(?:.*\))', '\1') where term like '%)%' and term not like '%(%' and not term ~ '(?:\[|\])' and term not like '%-%-%'
     # update terms set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
     # update terms set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
     # update synonym_map set term=regexp_replace(term, '(?:target(?:ed|ing) adc)', 'adc') where term ~* '\y(?:target(?:ed|ing) adc)\y';
-    # update terms set term=regexp_replace(term, '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| its| be| which)+$', '') where term ~* '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| its| be| which)+$'
+    # update terms set term=regexp_replace(term, '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$', '') where term ~* '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$'
+    # update biosym_annotations_source set term=regexp_replace(term, '([a-z]+)inhibitor', '\1 inhibitor')  where term ~* '[b-z]+inhibitor\y';
+    # update biosym_annotations_source set term=regexp_replace(term, '^vitro', 'in-vitro') where term ~* '^vitro .*';
+    # update annotations set term=regexp_replace(term, ', rat', '') where term ~* ', rat$';
+    # update terms  set term=regexp_replace(term, ', human', '') where term ~* ', human$';
+    # update annotations  set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
+    # update terms set term=regexp_replace(term, 'modulate$', 'modulator') where term ~* '\y modulate$';
+    # update annotations set term=regexp_replace(term, 'activate$', 'activator') where term ~* '\y activate$';
+    # update terms set term=regexp_replace(term, 'stimulat(?:e|ing|ion)$', 'stimulator') where term ~* '\y stimulat(?:e|ing|ion)$';
+    # update terms set term=regexp_replace(term, 'stabili(?:s|z)(?:e|ing|ion)$', 'stabilizer') where term ~* '\y stabili(?:s|z)(?:e|ing|ion)$';
+    # update annotations set term=regexp_replace(term, 'inhibit(?:ion|ing)$', 'inhibitor') where term ~* '\y inhibit(?:ion|ing)$';
+    # update annotations set term=regexp_replace(term, 'agonist(?:ic)? action$', 'agonist') where term ~* 'agonist(?:ic)? action$';
+    # update terms set term=regexp_replace(term, 'receptor activat(?:ion|or)$', 'activator') where term ~* 'receptor activat(?:ion|or)$';
+    # update annotations set term=regexp_replace(term, 'agonism$', 'agonist') where term ~* 'agonism$';
+    # update terms set term=regexp_replace(term, '^([a-z]{2,3}[0-9]{0,2}) ([a-zαβγδεζηθικλμνξοπρστυφχψω]{1}[ ])', '\1\2') where term ~* '^[a-z]{2,3}[0-9]{0,2} [a-zαβγδεζηθικλμνξοπρστυφχψω]{1} (?:inhibitor|modulator|antagonist|agonist|protein|(?:poly)?peptide|antibody|isoform|domain|bispecific|chain|activator|stimulator|dna)';
+    # update terms set term=regexp_replace(term, ' protein$', '') where  term ~* '^[a-z0-9]{3,5} protein$';
+    # update terms set term=regexp_replace(term, ' protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] protein$';
 
 
 if __name__ == "__main__":

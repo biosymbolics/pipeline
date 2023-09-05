@@ -78,6 +78,7 @@ PHRASE_MAP = {
     "g[ -]?protein[ -]?coupled[ -]?receptor": "g protein-coupled receptors",
     "gpcrs?": "g protein-coupled receptors",
     "homologue": "homolog",
+    "ifn": "interferon",
     "inhibit(?:ing|ory?) (?:agent|compound|composition|pathway|peptide|protein|factor)": "inhibitor",
     "inhibit(?:ion|ory)?": "inhibitor",
     "kinases": "kinase",

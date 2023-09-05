@@ -19,7 +19,7 @@ from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
     "QueryPieces",
-    {"match_condition": str, "where": str, "params": list},
+    {"annotation_join_condition": str, "where": str, "params": list},
 )
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ def __get_query_pieces(
             raise ValueError("Cannot mix id and term search")
 
         return {
-            "match_condition": f"AND publication_number = any(%s)",
+            "annotation_join_condition": f"AND apps.publication_number = any(%s)",
             "where": "",
             "params": [terms],
         }
@@ -136,7 +136,7 @@ def __get_query_pieces(
             ORDER BY randomizer desc, priority_date desc
             limit {limit}
         """,
-        "match_condition": f"""
+        "annotation_join_condition": f"""
             terms @> %s -- terms contains all input terms
             {"AND domains @> %s" if domains else ""}
         """,
@@ -153,7 +153,7 @@ def __get_query_pieces(
             {
                 **base_params,
                 # text_search in match_condition so we can use JOIN instead of LEFT_JOIN
-                "match_condition": f"AND ({base_params['match_condition']} OR text_search @@ to_tsquery('english', %s))",
+                "annotation_join_condition": f"AND ({base_params['annotation_join_condition']} OR text_search @@ to_tsquery('english', %s))",
                 "params": compact([lower_terms, domains, ts_query_terms]),
             },
         )
@@ -162,7 +162,7 @@ def __get_query_pieces(
         QueryPieces,
         {
             **base_params,
-            "match_condition": f"AND {base_params['match_condition']}",
+            "annotation_join_condition": f"AND {base_params['annotation_join_condition']}",
             "params": compact([lower_terms, domains]),
         },
     )
@@ -202,7 +202,7 @@ def _search(
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
-            {qp["match_condition"]}
+            {qp["annotation_join_condition"]}
         )
         -- TODO: duplicates here
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)

@@ -35,6 +35,10 @@ def calc_suitability_score(
     min = sum([v for v in score_map.values() if v <= 0])
     max = sum([v for v in score_map.values() if v >= 0])
     score: float = sum([(score_map.get(attr, 0)) for attr in attributes])
+
+    if score < 0:
+        return 0
+
     score = (score - min) / (max - min)
     return score
 

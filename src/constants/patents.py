@@ -380,7 +380,7 @@ SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "FORMULATION": -0.25,
     "IRRELEVANT": -5,
     "METHOD": -0.25,  # really only a prob if not COM
-    "METHOD_OF_ADMINISTRATION": -0.5,
+    "METHOD_OF_ADMINISTRATION": -1.0,
     "NOVEL": 1.5,
     "PALLIATIVE": 0,
     "PREVENTATIVE": 1,
