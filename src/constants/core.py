@@ -14,6 +14,7 @@ logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
 IS_LOCAL = os.environ.get("ENV") == "local"
 IS_DEPLOYED = not IS_LOCAL
+BASE_DATABASE_URL = "postgres://:@localhost:5432"
 DATABASE_URL = (
     os.environ["DATABASE_URL"] if IS_DEPLOYED else "postgres://:@localhost:5432/patents"
 )

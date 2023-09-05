@@ -48,10 +48,10 @@ def ask(event: SecChatEvent, context):
 
     logger.info("Fetching answer for question: %s (%s)", question, question_type)
 
-    if question_type == "entity":
-        answer = ask_sec.ask_about_entity(question)
-    elif question_type == "events":
-        answer = json.dumps(ask_sec.get_events(question, datetime(2020, 1, 1)))
+    if question_type == "events":
+        answer = json.dumps(
+            ask_sec.get_events(question, datetime(2020, 1, 1)), default=str
+        )
     else:
         answer = ask_sec.ask_question(question)
 

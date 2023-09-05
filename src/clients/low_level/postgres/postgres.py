@@ -2,8 +2,7 @@
 Low-level Postgres client
 """
 import time
-from typing_extensions import NotRequired
-from typing import Any, Mapping, TypeGuard, TypeVar, TypedDict
+from typing import Any, Callable, Mapping, TypeVar
 import logging
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -12,43 +11,25 @@ from psycopg.rows import dict_row
 from clients.low_level.database import DatabaseClient, ExecuteResult
 from constants.core import DATABASE_URL
 from typings.core import is_string_list
-from utils.classes import overrides
+from utils.classes import overrides, nonoverride
+
+from .types import (
+    IndexCreateDef,
+    IndexSql,
+    is_index_create_def,
+    is_index_sql,
+    NoResults,
+)
+from .utils import get_schema_from_cursor
 
 T = TypeVar("T", bound=Mapping)
-IndexCreateDef = TypedDict(
-    "IndexCreateDef",
-    {
-        "table": str,
-        "column": str,
-        "is_gin": NotRequired[bool],
-        "is_lower": NotRequired[bool],
-        "is_tgrm": NotRequired[bool],
-        "is_uniq": NotRequired[bool],
-    },
-)
-IndexSql = TypedDict("IndexSql", {"sql": str})
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def is_index_sql(index_def: IndexCreateDef | IndexSql) -> TypeGuard[IndexSql]:
-    return index_def.get("sql") is not None
-
-
-def is_index_create_def(
-    index_def: IndexCreateDef | IndexSql,
-) -> TypeGuard[IndexCreateDef]:
-    return index_def.get("sql") is None
-
-
 MIN_CONNECTIONS = 2
 MAX_CONNECTIONS = 20
-
-
-class NoResults(Exception):
-    pass
 
 
 class PsqlClient:
@@ -128,12 +109,13 @@ class PsqlDatabaseClient(DatabaseClient):
             logger.error("Error checking table exists: %s", e)
             return False
 
+    @nonoverride
     def handle_error(
         self, conn, e: Exception, is_rollback: bool = False, ignore_error: bool = False
     ) -> ExecuteResult:
         if ignore_error:
             logger.info("Acceptable error executing query: %s", e)
-            return {"data": [], "columns": []}
+            return {"data": [], "columns": {}}
         elif isinstance(e, NoResults):
             logger.debug("No results executing query (not an error)")
         else:
@@ -144,7 +126,7 @@ class PsqlDatabaseClient(DatabaseClient):
             raise e
 
         self.client.put_conn(conn)
-        return {"data": [], "columns": []}
+        return {"data": [], "columns": {}}
 
     @overrides(DatabaseClient)
     def execute_query(
@@ -165,10 +147,10 @@ class PsqlDatabaseClient(DatabaseClient):
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
+            # execute query
             try:
                 cursor.execute(query, values)  # type: ignore
                 conn.commit()
-
                 logger.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
                 return self.handle_error(
@@ -182,13 +164,15 @@ class PsqlDatabaseClient(DatabaseClient):
             if execute_time > 100:
                 logger.info("Query took %s minutes", round(execute_time / 60, 2))
 
+            # fetch results if appropriate
             try:
                 if cursor.rownumber is None:
                     raise NoResults("Query returned no rows")
 
                 data = list(cursor.fetchall())
-                columns = [desc[0] for desc in (cursor.description or [])]
+                columns = get_schema_from_cursor(cursor)
                 self.client.put_conn(conn)
+
                 return {"data": data, "columns": columns}
             except Exception as e:
                 return self.handle_error(conn, e, ignore_error=ignore_error)
@@ -206,7 +190,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 cursor.executemany(query, values)  # type: ignore
                 conn.commit()
                 self.client.put_conn(conn)
-                return {"data": [], "columns": columns}
+                return {"data": [], "columns": {}}
             except Exception as e:
                 return self.handle_error(conn, e, is_rollback=True)
 
@@ -230,6 +214,7 @@ class PsqlDatabaseClient(DatabaseClient):
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
         self.execute_query(query)
 
+    @nonoverride
     def create_index(self, index_def: IndexCreateDef | IndexSql):
         """
         Add an index
@@ -265,9 +250,51 @@ class PsqlDatabaseClient(DatabaseClient):
         except psycopg.errors.DuplicateTable as e:
             logger.warning("Index already exists: %s", e)
 
+    @nonoverride
     def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """
         Add indices
         """
         for index_def in index_defs:
             self.create_index(index_def)
+
+    @nonoverride
+    @staticmethod
+    def copy_between_db(
+        source_db: str,
+        source_sql: str,
+        dest_db: str,
+        dest_table_name: str,
+        truncate_if_exists: bool = True,
+        transform: Callable[[list[dict]], list[dict]] | None = None,
+        transform_schema: Callable[[dict], dict] | None = None,
+    ):
+        """
+        Copy data from one psql db to another
+
+        Args:
+            source_db (str): source db name
+            source_sql (str): source sql query
+            dest_db (str): destination db name
+            dest_table (str): destination table name
+        """
+        dest_client = PsqlDatabaseClient(dest_db)
+        source_client = PsqlDatabaseClient(source_db)
+
+        results = source_client.execute_query(source_sql)
+        records = results["data"]
+
+        # transform schema if method provided
+        if transform_schema:
+            schema = transform_schema(results["columns"])
+        else:
+            schema = results["columns"]
+
+        # add records
+        dest_client.create_and_insert(
+            records,
+            dest_table_name,
+            schema,
+            truncate_if_exists=truncate_if_exists,
+            transform=transform,
+        )

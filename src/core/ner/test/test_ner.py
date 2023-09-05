@@ -12,16 +12,19 @@ from core.ner import NerTagger
 # Abc transporter-associated gene abcc13
 # Use of poly-alpha2,8-sialic acid mimetic peptides to modulate ncam functions.
 # Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
+
+
 class TestNerUtils(unittest.TestCase):
     """
     from core.ner import NerTagger; tagger=NerTagger()
-    t = tagger.extract([text], link=False)[0]
+    t = tagger.extract([text])[0]
     [(t1[0], t1.start_char, t1.end_char) for t1 in t]
     """
 
     def setUp(self):
         self.tagger = NerTagger(
             entity_types=frozenset(["compounds", "diseases", "mechanisms"]),
+            link=False
             # rule_sets=[],
         )
 
@@ -33,10 +36,34 @@ class TestNerUtils(unittest.TestCase):
                 This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
                 """,
                 "expected_output": [
+                    "amorphous form",
+                    "bioenhanced formulation",
+                    "block angiotensin ii receptor",
+                    "congestive heart failure",
                     "eprosartan mesylate",
                     "hypertension",
-                    "congestive heart failure",
                     "renal failure",
+                ],
+            },
+            {
+                "text": [
+                    """
+                Bioenhanced formulations comprising eprosartan in oral solid dosage form.
+                This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
+                """,
+                    "Cox-2 inhibitors in combination with centrally acting analgesics",
+                ],
+                "expected_output": [
+                    [
+                        "amorphous form",
+                        "bioenhanced formulation",
+                        "block angiotensin ii receptor",
+                        "congestive heart failure",
+                        "eprosartan mesylate",
+                        "hypertension",
+                        "renal failure",
+                    ],
+                    ["analgesic", "centrally acting analgesic", "cox2 inhibitor"],
                 ],
             },
             {
@@ -45,13 +72,12 @@ class TestNerUtils(unittest.TestCase):
                 The invention concerns a pharmaceutical composition designed to adhere to a mucous membrane in particular for preventing or treating radiotherapy-related and chemotherapy-related mucositis, induced by radiotherapy or combined radiochemotherapy, comprising an efficient amount of an antiradical compound mixed with a vehicle which is liquid at room temperature and gels at the mucous membrane temperature and capable of adhering to the mucous membrane by its gelled state.
                 """,
                 "expected_output": [
-                    "radiotherapy",
-                    "chemotherapy",
-                    "radiotherapy relate",
-                    "chemotherapy related mucositis",
-                    "radiotherapy",
-                    "combined radiochemotherapy",
                     "antiradical compound",
+                    "chemotherapy",
+                    "chemotherapy related mucositis",
+                    "combined radiochemotherapy",
+                    "radiotherapy",
+                    "radiotherapy relate",
                 ],
             },
             {
@@ -60,13 +86,11 @@ class TestNerUtils(unittest.TestCase):
                 Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
                 """,
                 "expected_output": [
-                    "novel aspartyl dipeptide ester derivative",
                     "aspartyl dipeptide ester",
+                    "n[n[33 hydroxy 4 methoxyphenylpropyl]-lα aspartyl]-l(α methyl)phenylalanine 1 methyl ester",
                     "novel aspartyl dipeptide ester derivative",
-                    "n[n[3(3 hydroxy 4 methoxyphenyl)propyl]-lα aspartyl]-l(α methyl)phenylalanine 1 methyl ester",
                 ],
             },
-            # inconsistent results
             # {
             #     "text": """
             #     Muscarinic antagonists
@@ -74,13 +98,14 @@ class TestNerUtils(unittest.TestCase):
             #     """,
             #     "expected_output": [
             #         "muscarinic antagonists heterocyclic derivative",
-            #         "din substituted piperazine heterocyclic derivative",
+            #         "din substituted piperazine",
             #         "1,4 di substituted piperidine",
             #         "di substituted piperidine compound",
             #         "optionally substituted aryl",
-            #         "heteroaryl",
-            #         "r7 is h",
-            #         "hydroxyalkyl or alkoxyalkyl; are muscarinic antagonist",
+            #         "arylcarbonyl",
+            #         "aryloxycarbonyl",
+            #         "aryl aminocarbonyl",
+            #         "optionally",  # TODO
             #         "muscarinic antagonists useful",
             #         "alzheimer disease",
             #     ],
@@ -91,16 +116,11 @@ class TestNerUtils(unittest.TestCase):
                 In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
                 """,
                 "expected_output": [
+                    "intermittent air pressure pulse train",
                     "meniere disease",
                     "ménière disease intermittent air pressure pulse train",
-                    "intermittent air pressure pulse train",
+                    "modulation frequency",
                     "surgically perforated tympanic membrane",
-                    # the below are perhaps an indexing problem
-                    # if no unescaping, we get:
-                    # [..., 'h2o per millisecond']
-                    "the 16 cm h2o,",  # TODO;  P1 is from 4 to 16 cm H2
-                    "to 4 mm h2o per",  # TODO
-                    "millisecond, the",  # TODO; the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease...
                 ],
             },
             {
@@ -109,17 +129,20 @@ class TestNerUtils(unittest.TestCase):
                 A method of alleviating a pain state not associated with a cough condition is provided which comprises administering a cyclooxygenase-2 inhibitor and a centrally active analgesic selected from the group consisting of a narcotic analgesic selected from the group consisitng of codeine and hydrocodone; an agonist-antagonist analgesic and tramadol. A method and analgesic composition therefor is also provided for treating all pain states which comprises administering a cyclooxygenase-2 inhibitor and a centrally acting analgesic selected from the group consisting of a narcotic analgesic other than codeine and hydrocodone; an agonist-antagonist analgesic and tramadol.
                 """,
                 "expected_output": [
+                    "analgesic",
                     "cox2 inhibitor",
                     "centrally acting analgesic",
-                    "pain state",
+                    "codeine",
                     "cough condition",
                     "cyclooxygenase 2 inhibitor",
+                    "active analgesic",
                     "narcotic analgesic",
                     "codeine",
                     "agonist antagonist analgesic",
                     "analgesic composition therefor",
                     "cyclooxygenase 2 inhibitor",
-                    "than codeine and",  # TODO
+                    "pain state",
+                    "narcotic analgesic other",
                     "agonist antagonist analgesic",
                     # hydrocodone and tramadol # TODO
                 ],
@@ -131,14 +154,16 @@ class TestNerUtils(unittest.TestCase):
                 """,
                 "expected_output": [
                     "oxidative stress",
+                    "quantifying biomarker",
                     "protein",
-                    "dityrosine",
+                    "dityrosine)",  # TODO
                     "selenium containing amino acid",
                     "protein",
                     "antibody",
                     "selenium containing amino acid",
                     "antibody",
-                    "biomarker or",  # TODO
+                    "monoclonal",
+                    "polyclonal",
                     # antibody that binds to oxidized amino acids # TODO
                     # chloro-tyrosine todo
                     # oxidized sulfur- or selenium-containing amino acids (SSAA) # TODO
@@ -150,13 +175,15 @@ class TestNerUtils(unittest.TestCase):
                 The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15) cytokines are associated with important human diseases, such as cytokine-release syndrome and cytokine storm associated disorders. Compositions, methods, and kits to modulate signaling by at least one IL-2, IL-9, or IL-15 γc-cytokine family members for inhibiting, ameliorating, reducing a severity of, treating, delaying the onset of, or preventing at least one cytokine storm related disorder are described.
                 """,
                 "expected_output": [
-                    "antagonistic peptide",  # TODO: targeting il-2, il-9, and il-15
+                    "antagonistic peptide targeting il2",  # TODO: targeting il-2, il-9, and il-15
                     "cytokine release syndrome",
                     "cytokine storm associated disorder",
                     "cytokine",
                     "cytokine release syndrome",
                     "cytokine storm",
-                    "il15 γc cytokine family member",
+                    "modulate signal",
+                    "il15 γc cytokine family",
+                    "inhibiting",
                     "cytokine storm related disorder",
                     # γc-family Interleukin-2 (IL-2) # TODO
                 ],
@@ -168,14 +195,16 @@ class TestNerUtils(unittest.TestCase):
                 """,
                 "expected_output": [
                     "probucol",
-                    "tetrazolylalkoxy dihydrocarbostyril derivative",
+                    "tetrazolylalkoxy dihydrocarbostyril",
+                    "derivative",
                     "superoxide supressant effect",
-                    "tetrazolylalkoxy dihydrocarbostyril derivative",
+                    "derivative",
                     "cerebral infarction",
-                    "chronic cerebral infarction",
+                    "cerebral infarction",
+                    "arteriosclerosis",
                     "renal disease",
-                    "renal failure"
-                    # arteriosclerosis, diabetic nephropathy, nephritis, diabetes # TODO
+                    "renal failure",
+                    "synergistic superoxide suppressant effect",
                 ],
             },
             {
@@ -184,12 +213,40 @@ class TestNerUtils(unittest.TestCase):
                     There are disclosed certain novel compounds (including pharmaceutically acceptable salts thereof) (I) that inhibit phosphatidylinositol 3-kinase gamma (PI3Kδ) and phosphatidylinositol 3-kinase gamma (ΡΙ3Κγ) activity, to their utility in treating and/or preventing clinical conditions including respiratory diseases, such as asthma and chronic obstructive pulmonary disease (COPD), to their use in therapy, to pharmaceutical compositions containing them and to processes for preparing such compounds.
                 """,
                 "expected_output": [
-                    "5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivative",
-                    "dual inhibitors of phosphatidylinositol 3-kinase delta and gamma",
-                    "chronic obstructive pulmonary disease",
-                    "asthma",
+                    # "5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivative", # TODO!!!
+                    "derivative",
+                    "dual inhibitor",
+                    "phosphatidylinositol 3 kinase δ & γ",
+                    "inhibitor phosphatidylinositol 3 kinase γ (pi3kδ",  # TODO
+                    "phosphatidylinositol 3 kinase γ (ρι3κγ) activity",
                     "respiratory disease",
-                    "inhibit phosphatidylinositol 3-kinase gamma",
+                    "asthma",
+                    "chronic obstructive pulmonary disease",
+                ],
+            },
+            {
+                "text": """
+                    useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)
+                """,
+                "expected_output": [
+                    # "apoptosis signal regulating kinase 1",
+                    # "disorders response to the inhibition of apoptosis signal regulating kinase 1",
+                    "disorders responsive",
+                    "inhibitor",
+                    "apoptosis signal regulating kinase",
+                    # "ask1 inhibitor"
+                ],
+            },
+            {
+                "text": "Compositions containing reduced amounts of daclizumab acidic isoforms and methods for preparing the same.",
+                "expected_output": [
+                    "daclizumab acidic isoform",
+                ],
+            },
+            {
+                "text": "The present invention relates to a method for PEGylating interferon beta.",
+                "expected_output": [
+                    # "pegylating interferon beta",
                 ],
             },
         ]
@@ -198,9 +255,9 @@ class TestNerUtils(unittest.TestCase):
             text = condition["text"]
             expected_output = condition["expected_output"]
 
-            result = self.tagger.extract_strings([text], link=False)[0]
+            result = self.tagger.extract_strings([text])
 
             if result != expected_output:
                 print("Actual", result, "expected", expected_output)
 
-            # self.assertEqual(result, expected_output) # results are too stochastic
+            self.assertEqual(result, expected_output)  # results are too stochastic

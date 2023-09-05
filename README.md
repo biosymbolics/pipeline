@@ -158,5 +158,5 @@ system.initialize()
 from core.ner import NerTagger
 tagger = NerTagger()
 text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
-tagger.extract([text], link=False)
+tagger.extract([text])
 ```

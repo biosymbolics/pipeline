@@ -1,12 +1,10 @@
 """
 Term Normalizer
 """
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from typing import List, NamedTuple, Union
-
-# import torch
+import torch
 
 from .types import KbLinker, CanonicalEntity
 
@@ -43,7 +41,7 @@ class TermLinker:
         """
         Initialize term normalizer using existing model
         """
-        # torch.device("mps")  # does this work?
+        torch.device("mps")  # does this work?
 
         # lazy (Umls is big)
         logger.info("Loading scispacy")
@@ -112,12 +110,8 @@ class TermLinker:
 
         canonical_map = self.generate_map(terms)
 
-        # TODO: what is parallelism offering here??
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            linked_entities = list(executor.map(lambda e: canonical_map.get(e), terms))
-            logging.info("Completed linking batch of %s terms", len(terms))
-
-        executor.shutdown()
+        linked_entities = [canonical_map.get(t) for t in terms]
+        logging.info("Completed linking batch of %s terms", len(terms))
 
         # should always be the same length ("" for omitted terms)
         assert len(terms) == len(linked_entities)

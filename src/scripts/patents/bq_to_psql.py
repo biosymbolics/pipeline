@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    # "biosym_annotations_source": None,
+    "biosym_annotations_source": None,
     APPLICATIONS_TABLE: "priority_date",  # shard by priority date
 }
 
@@ -248,6 +248,11 @@ def copy_bq_to_psql():
             {
                 "table": APPLICATIONS_TABLE,
                 "column": "priority_date",
+            },
+            {
+                "table": APPLICATIONS_TABLE,
+                "column": "all_base_publication_numbers",
+                "is_gin": True,
             },
         ]
     )

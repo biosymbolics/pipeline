@@ -3,7 +3,7 @@ Boto3 client
 """
 import json
 import os
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, cast
 import boto3
 import logging
 
@@ -47,19 +47,62 @@ def fetch_s3_obj(
     return json.loads(response["Body"].read().decode("utf-8"))
 
 
+def get_cache_key(key, is_all: bool | None = None, limit: int | None = None) -> str:
+    """
+    Get cache key depending upon whether the result is all or not.
+
+    Args:
+        key (str): key
+        is_all (bool): whether the result is all or not
+        limit (int): limit
+    """
+    if limit is None:
+        return f"cache/{key}.json"
+
+    if is_all:
+        return f"cache/{key}_limit=all.json"
+
+    return f"cache/{key}_limit={limit}.json"
+
+
+def get_cache_with_all_check(
+    key: str, limit: int, cache_name: str = DEFAULT_BUCKET
+) -> Any:
+    """
+    Get results from cache with all check.
+
+    First see if a limit=all result exists. If so, return.
+    Otherwise, attempt to get the result with limit=limit. Throws exception if not found.
+    """
+    s3 = boto3.client("s3")
+    try:
+        all_cache_key = get_cache_key(key, is_all=True, limit=limit)
+        return s3.get_object(Bucket=cache_name, Key=all_cache_key)
+    except s3.exceptions.NoSuchKey:
+        limit_cache_key = get_cache_key(key, is_all=False, limit=limit)
+        return s3.get_object(Bucket=cache_name, Key=limit_cache_key)
+
+
 def retrieve_with_cache_check(
-    operation: Callable[[], T], key: str, cache_name: str = DEFAULT_BUCKET
+    operation: Callable[[int], T] | Callable[[], T],
+    key: str,
+    limit: int | None = None,
+    cache_name: str = DEFAULT_BUCKET,
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.
     """
-    s3 = boto3.client("s3")  # get_boto_client("s3")?
-    key = f"cache/{key}.json"
+    s3 = boto3.client("s3")
 
-    # Check if the result exists in S3
     try:
         logger.info("Checking cache `%s` for key `%s`", cache_name, key)
-        response = s3.get_object(Bucket=cache_name, Key=key)
+
+        if limit:
+            # If limit is set, first check if there is a limit=all result.
+            response = get_cache_with_all_check(key, limit, cache_name=cache_name)
+        else:
+            response = s3.get_object(Bucket=cache_name, Key=get_cache_key(key))
+
         data = json.loads(
             response["Body"].read().decode("utf-8"), object_hook=date_deserialier
         )
@@ -68,14 +111,21 @@ def retrieve_with_cache_check(
         logger.info("Checking miss for key: %s", key)
 
         # If not in cache, perform the operation
-        data = operation()
+        if limit:
+            data: T = operation(limit=limit)  # type: ignore
+        else:
+            data: T = operation()  # type: ignore
 
-        # Save the result to S3
+        # if limit is set and result is list, see if the result size is less than limit.
+        # if so, adjust the cache key to indicate that this is all the results.
+        is_all = limit is not None and isinstance(data, list) and len(data) < limit
+        cache_key = get_cache_key(key, is_all=is_all, limit=limit)
+
         s3.put_object(
             Bucket=cache_name,
-            Key=key,
+            Key=cache_key,
             Body=json.dumps(data, default=str),
             ContentType="application/json",
         )
 
-        return data
+        return cast(T, data)

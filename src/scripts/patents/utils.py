@@ -1,27 +1,18 @@
-from functools import partial, reduce
+from functools import reduce
 from typing import Iterable
 import re
 import logging
 
-from utils.re import get_or_re, remove_extra_spaces
 from constants.patents import (
     COMPANY_MAP,
     COMPANY_SUPPRESSIONS,
-    COMPANY_SUPPRESSIONS_DEFINITE,
+    OWNER_TERM_MAP,
 )
+from core.ner.utils import cluster_terms
+from utils.re import get_or_re, remove_extra_spaces
 
 
-EXCEPTION_TERMS = [
-    "agency",
-    "council",
-    "gen",
-    "korea",
-    "life",
-    "univ",
-]
-
-
-def clean_owners(owners: list[str]) -> Iterable[str]:
+def clean_owners(owners: list[str]) -> list[str]:
     """
     Clean owner names
     - removes suppressions
@@ -32,42 +23,71 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         owners (list[tuple[str, str]]): List of owner names
     """
 
-    def remove_suppressions(terms: list[str], only_definite=False) -> Iterable[str]:
+    def remove_suppressions(terms: list[str]) -> Iterable[str]:
         """
         Remove suppressions (generic terms like LLC, country, etc),
         Examples:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
         """
-        suppressions = (
-            COMPANY_SUPPRESSIONS_DEFINITE if only_definite else COMPANY_SUPPRESSIONS
-        )
-        suppress_re = r"\b" + get_or_re(suppressions) + r"\b"
+        suppressions = COMPANY_SUPPRESSIONS
+        suppress_re = rf"(?:(?:\s+|,){get_or_re(suppressions)}\b|\(.+\))"
 
         for term in terms:
-            yield re.sub("(?i)" + suppress_re, "", term, flags=re.DOTALL).rstrip(
+            yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
                 "&[ ]*"
             )
 
-    def get_mapping(clean_assignee: str, og_assignee: str, key: str) -> str | None:
+    def normalize_terms(assignees: list[str]) -> Iterable[str]:
+        """
+        Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
+        """
+        term_map_set = set(OWNER_TERM_MAP.keys())
+
+        def __normalize(cleaned: str):
+            terms_to_rewrite = list(term_map_set.intersection(cleaned.lower().split()))
+            if len(terms_to_rewrite) > 0:
+                _assignee = assignee
+                for term in terms_to_rewrite:
+                    _assignee = re.sub(
+                        rf"\b{term}\b",
+                        f" {OWNER_TERM_MAP[term.lower()]} ",
+                        cleaned,
+                        flags=re.IGNORECASE | re.DOTALL,
+                    ).strip()
+                return _assignee
+
+            return assignee
+
+        for assignee in assignees:
+            yield __normalize(assignee)
+
+    def get_lookup_mapping(
+        clean_assignee: str, og_assignee: str, key: str
+    ) -> str | None:
         """
         See if there is an explicit name mapping on cleaned or original assignee
         """
         to_check = [clean_assignee, og_assignee]
         has_mapping = any(
-            [re.findall("(?i)" + r"\b" + key + r"\b", check) for check in to_check]
+            [
+                re.findall(rf"\b{key}\b", check, flags=re.IGNORECASE)
+                for check in to_check
+            ]
         )
         if has_mapping:
             return key
         return None
 
-    def rewrite(assignees: list[str], lookup_map) -> Iterable[str]:
+    def apply_overrides(
+        assignees: list[str], cleaned_orig_map: dict[str, str]
+    ) -> Iterable[str]:
         def __map(cleaned: str):
-            og_assignee = lookup_map[cleaned]
+            og_assignee = cleaned_orig_map[cleaned]
             mappings = [
                 key
                 for key in COMPANY_MAP.keys()
-                if get_mapping(cleaned, og_assignee, key)
+                if get_lookup_mapping(cleaned, og_assignee, key)
             ]
             if len(mappings) > 0:
                 logging.debug(
@@ -79,41 +99,27 @@ def clean_owners(owners: list[str]) -> Iterable[str]:
         for assignee in assignees:
             yield __map(assignee)
 
-    def handle_exception(terms: list[str]) -> Iterable[str]:
-        """
-        Avoid reducing names to near nothing
-        e.g. "Med Inst", "Lt Mat"
-        TODO: make longer (4-5 chars) but check for common word or not
-        """
-        exceptions = [
-            (len(term) < 3 or term.lower() in EXCEPTION_TERMS) for term in terms
-        ]
-
-        if not any(exceptions):
-            return terms
-
-        steps = [
-            partial(remove_suppressions, only_definite=True),
-            remove_extra_spaces,
-        ]
-        for term, is_exception in zip(terms, exceptions):
-            _term = reduce(
-                lambda x, func: (func(x) if is_exception else term), steps, term
-            )
-            yield _term
-
     def title(assignees: list[str]) -> Iterable[str]:
         for assignee in assignees:
             yield assignee.title()
 
     cleaning_steps = [
         remove_suppressions,
+        normalize_terms,  # order matters
         remove_extra_spaces,
-        # handle_exception, # TODO
         title,
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
-    lookup_map = dict(zip(cleaned, owners))
+    cleaned_orig_map = dict(zip(cleaned, owners))
 
-    rewrites = rewrite(cleaned, lookup_map)
-    return rewrites
+    with_overides = list(apply_overrides(cleaned, cleaned_orig_map))
+
+    norm_map: dict = cluster_terms(with_overides, return_dict=True)  # type: ignore
+    final = [norm_map.get(owner) or owner for owner in with_overides]
+
+    if len(final) != len(owners):
+        raise ValueError(
+            f"Length of cleaned assignees ({len(with_overides)}) does not match length of original assignees ({len(owners)})"
+        )
+
+    return final

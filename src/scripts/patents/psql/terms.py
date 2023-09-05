@@ -28,6 +28,7 @@ class BaseTermRecord(TypedDict):
 class TermRecord(BaseTermRecord):
     domain: str
     original_id: Optional[str]
+    original_term: Optional[str]
 
 
 class AggregatedTermRecord(BaseTermRecord):
@@ -106,15 +107,18 @@ class SynonymMapper:
                 "term": entry[1].lower(),
             }
             for entry in synonym_map.items()
-            if len(entry[1]) > 0 and len(entry[0]) > 0 and entry[0] != entry[1]
+            if len(entry[0]) > 0 and entry[0] != entry[1]
         ]
 
         self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
-        logging.debug(
+        logging.info(
             "Inserted %s rows into synonym_map (%s)",
             len(records),
             len(list(synonym_map.keys())),
         )
+
+    def index(self):
+        self.client.create_index({"table": "synonym_map", "column": "synonym"})
 
 
 class TermAssembler:
@@ -141,7 +145,7 @@ class TermAssembler:
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "domains": dedup([row["domain"] for row in group]),
-                "synonyms": dedup([row["term"] for row in group]),
+                "synonyms": dedup([row["original_term"] for row in group]),
                 "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
@@ -153,6 +157,12 @@ class TermAssembler:
         Generates owner terms (assignee/inventor) from the applications table
         """
         owner_query = f"""
+            select lower(sponsor) as name, 'sponsors' as domain, count(*) as count
+            from trials
+            group by lower(sponsor)
+
+            UNION ALL
+
             SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
             FROM applications a
             group by name
@@ -172,15 +182,14 @@ class TermAssembler:
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
-                "term": row["name"],
+                "original_term": row["name"],
                 "original_id": None,
             }
             for row, owner in zip(rows, owners)
+            if len(owner) > 0
         ]
 
-        terms = TermAssembler.__aggregate(
-            [row for row in normalized if len(row["term"]) > 1]
-        )
+        terms = TermAssembler.__aggregate(normalized)
         return terms
 
     def __generate_entity_terms(self) -> list[AggregatedTermRecord]:
@@ -191,7 +200,7 @@ class TermAssembler:
         terms_query = f"""
                 SELECT lower(term) as term, domain, COUNT(*) as count
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(term) > 1
+                where length(term) > 0
                 group by lower(term), domain
             """
         rows = self.client.select(terms_query)
@@ -219,17 +228,17 @@ class TermAssembler:
                     normalization_map.get(row["term"]) or (), "concept_id", None
                 ),
                 "domain": row["domain"],
-                "term": row["term"],
-                "original_id": "",  # row["original_id"],
+                "original_term": row["term"],
+                "original_id": None,
             }
             for row in rows
         ]
 
         return TermAssembler.__aggregate(term_records)
 
-    def generate_terms(self):
+    def generate_terms(self) -> list[AggregatedTermRecord]:
         """
-        Collects and forms terms for the terms table
+        Collects and forms terms for the terms table; persists to TERMS_FILE
         From
         - biosym_annotations
         - applications (assignees + inventors)
@@ -241,18 +250,19 @@ class TermAssembler:
         entity_terms = self.__generate_entity_terms()
 
         terms = assignee_terms + entity_terms
+
+        save_json_as_file(terms, TERMS_FILE)
         return terms
 
-    def create_and_persist_terms(self):
+    def persist_terms(
+        self, existing_terms: Optional[list[AggregatedTermRecord]] = None
+    ):
         """
-        Extracts/generates terms and persists them to a table
+        Persists terms to a table
+        """
+        terms = existing_terms or load_json_from_file(TERMS_FILE)
 
-        - pulls distinct annotation and assigee values
-        - normalizes the terms
-        - inserts them into a new table
-        - adds synonym entries for the original terms
-        """
-        table_name = "terms"
+        term_table = "terms"
         schema = {
             "term": "TEXT",
             "canonical_id": "TEXT",
@@ -260,26 +270,36 @@ class TermAssembler:
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
             "synonym_ids": "TEXT[]",
+            "text_search": "tsvector",
         }
-        self.client.create_table(
-            table_name, schema, exists_ok=True, truncate_if_exists=True
+        self.client.create_and_insert(
+            terms, term_table, schema, truncate_if_exists=True
         )
 
-        # grab terms from annotation tables (slow!!)
-        terms = self.generate_terms()
-        save_json_as_file(terms, TERMS_FILE)
+        # add text_search column
+        self.client.execute_query(
+            f"""
+            UPDATE {term_table}
+            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
+            """
+        )
 
-        self.client.insert_into_table(terms, table_name)
         self.client.create_index(
-            {"table": table_name, "column": "term", "is_tgrm": True}
-        )
-        self.client.create_indices(
-            [
-                {"table": "synonym_map", "column": "synonym"},
-                {"table": "synonym_map", "column": "synonym", "is_tgrm": True},
-            ]
+            {
+                "table": term_table,
+                "column": "text_search",
+                "is_gin": True,
+                "is_lower": False,
+            },
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
+
+    def generate_and_persist_terms(self):
+        """
+        Generate and persist terms
+        """
+        self.generate_terms()
+        self.persist_terms()
 
     @staticmethod
     def run():
@@ -288,9 +308,10 @@ class TermAssembler:
 
         Idempotent (all tables are dropped and recreated)
         """
+        TermAssembler().generate_and_persist_terms()
         sm = SynonymMapper(SYNONYM_MAP)
-        TermAssembler().create_and_persist_terms()
         sm.add_synonyms()
+        sm.index()
 
 
 def create_patent_terms():

@@ -10,33 +10,9 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 
 
-def copy_from_psql(sql_query: str, new_table_name: str, database: str):
-    """
-    Copy data from Postgres to BigQuery
-
-    Args:
-        sql_query (str): generator SQL query
-        new_table_name (str): name of the new table
-        database (str): name of the database
-    """
-    client = PsqlDatabaseClient()
-
-    # pull records from other db
-    results = PsqlDatabaseClient(database).execute_query(sql_query)
-    records = [dict(row) for row in results["data"]]
-
-    # recreate
-    client.create_table(
-        new_table_name, results["columns"], exists_ok=True, truncate_if_exists=True
-    )
-
-    # add records
-    client.insert_into_table(records, new_table_name)
-
-
 def copy_patent_approvals():
     """
-    Copy patent approvals from Postgres to bigquery
+    Copy data from Postgres (drugcentral) to Postgres (patents)
 
     Limitations:
       - Includes only NDA/ANDA, no BLAs nor other country regulatory approvals
@@ -59,28 +35,34 @@ def copy_patent_approvals():
         "(array_agg(active_ingredient_count))[1] as active_ingredient_count",
         "(array_agg(pv.route))[1] as route",
     ]
-    query = f"""
+    source_sql = f"""
         select {", ".join(PATENT_FIELDS)}
         from ob_patent_view pv, product prod, structures s
         where lower(pv.trade_name) = lower(prod.product_name)
         AND s.id = pv.struct_id
         group by pv.patent_no
     """
-    database = "drugcentral"
-    new_table_name = "patent_approvals"
-    copy_from_psql(query, new_table_name, database)
+    source_db = "drugcentral"
+    dest_db = "patents"
+    dest_table_name = "patent_approvals"
+    PsqlDatabaseClient.copy_between_db(
+        source_db=source_db,
+        source_sql=source_sql,
+        dest_db=dest_db,
+        dest_table_name=dest_table_name,
+    )
 
 
 def main():
     """
-    Copy data from Postgres to BigQuery
+    Copy data from Postgres (drugcentral) to Postgres (patents)
     """
     copy_patent_approvals()
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 copy_psql.py\nCopies psql data to BigQuery")
+        print("Usage: python3 copy_psql.py\nCopies approvals data to postgres")
         sys.exit()
 
     main()

@@ -13,3 +13,6 @@ node_modules
 s_*.py
 serverless_sdk
 .requirements.zip
+company_dedup_settings
+company_dedup_training.json
+terms.json

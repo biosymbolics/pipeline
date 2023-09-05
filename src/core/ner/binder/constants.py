@@ -20,16 +20,27 @@ NER_TYPES = [
 ]
 
 PHRASE_MAP = {
+    "activity inhibitor": "inhibitor",
     "activity modulator": "modulator",
+    "activity antagonist": "antagonist",
+    "activity agonist": "agonist",
+    "activation agonist": "agonist",
+    "activation antagonist": "antagonist",
+    "activation inhibitor": "inhibitor",
+    "activation modulator": "modulator",
     "activated protein": "protein",
     "agonist ligand": "agonist",
     "analogue": "analog",
+    "activating": "activator",
+    "activator activity": "activator",
+    "activator action": "activator",
     "antibody conjugate": "antibody",
     "antibody immunoconjugate": "antibody",
     "antibodie": "antibody",
     "antibody construct": "antibody",
     "antibody drug": "antibody",
     "associated protein": "protein",
+    "associated illness": "associated disease",
     "axis antagonist": "antagonist",
     "axis inhibitor": "inhibitor",
     "axis modulator": "modulator",
@@ -58,6 +69,7 @@ PHRASE_MAP = {
     "disorders and disease": "diseases",
     "disease state": "diseases",
     "diseases and condition": "diseases",
+    "induced diseases": "diseases",
     "family member": "family",
     "family protein": "family",
     # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
@@ -67,6 +79,7 @@ PHRASE_MAP = {
     "g[ -]?protein[ -]?coupled[ -]?receptor": "g protein-coupled receptors",
     "gpcrs?": "g protein-coupled receptors",
     "homologue": "homolog",
+    "ifn": "interferon",
     "inhibit(?:ing|ory?) (?:agent|compound|composition|pathway|peptide|protein|factor)": "inhibitor",
     "inhibit(?:ion|ory)?": "inhibitor",
     "kinases": "kinase",
@@ -85,11 +98,13 @@ PHRASE_MAP = {
     "protein kinase": "kinase",
     "protein degrader": "degrader",
     "peptide complex(?:es)?": "peptide",
+    "(?:poly)?peptide chain": "polypeptide",
     # we might want to undo this in the future (but note that the info isn't lost to the user)
     "(?:ligand )?receptor activator": "activator",
     "receptor agonist": "agonist",  # ??
     "receptor antagonist": "antagonist",  # ??
     "receptor antibody": "antibody",
+    "receptor activat(?:ion|or)": "activator",
     "receptor bind(?:ing|er)": "binder",
     "receptor inhibitor": "inhibitor",
     "receptor ligand": "ligand",
@@ -114,6 +129,7 @@ PHRASE_MAP = {
     "therapy agent": "therapy",
     "therapeutic agent": "therapy",
     "target(?:ing)? protein": "protein",
+    "target(?:ed|ing) (?:antibody|antibody conjugate)": "antibody",  # TODO - keep ADC? but often abbr as antibody, antibody conjugate, etc.
     "toll[ -]?like": "toll-like",
     "tumour": "tumor",
     "transporter inhibitor": "transport inhibitor",

@@ -3,7 +3,7 @@ Client for querying SEC docs
 """
 from datetime import date
 from functools import partial
-from typing import Any, TypedDict
+from typing import Any, Mapping, TypedDict
 from llama_index import Prompt
 from llama_index.prompts.prompt_type import PromptType
 from langchain.output_parsers import ResponseSchema
@@ -12,8 +12,7 @@ from clients.finance.yfinance_client import fetch_yfinance_data
 from clients.llama_index.parsing import get_prompts_and_parser
 from clients.low_level.boto3 import retrieve_with_cache_check
 from core import SourceDocIndex
-from core.indices.entity_index import EntityIndex
-from utils.date import format_date, parse_date
+from utils.date import format_date
 from utils.misc import dict_to_named_tuple
 from utils.parse import parse_answer
 from utils.string import get_id
@@ -44,8 +43,8 @@ class AskSecClient:
     """
 
     def __init__(self):
-        self.source_index = SourceDocIndex(model_name="GPT4")
-        self.entity_index = EntityIndex(model_name="ChatGPT")
+        self.source_index = SourceDocIndex(model_name="ChatGPT")
+        # self.entity_index = EntityIndex(model_name="ChatGPT")
         self.source = {"doc_source": "SEC", "doc_type": "10-K"}
 
     def ask_question(self, question: str, skip_cache: bool = False) -> str:
@@ -64,27 +63,30 @@ class AskSecClient:
 
         return retrieve_with_cache_check(ask, key=key)
 
-    def ask_about_entity(self, question: str) -> str:
-        """
-        Ask a question about the entity index
-        """
-        si_answer = self.entity_index.query(question, dict_to_named_tuple(self.source))
-        return si_answer
+    # def ask_about_entity(self, question: str) -> str:
+    #     """
+    #     Ask a question about the entity index
+    #     """
+    #     si_answer = self.entity_index.query(question, dict_to_named_tuple(self.source))
+    #     return si_answer
 
     def get_events(
         self,
         ticker: str,
         start_date: date,
-        end_date: date = date.today(),
+        end_date: date = date.today(),  # TODO
         skip_cache: bool = False,
     ) -> StockPriceWithEvents:
         """
         Get SEC events atop stock perf for a given ticker symbol
         """
+        source_with_co: Mapping = {
+            **self.source,
+            "company": ticker,
+        }
         key = get_id(
             {
-                **self.source,
-                "ticker": ticker,
+                **source_with_co,
                 "start_date": start_date,
                 "end_date": end_date,
             }
@@ -103,7 +105,7 @@ class AskSecClient:
         def __get_event() -> StockPriceWithEvents:
             si_answer = self.source_index.query(
                 question,
-                source=dict_to_named_tuple(self.source),
+                source=dict_to_named_tuple(source_with_co),
                 prompt_template=prompts[0],
             )
 

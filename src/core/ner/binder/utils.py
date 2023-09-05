@@ -6,10 +6,8 @@ import re
 import numpy as np
 import numpy.typing as npt
 from pydash import compact, flatten
-import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
-import time
 import logging
 import polars as pl
 
@@ -30,86 +28,90 @@ def generate_word_indices(text: str) -> list[tuple[int, int]]:
     token_re = re.compile(r"[\s\n]")
     words = token_re.split(text)
     for idx, word in enumerate(words):
+        end_adj = len(re.sub("[.,;)]$", "", word))
         start_char = sum([len(word) + 1 for word in words[:idx]])
-        end_char = start_char + len(re.sub("[.,;]$", "", word))  # add ) ?
+        # end char to be before certain punct.
+        end_char = start_char + end_adj
         word_indices.append((start_char, end_char))
     return word_indices
 
 
+def extract_prediction(
+    span_logits, feature: Feature, index: int, type_map: dict[int, str]
+) -> list[Annotation]:
+    """
+    Extract predictions from a single feature.
+    """
+
+    def start_end_types(
+        feature: Feature,
+    ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        """
+        Extracts predictions from the tensor
+        """
+        # https://github.com/pytorch/pytorch/issues/77764
+        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
+        token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
+        token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
+
+        # using the [CLS] logits as thresholds
+        span_preds = np.triu(cpu_span_logits > cpu_span_logits[:, 0:1, 0:1])
+
+        type_ids, start_indexes, end_indexes = (
+            token_start_mask[np.newaxis, :, np.newaxis]
+            & token_end_mask[np.newaxis, np.newaxis, :]
+            & span_preds
+        ).nonzero()
+
+        return (start_indexes, end_indexes, type_ids)
+
+    def create_annotation(start, end, type, feature: Feature, idx: int):
+        """
+        Applies offset and creates an annotation.
+        """
+        offset_mapping = feature["offset_mapping"]
+        start_char, end_char = (
+            offset_mapping[start][0],  # type: ignore
+            offset_mapping[end][1],  # type: ignore
+        )
+        pred = Annotation(
+            id=f"{feature['id']}-{idx}",
+            entity_type=type_map[type],
+            start_char=int(start_char),
+            end_char=int(end_char),
+            text=feature["text"][start_char:end_char],
+        )
+        return pred
+
+    start_indexes, end_indexes, type_ids = start_end_types(feature)
+
+    annotations = compact(
+        [
+            create_annotation(*tup, feature, idx)
+            for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
+        ]
+    )
+    return annotations
+
+
 def extract_predictions(
-    features: list[Feature], predictions: npt.NDArray, type_map: dict[int, str]
+    features: list[Feature],
+    predictions: npt.NDArray,
+    type_map: dict[int, str],
 ) -> list[Annotation]:
     """
     Extract predictions from a list of features.
 
-    TODO: convuluted; factor. Also might be reasonable to return Spans instead of Annotations
-
     Args:
         features: the features from which to extract predictions.
         predictions: the span predictions from the model.
+        type_map: the type map for reconstituting the NER types
     """
-
-    def __extract_prediction(span_logits, feature: Feature) -> list[Annotation]:
-        """
-        Extract predictions from a single feature.
-        """
-
-        def start_end_types(
-            span_logits: torch.Tensor, feature: Feature
-        ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
-            """
-            Extracts predictions from the tensor
-            """
-            token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
-            token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
-
-            # using the [CLS] logits as thresholds
-            span_preds = np.triu(span_logits > span_logits[:, 0:1, 0:1])
-
-            type_ids, start_indexes, end_indexes = (
-                token_start_mask[np.newaxis, :, np.newaxis]
-                & token_end_mask[np.newaxis, np.newaxis, :]
-                & span_preds
-            ).nonzero()
-
-            return (start_indexes, end_indexes, type_ids)
-
-        def create_annotation(tup: tuple[int, int, int], feature: Feature, idx: int):
-            """
-            Applies offset and creates an annotation.
-            """
-            offset_mapping = feature["offset_mapping"]
-            start_char, end_char = (
-                offset_mapping[tup[0]][0],  # type: ignore
-                offset_mapping[tup[1]][1],  # type: ignore
-            )
-            pred = Annotation(
-                id=f"{feature['id']}-{idx}",
-                entity_type=type_map[tup[2]],
-                start_char=int(start_char),
-                end_char=int(end_char),
-                text=feature["text"][start_char:end_char],
-            )
-            return pred
-
-        start_time = time.time()
-        # https://github.com/pytorch/pytorch/issues/77764
-        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
-        start_indexes, end_indexes, type_ids = start_end_types(cpu_span_logits, feature)
-        logger.debug(
-            "Extracted predictions in %s seconds", round(time.time() - start_time, 2)
-        )
-
-        annotations = compact(
-            [
-                create_annotation(tup, feature, idx)
-                for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
-            ]
-        )
-        return annotations
-
     all_predictions = flatten(
-        [__extract_prediction(predictions[0], feature) for feature in features]
+        [
+            extract_prediction(predictions[i], feature, i, type_map)
+            for i, feature in enumerate(features)
+        ]
     )
 
     return all_predictions
@@ -125,57 +127,48 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
         text: the text to prepare features for.
         tokenized: the tokenized text.
 
-    Note: this is kinda convuluted and should be refactored.
+    Note: this is kinda convoluted and should be refactored.
     """
     word_idx = generate_word_indices(text)
     word_start_chars = [word[0] for word in word_idx]
     word_end_chars = [word[1] for word in word_idx]
 
-    num_features = len(tokenized.pop("input_ids"))
-    offset_mapping = tokenized.pop("offset_mapping")
+    num_features = len(tokenized["input_ids"])  # type: ignore
+    offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
 
-    def process_feature(text: str, offset_mapping, i: int):
-        feature: Feature = {
-            "id": f"feat-{str(i + 1)}",
-            "text": text,
-            "token_start_mask": [],
-            "token_end_mask": [],
-            "offset_mapping": offset_mapping[i],
-        }
+    def process_feature(text: str, i: int):
         sequence_ids = tokenized.sequence_ids(i)
 
-        # Create a DataFrame
         df = pl.DataFrame(
             {
-                "offset_mapping": list(
-                    offset_mapping[i].detach().cpu().clone().numpy()
-                ),
-                "sequence_ids": list(sequence_ids),
+                "start": [om[0] for om in offset_mapping[i]],
+                "end": [om[1] for om in offset_mapping[i]],
+                "sequence_ids": sequence_ids,
             }
         )
 
-        # Split offset_mapping into two separate columns for start and end
-        df = df.with_columns(
-            (
-                pl.col("offset_mapping").apply(lambda om: om[0] in word_start_chars)
-                & ((pl.col("sequence_ids") == 0))
-            ).alias("start_mask"),
-            (
-                pl.col("offset_mapping").apply(lambda om: om[1] in word_end_chars)
-                & ((pl.col("sequence_ids") == 0))
-            ).alias("end_mask"),
-        )
+        feature: Feature = {
+            "id": f"feat-{str(i + 1)}",
+            "text": text,
+            "token_start_mask": df.select(
+                pl.col("start").is_in(word_start_chars) & (pl.col("sequence_ids") == 0)
+            )
+            .to_series()
+            .to_list(),
+            "token_end_mask": df.select(
+                pl.col("end").is_in(word_end_chars) & (pl.col("sequence_ids") == 0)
+            )
+            .to_series()
+            .to_list(),
+            "offset_mapping": [
+                om if sequence_ids[k] == 0 else None
+                for k, om in enumerate(offset_mapping[i])
+            ],
+        }
 
-        feature["token_start_mask"] = (
-            df.select(pl.col("start_mask")).to_series().to_list()
-        )
-        feature["token_end_mask"] = df.select(pl.col("end_mask")).to_series().to_list()
-        feature["offset_mapping"] = [
-            o if sequence_ids[k] == 0 else None for k, o in enumerate(offset_mapping[i])
-        ]
         return feature
 
-    features = [process_feature(text, offset_mapping, i) for i in range(num_features)]
+    features = [process_feature(text, i) for i in range(num_features)]
     return features
 
 

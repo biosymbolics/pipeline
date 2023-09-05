@@ -14,13 +14,15 @@ MECHANISM_BASE_TERMS: list[str] = [
     "analgesic",
     "anaesthetic",
     "anti[ -]?microbial",
-    "anti[ -]?biotic" "anti[ -]?infective",
-    "anti[ -]?inflammatory",
+    "anti[ -]?biotic",
+    "anti[ -]?infective",
+    "anti[ -]?inflammator(?:y|ie)",
     "anti[ -]?bacterial",
     "anti[ -]?viral",
     "anti[ -]?metabolite",
     "carrier",
     "catalyst",
+    "chaperone",
     "contraception",
     "co[- ]?factor",
     "(?:cross[ -]?)?linker",
@@ -35,7 +37,6 @@ MECHANISM_BASE_TERMS: list[str] = [
     "emollient",
     "emulsifier",
     "encoder",
-    "expression vectors",
     "factor",
     "growth factor",
     "interference",
@@ -44,8 +45,9 @@ MECHANISM_BASE_TERMS: list[str] = [
     "lubricant",
     "metabolite",
     "mimetic",
+    "(?:(?:neo|peri)[ -]?)?adjuvant",
     "(?:oligo[ -])?nucleotide",
-    "phototherapy",
+    "phototherap(?:y|ie)",
     "precursor",
     "primer",
     "pro[ -]?drug",
@@ -53,6 +55,7 @@ MECHANISM_BASE_TERMS: list[str] = [
     "solvent",
     "surfactant",
     "target",  # ??
+    "transcription(?: factor)?",
     "transfer",
     "toxin",
     "vaccine",
@@ -65,36 +68,45 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "anion",
     "antibod(?:ie|y)",
     "autoantibod(?:y|ie)",
-    "ADC",
+    "adc",
     "antibody[ -]?drug conjugate",
+    "bcma(?: nke)?",
+    "car[- ]?(?:t|nk)",
+    "chimeric antigen receptor.*",
     "chemotherap(?:y|ie)",  # not necessary biologic, more class/descriptive
-    "cell",
+    "(?:adoptive )?cell(?: tranfer)?(?: therap(?:y|ie))?",
     "clone",
+    "cytokine",
     "decomposition",
     "dimer",
     "epitope",
     "exosome",
     "enzyme",
-    "(?:hairpin|micro|messenger|sh|si|ds|m|hp)?[ -]?rna",
+    "fab(?: region)?",
+    "factor [ivx]{1,3}",
+    "fc(?:[- ]fusion )?(?: protein)?",
+    "fusion" "(?:hairpin|micro|messenger|sh|si|ds|m|hp)?[ -]?rna",
     "double[- ]?stranded rna",
     "isoform",
     "(?:phospho[ -]?)?lipid",
     "kinase",
-    "monomer",
+    "(?:mono|poly)mer",
+    "(?:natural killer|nkt|nkc)(?: cells)?",
     "neoantigen",
     "nuclease",
     "oligomer",
-    "polymer",
+    "(?:poly[ -]?)?peptide",
     "protease",
+    "protein",
     "recognizer",
     "sequence",
     "scaffold",
     "scfv",  # single-chain variable fragment
     "liposome",
-    "vector",
+    "(?:expression )?vector",
     "stem cell",
-    "gene therap(?:y|ie)",
-    "immunotherap(?:y|ie)",
+    "(?:tumor[- ]?infiltrating )?lymphocyte",
+    "(?:(?:immuno|gene)[ -]?)?therap(?:y|ie)",
 ]
 COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "acid",
@@ -126,7 +138,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "complex(?:e)?",
     "composition",
     "component",
-    "(?:binding )?compound",
+    "(?:binding )?(?:compound|molecule)",
     "cream",
     "derivative",
     "detergent",
@@ -139,7 +151,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "formation",
     "function",
     "gel",
-    "group",
+    # "group",
     "herb",
     "homologue",
     "infusion",
@@ -172,6 +184,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "strain",
     "strand",
     "substance",
+    "substitute",
     "substrate",
     "subunit",
     "suppository",
@@ -183,11 +196,15 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "variant",
 ]
 
+COMPOUND_BASE_TERMS = [
+    *COMPOUND_BASE_TERMS_SPECIFIC,
+    *COMPOUND_BASE_TERMS_GENERIC,
+]
+
 INTERVENTION_BASE_TERMS = [
     *BIOLOGIC_BASE_TERMS,
     *MECHANISM_BASE_TERMS,
-    *COMPOUND_BASE_TERMS_SPECIFIC,
-    *COMPOUND_BASE_TERMS_GENERIC,
+    *COMPOUND_BASE_TERMS,
 ]
 
 MECHANISM_BASE_TERM_SETS: list[list[str]] = [
@@ -199,8 +216,9 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "immunological",
         "immunoconjugate",
         "immunotherapy",
-        "immunogenic compositions",
+        "immunogenic composition",
     ],
+    ["potentiator", "potentiation", "potentiating", "potentiate"],
     ["regenerate", "regeneration", "regenerating", "regeneration"],
     ["stabilizer", "stabilizing", "stabilize", "stabilization"],
     ["modifier", "modifying", "modification"],
@@ -228,10 +246,23 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "(?:(?:neuro|immuno)[- ]?)?modulator",
     ],
     ["promotion", "promoting", "promote"],
+    [
+        "(?:t[ -]cell )?engager",
+        "(?:t[ -]cell )?engaging(?: receptor)?",
+        "(?:t[ -]cell )?engage",
+        "(?:t[ -]cell )?engagement",
+        # "t[- ]?cell engaging receptor",
+        "tce",
+        "tcer",
+    ],
     ["enhancement", "enhancing", "enhance", "enhancer"],
-    ["regulator", "regulation", "regulating"],
+    [
+        "(?:(?:down|up)[ -]?)?regulator",
+        "(?:(?:down|up)[ -]?)?regulation",
+        "(?:(?:down|up)[ -]?)?regulating",
+    ],
     ["degrader", "degradation", "degrading", "degrade"],
-    ["inducer", "inducing", "induce", "induction"],
+    ["inducer", "inducing", "induction"],
     ["promoter", "promoting", "promote", "promotion"],
     ["blocker", "blockade", "blocking", "block"],
     ["transporter", "transporting", "transport", "transportation"],
@@ -245,20 +276,50 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
 ]
 
 BIOLOGIC_BASE_TERM_SETS: list[list[str]] = [
-    ["(?:glyco[ -]?)?protein", "(?:glyco[ -]?)?proteins? binding"],
+    [
+        "(?:(?:glyco|fusion)[ -]?)?protein",
+        "(?:(?:glyco|fusion)[ -]?)?proteins? binding",
+    ],
     ["(?:poly)peptide", "(?:poly)peptides? binding"],
     ["(?:poly)?nucleotide", "(?:poly)?nucleotides? binding"],
-    ["ligand", "ligands? binding", "ligands? that bind"],
     [
-        "(?:dna |nucleic acid)?fragment",
-        "(?:dna |nucleic acid)?fragments? binding",
-        "(?:dna |nucleic acid)?fragments? that bind",
+        "(?:receptor |protein )?ligand",
+        "(?:receptor |protein )?ligands? binding",
+        "(?:receptor |protein )?ligands? that bind",
+    ],
+    [
+        "(?:dna |nucleic acid )?fragment",
+        "(?:dna |nucleic acid )?fragments? binding",
+        "(?:dna |nucleic acid )?fragments? that bind",
     ],
 ]
 COMPOUND_BASE_TERM_SETS: list[list[str]] = [
     ["conjugation", "conjugating", "conjugate"],
     ["(?:small |antibody )?molecule", "(?:small |antibody )?molecules? binding"],
 ]
+
+ALL_COMPOUND_BASE_TERMS = [
+    *COMPOUND_BASE_TERMS,
+    *flatten(COMPOUND_BASE_TERM_SETS),
+]
+
+ALL_COMPOUND_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_COMPOUND_BASE_TERMS], "+")
+
+ALL_BIOLOGIC_BASE_TERMS = [
+    *BIOLOGIC_BASE_TERMS,
+    *flatten(BIOLOGIC_BASE_TERM_SETS),
+]
+
+ALL_BIOLOGIC_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_BIOLOGIC_BASE_TERMS], "+")
+
+ALL_MECHANISM_BASE_TERMS = [
+    *MECHANISM_BASE_TERMS,
+    *flatten(MECHANISM_BASE_TERM_SETS),
+]
+
+ALL_MECHANISM_BASE_TERMS_RE = get_or_re(
+    [f"{t}s?" for t in ALL_MECHANISM_BASE_TERMS], "+"
+)
 
 INTERVENTION_BASE_TERM_SETS: list[list[str]] = [
     *MECHANISM_BASE_TERM_SETS,
@@ -267,36 +328,35 @@ INTERVENTION_BASE_TERM_SETS: list[list[str]] = [
 ]
 
 ALL_INTERVENTION_BASE_TERMS = [
-    *INTERVENTION_BASE_TERMS,
-    *flatten(INTERVENTION_BASE_TERM_SETS),
+    *ALL_COMPOUND_BASE_TERMS,
+    *ALL_BIOLOGIC_BASE_TERMS,
+    *ALL_MECHANISM_BASE_TERMS,
 ]
 ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 
 
+# TODO split generic and specific; remove generic
 INTERVENTION_BASE_PREFIXES = [
     "acceptable",
     "allosteric",
     "anti",
     "aromatic",
-    "bi[- ]?specific",
+    "(?:(?:bi|mono|multi|poly)[- ]?)specific",
+    "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
     "chimeric",
     "cyclic",
     "dual",
     "encoding",
-    "(?:bi[- ])?functional",
+    "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "heterocyclic",
     "inverse",
     "irreversible",
     "(?:ion )?channel",
     "inventive",
-    "monoclonal",
-    "multi[- ]?specific",
     "negative",
     "novel",
     "new",
     "partial",
-    "polyclonal",
-    "poly[- ]?specific",
     "positive",
     "potent",
     "optionally",
@@ -304,9 +364,15 @@ INTERVENTION_BASE_PREFIXES = [
     "reversible",
     "recombinant",
     "topical",
-    "tricyclic",
+    "tri(?:cyclic)?",
     "selective",
     "single",
     "short",
     "substituted",
+    "therapeutic",
+    "cd[0-9]{1,2}",
+    "cd[0-9]{1,2}-cd[0-9]{2}",
+    "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20
+    "cd[0-9]{1,2}x[A-Z]{3,6}",  # CD3xPSCA
+    "il[0-9]{1,2}-cd[0-9]{2}",
 ]

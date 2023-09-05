@@ -94,3 +94,5 @@ def is_sci_spacy_linker(linker: Pipe) -> TypeGuard[SciSpacyLinker]:
 
 
 GetTokenizer = Callable[[Language], Tokenizer]
+
+SynonymRecord = TypedDict("SynonymRecord", {"term": str, "synonym": str})

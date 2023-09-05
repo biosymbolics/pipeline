@@ -128,9 +128,12 @@ class EntityCleaner:
 
         only parallelize if
             1) parallelize is set to true and
-            2) there are more than 800 entities (otherwise the overhead probably exceeds the benefits)
+            2) there are more than 10000 entities (otherwise the overhead probably exceeds the benefits)
+
+        TODO: it might never make sense to parallelize.
+        Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
         """
-        parallelize = self.parallelize and num_entries > 800
+        parallelize = self.parallelize and num_entries > 10000
         return MAX_N_PROCESS if parallelize else 1
 
     @property
@@ -231,15 +234,25 @@ class EntityCleaner:
 
                 # removes `(IL-2)` from `Interleukin-2 (IL-2) inhibitor`
                 no_parenth = re.sub(
-                    r"(?i)(?<=[ ,])(\([a-z-0-9]+\))(?=(?: |,|$))", "", term
+                    r"(?<=[ ,])(\([a-z-0-9 ]+\))(?=(?: |,|$))",
+                    "",
+                    term,
+                    flags=re.DOTALL | re.IGNORECASE,
                 )
                 # `poly(isoprene)` -> `polyisoprene``
-                no_parens = re.sub(r"(?i)\(([a-z-0-9]+)\)", r"\1", no_parenth)
+                no_parens = re.sub(
+                    r"\(([a-z-0-9]+)\)",
+                    r"\1",
+                    no_parenth,
+                    flags=re.DOTALL | re.IGNORECASE,
+                )
                 yield no_parens
 
         def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
-                return re.sub(rf"(?i)\b{syn}s?\b", canonical, s, flags=re.DOTALL)
+                return re.sub(
+                    rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
+                )
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
@@ -257,7 +270,7 @@ class EntityCleaner:
             decode_html,
             remove_chars,
             unwrap,
-            format_parentheticals,  # order matters (after unwrap)
+            format_parentheticals,  # order matters (run after unwrap)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
             partial(
@@ -366,7 +379,7 @@ class EntityCleaner:
             lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
         )
 
-        logging.debug(
+        logging.info(
             "Cleaned %s entities in %s seconds",
             len(entities),
             round(time.time() - start, 2),

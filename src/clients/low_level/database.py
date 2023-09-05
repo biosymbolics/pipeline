@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 T = TypeVar("T", bound=Mapping)
-ExecuteResult = TypedDict("ExecuteResult", {"columns": list[str], "data": list[dict]})
+ExecuteResult = TypedDict(
+    "ExecuteResult", {"columns": dict[str, str], "data": list[dict]}
+)
 
 
 class DatabaseClient:
@@ -85,8 +87,35 @@ class DatabaseClient:
         logger.info("Inserting via query (%s) into table %s", query, table_id)
         self.execute_query(query)
 
+    def create_and_insert(
+        self,
+        records: list[T],
+        table_name: str,
+        columns: list[str] | dict[str, str] | None = None,
+        truncate_if_exists: bool = True,
+        transform: Callable[[list[T]], list[T]] | None = None,
+        batch_size: int = 1000,
+    ):
+        """
+        Create a table and insert rows into it
+
+        Args:
+            records (list[dict]): list of records to insert
+            table_name (str): name of the table
+            batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
+        """
+        schema = columns or list(records[0].keys())
+        self.create_table(
+            table_name, schema, exists_ok=True, truncate_if_exists=truncate_if_exists
+        )
+        self.insert_into_table(records, table_name, transform, batch_size)
+
     def insert_into_table(
-        self, records: list[T], table_name: str, batch_size: int = 1000
+        self,
+        records: list[T],
+        table_name: str,
+        transform: Callable[[list[T]], list[T]] | None = None,
+        batch_size: int = 1000,
     ):
         """
         Insert rows into a table from a list of records
@@ -101,7 +130,8 @@ class DatabaseClient:
         for i, b in enumerate(batched):
             logging.debug("Inserting batch %s into table %s", i, table_name)
             try:
-                self._insert(table_name, records=b)
+                _records = transform(b) if transform else b
+                self._insert(table_name, _records)
             except Exception as e:
                 logging.error("Error inserting rows: %s", e)
                 raise e
@@ -111,7 +141,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        columns: list[str] | dict[str, str],
+        schema: list[str] | dict[str, str],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):
@@ -120,7 +150,7 @@ class DatabaseClient:
 
         Args:
             table_name (str): name of the table (with or without dataset prefix)
-            columns: list of column names or dict (column name -> type)
+            schema: list of column names or dict (column name -> type)
             exists_ok (bool): if True, do not raise an error if the table already exists
             truncate_if_exists (bool): if True, truncate the table if it already exists
         """
@@ -137,7 +167,7 @@ class DatabaseClient:
             else:
                 logging.info("Table %s already exists", table_name)
         else:
-            self._create(table_name, columns)
+            self._create(table_name, schema)
 
     def delete_table(self, table_name: str, is_cascade: bool = False):
         """

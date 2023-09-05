@@ -49,7 +49,7 @@ def aggregate_over_time(event: ReportEvent, context):
 
         summaries = aggregate(
             patents,
-            x_dimensions=[*DOMAINS_OF_INTEREST, "ipc_codes", "similar"],
+            x_dimensions=[*DOMAINS_OF_INTEREST, "similar_patents"],
             y_dimensions=["priority_date"],
             y_transform=lambda y: y.year,
         )

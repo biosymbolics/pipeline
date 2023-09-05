@@ -22,20 +22,20 @@ PHARMA_TICKERS = [
     # "ABBV",
     # "AMGN",
     # "GSK", # 20-F
-    # "GILD",
+    # # "GILD",
     # "NVO", # 20-F
     # "TAK", # 20-F
-    # "LLY",
+    "LLY",
     # "AZN", # 20-F
     # "BAYRY", # 20-F
     # "RHHBY", # 20-F
     # "MTZPY", # 20-F
-    # "MRK",
-    # "BMY",
+    "MRK",
+    "BMY",
     "BIIB",
-    # "SNY",
-    # "VTRS",
-    # "REGN",
+    "SNY",
+    "VTRS",
+    "REGN",
 ]
 
 
@@ -65,7 +65,7 @@ async def main():
     Build SEC stuffs
 
     Usage:
-        >>> python3 -m  workflows.enpv.build
+        >>> python3 -m  data.workflows.enpv.build
     """
     start_date = datetime(2015, 1, 1)
     closures = [__build_indices(ticker, start_date) for ticker in PHARMA_TICKERS]

@@ -90,7 +90,7 @@ class BQDatabaseClient(DatabaseClient):
         # Wait for the job to complete
         results = list(query_job.result())
         logging.info("Query complete")
-        return {"data": results, "columns": []}
+        return {"data": results, "columns": {}}
 
     @overrides(DatabaseClient)
     def _insert(self, table_name: str, records: list[T]):

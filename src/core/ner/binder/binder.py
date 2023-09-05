@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DOC_STRIDE = 16
-MAX_LENGTH = 128  # max??
+MAX_LENGTH = 128  # same as with training
 DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_DEVICE = "mps"
 
@@ -76,13 +76,6 @@ class BinderNlp:
         Args:
             doc (Union[str, Doc]): text or SpaCy Doc
             annotations (list[Annotation]): list of annotations
-
-        ```
-        from core.ner.binder.binder import BinderNlp
-        b = BinderNlp("binder.pt")
-        text="Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-        b.extract(text).ents
-        ```
         """
         # TODO: have this use tokenization identical to the model (biobert)
         new_doc = self.nlp(doc) if not isinstance(doc, Doc) else doc
@@ -150,10 +143,22 @@ class BinderNlp:
 
         Args:
             doc (Union[str, Doc]): The Spacy Docs (or strings) to annotate.
+
+        ```
+        import system; system.initialize()
+        from core.ner.binder.binder import BinderNlp
+        b = BinderNlp("models/binder.pt")
+        text="\n ".join([
+            "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+            for i in range(20)
+        ]) + " and some melanoma."
+        b.extract(text).ents
+        ```
         """
         text = doc.text if isinstance(doc, Doc) else doc
-        features = prepare_features(text, self.tokenize(text))
-        inputs = self.tokenize(text, {"return_tensors": "pt"})
+        inputs = self.tokenize(text)
+        features = prepare_features(text, inputs)
+        inputs.pop("overflow_to_sample_mapping")
 
         predictions = self.model(
             **inputs,
@@ -161,7 +166,7 @@ class BinderNlp:
         )
 
         annotations = extract_predictions(
-            features, predictions.__dict__["span_scores"], self.type_map
+            features, predictions.span_scores, self.type_map
         )
         return self.get_doc(doc, annotations)
 

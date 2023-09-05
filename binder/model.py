@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple, List, Union, Dict
 import torch
-from torch import nn
+from torch import LongTensor, nn
 import torch.nn.functional as F
 import numpy as np
 from transformers import PreTrainedModel, AutoModel, AutoConfig
@@ -59,10 +59,10 @@ def masked_log_softmax(
 
 
 def contrastive_loss(
-    scores: torch.FloatTensor,
+    scores: torch.FloatTensor | torch.Tensor,
     positions: Union[List[int], Tuple[List[int], List[int]]],
     mask: torch.BoolTensor,
-    prob_mask: torch.BoolTensor = None,
+    prob_mask: torch.BoolTensor | None = None,
 ) -> torch.FloatTensor:
     batch_size, seq_length = scores.size(0), scores.size(1)
     if len(scores.shape) == 3:
@@ -84,10 +84,10 @@ def contrastive_loss(
 
 def l2reg_contrastive_loss(
     parameters: list[torch.nn.Parameter],
-    scores: torch.FloatTensor,
+    scores: torch.FloatTensor | torch.Tensor,
     positions: Union[List[int], Tuple[List[int], List[int]]],
     mask: torch.BoolTensor,
-    prob_mask: torch.BoolTensor = None,
+    prob_mask: torch.BoolTensor | None = None,
     lambda_l2: float = 0.00000002,
 ) -> torch.FloatTensor:
     """
@@ -109,10 +109,10 @@ def l2reg_contrastive_loss(
 
 @dataclass
 class BinderModelOutput(ModelOutput):
+    start_scores: torch.FloatTensor | None = None  # otherwise "should not have more than one required field" from transformers
+    end_scores: torch.FloatTensor | None = None
+    span_scores: torch.FloatTensor | None = None
     loss: Optional[torch.FloatTensor] = None
-    start_scores: torch.FloatTensor = None
-    end_scores: torch.FloatTensor = None
-    span_scores: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
 
@@ -206,14 +206,14 @@ class Binder(PreTrainedModel):
 
     def forward(
         self,
-        input_ids: torch.LongTensor = None,  # type: ignore
-        attention_mask: torch.Tensor = None,  # type: ignore
-        token_type_ids: torch.Tensor = None,  # type: ignore
-        type_input_ids: torch.LongTensor = None,  # type: ignore
-        type_attention_mask: torch.Tensor = None,  # type: ignore
-        type_token_type_ids: torch.Tensor = None,  # type: ignore
+        input_ids: torch.LongTensor,
+        attention_mask: torch.Tensor,
+        token_type_ids: torch.Tensor,
+        type_input_ids: torch.LongTensor,
+        type_attention_mask: torch.Tensor,
+        type_token_type_ids: torch.Tensor,
         ner: Optional[Dict] = None,
-        return_dict: bool = None,  # type: ignore
+        return_dict: bool | None = None,
     ):
         return_dict = (
             return_dict if return_dict is not None else self.hf_config.use_return_dict
@@ -282,7 +282,7 @@ class Binder(PreTrainedModel):
         if self.width_embeddings is not None:
             if torch.cuda.is_available():
                 range_vector = (
-                    torch.cuda.LongTensor(seq_length, device=sequence_output.device)
+                    LongTensor(seq_length, device=sequence_output.device)
                     .fill_(1)
                     .cumsum(0)
                     - 1
@@ -342,13 +342,13 @@ class Binder(PreTrainedModel):
             )
 
             start_threshold_loss = l2reg_contrastive_loss(
-                self.parameters(), flat_start_scores, 0, start_negative_mask  # type: ignore
+                list(self.parameters()), flat_start_scores, [0], start_negative_mask
             )
             end_threshold_loss = l2reg_contrastive_loss(
-                self.parameters(), flat_end_scores, 0, end_negative_mask  # type: ignore
+                list(self.parameters()), flat_end_scores, [0], end_negative_mask
             )
             span_threshold_loss = l2reg_contrastive_loss(
-                self.parameters(), flat_span_scores, (0, 0), span_negative_mask  # type: ignore
+                list(self.parameters()), flat_span_scores, [0, 0], span_negative_mask
             )
 
             threshold_loss = (
@@ -366,16 +366,19 @@ class Binder(PreTrainedModel):
             ner_span_masks = ner["example_span_masks"]
 
             start_loss = l2reg_contrastive_loss(
-                self.parameters(),
+                list(self.parameters()),
                 start_scores[ner_indices],
                 ner_starts,
                 ner_start_masks,
             )
             end_loss = l2reg_contrastive_loss(
-                self.parameters(), end_scores[ner_indices], ner_ends, ner_end_masks
+                list(self.parameters()),
+                end_scores[ner_indices],
+                ner_ends,
+                ner_end_masks,
             )
             span_loss = l2reg_contrastive_loss(
-                self.parameters(),
+                list(self.parameters()),
                 span_scores[ner_indices],
                 (ner_starts, ner_ends),
                 ner_span_masks,
@@ -397,10 +400,10 @@ class Binder(PreTrainedModel):
             return ((total_loss,) + output) if total_loss is not None else output
 
         return BinderModelOutput(
-            loss=total_loss,
             start_scores=start_scores,
             end_scores=end_scores,
             span_scores=span_scores,
+            loss=total_loss,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )

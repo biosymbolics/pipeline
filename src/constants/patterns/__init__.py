@@ -4,11 +4,9 @@ Pattern constants
 __all__ = [
     "BIOLOGIC_INFIXES",
     "BIOLOGIC_SUFFIXES",
-    "EFFECTS",
     "INDICATION_REGEXES",
     "INDICATION_MODIFIER_REGEXES",
     "IUPAC_RE",
-    "MOA_ACTIONS",
     "MOA_INFIXES",
     "MOA_PREFIXES",
     "MOA_SUFFIXES",
@@ -20,8 +18,6 @@ __all__ = [
 from .biologics import BIOLOGIC_INFIXES, BIOLOGIC_SUFFIXES
 from .indication import INDICATION_MODIFIER_REGEXES, INDICATION_REGEXES
 from .moa import (
-    ACTIONS as MOA_ACTIONS,
-    EFFECTS,
     MOA_INFIXES,
     MOA_PREFIXES,
     MOA_SUFFIXES,

@@ -14,6 +14,7 @@ RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
     "very high": 0.75,
 }
 
+EST_MAX_CLINDEV = 10
 MAX_PATENT_LIFE = 20
 
 DOMAINS_OF_INTEREST = [

@@ -10,7 +10,7 @@ from clients.patents.constants import DOMAINS_OF_INTEREST
 from typings import PatentApplication
 from utils.list import dedup
 
-from .score import calculate_score
+from .score import calculate_scores
 from .utils import get_patent_years
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def format_search_result(
         ],
     ).drop("terms", "domains")
 
-    df = calculate_score(df).sort("score").reverse()
+    df = calculate_scores(df).sort("score").reverse()
 
     logging.info(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)

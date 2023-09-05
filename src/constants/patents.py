@@ -1,5 +1,5 @@
+from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
-from .patterns import MOA_ACTIONS
 
 COMPOSITION_OF_MATTER_IPC_CODES = [
     "C01",  # inorganic chemistry
@@ -28,6 +28,8 @@ METHOD_OF_USE_IPC_CODES = [
 ]
 
 COMPANY_SUPPRESSIONS_DEFINITE = [
+    "»",
+    "«",
     "LTD",
     "INC",
     "CORP",
@@ -58,8 +60,8 @@ COMPANY_SUPPRESSIONS_DEFINITE = [
     "PATENTS",
     "THE",
     "OF$",
-    "^\\s*-",
-    "^\\s*&",
+    r"^\s*-",
+    r"^\s*&",
 ]
 
 COMPANY_SUPPRESSIONS_MAYBE = [
@@ -181,22 +183,24 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "TECHNOLOGY SERVICES",
     "TECHNOLOGIES",
     "THERAPEUTIC",
-    "»",
-    "«",
-    "\\(.+\\)",  # remove any parantheticals
 ]
+
 
 COUNTRIES = [
     "CALISTOGA",
     "CANADA",
+    "CHINA",
     "COLORADO",
     "DE",
     "DEUTSCHLAND",
     "EU",
     "NORTH AMERICA",
     "NA",
+    "INDIA",
     "IRELAND",
     "JAPAN",
+    "MA",
+    "MFG",
     "PALO ALTO",
     "SAN DIEGO",
     "UK",
@@ -207,13 +211,14 @@ COUNTRIES = [
 COMPANY_SUPPRESSIONS = [
     *COMPANY_SUPPRESSIONS_DEFINITE,
     *COMPANY_SUPPRESSIONS_MAYBE,
-    *COUNTRIES,
+    *[c for c in COUNTRIES],
 ]
 
 
 COMPANY_MAP = {
     "massachusetts inst technology": "Massachusetts Institute of Technology",
     "roche": "Roche",
+    "biogen": "Biogen",
     "boston scient": "Boston Scientific",
     "boston scimed": "Boston Scientific",
     "lilly co eli": "Eli Lilly",
@@ -251,10 +256,16 @@ COMPANY_MAP = {
     "dow": "Dow",
 }
 
+OWNER_TERM_MAP = {
+    "lab": "laboratory",
+    "labs": "laboratories",
+    "univ": "university",
+}
+
 PATENT_ATTRIBUTE_MAP = {
     "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [
-        *MOA_ACTIONS,
+        *ALL_INTERVENTION_BASE_TERMS,
         "composition",
         "compound",
         "composition",
@@ -361,21 +372,21 @@ PATENT_ATTRIBUTE_MAP = {
 PATENT_ATTRIBUTES = dict([(k, k) for k in PATENT_ATTRIBUTE_MAP.keys()])
 
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
-    "COMBINATION": 0,
+    "COMBINATION": -1,
     "COMPOUND_OR_MECHANISM": 3,
     "DEVICE": -2,
-    "DIAGNOSTIC": -1.5,
+    "DIAGNOSTIC": -2,
     "DISEASE_MODIFYING": 1.5,
     "FORMULATION": -0.25,
     "IRRELEVANT": -5,
     "METHOD": -0.25,  # really only a prob if not COM
-    "METHOD_OF_ADMINISTRATION": -0.5,
+    "METHOD_OF_ADMINISTRATION": -1.0,
     "NOVEL": 1.5,
     "PALLIATIVE": 0,
     "PREVENTATIVE": 1,
     "PROCEDURE": -1.5,
     "PROCESS": -1,
-    "TREATMENT": 1,
+    "TREATMENT": 0,
 }
 
 

@@ -65,6 +65,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "in": "leading",
     "recombinant": "all",
     "novel": "all",
+    "exceptional": "all",
     "non[ -]?toxic": "leading",
     "(?:non )?selective": "leading",
     "adequate": "leading",
@@ -150,6 +151,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "based": "trailing",
     "an?": "leading",
     "active": "all",
+    "wherein": "all",
     "additional": "all",
     "additive": "all",
     "advantageous": "all",
@@ -385,6 +387,11 @@ DELETION_TERMS = [
     "(?:.* )?capacitor",
     "(?:.* )?mass spectrometry",
     "accelerometer",
+    "container",
+    "reservoir",
+    "elongated housing",
+    "modulator device",
+    "injector body",
     "(?:.* )?diaphragm",
     "(?:.* )?cartridge",
     "(?:.* )?plunger",
@@ -671,6 +678,7 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
+    # inhibition of apoptosis signal-regulating kinase 1 (ASK1)
     def get_query(term_or_term_set: str | list[str], field: TextField):
         if isinstance(term_or_term_set, list):
             # term set
@@ -679,7 +687,7 @@ def fix_of_for_annotations():
             re_term = term_or_term_set + "s?"
         sql = f"""
             UPDATE {WORKING_TABLE} ba
-            SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+ (?:(?:the|a) )?.*?)(?:and|useful|for|,|$)'))
+            SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+(?:(?:the|a) )?.*?)(?:and|useful|for|,|.|$)'))
             FROM applications a
             WHERE ba.publication_number=a.publication_number
             AND term ~* '^(?:{prefix_re})*{re_term}$'
@@ -779,19 +787,16 @@ def clean_up_junk():
         f"update {WORKING_TABLE} "
         + r"set term=(REGEXP_REPLACE(term, '[)(]', '', 'g')) where term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^\"', '')) where term ~ '^\"'",
+        # orphaned closing parens
         f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
-        # leading whitespace
-        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
-        # trailing whitespace
-        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[ ]+$', '')) where term ~ '[ ]+$'",
+        # leading/trailing whitespace
+        rf"update {WORKING_TABLE} set term=trim(term) where trim(term) <> term",
         # f"update {WORKING_TABLE} set "
         # + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
         client.execute_query(sql)
-
-    # rf"update biosym_annotations set term=(REGEXP_REPLACE(term, '^[ ]+', '')) where term ~ '^[ ]+'",
 
 
 def fix_unmatched():
@@ -828,7 +833,7 @@ def remove_common_terms():
     # regex in here, effectively ignored
     common_terms = [
         *DELETION_TERMS,
-        *flatten(INTERVENTION_BASE_TERM_SETS),
+        *flatten(INTERVENTION_BASE_TERMS),
         *INTERVENTION_BASE_TERMS,
     ]
 
@@ -845,11 +850,12 @@ def remove_common_terms():
         common_del_query,
         f"delete FROM {WORKING_TABLE} "
         + r"where term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} " + r"where term ~ '^[0-9., ]+$'",
+        f"delete FROM {WORKING_TABLE} "
+        + r"where term ~ '^[0-9., ]+$'",  # only numbers . and ,
         rf"delete from {WORKING_TABLE} where length(term) > 150 and term ~* '\y(?:and|or)\y';",  # sentences
-        rf"delete from {WORKING_TABLE}  where length(term) > 150 and term ~* '.*[.;] .*';",
-        f"delete FROM {WORKING_TABLE} where term ~* '^said .*'",
-        f"delete FROM {WORKING_TABLE} where length(term) < 3 or term is null",
+        rf"delete from {WORKING_TABLE}  where length(term) > 150 and term ~* '.*[.;] .*';",  # sentences
+        f"delete FROM {WORKING_TABLE} where term ~* '^said .*'",  # arg
+        f"delete FROM {WORKING_TABLE} where length(trim(term)) < 3 or term is null",
     ]
     for del_query in del_queries:
         DatabaseClient().execute_query(del_query)
@@ -966,26 +972,66 @@ if __name__ == "__main__":
     """
     Checks:
 
-    08/17/2023, after
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398)
-    select sum(count) from (select count(*) as count from biosym_annotations where domain<>'attributes' and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723)
-    select count(*) from biosym_annotations where domain<>'attributes' and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428)
-    select count(*) from biosym_annotations where domain<>'attributes' and term<>'';
-    (3,748,417 -> 3,748,417)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
+    (556,711 -> 567,398 -> 908,930)
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
+    (2,555,158 -> 2,539,723 -> 3,697,848)
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
+    (2,812,965 -> 2,786,428 -> 4,405,141)
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
+    (3,748,417 -> 3,748,417 -> 5,552,648)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3032462
     compounds  | 1474950
     diseases   |  829121
     mechanisms | 1444346
+    --
+    assignees  | 3288088
+    attributes | 3021418
+    compounds  | 3056458
+    diseases   | 1776624
+    inventors  | 3984539
+    mechanisms | 3895219
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206)
+    (14,910 -> 15,206 -> 37,283)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039)
+    (38,315 -> 39,039 -> 76,872)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715)
+    (70,439 -> 69,715 -> 103,874)
+
+
+        alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
+            ORDER BY id ) AS row_num
+            FROM terms ) t
+            WHERE t.row_num > 1 );
+
+    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
+            ORDER BY id ) AS row_num
+            FROM terms ) t
+            WHERE t.row_num > 1 );
+
+    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
+    DELETE FROM terms
+    WHERE id IN
+        (SELECT id
+        FROM
+            (SELECT id,
+            ROW_NUMBER() OVER( PARTITION BY term
+            ORDER BY id ) AS row_num
+            FROM terms ) t
+            WHERE t.row_num > 1 );
     """
     if "-h" in sys.argv:
         print(

@@ -3,7 +3,7 @@ Regex utilities
 """
 
 import re
-from typing import Iterable, Literal, Optional, Union
+from typing import Iterable, Literal, Optional, Sequence, Union
 
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
@@ -23,7 +23,7 @@ ReCount = Union[Literal["*", "+", "?"], int]
 
 
 def get_or_re(
-    re_strs: list[str], count: Optional[ReCount] = None, upper: Optional[int] = None
+    re_strs: Sequence[str], count: Optional[ReCount] = None, upper: Optional[int] = None
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -66,7 +66,7 @@ def wrap(core_re: str) -> str:
     return "(?:" + core_re + ")"
 
 
-def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
+def remove_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
     """
     Removes extra spaces from terms
     (also strips)
@@ -74,6 +74,9 @@ def remove_extra_spaces(terms: list[str]) -> Iterable[str]:
     Args:
         terms: list of terms from which to remove extra spaces
     """
+    if isinstance(terms, str):
+        raise Exception("terms must be a list or iterable")
+
     extra_space_patterns = {
         r"\s{2,}": " ",
         r"\s{1,},": ",",  # e.g. to address "OPSUMIT , other product"

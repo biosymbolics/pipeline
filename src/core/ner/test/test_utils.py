@@ -160,7 +160,23 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "akt (protein kinase b) inhibitor",
-                "expected": "akt (kinase b) inhibitor",  # TODO
+                "expected": "akt inhibitor",  # TODO
+            },
+            {
+                "input": "apolipoprotein ai (apo ai)",
+                "expected": "apolipoprotein ai",
+            },
+            {
+                "input": "di(C1-C4 alkyl) ether",
+                "expected": "di(c1 c4 alkyl) ether",
+            },
+            {
+                "input": "epstein barr virus (ebv) nucleic acid",
+                "expected": "epstein barr virus nucleic acid",
+            },
+            {
+                "input": "ingredient tumor cytotoxic factor-II (TCF-II)",
+                "expected": "ingredient tumor cytotoxic factor ii",
             },
         ]
 
@@ -236,6 +252,10 @@ class TestNerUtils(unittest.TestCase):
                 "input": "antibody against urokinase receptor",
                 "expected": "urokinase receptor antibody",
             },
+            # {
+            #     "input": "useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
+            #     "expected": "disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
+            # },
         ]
 
         for condition in test_conditions:

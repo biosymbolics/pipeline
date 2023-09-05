@@ -16,7 +16,7 @@ from utils.re import (
 )
 
 from .spacy import Spacy
-from .types import DocEntities, DocEntity
+from .types import DocEntities, DocEntity, SynonymRecord
 
 
 # end-of-entity regex
@@ -166,11 +166,14 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
+
+    # "useful in the treatment of disorders responsive to the (inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
     adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
         "against": r"against\b",
         "targeting": r"targeting\b",
+        # antibody to
         # "by": r"mediated by\b",
     }
 
@@ -258,7 +261,7 @@ def __normalize_by_pos(doc: Doc):
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.info("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
     def clean_by_pos(t, prev_t, next_t):
         # spacy only marks a token as SPACE if it is hanging out in a weird place
@@ -339,9 +342,6 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
-
-    TODO:
-    - antiil36r antibody / {"anti-il-36r antibody","anti-il-36r antibodies"}
     """
     nlp = Spacy.get_instance()
 
@@ -376,3 +376,43 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
         for span in spans
     ]
     return entity_set
+
+
+def cluster_terms(
+    terms: list[str], return_dict: bool = False
+) -> list[SynonymRecord] | dict[str, str]:
+    """
+    Clusters terms using TF-IDF and DBSCAN.
+    Returns a synonym record mapping between the canonical term and the synonym (one per pair)
+
+    Args:
+        terms (list[str]): list of terms to cluster
+    """
+    # lazy loading
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import DBSCAN
+    import polars as pl
+
+    vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
+    X = vectorizer.fit_transform(terms)
+    clustering = DBSCAN(eps=0.8, min_samples=2).fit(X)
+    labels = clustering.labels_
+
+    df = pl.DataFrame({"cluster_id": labels, "name": terms})
+    terms_by_cluster_id = (
+        df.filter(pl.col("cluster_id") > -1)
+        .groupby("cluster_id")
+        .agg(pl.col("name"))
+        .drop("cluster_id")
+        .to_series()
+        .to_list()
+    )
+    synonyms = [
+        SynonymRecord({"term": members_terms[0], "synonym": m})
+        for members_terms in terms_by_cluster_id
+        for m in members_terms[1:]
+    ]
+
+    if return_dict:
+        return {synonym["synonym"]: synonym["term"] for synonym in synonyms}
+    return synonyms
