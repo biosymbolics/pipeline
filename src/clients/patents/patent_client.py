@@ -5,7 +5,7 @@ from functools import partial
 import logging
 import time
 from typing import Sequence, TypedDict, cast
-from pydash import compact, flatten
+from pydash import compact
 from clients.low_level.boto3 import retrieve_with_cache_check
 
 from clients.low_level.postgres import PsqlDatabaseClient
@@ -14,13 +14,14 @@ from typings.patents import PatentApplication
 from utils.string import get_id
 
 from .formatting import format_search_result
-from .types import AutocompleteTerm, TermResult
+from .types import AutocompleteTerm, QueryType, TermResult
 from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
     "QueryPieces",
     {"annotation_join_condition": str, "where": str, "params": list},
 )
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -58,7 +59,7 @@ APPROVED_SEARCH_RETURN_FIELDS = [
 
 def search(
     terms: Sequence[str],
-    domains: Sequence[str] | None = None,
+    query_type: QueryType = "AND",
     min_patent_years: int = 10,
     limit: int = MAX_SEARCH_RESULTS,
     is_randomized: bool = False,
@@ -74,7 +75,7 @@ def search(
 
     Args:
         terms (Sequence[str]): list of terms to search for
-        domains (Sequence[str], optional): list of domains to filter on. Defaults to None.
+        query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         is_randomized (bool, optional): whether to randomize results. Defaults to False.
@@ -91,7 +92,7 @@ def search(
     """
     args = {
         "terms": terms,
-        "domains": domains,
+        "query_type": query_type,
         "min_patent_years": min_patent_years,
         "is_randomized": is_randomized,
         "is_exhaustive": is_exhaustive,
@@ -107,7 +108,7 @@ def search(
 
 def __get_query_pieces(
     terms: list[str],
-    domains: Sequence[str] | None,
+    query_type: QueryType,
     min_patent_years: int,
     limit: int,
     is_exhaustive: bool = False,
@@ -130,31 +131,31 @@ def __get_query_pieces(
         }
 
     max_priority_date = get_max_priority_date(int(min_patent_years))
+    array_search_op = "@>" if query_type == "AND" else "&&"
     base_params = {
         "where": f"""
             WHERE priority_date > '{max_priority_date}'::date
             ORDER BY randomizer desc, priority_date desc
             limit {limit}
         """,
-        "annotation_join_condition": f"""
-            terms @> %s -- terms contains all input terms
-            {"AND domains @> %s" if domains else ""}
-        """,
+        "annotation_join_condition": f"terms {array_search_op} %s",
     }
 
     lower_terms = [t.lower() for t in terms]
 
     if is_exhaustive:  # aka do tsquery search too
-        # AND all words in all supplied terms (TODO: this could obviously be more precise)
-        ts_query_terms = (" & ").join(flatten([t.split(" ") for t in lower_terms]))
+        join_char = " & " if query_type == "AND" else " | "
+        ts_query_terms = (join_char).join(
+            [" & ".join(t.split(" ")) for t in lower_terms]
+        )
 
         return cast(
             QueryPieces,
             {
                 **base_params,
-                # text_search in match_condition so we can use JOIN instead of LEFT_JOIN
+                # text_search in annotation_join_condition so we can use JOIN instead of LEFT_JOIN
                 "annotation_join_condition": f"AND ({base_params['annotation_join_condition']} OR text_search @@ to_tsquery('english', %s))",
-                "params": compact([lower_terms, domains, ts_query_terms]),
+                "params": [lower_terms, ts_query_terms],
             },
         )
 
@@ -163,14 +164,14 @@ def __get_query_pieces(
         {
             **base_params,
             "annotation_join_condition": f"AND {base_params['annotation_join_condition']}",
-            "params": compact([lower_terms, domains]),
+            "params": [lower_terms],
         },
     )
 
 
 def _search(
     terms: Sequence[str],
-    domains: Sequence[str] | None = None,
+    query_type: QueryType = "AND",
     min_patent_years: int = 10,
     limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
@@ -195,7 +196,7 @@ def _search(
         ]
     )
 
-    qp = __get_query_pieces(terms, domains, min_patent_years, limit, is_exhaustive)
+    qp = __get_query_pieces(terms, query_type, min_patent_years, limit, is_exhaustive)
 
     query = f"""
         SELECT {", ".join(fields)}, terms, domains

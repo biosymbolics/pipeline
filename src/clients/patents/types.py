@@ -20,6 +20,22 @@ PatentsReport = TypedDict(
     {"x": str, "y": str | None, "data": list[PatentsReportRecord] | None},
 )
 
+QueryType = Literal["AND", "OR"]
+
+
+def get_query_type(value: str | None) -> QueryType:
+    """
+    Get QueryType from string
+
+    Args:
+        value (str): value to check
+    """
+    if value is None:
+        return "AND"
+    if isinstance(value, str) and value in typing.get_args(QueryType):
+        return value  # type: ignore
+    raise ValueError(f"Invalid query type: {value}")
+
 
 def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThreshold]:
     """
