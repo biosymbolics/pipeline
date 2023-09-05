@@ -266,7 +266,7 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, ', rat', '') where term ~* ', rat$';
     # update terms  set term=regexp_replace(term, ', human', '') where term ~* ', human$';
     # update annotations  set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
-    # update terms set term=regexp_replace(term, 'modulate$', 'modulator') where term ~* '\y modulate$';
+    # update terms set term=regexp_replace(term, 'modulat(?:e|ing|ion)$', 'modulator') where term ~* '\y modulat(?:e|ing|ion)$';
     # update annotations set term=regexp_replace(term, 'activate$', 'activator') where term ~* '\y activate$';
     # update terms set term=regexp_replace(term, 'stimulat(?:e|ing|ion)$', 'stimulator') where term ~* '\y stimulat(?:e|ing|ion)$';
     # update terms set term=regexp_replace(term, 'stabili(?:s|z)(?:e|ing|ion)$', 'stabilizer') where term ~* '\y stabili(?:s|z)(?:e|ing|ion)$';
@@ -276,7 +276,7 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, 'agonism$', 'agonist') where term ~* 'agonism$';
     # update terms set term=regexp_replace(term, '^([a-z]{2,3}[0-9]{0,2}) ([a-zαβγδεζηθικλμνξοπρστυφχψω]{1}[ ])', '\1\2') where term ~* '^[a-z]{2,3}[0-9]{0,2} [a-zαβγδεζηθικλμνξοπρστυφχψω]{1} (?:inhibitor|modulator|antagonist|agonist|protein|(?:poly)?peptide|antibody|isoform|domain|bispecific|chain|activator|stimulator|dna)';
     # update terms set term=regexp_replace(term, ' protein$', '') where  term ~* '^[a-z0-9]{3,5} protein$';
-    # update terms set term=regexp_replace(term, ' protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] protein$';
+    # update terms set term=regexp_replace(term, ' (?:family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:family )?protein$';
 
 
 if __name__ == "__main__":

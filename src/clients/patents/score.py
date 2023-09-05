@@ -4,8 +4,8 @@ from typing import TypedDict
 import polars as pl
 import math
 import logging
-from constants.patents import SUITABILITY_SCORE_MAP
 
+from constants.patents import SUITABILITY_SCORE_MAP
 from typings.patents import SuitabilityScoreMap
 
 from .constants import EST_MAX_CLINDEV, MAX_PATENT_LIFE
@@ -30,7 +30,7 @@ def calc_suitability_score(
     Example:
         >>> calc_suitability_score(['DEVICE', 'COMPOUND_OR_MECHANISM', 'METHOD', 'DIAGNOSTIC'], SUITABILITY_SCORE_MAP)
         >>> calc_suitability_score(['DEVICE', 'COMPOUND_OR_MECHANISM'], SUITABILITY_SCORE_MAP)
-        >>> calc_suitability_score(['DEVICE'], SUITABILITY_SCORE_MAP)
+        >>> calc_suitability_score(['COMPOUND_OR_MECHANISM'], SUITABILITY_SCORE_MAP)
     """
     min = sum([v for v in score_map.values() if v <= 0])
     max = sum([v for v in score_map.values() if v >= 0])

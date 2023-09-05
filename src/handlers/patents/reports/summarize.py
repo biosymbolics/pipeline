@@ -25,7 +25,7 @@ def summarize(event: ReportEvent, context):
     Summarize patents by terms (diseases, compounds, etc)
 
     Invocation:
-    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": "True" }}'`
+    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
     - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
     """
@@ -43,7 +43,9 @@ def summarize(event: ReportEvent, context):
 
     try:
         results = patent_client.search(**params)
-        summaries = aggregate(results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar"])
+        summaries = aggregate(
+            results, [*DOMAINS_OF_INTEREST, "ipc_codes", "similar_patents"]
+        )
     except Exception as e:
         message = f"Error reporting on patents: {e}"
         logger.error(message)

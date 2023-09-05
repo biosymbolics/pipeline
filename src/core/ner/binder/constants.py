@@ -69,6 +69,7 @@ PHRASE_MAP = {
     "disorders and disease": "diseases",
     "disease state": "diseases",
     "diseases and condition": "diseases",
+    "induced diseases": "diseases",
     "family member": "family",
     "family protein": "family",
     # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
@@ -102,6 +103,7 @@ PHRASE_MAP = {
     "receptor agonist": "agonist",  # ??
     "receptor antagonist": "antagonist",  # ??
     "receptor antibody": "antibody",
+    "receptor activat(?:ion|or)": "activator",
     "receptor bind(?:ing|er)": "binder",
     "receptor inhibitor": "inhibitor",
     "receptor ligand": "ligand",

@@ -30,30 +30,35 @@ MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 
 
-SEARCH_RETURN_FIELDS = [
-    "apps.publication_number",
-    "priority_date",
-    "abstract",
-    # "application_kind",
-    "application_number",
-    "country",
-    "embeddings",
-    "family_id",
-    # "filing_date",
-    # "grant_date",
-    # "publication_date",
-    "ipc_codes",
-    '"similar"',
-    "title",
-    "url",
-]
+SEARCH_RETURN_FIELDS = {
+    "apps.publication_number": "publication_number",
+    "priority_date": "priority_date",
+    "abstract": "abstract",
+    "application_number": "application_number",
+    "country": "country",
+    "embeddings": "embeddings",
+    "family_id": "family_id",
+    "ipc_codes": "ipc_codes",
+    '"similar"': "similar_patents",
+    "apps.title": "title",
+    "url": "url",
+    "terms": "terms",
+    "domains": "domains",
+}
 
-APPROVED_SEARCH_RETURN_FIELDS = [
-    "approval_date",
-    "brand_name",
-    "generic_name",
-    "(CASE WHEN approval_date IS NOT NULL THEN True ELSE False END) as is_approved",
-    "patent_indication as indication",
+APPROVED_SEARCH_RETURN_FIELDS = {
+    "approval_date": "approval_date",
+    "brand_name": "brand_name",
+    "generic_name": "generic_name",
+    "patent_indication": "indication",
+}
+
+FIELDS = [
+    f"max({field}) as {new_field}"
+    for field, new_field in {
+        **SEARCH_RETURN_FIELDS,
+        **APPROVED_SEARCH_RETURN_FIELDS,
+    }.items()
 ]
 
 
@@ -135,8 +140,6 @@ def __get_query_pieces(
     base_params = {
         "where": f"""
             WHERE priority_date > '{max_priority_date}'::date
-            ORDER BY randomizer desc, priority_date desc
-            limit {limit}
         """,
         "annotation_join_condition": f"terms {array_search_op} %s",
     }
@@ -188,8 +191,7 @@ def _search(
 
     fields = compact(
         [
-            *SEARCH_RETURN_FIELDS,
-            *APPROVED_SEARCH_RETURN_FIELDS,
+            *FIELDS,
             "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
             if is_randomized
             else "1 as randomizer",  # for randomizing approved patents
@@ -199,15 +201,20 @@ def _search(
     qp = __get_query_pieces(terms, query_type, min_patent_years, limit, is_exhaustive)
 
     query = f"""
-        SELECT {", ".join(fields)}, terms, domains
+        SELECT {", ".join(fields)},
+        (CASE WHEN max(approval_date) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
         )
-        -- TODO: duplicates here
         LEFT JOIN patent_approvals approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
+        LEFT JOIN application_to_trial a2t ON a2t.publication_number = apps.publication_number
+        LEFT JOIN trials ON trials.nct_id = a2t.nct_id
         {qp["where"]}
+        group by apps.publication_number
+        ORDER BY randomizer desc, priority_date desc
+        limit {limit}
     """
 
     results = PsqlDatabaseClient().select(query, qp["params"])

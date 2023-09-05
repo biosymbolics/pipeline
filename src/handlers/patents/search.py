@@ -23,8 +23,8 @@ def search(event: SearchEvent, context):
     Search patents by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "domain": "diseases" }}'`
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"progenity", "is_exhaustive": false }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "domain": "diseases", "query_type": "OR" }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"presbyopia", "is_exhaustive": false }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"Chronic Obstructive Airway Disease" }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1" }}'`
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`

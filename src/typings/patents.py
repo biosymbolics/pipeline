@@ -40,7 +40,7 @@ class PatentApplication(PatentBasicInfo):
     # filing_date: date
     inventors: list[str]
     mechanisms: list[str]
-    similar: list[str]
+    similar_patents: list[str]
     top_terms: list[str]  # from GPR table
 
 
