@@ -114,15 +114,15 @@ if __name__ == "__main__":
 
 """
 
-select apps.publication_number, apps.title as patent, apps.priority_date,
-apps.assignees as patent_owner, t.phase as phase, t.interventions
-from
-trials t,
-aggregated_annotations a,
-applications apps
-where apps.publication_number=a.publication_number
-AND t.normalized_sponsor = any(a.terms)
-AND t.interventions && a.terms
-order by apps.priority_date desc
-limit 100;
+create table application_to_trial (publication_number TEXT, nct_id TEXT);
+create index index_trials_nct_id ON trials(nct_id);
+create index index_application_to_trial_publication_number ON application_to_trial(publication_number);
+create index index_application_to_trial_nct_id ON application_to_trial(nct_id);
+insert into application_to_trial (publication_number, nct_id)
+    select nct_id, publication_number
+    from trials t,
+    aggregated_annotations a
+    where a.publication_number=a.publication_number
+    AND t.normalized_sponsor = any(a.terms)
+    AND t.interventions && a.terms
 """
