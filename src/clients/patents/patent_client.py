@@ -55,10 +55,9 @@ APPROVED_SEARCH_RETURN_FIELDS = {
 
 TRIAL_RETURN_FIELDS = {
     "array_agg(trials.nct_id)": "nct_ids",
-    "max(trials.phase)": "max_trial_phase",
+    "(array_agg(trials.phase ORDER BY trials.start_date desc))[1]": "max_trial_phase",
     "max(trials.last_updated_date)": "last_trial_update",
-    # "max(trials.status OVER (PARTITION BY start_date))": "last_trial_status",
-    "max(trials.status)": "last_trial_status",
+    "(array_agg(trials.status ORDER BY trials.start_date desc))[1]": "last_trial_status",
 }
 
 FIELDS: list[str] = [
