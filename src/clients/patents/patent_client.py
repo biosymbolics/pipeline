@@ -53,12 +53,23 @@ APPROVED_SEARCH_RETURN_FIELDS = {
     "patent_indication": "indication",
 }
 
-FIELDS = [
-    f"max({field}) as {new_field}"
-    for field, new_field in {
-        **SEARCH_RETURN_FIELDS,
-        **APPROVED_SEARCH_RETURN_FIELDS,
-    }.items()
+TRIAL_RETURN_FIELDS = {
+    "array_agg(trials.nct_id)": "nct_ids",
+    "max(trials.phase)": "max_trial_phase",
+    "max(trials.last_updated_date)": "last_trial_update",
+    # "max(trials.status OVER (PARTITION BY start_date))": "last_trial_status",
+    "max(trials.status)": "last_trial_status",
+}
+
+FIELDS: list[str] = [
+    *[
+        f"max({field}) as {new_field}"
+        for field, new_field in {
+            **SEARCH_RETURN_FIELDS,
+            **APPROVED_SEARCH_RETURN_FIELDS,
+        }.items()
+    ],
+    *[f"{field} as {new_field}" for field, new_field in TRIAL_RETURN_FIELDS.items()],
 ]
 
 
@@ -123,6 +134,7 @@ def __get_query_pieces(
     """
 
     is_id_search = any([t.startswith("WO-") for t in terms])
+    logger.info("NOT ID %s %s", is_id_search, terms)
 
     # if ids, ignore most of the standard criteria
     if is_id_search:
@@ -138,9 +150,7 @@ def __get_query_pieces(
     max_priority_date = get_max_priority_date(int(min_patent_years))
     array_search_op = "@>" if query_type == "AND" else "&&"
     base_params = {
-        "where": f"""
-            WHERE priority_date > '{max_priority_date}'::date
-        """,
+        "where": f"WHERE priority_date > '{max_priority_date}'::date",
         "annotation_join_condition": f"terms {array_search_op} %s",
     }
 

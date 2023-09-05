@@ -119,7 +119,7 @@ create index index_trials_nct_id ON trials(nct_id);
 create index index_application_to_trial_publication_number ON application_to_trial(publication_number);
 create index index_application_to_trial_nct_id ON application_to_trial(nct_id);
 insert into application_to_trial (publication_number, nct_id)
-    select nct_id, publication_number
+    select publication_number, nct_id
     from trials t,
     aggregated_annotations a
     where a.publication_number=a.publication_number

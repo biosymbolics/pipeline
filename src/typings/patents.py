@@ -39,7 +39,11 @@ class PatentApplication(PatentBasicInfo):
     # grant_date: date
     # filing_date: date
     inventors: list[str]
+    last_trial_status: str
+    last_trial_update: date
+    max_trial_phase: str
     mechanisms: list[str]
+    nct_ids: list[str]
     similar_patents: list[str]
     top_terms: list[str]  # from GPR table
 
