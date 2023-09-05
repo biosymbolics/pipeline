@@ -124,7 +124,7 @@ def __get_query_pieces(
             raise ValueError("Cannot mix id and term search")
 
         return {
-            "match_condition": f"publication_number = any(%s)",
+            "match_condition": f"AND publication_number = any(%s)",
             "where": "",
             "params": [terms],
         }
