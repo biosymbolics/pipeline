@@ -50,6 +50,7 @@ def copy_patent_approvals():
         source_sql=source_sql,
         dest_db=dest_db,
         dest_table_name=dest_table_name,
+        truncate_if_exists=True,
     )
 
 

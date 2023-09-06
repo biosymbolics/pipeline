@@ -248,6 +248,12 @@ def import_into_psql(today: str):
     )
 
 
+def copy_bq_to_psql():
+    today = datetime.now().strftime("%Y%m%d")
+    export_bq_tables(today)
+    import_into_psql(today)
+
+
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")

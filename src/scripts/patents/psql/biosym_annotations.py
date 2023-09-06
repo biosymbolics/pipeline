@@ -936,7 +936,8 @@ def populate_working_biosym_annotations():
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
     client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'", WORKING_TABLE
+        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+        WORKING_TABLE,
     )
 
     # add indices after initial load
@@ -1006,17 +1007,6 @@ if __name__ == "__main__":
     (70,439 -> 69,715 -> 103,874)
 
 
-        alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
-
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
     DELETE FROM terms
     WHERE id IN
@@ -1024,17 +1014,6 @@ if __name__ == "__main__":
         FROM
             (SELECT id,
             ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
-
-    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY term
             ORDER BY id ) AS row_num
             FROM terms ) t
             WHERE t.row_num > 1 );
