@@ -6,7 +6,6 @@ from pydash import compact
 from typing import Mapping, Union
 import logging
 
-from core.ner.spacy import Spacy
 from core.ner.utils import lemmatize_all
 from utils.list import dedup
 

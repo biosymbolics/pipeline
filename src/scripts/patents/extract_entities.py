@@ -254,7 +254,7 @@ class PatentEnricher(BaseEnricher):
         """
         batch_size = 2000
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
-        self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES)
+        self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES, link=False)
 
     @overrides(BaseEnricher)
     def upsert(self, df: pl.DataFrame):
@@ -275,10 +275,7 @@ class PatentEnricher(BaseEnricher):
         )
 
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
-        entities = self.tagger.extract(
-            patent_docs,
-            link=False,
-        )
+        entities = self.tagger.extract(patent_docs)
         attributes = extract_attributes(patent_docs)
         return [*entities, *attributes]
 
@@ -294,5 +291,5 @@ if __name__ == "__main__":
 
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
-    # enricher = PatentClassifier()
+    # enricher = PatentClassifier() # only use if wanting to re-classify (comparatively fast)
     enricher(starting_id)

@@ -90,3 +90,33 @@ def remove_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
 
     for term in terms:
         yield __remove(term)
+
+
+def expand_re(re_str: str, max_len: int = 1000) -> list[str]:
+    """
+    Expands a regex into a list of strings
+
+    Args:
+        re_str (str): regex to expand
+        max_len (int): maximum number of strings to generate for each regex, above which the method will throw an exception
+
+    Example:
+        expand_re("fab(?: region)?") -> ['fab', 'fab region']
+    """
+    # lazy import
+    import exrex
+
+    if exrex.count(re_str) < max_len:
+        return list(exrex.generate(re_str))
+    else:
+        raise Exception("Regex too complex to expand")
+
+
+def expand_res(re_strs: list[str]) -> list[list[str]]:
+    """
+    Expands a list of regexes into a list of lists of strings
+
+    Args:
+        re_strs (list[str]): list of regexes
+    """
+    return [expand_re(re_str) for re_str in re_strs]

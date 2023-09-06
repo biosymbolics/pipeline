@@ -76,9 +76,11 @@ class BQDatabaseClient(DatabaseClient):
             return False
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str) -> ExecuteResult:
+    def execute_query(self, query: str, values: list = []) -> ExecuteResult:
         """
         Execute BigQuery query
+
+        (values not used; just accepting it to comply with parent)
 
         Args:
             query (str): SQL query

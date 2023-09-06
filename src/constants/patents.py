@@ -1,5 +1,7 @@
+from pydash import flatten
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
+from utils.re import expand_res
 
 BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))
@@ -70,9 +72,6 @@ COMPANY_SUPPRESSIONS_DEFINITE = [
 
 COMPANY_SUPPRESSIONS_MAYBE = [
     "AGENCY",
-    "AGROBIO",
-    "AGROSCIENCE",
-    "AGROSCIENCES",
     "APS",
     "AS",
     "ASSETS",
@@ -122,8 +121,6 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "HIGH TECH",
     "HIGHER",
     "IDEC",
-    "INSTITUTE",
-    "INST",
     "INT",
     "KG",
     "KK",
@@ -264,37 +261,36 @@ OWNER_TERM_MAP = {
     "lab": "laboratory",
     "labs": "laboratories",
     "univ": "university",
+    "inst": "institute",
 }
 
 PATENT_ATTRIBUTE_MAP = {
     "COMBINATION": ["combo", "combination"],
     "COMPOUND_OR_MECHANISM": [
-        *ALL_INTERVENTION_BASE_TERMS,
-        "composition",
-        "compound",
-        "composition",
-        "derivative",
-        "drug",
-        "enzyme",
-        "inhibiting",  # not the same stem as inhibitor
+        *flatten(expand_res(ALL_INTERVENTION_BASE_TERMS)),
         "molecule",
         "receptor",
-        "substitute",
         "therapeutic",  # TODO: will probably over-match
     ],
     "DEVICE": [
         "apparatus",
+        "cannula",
         "computer",
         "device",
+        "drug matrix",
+        "electronic",
         "implant",
+        "injector",
         "instrument",
         "prosthesis",
         "scan",
         "sensor",
         "stent",
+        "video",
     ],
     "DIAGNOSTIC": [
         "analysis",
+        "analyte",
         "biomaker",  # IRL
         "biomarker",
         "biometric",
@@ -317,6 +313,7 @@ PATENT_ATTRIBUTE_MAP = {
         "predict",
         "prognosis",
         "prognostic",  # needed?
+        "reagent",
         "risk score",
         "scan",
         "sensor",
@@ -326,7 +323,15 @@ PATENT_ATTRIBUTE_MAP = {
         "disease modifying",
         "disease-modifying",
     ],
-    "FORMULATION": ["formulation", "form", "salt"],
+    "FORMULATION": [
+        "formulation",
+        "form",
+        "salt",
+        "extended release",
+        "topical",
+        "aerosol",
+    ],
+    "INCREMENTAL": ["improved process", "improved method", "improved system"],
     "IRRELEVANT": [
         "mammal",
         "veterinary",
@@ -335,8 +340,16 @@ PATENT_ATTRIBUTE_MAP = {
         "food supplement",
         "primate",
         "traditional",
+        "agricultural",
+        "horticultural",
+        "cosmetic",
+        "fungicide",
+        "herbicide",
+        "pesticide",
+        "plant disease",
+        "pest control",
     ],
-    "METHOD": ["method", "procedure", "preparation method", "method of use"],
+    "METHOD": ["procedure", "preparation method", "method of use"],
     "METHOD_OF_ADMINISTRATION": [
         "delivery",
         "dosing",
