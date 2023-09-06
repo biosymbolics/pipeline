@@ -4,7 +4,7 @@ Functions for copying around subsets of the patents database
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 
 from constants.patents import BIOMEDICAL_IPC_CODE_PREFIX_RE
-from scripts.patents._constants import GPR_ANNOTATIONS_TABLE
+from scripts.patents._constants import GPR_ANNOTATIONS_TABLE, GPR_PUBLICATIONS_TABLE
 
 
 def __copy_publications():
@@ -52,9 +52,8 @@ def __copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
-    table_id = "gpr_publications"
     client = BQDatabaseClient()
-    client.delete_table(table_id)
+    client.delete_table(GPR_PUBLICATIONS_TABLE)
 
     query = f"""
         SELECT gpr_pubs.* FROM
@@ -62,7 +61,7 @@ def __copy_gpr_publications():
         `{BQ_DATASET_ID}.publications` p
         WHERE p.publication_number = gpr_pubs.publication_number
     """
-    client.create_from_select(query, table_id)
+    client.create_from_select(query, GPR_PUBLICATIONS_TABLE)
 
 
 def copy_patent_tables():

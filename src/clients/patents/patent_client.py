@@ -39,7 +39,7 @@ SEARCH_RETURN_FIELDS = {
     "embeddings": "embeddings",
     "family_id": "family_id",
     "ipc_codes": "ipc_codes",
-    '"similar"': "similar_patents",
+    "similar_patents": "similar_patents",
     "apps.title": "title",
     "url": "url",
     "terms": "terms",

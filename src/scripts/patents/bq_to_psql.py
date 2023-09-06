@@ -14,7 +14,11 @@ system.initialize()
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 
-from ._constants import APPLICATIONS_TABLE, GPR_ANNOTATIONS_TABLE
+from ._constants import (
+    APPLICATIONS_TABLE,
+    GPR_ANNOTATIONS_TABLE,
+    GPR_PUBLICATIONS_TABLE,
+)
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
@@ -44,7 +48,7 @@ INITIAL_COPY_FIELDS = [
     "cited_by",
     "country",
     "embedding_v1 as embeddings",
-    '"similar"',
+    '"similar" as similar_patents',
     "title",
     "top_terms",
     "url",
@@ -77,16 +81,15 @@ def create_patent_applications_table():
     client.delete_table(APPLICATIONS_TABLE)
 
     applications = f"""
-        SELECT
-        {','.join(INITIAL_COPY_FIELDS)}
-        FROM `{BQ_DATASET_ID}.publications` as pubs,
-        `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
+        SELECT {','.join(INITIAL_COPY_FIELDS)}
+        FROM `{BQ_DATASET_ID}.publications` pubs,
+        `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
     client.create_from_select(applications, APPLICATIONS_TABLE)
 
 
-def export_bq_tables():
+def export_bq_tables(today):
     """
     Export tables from BigQuery to GCS
     """
@@ -115,7 +118,7 @@ def export_bq_tables():
                 db_client.create_from_select(shard_query, shared_table_name)
 
                 # Define the destination in GCS
-                destination_uri = f"gs://{GCS_BUCKET}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"
+                destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"
                 db_client.export_table_to_storage(shared_table_name, destination_uri)
 
                 db_client.delete_table(shared_table_name)
@@ -152,12 +155,16 @@ def determine_data_type(value, field: str | None = None):
         return "TEXT"
 
 
-def import_into_psql():
+def import_into_psql(today: str):
     """
     Load data from a JSON file into a psql table
     """
     logging.info("Importing applications table (etc) into postgres")
     client = PsqlDatabaseClient()
+
+    # truncate table copy in postgres
+    for table in EXPORT_TABLES.keys():
+        client.truncate_table(table)
 
     def transform(s, c: str):
         if c.endswith("_date") and s == 0:
@@ -195,7 +202,7 @@ def import_into_psql():
         client.create_table(table_name, columns, exists_ok=True)
         client.insert_into_table(df.to_dicts(), table_name)
 
-    bucket = storage_client.bucket(GCS_BUCKET)
+    bucket = storage_client.bucket(GCS_BUCKET)  # {GCS_BUCKET}/{today}
     blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
@@ -210,16 +217,6 @@ def import_into_psql():
 
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
         load_data_from_json(blob, table_name)
-
-
-def copy_bq_to_psql():
-    client = PsqlDatabaseClient()
-
-    for table in EXPORT_TABLES.keys():
-        client.truncate_table(table)
-
-    export_bq_tables()
-    import_into_psql()
 
     client.create_indices(
         [
@@ -256,8 +253,10 @@ if __name__ == "__main__":
         print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")
         sys.exit()
 
+    today = datetime.now().strftime("%Y%m%d")
+
     if "-export" in sys.argv:
-        export_bq_tables()
+        export_bq_tables(today)
 
     if "-import" in sys.argv:
-        import_into_psql()
+        import_into_psql(today)
