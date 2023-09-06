@@ -146,7 +146,7 @@ class TestNerUtils(unittest.TestCase):
             {
                 "text": """
                 Biomarkers for oxidative stress
-                This invention relates generally to methods of detecting and quantifying biomarkers of oxidative stress in proteins. The biomarker may be any amino acid that has undergone oxidation (or other modification, e.g. chloro-tyrosine, dityrosine). Emphasis is given herein on oxidized sulfur- or selenium-containing amino acids (SSAA). The biomarker of oxidative stress in proteins may be detected with an antibody that binds to oxidized amino acids, specifically oxidized sulfur- or selenium-containing amino acids. The antibody may be monoclonal or polyclonal. The presence of biomarker or amount of biomarker present in a sample may be used to aid in assessing the efficacy of environmental, nutritional and therapeutic interventions, among other uses.
+                This invention relates generally to methods of detecting and quantifying biomarkers of oxidative stress in proteins. The biomarker may be any amino acid that has undergone oxidation, or other modification such as chloro-tyrosine, dityrosin. Emphasis is given herein on oxidized sulfur- or selenium-containing amino acids (SSAA). The biomarker of oxidative stress in proteins may be detected with an antibody that binds to oxidized amino acids, specifically oxidized sulfur- or selenium-containing amino acids. The antibody may be monoclonal or polyclonal. The presence of biomarker or amount of biomarker present in a sample may be used to aid in assessing the efficacy of environmental, nutritional and therapeutic interventions, among other uses.
                 """,
                 "expected_output": [
                     "antibody",
@@ -179,26 +179,26 @@ class TestNerUtils(unittest.TestCase):
             #         "modulate signal",
             #     ],
             # },
-            # {
-            #     "text": """
-            #     Combination drug containing probucol and a tetrazolylalkoxy-dihydrocarbostyril derivative with superoxide supressant effects
-            #     This invention relates to a combination drug comprising a combination of a tetrazolylalkoxy-dihydrocarbostyril derivative of the formula: wherein R is cycloalkyl, A is lower alkylene, and the bond between 3-and 4-positions of carbostyril nucleus is single bond or double bond, or a salt thereof and Probucol, which is useful for preventing and treating cerebral infarction including acute cerebral infarction and chronic cerebral infarction, arteriosclerosis, renal diseases (e.g. diabetic nephropathy, renal failure, nephritis), and diabetes owing to synergistic superoxide suppressant effects of the combination.
-            #     """,
-            #     "expected_output": [
-            #         "arteriosclerosis",
-            #         "cerebral infarction",
-            #         "derivative",
-            #         "probucol",
-            #         "renal disease",
-            #         "renal failure",
-            #         "superoxide supressant effect",
-            #         "synergistic superoxide suppressant effect",
-            #         "tetrazolylalkoxy dihydrocarbostyril",
-            #     ],
-            # },
             {
                 "text": """
-                    5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivatives and their use as dual inhibitors of phosphatidylinositol 3-kinase delta &amp; gamma
+                Combination drug containing probucol and a tetrazolylalkoxy-dihydrocarbostyril derivative with superoxide supressant effects
+                This invention relates to a combination drug comprising a combination of a tetrazolylalkoxy-dihydrocarbostyril derivative of the formula: wherein R is cycloalkyl, A is lower alkylene, and the bond between 3-and 4-positions of carbostyril nucleus is single bond or double bond, or a salt thereof and Probucol, which is useful for preventing and treating cerebral infarction including acute cerebral infarction and chronic cerebral infarction, arteriosclerosis, renal diseases, e.g. diabetic nephropathy, renal failure, nephritis, and diabetes owing to synergistic superoxide suppressant effects of the combination.
+                """,
+                "expected_output": [
+                    "arteriosclerosis",
+                    "cerebral infarction",
+                    "derivative",
+                    "probucol",
+                    "renal disease",
+                    "renal failure",
+                    "superoxide supressant effect",
+                    "synergistic superoxide suppressant effect",
+                    "tetrazolylalkoxy dihydrocarbostyril",
+                ],
+            },
+            {
+                "text": """
+                    5-[2-(pyridin-2-ylamino)-1,3-thiazol-5-yl]-2,3-dihydro-1 h-isoindol-1 -one derivatives and their use as dual inhibitors of phosphatidylinositol 3-kinase delta &amp; gamma.
                     There are disclosed certain novel compounds (including pharmaceutically acceptable salts thereof) (I) that inhibit phosphatidylinositol 3-kinase gamma (PI3Kδ) and phosphatidylinositol 3-kinase gamma (ΡΙ3Κγ) activity, to their utility in treating and/or preventing clinical conditions including respiratory diseases, such as asthma and chronic obstructive pulmonary disease (COPD), to their use in therapy, to pharmaceutical compositions containing them and to processes for preparing such compounds.
                 """,
                 "expected_output": [
@@ -214,7 +214,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "text": """
-                    useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)
+                    Compounds useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)
                 """,
                 "expected_output": [
                     # "apoptosis signal regulating kinase 1",

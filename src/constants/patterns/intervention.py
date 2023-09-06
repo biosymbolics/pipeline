@@ -2,37 +2,45 @@
 Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
-from pydash import flatten
 from utils.re import get_or_re
 
 
-MECHANISM_BASE_TERMS: list[str] = [
-    "stabiliz(?:er|ing|e|ion)",
-    "modif(?:ier|ying|ication|y",
-    "inhibit(?:ion|ing)?",
-    "agoni(?:st|[sz]ing|[sz]e|sm)?",
-    "antagoni(?:st|[sz]ing|[sz]e|sm)?",
-    "activat(?:or|ion|ing|e)?",
-    "potentiat(?:or|ion|ing|e)?",
-    "suppress(?:or|ion|ing|ant)?",
-    "stimulat(?:or|ion|ing|ant|e)?",
-    "promot(?:or|ion|ing|ant|e)?",
-    "degrad(?:er|ation|ing|e)?",
-    "induc(?:er|ing|ion|e)?",
-    "block(?:er|ing|ade)?",
-    "regenerat(?:e|ion|ing|ion)",
-    "(?:de)?sensitiz(?:ation|ing|e)",
-    "(?:(?:neuro|immuno)[- ]?)?modulat(?:or|ion|ing|e)s?(?: binding)?",
-    "enhanc(?:er|ing|e)" "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
-    "transport(?:er|ing|ation)?"
-    "disrupt(?:or|ion|ing)?"
-    "desicca(?:tion|nt|te|ted|ting)",
+PRIMARY_BASE_TERMS: dict[str, str] = {
+    "activat(?:or|ion|ing|e)?": "activator",
+    "agoni(?:st|[sz]ing|[sz]e|sm)?": "agonist",
+    "antagoni(?:st|[sz]ing|[sz]e|sm)?": "antagonist",
+    "amplif(?:ier|ication|ying|y)": "amplifier",
+    "bind(?:er|ing)?": "binder",
+    "block(?:er|ing|ade)?": "blocker",
+    "chaperone": "chaperone",
+    "cataly(?:st|ze|zing)": "catalyst",
+    "degrad(?:er|ation|ing|e)?": "degrader",
+    "desensitiz(?:ation|ing|e)": "desensitizer",
+    "disrupt(?:or|ion|ing)?": "disruptor",
+    "desicca(?:tion|nt|te|ted|ting)": "desiccant",
+    "enhanc(?:er|ing|e)": "enhancer",
+    "induc(?:er|ing|ion|e)?": "inducer",
+    "inhibit(?:ion|ing)?": "inhibitor",
+    "mimetic": "mimetic",
+    "modif(?:ier|ying|ication|y": "modifier",
+    "promot(?:or|ion|ing|ant|e)?": "promoter",
+    "potentiat(?:or|ion|ing|e)?": "potentiator",
+    "regenerat(?:e|ion|ing|ion)": "regenerator",
+    "suppress(?:or|ion|ing|ant)?": "suppressor",
+    "stimulat(?:or|ion|ing|ant|e)?": "stimulator",
+    "sensitiz(?:ation|ing|e)": "sensitizer",
+    "stabiliz(?:er|ing|e|ion)": "stabilizer",
+    "transport(?:er|ing|ation)?": "transporter",
+}
+
+SECONDARY_MECHANISM_BASE_TERMS = [
     "immun[io][zs](?:ation|ing|e|logical|therapy|genic)",
+    "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
+    "(?:(?:neuro|immuno)[- ]?)?modulat(?:or|ion|ing|e)s?(?: binding)?",
     "(?:(?:t[ -]cell )?engag(?:er|ing|e|ment)(?: receptor)?|tce(?:r))",
     "activity",
     "adjuvant",
     "agent",
-    "amplifier",
     "analgesic",
     "anaesthetic",
     "anti[ -]?microbial",
@@ -43,8 +51,6 @@ MECHANISM_BASE_TERMS: list[str] = [
     "anti[ -]?viral",
     "anti[ -]?metabolite",
     "carrier",
-    "catalyst",
-    "chaperone",
     "contraception",
     "co[- ]?factor",
     "(?:cross[ -]?)?linker",
@@ -65,9 +71,7 @@ MECHANISM_BASE_TERMS: list[str] = [
     "interaction",
     "lubricant",
     "metabolite",
-    "mimetic",
     "(?:(?:neo|peri)[ -]?)?adjuvant",
-    "(?:oligo[ -])?nucleotide",
     "phototherap(?:y|ie)",
     "precursor",
     "primer",
@@ -80,6 +84,11 @@ MECHANISM_BASE_TERMS: list[str] = [
     "transfer",
     "toxin",
     "vaccine(?: adjuvant)?",
+]
+
+MECHANISM_BASE_TERMS = [
+    *list(PRIMARY_BASE_TERMS.keys()),
+    *SECONDARY_MECHANISM_BASE_TERMS,
 ]
 BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:(?:glyco|fusion)[ -]?)?proteins?(?: binding)?",
@@ -116,6 +125,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:natural killer|nkt|nkc)(?: cells)?",
     "mutein",
     "nuclease",
+    "(?:oligo[ -])?nucleotide",
     "(?:poly[ -]?)?peptide",
     "protease",
     "protein",
