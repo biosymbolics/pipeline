@@ -14,7 +14,7 @@ system.initialize()
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 
-from ._constants import APPLICATIONS_TABLE
+from ._constants import APPLICATIONS_TABLE, GPR_ANNOTATIONS_TABLE
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": None,
+    # "biosym_annotations_source": None,
     APPLICATIONS_TABLE: "priority_date",  # shard by priority date
+    GPR_ANNOTATIONS_TABLE: "character_offset_start",
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -49,31 +50,23 @@ INITIAL_COPY_FIELDS = [
     "url",
     # publications
     "application_kind",
-    # "assignee as assignee_raw",
-    # "assignee_harmonized",
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
     "citation",
     "claims_localized as claims",
     "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
     "family_id",
-    # "filing_date",
-    # "grant_date",
-    # "publication_date",
-    # "inventor as inventor_raw",
-    # "inventor_harmonized",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
     "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
     "kind_code",
     "pct_number",
     "priority_claim",
     "priority_date",
-    # "publication_date",
     "spif_application_number",
     "spif_publication_number",
 ]
 
 
-def create_applications_table():
+def create_patent_applications_table():
     """
     Create a table of patent applications in BigQuery
     (then exported and pulled into psql)
@@ -98,7 +91,7 @@ def export_bq_tables():
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_applications_table()
+    create_patent_applications_table()
     start_date = datetime(2000, 1, 1)
     end_date = datetime(2023, 1, 1)
 

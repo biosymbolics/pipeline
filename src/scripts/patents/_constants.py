@@ -1,5 +1,6 @@
 TEXT_FIELDS = frozenset(["title", "abstract"])
 APPLICATIONS_TABLE = "applications"
+GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 
 
 ADHD = "Attention Deficit Hyperactivity Disorder"
