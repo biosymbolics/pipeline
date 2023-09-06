@@ -132,7 +132,7 @@ class BinderNlp:
             "stride": DOC_STRIDE,
             "return_tensors": "pt",
             "padding": "max_length",
-            "truncation": True,
+            "truncation": False,
         }
         all_args = {**common_args, **tokenize_args}
         return self.__tokenizer(text, **all_args).to(DEFAULT_DEVICE)

@@ -7,7 +7,30 @@ from typing import Optional
 import polars as pl
 
 from utils.file import save_json_as_file
-from core.ner.binder.utils import generate_word_indices
+
+
+# TODO: flawed... use word indices from tokenization??
+# e.g
+# char_spans = [tokenized.token_to_chars(i, ti) for ti in range(num_tokens)]
+# word_start_chars = [cs.start for cs in char_spans if cs is not None]
+# word_end_chars = [cs.end for cs in char_spans if cs is not None]
+def generate_word_indices(text: str) -> list[tuple[int, int]]:
+    """
+    Generate word indices for a text
+
+    Args:
+        text (str): text to generate word indices for
+    """
+    word_indices = []
+    token_re = re.compile(r"[\s\n]")
+    words = token_re.split(text)
+    for idx, word in enumerate(words):
+        end_adj = len(re.sub("[.,;]$", "", word))
+        start_char = sum([len(word) + 1 for word in words[:idx]])
+        # end char to be before certain punct.
+        end_char = start_char + end_adj
+        word_indices.append((start_char, end_char))
+    return word_indices
 
 
 def format_into_binder(df: pl.DataFrame):

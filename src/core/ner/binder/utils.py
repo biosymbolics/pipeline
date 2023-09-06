@@ -2,14 +2,12 @@
 Utility functions for the Binder NER model
 """
 
-import re
 import numpy as np
 import numpy.typing as npt
 from pydash import compact, flatten
 from transformers import BatchEncoding
 from spacy.tokens import Span
 import logging
-import polars as pl
 
 from .types import Feature, Annotation
 
@@ -17,35 +15,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def generate_word_indices(text: str) -> list[tuple[int, int]]:
-    """
-    Generate word indices for a text
-
-    Args:
-        text (str): text to generate word indices for
-    """
-    word_indices = []
-    token_re = re.compile(r"[\s\n]")
-    words = token_re.split(text)
-    for idx, word in enumerate(words):
-        end_adj = len(re.sub("[.,;)]$", "", word))
-        start_char = sum([len(word) + 1 for word in words[:idx]])
-        # end char to be before certain punct.
-        end_char = start_char + end_adj
-        word_indices.append((start_char, end_char))
-    return word_indices
-
-
 def extract_prediction(
-    span_logits, feature: Feature, index: int, type_map: dict[int, str]
+    span_logits, feature: Feature, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a single feature.
     """
 
-    def start_end_types(
-        feature: Feature,
-    ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+    def start_end_types() -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
         """
         Extracts predictions from the tensor
         """
@@ -65,7 +42,7 @@ def extract_prediction(
 
         return (start_indexes, end_indexes, type_ids)
 
-    def create_annotation(start, end, type, feature: Feature, idx: int):
+    def create_annotation(start, end, type, idx: int):
         """
         Applies offset and creates an annotation.
         """
@@ -83,11 +60,11 @@ def extract_prediction(
         )
         return pred
 
-    start_indexes, end_indexes, type_ids = start_end_types(feature)
+    start_indexes, end_indexes, type_ids = start_end_types()
 
     annotations = compact(
         [
-            create_annotation(*tup, feature, idx)
+            create_annotation(*tup, idx)
             for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
         ]
     )
@@ -109,7 +86,7 @@ def extract_predictions(
     """
     all_predictions = flatten(
         [
-            extract_prediction(predictions[i], feature, i, type_map)
+            extract_prediction(predictions[i], feature, type_map)
             for i, feature in enumerate(features)
         ]
     )
@@ -129,46 +106,27 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
 
     Note: this is kinda convoluted and should be refactored.
     """
-    word_idx = generate_word_indices(text)
-    word_start_chars = [word[0] for word in word_idx]
-    word_end_chars = [word[1] for word in word_idx]
-
     num_features = len(tokenized["input_ids"])  # type: ignore
     offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
 
-    def process_feature(text: str, i: int):
+    def process_feature(i: int):
         sequence_ids = tokenized.sequence_ids(i)
 
-        df = pl.DataFrame(
-            {
-                "start": [om[0] for om in offset_mapping[i]],
-                "end": [om[1] for om in offset_mapping[i]],
-                "sequence_ids": sequence_ids,
-            }
-        )
-
+        offset_mapping_i = offset_mapping[i].cpu()
         feature: Feature = {
             "id": f"feat-{str(i + 1)}",
             "text": text,
-            "token_start_mask": df.select(
-                pl.col("start").is_in(word_start_chars) & (pl.col("sequence_ids") == 0)
-            )
-            .to_series()
-            .to_list(),
-            "token_end_mask": df.select(
-                pl.col("end").is_in(word_end_chars) & (pl.col("sequence_ids") == 0)
-            )
-            .to_series()
-            .to_list(),
+            "token_start_mask": [om[0] for om in offset_mapping_i],
+            "token_end_mask": [om[1] for om in offset_mapping_i],
             "offset_mapping": [
                 om if sequence_ids[k] == 0 else None
-                for k, om in enumerate(offset_mapping[i])
+                for k, om in enumerate(offset_mapping_i)
             ],
         }
 
         return feature
 
-    features = [process_feature(text, i) for i in range(num_features)]
+    features = [process_feature(i) for i in range(num_features)]
     return features
 
 
@@ -178,13 +136,20 @@ def has_span_overlap(new_ent: Span, index: int, existing_ents: list[Span]) -> bo
 
     Args:
         new_ent: the new entity to check
+        index: the index of the new entity
         existing_ents: the existing entities to check against
     """
-    has_overlap = any(
-        new_ent.start_char <= ent.end_char and new_ent.end_char >= ent.start_char
+    overlapping_ents = [
+        ent
         for ent in existing_ents[:index]
-    )
-    return has_overlap
+        if new_ent.start_char <= ent.end_char and new_ent.end_char >= ent.start_char
+    ]
+    if len(overlapping_ents) > 0:
+        logger.warning(
+            "Overlap detected between %s and %s", new_ent.text, overlapping_ents
+        )
+        return True
+    return False
 
 
 def remove_overlapping_spans(spans: list[Span]) -> list[Span]:

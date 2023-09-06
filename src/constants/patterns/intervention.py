@@ -199,6 +199,26 @@ INTERVENTION_BASE_TERMS = [
     *COMPOUND_BASE_TERMS,
 ]
 
+MECHANISM_PRIMARY_BASE_TERM_SETS: list[list[str]] = [
+    ["stabilizer", "stabilizing", "stabilize", "stabilization"],
+    ["modifier", "modifying", "modification"],
+    ["inhibitor", "inhibition", "inhibiting", "inhibit"],
+    ["agonist", "agonizing", "agonize", "agonism"],
+    ["antagonist", "antagonizing", "antagonize", "antagonism"],
+    [
+        "activator",
+        "activation",
+        "activating",
+    ],
+    ["potentiator", "potentiation", "potentiating", "potentiate"],
+    ["suppressor", "suppression", "suppressing", "suppress", "suppressant"],
+    ["stimulator", "stimulation", "stimulating", "stimulate"],
+    ["promotion", "promoting", "promoter", "promote"],
+    ["degrader", "degradation", "degrading", "degrade"],
+    ["inducer", "inducing", "induction"],
+    ["promoter", "promoting", "promote", "promotion"],
+    ["blocker", "blockade", "blocking", "block"],
+]
 MECHANISM_BASE_TERM_SETS: list[list[str]] = [
     [
         "immunization",
@@ -210,26 +230,13 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "immunotherapy",
         "immunogenic composition",
     ],
-    ["potentiator", "potentiation", "potentiating", "potentiate"],
     ["regenerate", "regeneration", "regenerating", "regeneration"],
-    ["stabilizer", "stabilizing", "stabilize", "stabilization"],
-    ["modifier", "modifying", "modification"],
-    ["inhibitor", "inhibition", "inhibiting", "inhibit"],
-    ["agonist", "agonizing", "agonize", "agonism"],
-    ["antagonist", "antagonizing", "antagonize", "antagonism"],
-    [
-        "activator",
-        "activation",
-        "activating",
-    ],
     [
         "(?:de)?sensitizer",
         "(?:de)?sensitization",
         "(?:de)?sensitizing",
         "(?:de)?sensitize",
     ],
-    ["suppressor", "suppression", "suppressing", "suppress", "suppressant"],
-    ["stimulator", "stimulation", "stimulating", "stimulate"],
     [
         "(?:(?:neuro|immuno)[- ]?)?modulate",
         "(?:(?:neuro|immuno)[- ]?)?modulates? binding",
@@ -237,7 +244,6 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "(?:(?:neuro|immuno)[- ]?)?modulation",
         "(?:(?:neuro|immuno)[- ]?)?modulator",
     ],
-    ["promotion", "promoting", "promote"],
     [
         "(?:t[ -]cell )?engager",
         "(?:t[ -]cell )?engaging(?: receptor)?",
@@ -253,10 +259,6 @@ MECHANISM_BASE_TERM_SETS: list[list[str]] = [
         "(?:(?:down|up)[ -]?)?regulation",
         "(?:(?:down|up)[ -]?)?regulating",
     ],
-    ["degrader", "degradation", "degrading", "degrade"],
-    ["inducer", "inducing", "induction"],
-    ["promoter", "promoting", "promote", "promotion"],
-    ["blocker", "blockade", "blocking", "block"],
     ["transporter", "transporting", "transport", "transportation"],
     ["disruptor", "disruption", "disrupting", "disrupt"],
     [
