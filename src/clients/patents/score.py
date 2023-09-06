@@ -101,6 +101,8 @@ def score_patents(
         .alias("result")
     ).unnest("result")
 
+    logger.info("Exploded df: %s", df)
+
     # multiply score by pct patent life remaining
     df = df.with_columns(
         pl.col("patent_years")

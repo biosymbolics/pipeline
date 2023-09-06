@@ -225,6 +225,10 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
 
 
 DELETION_TERMS = [
+    "crystal structure",
+    "standard tibetan language",
+    "present tricyclic",
+    "topical surface",
     "cell",
     "wherein(?: a)?",
     "computer-readable",
@@ -473,6 +477,7 @@ DELETION_TERMS = [
     "(?:.* )?surger(?:y|ie)",
     "radiotherapy",
     "sealant",
+    "microelectronic",
     # agtech
     "herbicide",
     "insecticide" "fungicide",
@@ -485,6 +490,7 @@ DELETION_TERMS = [
     ".* plant"
     # end agtech
     "explosive",
+    "cell culture techniques",
     # diagnostic
     "(?:.* )?testing",
     "(?:.* )?detection",
