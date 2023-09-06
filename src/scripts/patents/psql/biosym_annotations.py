@@ -18,10 +18,8 @@ from constants.core import (
 from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
     MECHANISM_BASE_TERMS,
-    MECHANISM_BASE_TERM_SETS,
     INTERVENTION_BASE_TERMS,
-    INTERVENTION_BASE_TERM_SETS,
-    INTERVENTION_BASE_PREFIXES,
+    INTERVENTION_PREFIXES,
 )
 from utils.re import get_or_re
 
@@ -191,7 +189,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "peripheral": "all",
     "mutant": "leading",
     "mutated": "leading",
     "activatable": "all",
@@ -678,18 +675,12 @@ def fix_of_for_annotations():
     logging.info("Fixing of/for annotations")
 
     terms = INTERVENTION_BASE_TERMS
-    term_sets = INTERVENTION_BASE_TERM_SETS
-    prefixes = INTERVENTION_BASE_PREFIXES
+    prefixes = INTERVENTION_PREFIXES
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
     # inhibition of apoptosis signal-regulating kinase 1 (ASK1)
-    def get_query(term_or_term_set: str | list[str], field: TextField):
-        if isinstance(term_or_term_set, list):
-            # term set
-            re_term = "(?:" + "|".join([f"{ts}s?" for ts in term_or_term_set]) + ")"
-        else:
-            re_term = term_or_term_set + "s?"
+    def get_query(re_term: str, field: TextField):
         sql = f"""
             UPDATE {WORKING_TABLE} ba
             SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+(?:(?:the|a) )?.*?)(?:and|useful|for|,|.|$)'))
@@ -714,19 +705,19 @@ def fix_of_for_annotations():
 
     client = DatabaseClient()
 
-    # for term in [*terms, *flatten(term_sets)]:
-    #     for field in TEXT_FIELDS:
-    #         try:
-    #             sql = get_hyphen_query(term, field)
-    #             client.execute_query(sql)
-    #         except Exception as e:
-    #             logging.error(e)
-
-    # loop over term sets, in which the term may be in another form than the title variant
-    for term_or_term_set in [*terms, *term_sets]:
+    for term in terms:
         for field in TEXT_FIELDS:
             try:
-                sql = get_query(term_or_term_set, field)
+                sql = get_hyphen_query(term, field)
+                client.execute_query(sql)
+            except Exception as e:
+                logging.error(e)
+
+    # loop over term sets, in which the term may be in another form than the title variant
+    for term in terms:
+        for field in TEXT_FIELDS:
+            try:
+                sql = get_query(term, field)
                 client.execute_query(sql)
             except Exception as e:
                 logging.error(e)
@@ -874,13 +865,7 @@ def normalize_domains():
     """
     client = DatabaseClient()
 
-    mechanism_terms = [
-        f"{t}s?"
-        for t in [
-            *flatten(MECHANISM_BASE_TERM_SETS),
-            *MECHANISM_BASE_TERMS,
-        ]
-    ]
+    mechanism_terms = [f"{t}s?" for t in MECHANISM_BASE_TERMS]
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [

@@ -7,6 +7,28 @@ from utils.re import get_or_re
 
 
 MECHANISM_BASE_TERMS: list[str] = [
+    "stabiliz(?:er|ing|e|ion)",
+    "modif(?:ier|ying|ication|y",
+    "inhibit(?:ion|ing)?",
+    "agoni(?:st|[sz]ing|[sz]e|sm)?",
+    "antagoni(?:st|[sz]ing|[sz]e|sm)?",
+    "activat(?:or|ion|ing|e)?",
+    "potentiat(?:or|ion|ing|e)?",
+    "suppress(?:or|ion|ing|ant)?",
+    "stimulat(?:or|ion|ing|ant|e)?",
+    "promot(?:or|ion|ing|ant|e)?",
+    "degrad(?:er|ation|ing|e)?",
+    "induc(?:er|ing|ion|e)?",
+    "block(?:er|ing|ade)?",
+    "regenerat(?:e|ion|ing|ion)",
+    "(?:de)?sensitiz(?:ation|ing|e)",
+    "(?:(?:neuro|immuno)[- ]?)?modulat(?:or|ion|ing|e)s?(?: binding)?",
+    "enhanc(?:er|ing|e)" "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
+    "transport(?:er|ing|ation)?"
+    "disrupt(?:or|ion|ing)?"
+    "desicca(?:tion|nt|te|ted|ting)",
+    "immun[io][zs](?:ation|ing|e|logical|therapy|genic)",
+    "(?:(?:t[ -]cell )?engag(?:er|ing|e|ment)(?: receptor)?|tce(?:r))",
     "activity",
     "adjuvant",
     "agent",
@@ -60,6 +82,10 @@ MECHANISM_BASE_TERMS: list[str] = [
     "vaccine(?: adjuvant)?",
 ]
 BIOLOGIC_BASE_TERMS: list[str] = [
+    "(?:(?:glyco|fusion)[ -]?)?proteins?(?: binding)?",
+    "(?:poly)peptides?(?: binding)?" "(?:poly)?nucleotides?(?: binding)?",
+    "(?:receptor |protein )?ligands?(?: binding| that bind)?",
+    "(?:dna |nucleic acid )?fragments?(?: binding| that bind)?",
     "(?:neo)?antigen",
     "antigen[ -]binding fragment",
     "aptamer",
@@ -105,7 +131,8 @@ BIOLOGIC_BASE_TERMS: list[str] = [
 ]
 COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     # incomplete is an understatement.
-    "acid",
+    "conjugat(?:ion|ing|e)",
+    "(?:small |antibody )?molecules?(?: binding)?" "acid",
     "carbonyl",
     "ester",
     "hydrogel",
@@ -199,127 +226,18 @@ INTERVENTION_BASE_TERMS = [
     *COMPOUND_BASE_TERMS,
 ]
 
-MECHANISM_PRIMARY_BASE_TERM_SETS: list[list[str]] = [
-    ["stabilizer", "stabilizing", "stabilize", "stabilization"],
-    ["modifier", "modifying", "modification"],
-    ["inhibitor", "inhibition", "inhibiting", "inhibit"],
-    ["agonist", "agonizing", "agonize", "agonism"],
-    ["antagonist", "antagonizing", "antagonize", "antagonism"],
-    [
-        "activator",
-        "activation",
-        "activating",
-    ],
-    ["potentiator", "potentiation", "potentiating", "potentiate"],
-    ["suppressor", "suppression", "suppressing", "suppress", "suppressant"],
-    ["stimulator", "stimulation", "stimulating", "stimulate"],
-    ["promotion", "promoting", "promoter", "promote"],
-    ["degrader", "degradation", "degrading", "degrade"],
-    ["inducer", "inducing", "induction"],
-    ["promoter", "promoting", "promote", "promotion"],
-    ["blocker", "blockade", "blocking", "block"],
-]
-MECHANISM_BASE_TERM_SETS: list[list[str]] = [
-    [
-        "immunization",
-        "immunizing",
-        "immunize",
-        "immunization",
-        "immunological",
-        "immunoconjugate",
-        "immunotherapy",
-        "immunogenic composition",
-    ],
-    ["regenerate", "regeneration", "regenerating", "regeneration"],
-    [
-        "(?:de)?sensitizer",
-        "(?:de)?sensitization",
-        "(?:de)?sensitizing",
-        "(?:de)?sensitize",
-    ],
-    [
-        "(?:(?:neuro|immuno)[- ]?)?modulate",
-        "(?:(?:neuro|immuno)[- ]?)?modulates? binding",
-        "(?:(?:neuro|immuno)[- ]?)?modulating",
-        "(?:(?:neuro|immuno)[- ]?)?modulation",
-        "(?:(?:neuro|immuno)[- ]?)?modulator",
-    ],
-    [
-        "(?:t[ -]cell )?engager",
-        "(?:t[ -]cell )?engaging(?: receptor)?",
-        "(?:t[ -]cell )?engage",
-        "(?:t[ -]cell )?engagement",
-        # "t[- ]?cell engaging receptor",
-        "tce",
-        "tcer",
-    ],
-    ["enhancement", "enhancing", "enhance", "enhancer"],
-    [
-        "(?:(?:down|up)[ -]?)?regulator",
-        "(?:(?:down|up)[ -]?)?regulation",
-        "(?:(?:down|up)[ -]?)?regulating",
-    ],
-    ["transporter", "transporting", "transport", "transportation"],
-    ["disruptor", "disruption", "disrupting", "disrupt"],
-    [
-        "desiccation",
-        "desiccant",
-        "desiccator",
-        "desiccating",
-    ],
-]
 
-BIOLOGIC_BASE_TERM_SETS: list[list[str]] = [
-    [
-        "(?:(?:glyco|fusion)[ -]?)?protein",
-        "(?:(?:glyco|fusion)[ -]?)?proteins? binding",
-    ],
-    ["(?:poly)peptide", "(?:poly)peptides? binding"],
-    ["(?:poly)?nucleotide", "(?:poly)?nucleotides? binding"],
-    [
-        "(?:receptor |protein )?ligand",
-        "(?:receptor |protein )?ligands? binding",
-        "(?:receptor |protein )?ligands? that bind",
-    ],
-    [
-        "(?:dna |nucleic acid )?fragment",
-        "(?:dna |nucleic acid )?fragments? binding",
-        "(?:dna |nucleic acid )?fragments? that bind",
-    ],
-]
-COMPOUND_BASE_TERM_SETS: list[list[str]] = [
-    ["conjugation", "conjugating", "conjugate"],
-    ["(?:small |antibody )?molecule", "(?:small |antibody )?molecules? binding"],
-]
-
-ALL_COMPOUND_BASE_TERMS = [
-    *COMPOUND_BASE_TERMS,
-    *flatten(COMPOUND_BASE_TERM_SETS),
-]
-
+ALL_COMPOUND_BASE_TERMS = COMPOUND_BASE_TERMS
 ALL_COMPOUND_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_COMPOUND_BASE_TERMS], "+")
-
-ALL_BIOLOGIC_BASE_TERMS = [
-    *BIOLOGIC_BASE_TERMS,
-    *flatten(BIOLOGIC_BASE_TERM_SETS),
-]
+ALL_BIOLOGIC_BASE_TERMS = BIOLOGIC_BASE_TERMS
+ALL_MECHANISM_BASE_TERMS = MECHANISM_BASE_TERMS
 
 ALL_BIOLOGIC_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_BIOLOGIC_BASE_TERMS], "+")
 
-ALL_MECHANISM_BASE_TERMS = [
-    *MECHANISM_BASE_TERMS,
-    *flatten(MECHANISM_BASE_TERM_SETS),
-]
 
 ALL_MECHANISM_BASE_TERMS_RE = get_or_re(
     [f"{t}s?" for t in ALL_MECHANISM_BASE_TERMS], "+"
 )
-
-INTERVENTION_BASE_TERM_SETS: list[list[str]] = [
-    *MECHANISM_BASE_TERM_SETS,
-    *BIOLOGIC_BASE_TERM_SETS,
-    *COMPOUND_BASE_TERM_SETS,
-]
 
 ALL_INTERVENTION_BASE_TERMS = [
     *ALL_COMPOUND_BASE_TERMS,
@@ -330,43 +248,66 @@ ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 
 
 # TODO split generic and specific; remove generic
-INTERVENTION_BASE_PREFIXES = [
+INTERVENTION_PREFIXES_GENERIC = [
+    "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "acceptable",
-    "allosteric",
-    "anti",
-    "aromatic",
-    "(?:(?:bi|mono|multi|poly)[- ]?)specific",
-    "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
-    "chimeric",
-    "cyclic",
+    "active",
+    "basic",
+    "bovine",
     "dual",
     "encoding",
-    "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
-    "heterocyclic",
-    "inverse",
-    "irreversible",
-    "(?:ion )?channel",
+    "human(?:ized|ised)",
     "inventive",
-    "negative",
+    "mammal(?:ian)?",
+    "modified",
+    "mouse",
+    "murine",
     "novel",
     "new",
     "partial",
+    "porcine",
     "positive",
     "potent",
-    "optionally",
+    "preferred",
+    "optional(?:ly)?",
+    "rat",
     "receptor",
-    "reversible",
+    "(?:irr)?reversible",
     "recombinant",
-    "topical",
-    "tri(?:cyclic)?",
+    "rodent",
     "selective",
     "single",
     "short",
+    "soluble",
     "substituted",
-    "therapeutic",
+    "target(?:ing|ed)?" "therapeutic",
+    "topical",
+    "useful",
+]
+
+INTERVENTION_PREFIXES_SPECIFIC = [
+    "allosteric",
+    "anti",
+    "aromatic",
+    "chimeric",
+    "cyclic",
+    "heterocyclic",
+    "(?:ion )?channel",
+    "inverse",
+    "mutant",
+    "negative",
+    "tri(?:cyclic)?",
+    "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
+    "(?:(?:bi|mono|multi|poly)[- ]?)specific",
     "cd[0-9]{1,2}",
     "cd[0-9]{1,2}-cd[0-9]{2}",
     "cd[0-9]{1,2}xcd[0-9]{2}",  # CD47xCD20
     "cd[0-9]{1,2}x[A-Z]{3,6}",  # CD3xPSCA
     "il[0-9]{1,2}-cd[0-9]{2}",
+]
+
+
+INTERVENTION_PREFIXES = [
+    *INTERVENTION_PREFIXES_GENERIC,
+    *INTERVENTION_PREFIXES_SPECIFIC,
 ]

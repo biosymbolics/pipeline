@@ -17,14 +17,21 @@ def __copy_publications():
 
     # adds all publication_numbers with the same family_id
     query = f"""
-        SELECT *
-        FROM (
-            SELECT main_publications.*,
-            ARRAY_AGG(related_publications.publication_number) OVER (PARTITION BY main_publications.family_id) AS all_publication_numbers
-            FROM `patents-public-data.patents.publications` as main_publications
-            JOIN `patents-public-data.patents.publications` AS related_publications ON related_publications.family_id = main_publications.family_id
-            WHERE main_publications.application_kind = 'W'
+        WITH numbered_rows AS (
+            SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY publication_number) as row_number
+            FROM (
+                SELECT main_publications.*,
+                ARRAY_AGG(related_publications.publication_number) OVER (PARTITION BY main_publications.family_id) AS all_publication_numbers
+                FROM `patents-public-data.patents.publications` as main_publications
+                JOIN `patents-public-data.patents.publications` AS related_publications ON related_publications.family_id = main_publications.family_id
+                WHERE main_publications.application_kind = 'W'
+                AND EXISTS (SELECT 1 FROM UNNEST(main_publications.cpc) AS cpc WHERE REGEXP_CONTAINS(cpc.code, "{BIOMEDICAL_IPC_CODE_PREFIX_RE}"))
+            )
         )
+        SELECT *
+        FROM numbered_rows
+        WHERE row_number = 1
     """
     client.create_from_select(query, table_id)
 
