@@ -3,6 +3,7 @@ Utils for transforming data into binder format
 """
 
 import re
+import sys
 from typing import Any, Optional
 import polars as pl
 from transformers import AutoTokenizer
@@ -155,9 +156,9 @@ def get_annotations():
         gpr_publications pubs
         where b_anns.publication_number = pubs.publication_number
         AND s.publication_number = pubs.publication_number
-        and "mechanisms" in unnest(s.domains)
-        and "compounds" in unnest(s.domains)
-        and "diseases" in unnest(s.domains)
+        and 'mechanisms' in unnest(s.domains)
+        and 'compounds' in unnest(s.domains)
+        and 'diseases' in unnest(s.domains)
         order by pubs.publication_number
     """
     records = client.select(query)
@@ -188,8 +189,9 @@ def create_binder_data():
 
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
+    annotations = get_annotations()
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
-    df = get_annotations().with_columns(
+    df = annotations.with_columns(
         pl.struct(["text", "term"])
         .apply(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
         .alias("indices")
@@ -206,3 +208,20 @@ def create_binder_data():
         .alias("check")
     )
     print(validation)
+
+
+def main():
+    """
+    Create training data for binder model
+    """
+    create_binder_data()
+
+
+if __name__ == "__main__":
+    if "-h" in sys.argv:
+        print(
+            "Usage: python3 -m scripts.binder.binder_data_prep\nPreps data for training the binder model"
+        )
+        sys.exit()
+
+    main()

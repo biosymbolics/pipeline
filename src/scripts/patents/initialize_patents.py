@@ -15,6 +15,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from scripts.ctgov.copy_ctgov import copy_ctgov
 from scripts.patents.psql.copy_approvals import copy_patent_approvals
 from scripts.patents.bq.copy_tables import copy_patent_tables
 from scripts.patents.bq_to_psql import copy_bq_to_psql
@@ -206,7 +207,7 @@ def main(bootstrap: bool = False):
         Followed by:
         ```
         # from local machine
-        pg_dump --no-owner patents > patents.psql
+        pg_dump --no-owner patents -t aggregated_annotations annotations applications application_to_trial patent_approvals terms trials  > patents.psql
         zip patents.psql.zip patents.psql
         aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
         aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
@@ -257,6 +258,9 @@ def main(bootstrap: bool = False):
 
     # create annotations (psql)
     __create_annotations_table()
+
+    # copy trial data
+    copy_ctgov()
 
     # post
     # update terms set term=regexp_replace(term, ' gene$', '') where term ~* '^[a-z0-9-]{3,} gene$';

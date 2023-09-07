@@ -69,6 +69,7 @@ PHRASE_MAP = {
     "induced condition": "associated disease",
     "induced illness": "associated disease",
     "induced disease": "associated disease",
+    "induced by": "associated with",
     "family member": "family",
     "family protein": "protein",
     "formulae": "formula",

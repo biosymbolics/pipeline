@@ -45,6 +45,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def transform_ct_records(ctgov_records, tagger: NerTagger):
     """
     Transform ctgov records
+    Slow due to intervention mapping!!
 
     - normalizes/extracts intervention names
 
@@ -68,7 +69,7 @@ def ingest_trials():
     """
 
     source_sql = f"""
-        select {", ".join(FIELDS)}, "" as normalized_sponsor
+        select {", ".join(FIELDS)}, '' as normalized_sponsor
         from studies, interventions, conditions
         where studies.nct_id = interventions.nct_id
         AND studies.nct_id = conditions.nct_id
@@ -111,6 +112,10 @@ def ingest_trials():
                 "column": "interventions",
                 "is_gin": True,
             },
+            {
+                "table": "trials",
+                "column": "normalized_sponsor",
+            },
         ]
     )
 
@@ -121,13 +126,15 @@ def create_application_to_trial():
     """
     client = PsqlDatabaseClient()
     att_query = """
-        select publication_number, nct_id
+        select a.publication_number, nct_id
         from trials t,
-        aggregated_annotations a
+        aggregated_annotations a,
+        applications p
         where a.publication_number=a.publication_number
+        AND p.publication_number=a.publication_number
         AND t.normalized_sponsor = any(a.terms) -- sponsor match
         AND t.interventions && a.terms -- intervention match
-        AND t.start_date >= a.priority_date -- seemingly the trial starts after the patent was filed
+        AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
     """
     client.create_from_select(att_query, "application_to_trial")
     client.create_indices(
@@ -145,12 +152,16 @@ def create_application_to_trial():
     client.insert_into_table
 
 
-def main():
+def copy_ctgov():
     """
     Copy data from ctgov to patents
     """
     ingest_trials()
     create_application_to_trial()
+
+
+def main():
+    copy_ctgov()
 
 
 if __name__ == "__main__":
