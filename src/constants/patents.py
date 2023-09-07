@@ -269,6 +269,7 @@ def get_patent_attribute_map():
     return {
         "COMBINATION": ["combo", "combination"],
         "COMPOUND_OR_MECHANISM": [
+            # TODO: remove drug?
             *flatten(expand_res(ALL_INTERVENTION_BASE_TERMS)),
             "molecule",
             "receptor",
@@ -324,6 +325,8 @@ def get_patent_attribute_map():
         "DISEASE_MODIFYING": [
             "disease modifying",
             "disease-modifying",
+            "cure",
+            "curative",
         ],
         "FORMULATION": [
             "formulation",
@@ -368,6 +371,9 @@ def get_patent_attribute_map():
             "symptom relief",
             "symptom relief",
         ],
+        "PEDIATRIC": ["pediatric", "paediatric"],
+        "OBSTETRIC": ["obstetric", "obstetrical", "pregnant", "pregnancy"],
+        "GERIATRIC": ["geriatric", "elderly", "senior", "older adult", "older patient"],
         "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
         "PROCEDURE": [
             "procedure",
@@ -396,18 +402,21 @@ def get_patent_attribute_map():
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
     "COMBINATION": -1,
     "COMPOUND_OR_MECHANISM": 3,
-    "DEVICE": -2,
+    "DEVICE": -3,
     "DIAGNOSTIC": -2,
     "DISEASE_MODIFYING": 1.5,
     "FORMULATION": -0.25,
+    "GERIATRIC": 0,
     "IRRELEVANT": -5,
-    "METHOD": -0.25,  # really only a prob if not COM
+    "METHOD": -1.0,  # really only a prob if not COM
     "METHOD_OF_ADMINISTRATION": -1.0,
     "NOVEL": 1.5,
+    "OBSTETRIC": 0,
     "PALLIATIVE": 0,
-    "PREVENTATIVE": 1,
-    "PROCEDURE": -1.5,
-    "PROCESS": -1,
+    "PEDIATRIC": 0,
+    "PREVENTATIVE": 0,
+    "PROCEDURE": -3,
+    "PROCESS": -2,
     "TREATMENT": 0,
 }
 
