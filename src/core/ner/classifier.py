@@ -99,7 +99,7 @@ def classify_by_keywords(
     Returns: a list of categories
 
     Example:
-        >>> classify_by_keywords(pl.Series(["Method of treatment by tryptamine alkaloids"]), PATENT_ATTRIBUTE_MAP)
+        >>> classify_by_keywords(pl.Series(["Method of treatment by tryptamine alkaloids"]), get_patent_attribute_map())
     """
     lookup = create_lookup_map(keyword_map)
 

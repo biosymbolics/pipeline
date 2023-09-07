@@ -2,9 +2,8 @@
 Utils for transforming data into binder format
 """
 
-import re
 import sys
-from typing import Any, Optional
+from typing import Optional
 import polars as pl
 from transformers import AutoTokenizer
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
@@ -42,7 +41,7 @@ def get_entity_indices(
         text (str): text to search
         entity (str): entity to search for
     """
-    all_words = tokenizer(text, max_length=1000000).to(DEFAULT_TORCH_DEVICE).tokens()
+    all_words = tokenizer(text, max_length=1000000).tokens()
     entity_words = tokenizer(entity).tokens()
     start_words = [
         (idx, word)
@@ -96,10 +95,14 @@ def format_into_binder(df: pl.DataFrame):
                     pl.col("publication_number").first().alias("id"),
                     pl.col("text").first(),
                     pl.col("indices")
-                    .apply(lambda indices: sorted([idx[1][0] for idx in indices]))
+                    .map_elements(
+                        lambda indices: sorted([idx[1][0] for idx in indices])
+                    )
                     .alias("entity_start_chars"),
                     pl.col("indices")
-                    .apply(lambda indices: sorted([idx[1][1] for idx in indices]))
+                    .map_elements(
+                        lambda indices: sorted([idx[1][1] for idx in indices])
+                    )
                     .alias("entity_end_chars"),
                     pl.struct(["domain", "indices"]).alias("entity_info"),
                 ]
@@ -109,7 +112,7 @@ def format_into_binder(df: pl.DataFrame):
         )
         .with_columns(
             pl.col("entity_info")
-            .apply(
+            .map_elements(
                 lambda recs: [
                     d
                     for _, d in sorted(
@@ -127,14 +130,14 @@ def format_into_binder(df: pl.DataFrame):
 
     with_word_indices = formatted.with_columns(
         pl.col("text")
-        .apply(lambda text: generate_word_indices(str(text), tokenizer))
+        .map_elements(lambda text: generate_word_indices(str(text), tokenizer))
         .alias("word_indices")
     ).with_columns(
         pl.col("word_indices")
-        .apply(lambda idxs: sorted([i[0] for i in idxs]))
+        .map_elements(lambda idxs: sorted([i[0] for i in idxs]))
         .alias("word_start_chars"),
         pl.col("word_indices")
-        .apply(lambda idxs: sorted([i[1] for i in idxs]))
+        .map_elements(lambda idxs: sorted([i[1] for i in idxs]))
         .alias("word_end_chars"),
     )
     records = with_word_indices.to_dicts()
@@ -146,20 +149,21 @@ def get_annotations():
     client = PsqlDatabaseClient()
     query = """
         SELECT
-        concat(title, "\n", abstract) as text, s.publication_number, original_term, domain
+        concat(title, '\n', abstract) as text, s.publication_number, term, domain
         FROM
         (
             select publication_number, array_agg(domain) as domains
             FROM biosym_annotations group by publication_number
         ) s,
         biosym_annotations b_anns,
-        gpr_publications pubs
-        where b_anns.publication_number = pubs.publication_number
-        AND s.publication_number = pubs.publication_number
-        and 'mechanisms' in unnest(s.domains)
-        and 'compounds' in unnest(s.domains)
-        and 'diseases' in unnest(s.domains)
-        order by pubs.publication_number
+        applications apps
+        where b_anns.publication_number = apps.publication_number
+        AND s.publication_number = apps.publication_number
+        and 'mechanisms' = any(s.domains)
+        and 'compounds' = any(s.domains)
+        and 'diseases' = any(s.domains)
+        order by apps.publication_number
+        limit 10
     """
     records = client.select(query)
     df = pl.DataFrame(records)
@@ -191,14 +195,15 @@ def create_binder_data():
     """
     annotations = get_annotations()
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+    print(annotations)
     df = annotations.with_columns(
         pl.struct(["text", "term"])
-        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
+        .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
         .alias("indices")
     )
     validation = df.filter(pl.col("indices").is_not_null()).select(
         pl.struct(["text", "term", "indices"])
-        .apply(
+        .map_elements(
             lambda rec: print(
                 rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
                 if len(rec["indices"]) > 0  # type: ignore

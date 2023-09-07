@@ -13,7 +13,7 @@ initialize()
 
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.patents import ATTRIBUTE_FIELD, PATENT_ATTRIBUTE_MAP
+from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from core.ner.classifier import classify_by_keywords
 from core.ner.types import DocEntities, DocEntity
@@ -30,12 +30,13 @@ BASE_DIR = "data/ner_enriched"
 
 
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
+    attr_map = get_patent_attribute_map()
     return [
         [
             DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, a_set, None)
             for a_set in attribute_set
         ]
-        for attribute_set in classify_by_keywords(patent_docs, PATENT_ATTRIBUTE_MAP)
+        for attribute_set in classify_by_keywords(patent_docs, attr_map)
     ]
 
 

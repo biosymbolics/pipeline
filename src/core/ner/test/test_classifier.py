@@ -1,7 +1,10 @@
 import unittest
 
 from core.ner.classifier import classify_by_keywords
-from constants.patents import PATENT_ATTRIBUTE_MAP
+from constants.patents import get_patent_attribute_map
+
+
+PATENT_ATTRIBUTE_MAP = get_patent_attribute_map()
 
 
 class TestClassifier(unittest.TestCase):

@@ -248,6 +248,7 @@ class TestNerUtils(unittest.TestCase):
             # WARNING:core.ner.binder.utils:Overlap detected between schizophrenia and [disorders treatable and/or preventable with anti-convulsive agents, such as epilepsy including post-traumatic epilepsy, Parkinson's disease, psychosis, migraine, cerebral ischaemia, Alzheimer's disease and other degenerative diseases such as Huntingdon's chorea, schizophrenia, obsessive compulsive disorders (OCD)]
             # WARNING:core.ner.binder.utils:Overlap detected between anti-inflammatory agents and [anti-inflammatory agents
             # Bifunctional activation cascade antagonist]
+            # WARNING:core.ner.binder.utils:Overlap detected between π-bound ligand and [monoanionic ligand bound to the metal, B is a π-bound ligand]
         ]
 
         for condition in test_conditions:
