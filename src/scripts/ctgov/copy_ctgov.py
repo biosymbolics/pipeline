@@ -121,12 +121,13 @@ def create_application_to_trial():
     """
     client = PsqlDatabaseClient()
     att_query = """
-    select publication_number, nct_id
-    from trials t,
-    aggregated_annotations a
-    where a.publication_number=a.publication_number
-    AND t.normalized_sponsor = any(a.terms)
-    AND t.interventions && a.terms
+        select publication_number, nct_id
+        from trials t,
+        aggregated_annotations a
+        where a.publication_number=a.publication_number
+        AND t.normalized_sponsor = any(a.terms) -- sponsor match
+        AND t.interventions && a.terms -- intervention match
+        AND t.start_date >= a.priority_date -- seemingly the trial starts after the patent was filed
     """
     client.create_from_select(att_query, "application_to_trial")
     client.create_indices(
