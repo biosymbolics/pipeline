@@ -23,7 +23,7 @@ from utils.classes import overrides
 
 ID_FIELD = "publication_number"
 ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
-MAX_TEXT_LENGTH = 750
+MAX_TEXT_LENGTH = 2000
 ENRICH_PROCESSED_PUBS_FILE = "data/enrich_processed_pubs.txt"
 CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
 BASE_DIR = "data/ner_enriched"
@@ -103,8 +103,6 @@ class BaseEnricher:
         abstracts = patents["abstract"].to_list()
 
         def format(title, abstract) -> str:
-            if not title.endswith("."):
-                title = title + "."  # more sentence-like, which improves NER.
             text = "\n".join([title, abstract])
             return text[0:MAX_TEXT_LENGTH]
 
@@ -146,30 +144,28 @@ class BaseEnricher:
         # extract entities
         entities = self.extractor(patent_docs)
 
-        # turn into dicts for polars' sake
-        entity_dicts = [[a._asdict() for a in es] for es in entities]
-
-        if len(flatten(entity_dicts)) == 0:
+        if len(flatten(entities)) == 0:
             logging.info("No entities found")
             return None
 
-        # add back to orig df
+        # turn into dicts for polars' sake
+        entity_dicts = [[a.to_flat_dict() for a in es] for es in entities]
+
         enriched = unprocessed_patents.with_columns(
             pl.Series("entities", entity_dicts)
         ).filter(pl.col("entities").list.lengths() > 0)
 
         logging.info("Enriched df: %s", enriched)
 
-        #  *** TODO: change schema on biosym table prior to next run***
         flattened_df = (
             # polars can't handle explode list[struct] as of 08/14/23
             pl.from_pandas(enriched.to_pandas().explode("entities"))
             .lazy()
             .select(
                 pl.col("publication_number"),
-                pl.col("entities").apply(lambda e: e["term"]).alias("term"),  # type: ignore
+                pl.col("entities").apply(lambda e: e["term"]).alias("original_term"),  # type: ignore
+                pl.col("entities").apply(lambda e: e["normalized_term"]).alias("term"),  # type: ignore
                 pl.col("entities").apply(lambda e: e["type"]).alias("domain"),  # type: ignore
-                # pl.lit(0.90000001).alias("confidence"),
                 pl.lit("title+abstract").alias("source"),
                 pl.col("entities")
                 .apply(lambda e: e["start_char"])  # type: ignore
@@ -252,7 +248,7 @@ class PatentEnricher(BaseEnricher):
         """
         Initialize the enricher
         """
-        batch_size = 2000
+        batch_size = 1000
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES, link=False)
 
@@ -261,12 +257,13 @@ class PatentEnricher(BaseEnricher):
         self.db.upsert_df_into_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
-            id_fields=[ID_FIELD, "term", "domain"],
+            id_fields=[ID_FIELD, "term", "original_term", "domain"],
             insert_fields=[
                 ID_FIELD,
                 "term",
+                "original_term",
                 "domain",
-                "confidence",
+                # "confidence",
                 "source",
                 "character_offset_start",
                 "character_offset_end",
@@ -277,7 +274,8 @@ class PatentEnricher(BaseEnricher):
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
         entities = self.tagger.extract(patent_docs)
         attributes = extract_attributes(patent_docs)
-        return [*entities, *attributes]
+        all = [e[0] + e[1] for e in zip(entities, attributes)]
+        return all
 
 
 if __name__ == "__main__":

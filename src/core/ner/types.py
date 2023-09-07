@@ -43,6 +43,19 @@ class DocEntity(
     def __repr__(self):
         return self.__str__()
 
+    def to_flat_dict(self):
+        """
+        Convert to a flat dictionary
+        (Skips linked_entity)
+        """
+        return {
+            "term": self.term,
+            "type": self.type,
+            "start_char": self.start_char,
+            "end_char": self.end_char,
+            "normalized_term": self.normalized_term,
+        }
+
 
 DocEntities = list[DocEntity]
 

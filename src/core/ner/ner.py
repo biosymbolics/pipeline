@@ -158,11 +158,8 @@ class NerTagger:
 
         - If the same entity is found in both docs, use the longest one.
         """
-        # Create a new list combining entities from both docs
-        all_ents = [*doc1.ents, *doc2.ents]
-
         indices = sorted(
-            [(ent.start_char, ent.end_char, ent) for ent in all_ents],
+            [(ent.start_char, ent.end_char, ent) for ent in [*doc1.ents, *doc2.ents]],
             key=lambda k: (k[0], k[1]),
             reverse=True,
         )

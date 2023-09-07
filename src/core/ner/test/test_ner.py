@@ -236,6 +236,18 @@ class TestNerUtils(unittest.TestCase):
                     # "pegylating interferon beta",
                 ],
             },
+            {
+                "text": """
+                    Bipolar pliers for microsurgery and coeliosurgery
+                    The invention concerns prehensile, rotating and detachable bipolar electro-coagulating pliers for microsurgery and coeliosurgery. It concerns reusable pliers for microsurgery and coeliosurgery prehensile and ensuring bipolar coagulation without bonding the coagulated tissues, combining in a single instrument both functions, so as to save time and handling procedure during an operation. Said pliers consist of: a head called fixed part (1) internally and externally insulated except for the fixed coagulating jaw (1); a mobile jaw (2) articulated on a ceramic pin (3) provided like the fixed jaw (1) with a coating preventing the coagulated tissues from being bonded; an externally insulated tube (7) with its snake (6) likewise insulated, connected to the mobile blade (2) and the handle (12-11); a handle controlling (11-12) power supply electrode-holders (14-13) connected to the tube and snake assembly by a screw socket (9) and the movement controlling ball (10). The insulation between the various metal components is provided by the ceramic pin (3) and the hot-deposited insulating coating.
+                """,
+                "expected_output": [],
+            },
+            # virus-induced antigen expressed on the plasma membrane of virus-infected cells, or; e) a receptor molecule or the fragment thereof with an affinity to an epitope of the viral structural proteins
+            # WARNING:core.ner.binder.utils:Overlap detected between sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor and [glucosylceramide synthesis inhibitors, (ii) sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor, sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor, protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor]
+            # WARNING:core.ner.binder.utils:Overlap detected between schizophrenia and [disorders treatable and/or preventable with anti-convulsive agents, such as epilepsy including post-traumatic epilepsy, Parkinson's disease, psychosis, migraine, cerebral ischaemia, Alzheimer's disease and other degenerative diseases such as Huntingdon's chorea, schizophrenia, obsessive compulsive disorders (OCD)]
+            # WARNING:core.ner.binder.utils:Overlap detected between anti-inflammatory agents and [anti-inflammatory agents
+            # Bifunctional activation cascade antagonist]
         ]
 
         for condition in test_conditions:

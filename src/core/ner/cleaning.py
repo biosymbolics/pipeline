@@ -9,8 +9,11 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
-from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS_RE
 
+from constants.patterns.intervention import (
+    ALL_INTERVENTION_BASE_TERMS_RE,
+    INTERVENTION_PREFIXES_GENERIC_RE,
+)
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
@@ -32,8 +35,10 @@ class CleanFunction(Protocol):
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
-    r"[\.,:;'\"]+$": "",
+    r"[.,:;'\"\)]+$": "",  # trailing punct
+    r"^[.,:;'\"\(]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
+    INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 DEFAULT_EXCEPTION_LIST: list[str] = [
@@ -133,7 +138,7 @@ class EntityCleaner:
         TODO: it might never make sense to parallelize.
         Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
         """
-        parallelize = self.parallelize and num_entries > 10000
+        parallelize = self.parallelize and num_entries > 100000000
         return MAX_N_PROCESS if parallelize else 1
 
     @property

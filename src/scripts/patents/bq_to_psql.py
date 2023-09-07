@@ -28,13 +28,24 @@ logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
     # "biosym_annotations_source": None,
-    APPLICATIONS_TABLE: "priority_date",  # shard by priority date
-    GPR_ANNOTATIONS_TABLE: "character_offset_start",
+    APPLICATIONS_TABLE: {
+        "column": "priority_date",
+        "size": timedelta(days=730),
+        "transform": lambda x: int(x.strftime("%Y%m%d")),
+        "starting_value": datetime(2000, 1, 1),
+        "ending_value": datetime(2023, 1, 1),
+    },  # shard by priority date
+    GPR_ANNOTATIONS_TABLE: {
+        "column": "character_offset_start",
+        "size": 500000,
+        "starting_value": 0,
+        "ending_value": 12592439,
+        "transform": lambda x: x,
+    },
 }
 
 GCS_BUCKET = "biosym-patents"
 # adjust this based on how large you want each shard to be
-SHARD_SIZE = timedelta(days=730)
 
 
 INITIAL_COPY_FIELDS = [
@@ -95,34 +106,34 @@ def export_bq_tables(today):
     """
     logging.info("Exporting BigQuery tables to GCS")
     create_patent_applications_table()
-    start_date = datetime(2000, 1, 1)
-    end_date = datetime(2023, 1, 1)
 
-    for table, date_column in EXPORT_TABLES.items():
-        if date_column is None:
+    for table, shard_spec in EXPORT_TABLES.items():
+        if shard_spec is None:
             destination_uri = f"gs://{GCS_BUCKET}/{table}.csv"
             db_client.export_table_to_storage(table, destination_uri)
         else:
             shared_table_name = f"{table}_shard_tmp"
-            current_date = start_date
-            while current_date < end_date:
-                shard_end_date = current_date + SHARD_SIZE
+            current_shard = shard_spec["starting_value"]
+            while current_shard < shard_spec["ending_value"]:
+                shard_end = current_shard + shard_spec["size"]
 
                 # Construct the SQL for exporting the shard
                 shard_query = f"""
                     SELECT *
                     FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {date_column} >= {int(current_date.strftime('%Y%m%d'))}
-                    AND {date_column} < {int(shard_end_date.strftime('%Y%m%d'))}
+                    WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
+                    AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
                 """
                 db_client.create_from_select(shard_query, shared_table_name)
 
                 # Define the destination in GCS
-                destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"
+                destination_uri = (
+                    f"gs://{GCS_BUCKET}/{today}/{table}_shard_{current_shard}.json"
+                )
                 db_client.export_table_to_storage(shared_table_name, destination_uri)
 
                 db_client.delete_table(shared_table_name)
-                current_date = shard_end_date
+                current_shard = shard_end
 
 
 # alter table applications alter column priority_date type date USING priority_date::date;

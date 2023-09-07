@@ -132,7 +132,7 @@ class BinderNlp:
             "stride": DOC_STRIDE,
             "return_tensors": "pt",
             "padding": "max_length",
-            "truncation": False,
+            "truncation": True,
         }
         all_args = {**common_args, **tokenize_args}
         return self.__tokenizer(text, **all_args).to(DEFAULT_DEVICE)
@@ -150,7 +150,7 @@ class BinderNlp:
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
             "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-            for i in range(20)
+            for i in range(100)
         ]) + " and some melanoma."
         b.extract(text).ents
         ```

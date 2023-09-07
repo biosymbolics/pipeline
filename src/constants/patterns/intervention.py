@@ -22,7 +22,7 @@ PRIMARY_BASE_TERMS: dict[str, str] = {
     "induc(?:er|ing|ion|e)?": "inducer",
     "inhibit(?:ion|ing)?": "inhibitor",
     "mimetic": "mimetic",
-    "modif(?:ier|ying|ication|y": "modifier",
+    "modif(?:ier|ying|ication|y)": "modifier",
     "promot(?:or|ion|ing|ant|e)?": "promoter",
     "potentiat(?:or|ion|ing|e)?": "potentiator",
     "regenerat(?:e|ion|ing|ion)": "regenerator",
@@ -92,7 +92,8 @@ MECHANISM_BASE_TERMS = [
 ]
 BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:(?:glyco|fusion)[ -]?)?proteins?(?: binding)?",
-    "(?:poly)peptides?(?: binding)?" "(?:poly)?nucleotides?(?: binding)?",
+    "(?:poly)peptides?(?: binding)?",
+    "(?:poly)?nucleotides?(?: binding)?",
     "(?:receptor |protein )?ligands?(?: binding| that bind)?",
     "(?:dna |nucleic acid )?fragments?(?: binding| that bind)?",
     "(?:neo)?antigen",
@@ -156,6 +157,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
 COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "administration(?: of)?",
     "aerosol",
+    "agent",
     "application(?: of)?",
     "analog(?:ue)?",
     "assembl(?:y|ies)",
@@ -169,6 +171,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "complex(?:es)?",
     "composition",
     "component",
+    "content",
     "(?:binding )?(?:compound|molecule)",
     "cream",
     "derivative",
@@ -266,7 +269,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "bovine",
     "dual",
     "encoding",
-    "human(?:ized|ised)",
+    "human(?:ized|ised)?",
     "inventive",
     "mammal(?:ian)?",
     "modified",
@@ -283,17 +286,26 @@ INTERVENTION_PREFIXES_GENERIC = [
     "rat",
     "receptor",
     "(?:irr)?reversible",
-    "recombinant",
     "rodent",
     "selective",
     "single",
     "short",
     "soluble",
     "substituted",
-    "target(?:ing|ed)?" "therapeutic",
+    "such",
+    "target(?:ing|ed)?",
+    "therapeutic",
     "topical",
     "useful",
+    "viable",
 ]
+
+INTERVENTION_PREFIXES_GENERIC_RE = get_or_re(
+    INTERVENTION_PREFIXES_GENERIC,
+    "+",
+    permit_trailing_space=True,
+    enforce_word_boundaries=True,
+)
 
 INTERVENTION_PREFIXES_SPECIFIC = [
     "allosteric",
@@ -306,6 +318,7 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "inverse",
     "mutant",
     "negative",
+    "recobinant",
     "tri(?:cyclic)?",
     "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
     "(?:(?:bi|mono|multi|poly)[- ]?)specific",
