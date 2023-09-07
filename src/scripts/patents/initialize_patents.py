@@ -67,7 +67,15 @@ def __create_annotations_table():
                 UNION ALL
 
                 -- gpr annotations (just diseases)
-                SELECT * from {GPR_ANNOTATIONS_TABLE}
+                SELECT
+                    publication_number,
+                    LOWER(case when map.term is null then preferred_name else map.term end) as term,
+                    domain,
+                    source,
+                    character_offset_start,
+                    character_offset_end
+                from {GPR_ANNOTATIONS_TABLE}
+                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
 
                 UNION ALL
 
