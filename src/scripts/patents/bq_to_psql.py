@@ -35,13 +35,13 @@ EXPORT_TABLES = {
         "starting_value": datetime(2000, 1, 1),
         "ending_value": datetime(2023, 1, 1),
     },
-    GPR_ANNOTATIONS_TABLE: {
-        "column": "confidence",
-        "size": 0.0125,
-        "starting_value": 0.774,
-        "ending_value": 0.91,  # max 0.90
-        "transform": lambda x: x,
-    },
+    # GPR_ANNOTATIONS_TABLE: {
+    #     "column": "confidence",
+    #     "size": 0.0125,
+    #     "starting_value": 0.774,
+    #     "ending_value": 0.91,  # max 0.90
+    #     "transform": lambda x: x,
+    # },
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -140,9 +140,9 @@ def export_bq_tables(today):
 TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
-    # "publication_date": "DATE",
-    # "filing_date": "DATE",
-    # "grant_date": "DATE",
+    "publication_date": "DATE",
+    "filing_date": "DATE",
+    "grant_date": "DATE",
     "priority_date": "DATE",
 }
 
@@ -214,8 +214,8 @@ def import_into_psql(today: str):
         client.create_table(table_name, columns, exists_ok=True)
         client.insert_into_table(df.to_dicts(), table_name)
 
-    bucket = storage_client.bucket(f"{GCS_BUCKET}/{today}")
-    blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json
+    bucket = storage_client.bucket(GCS_BUCKET)
+    blobs: list[storage.Blob] = list(bucket.list_blobs(prefix=today))
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
 
