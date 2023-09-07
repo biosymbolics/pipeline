@@ -31,32 +31,14 @@ LOW_VALUE_MOA_PREFIX = (
     "(?:(?:axis|binding|formula|pathway|receptor|(?:non )?selective|small molecule)[ ])"
 )
 
-LOW_VALUE_MOA_POSTFIXES = [
-    *COMPOUND_BASE_TERMS_GENERIC,
-    "activ(?:ity|ation|ed)",
-    "actions?",
-    "capable",
-    "contributing",
-    "effects?",
-    "functions?",
-    "ligands?",
-    "pathways?",
-    "(?:poly)?peptides?",
-    "proteins?",
-    "useful",
-]
-LOW_VALUE_MOA_POSTFIX = get_or_re(
-    LOW_VALUE_MOA_POSTFIXES,
-    "+",
-    permit_trailing_space=True,
-    enforce_word_boundaries=True,
-)
 
+LOW_VALUE_MOA_POSTFIX_RE = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
 
 MOA_PATTERNS = {
-    f"{LOW_VALUE_MOA_PREFIX}?{pattern}[ ]{LOW_VALUE_MOA_POSTFIX}?": f" {canonical} "  # extra space removed later
+    f"{LOW_VALUE_MOA_PREFIX}?{pattern}(?:[ ]{LOW_VALUE_MOA_POSTFIX_RE})?": f" {canonical} "  # extra space removed later
     for pattern, canonical in PRIMARY_BASE_TERMS.items()
 }
+
 
 PHRASE_MAP = {
     **MOA_PATTERNS,
@@ -89,6 +71,7 @@ PHRASE_MAP = {
     "induced disease": "associated disease",
     "family member": "family",
     "family protein": "protein",
+    "formulae": "formula",
     # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
     "diarrhoea": "diarrhea",
     "faecal": "fecal",

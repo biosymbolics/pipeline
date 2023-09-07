@@ -35,8 +35,8 @@ class CleanFunction(Protocol):
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
-    r"[.,:;'\"\)]+$": "",  # trailing punct
-    r"^[.,:;'\"\(]+": "",  # leading punct
+    r"[.,:;'\"]+$": "",  # trailing punct
+    r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
@@ -273,9 +273,9 @@ class EntityCleaner:
 
         cleaning_steps = [
             decode_html,
-            remove_chars,
             unwrap,
             format_parentheticals,  # order matters (run after unwrap)
+            remove_chars,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
             partial(
@@ -285,6 +285,7 @@ class EntityCleaner:
             ),
             partial(normalize_by_pos, n_process=n_process),
             normalize_phrasing,  # order matters (after rearrange)
+            remove_extra_spaces,
             lower,
         ]
 
@@ -373,10 +374,10 @@ class EntityCleaner:
         cleaning_steps: list[CleanFunction] = [
             lambda terms, n_process: self.__suppress(terms),
             self.normalize_terms,
-            partial(
-                self.filter_common_terms,
-                exception_list=common_exception_list,
-            ),
+            # partial(
+            #     self.filter_common_terms,
+            #     exception_list=common_exception_list,
+            # ),
         ]
 
         terms = [self.__get_text(ent) for ent in entities]
