@@ -34,12 +34,12 @@ EXPORT_TABLES = {
         "transform": lambda x: int(x.strftime("%Y%m%d")),
         "starting_value": datetime(2000, 1, 1),
         "ending_value": datetime(2023, 1, 1),
-    },  # shard by priority date
+    },
     GPR_ANNOTATIONS_TABLE: {
-        "column": "character_offset_start",
-        "size": 500000,
-        "starting_value": 0,
-        "ending_value": 12592439,
+        "column": "confidence",
+        "size": 0.0125,
+        "starting_value": 0.774,
+        "ending_value": 0.91,  # max 0.90
         "transform": lambda x: x,
     },
 }
@@ -105,7 +105,7 @@ def export_bq_tables(today):
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_patent_applications_table()
+    # create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
         if shard_spec is None:
@@ -193,14 +193,15 @@ def import_into_psql(today: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
+        # figure out transformation before re-enabling.
         nono_columns = [
             "cited_by",
             "citation",
             "publication_date",
-        ]  # requires work on transformation
+        ]
         df = df.select(
             *[
-                pl.col(c).apply(lambda s: transform(s, c))
+                pl.col(c).map_elements(lambda s: transform(s, c))
                 for c in df.columns
                 if c not in nono_columns
             ]
@@ -213,7 +214,7 @@ def import_into_psql(today: str):
         client.create_table(table_name, columns, exists_ok=True)
         client.insert_into_table(df.to_dicts(), table_name)
 
-    bucket = storage_client.bucket(GCS_BUCKET)  # {GCS_BUCKET}/{today}
+    bucket = storage_client.bucket(f"{GCS_BUCKET}/{today}")
     blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
@@ -229,6 +230,13 @@ def import_into_psql(today: str):
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
         load_data_from_json(blob, table_name)
 
+
+def copy_bq_to_psql():
+    today = datetime.now().strftime("%Y%m%d")
+    export_bq_tables(today)
+    import_into_psql(today)
+
+    client = PsqlDatabaseClient()
     client.create_indices(
         [
             {
@@ -257,12 +265,6 @@ def import_into_psql(today: str):
             },
         ]
     )
-
-
-def copy_bq_to_psql():
-    today = datetime.now().strftime("%Y%m%d")
-    export_bq_tables(today)
-    import_into_psql(today)
 
 
 if __name__ == "__main__":

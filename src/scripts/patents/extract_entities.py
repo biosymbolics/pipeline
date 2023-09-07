@@ -149,29 +149,27 @@ class BaseEnricher:
             return None
 
         # turn into dicts for polars' sake
-        entity_dicts = [[a.to_flat_dict() for a in es] for es in entities]
-
-        enriched = unprocessed_patents.with_columns(
-            pl.Series("entities", entity_dicts)
-        ).filter(pl.col("entities").list.lengths() > 0)
-
-        logging.info("Enriched df: %s", enriched)
+        entity_dicts = pl.Series(
+            "entities", ([[a.to_flat_dict() for a in es] for es in entities])
+        )
 
         flattened_df = (
             # polars can't handle explode list[struct] as of 08/14/23
-            pl.from_pandas(enriched.to_pandas().explode("entities"))
+            unprocessed_patents.with_columns(entity_dicts)
+            .filter(pl.col("entities").list.lengths() > 0)
+            .explode("entities")
             .lazy()
             .select(
                 pl.col("publication_number"),
-                pl.col("entities").apply(lambda e: e["term"]).alias("original_term"),  # type: ignore
-                pl.col("entities").apply(lambda e: e["normalized_term"]).alias("term"),  # type: ignore
-                pl.col("entities").apply(lambda e: e["type"]).alias("domain"),  # type: ignore
+                pl.col("entities").map_elements(lambda e: e["term"]).alias("original_term"),  # type: ignore
+                pl.col("entities").map_elements(lambda e: e["normalized_term"]).alias("term"),  # type: ignore
+                pl.col("entities").map_elements(lambda e: e["type"]).alias("domain"),  # type: ignore
                 pl.lit("title+abstract").alias("source"),
                 pl.col("entities")
-                .apply(lambda e: e["start_char"])  # type: ignore
+                .map_elements(lambda e: e["start_char"])  # type: ignore
                 .alias("character_offset_start"),
                 pl.col("entities")
-                .apply(lambda e: e["end_char"])  # type: ignore
+                .map_elements(lambda e: e["end_char"])  # type: ignore
                 .alias("character_offset_end"),
             )
             .collect()

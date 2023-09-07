@@ -51,6 +51,8 @@ def __copy_gpr_annotations():
         `{BQ_DATASET_ID}.publications` p
         WHERE a.publication_number = p.publication_number
         AND a.domain='diseases'
+        AND confidence >= 0.65
+        and character_offset_start < 10000 -- otherwise, probably not the main indication?
     """
     client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
 
