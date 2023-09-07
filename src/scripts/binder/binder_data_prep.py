@@ -3,34 +3,71 @@ Utils for transforming data into binder format
 """
 
 import re
-from typing import Optional
+from typing import Any, Optional
 import polars as pl
+from transformers import AutoTokenizer
+from clients.low_level.postgres.postgres import PsqlDatabaseClient
 
+
+from constants.core import (
+    DEFAULT_BASE_NLP_MODEL,
+    DEFAULT_TORCH_DEVICE,
+)
 from utils.file import save_json_as_file
 
 
-# TODO: flawed... use word indices from tokenization??
-# e.g
-# char_spans = [tokenized.token_to_chars(i, ti) for ti in range(num_tokens)]
-# word_start_chars = [cs.start for cs in char_spans if cs is not None]
-# word_end_chars = [cs.end for cs in char_spans if cs is not None]
-def generate_word_indices(text: str) -> list[tuple[int, int]]:
+def generate_word_indices(text: str, tokenizer) -> list[tuple[int, int]]:
     """
     Generate word indices for a text
 
     Args:
         text (str): text to generate word indices for
     """
-    word_indices = []
-    token_re = re.compile(r"[\s\n]")
-    words = token_re.split(text)
-    for idx, word in enumerate(words):
-        end_adj = len(re.sub("[.,;]$", "", word))
-        start_char = sum([len(word) + 1 for word in words[:idx]])
-        # end char to be before certain punct.
-        end_char = start_char + end_adj
-        word_indices.append((start_char, end_char))
-    return word_indices
+    tokenized = tokenizer(text, max_length=1000000).to(DEFAULT_TORCH_DEVICE)
+    num_tokens = len(tokenized.tokens())
+    char_spans = [tokenized.token_to_chars(ti) for ti in range(num_tokens)]
+    return [(cs.start, cs.end) for cs in char_spans if cs is not None]
+
+
+def get_entity_indices(
+    text: str,
+    entity: str,
+    tokenizer,
+) -> Optional[tuple[tuple[int, int], tuple[int, int]]]:
+    """
+    Get the indices of an entity in a text
+
+    Args:
+        text (str): text to search
+        entity (str): entity to search for
+    """
+    all_words = tokenizer(text, max_length=1000000).to(DEFAULT_TORCH_DEVICE).tokens()
+    entity_words = tokenizer(entity).tokens()
+    start_words = [
+        (idx, word)
+        for idx, word in enumerate(all_words)
+        if word.lower().startswith(entity_words[0].lower())
+    ]
+    for start_idx, _ in start_words:
+        possible_entity_words = all_words[start_idx : start_idx + len(entity_words)]
+        is_match = all(
+            [
+                word.lower().startswith(entity_word.lower())
+                for entity_word, word in zip(entity_words, possible_entity_words)
+            ]
+        )
+        if is_match:
+            # copy of words inclusive of entity
+            # then hack to avoid getting indexes that include EOS punctuation (e.g. we want "septic shock" not "septic shock.")
+            words_inclusive = all_words[: start_idx + len(entity_words)]
+            # words_inclusive[-1] = re.sub("[.,;]$", "", words_inclusive[-1])  # add ) ?
+            start_char = sum([len(word) + 1 for word in all_words[:start_idx]])
+            end_char = sum([len(word) + 1 for word in words_inclusive]) - 1
+            return (
+                (start_idx, start_idx + len(entity_words) - 1),  # word indices
+                (start_char, end_char),  # char indices
+            )
+    return None
 
 
 def format_into_binder(df: pl.DataFrame):
@@ -47,6 +84,8 @@ def format_into_binder(df: pl.DataFrame):
     }
     and saves to file.
     """
+    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+
     formatted = (
         (
             df.filter(pl.col("indices").is_not_null())
@@ -87,7 +126,7 @@ def format_into_binder(df: pl.DataFrame):
 
     with_word_indices = formatted.with_columns(
         pl.col("text")
-        .apply(lambda text: generate_word_indices(str(text)))
+        .apply(lambda text: generate_word_indices(str(text), tokenizer))
         .alias("word_indices")
     ).with_columns(
         pl.col("word_indices")
@@ -102,29 +141,33 @@ def format_into_binder(df: pl.DataFrame):
     return formatted
 
 
-def get_entity_indices(
-    text: str, entity: str
-) -> Optional[tuple[tuple[int, int], tuple[int, int]]]:
+def get_annotations():
+    client = PsqlDatabaseClient()
+    query = """
+        SELECT
+        concat(title, "\n", abstract) as text, s.publication_number, original_term, domain
+        FROM
+        (
+            select publication_number, array_agg(domain) as domains
+            FROM biosym_annotations group by publication_number
+        ) s,
+        biosym_annotations b_anns,
+        gpr_publications pubs
+        where b_anns.publication_number = pubs.publication_number
+        AND s.publication_number = pubs.publication_number
+        and "mechanisms" in unnest(s.domains)
+        and "compounds" in unnest(s.domains)
+        and "diseases" in unnest(s.domains)
+        order by pubs.publication_number
     """
-    Get the indices of an entity in a text
+    records = client.select(query)
+    df = pl.DataFrame(records)
+    return df
 
-    Args:
-        text (str): text to search
-        entity (str): entity to search for
 
-    Usage:
-    ```
-    # export stored query https://console.cloud.google.com/bigquery?sq=1056123862280:06dfa28ce71c45f19755ee3d5f631843
-    export_file = "ner_training.csv"
-    csv_df = pl.read_csv(export_file)
-    df = csv_df.with_columns(csv_df.select(pl.struct(["text", "term"])
-        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"])).alias("indices")))
-    ```
-
-    To check:
-        df.filter(pl.col("indices").is_not_null()).select(pl.struct(["text", "term", "indices"])
-            .apply(lambda rec: print(rec["text"][rec["indices"][1][0]:rec["indices"][1][1]] if len(rec["indices"]) > 0 else "hi"))
-            .alias("check"))
+def create_binder_data():
+    """
+    Create training data for binder model
 
     To split:
     ``` bash
@@ -145,31 +188,21 @@ def get_entity_indices(
 
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
-    token_re = re.compile(r"[\s\n]")
-    words = token_re.split(text)
-    entity_words = token_re.split(entity)
-    start_words = [
-        (idx, word)
-        for idx, word in enumerate(words)
-        if word.lower().startswith(entity_words[0].lower())
-    ]
-    for start_idx, _ in start_words:
-        possible_entity_words = words[start_idx : start_idx + len(entity_words)]
-        is_match = all(
-            [
-                word.lower().startswith(entity_word.lower())
-                for entity_word, word in zip(entity_words, possible_entity_words)
-            ]
-        )
-        if is_match:
-            # copy of words inclusive of entity
-            # then hack to avoid getting indexes that include EOS punctuation (e.g. we want "septic shock" not "septic shock.")
-            words_inclusive = words[: start_idx + len(entity_words)]
-            words_inclusive[-1] = re.sub("[.,;]$", "", words_inclusive[-1])  # add ) ?
-            start_char = sum([len(word) + 1 for word in words[:start_idx]])
-            end_char = sum([len(word) + 1 for word in words_inclusive]) - 1
-            return (
-                (start_idx, start_idx + len(entity_words) - 1),  # word indices
-                (start_char, end_char),  # char indices
+    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+    df = get_annotations().with_columns(
+        pl.struct(["text", "term"])
+        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
+        .alias("indices")
+    )
+    validation = df.filter(pl.col("indices").is_not_null()).select(
+        pl.struct(["text", "term", "indices"])
+        .apply(
+            lambda rec: print(
+                rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
+                if len(rec["indices"]) > 0  # type: ignore
+                else "hi"
             )
-    return None
+        )
+        .alias("check")
+    )
+    print(validation)

@@ -9,6 +9,11 @@ import logging
 from spacy.tokens import Doc
 
 from core.ner.spacy import Spacy
+from constants.core import (
+    DEFAULT_BASE_NLP_MODEL,
+    DEFAULT_TORCH_DEVICE,
+    DEFAULT_NLP_MODEL_ARGS,
+)
 
 from .constants import NER_TYPES
 from .types import Annotation
@@ -16,11 +21,6 @@ from .utils import extract_predictions, remove_overlapping_spans, prepare_featur
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-DOC_STRIDE = 16
-MAX_LENGTH = 128  # same as with training
-DEFAULT_BASE_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
-DEFAULT_DEVICE = "mps"
 
 
 class BinderNlp:
@@ -30,8 +30,8 @@ class BinderNlp:
     To create the model, clone https://github.com/kristinlindquist/binder and from that directory, run the instructions in the readme.
     """
 
-    def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_MODEL):
-        device = torch.device(DEFAULT_DEVICE)
+    def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_NLP_MODEL):
+        device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info("Loading torch model from: %s", model_file)
         self.model = torch.load(model_file)
@@ -127,15 +127,8 @@ class BinderNlp:
         Args:
             text (Union[str, list[str]]): text or list of texts to tokenize
         """
-        common_args = {
-            "max_length": MAX_LENGTH,
-            "stride": DOC_STRIDE,
-            "return_tensors": "pt",
-            "padding": "max_length",
-            "truncation": True,
-        }
-        all_args = {**common_args, **tokenize_args}
-        return self.__tokenizer(text, **all_args).to(DEFAULT_DEVICE)
+        all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
+        return self.__tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
     def extract(self, doc: Union[str, Doc]) -> Doc:
         """
