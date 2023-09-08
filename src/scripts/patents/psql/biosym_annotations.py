@@ -4,7 +4,7 @@ To run after NER is complete
 import sys
 import logging
 from typing import Literal
-from pydash import compact, flatten
+from pydash import compact
 
 from system import initialize
 
@@ -21,7 +21,7 @@ from constants.patterns.intervention import (
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
 )
-from utils.re import get_or_re
+from utils.re import expand_res, get_or_re
 
 
 TextField = Literal["title", "abstract"]
@@ -825,11 +825,9 @@ def remove_common_terms():
     Remove common original terms
     """
     logging.info("Removing common terms")
-    # regex in here, effectively ignored
     common_terms = [
         *DELETION_TERMS,
-        *flatten(INTERVENTION_BASE_TERMS),
-        *INTERVENTION_BASE_TERMS,
+        *expand_res(INTERVENTION_BASE_TERMS),
     ]
 
     or_re = get_or_re([f"{t}s?" for t in common_terms])
