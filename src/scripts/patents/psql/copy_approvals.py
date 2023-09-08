@@ -26,7 +26,7 @@ def copy_all_approvals():
         "max(prod.ndc_product_code) as ndc_code",
         "max(prod.product_name) as brand_name",
         "(ARRAY_TO_STRING(array_agg(distinct struct.name), '+')) as generic_name",  # or product.generic_name
-        "ARRAY_AGG(distinct struct.name) as active_ingredients",
+        "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
         "max(struct.stem) as stem",
         "max(prod_approval.applicant) as applicant",
         "max(prod.marketing_status) as application_type",
@@ -106,6 +106,7 @@ def copy_direct_patent_to_approval():
         ob_patent_view patents
         where prod_approval.trade_name = prod.product_name
         AND lower(patents.trade_name) = lower(prod.product_name)
+        group by concat('US-', patent_no), prod_approval.appl_no
     """
     PsqlDatabaseClient.copy_between_db(
         source_db=SOURCE_DB,
@@ -124,14 +125,17 @@ def copy_indirect_patent_to_approval():
     """
     client = PsqlDatabaseClient()
     query = f"""
-        select *
-        from {REGULATORY_APPROVAL_TABLE} approvals,
+        select
+        patent_app.publication_number as publication_number,
+        approvals.regulatory_application_number as regulatory_application_number
+        from
+        applications as patent_app,
         aggregated_annotations as a,
-        applications as patent_applications
+        {REGULATORY_APPROVAL_TABLE} approvals
         LEFT JOIN synonym_map as sm ON sm.synonym = approvals.generic_name
-        where aggregated_annotations.publication_number = patent_applications.publication_number
+        where a.publication_number = patent_app.publication_number
         AND approvals.active_ingredients @> a.terms -- TODO this could FP
-        AND t.normalized_appliant = any(a.terms)
+        AND approvals.normalized_applicant = any(a.terms)
     """
     client.select_insert_into_table(query, PATENT_TO_REGULATORY_APPROVAL_TABLE)
 
