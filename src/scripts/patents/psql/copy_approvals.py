@@ -26,6 +26,7 @@ def copy_all_approvals():
         "max(prod.ndc_product_code) as ndc_code",
         "max(prod.product_name) as brand_name",
         "(ARRAY_TO_STRING(array_agg(distinct struct.name), '+')) as generic_name",  # or product.generic_name
+        "ARRAY_AGG(distinct struct.name) as active_ingredients",
         "max(struct.stem) as stem",
         "max(prod_approval.applicant) as applicant",
         "max(prod.marketing_status) as application_type",
@@ -36,6 +37,7 @@ def copy_all_approvals():
         "max(distinct struct.lipinski) as lipinski",
         "max(prod_approval.route) as route",
         "max(label.pdf_url) as label_url",
+        "'' as normalized_applicant",
     ]
     # faers? ddi?
     source_sql = f"""
@@ -64,9 +66,33 @@ def copy_all_approvals():
         dest_table_name=REGULATORY_APPROVAL_TABLE,
         truncate_if_exists=True,
     )
+    client = PsqlDatabaseClient()
+    client.execute_query(
+        """
+        update {REGULATORY_APPROVAL_TABLE} set normalized_applicant=sm.term from
+        synonym_map sm where sm.synonym = lower(applicant)
+        """
+    )
+    client.create_indices(
+        [
+            {
+                "table": REGULATORY_APPROVAL_TABLE,
+                "column": "regulatory_application_number",
+            },
+            {
+                "table": REGULATORY_APPROVAL_TABLE,
+                "column": "active_ingredients",
+                "is_gin": True,
+            },
+            {
+                "table": REGULATORY_APPROVAL_TABLE,
+                "column": "normalized_applicant",
+            },
+        ]
+    )
 
 
-def copy_patent_to_regulatory_approval():
+def copy_direct_patent_to_approval():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
     """
@@ -90,12 +116,54 @@ def copy_patent_to_regulatory_approval():
     )
 
 
+def copy_indirect_patent_to_approval():
+    """
+    Map patents to regulatory approvals based on
+    1) intervention/ingredient name match
+    2) sponsor match
+    """
+    client = PsqlDatabaseClient()
+    query = """
+        select *
+        from {REGULATORY_APPROVAL_TABLE} approvals,
+        aggregated_annotations as a,
+        applications as patent_applications
+        LEFT JOIN synonym_map as sm ON sm.synonym = approvals.generic_name
+        where aggregated_annotations.publication_number = patent_applications.publication_number
+        AND approvals.active_ingredients @> a.terms -- TODO this could FP
+        AND t.normalized_appliant = any(a.terms)
+    """
+    client.select_insert_into_table(query, PATENT_TO_REGULATORY_APPROVAL_TABLE)
+
+
+def copy_patent_to_approval():
+    """
+    Copy map between patents and regulatory approvals
+    """
+    copy_direct_patent_to_approval()
+    copy_indirect_patent_to_approval()
+
+    client = PsqlDatabaseClient()
+    client.create_indices(
+        [
+            {
+                "table": PATENT_TO_REGULATORY_APPROVAL_TABLE,
+                "column": "publication_number",
+            },
+            {
+                "table": PATENT_TO_REGULATORY_APPROVAL_TABLE,
+                "column": "regulatory_application_number",
+            },
+        ]
+    )
+
+
 def copy_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
     """
     copy_all_approvals()
-    copy_patent_to_regulatory_approval()
+    copy_patent_to_approval()
 
 
 def main():
