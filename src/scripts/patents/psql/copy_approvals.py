@@ -68,7 +68,7 @@ def copy_all_approvals():
     )
     client = PsqlDatabaseClient()
     client.execute_query(
-        """
+        f"""
         update {REGULATORY_APPROVAL_TABLE} set normalized_applicant=sm.term from
         synonym_map sm where sm.synonym = lower(applicant)
         """
@@ -123,7 +123,7 @@ def copy_indirect_patent_to_approval():
     2) sponsor match
     """
     client = PsqlDatabaseClient()
-    query = """
+    query = f"""
         select *
         from {REGULATORY_APPROVAL_TABLE} approvals,
         aggregated_annotations as a,
