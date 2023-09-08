@@ -47,14 +47,14 @@ def __copy_gpr_annotations():
     # 3.7TB query
     query = f"""
         SELECT a.publication_number, max(ocid) as ocid, a.preferred_name as preferred_name, max(a.domain) as domain,
-        max(a.source) as source, max(a.confidence) as confidence,
-        max(a.character_offset_start) as character_offset_start, max(a.character_offset_end) as character_offset_end
+        max(a.source) as source, array_agg(distinct a.source) as sources, max(a.confidence) as confidence,
+        max(a.character_offset_start) as character_offset_start, max(a.character_offset_end) as character_offset_end,
         FROM `patents-public-data.google_patents_research.annotations` a,
         `{BQ_DATASET_ID}.publications` p
         WHERE a.publication_number = p.publication_number
         AND a.domain='diseases'
         AND confidence >= 0.65
-        AND preferred_name<>'disease'
+        AND preferred_name not in ('disease', 'syndrome')
         AND character_offset_start < 10000 -- otherwise, probably not the main indication?
         group by a.publication_number, a.preferred_name
     """
