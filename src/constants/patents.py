@@ -267,6 +267,15 @@ OWNER_TERM_MAP = {
 
 def get_patent_attribute_map():
     return {
+        "CAM": [
+            "herbal",
+            "herb",
+            "botanical",
+            "plant",
+            "traditional medicine",
+            "chinese medicine",
+            "tibetian medicine",
+        ],
         "COMBINATION": ["combo", "combination"],
         "COMPOUND_OR_MECHANISM": [
             # TODO: remove drug?
@@ -282,6 +291,7 @@ def get_patent_attribute_map():
             "cannula",
             "computer",
             "device",
+            "dressing",
             "drug matrix",
             "electronic",
             "implant",
@@ -289,6 +299,7 @@ def get_patent_attribute_map():
             "instrument",
             "needle",
             "packaging",
+            "probe",
             "prosthesis",
             "scan",
             "sensor",
@@ -340,16 +351,16 @@ def get_patent_attribute_map():
             "extended release",
             "topical",
             "aerosol",
+            "analog",
+            "analogue",
         ],
         "INCREMENTAL": ["improved process", "improved method", "improved system"],
         "IRRELEVANT": [
             "mammal",
             "veterinary",
             "animal",
-            "nutritional",
-            "food supplement",
+            "dental",
             "primate",
-            "traditional",
             "agricultural",
             "horticultural",
             "cosmetic",
@@ -358,16 +369,27 @@ def get_patent_attribute_map():
             "pesticide",
             "plant disease",
             "pest control",
+            "machine learning",
         ],
         "METHOD": ["procedure", "preparation method", "method of use"],
         "METHOD_OF_ADMINISTRATION": [
             "delivery",
             "dosing",
-            "kit",
             "regimen",
             "administration",
         ],
-        "NOVEL": ["novel"],
+        "NOVEL": ["novel", "new"],
+        "NUTRITIONAL": [
+            "nutrition",
+            "nutritional",
+            "nutraceutical",
+            "vitamin",
+            "dietary",
+            "diet",
+            "food",
+            "nutrient",
+            "nutriment",
+        ],
         "PALLIATIVE": [
             "palliative",
             "reduction in symptoms",
@@ -377,8 +399,18 @@ def get_patent_attribute_map():
             "symptom relief",
             "quality of life",
         ],
+        "PLATFORM": ["platform"],
         "PEDIATRIC": ["pediatric", "paediatric"],
-        "OBSTETRIC": ["obstetric", "obstetrical", "pregnant", "pregnancy"],
+        "OBSTETRIC": [
+            "obstetric",
+            "obstetrical",
+            "pregnant",
+            "pregnancy",
+            "natal",
+            "neonatal",
+            "fetal",
+            "fetus",
+        ],
         "GERIATRIC": ["geriatric", "elderly", "senior", "older adult", "older patient"],
         "PREVENTATIVE": ["prevention", "prophylaxis", "prophylactic"],
         "PROCEDURE": [
@@ -387,6 +419,8 @@ def get_patent_attribute_map():
             "surgical",
         ],
         "PROCESS": [
+            "culture",
+            "culturing",
             "manufacture",
             "preparation",
             "process",
@@ -406,24 +440,27 @@ def get_patent_attribute_map():
 
 
 SUITABILITY_SCORE_MAP: SuitabilityScoreMap = {
+    "CAM": -3,
     "COMBINATION": -1,
     "COMPOUND_OR_MECHANISM": 3,
     "DEVICE": -3,
     "DIAGNOSTIC": -2,
     "DISEASE_MODIFYING": 1.5,
-    "FORMULATION": -0.25,
+    "FORMULATION": -1,
     "GERIATRIC": 0,
     "IRRELEVANT": -5,
     "METHOD": -1.0,  # really only a prob if not COM
     "METHOD_OF_ADMINISTRATION": -1.0,
     "NOVEL": 1.5,
+    "NUTRITIONAL": -4,
     "OBSTETRIC": 0,
     "PALLIATIVE": 0,
     "PEDIATRIC": 0,
+    "PLATFORM": 0,
     "PREVENTATIVE": 0,
     "PROCEDURE": -3,
     "PROCESS": -2,
-    "TREATMENT": 0,
+    "TREATMENT": 1,
 }
 
 
