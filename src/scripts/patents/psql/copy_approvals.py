@@ -72,11 +72,10 @@ def copy_all_approvals():
         "max(prod.marketing_status) as application_type",
         "max(prod_approval.approval_date) as approval_date",
         "max(label_section.text) as patent_indication",
-        "array_agg(distinct struct.cd_formula) as formula",
-        "array_agg(distinct struct.smiles) as smiles",
-        "array_agg(distinct struct.lipinski) as lipinski",
+        "max(distinct struct.cd_formula) as formula",
+        "max(distinct struct.smiles) as smiles",
+        "max(distinct struct.lipinski) as lipinski",
         "max(prod_approval.route) as route",
-        "array_agg(pubs.pubmed_id) as pubmed_ids",
         "max(label.pdf_url) as label_url",
     ]
     # faers? ddi?
@@ -87,19 +86,17 @@ def copy_all_approvals():
         product prod,
         structures struct,
         struct2obprod s2p,
-        pdb as pubs,
         prd2label p2l,
         label,
         section label_section
         where prod_approval.id = s2p.prod_id
-        AND prod.id = prod_approval.id
-        AND s2p.id = struct.id
-        AND pubs.struct_id=struct.id
-        AND p2l.ndc_product_code = prod.id
+        AND prod.product_name = prod_approval.trade_name
+        AND s2p.struct_id = struct.id
+        AND p2l.ndc_product_code = prod.ndc_product_code
         AND label.id = p2l.label_id
         AND label_section.label_id = label.id
         AND label_section.title = 'INDICATIONS & USAGE SECTION'
-        group by pv.patent_no
+        group by prod_approval.trade_name;
     """
     dest_db = "patents"
     dest_table_name = PATENT_APPROVALS_TABLE
