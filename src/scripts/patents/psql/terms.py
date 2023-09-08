@@ -219,7 +219,6 @@ class TermAssembler:
             if len(owner) > 0
         ]
 
-        # yields 671,791 (09/08/2023)
         terms = TermAssembler.__aggregate(normalized)
         return terms
 
