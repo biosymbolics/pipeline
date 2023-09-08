@@ -9,7 +9,7 @@ from pydash import compact
 
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import AGGREGATED_ANNOTATIONS_TABLE, PATENT_APPROVALS_TABLE
+from constants.core import AGGREGATED_ANNOTATIONS_TABLE, REGULATORY_APPROVAL_TABLE
 from typings.patents import PatentApplication
 from utils.string import get_id
 
@@ -217,7 +217,7 @@ def _search(
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
         )
-        LEFT JOIN {PATENT_APPROVALS_TABLE} approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
+        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN application_to_trial a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN trials ON trials.nct_id = a2t.nct_id
         {qp["where"]}
