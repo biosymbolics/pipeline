@@ -253,7 +253,7 @@ class EntityCleaner:
                 )
                 yield no_parens
 
-        def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
+        def normalize_phrases(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(
                     rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
@@ -278,13 +278,13 @@ class EntityCleaner:
             remove_chars,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
-            partial(
-                lemmatize_tails,
-                n_process=n_process,
-                exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
-            ),
+            # partial(
+            #     lemmatize_tails,
+            #     n_process=n_process,
+            #     exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
+            # ),
             partial(normalize_by_pos, n_process=n_process),
-            normalize_phrasing,  # order matters (after rearrange)
+            normalize_phrases,  # order matters (after rearrange)
             remove_extra_spaces,
             lower,
         ]
