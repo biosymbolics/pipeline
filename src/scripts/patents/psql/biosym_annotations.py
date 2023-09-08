@@ -785,8 +785,9 @@ def clean_up_junk():
         f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
         # leading/trailing whitespace
         rf"update {WORKING_TABLE} set term=trim(term) where trim(term) <> term",
-        # f"update {WORKING_TABLE} set "
-        # + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
+        # fixes some sentences
+        f"update {WORKING_TABLE} set "
+        + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
