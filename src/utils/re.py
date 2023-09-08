@@ -23,7 +23,11 @@ ReCount = Union[Literal["*", "+", "?"], int]
 
 
 def get_or_re(
-    re_strs: Sequence[str], count: Optional[ReCount] = None, upper: Optional[int] = None
+    _re_strs: Sequence[str],
+    count: Optional[ReCount] = None,
+    upper: Optional[int] = None,
+    permit_trailing_space: bool = False,
+    enforce_word_boundaries: bool = False,
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -31,7 +35,16 @@ def get_or_re(
     Args:
         re_strs (list[str]): list of regexes
         count (Optional[ReCount]): count to apply to regex (defaults to None, which is effectively {1})
+        upper (Optional[int]): upper bound for count (defaults to None, which is effectively {1, 100})
+        permit_trailing_space (bool): whether to permit trailing space between each re
     """
+    re_strs = [*_re_strs]
+    if enforce_word_boundaries:
+        re_strs = [rf"\b{re_str}\b" for re_str in re_strs]
+
+    if permit_trailing_space:
+        re_strs = [re_str + r"\s*" for re_str in re_strs]
+
     base_re = f"(?:{'|'.join(re_strs)})"
 
     if count is None:
@@ -90,3 +103,34 @@ def remove_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
 
     for term in terms:
         yield __remove(term)
+
+
+def expand_re(re_str: str, max_len: int = 1000) -> list[str]:
+    """
+    Expands a regex into a list of strings
+
+    Args:
+        re_str (str): regex to expand
+        max_len (int): maximum number of strings to generate for each regex, above which the method will throw an exception
+
+    Example:
+        expand_re("fab(?: region)?") -> ['fab', 'fab region']
+    """
+    # lazy import
+    import exrex
+
+    if exrex.count(re_str) < max_len:
+        return list(exrex.generate(re_str))
+
+    else:
+        raise Exception("Regex too complex to expand")
+
+
+def expand_res(re_strs: list[str]) -> list[list[str]]:
+    """
+    Expands a list of regexes into a list of lists of strings
+
+    Args:
+        re_strs (list[str]): list of regexes
+    """
+    return [expand_re(re_str) for re_str in re_strs]

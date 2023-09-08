@@ -14,7 +14,11 @@ system.initialize()
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 
-from ._constants import APPLICATIONS_TABLE
+from ._constants import (
+    APPLICATIONS_TABLE,
+    GPR_ANNOTATIONS_TABLE,
+    GPR_PUBLICATIONS_TABLE,
+)
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
@@ -23,13 +27,25 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": None,
-    APPLICATIONS_TABLE: "priority_date",  # shard by priority date
+    # "biosym_annotations_source": None,
+    APPLICATIONS_TABLE: {
+        "column": "priority_date",
+        "size": timedelta(days=730),
+        "transform": lambda x: int(x.strftime("%Y%m%d")),
+        "starting_value": datetime(2000, 1, 1),
+        "ending_value": datetime(2023, 1, 1),
+    },
+    # GPR_ANNOTATIONS_TABLE: {
+    #     "column": "confidence",
+    #     "size": 0.0125,
+    #     "starting_value": 0.774,
+    #     "ending_value": 0.91,  # max 0.90
+    #     "transform": lambda x: x,
+    # },
 }
 
 GCS_BUCKET = "biosym-patents"
 # adjust this based on how large you want each shard to be
-SHARD_SIZE = timedelta(days=730)
 
 
 INITIAL_COPY_FIELDS = [
@@ -43,37 +59,29 @@ INITIAL_COPY_FIELDS = [
     "cited_by",
     "country",
     "embedding_v1 as embeddings",
-    '"similar"',
+    "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s) as similar_patents",
     "title",
     "top_terms",
     "url",
     # publications
     "application_kind",
-    # "assignee as assignee_raw",
-    # "assignee_harmonized",
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
     "citation",
     "claims_localized as claims",
     "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
     "family_id",
-    # "filing_date",
-    # "grant_date",
-    # "publication_date",
-    # "inventor as inventor_raw",
-    # "inventor_harmonized",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
     "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
     "kind_code",
     "pct_number",
     "priority_claim",
     "priority_date",
-    # "publication_date",
     "spif_application_number",
     "spif_publication_number",
 ]
 
 
-def create_applications_table():
+def create_patent_applications_table():
     """
     Create a table of patent applications in BigQuery
     (then exported and pulled into psql)
@@ -84,58 +92,57 @@ def create_applications_table():
     client.delete_table(APPLICATIONS_TABLE)
 
     applications = f"""
-        SELECT
-        {','.join(INITIAL_COPY_FIELDS)}
-        FROM `{BQ_DATASET_ID}.publications` as pubs,
-        `{BQ_DATASET_ID}.gpr_publications` as gpr_pubs
+        SELECT {','.join(INITIAL_COPY_FIELDS)}
+        FROM `{BQ_DATASET_ID}.publications` pubs,
+        `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
     """
     client.create_from_select(applications, APPLICATIONS_TABLE)
 
 
-def export_bq_tables():
+def export_bq_tables(today):
     """
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_applications_table()
-    start_date = datetime(2000, 1, 1)
-    end_date = datetime(2023, 1, 1)
+    # create_patent_applications_table()
 
-    for table, date_column in EXPORT_TABLES.items():
-        if date_column is None:
+    for table, shard_spec in EXPORT_TABLES.items():
+        if shard_spec is None:
             destination_uri = f"gs://{GCS_BUCKET}/{table}.csv"
             db_client.export_table_to_storage(table, destination_uri)
         else:
             shared_table_name = f"{table}_shard_tmp"
-            current_date = start_date
-            while current_date < end_date:
-                shard_end_date = current_date + SHARD_SIZE
+            current_shard = shard_spec["starting_value"]
+            while current_shard < shard_spec["ending_value"]:
+                shard_end = current_shard + shard_spec["size"]
 
                 # Construct the SQL for exporting the shard
                 shard_query = f"""
                     SELECT *
                     FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {date_column} >= {int(current_date.strftime('%Y%m%d'))}
-                    AND {date_column} < {int(shard_end_date.strftime('%Y%m%d'))}
+                    WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
+                    AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
                 """
                 db_client.create_from_select(shard_query, shared_table_name)
 
                 # Define the destination in GCS
-                destination_uri = f"gs://{GCS_BUCKET}/{table}_shard_{current_date.strftime('%Y%m%d')}.json"
+                destination_uri = (
+                    f"gs://{GCS_BUCKET}/{today}/{table}_shard_{current_shard}.json"
+                )
                 db_client.export_table_to_storage(shared_table_name, destination_uri)
 
                 db_client.delete_table(shared_table_name)
-                current_date = shard_end_date
+                current_shard = shard_end
 
 
 # alter table applications alter column priority_date type date USING priority_date::date;
 TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
-    # "publication_date": "DATE",
-    # "filing_date": "DATE",
-    # "grant_date": "DATE",
+    "publication_date": "DATE",
+    "filing_date": "DATE",
+    "grant_date": "DATE",
     "priority_date": "DATE",
 }
 
@@ -159,12 +166,16 @@ def determine_data_type(value, field: str | None = None):
         return "TEXT"
 
 
-def import_into_psql():
+def import_into_psql(today: str):
     """
     Load data from a JSON file into a psql table
     """
     logging.info("Importing applications table (etc) into postgres")
     client = PsqlDatabaseClient()
+
+    # truncate table copy in postgres
+    for table in EXPORT_TABLES.keys():
+        client.truncate_table(table)
 
     def transform(s, c: str):
         if c.endswith("_date") and s == 0:
@@ -182,14 +193,15 @@ def import_into_psql():
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
+        # figure out transformation before re-enabling.
         nono_columns = [
             "cited_by",
             "citation",
             "publication_date",
-        ]  # requires work on transformation
+        ]
         df = df.select(
             *[
-                pl.col(c).apply(lambda s: transform(s, c))
+                pl.col(c).map_elements(lambda s: transform(s, c))
                 for c in df.columns
                 if c not in nono_columns
             ]
@@ -203,7 +215,7 @@ def import_into_psql():
         client.insert_into_table(df.to_dicts(), table_name)
 
     bucket = storage_client.bucket(GCS_BUCKET)
-    blobs: list[storage.Blob] = list(bucket.list_blobs())  # TODO: change to .json
+    blobs: list[storage.Blob] = list(bucket.list_blobs(prefix=today))
 
     logging.info("Found %s blobs (%s)", len(blobs), bucket)
 
@@ -220,14 +232,11 @@ def import_into_psql():
 
 
 def copy_bq_to_psql():
+    today = datetime.now().strftime("%Y%m%d")
+    export_bq_tables(today)
+    import_into_psql(today)
+
     client = PsqlDatabaseClient()
-
-    for table in EXPORT_TABLES.keys():
-        client.truncate_table(table)
-
-    export_bq_tables()
-    import_into_psql()
-
     client.create_indices(
         [
             {
@@ -263,8 +272,10 @@ if __name__ == "__main__":
         print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")
         sys.exit()
 
+    today = datetime.now().strftime("%Y%m%d")
+
     if "-export" in sys.argv:
-        export_bq_tables()
+        export_bq_tables(today)
 
     if "-import" in sys.argv:
-        import_into_psql()
+        import_into_psql(today)

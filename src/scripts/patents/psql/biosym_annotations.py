@@ -18,10 +18,8 @@ from constants.core import (
 from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
     MECHANISM_BASE_TERMS,
-    MECHANISM_BASE_TERM_SETS,
     INTERVENTION_BASE_TERMS,
-    INTERVENTION_BASE_TERM_SETS,
-    INTERVENTION_BASE_PREFIXES,
+    INTERVENTION_PREFIXES,
 )
 from utils.re import get_or_re
 
@@ -191,7 +189,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "peripheral": "all",
     "mutant": "leading",
     "mutated": "leading",
     "activatable": "all",
@@ -395,7 +392,7 @@ DELETION_TERMS = [
     "reservoir",
     "elongated housing",
     "modulator device",
-    "injector body",
+    "injector",
     "(?:.* )?diaphragm",
     "(?:.* )?cartridge",
     "(?:.* )?plunger",
@@ -441,7 +438,6 @@ DELETION_TERMS = [
     "(?:.* )?chromatography",
     "(?:.* )?blade",
     "centrifugal force",
-    "(?:.* )?needle",
     "(?:.* )?needle",
     "implant .*",
     "tensile strength",
@@ -580,7 +576,6 @@ DELETION_TERMS = [
     ".*patient",
     "field of .*",
     "femur",
-    "nucleotide sequence",
     "immunogenic",
     "organic solvent",
     "bacterium",
@@ -595,7 +590,6 @@ DELETION_TERMS = [
     "antigen-binding",
     "pyridine",
     "pyrimidine",
-    "polynucleotide sequence",
     "phenol",
     "said",
     "reporter",
@@ -679,18 +673,12 @@ def fix_of_for_annotations():
     logging.info("Fixing of/for annotations")
 
     terms = INTERVENTION_BASE_TERMS
-    term_sets = INTERVENTION_BASE_TERM_SETS
-    prefixes = INTERVENTION_BASE_PREFIXES
+    prefixes = INTERVENTION_PREFIXES
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
     # inhibition of apoptosis signal-regulating kinase 1 (ASK1)
-    def get_query(term_or_term_set: str | list[str], field: TextField):
-        if isinstance(term_or_term_set, list):
-            # term set
-            re_term = "(?:" + "|".join([f"{ts}s?" for ts in term_or_term_set]) + ")"
-        else:
-            re_term = term_or_term_set + "s?"
+    def get_query(re_term: str, field: TextField):
         sql = f"""
             UPDATE {WORKING_TABLE} ba
             SET term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+(?:(?:the|a) )?.*?)(?:and|useful|for|,|.|$)'))
@@ -715,19 +703,19 @@ def fix_of_for_annotations():
 
     client = DatabaseClient()
 
-    # for term in [*terms, *flatten(term_sets)]:
-    #     for field in TEXT_FIELDS:
-    #         try:
-    #             sql = get_hyphen_query(term, field)
-    #             client.execute_query(sql)
-    #         except Exception as e:
-    #             logging.error(e)
-
-    # loop over term sets, in which the term may be in another form than the title variant
-    for term_or_term_set in [*terms, *term_sets]:
+    for term in terms:
         for field in TEXT_FIELDS:
             try:
-                sql = get_query(term_or_term_set, field)
+                sql = get_hyphen_query(term, field)
+                client.execute_query(sql)
+            except Exception as e:
+                logging.error(e)
+
+    # loop over term sets, in which the term may be in another form than the title variant
+    for term in terms:
+        for field in TEXT_FIELDS:
+            try:
+                sql = get_query(term, field)
                 client.execute_query(sql)
             except Exception as e:
                 logging.error(e)
@@ -797,8 +785,9 @@ def clean_up_junk():
         f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
         # leading/trailing whitespace
         rf"update {WORKING_TABLE} set term=trim(term) where trim(term) <> term",
-        # f"update {WORKING_TABLE} set "
-        # + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
+        # fixes some sentences
+        f"update {WORKING_TABLE} set "
+        + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
@@ -875,13 +864,7 @@ def normalize_domains():
     """
     client = DatabaseClient()
 
-    mechanism_terms = [
-        f"{t}s?"
-        for t in [
-            *flatten(MECHANISM_BASE_TERM_SETS),
-            *MECHANISM_BASE_TERMS,
-        ]
-    ]
+    mechanism_terms = [f"{t}s?" for t in MECHANISM_BASE_TERMS]
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [
@@ -936,7 +919,8 @@ def populate_working_biosym_annotations():
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
     client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'", WORKING_TABLE
+        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+        WORKING_TABLE,
     )
 
     # add indices after initial load
@@ -1006,17 +990,6 @@ if __name__ == "__main__":
     (70,439 -> 69,715 -> 103,874)
 
 
-        alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
-
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
     DELETE FROM terms
     WHERE id IN
@@ -1024,17 +997,6 @@ if __name__ == "__main__":
         FROM
             (SELECT id,
             ROW_NUMBER() OVER( PARTITION BY term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
-
-    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY term
             ORDER BY id ) AS row_num
             FROM terms ) t
             WHERE t.row_num > 1 );

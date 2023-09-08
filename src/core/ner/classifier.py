@@ -6,7 +6,6 @@ from pydash import compact
 from typing import Mapping, Union
 import logging
 
-from core.ner.spacy import Spacy
 from core.ner.utils import lemmatize_all
 from utils.list import dedup
 
@@ -100,7 +99,7 @@ def classify_by_keywords(
     Returns: a list of categories
 
     Example:
-        >>> classify_by_keywords(pl.Series(["Method of treatment by tryptamine alkaloids"]), PATENT_ATTRIBUTE_MAP)
+        >>> classify_by_keywords(pl.Series(["Method of treatment by tryptamine alkaloids"]), get_patent_attribute_map())
     """
     lookup = create_lookup_map(keyword_map)
 

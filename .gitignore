@@ -17,3 +17,5 @@ serverless_sdk
 company_dedup_settings
 company_dedup_training.json
 terms.json
+formatted_data.json
+binder_training_data.json

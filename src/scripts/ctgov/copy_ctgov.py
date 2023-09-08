@@ -45,6 +45,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def transform_ct_records(ctgov_records, tagger: NerTagger):
     """
     Transform ctgov records
+    Slow due to intervention mapping!!
 
     - normalizes/extracts intervention names
 
@@ -68,7 +69,7 @@ def ingest_trials():
     """
 
     source_sql = f"""
-        select {", ".join(FIELDS)}
+        select {", ".join(FIELDS)}, '' as normalized_sponsor
         from studies, interventions, conditions
         where studies.nct_id = interventions.nct_id
         AND studies.nct_id = conditions.nct_id
@@ -77,10 +78,6 @@ def ingest_trials():
         AND interventions.name not in ('Placebo', 'placebo')
         group by studies.nct_id
     """
-
-    # TODO!
-    # update trials set normalized_sponsor=sm.term from
-    # synonym_map sm where sm.synonym = lower(sponsor)
 
     tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]))
     trial_db = f"{BASE_DATABASE_URL}/aact"
@@ -94,14 +91,77 @@ def ingest_trials():
         transform=lambda records: transform_ct_records(records, tagger),
     )
 
-    # TODO create index index_trials_interventions ON trials using gin(interventions);
+    client = PsqlDatabaseClient()
+
+    # NOTE: this is a flaw. synonym_map is populated with trial sponsors,
+    # so this will only work if we're loading trials for a subsequent time.
+    client.execute_query(
+        """
+        update trials set normalized_sponsor=sm.term from
+        synonym_map sm where sm.synonym = lower(sponsor)
+        """
+    )
+    client.create_indices(
+        [
+            {
+                "table": "trials",
+                "column": "nct_id",
+            },
+            {
+                "table": "trials",
+                "column": "interventions",
+                "is_gin": True,
+            },
+            {
+                "table": "trials",
+                "column": "normalized_sponsor",
+            },
+        ]
+    )
 
 
-def main():
+def create_application_to_trial():
+    """
+    Create table that maps patent applications to trials
+    """
+    client = PsqlDatabaseClient()
+    att_query = """
+        select a.publication_number, nct_id
+        from trials t,
+        aggregated_annotations a,
+        applications p
+        where a.publication_number=a.publication_number
+        AND p.publication_number=a.publication_number
+        AND t.normalized_sponsor = any(a.terms) -- sponsor match
+        AND t.interventions && a.terms -- intervention match
+        AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
+    """
+    client.create_from_select(att_query, "application_to_trial")
+    client.create_indices(
+        [
+            {
+                "table": "application_to_trial",
+                "column": "publication_number",
+            },
+            {
+                "table": "application_to_trial",
+                "column": "nct_id",
+            },
+        ]
+    )
+    client.insert_into_table
+
+
+def copy_ctgov():
     """
     Copy data from ctgov to patents
     """
     ingest_trials()
+    create_application_to_trial()
+
+
+def main():
+    copy_ctgov()
 
 
 if __name__ == "__main__":
@@ -110,19 +170,3 @@ if __name__ == "__main__":
         sys.exit()
 
     main()
-
-
-"""
-
-create table application_to_trial (publication_number TEXT, nct_id TEXT);
-create index index_trials_nct_id ON trials(nct_id);
-create index index_application_to_trial_publication_number ON application_to_trial(publication_number);
-create index index_application_to_trial_nct_id ON application_to_trial(nct_id);
-insert into application_to_trial (publication_number, nct_id)
-    select publication_number, nct_id
-    from trials t,
-    aggregated_annotations a
-    where a.publication_number=a.publication_number
-    AND t.normalized_sponsor = any(a.terms)
-    AND t.interventions && a.terms
-"""

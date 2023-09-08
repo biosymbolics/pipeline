@@ -1,58 +1,33 @@
 """
 Functions for copying around subsets of the patents database
 """
-from clients.low_level.big_query import (
-    DatabaseClient,
-    BQ_DATASET_ID,
-)
+from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 
-
-BIOMEDICAL_IPC_CODES = ["A61", "C07", "C12", "G01N"]
-IPC_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODES))
-
-
-def __copy_gpr_publications():
-    """
-    Copy publications from GPR to a local table
-    """
-    table_id = "gpr_publications"
-    client = DatabaseClient()
-    client.delete_table(table_id)
-
-    query = f"""
-        SELECT * FROM `patents-public-data.google_patents_research.publications`
-        WHERE EXISTS
-        (SELECT 1 FROM UNNEST(cpc) AS cpc_code WHERE REGEXP_CONTAINS(cpc_code.code, "{IPC_RE}"))
-    """
-    client.create_from_select(query, table_id)
+from constants.patents import BIOMEDICAL_IPC_CODE_PREFIX_RE
+from scripts.patents._constants import GPR_ANNOTATIONS_TABLE, GPR_PUBLICATIONS_TABLE
 
 
 def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
-
-    NOTE: this has not been tested
     """
     table_id = "publications"
-    client = DatabaseClient()
+    client = BQDatabaseClient()
     client.delete_table(table_id)
 
-    # add to this all publication_numbers with the same family_id
+    # adds all publication_numbers with the same family_id
     query = f"""
         WITH numbered_rows AS (
-        SELECT *,
-        ROW_NUMBER() OVER (PARTITION BY publication_number) as row_number
-        FROM (
-            SELECT
-            main_publications.*,
-            ARRAY_AGG(related_publications.publication_number) OVER (PARTITION BY main_publications.family_id) AS all_publication_numbers
-            FROM `patents-public-data.patents.publications` as main_publications
-            JOIN `{BQ_DATASET_ID}.gpr_publications` AS local_gpr
-            ON local_gpr.publication_number = main_publications.publication_number
-            JOIN `patents-public-data.patents.publications` AS related_publications
-            ON related_publications.family_id = main_publications.family_id
-            WHERE main_publications.application_kind = 'W'
-        )
+            SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY publication_number) as row_number
+            FROM (
+                SELECT main_publications.*,
+                ARRAY_AGG(related_publications.publication_number) OVER (PARTITION BY main_publications.family_id) AS all_publication_numbers
+                FROM `patents-public-data.patents.publications` as main_publications
+                JOIN `patents-public-data.patents.publications` AS related_publications ON related_publications.family_id = main_publications.family_id
+                WHERE main_publications.application_kind = 'W'
+                AND EXISTS (SELECT 1 FROM UNNEST(main_publications.cpc) AS cpc WHERE REGEXP_CONTAINS(cpc.code, "{BIOMEDICAL_IPC_CODE_PREFIX_RE}"))
+            )
         )
         SELECT *
         FROM numbered_rows
@@ -61,15 +36,53 @@ def __copy_publications():
     client.create_from_select(query, table_id)
 
 
+def __copy_gpr_annotations():
+    """
+    Copy annotations from GPR to a local table
+    (ONLY diseases)
+    """
+    client = BQDatabaseClient()
+    client.delete_table(GPR_ANNOTATIONS_TABLE)
+
+    # ~5TB query
+    query = f"""
+        SELECT a.*
+        FROM `patents-public-data.google_patents_research.annotations` a,
+        `{BQ_DATASET_ID}.publications` p
+        WHERE a.publication_number = p.publication_number
+        AND a.domain='diseases'
+        AND confidence >= 0.65
+        AND preferred_name<>'disease'
+        AND character_offset_start < 10000 -- otherwise, probably not the main indication?
+    """
+    client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
+
+
+def __copy_gpr_publications():
+    """
+    Copy publications from GPR to a local table
+    """
+    client = BQDatabaseClient()
+    client.delete_table(GPR_PUBLICATIONS_TABLE)
+
+    query = f"""
+        SELECT gpr_pubs.* FROM
+        `patents-public-data.google_patents_research.publications` gpr_pubs,
+        `{BQ_DATASET_ID}.publications` p
+        WHERE p.publication_number = gpr_pubs.publication_number
+    """
+    client.create_from_select(query, GPR_PUBLICATIONS_TABLE)
+
+
 def copy_patent_tables():
     """
-    Copy tables from patents-public-data to a local dataset
+    Copy tables from patents-public-data to a local BQ dataset
 
-    Order matters.
     Idempotent (as in, tables are deleted and recreated) but not atomic, and also expensive (from a BigQuery standpoint)
     """
-    # copy gpr_publications table
-    __copy_gpr_publications()
+    # copy gpr_annotations table
+    __copy_gpr_annotations()
 
-    # copy publications table
+    # copy publications and gpr publications table (order matters)
     __copy_publications()
+    __copy_gpr_publications()

@@ -9,8 +9,11 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
-from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS_RE
 
+from constants.patterns.intervention import (
+    ALL_INTERVENTION_BASE_TERMS_RE,
+    INTERVENTION_PREFIXES_GENERIC_RE,
+)
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
@@ -32,8 +35,10 @@ class CleanFunction(Protocol):
 CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
-    r"[\.,:;'\"]+$": "",
+    r"[.,:;'\"]+$": "",  # trailing punct
+    r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
+    INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
 DEFAULT_EXCEPTION_LIST: list[str] = [
@@ -133,7 +138,7 @@ class EntityCleaner:
         TODO: it might never make sense to parallelize.
         Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
         """
-        parallelize = self.parallelize and num_entries > 10000
+        parallelize = self.parallelize and num_entries > 100000000
         return MAX_N_PROCESS if parallelize else 1
 
     @property
@@ -248,7 +253,7 @@ class EntityCleaner:
                 )
                 yield no_parens
 
-        def normalize_phrasing(_terms: list[str]) -> Iterable[str]:
+        def normalize_phrases(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(
                     rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
@@ -268,18 +273,19 @@ class EntityCleaner:
 
         cleaning_steps = [
             decode_html,
-            remove_chars,
             unwrap,
             format_parentheticals,  # order matters (run after unwrap)
+            remove_chars,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
-            partial(
-                lemmatize_tails,
-                n_process=n_process,
-                exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
-            ),
+            # partial(
+            #     lemmatize_tails,
+            #     n_process=n_process,
+            #     exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
+            # ),
             partial(normalize_by_pos, n_process=n_process),
-            normalize_phrasing,  # order matters (after rearrange)
+            normalize_phrases,  # order matters (after rearrange)
+            remove_extra_spaces,
             lower,
         ]
 
@@ -368,10 +374,10 @@ class EntityCleaner:
         cleaning_steps: list[CleanFunction] = [
             lambda terms, n_process: self.__suppress(terms),
             self.normalize_terms,
-            partial(
-                self.filter_common_terms,
-                exception_list=common_exception_list,
-            ),
+            # partial(
+            #     self.filter_common_terms,
+            #     exception_list=common_exception_list,
+            # ),
         ]
 
         terms = [self.__get_text(ent) for ent in entities]
