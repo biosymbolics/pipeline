@@ -207,7 +207,8 @@ def main(bootstrap: bool = False):
         Followed by:
         ```
         # from local machine
-        pg_dump --no-owner patents -t aggregated_annotations annotations applications application_to_trial patent_approvals terms trials  > patents.psql
+        pg_dump --no-owner patents -t aggregated_annotations -t annotations -t applications \
+            -t application_to_trial -t patent_approvals -t terms -t trials  > patents.psql
         zip patents.psql.zip patents.psql
         aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
         aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip

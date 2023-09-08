@@ -3,11 +3,15 @@ Utils for transforming data into binder format
 """
 
 from functools import lru_cache
+import re
 import sys
-from typing import Optional
 import polars as pl
 from pydash import compact
 from transformers import AutoTokenizer
+
+import system
+
+system.initialize()
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import (
@@ -35,13 +39,16 @@ def get_entity_indices(
     text: str,
     entity: str,
     tokenizer,
-) -> Optional[tuple[tuple[int, int]]]:
+) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     """
     Get the indices of an entity in a text
 
     Args:
-        text (str): text to search
+        text (str): text to searc
         entity (str): entity to search for
+
+    Returns:
+        list[tuple[tuple[int, int], tuple[int, int]]]: list of indices of entity in text (word indices, char indices)
     """
     all_tokens = tokenizer.tokenize(text)
     entity_tokens = tokenizer.tokenize(entity)
@@ -51,13 +58,12 @@ def get_entity_indices(
             return (i, i + len(entity_tokens) - 1)
         return None
 
-    indices = compact(
+    word_indices = compact(
         [get_index(i) for i in range(len(all_tokens) - len(entity_tokens) + 1)]
     )
+    char_indices = [(m.start(), m.end()) for m in re.finditer(entity, text)]
 
-    if len(indices) > 0:
-        return tuple(indices)  # type: ignore
-    return None
+    return list(zip(word_indices, char_indices))
 
 
 def format_into_binder(df: pl.DataFrame):
@@ -78,7 +84,8 @@ def format_into_binder(df: pl.DataFrame):
 
     formatted = (
         (
-            df.filter(pl.col("indices").is_not_null())
+            df.explode("indices")
+            .filter(pl.col("indices").is_not_null())
             .groupby("publication_number")
             .agg(
                 [
@@ -153,14 +160,13 @@ def get_annotations():
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
         order by apps.publication_number
-        limit 10
     """
     records = client.select(query)
     df = pl.DataFrame(records)
     return df
 
 
-def create_binder_data():
+def create_binder_data(debug: bool = False):
     """
     Create training data for binder model
 
@@ -185,25 +191,29 @@ def create_binder_data():
     """
     annotations = get_annotations()
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
-    print(annotations)
     df = annotations.with_columns(
         pl.struct(["text", "term"])
         .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
         .alias("indices")
     )
-    print(df)
-    validation = df.filter(pl.col("indices").is_not_null()).select(
-        pl.struct(["text", "term", "indices"])
-        .map_elements(
-            lambda rec: print(
-                rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
-                if len(rec["indices"]) > 0  # type: ignore
-                else "hi"
+    if debug:
+        print(df)
+        validation = (
+            df.explode("indices")
+            .filter(pl.col("indices").is_not_null())
+            .select(
+                pl.struct(["text", "term", "indices"])
+                .map_elements(
+                    lambda rec: print(
+                        rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
+                        if len(rec["indices"]) > 1 and len(rec["indices"][1]) > 1  # type: ignore
+                        else "hi"
+                    )
+                )
+                .alias("check")
             )
         )
-        .alias("check")
-    )
-    print(validation)
+        print(validation.select("check").to_series().to_list())
     return df
 
 
