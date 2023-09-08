@@ -7,7 +7,7 @@ import re
 import sys
 import polars as pl
 from pydash import compact
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer  # type: ignore
 
 import system
 
@@ -21,6 +21,31 @@ from constants.core import (
 from utils.file import save_json_as_file
 
 
+def get_annotations():
+    client = PsqlDatabaseClient()
+    query = """
+        SELECT
+        concat(title, '\n', abstract) as text, s.publication_number, term, domain
+        FROM
+        (
+            select publication_number, array_agg(domain) as domains
+            FROM biosym_annotations group by publication_number
+        ) s,
+        biosym_annotations b_anns,
+        applications apps
+        where b_anns.publication_number = apps.publication_number
+        AND s.publication_number = apps.publication_number
+        and 'mechanisms' = any(s.domains)
+        and 'compounds' = any(s.domains)
+        and 'diseases' = any(s.domains)
+        order by apps.publication_number
+        limit 10
+    """
+    records = client.select(query)
+    df = pl.DataFrame(records)
+    return df
+
+
 def generate_word_indices(text: str, tokenizer) -> list[tuple[int, int]]:
     """
     Generate word indices for a text
@@ -28,10 +53,10 @@ def generate_word_indices(text: str, tokenizer) -> list[tuple[int, int]]:
     Args:
         text (str): text to generate word indices for
     """
-    tokenized = tokenizer(text).to(DEFAULT_TORCH_DEVICE)
+    tokenized = tokenizer(text)
     num_tokens = len(tokenized.tokens())
     char_spans = [tokenized.token_to_chars(ti) for ti in range(num_tokens)]
-    return [(cs.start, cs.end) for cs in char_spans if cs is not None]
+    return sorted([(cs.start, cs.end) for cs in char_spans if cs is not None])
 
 
 @lru_cache
@@ -61,9 +86,40 @@ def get_entity_indices(
     word_indices = compact(
         [get_index(i) for i in range(len(all_tokens) - len(entity_tokens) + 1)]
     )
-    char_indices = [(m.start(), m.end()) for m in re.finditer(entity, text)]
+    char_indices = [(m.start(), m.end()) for m in re.finditer(re.escape(entity), text)]
 
     return list(zip(word_indices, char_indices))
+
+
+def create_binder_data(debug: bool = False):
+    """
+    Create training data for binder model
+    """
+    annotations = get_annotations()
+    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+    df = annotations.with_columns(
+        pl.struct(["text", "term"])
+        .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
+        .alias("indices")
+    )
+    if debug:
+        validation = (
+            df.explode("indices")
+            .filter(pl.col("indices").is_not_null())
+            .select(
+                pl.struct(["text", "term", "indices"])
+                .map_elements(
+                    lambda rec: print(
+                        rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
+                        if len(rec["indices"]) > 1 and len(rec["indices"][1]) > 1  # type: ignore
+                        else "No match"
+                    )
+                )
+                .alias("check")
+            )
+        )
+        print(validation.select("check").to_series().to_list())
+    return format_into_binder(df)
 
 
 def format_into_binder(df: pl.DataFrame):
@@ -79,6 +135,25 @@ def format_into_binder(df: pl.DataFrame):
         "word_end_chars": [7, 15, 25, 30, 39, 47, 56, 66, 70, 82, 92, 97, 99, 107, 115, 124, 132, 133]
     }
     and saves to file.
+
+    To split:
+    ``` bash
+    split_ratio=0.2
+    export export_file="ner_training.csv"
+    export output_file="output.jsonl"
+    jq -c '.[]' ./formatted_data.json | while IFS= read -r line; do   echo "$line" >> "$output_file"; done
+    export total_lines=$(cat "$output_file" | wc -l)
+    export test_lines_rounded=`printf %.0f $(echo "$total_lines * $split_ratio" | bc -l)`
+    split -l "$test_lines_rounded" output.jsonl
+    mv xaa test.json
+    mv xab dev.json
+    mv xac train.json
+    cat xad >> train.json
+    cat xae >> train.json
+    rm xad xae
+    ```
+
+    # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
 
@@ -131,90 +206,15 @@ def format_into_binder(df: pl.DataFrame):
         .alias("word_indices")
     ).with_columns(
         pl.col("word_indices")
-        .map_elements(lambda idxs: sorted([i[0] for i in idxs]))
+        .map_elements(lambda idxs: [i[0] for i in idxs])
         .alias("word_start_chars"),
         pl.col("word_indices")
-        .map_elements(lambda idxs: sorted([i[1] for i in idxs]))
+        .map_elements(lambda idxs: [i[1] for i in idxs])
         .alias("word_end_chars"),
     )
     records = with_word_indices.to_dicts()
     save_json_as_file(records, "formatted_data.json")
     return formatted
-
-
-def get_annotations():
-    client = PsqlDatabaseClient()
-    query = """
-        SELECT
-        concat(title, '\n', abstract) as text, s.publication_number, term, domain
-        FROM
-        (
-            select publication_number, array_agg(domain) as domains
-            FROM biosym_annotations group by publication_number
-        ) s,
-        biosym_annotations b_anns,
-        applications apps
-        where b_anns.publication_number = apps.publication_number
-        AND s.publication_number = apps.publication_number
-        and 'mechanisms' = any(s.domains)
-        and 'compounds' = any(s.domains)
-        and 'diseases' = any(s.domains)
-        order by apps.publication_number
-    """
-    records = client.select(query)
-    df = pl.DataFrame(records)
-    return df
-
-
-def create_binder_data(debug: bool = False):
-    """
-    Create training data for binder model
-
-    To split:
-    ``` bash
-    split_ratio=0.2
-    export export_file="ner_training.csv"
-    export output_file="output.jsonl"
-    jq -c '.[]' ./formatted_data.json | while IFS= read -r line; do   echo "$line" >> "$output_file"; done
-    export total_lines=$(cat "$output_file" | wc -l)
-    export test_lines_rounded=`printf %.0f $(echo "$total_lines * $split_ratio" | bc -l)`
-    split -l "$test_lines_rounded" output.jsonl
-    mv xaa test.json
-    mv xab dev.json
-    mv xac train.json
-    cat xad >> train.json
-    cat xae >> train.json
-    rm xad xae
-    ```
-
-    # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
-    """
-    annotations = get_annotations()
-    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
-    df = annotations.with_columns(
-        pl.struct(["text", "term"])
-        .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
-        .alias("indices")
-    )
-    if debug:
-        print(df)
-        validation = (
-            df.explode("indices")
-            .filter(pl.col("indices").is_not_null())
-            .select(
-                pl.struct(["text", "term", "indices"])
-                .map_elements(
-                    lambda rec: print(
-                        rec["text"][rec["indices"][1][0] : rec["indices"][1][1]]  # type: ignore
-                        if len(rec["indices"]) > 1 and len(rec["indices"][1]) > 1  # type: ignore
-                        else "hi"
-                    )
-                )
-                .alias("check")
-            )
-        )
-        print(validation.select("check").to_series().to_list())
-    return df
 
 
 def main():
