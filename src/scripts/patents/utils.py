@@ -34,8 +34,7 @@ def clean_owners(owners: list[str]) -> list[str]:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
         """
-        suppressions = COMPANY_SUPPRESSIONS
-        suppress_re = rf"(?:(?:\s+|,){get_or_re(suppressions)}\b|\(.+\))"
+        suppress_re = rf"(?:(?:\s+|,){get_or_re(COMPANY_SUPPRESSIONS)}\b|\(.+\))"
 
         for term in terms:
             yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
@@ -123,7 +122,7 @@ def clean_owners(owners: list[str]) -> list[str]:
 
     if len(final) != len(owners):
         raise ValueError(
-            f"Length of cleaned assignees ({len(with_overides)}) does not match length of original assignees ({len(owners)})"
+            f"Length of cleaned assignees ({len(final)}) does not match length of original assignees ({len(owners)})"
         )
 
     return final
