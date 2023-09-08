@@ -9,7 +9,7 @@ from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
 from clients.low_level.database import DatabaseClient, ExecuteResult
-from constants.core import DATABASE_URL
+from constants.core import BASE_DATABASE_URL, DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides, nonoverride
 
@@ -82,7 +82,12 @@ class PsqlDatabaseClient(DatabaseClient):
     ```
     """
 
-    def __init__(self, uri: str = DATABASE_URL):
+    def __init__(self, uri_or_db: str = DATABASE_URL):
+        if not uri_or_db.startswith("postgres://"):
+            logger.warning("Passed non-uri string; assuming db name. Expanding to uri.")
+            uri = f"{BASE_DATABASE_URL}/{uri_or_db}"
+        else:
+            uri = uri_or_db
         self.client = PsqlClient.get_instance(uri=uri)
 
     @staticmethod

@@ -18,6 +18,10 @@ def clean_owners(owners: list[str]) -> list[str]:
     - removes suppressions
     - removes 2x+ and trailing spaces
     - title cases
+    - normalizes terms (e.g. "lab" -> "laboratory", "univ" -> "university")
+    - applies overrides (e.g. "biogen ma" -> "biogen")
+    - then does clustering
+
 
     Args:
         owners (list[tuple[str, str]]): List of owner names

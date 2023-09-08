@@ -2,6 +2,7 @@
 Utils for copying approvals data
 """
 import sys
+from constants.core import PATENT_APPROVALS_TABLE
 
 from system import initialize
 
@@ -44,7 +45,7 @@ def copy_patent_approvals():
     """
     source_db = "drugcentral"
     dest_db = "patents"
-    dest_table_name = "patent_approvals"
+    dest_table_name = PATENT_APPROVALS_TABLE
     PsqlDatabaseClient.copy_between_db(
         source_db=source_db,
         source_sql=source_sql,
