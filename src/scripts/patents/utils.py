@@ -38,7 +38,7 @@ def clean_owners(owners: list[str]) -> list[str]:
         """
         post_suppress_re = rf"(?:(?:\s+|,){get_or_re(COMPANY_SUPPRESSIONS)}\b)"
         pre_suppress_re = "^the"
-        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$))"
+        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$)|\(.+\))"
 
         for term in terms:
             yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(

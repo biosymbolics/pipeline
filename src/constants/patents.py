@@ -76,10 +76,10 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "ASSETS",
     "ASD",
     "AVG",
-    "(?<!for |of )BIOLOGY?",
-    "(?<!for |of )BIOL(?:OGICALS?)?",
-    "(?<!for |of )BIOSCI(?:ENCES?)?",
-    "(?<!for |of )BIOSCIENCES?",
+    "(?<!for |of |and )BIOLOGY?",
+    "(?<!for |of |and )BIOL(?:OGICALS?)?",
+    "(?<!for |of |and )BIOSCI(?:ENCES?)?",
+    "(?<!for |of |and )BIOSCIENCES?",
     "BIOTECH?(?:NOLOGY)?",
     "BUS",
     "BV",
@@ -101,7 +101,7 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "GROUP",
     "GLOBAL",
     "H",
-    "(?<!for |of )HEALTH(?:CARE)?",
+    "(?<!for |of |and )HEALTH(?:CARE)?",
     "HEALT",
     "HIGH TECH",
     "HIGHER",
@@ -145,7 +145,7 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "SA",
     "SCI",
     "SCIENT",
-    "(?<!for |of )sciences?",
+    "(?<!for |of |and )sciences?",
     "SCIENTIFIC",
     "School Of Medicine",
     "SE",
@@ -155,7 +155,7 @@ COMPANY_SUPPRESSIONS_MAYBE = [
     "SYS",
     "SYST(?:EM)?S?",
     "TECH",
-    "(?<!of )TECHNOLOG(?:Y|IES)?",
+    "(?<!of |and )TECHNOLOG(?:Y|IES)?",
     "TECHNOLOGY SERVICES?",
     "THERAPEUTICS?",
 ]
@@ -188,7 +188,6 @@ COUNTRIES = [
 ]
 
 COMPANY_SUPPRESSIONS = [
-    r"\(.+\)",  # anything in parens
     *COMPANY_SUPPRESSIONS_DEFINITE,
     *COMPANY_SUPPRESSIONS_MAYBE,
     *[f"(?<!of ){c}" for c in COUNTRIES],
@@ -243,6 +242,7 @@ COMPANY_MAP = {
     "Mitsubishi": "Mitsubishi",
     "Dana[- ]?Farber": "Dana Farber",
     "Novo Nordisk": "Novo Nordisk",
+    "Astrazeneca": "AstraZeneca",
 }
 
 OWNER_TERM_MAP = {
