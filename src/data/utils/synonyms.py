@@ -10,7 +10,7 @@ from typing import Any, Mapping, Optional, TypedDict, cast
 import uuid
 import Levenshtein
 from redis.exceptions import ResponseError  # type: ignore
-import regex as redisearch
+import redisearch
 from redisearch import TextField, IndexDefinition, Query
 
 from utils.string import byte_dict_to_string_dict, get_id

@@ -224,7 +224,7 @@ def _search(
             {qp["annotation_join_condition"]}
         )
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
-        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.application_number = p2a.regulatory_application_number
+        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["where"]}
