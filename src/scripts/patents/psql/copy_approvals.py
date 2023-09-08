@@ -90,12 +90,16 @@ def copy_patent_to_regulatory_approval():
     )
 
 
-def main():
+def copy_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
     """
     copy_all_approvals()
     copy_patent_to_regulatory_approval()
+
+
+def main():
+    copy_approvals()
 
 
 if __name__ == "__main__":

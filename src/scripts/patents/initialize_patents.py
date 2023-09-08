@@ -16,7 +16,7 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
-from scripts.patents.psql.copy_approvals import copy_patent_approvals
+from scripts.patents.psql.copy_approvals import copy_approvals
 from scripts.patents.bq.copy_tables import copy_patent_tables
 from scripts.patents.bq_to_psql import copy_bq_to_psql
 from scripts.patents.psql.terms import create_patent_terms
@@ -250,7 +250,7 @@ def main(bootstrap: bool = False):
         # create patent applications etc in postgres
         copy_bq_to_psql()
         # copy data about approvals
-        copy_patent_approvals()
+        copy_approvals()
         # adds column & index for application search
         add_application_search()
 
