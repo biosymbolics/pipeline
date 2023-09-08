@@ -2,13 +2,14 @@
 Utils for transforming data into binder format
 """
 
+from functools import lru_cache
 import sys
 from typing import Optional
 import polars as pl
+from pydash import compact
 from transformers import AutoTokenizer
+
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
-
-
 from constants.core import (
     DEFAULT_BASE_NLP_MODEL,
     DEFAULT_TORCH_DEVICE,
@@ -23,17 +24,18 @@ def generate_word_indices(text: str, tokenizer) -> list[tuple[int, int]]:
     Args:
         text (str): text to generate word indices for
     """
-    tokenized = tokenizer(text, max_length=1000000).to(DEFAULT_TORCH_DEVICE)
+    tokenized = tokenizer(text).to(DEFAULT_TORCH_DEVICE)
     num_tokens = len(tokenized.tokens())
     char_spans = [tokenized.token_to_chars(ti) for ti in range(num_tokens)]
     return [(cs.start, cs.end) for cs in char_spans if cs is not None]
 
 
+@lru_cache
 def get_entity_indices(
     text: str,
     entity: str,
     tokenizer,
-) -> Optional[tuple[tuple[int, int], tuple[int, int]]]:
+) -> Optional[tuple[tuple[int, int]]]:
     """
     Get the indices of an entity in a text
 
@@ -41,32 +43,20 @@ def get_entity_indices(
         text (str): text to search
         entity (str): entity to search for
     """
-    all_words = tokenizer(text, max_length=1000000).tokens()
-    entity_words = tokenizer(entity).tokens()
-    start_words = [
-        (idx, word)
-        for idx, word in enumerate(all_words)
-        if word.lower().startswith(entity_words[0].lower())
-    ]
-    for start_idx, _ in start_words:
-        possible_entity_words = all_words[start_idx : start_idx + len(entity_words)]
-        is_match = all(
-            [
-                word.lower().startswith(entity_word.lower())
-                for entity_word, word in zip(entity_words, possible_entity_words)
-            ]
-        )
-        if is_match:
-            # copy of words inclusive of entity
-            # then hack to avoid getting indexes that include EOS punctuation (e.g. we want "septic shock" not "septic shock.")
-            words_inclusive = all_words[: start_idx + len(entity_words)]
-            # words_inclusive[-1] = re.sub("[.,;]$", "", words_inclusive[-1])  # add ) ?
-            start_char = sum([len(word) + 1 for word in all_words[:start_idx]])
-            end_char = sum([len(word) + 1 for word in words_inclusive]) - 1
-            return (
-                (start_idx, start_idx + len(entity_words) - 1),  # word indices
-                (start_char, end_char),  # char indices
-            )
+    all_tokens = tokenizer.tokenize(text)
+    entity_tokens = tokenizer.tokenize(entity)
+
+    def get_index(i):
+        if all_tokens[i : i + len(entity_tokens)] == entity_tokens:
+            return (i, i + len(entity_tokens) - 1)
+        return None
+
+    indices = compact(
+        [get_index(i) for i in range(len(all_tokens) - len(entity_tokens) + 1)]
+    )
+
+    if len(indices) > 0:
+        return tuple(indices)  # type: ignore
     return None
 
 
@@ -201,6 +191,7 @@ def create_binder_data():
         .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
         .alias("indices")
     )
+    print(df)
     validation = df.filter(pl.col("indices").is_not_null()).select(
         pl.struct(["text", "term", "indices"])
         .map_elements(
@@ -213,6 +204,7 @@ def create_binder_data():
         .alias("check")
     )
     print(validation)
+    return df
 
 
 def main():
