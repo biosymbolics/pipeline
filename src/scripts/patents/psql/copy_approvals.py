@@ -135,7 +135,7 @@ def copy_indirect_patent_to_approval():
         LEFT JOIN synonym_map as sm ON sm.synonym = approvals.generic_name
         where a.publication_number = patent_app.publication_number
         AND approvals.active_ingredients @> a.terms -- TODO this could FP
-        AND approvals.normalized_applicant = any(a.terms)
+        AND coalesce(nullif(approvals.normalized_applicant, ''), lower(approvals.applicant)) = any(a.terms)
     """
     client.select_insert_into_table(query, PATENT_TO_REGULATORY_APPROVAL_TABLE)
 
