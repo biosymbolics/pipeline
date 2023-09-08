@@ -115,14 +115,15 @@ def clean_owners(owners: list[str]) -> list[str]:
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
     cleaned_orig_map = dict(zip(cleaned, owners))
 
-    with_overides = list(apply_overrides(cleaned, cleaned_orig_map))
+    with_overiddes = list(apply_overrides(cleaned, cleaned_orig_map))
 
-    norm_map: dict = cluster_terms(with_overides, return_dict=True)  # type: ignore
-    final = [norm_map.get(owner) or owner for owner in with_overides]
+    norm_map: dict = cluster_terms(with_overiddes, return_dict=True)  # type: ignore
+    final = [norm_map.get(owner) or owner for owner in with_overiddes]
 
     if len(final) != len(owners):
         raise ValueError(
             f"Length of cleaned assignees ({len(final)}) does not match length of original assignees ({len(owners)})"
         )
 
-    return final
+    # one more run thru mapping
+    return [norm_map.get(owner) or owner for owner in with_overiddes]

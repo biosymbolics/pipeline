@@ -397,7 +397,7 @@ def cluster_terms(
 
     vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
     X = vectorizer.fit_transform(terms)
-    clustering = DBSCAN(eps=0.7, min_samples=2).fit(X)
+    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)
     labels = clustering.labels_
 
     df = pl.DataFrame({"cluster_id": labels, "name": terms})

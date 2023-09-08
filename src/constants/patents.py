@@ -176,6 +176,7 @@ COUNTRIES = [
     "INDIA",
     "IRELAND",
     "JAPAN",
+    "(?:de )?M[ée]xico",
     "MA",
     "MFG",
     "PALO ALTO",
