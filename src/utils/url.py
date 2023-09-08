@@ -1,7 +1,7 @@
 """
 Utils related to urls
 """
-import re
+import regex as re
 
 
 def url_to_filename(url: str) -> str:

@@ -1,7 +1,7 @@
 from functools import reduce
 from typing import Any
 import json
-import re
+import regex as re
 import logging
 
 from typings.gpt import OutputParser

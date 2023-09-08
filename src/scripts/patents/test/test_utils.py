@@ -23,9 +23,12 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "US GOV CT DISEASE CONTR & PREV",
                     "US GOV NAT INST HEALTH",
                     "THE US GOV",
-                    # "Diabetes Center Of Southwest", wtf op
-                    # Dicerna Pharmaceuticals, Inc., a Novo Nordisk company
-                    # "Genentech, Inc.",
+                    "korea advanced institute of science and technology",
+                    "Korea Advanced Institute Science And Technology",
+                    "university of colorado at denver",
+                    "university of colorado, denver",
+                    "Dicerna Pharmaceuticals, Inc., a Novo Nordisk company",
+                    "Genentech, Inc.",
                 ],
                 "expected_output": [
                     "Pfizer",
@@ -43,6 +46,12 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "US Government",
                     "US Government",
                     "US Government",
+                    "Korea Advanced Institute of Science And Technology",
+                    "Korea Advanced Institute Science And Technology",
+                    "University Of Colorado",
+                    "University Of Colorado",
+                    "Novo Nordisk",
+                    "Genentech",
                 ],
             },
         ]

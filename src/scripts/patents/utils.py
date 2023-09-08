@@ -1,6 +1,6 @@
 from functools import reduce
 from typing import Iterable
-import re
+import regex as re
 import logging
 
 from constants.patents import (
@@ -33,12 +33,16 @@ def clean_owners(owners: list[str]) -> list[str]:
         Examples:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
+            - University Of Alabama At Birmingham  -> University Of Alabama
+            - University of Colorado, Denver -> University of Colorado
         """
-        suppress_re = rf"(?:(?:\s+|,){get_or_re(COMPANY_SUPPRESSIONS)}\b|\(.+\))"
+        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(COMPANY_SUPPRESSIONS)}\b)"
+        pre_suppress_re = "^the"
+        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$))"
 
         for term in terms:
             yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
-                "&[ ]*"
+                "&[ .,]*"
             )
 
     def normalize_terms(assignees: list[str]) -> Iterable[str]:

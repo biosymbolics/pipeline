@@ -2,7 +2,7 @@
 Regex utilities
 """
 
-import re
+import regex as re
 from typing import Iterable, Literal, Optional, Sequence, Union
 
 

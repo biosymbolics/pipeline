@@ -6,7 +6,7 @@ import json
 from typing import Optional
 from typing_extensions import TypedDict
 import logging
-import re
+import regex as re
 import requests
 from pydash import flatten
 

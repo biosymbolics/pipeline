@@ -5,12 +5,12 @@ from functools import reduce
 import json
 import logging
 import os
-import re
+import regex as re
 from typing import Any, Mapping, Optional, TypedDict, cast
 import uuid
 import Levenshtein
 from redis.exceptions import ResponseError  # type: ignore
-import redisearch
+import regex as redisearch
 from redisearch import TextField, IndexDefinition, Query
 
 from utils.string import byte_dict_to_string_dict, get_id

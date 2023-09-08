@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from functools import partial, reduce
 import logging
-import re
+import regex as re
 import time
 from typing import Iterable
 from spacy.tokens import Doc, Span

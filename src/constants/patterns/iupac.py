@@ -2,7 +2,7 @@
 Patterns related to IUPAC nomenclature
 """
 
-import re
+import regex as re
 import logging
 
 from utils.re import get_or_re, ALPHA_CHARS

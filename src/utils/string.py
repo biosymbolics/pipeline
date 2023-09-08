@@ -4,7 +4,7 @@ String utilities
 
 
 from datetime import date
-import re
+import regex as re
 from typing import Any, Mapping, TypeGuard, Union
 
 
