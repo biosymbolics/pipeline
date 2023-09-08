@@ -11,6 +11,8 @@ WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
 AGGREGATED_ANNOTATIONS_TABLE = "aggregated_annotations"  # a mat view
 REGULATORY_APPROVAL_TABLE = "regulatory_applications"
 PATENT_TO_REGULATORY_APPROVAL_TABLE = "patent_to_regulatory_approval"
+PATENT_TO_TRIAL_TABLE = "patent_to_trial"
+TRIALS_TABLE = "trials"
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
