@@ -39,14 +39,16 @@ def __copy_publications():
 def __copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
-    (ONLY diseases)
+    (ONLY diseases, and only the first instance of the term for a given publication_number)
     """
     client = BQDatabaseClient()
     client.delete_table(GPR_ANNOTATIONS_TABLE)
 
-    # ~5TB query
+    # 3.7TB query
     query = f"""
-        SELECT a.*
+        SELECT a.publication_number, max(ocid) as ocid, a.preferred_name as preferred_name, max(a.domain) as domain,
+        max(a.source) as source, max(a.confidence) as confidence,
+        max(a.character_offset_start) as character_offset_start, max(a.character_offset_end) as character_offset_end
         FROM `patents-public-data.google_patents_research.annotations` a,
         `{BQ_DATASET_ID}.publications` p
         WHERE a.publication_number = p.publication_number
@@ -54,6 +56,7 @@ def __copy_gpr_annotations():
         AND confidence >= 0.65
         AND preferred_name<>'disease'
         AND character_offset_start < 10000 -- otherwise, probably not the main indication?
+        group by a.publication_number, a.preferred_name
     """
     client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
 
