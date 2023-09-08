@@ -15,6 +15,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Charles River Laboratories Inc",
                     "BBOB Labs",
                     "PFIZER R&D UK LTD",
+                    "Astrazeneca",
                     "Astrazeneca China",
                     "ASTRAZENECA INVEST (CHINA) CO LTD",
                     "ASTRAZENECA COLLABORATION VENTURES LLC",
@@ -29,6 +30,8 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "university of colorado, denver",
                     "Dicerna Pharmaceuticals, Inc., a Novo Nordisk company",
                     "Genentech, Inc.",
+                    "canadian institutes of health research (cihr)",
+                    "agency for innovation by science and technology",
                 ],
                 "expected_output": [
                     "Pfizer",
@@ -40,6 +43,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Pfizer",
                     "Astrazeneca",
                     "Astrazeneca",
+                    "Astrazeneca (China)",
                     "Astrazeneca Collaboration Ventures",  # TODO
                     "Japan",
                     "Matsushita",
@@ -52,6 +56,8 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "University Of Colorado",
                     "Novo Nordisk",
                     "Genentech",
+                    "canadian institutes of health research",
+                    "agency for innovation by science and technology",
                 ],
             },
         ]

@@ -165,6 +165,9 @@ class TermAssembler:
         - patent applications table
         - aact (ctgov)
         - drugcentral approvals
+
+        TODO:
+        National Cancer Center, boston therapeutics
         """
         db_owner_query_map = {
             # patents db
