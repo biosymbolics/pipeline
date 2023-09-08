@@ -5,6 +5,8 @@ from itertools import groupby
 from typing import Optional, TypedDict
 import logging
 
+from pydash import flatten
+
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
 from core.ner import TermNormalizer
@@ -17,6 +19,7 @@ from .._constants import SYNONYM_MAP
 from ..utils import clean_owners
 
 TERMS_FILE = "terms.json"
+TERMS_TABLE = "terms"
 
 
 class BaseTermRecord(TypedDict):
@@ -124,6 +127,10 @@ class SynonymMapper:
 class TermAssembler:
     """
     Static class for assembling terms and synonyms
+
+    Terms assembled:
+    - owner/sponsor/applications (companies, universities and individuals)
+    - entities/annotations (compounds, diseases, mechanisms)
     """
 
     def __init__(self):
@@ -152,28 +159,46 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
         return agg_terms
 
-    def __generate_owner_terms(self) -> list[AggregatedTermRecord]:
+    def generate_owner_terms(self) -> list[AggregatedTermRecord]:
         """
-        Generates owner terms (assignee/inventor) from the applications table
+        Generates owner terms (assignee/inventor) from:
+        - patent applications table
+        - aact (ctgov)
+        - drugcentral approvals
         """
-        owner_query = f"""
-            select lower(sponsor) as name, 'sponsors' as domain, count(*) as count
-            from trials
-            group by lower(sponsor)
+        db_owner_query_map = {
+            # patents db
+            "patents": """
+                SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+                FROM applications a
+                group by name
 
-            UNION ALL
+                UNION ALL
 
-            SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
-            FROM applications a
-            group by name
-
-            UNION ALL
-
-            SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
-            FROM applications a
-            group by name
-        """
-        rows = self.client.select(owner_query)
+                SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+                FROM applications a
+                group by name
+            """,
+            # ctgov db
+            "aact": """
+                select lower(name) as name, 'sponsors' as domain, count(*) as count
+                from sponsors
+                group by lower(name)
+            """,
+            # drugcentral db, with approvals
+            "drugcentral": """
+                select lower(applicant) as name, 'applicants' as domain, count(*) as count
+                from approval
+                where applicant is not null
+                group by lower(applicant)
+            """,
+        }
+        rows = flatten(
+            [
+                PsqlDatabaseClient(db).select(query)
+                for db, query in db_owner_query_map.items()
+            ]
+        )
         owners = clean_owners([row["name"] for row in rows])
 
         normalized: list[TermRecord] = [
@@ -192,7 +217,7 @@ class TermAssembler:
         terms = TermAssembler.__aggregate(normalized)
         return terms
 
-    def __generate_entity_terms(self) -> list[AggregatedTermRecord]:
+    def generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations table
         Normalizes terms and associates to canonical ids
@@ -244,10 +269,10 @@ class TermAssembler:
         - applications (assignees + inventors)
         """
         logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = self.__generate_owner_terms()
+        assignee_terms = self.generate_owner_terms()
 
         logging.info("Generating entity terms")
-        entity_terms = self.__generate_entity_terms()
+        entity_terms = self.generate_entity_terms()
 
         terms = assignee_terms + entity_terms
 
@@ -262,7 +287,6 @@ class TermAssembler:
         """
         terms = existing_terms or load_json_from_file(TERMS_FILE)
 
-        term_table = "terms"
         schema = {
             "term": "TEXT",
             "canonical_id": "TEXT",
@@ -273,26 +297,29 @@ class TermAssembler:
             "text_search": "tsvector",
         }
         self.client.create_and_insert(
-            terms, term_table, schema, truncate_if_exists=True
+            terms, TERMS_TABLE, schema, truncate_if_exists=True
         )
+        logging.info(f"Inserted %s rows into terms table", len(terms))
 
-        # add text_search column
+    def index_terms(self):
+        """
+        Create search column / index on terms table
+        """
         self.client.execute_query(
             f"""
-            UPDATE {term_table}
+            UPDATE {TERMS_TABLE}
             SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
             """
         )
 
         self.client.create_index(
             {
-                "table": term_table,
+                "table": TERMS_TABLE,
                 "column": "text_search",
                 "is_gin": True,
                 "is_lower": False,
             },
         )
-        logging.info(f"Inserted %s rows into terms table", len(terms))
 
     def generate_and_persist_terms(self):
         """
@@ -300,6 +327,7 @@ class TermAssembler:
         """
         self.generate_terms()
         self.persist_terms()
+        self.index_terms()
 
     @staticmethod
     def run():
