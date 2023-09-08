@@ -169,15 +169,17 @@ class TermAssembler:
         db_owner_query_map = {
             # patents db
             "patents": """
-                SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+                SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
                 group by name
+                having count(*) > 30 -- individuals unlikely to have more than 30 patents
 
                 UNION ALL
 
-                SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+                SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
                 group by name
+                having count(*) > 30 -- individuals unlikely to have more than 30 patents
             """,
             # ctgov db
             "aact": """
@@ -214,6 +216,7 @@ class TermAssembler:
             if len(owner) > 0
         ]
 
+        # yields 671,791 (09/08/2023)
         terms = TermAssembler.__aggregate(normalized)
         return terms
 
