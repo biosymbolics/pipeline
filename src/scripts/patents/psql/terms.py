@@ -165,19 +165,24 @@ class TermAssembler:
         - patent applications table
         - aact (ctgov)
         - drugcentral approvals
+
+        TODO:
+        National Cancer Center, boston therapeutics
         """
         db_owner_query_map = {
             # patents db
             "patents": """
-                SELECT unnest(assignees) as name, 'assignees' as domain, count(*) as count
+                SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
                 group by name
+                having count(*) > 30 -- individuals unlikely to have more than 30 patents
 
                 UNION ALL
 
-                SELECT unnest(inventors) as name, 'inventors' as domain, count(*) as count
+                SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
                 group by name
+                having count(*) > 30 -- individuals unlikely to have more than 30 patents
             """,
             # ctgov db
             "aact": """

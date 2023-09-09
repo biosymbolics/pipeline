@@ -120,7 +120,7 @@ def ingest_trials():
     )
 
 
-def create_application_to_trial():
+def create_patent_to_trial():
     """
     Create table that maps patent applications to trials
     """
@@ -136,15 +136,15 @@ def create_application_to_trial():
         AND t.interventions && a.terms -- intervention match
         AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
     """
-    client.create_from_select(att_query, "application_to_trial")
+    client.create_from_select(att_query, "patent_to_trial")
     client.create_indices(
         [
             {
-                "table": "application_to_trial",
+                "table": "patent_to_trial",
                 "column": "publication_number",
             },
             {
-                "table": "application_to_trial",
+                "table": "patent_to_trial",
                 "column": "nct_id",
             },
         ]
@@ -157,7 +157,7 @@ def copy_ctgov():
     Copy data from ctgov to patents
     """
     ingest_trials()
-    create_application_to_trial()
+    create_patent_to_trial()
 
 
 def main():

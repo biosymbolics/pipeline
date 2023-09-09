@@ -5,7 +5,7 @@ from functools import reduce
 import json
 import logging
 import os
-import re
+import regex as re
 from typing import Any, Mapping, Optional, TypedDict, cast
 import uuid
 import Levenshtein

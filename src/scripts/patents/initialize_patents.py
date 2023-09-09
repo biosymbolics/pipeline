@@ -16,7 +16,7 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
-from scripts.patents.psql.copy_approvals import copy_patent_approvals
+from scripts.patents.psql.copy_approvals import copy_approvals
 from scripts.patents.bq.copy_tables import copy_patent_tables
 from scripts.patents.bq_to_psql import copy_bq_to_psql
 from scripts.patents.psql.terms import create_patent_terms
@@ -208,7 +208,7 @@ def main(bootstrap: bool = False):
         ```
         # from local machine
         pg_dump --no-owner patents -t aggregated_annotations -t annotations -t applications \
-            -t application_to_trial -t patent_approvals -t terms -t trials  > patents.psql
+            -t patent_to_trial -t patent_approvals -t terms -t trials  > patents.psql
         zip patents.psql.zip patents.psql
         aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
         aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
@@ -250,7 +250,7 @@ def main(bootstrap: bool = False):
         # create patent applications etc in postgres
         copy_bq_to_psql()
         # copy data about approvals
-        copy_patent_approvals()
+        copy_approvals()
         # adds column & index for application search
         add_application_search()
 

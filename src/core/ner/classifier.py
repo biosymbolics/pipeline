@@ -1,7 +1,7 @@
 """
 Text classifiers
 """
-import re
+import regex as re
 from pydash import compact
 from typing import Mapping, Union
 import logging

@@ -2,7 +2,7 @@
 SEC build
 """
 from datetime import date, datetime
-import re
+import regex as re
 
 from utils.extraction.html import extract_text
 from utils.misc import dict_to_named_tuple

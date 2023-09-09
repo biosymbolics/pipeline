@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from functools import partial, reduce
 import logging
-import re
+import regex as re
 import time
 from typing import Iterable
 from spacy.tokens import Doc, Span
@@ -385,6 +385,8 @@ def cluster_terms(
     Clusters terms using TF-IDF and DBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair)
 
+    TODO: returns one massive group (which it shouldn't because cluster -1 is the catch all)
+
     Args:
         terms (list[str]): list of terms to cluster
     """
@@ -395,24 +397,30 @@ def cluster_terms(
 
     vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
     X = vectorizer.fit_transform(terms)
-    clustering = DBSCAN(eps=0.8, min_samples=2).fit(X)
+    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)
     labels = clustering.labels_
 
     df = pl.DataFrame({"cluster_id": labels, "name": terms})
     terms_by_cluster_id = (
-        df.filter(pl.col("cluster_id") > -1)
+        df.filter(pl.col("cluster_id") > 0)
         .groupby("cluster_id")
         .agg(pl.col("name"))
+        # hack fix for big-ass catchall that shouldn't happen
+        .filter(pl.col("name").list.lengths() < 100000)
         .drop("cluster_id")
         .to_series()
         .to_list()
     )
-    synonyms = [
+
+    if return_dict:
+        return {
+            members_terms[0]: m
+            for members_terms in terms_by_cluster_id
+            for m in members_terms[1:]
+        }
+
+    return [
         SynonymRecord({"term": members_terms[0], "synonym": m})
         for members_terms in terms_by_cluster_id
         for m in members_terms[1:]
     ]
-
-    if return_dict:
-        return {synonym["synonym"]: synonym["term"] for synonym in synonyms}
-    return synonyms

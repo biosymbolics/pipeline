@@ -4,7 +4,7 @@ Utils for the NER pipeline
 from abc import abstractmethod
 import time
 from typing import Iterable, TypeVar, Union, cast
-import re
+import regex as re
 from functools import partial, reduce
 import logging
 import html

@@ -3,7 +3,7 @@ Utils for transforming data into binder format
 """
 
 from functools import lru_cache
-import re
+import regex as re
 import sys
 import polars as pl
 from pydash import compact
