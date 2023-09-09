@@ -25,12 +25,13 @@ def copy_all_approvals():
         "max(prod_approval.appl_no) as regulatory_application_number",
         "max(prod.ndc_product_code) as ndc_code",
         "max(prod.product_name) as brand_name",
-        "(ARRAY_TO_STRING(array_agg(distinct struct.name), '+')) as generic_name",  # or product.generic_name
+        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), '+')) as generic_name",  # or product.generic_name
         "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
         "max(struct.stem) as stem",
         "max(prod_approval.applicant) as applicant",
         "max(prod.marketing_status) as application_type",
-        "max(prod_approval.approval_date) as approval_date",
+        "ARRAY_AGG(distinct approval.approval) as approval_dates",
+        "ARRAY_AGG(distinct approval.type) as regulatory_agency",
         "max(label_section.text) as patent_indication",
         "max(distinct struct.cd_formula) as formula",
         "max(distinct struct.smiles) as smiles",
@@ -49,8 +50,10 @@ def copy_all_approvals():
         label,
         section label_section,
         ob_product prod_approval,
-        product prod
+        product prod,
+        approval
         where prod_approval.id = s2p.prod_id
+        AND approval.struct_id = struct.id -- TODO: combo drugs??
         AND prod.product_name = prod_approval.trade_name
         AND s2p.struct_id = struct.id
         AND p2l.ndc_product_code = prod.ndc_product_code
