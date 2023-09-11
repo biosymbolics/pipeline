@@ -20,6 +20,10 @@ DEST_DB = "patents"
 def copy_all_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
+
+    NOTE: drugcentral is a bit if a sh*tshow. there is lots of partly duplicated data
+    and it doesn't really add up, e.g. why are there 1136 distinct applicants in `approval`
+    and 1772 in `ob_product`?
     """
     PATENT_FIELDS = [
         "max(prod_approval.appl_no) as regulatory_application_number",
@@ -135,10 +139,9 @@ def copy_indirect_patent_to_approval():
         applications as patent_app,
         aggregated_annotations as a,
         {REGULATORY_APPROVAL_TABLE} approvals
-        LEFT JOIN synonym_map as sm ON sm.synonym = approvals.generic_name
         where a.publication_number = patent_app.publication_number
-        AND approvals.active_ingredients @> a.terms -- TODO this could FP
-        AND coalesce(nullif(approvals.normalized_applicant, ''), lower(approvals.applicant)) = any(a.terms)
+        AND {REGULATORY_APPROVAL_TABLE}.active_ingredients @> a.terms -- TODO this could FP
+        AND coalesce(nullif({REGULATORY_APPROVAL_TABLE}.normalized_applicant, ''), lower({REGULATORY_APPROVAL_TABLE}.applicant)) = any(a.terms)
     """
     client.select_insert_into_table(query, PATENT_TO_REGULATORY_APPROVAL_TABLE)
 

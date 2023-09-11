@@ -175,14 +175,14 @@ class TermAssembler:
                 SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 30 -- individuals unlikely to have more than 30 patents
+                having count(*) > 20 -- individuals unlikely to have more patents
 
                 UNION ALL
 
                 SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 30 -- individuals unlikely to have more than 30 patents
+                having count(*) > 20 -- individuals unlikely to have more patents
             """,
             # ctgov db
             "aact": """
@@ -191,9 +191,10 @@ class TermAssembler:
                 group by lower(name)
             """,
             # drugcentral db, with approvals
+            # `ob_product`` has 1772 distinct applicants vs `approval` at 1136
             "drugcentral": """
                 select lower(applicant) as name, 'applicants' as domain, count(*) as count
-                from approval
+                from ob_product
                 where applicant is not null
                 group by lower(applicant)
             """,
