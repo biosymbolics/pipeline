@@ -219,6 +219,14 @@ class EntityCleaner:
             for term in _terms:
                 yield html.unescape(term)
 
+        def remove_after_newline(_terms: list[str]) -> Iterable[str]:
+            """
+            Remove everything after a newline
+            e.g. "asthma\n is a disease" -> "asthma"
+            """
+            for term in _terms:
+                yield re.sub(r"\n.*", "", term, flags=re.DOTALL)
+
         def lower(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
                 yield term.lower()
@@ -273,6 +281,7 @@ class EntityCleaner:
 
         cleaning_steps = [
             decode_html,
+            remove_after_newline,  # order matters (this before unwrap etc)
             unwrap,
             format_parentheticals,  # order matters (run after unwrap)
             remove_chars,  # order matters (after unwrap/format_parentheticals)
