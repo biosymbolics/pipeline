@@ -777,6 +777,8 @@ def clean_up_junk():
     logging.info("Removing junk")
 
     queries = [
+        # removes evertyhing after a newline
+        rf"update {WORKING_TABLE} set term= regexp_replace(term, '\.?\s*\n.*', '') where  term ~ '.*\n.*'",
         # unwrap
         f"update {WORKING_TABLE} "
         + r"set term=(REGEXP_REPLACE(term, '[)(]', '', 'g')) where term ~ '^[(][^)(]+[)]$'",
