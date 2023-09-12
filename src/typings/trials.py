@@ -3,69 +3,159 @@ from enum import IntEnum
 from typing import TypeGuard, TypedDict, cast
 from constants.company import LARGE_PHARMA_KEYWORDS
 
-from core.ner.classifier import classify_by_keywords
+from core.ner.classifier import classify_string, create_lookup_map
 from utils.list import dedup
 
 
-class SponsorType(IntEnum):
-    UNIVERSITY = 1
-    INDUSTRY_LARGE = 2  # big pharma
-    INDUSTRY = 3
-    GOVERNMENTAL = 3
-    HEALTH_SYSTEM = 4
-    OTHER = 5
+class TrialRandomization(IntEnum):
+    RANDOMIZED = "RANDOMIZED"
+    NON_RANDOMIZED = "NON_RANDOMIZED"
+    NA = "N/A"
+    UNKNOWN = "UNKNOWN"
 
     @classmethod
     def _missing_(cls, value):
-        reason = classify_by_keywords(
-            [value],  # type: ignore
-            SPONSOR_KEYWORD_MAP,
-            cls.OTHER,
-        )
-        res = reason[0][0]
+        rand_term_map = {
+            "Randomized": cls.RANDOMIZED,
+            "Non-Randomized": cls.NON_RANDOMIZED,
+            "N/A": cls.NA,
+        }
+        if value in rand_term_map:
+            return rand_term_map[value]
+        return cls.UNKNOWN
+
+
+class TrialMasking(IntEnum):
+    NONE = "NONE"
+    SINGLE = "SINGLE"
+    DOUBLE = "DOUBLE"
+    TRIPLE = "TRIPLE"
+    QUADRUPLE = "QUADRUPLE"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def _missing_(cls, value):
+        masking_term_map = {
+            "None (Open Label)": cls.NONE,
+            "Single": cls.SINGLE,
+            "Double": cls.DOUBLE,
+            "Triple": cls.TRIPLE,
+            "Quadruple": cls.QUADRUPLE,
+        }
+        if value in masking_term_map:
+            return masking_term_map[value]
+        return cls.UNKNOWN
+
+
+class TrialPurpose(IntEnum):
+    TREATMENT = "TREATMENT"
+    PREVENTION = "PREVENTION"
+    DIAGNOSTIC = "DIAGNOSTIC"
+    BASIC_SCIENCE = "BASIC_SCIENCE"
+    SUPPORTIVE_CARE = "SUPPORTIVE_CARE"
+    DEVICE = "DEVICE"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def _missing_(cls, value):
+        purpose_term_map = {
+            "Treatment": cls.TREATMENT,
+            "Prevention": cls.PREVENTION,
+            "Diagnostic": cls.DIAGNOSTIC,
+            "Basic Science": cls.BASIC_SCIENCE,
+            "Supportive Care": cls.SUPPORTIVE_CARE,
+            "Device Feasibility": cls.DEVICE,
+            "Educational/Counseling/Training": cls.OTHER,
+            "Health Services Research": cls.OTHER,
+            "Screening": cls.OTHER,
+        }
+        if value in purpose_term_map:
+            return purpose_term_map[value]
+        return cls.UNKNOWN
+
+
+class TrialDesign(IntEnum):
+    PARALLEL = "PARALLEL"
+    CROSSOVER = "CROSSOVER"
+    FACTORIAL = "FACTORIAL"
+    SEQUENTIAL = "SEQUENTIAL"
+    SINGLE_GROUP = "SINGLE_GROUP"
+    NA = "N/A"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def _missing_(cls, value):
+        design_term_map = {
+            "Parallel Assignment": cls.PARALLEL,
+            "Crossover Assignment": cls.CROSSOVER,
+            "Factorial Assignment": cls.FACTORIAL,
+            "Sequential Assignment": cls.SEQUENTIAL,
+            "Single Group Assignment": cls.SINGLE_GROUP,
+            "": cls.NA,
+        }
+        if value in design_term_map:
+            return design_term_map[value]
+        return cls.UNKNOWN
+
+
+class SponsorType(IntEnum):
+    UNIVERSITY = "UNIVERSITY"
+    INDUSTRY_LARGE = "INDUSTRY_LARGE"  # big pharma
+    INDUSTRY = "INDUSTRY"
+    GOVERNMENTAL = "GOVERNMENTAL"
+    HEALTH_SYSTEM = "HEALTH_SYSTEM"
+    OTHER = "OTHER"
+
+    @classmethod
+    def _missing_(cls, value):
+        reason = classify_string(value, SPONSOR_KEYWORD_MAP, cls.OTHER)  # type: ignore
+        res = reason[0]
         return res
 
 
-SPONSOR_KEYWORD_MAP = {
-    SponsorType.UNIVERSITY: [
-        "univ(?:ersity)?",
-        "univ(?:ersities)?",
-        "college",
-        "research hospital",
-    ],
-    SponsorType.INDUSTRY_LARGE: LARGE_PHARMA_KEYWORDS,
-    SponsorType.INDUSTRY: [
-        "(?:bio)?pharma(?:ceutical)s?",
-        "biotech(?:nology)",
-        "llc",
-        "corp",
-    ],
-    SponsorType.GOVERNMENTAL: [
-        "government",
-        "govt",
-        "federal",
-        "state",
-        "us health",
-        "veterans affairs",
-    ],
-    SponsorType.HEALTH_SYSTEM: [
-        "hospital",
-        "health system",
-        "healthcare",
-        "medical system",
-    ],
-}
+SPONSOR_KEYWORD_MAP = create_lookup_map(
+    {
+        SponsorType.UNIVERSITY: [
+            "univ(?:ersity)?",
+            "univ(?:ersities)?",
+            "college",
+            "research hospital",
+        ],
+        SponsorType.INDUSTRY_LARGE: LARGE_PHARMA_KEYWORDS,
+        SponsorType.INDUSTRY: [
+            "(?:bio)?pharma(?:ceutical)s?",
+            "biotech(?:nology)",
+            "llc",
+            "corp",
+        ],
+        SponsorType.GOVERNMENTAL: [
+            "government",
+            "govt",
+            "federal",
+            "state",
+            "us health",
+            "veterans affairs",
+        ],
+        SponsorType.HEALTH_SYSTEM: [
+            "hospital",
+            "health system",
+            "healthcare",
+            "medical system",
+        ],
+    }
+)
 
 
 class TrialStatus(IntEnum):
-    PRE_ENROLLMENT = 1  # Active, not recruiting, Not yet recruiting
-    ENROLLMENT = 2  # Recruiting, Enrolling by invitation
-    WITHDRAWN = 3  # Withdrawn
-    SUSPENDED = 4  # Suspended
-    TERMINATED = 5  # Terminated
-    COMPLETED = 6  # Completed
-    UNKNOWN = 7  # Unknown status
-    NA = 8  # Not Applicable
+    PRE_ENROLLMENT = "PRE_ENROLLMENT"  # Active, not recruiting, Not yet recruiting
+    ENROLLMENT = "ENROLLMENT"  # Recruiting, Enrolling by invitation
+    WITHDRAWN = "WITHDRAWN"  # Withdrawn
+    SUSPENDED = "SUSPENDED"  # Suspended
+    TERMINATED = "TERMINATED"  # Terminated
+    COMPLETED = "COMPLETED"  # Completed
+    UNKNOWN = "UNKNOWN"
+    NA = "N/A"
 
     @classmethod
     def _missing_(cls, value):
@@ -90,15 +180,15 @@ class TrialStatus(IntEnum):
 
 
 class TrialPhase(IntEnum):
-    EARLY_PHASE_1 = 1  # Early Phase 1
-    PHASE_1 = 2  # Phase 1
-    PHASE_1_2 = 3  # Phase 1/Phase 2
-    PHASE_2 = 4  # Phase 2
-    PHASE_2_3 = 5  # Phase 2/Phase 3
-    PHASE_3 = 6  # Phase 3
-    PHASE_4 = 7  # Phase 4
-    NA = 8  # Not Applicable
-    UNKNOWN = 9  # Unknown status
+    EARLY_PHASE_1 = "EARLY_PHASE_1"  # Early Phase 1
+    PHASE_1 = "PHASE_1"  # Phase 1
+    PHASE_1_2 = "PLASE_1_2"  # Phase 1/Phase 2
+    PHASE_2 = "PHASE_2"  # Phase 2
+    PHASE_2_3 = "PHASE_2_3"  # Phase 2/Phase 3
+    PHASE_3 = "PHASE_3"  # Phase 3
+    PHASE_4 = "PHASE_4"  # Phase 4
+    NA = "N/A"  # Not Applicable
+    UNKNOWN = "UNKNOWN"  # Unknown status
 
     @classmethod
     def _missing_(cls, value):
@@ -122,108 +212,112 @@ class TrialPhase(IntEnum):
 
 
 class TerminationReason(IntEnum):
-    FUTILITY = 1
-    SAFETY = 2
-    BUSINESS = 3
-    FAILED_TO_ENROLL = 4
-    LOSS_OF_FOLLOW_UP = 5
-    INVESTIGATOR = 6
-    FUNDING = 7
-    COVID = 8
-    OVERSIGHT = 9
-    SUPPLY_CHAIN = 10
-    PROTOCOL_REVISION = 11
-    FEASIBILITY = 12
-    NOT_SAFETY = 13
-    LOGISTICS = 14
-    NOT_EFFICACY = 15
-    OTHER = 16
+    FUTILITY = "FUTILITY"
+    SAFETY = "SAFETY"
+    BUSINESS = "BUSINESS"
+    ENROLLMENT = "ENROLLMENT"
+    INVESTIGATOR = "INVESTIGATOR"
+    FUNDING = "FUNDING"
+    COVID = "COVID"
+    OVERSIGHT = "OVERSIGHT"
+    SUPPLY_CHAIN = "SUPPLY_CHAIN"
+    PROTOCOL_REVISION = "PROTOCOL_REVISION"
+    FEASIBILITY = "FEASIBILITY"
+    NOT_SAFETY = "NOT_SAFETY"
+    LOGISTICS = "LOGISTICS"
+    NOT_EFFICACY = "NOT_EFFICACY"
+    OTHER = "OTHER"
 
     @classmethod
     def _missing_(cls, value):
-        reason = classify_by_keywords(
-            [value],  # type: ignore
+        reason = classify_string(
+            value,  # type: ignore
             TERMINATION_KEYWORD_MAP,
             TerminationReason.OTHER,
         )
-        return reason[0][0]
+        return reason[0]
 
 
-TERMINATION_KEYWORD_MAP = {
-    TerminationReason.FUTILITY: [
-        "futility",
-        # "efficacy",
-        "endpoints?",  # "failed to meet (?:primary )?endpoint", "no significant difference on (?:primary )?endpoint", "efficacy endpoints?", "efficacy endpoints"
-        "lower success rates?",
-        "interim analysis",
-        "lack of effectiveness",
-        "lack of efficacy",
-        "rate of relapse",
-        "lack of response",
-        "lack of performance",
-        "inadequate effect",
-        "no survival benefit",
-        "stopping rule",
-    ],
-    TerminationReason.SAFETY: [
-        # "safety", # "not a safety issue"
-        "toxicity",
-        "adverse",
-        "risk/benefit",
-        "detrimental effect",
-        "S?AEs?",
-        "mortality",
-        # "safety concerns?",
-        "unacceptable morbidity",
-        "side effects?",
-    ],
-    TerminationReason.BUSINESS: [
-        "business",
-        "company",
-        "strategic",
-        "sponsor(?:'s)? decision",
-        "management",
-        "stakeholders?",
-        "(?:re)?prioritization",
-    ],
-    TerminationReason.FAILED_TO_ENROLL: [
-        "accruals?",
-        "enroll?(?:ment|ed)?",
-        "inclusions?",
-        "recruit(?:ment|ing)?s?",
-        "lack of (?:eligibile )?(?:participants?|subjects?|patients?)",
-    ],
-    TerminationReason.LOSS_OF_FOLLOW_UP: ["lost to follow up"],
-    TerminationReason.INVESTIGATOR: ["investigator", "PI"],
-    TerminationReason.FUNDING: ["funding", "resources", "budget", "financial"],
-    TerminationReason.COVID: ["covid", "coronavirus", "pandemic"],
-    TerminationReason.OVERSIGHT: [
-        "IRB",
-        "ethics",  # "ethics committee",
-        "Institutional Review Board",
-        "certification",
-        "FDA",
-    ],
-    TerminationReason.SUPPLY_CHAIN: [
-        "supply",
-        "unavalaible",
-        "shortage",
-        "manufacturing",
-    ],
-    TerminationReason.PROTOCOL_REVISION: ["revision", "change in (?:study )?protocol"],
-    TerminationReason.FEASIBILITY: ["feasibility"],
-    TerminationReason.NOT_SAFETY: [
-        "not a safety issue",
-        "not related to safety",
-        "No Safety or Efficacy Concerns",
-        "no safety concern",
-    ],
-    TerminationReason.NOT_EFFICACY: [
-        "not related to efficacy",
-        "No Safety or Efficacy Concerns",
-    ],
-    TerminationReason.LOGISTICS: ["logistics", "logistical"],
-}
+TERMINATION_KEYWORD_MAP = create_lookup_map(
+    {
+        TerminationReason.FUTILITY: [
+            "futility",
+            # "efficacy",
+            "endpoints?",  # "failed to meet (?:primary )?endpoint", "no significant difference on (?:primary )?endpoint", "efficacy endpoints?", "efficacy endpoints"
+            "lower success rates?",
+            "interim analysis",
+            "lack of effectiveness",
+            "lack of efficacy",
+            "rate of relapse",
+            "lack of response",
+            "lack of performance",
+            "inadequate effect",
+            "no survival benefit",
+            "stopping rule",
+        ],
+        TerminationReason.SAFETY: [
+            # "safety", # "not a safety issue"
+            "toxicity",
+            "adverse",
+            "risk/benefit",
+            "detrimental effect",
+            "S?AEs?",
+            "mortality",
+            # "safety concerns?",
+            "unacceptable morbidity",
+            "side effects?",
+            "lost to follow up",  # TODO: is this really a safety issue?
+        ],
+        TerminationReason.BUSINESS: [
+            "business",
+            "company",
+            "strategic",
+            "sponsor(?:'s)? decision",
+            "management",
+            "stakeholders?",
+            "(?:re)?prioritization",
+        ],
+        TerminationReason.ENROLLMENT: [
+            "accruals?",
+            "enroll?(?:ment|ed)?",
+            "inclusions?",
+            "recruit(?:ment|ing)?s?",
+            "lack of (?:eligibile )?(?:participants?|subjects?|patients?)",
+        ],
+        TerminationReason.INVESTIGATOR: ["investigator", "PI"],
+        TerminationReason.FUNDING: ["funding", "resources", "budget", "financial"],
+        TerminationReason.COVID: ["covid", "coronavirus", "pandemic"],
+        TerminationReason.OVERSIGHT: [
+            "IRB",
+            "ethics",  # "ethics committee",
+            "Institutional Review Board",
+            "certification",
+            "FDA",
+        ],
+        TerminationReason.SUPPLY_CHAIN: [
+            "supply",
+            "unavalaible",
+            "shortage",
+            "manufacturing",
+        ],
+        TerminationReason.PROTOCOL_REVISION: [
+            "revision",
+            "change in (?:study )?protocol",
+        ],
+        TerminationReason.FEASIBILITY: ["feasibility"],
+        TerminationReason.NOT_SAFETY: [
+            "not a safety issue",
+            "not related to safety",
+            "No Safety or Efficacy Concerns",
+            "no safety concern",
+        ],
+        TerminationReason.NOT_EFFICACY: [
+            "not related to efficacy",
+            "No Safety or Efficacy Concerns",
+        ],
+        TerminationReason.LOGISTICS: ["logistics", "logistical"],
+    }
+)
 
 
 class BaseTrial(TypedDict):
@@ -236,24 +330,26 @@ class BaseTrial(TypedDict):
     """
 
     nct_id: str
-    # blinding: str # TODO
     conditions: list[str]
-    # design: str # parallel, crossover, etc
-    # dropout
     end_date: date
     enrollment: int
     interventions: list[str]
-    # intervention_design: str # TODO (whatever it is called - non-inferiority, superiority; active vs placebo comparator)
     last_updated_date: date
-    # primary_endpoint: str # TODO (non-trivial)
-    # randomization: str # TODO
     sponsor: str
     start_date: date
     title: str
 
 
 class TrialRecord(BaseTrial):
+    # TODO non-inferiority, superiority
+    # TODO comparator type (ACTIVE CONTROL, PLACEBO, etc.)
+    # TODO dropout
+    # TODO primary endpoint
+    design: str
+    masking: str
     phase: str
+    purpose: str
+    randomization: str
     status: str
 
 
@@ -262,8 +358,12 @@ class TrialSummary(BaseTrial):
     Patent trial info
     """
 
+    design: TrialDesign
     duration: int  # in days
+    masking: TrialMasking
     phase: TrialPhase
+    purpose: TrialPurpose
+    randomization: TrialRandomization
     sponsor_type: SponsorType
     status: TrialStatus
     termination_reason: TerminationReason
@@ -292,9 +392,14 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
     """
     Check if dict is a trial record
     """
+    _is_trial_record = is_trial_record(trial)
     return (
-        # is_trial_record(trial)
-        "duration" in trial
+        _is_trial_record
+        and "duration" in trial
+        and "design" in trial
+        and "masking" in trial
+        and "purpose" in trial
+        and "randomization" in trial
         and "termination_reason" in trial
         and "sponsor_type" in trial
     )
@@ -325,6 +430,7 @@ def get_trial_summary(trial: dict) -> TrialSummary:
 
     - formats start and end date
     - calculates duration
+    - etc
 
     TODO:
     - primary endpoint
@@ -337,8 +443,12 @@ def get_trial_summary(trial: dict) -> TrialSummary:
         {
             **trial,
             "conditions": dedup(trial["conditions"]),
-            "duartion": __calc_duration(trial["start_date"], trial["end_date"]),
+            "design": TrialDesign(trial["design"]),
+            "duration": __calc_duration(trial["start_date"], trial["end_date"]),
+            "masking": TrialMasking(trial["masking"]),
             "phase": TrialPhase(trial["phase"]),
+            "purpose": TrialPurpose(trial["purpose"]),
+            "randomization": TrialRandomization(trial["randomization"]),
             "sponsor_type": SponsorType(trial["sponsor"]),  # type: ignore
             "status": TrialStatus(trial["status"]),
         },

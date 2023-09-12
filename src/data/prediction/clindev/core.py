@@ -1,14 +1,11 @@
 """
-Patent Probability of Success (PoS) model(s)
+Trial characteristic and duration prediction model
 """
-from typing import Any, Optional
 import torch
 import torch.nn as nn
 
-OUTPUT_SIZE = 8
 
-
-class TrialCharacteristicsModel(nn.Module):
+class TwoStageModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
 
@@ -22,40 +19,26 @@ class TrialCharacteristicsModel(nn.Module):
         >>> torch.save(model, 'clindev-model.pt')
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_size: int = OUTPUT_SIZE):
-        super().__init__()
-        self.dnn = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_size),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.dnn(x)
-
-    def __call__(self, *args: Any, **kwds: Any) -> torch.Tensor:
-        return super().__call__(*args, **kwds)
-
-
-class TrialDurationModel(nn.Module):
-    """
-    Predicts duration of a clinical trial
-    """
-
     def __init__(
-        self, input_dim: int = OUTPUT_SIZE, hidden_dim: int = 32, output_size: int = 1
+        self, input_size, stage1_hidden_size, stage1_output_size, stage2_hidden_size
     ):
         super().__init__()
-        self.dnn = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+
+        # Stage 1 model
+        self.stage1_model = nn.Sequential(
+            nn.Linear(input_size, stage1_hidden_size),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim),
-            nn.Linear(hidden_dim, output_size),
+            nn.Linear(stage1_hidden_size, stage1_output_size),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.dnn(x)
+        # Stage 2 model
+        self.stage2_model = nn.Sequential(
+            nn.Linear(input_size + stage1_output_size, stage2_hidden_size),
+            nn.ReLU(),
+            nn.Linear(stage2_hidden_size, 1),  # Output size
+        )
 
-    def __call__(self, *args: Any, **kwds: Any) -> torch.Tensor:
-        return super().__call__(*args, **kwds)
+    def forward(self, x):
+        x1 = self.stage1_model(x)  # Stage 1 inference
+        x2 = torch.cat((x, x1), dim=1)
+        return self.stage2_model(x2)  # Stage 2 inference

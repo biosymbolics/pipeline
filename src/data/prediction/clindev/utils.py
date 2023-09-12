@@ -22,23 +22,26 @@ logger.setLevel(logging.INFO)
 def prepare_inputs(
     trials: Sequence[TrialSummary],
     batch_size: int,
-    dnn_categorical_fields: list[str],
-    dnn_text_fields: list[str],
+    categorical_fields: list[str],
+    text_fields: list[str],
+    y1_categorical_fields: list[str],  # e.g. randomization_type
+    y2_field: str,
 ) -> DnnInput:
     """
     Prepare data for DNN
     """
     logger.info("Preparing inputs for DNN")
-    embeddings = get_feature_embeddings(trials, dnn_categorical_fields, dnn_text_fields)  # type: ignore
+    embeddings = get_feature_embeddings(trials, categorical_fields, text_fields)  # type: ignore
     x1 = resize_and_batch(embeddings, batch_size)
 
-    y_vals = [trial["end_date"] - trial["start_date"] for trial in trials]
-    y = batch_and_pad(cast(list[Primitive], y_vals), batch_size)
+    y1_vals = get_feature_embeddings(trials, y1_categorical_fields, [])  # type: ignore
+    y1 = batch_and_pad(cast(list[Primitive], y1_vals), batch_size)
+
+    y2_vals = [trial[y2_field] for trial in trials]
+    y2 = batch_and_pad(cast(list[Primitive], y2_vals), batch_size)
     logger.info(
-        "X1: %s, Y: %s (t: %s, f: %s)",
+        "X1: %s, Y2: %s",
         x1.size(),
-        y.size(),
-        len([y for y in y_vals if y == 1.0]),
-        len([y for y in y_vals if y == 0.0]),
+        y2.size(),
     )
-    return {"x1": x1, "y": y}
+    return {"x1": x1, "y1": y1, "y2": y2}

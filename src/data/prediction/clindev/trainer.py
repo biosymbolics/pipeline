@@ -23,9 +23,11 @@ from .constants import (
     SAVE_FREQUENCY,
     TEXT_FIELDS,
     TRUE_THRESHOLD,
+    Y1_CATEGORICAL_FIELDS,
+    Y2_FIELD,
 )
-from .core import TrialCharacteristicsModel, TrialDurationModel
-from .types import AllInput, DnnInput
+from .core import TwoStageModel
+from .types import DnnInput
 from .utils import prepare_inputs
 
 
@@ -48,15 +50,17 @@ class ModelTrainer:
         """
         torch.device("mps")
 
-        self.stage1_model = TrialCharacteristicsModel(input_dim, round(input_dim / 2))
-        self.stage2_model = TrialDurationModel(input_dim, round(input_dim / 2))
+        self.model = TwoStageModel(
+            input_dim, round(input_dim / 2), round(input_dim / 4), 1
+        )
 
         self.stage1_optimizer = optimizer or OPTIMIZER_CLASS(
-            self.stage1_model.parameters(), lr=LR
+            self.model.parameters(), lr=LR
         )
         self.stage2_optimizer = optimizer or OPTIMIZER_CLASS(
-            self.stage2_model.parameters(), lr=LR
+            self.model.parameters(), lr=LR
         )
+
         self.criterion = nn.BCEWithLogitsLoss()
         self.input_dim = input_dim
 
@@ -81,7 +85,8 @@ class ModelTrainer:
         """
         checkpoint = {
             "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
+            "stage1_optimizer_state_dict": self.stage1_optimizer.state_dict(),
+            "stage2_optimizer_state_dict": self.stage2_optimizer.state_dict(),
             "epoch": epoch,
         }
         checkpoint_name = f"checkpoint_{epoch}.pt"
@@ -113,20 +118,26 @@ class ModelTrainer:
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
-                batch: AllInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
+                batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
                 pred = self.model(batch["x1"])
-                loss = self.criterion(pred, batch["y"])  # max 0.497 min 0.162
 
-                logging.info("Prediction loss: %s", loss)
+                # STAGE 1 backprop
+                self.stage1_optimizer.zero_grad()
+                stage1_loss = self.criterion(pred, batch["y1"])
+                logging.info("Stage 1 loss: %s", stage1_loss)
+                stage1_loss.backward(retain_graph=True)
+                self.stage1_optimizer.step()
 
-                # backprop
-                self.optimizer.zero_grad()
-                loss.backward(retain_graph=True)
-                self.optimizer.step()
+                # STAGE 2 backprop
+                self.stage2_optimizer.zero_grad()
+                stage2_loss = self.criterion(pred, batch["y2"])
+                logging.info("Stage 2 loss: %s", stage2_loss)
+                stage2_loss.backward(retain_graph=True)
+                self.stage2_optimizer.step()
 
                 # update status
                 y_pred = pred > TRUE_THRESHOLD
-                y_true = batch["y"] > TRUE_THRESHOLD
+                y_true = batch["y2"] > TRUE_THRESHOLD
                 self.precision.update((y_pred, y_true))
                 self.recall.update((y_pred, y_true))
             if epoch % SAVE_FREQUENCY == 0:
@@ -146,10 +157,17 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("Completed", limit=100000)  # 96001
-        input_dict = prepare_inputs(trials, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS)
-        dnn_input_dim = input_dict["x1"].size(2)
-        model = ModelTrainer(dnn_input_dim)
+        trials = fetch_trials("COMPLETED", limit=100000)  # 96001
+        input_dict = prepare_inputs(
+            trials,
+            BATCH_SIZE,
+            CATEGORICAL_FIELDS,
+            TEXT_FIELDS,
+            Y1_CATEGORICAL_FIELDS,
+            Y2_FIELD,
+        )
+        input_dim = input_dict["x1"].size(2)
+        model = ModelTrainer(input_dim)
         model.train(input_dict)
 
 

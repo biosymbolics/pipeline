@@ -28,6 +28,10 @@ SINGLE_FIELDS = {
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
     "studies.overall_status": "status",  # vs last_known_status
     "studies.acronym": "acronym",
+    "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
+    "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
+    "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
+    "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
 }
 
 MULTI_FIELDS = {
@@ -63,11 +67,16 @@ def ingest_trials():
     """
 
     source_sql = f"""
-        select {", ".join(FIELDS)}, '' as normalized_sponsor
-        from studies, interventions, conditions
+        select {", ".join(FIELDS)},
+        0 as duration,
+        '' as normalized_sponsor,
+        '' as sponsor_type,
+        '' as termination_reason
+        from studies, interventions, conditions, designs
         where studies.nct_id = interventions.nct_id
         AND studies.nct_id = conditions.nct_id
         AND study_type = 'Interventional'
+        AND designs.nct_id = studies.nct_id
         AND interventions.intervention_type = 'Drug'
         AND interventions.name not in ('Placebo', 'placebo')
         group by studies.nct_id
