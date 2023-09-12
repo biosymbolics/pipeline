@@ -25,7 +25,12 @@ from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
     "QueryPieces",
-    {"annotation_join_condition": str, "where": str, "params": list},
+    {
+        "annotation_join_condition": str,
+        "fields": list[str],
+        "where": str,
+        "params": list,
+    },
 )
 
 
@@ -35,35 +40,43 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 
+"""
+Larger decay rates will result in more matches
+
+Usage:
+    EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
+"""
+DECAY_RATE = 1 / 2000
+
 
 SEARCH_RETURN_FIELDS = {
     "apps.publication_number": "publication_number",
-    "priority_date": "priority_date",
+    "apps.title": "title",
     "abstract": "abstract",
     "application_number": "application_number",
     "country": "country",
+    "domains": "domains",
     "embeddings": "embeddings",
     "family_id": "family_id",
     "ipc_codes": "ipc_codes",
+    "priority_date": "priority_date",
     "similar_patents": "similar_patents",
-    "apps.title": "title",
-    "url": "url",
     "terms": "terms",
-    "domains": "domains",
+    "url": "url",
 }
 
 APPROVED_SEARCH_RETURN_FIELDS = {
-    "approval_date": "approval_date",
+    "approval_dates": "approval_date",
+    "approval_indications": "indications",
     "brand_name": "brand_name",
     "generic_name": "generic_name",
-    "patent_indication": "indication",
 }
 
 TRIAL_RETURN_FIELDS = {
-    "array_agg(trials.nct_id)": "nct_ids",
+    "array_agg(distinct trials.nct_id)": "nct_ids",
     "(array_agg(trials.phase ORDER BY trials.start_date desc))[1]": "max_trial_phase",
-    "max(trials.last_updated_date)": "last_trial_update",
     "(array_agg(trials.status ORDER BY trials.start_date desc))[1]": "last_trial_status",
+    "(array_agg(trials.last_updated_date ORDER BY trials.start_date desc))[1]": "last_trial_update",
 }
 
 FIELDS: list[str] = [
@@ -83,7 +96,6 @@ def search(
     query_type: QueryType = "AND",
     min_patent_years: int = 10,
     limit: int = MAX_SEARCH_RESULTS,
-    is_randomized: bool = False,
     skip_cache: bool = False,
     is_exhaustive: bool = False,
 ) -> Sequence[PatentApplication]:
@@ -99,7 +111,6 @@ def search(
         query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
-        is_randomized (bool, optional): whether to randomize results. Defaults to False.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
         is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
 
@@ -115,7 +126,6 @@ def search(
         "terms": terms,
         "query_type": query_type,
         "min_patent_years": min_patent_years,
-        "is_randomized": is_randomized,
         "is_exhaustive": is_exhaustive,
     }
     key = get_id(args)
@@ -131,15 +141,15 @@ def __get_query_pieces(
     terms: list[str],
     query_type: QueryType,
     min_patent_years: int,
-    limit: int,
     is_exhaustive: bool = False,
 ) -> QueryPieces:
     """
     Helper to generate pieces of patent search query
     """
-
     is_id_search = any([t.startswith("WO-") for t in terms])
-    logger.info("NOT ID %s %s", is_id_search, terms)
+    lower_terms = [t.lower() for t in terms]
+
+    fields = [*FIELDS, "1 as search_rank"]
 
     # if ids, ignore most of the standard criteria
     if is_id_search:
@@ -148,18 +158,23 @@ def __get_query_pieces(
 
         return {
             "annotation_join_condition": f"AND apps.publication_number = any(%s)",
+            "fields": fields,
             "where": "",
             "params": [terms],
         }
 
     max_priority_date = get_max_priority_date(int(min_patent_years))
     array_search_op = "@>" if query_type == "AND" else "&&"
+
     base_params = {
+        # exp decay scaling for search terms; higher is better
+        "fields": [
+            *fields,
+            f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
+        ],
         "where": f"WHERE priority_date > '{max_priority_date}'::date",
         "annotation_join_condition": f"terms {array_search_op} %s",
     }
-
-    lower_terms = [t.lower() for t in terms]
 
     if is_exhaustive:  # aka do tsquery search too
         join_char = " & " if query_type == "AND" else " | "
@@ -172,6 +187,7 @@ def __get_query_pieces(
             {
                 **base_params,
                 # text_search in annotation_join_condition so we can use JOIN instead of LEFT_JOIN
+                # faster this way but still slow. TODO: fix!
                 "annotation_join_condition": f"AND ({base_params['annotation_join_condition']} OR text_search @@ to_tsquery('english', %s))",
                 "params": [lower_terms, ts_query_terms],
             },
@@ -193,7 +209,6 @@ def _search(
     min_patent_years: int = 10,
     limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
-    is_randomized: bool = False,
 ) -> Sequence[PatentApplication]:
     """
     Search patents by terms
@@ -204,32 +219,24 @@ def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    fields = compact(
-        [
-            *FIELDS,
-            "(CASE WHEN approval_date IS NOT NULL THEN 1 ELSE 0 END) * (random() - 0.9) as randomizer"
-            if is_randomized
-            else "1 as randomizer",  # for randomizing approved patents
-        ]
-    )
-
-    qp = __get_query_pieces(terms, query_type, min_patent_years, limit, is_exhaustive)
+    qp = __get_query_pieces(terms, query_type, min_patent_years, is_exhaustive)
 
     query = f"""
-        SELECT {", ".join(fields)},
-        (CASE WHEN max(approval_date) IS NOT NULL THEN True ELSE False END) as is_approved
+        SELECT {", ".join(qp["fields"])},
+        (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM applications AS apps
+        JOIN annotations as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
-        )
+        ) -- for returning all annotations
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["where"]}
         group by apps.publication_number
-        ORDER BY randomizer desc, priority_date desc
+        ORDER BY priority_date desc
         limit {limit}
     """
 
