@@ -93,6 +93,7 @@ def ingest_trials():
         "trials",
         transform=lambda records: transform_ct_records(records, tagger),
     )
+    # TODO: alter table trials alter column interventions set data type text[];
 
     client = PsqlDatabaseClient()
 
