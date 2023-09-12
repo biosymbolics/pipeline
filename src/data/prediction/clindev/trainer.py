@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from typing import Optional
 import torch
 import torch.nn as nn
 from ignite.metrics import Precision, Recall
@@ -18,8 +17,6 @@ from .constants import (
     CATEGORICAL_FIELDS,
     CHECKPOINT_PATH,
     CATEGORICAL_FIELDS,
-    LR,
-    OPTIMIZER_CLASS,
     SAVE_FREQUENCY,
     TEXT_FIELDS,
     TRUE_THRESHOLD,
@@ -31,6 +28,10 @@ from .types import DnnInput
 from .utils import prepare_inputs
 
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 class ModelTrainer:
     """
     Trainable model
@@ -39,30 +40,27 @@ class ModelTrainer:
     def __init__(
         self,
         input_dim: int,
-        optimizer: Optional[torch.optim.Optimizer] = None,
+        stage1_output_dim: int,
     ):
         """
         Initialize model
 
         Args:
-            dnn_input_dim (int): Input dimension for DNN
-            optimizer (Optional[torch.optim.Optimizer]): Optimizer to use
+            input_dim (int): Input dimension for DNN
+            stage1_output_dim (int): Output dimension for stage 1 DNN
         """
         torch.device("mps")
 
-        self.model = TwoStageModel(
-            input_dim, round(input_dim / 2), round(input_dim / 4), 1
-        )
-
-        self.stage1_optimizer = optimizer or OPTIMIZER_CLASS(
-            self.model.parameters(), lr=LR
-        )
-        self.stage2_optimizer = optimizer or OPTIMIZER_CLASS(
-            self.model.parameters(), lr=LR
-        )
-
-        self.criterion = nn.BCEWithLogitsLoss()
         self.input_dim = input_dim
+        self.model = TwoStageModel(input_dim, stage1_output_size=stage1_output_dim)
+
+        self.stage1_optimizer = self.model.stage1_optimizer
+        self.stage2_optimizer = self.model.stage2_optimizer
+
+        self.stage1_criterion = nn.BCEWithLogitsLoss()
+        self.stage2_criterion = nn.MSELoss()
+
+        logger.info("Initialized model with input dim of %s", input_dim)
 
         self.precision = Precision(average=True)
         self.recall = Recall(average=True)
@@ -119,24 +117,24 @@ class ModelTrainer:
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
-                pred = self.model(batch["x1"])
+                x1_pred, x2_pred = self.model(batch["x1"])
 
                 # STAGE 1 backprop
                 self.stage1_optimizer.zero_grad()
-                stage1_loss = self.criterion(pred, batch["y1"])
+                stage1_loss = self.stage1_criterion(x1_pred, batch["y1"])
                 logging.info("Stage 1 loss: %s", stage1_loss)
                 stage1_loss.backward(retain_graph=True)
                 self.stage1_optimizer.step()
 
                 # STAGE 2 backprop
                 self.stage2_optimizer.zero_grad()
-                stage2_loss = self.criterion(pred, batch["y2"])
+                stage2_loss = self.stage2_criterion(x2_pred, batch["y2"])
                 logging.info("Stage 2 loss: %s", stage2_loss)
                 stage2_loss.backward(retain_graph=True)
                 self.stage2_optimizer.step()
 
                 # update status
-                y_pred = pred > TRUE_THRESHOLD
+                y_pred = x2_pred > TRUE_THRESHOLD
                 y_true = batch["y2"] > TRUE_THRESHOLD
                 self.precision.update((y_pred, y_true))
                 self.recall.update((y_pred, y_true))
@@ -167,7 +165,8 @@ class ModelTrainer:
             Y2_FIELD,
         )
         input_dim = input_dict["x1"].size(2)
-        model = ModelTrainer(input_dim)
+        stage1_output_dim = input_dict["y1"].size(2)
+        model = ModelTrainer(input_dim, stage1_output_dim)
         model.train(input_dict)
 
 

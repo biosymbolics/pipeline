@@ -28,7 +28,7 @@ CATEGORICAL_FIELDS: list[str] = [
     "conditions",
     "interventions",
     "phase",
-    "termination_reason",
+    # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []
 Y2_FIELD = "duration"
