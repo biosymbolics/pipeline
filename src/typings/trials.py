@@ -1,13 +1,13 @@
 from datetime import date, datetime
-from enum import IntEnum
 from typing import TypeGuard, TypedDict, cast
 from constants.company import LARGE_PHARMA_KEYWORDS
 
 from core.ner.classifier import classify_string, create_lookup_map
+from utils.classes import ByDefinitionOrderEnum
 from utils.list import dedup
 
 
-class TrialRandomization(IntEnum):
+class TrialRandomization(ByDefinitionOrderEnum):
     RANDOMIZED = "RANDOMIZED"
     NON_RANDOMIZED = "NON_RANDOMIZED"
     NA = "N/A"
@@ -25,7 +25,7 @@ class TrialRandomization(IntEnum):
         return cls.UNKNOWN
 
 
-class TrialMasking(IntEnum):
+class TrialMasking(ByDefinitionOrderEnum):
     NONE = "NONE"
     SINGLE = "SINGLE"
     DOUBLE = "DOUBLE"
@@ -47,7 +47,7 @@ class TrialMasking(IntEnum):
         return cls.UNKNOWN
 
 
-class TrialPurpose(IntEnum):
+class TrialPurpose(ByDefinitionOrderEnum):
     TREATMENT = "TREATMENT"
     PREVENTION = "PREVENTION"
     DIAGNOSTIC = "DIAGNOSTIC"
@@ -75,7 +75,7 @@ class TrialPurpose(IntEnum):
         return cls.UNKNOWN
 
 
-class TrialDesign(IntEnum):
+class TrialDesign(ByDefinitionOrderEnum):
     PARALLEL = "PARALLEL"
     CROSSOVER = "CROSSOVER"
     FACTORIAL = "FACTORIAL"
@@ -99,10 +99,10 @@ class TrialDesign(IntEnum):
         return cls.UNKNOWN
 
 
-class SponsorType(IntEnum):
-    UNIVERSITY = "UNIVERSITY"
+class SponsorType(ByDefinitionOrderEnum):
     INDUSTRY_LARGE = "INDUSTRY_LARGE"  # big pharma
     INDUSTRY = "INDUSTRY"
+    UNIVERSITY = "UNIVERSITY"
     GOVERNMENTAL = "GOVERNMENTAL"
     HEALTH_SYSTEM = "HEALTH_SYSTEM"
     OTHER = "OTHER"
@@ -147,7 +147,7 @@ SPONSOR_KEYWORD_MAP = create_lookup_map(
 )
 
 
-class TrialStatus(IntEnum):
+class TrialStatus(ByDefinitionOrderEnum):
     PRE_ENROLLMENT = "PRE_ENROLLMENT"  # Active, not recruiting, Not yet recruiting
     ENROLLMENT = "ENROLLMENT"  # Recruiting, Enrolling by invitation
     WITHDRAWN = "WITHDRAWN"  # Withdrawn
@@ -179,7 +179,7 @@ class TrialStatus(IntEnum):
         return cls.UNKNOWN
 
 
-class TrialPhase(IntEnum):
+class TrialPhase(ByDefinitionOrderEnum):
     EARLY_PHASE_1 = "EARLY_PHASE_1"  # Early Phase 1
     PHASE_1 = "PHASE_1"  # Phase 1
     PHASE_1_2 = "PLASE_1_2"  # Phase 1/Phase 2
@@ -211,21 +211,21 @@ class TrialPhase(IntEnum):
         return cls.UNKNOWN
 
 
-class TerminationReason(IntEnum):
+class TerminationReason(ByDefinitionOrderEnum):
     FUTILITY = "FUTILITY"
     SAFETY = "SAFETY"
+    NOT_SAFETY = "NOT_SAFETY"
+    NOT_FUTILITY = "NOT_FUTILITY"
     BUSINESS = "BUSINESS"
+    SUPPLY_CHAIN = "SUPPLY_CHAIN"
+    LOGISTICS = "LOGISTICS"
     ENROLLMENT = "ENROLLMENT"
+    FEASIBILITY = "FEASIBILITY"
     INVESTIGATOR = "INVESTIGATOR"
     FUNDING = "FUNDING"
     COVID = "COVID"
     OVERSIGHT = "OVERSIGHT"
-    SUPPLY_CHAIN = "SUPPLY_CHAIN"
     PROTOCOL_REVISION = "PROTOCOL_REVISION"
-    FEASIBILITY = "FEASIBILITY"
-    NOT_SAFETY = "NOT_SAFETY"
-    LOGISTICS = "LOGISTICS"
-    NOT_EFFICACY = "NOT_EFFICACY"
     OTHER = "OTHER"
 
     @classmethod
@@ -311,7 +311,7 @@ TERMINATION_KEYWORD_MAP = create_lookup_map(
             "No Safety or Efficacy Concerns",
             "no safety concern",
         ],
-        TerminationReason.NOT_EFFICACY: [
+        TerminationReason.NOT_FUTILITY: [
             "not related to efficacy",
             "No Safety or Efficacy Concerns",
         ],

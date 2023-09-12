@@ -17,7 +17,6 @@ TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
-    "intervention_model",
     "masking",
     "randomization",
     # "comparator",
