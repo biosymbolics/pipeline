@@ -158,7 +158,7 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m core.models.patent_pos.predictor [patent search term(s)]
-            Trains patent PoS (probability of success) model
+            Predicts with patent PoS (probability of success) model
 
             Example:
                 >>> python3 -m core.models.patent_pos.predictor asthma

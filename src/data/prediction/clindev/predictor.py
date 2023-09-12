@@ -2,6 +2,7 @@ import logging
 import sys
 import torch
 from ignite.metrics import Precision, Recall
+from clients.trials import fetch_trials
 
 from data.prediction.constants import DEFAULT_BATCH_SIZE, DEFAULT_TRUE_THRESHOLD
 from data.types import ModelMetrics
@@ -24,10 +25,10 @@ class ModelPredictor:
 
     Example:
     ```
-    from core.models.patent_pos import ModelPredictor; from clients.patents import patent_client
-    patents = patent_client.search(["asthma"], None, True, 0, "medium", limit=1000)
+    from core.models.clindev import ModelPredictor; from clients.trials import fetch_trials
+    trials = fetch_trials("COMPLETED")
     predictor = ModelPredictor()
-    preds = predictor(patents)
+    preds = predictor(trials)
     ```
     """
 
@@ -131,7 +132,7 @@ class ModelPredictor:
 
 
 def main():
-    trials = []  # TODO
+    trials = fetch_trials("COMPLETED")
     predictor = ModelPredictor()
     preds, metrics = predictor.predict(trials)
     logging.info(
@@ -148,7 +149,6 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m core.models.clindev.predictor
-            Trains trial attribute model
             """
         )
         sys.exit()
