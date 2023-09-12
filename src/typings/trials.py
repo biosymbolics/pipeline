@@ -2,6 +2,8 @@ from datetime import date, datetime
 from enum import Enum
 from typing import TypeGuard, TypedDict, cast
 
+from utils.list import dedup
+
 
 class TrialStatus(Enum):
     PRE_ENROLLMENT = 1  # Active, not recruiting, Not yet recruiting
@@ -32,6 +34,38 @@ class TrialStatus(Enum):
         }
         if value in status_term_map:
             return status_term_map[value]
+        return cls.UNKNOWN
+
+
+class TrialPhase(Enum):
+    EARLY_PHASE_1 = 1  # Early Phase 1
+    PHASE_1 = 2  # Phase 1
+    PHASE_1_2 = 3  # Phase 1/Phase 2
+    PHASE_2 = 4  # Phase 2
+    PHASE_2_3 = 5  # Phase 2/Phase 3
+    PHASE_3 = 6  # Phase 3
+    PHASE_4 = 7  # Phase 4
+    NA = 8  # Not Applicable
+    UNKNOWN = 9  # Unknown status
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        Example:
+        TrialStatus("Active, not recruiting") -> TrialStatus.PRE_ENROLLMENT
+        """
+        phase_term_map = {
+            "Early Phase 1": cls.EARLY_PHASE_1,
+            "Phase 1": cls.PHASE_1,
+            "Phase 1/Phase 2": cls.PHASE_1_2,
+            "Phase 2": cls.PHASE_2,
+            "Phase 2/Phase 3": cls.PHASE_2_3,
+            "Phase 3": cls.PHASE_3,
+            "Phase 4": cls.PHASE_4,
+            "Not Applicable": cls.NA,
+        }
+        if value in phase_term_map:
+            return phase_term_map[value]
         return cls.UNKNOWN
 
 
@@ -116,7 +150,6 @@ def get_trial_summary(trial: dict) -> TrialSummary:
     - calculates duration
 
     TODO:
-    - format phase
     - sponsor_type
     - termination_reason
     - primary endpoint
@@ -124,12 +157,13 @@ def get_trial_summary(trial: dict) -> TrialSummary:
     if not is_trial_record(trial):
         raise ValueError("Invalid trial record")
 
-    status = TrialStatus(trial["status"])
     return cast(
         TrialSummary,
         {
             **trial,
+            "conditions": dedup(trial["conditions"]),
             "duartion": __calc_duration(trial["start_date"], trial["end_date"]),
-            "status": status,
+            "phase": TrialPhase(trial["phase"]),
+            "status": TrialStatus(trial["status"]),
         },
     )

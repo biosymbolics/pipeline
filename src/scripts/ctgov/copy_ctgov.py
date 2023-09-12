@@ -5,6 +5,7 @@ import sys
 import logging
 
 from system import initialize
+from typings.trials import TrialRecord, TrialStatus, get_trial_summary
 
 initialize()
 
@@ -42,23 +43,20 @@ MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.ite
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def transform_ct_records(ctgov_records, tagger: NerTagger):
+def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
     """
     Transform ctgov records
     Slow due to intervention mapping!!
 
     - normalizes/extracts intervention names
-
-    TODO:
-    - status
-    - ??
+    - normalizes status etc.
     """
 
     intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
     logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
     normalized = tagger.extract_strings([dedup(i_set) for i_set in intervention_sets])
     return [
-        {**rec, "interventions": normalized}
+        {**get_trial_summary(rec), "interventions": normalized}
         for rec, normalized in zip(ctgov_records, normalized)
     ]
 

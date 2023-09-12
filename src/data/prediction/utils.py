@@ -14,6 +14,8 @@ import polars as pl
 
 from core.ner.spacy import Spacy
 from typings.core import Primitive
+from utils.list import batch
+from utils.tensor import batch_as_tensors
 
 from .constants import (
     DEFAULT_EMBEDDING_DIM,
@@ -21,10 +23,6 @@ from .constants import (
     DEFAULT_TEXT_FEATURES,
 )
 
-
-from typings.core import Primitive
-from utils.list import batch
-from utils.tensor import batch_as_tensors
 
 MAX_ITEMS_PER_CAT = 20
 
