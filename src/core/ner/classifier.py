@@ -2,17 +2,20 @@
 Text classifiers
 """
 import regex as re
-from pydash import compact
+from pydash import compact, flatten
 from typing import Mapping, Union
 import logging
 
 from core.ner.utils import lemmatize_all
 from utils.list import dedup
+from utils.re import expand_res
 
 
 def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]:
     """
     Create a lookup map from a keyword map, with keywords lemmatized.
+
+    Expands all regexes (and thus will barf on infinity regex like "blah .*")
 
     Usage:
     ```
@@ -34,7 +37,7 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
     cat_key_tups = [
         (keyword, category)
         for category, keywords in keyword_map.items()
-        for keyword in keywords
+        for keyword in flatten(expand_res(keywords))
     ]
     lookup_tups = [(lemmatize_all(tup[0]), tup[1]) for tup in cat_key_tups]
     lookup_map = dict(lookup_tups)

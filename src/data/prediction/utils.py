@@ -236,6 +236,7 @@ def get_feature_embeddings(
         )
         combo_cat_feats = torch.flatten(cat_feats[i])
         if combo_text_feats is not None:
+            # "list index out of range"?
             return torch.cat([combo_cat_feats, combo_text_feats], dim=0)
         else:
             return combo_cat_feats

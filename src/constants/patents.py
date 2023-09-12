@@ -1,7 +1,6 @@
 from pydash import flatten
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
-from utils.re import expand_res
 
 BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))
@@ -276,7 +275,7 @@ def get_patent_attribute_map():
         "COMBINATION": ["combo of", "combination of"],
         "COMPOUND_OR_MECHANISM": [
             # TODO: remove drug?
-            *flatten(expand_res(ALL_INTERVENTION_BASE_TERMS)),
+            *flatten(ALL_INTERVENTION_BASE_TERMS),
             "molecule",
             "receptor",
             "therapeutic",  # TODO: will probably over-match
@@ -403,15 +402,11 @@ def get_patent_attribute_map():
         "PEDIATRIC": ["pediatric", "paediatric"],
         "PLATFORM": ["platform"],
         "PROCESS": [
-            *expand_res(
-                [
-                    "process(?:es)? for preparing",
-                    "process(?:es)? to produce",
-                    "process(?:es)? to make",
-                    "methods? of making",
-                    "methods? for producing",
-                ]
-            ),
+            "process(?:es)? for preparing",
+            "process(?:es)? to produce",
+            "process(?:es)? to make",
+            "methods? of making",
+            "methods? for producing",
             "culture",
             "culturing",
             "manufacture",

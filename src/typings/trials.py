@@ -1,8 +1,10 @@
 from datetime import date, datetime
 from enum import Enum
 from typing import TypeGuard, TypedDict, cast
+from core.ner.classifier import classify_by_keywords
 
 from utils.list import dedup
+from utils.re import expand_res
 
 
 class TrialStatus(Enum):
@@ -67,6 +69,113 @@ class TrialPhase(Enum):
         if value in phase_term_map:
             return phase_term_map[value]
         return cls.UNKNOWN
+
+
+class TerminationReason(Enum):
+    FUTILITY = 1
+    SAFETY = 2
+    BUSINESS = 3
+    FAILED_TO_ENROLL = 4
+    LOSS_OF_FOLLOW_UP = 5
+    INVESTIGATOR = 6
+    FUNDING = 7
+    COVID = 8
+    OVERSIGHT = 9
+    SUPPLY_CHAIN = 10
+    PROTOCOL_REVISION = 11
+    FEASIBILITY = 12
+    NOT_SAFETY = 13
+    LOGISTICS = 14
+    NOT_EFFICACY = 15
+
+    @classmethod
+    def _missing_(cls, value):
+        reason = classify_by_keywords(
+            [value], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
+        )
+        return reason[0]
+
+
+TERMINATION_KEYWORD_MAP = {
+    TerminationReason.FUTILITY: [
+        "futility",
+        # "efficacy",
+        "endpoints?",  # "failed to meet (?:primary )?endpoint", "no significant difference on (?:primary )?endpoint", "efficacy endpoints?", "efficacy endpoints"
+        "lower success rates?",
+        "interim analysis",
+        "lack of effectiveness",
+        "lack of efficacy",
+        "rate of relapse",
+        "lack of response",
+        "lack of performance",
+        "inadequate effect",
+        "no survival benefit",
+        "stopping rule",
+    ],
+    TerminationReason.SAFETY: [
+        # "safety", # "not a safety issue"
+        "toxicity",
+        "adverse",
+        "risk/benefit",
+        "detrimental effect",
+        "S?AEs?",
+        "mortality",
+        # "safety concerns?",
+        "unacceptable morbidity",
+        "side effects?",
+    ],
+    TerminationReason.BUSINESS: [
+        "business",
+        "company",
+        "strategic",
+        "sponsor(?:'s)? decision",
+        "management",
+        "stakeholders?",
+        "(?:re)?prioritization",
+    ],
+    TerminationReason.FAILED_TO_ENROLL: [
+        "accruals?",
+        "enroll?(?:ment|ed)?",
+        "inclusions?",
+        "recruit(?:ment|ing)?s?",
+        "lack of (?:eligibile )?(?:participants?|subjects?|patients?)",
+        "lack of ",
+    ],
+    TerminationReason.LOSS_OF_FOLLOW_UP: ["lost to follow up"],
+    TerminationReason.INVESTIGATOR: ["investigator", "PI"],
+    TerminationReason.FUNDING: ["funding", "resources", "budget", "financial"],
+    TerminationReason.COVID: ["covid", "coronavirus", "pandemic"],
+    TerminationReason.OVERSIGHT: [
+        "IRB",
+        "ethics",
+        "Institutional Review Board",
+        "certification",
+        "FDA Hold",
+    ],
+    TerminationReason.SUPPLY_CHAIN: [
+        "supply",
+        "unavalaible",
+        "shortage",
+        "manufacturing",
+    ],
+    TerminationReason.PROTOCOL_REVISION: ["revision", "change in (?:study )?protocol"],
+    TerminationReason.FEASIBILITY: ["feasibility"],
+    TerminationReason.NOT_SAFETY: [
+        "not a safety issue",
+        "not related to safety",
+        "No Safety or Efficacy Concerns",
+        "no safety concern",
+    ],
+    TerminationReason.NOT_EFFICACY: [
+        "not related to efficacy",
+        "No Safety or Efficacy Concerns",
+    ],
+    TerminationReason.LOGISTICS: ["logistics", "logistical"],
+}
+
+
+def get_termination_reason(why_stopped: str) -> str:
+    return why_stopped
 
 
 class BaseTrial(TypedDict):
