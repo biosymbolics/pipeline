@@ -40,6 +40,7 @@ def prepare_inputs(
     y1 = batch_and_pad(cast(list[Primitive], y1_vals), batch_size)
 
     y2_vals = [float(trial[y2_field]) for trial in trials]
+    print("Y2 vals", y2_vals[0:100])
     y2 = unsqueeze(batch_and_pad(cast(list[Primitive], y2_vals), batch_size), 2)
     logger.info(
         "X1: %s, Y1: %s, Y2: %s",

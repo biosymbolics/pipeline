@@ -22,6 +22,7 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         SELECT *
         FROM trials
         WHERE status=%s
+        AND duration > 0
         AND array_length(conditions, 1) > 0
         AND array_length(interventions, 1) > 0
         AND sponsor_type in ('INDUSTRY', 'INDUSTRY_LARGE', 'OTHER')

@@ -35,14 +35,10 @@ class TwoStageModel(nn.Module):
         stage1_output_size: int = 32,
         stage2_hidden_size: int = 64,
     ):
+        torch.device("mps")
+
         super().__init__()
 
-        logger.info(
-            "Stage 1 dims - input: %s, hidden: %s, output: %s",
-            input_size,
-            stage1_hidden_size,
-            stage1_output_size,
-        )
         # Stage 1 model
         self.stage1_model = nn.Sequential(
             nn.Linear(input_size, stage1_hidden_size),

@@ -62,9 +62,21 @@ class ModelTrainer:
 
         logger.info("Initialized model with input dim of %s", input_dim)
 
-        self.precision = Precision(average=True)
-        self.recall = Recall(average=True)
-        self.f1 = 2 * (self.precision * self.recall) / (self.precision + self.recall)
+        self.stage1_precision = Precision(average=True)
+        self.stage1_recall = Recall(average=True)
+        self.stage1_f1 = (
+            2
+            * (self.stage1_precision * self.stage1_recall)
+            / (self.stage1_precision + self.stage1_recall)
+        )
+
+        self.stage2_precision = Precision(average=True)
+        self.stage2_recall = Recall(average=True)
+        self.stage2_f1 = (
+            2
+            * (self.stage2_precision * self.stage2_recall)
+            / (self.stage2_precision + self.stage2_recall)
+        )
 
     def __call__(self, *args, **kwargs):
         """
@@ -134,10 +146,17 @@ class ModelTrainer:
                 self.stage2_optimizer.step()
 
                 # update status
-                y_pred = x2_pred > TRUE_THRESHOLD
-                y_true = batch["y2"] > TRUE_THRESHOLD
-                self.precision.update((y_pred, y_true))
-                self.recall.update((y_pred, y_true))
+                y1_pred = x1_pred > TRUE_THRESHOLD
+                y1_true = batch["y1"] > TRUE_THRESHOLD
+                self.stage1_precision.update((y1_pred, y1_true))
+                self.stage1_recall.update((y1_pred, y1_true))
+
+                y2_pred = x2_pred > TRUE_THRESHOLD
+                y2_true = batch["y2"] > TRUE_THRESHOLD
+                self.stage2_precision.update((y2_pred, y2_true))
+                self.stage2_recall.update((y2_pred, y2_true))
+
+                self.evaluate()
             if epoch % SAVE_FREQUENCY == 0:
                 self.evaluate()
                 self.save_checkpoint(epoch)
@@ -146,16 +165,26 @@ class ModelTrainer:
         """
         Output evaluation metrics (precision, recall, F1)
         """
-        logging.info("Precision: %s", self.precision.compute())
-        logging.info("Recall: %s", self.recall.compute())
-        logging.info("F1 score: %s", self.f1.compute())
+        try:
+            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
+            logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
+            logging.info("Stage 1 F1 score: %s", self.stage1_f1.compute())
 
-        self.precision.reset()
-        self.recall.reset()
+            self.stage1_precision.reset()
+            self.stage1_recall.reset()
+
+            logging.info("Stage 2 Precision: %s", self.stage2_precision.compute())
+            logging.info("Stage 2 Recall: %s", self.stage2_recall.compute())
+            logging.info("Stage 2 F1 score: %s", self.stage2_f1.compute())
+
+            self.stage2_precision.reset()
+            self.stage2_recall.reset()
+        except Exception as e:
+            logging.warning("Failed to evaluate: %s", e)
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=100000)  # 96001
+        trials = fetch_trials("COMPLETED", limit=10000)  # 96001
         input_dict = prepare_inputs(
             trials,
             BATCH_SIZE,
