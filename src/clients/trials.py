@@ -22,10 +22,11 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         SELECT *
         FROM trials
         WHERE status=%s
-        ORDER BY count DESC
+        ORDER BY start_date DESC
         limit {limit}
     """
     records = PsqlDatabaseClient().select(query, [status])
+    print(records[0])
     trials = [get_trial_summary(rec) for rec in records]
 
     logger.info(
