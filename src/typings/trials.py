@@ -91,7 +91,7 @@ class TerminationReason(Enum):
     @classmethod
     def _missing_(cls, value):
         reason = classify_by_keywords(
-            [value], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
+            [str(value)], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
         )
         return reason[0]
 
