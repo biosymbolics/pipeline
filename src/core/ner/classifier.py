@@ -1,21 +1,26 @@
 """
 Text classifiers
 """
+from enum import Enum
 import regex as re
 from pydash import compact, flatten
-from typing import Mapping, Union
+from typing import Mapping, TypeVar, Union
 import logging
 
 from core.ner.utils import lemmatize_all
 from utils.list import dedup
 from utils.re import expand_res
 
+T = TypeVar("T", bound=Enum | str)
 
-def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]:
+
+def create_lookup_map(keyword_map: Mapping[T, list[str]]) -> Mapping[str, T]:
     """
     Create a lookup map from a keyword map, with keywords lemmatized.
 
     Expands all regexes (and thus will barf on infinity regex like "blah .*")
+
+    Lower-cases all keywords.
 
     Usage:
     ```
@@ -35,7 +40,7 @@ def create_lookup_map(keyword_map: Mapping[str, list[str]]) -> Mapping[str, str]
     ```
     """
     cat_key_tups = [
-        (keyword, category)
+        (keyword.lower(), category)
         for category, keywords in keyword_map.items()
         for keyword in flatten(expand_res(keywords))
     ]
@@ -50,13 +55,14 @@ def generate_ngrams(input_list: list[str], n: int):
 
 
 def classify_string(
-    string: str, lookup_map: Mapping[str, str], nx_name: Union[str, None] = None
-) -> list[str]:
+    string: str, lookup_map: Mapping[str, T], nx_name: T | None = None
+) -> list[T]:
     """
     Classify a string by keywords + lookup map.
     Assumes lookup map has lemmatized keywords.
     Sorts for consistency.
     Looks at most for 3-grams.
+    Lower-cases all keywords.
 
     Args:
         string (str): string to classify
@@ -81,14 +87,14 @@ def classify_string(
     categories = [
         lookup_map.get(re.sub(r"[.,]$", "", ngram), nx_name) for ngram in ngrams
     ]
-    return sorted(dedup(compact(categories)))
+    return sorted(dedup(compact(categories)))  # type: ignore
 
 
 def classify_by_keywords(
     strings: list[str],
-    keyword_map: Mapping[str, list[str]],
-    nx_name: Union[str, None] = None,
-) -> list[list[str]]:
+    keyword_map: Mapping[T, list[str]],
+    nx_name: T | None = None,
+) -> list[list[T]]:
     """
     Classify a string by keywords + keyword map.
     Uses lemmatization.
@@ -97,7 +103,7 @@ def classify_by_keywords(
     Args:
         strings (list[str]): strings to classify
         keyword_map (Mapping[str, list[str]]): mapping of categories to keywords
-        nx_name (str): name to use for non-matches
+        nx_name (T): name to use for non-matches
 
     Returns: a list of categories
 

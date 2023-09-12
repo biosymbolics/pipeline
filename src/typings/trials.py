@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from enum import Enum
+from enum import IntEnum
 from typing import TypeGuard, TypedDict, cast
 from constants.company import LARGE_PHARMA_KEYWORDS
 
@@ -7,7 +7,7 @@ from core.ner.classifier import classify_by_keywords
 from utils.list import dedup
 
 
-class SponsorType(Enum):
+class SponsorType(IntEnum):
     UNIVERSITY = 1
     INDUSTRY_LARGE = 2  # big pharma
     INDUSTRY = 3
@@ -18,9 +18,12 @@ class SponsorType(Enum):
     @classmethod
     def _missing_(cls, value):
         reason = classify_by_keywords(
-            [str(value)], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
+            [value],  # type: ignore
+            SPONSOR_KEYWORD_MAP,
+            cls.OTHER,
         )
-        return reason[0]
+        res = reason[0][0]
+        return res
 
 
 SPONSOR_KEYWORD_MAP = {
@@ -54,7 +57,7 @@ SPONSOR_KEYWORD_MAP = {
 }
 
 
-class TrialStatus(Enum):
+class TrialStatus(IntEnum):
     PRE_ENROLLMENT = 1  # Active, not recruiting, Not yet recruiting
     ENROLLMENT = 2  # Recruiting, Enrolling by invitation
     WITHDRAWN = 3  # Withdrawn
@@ -86,7 +89,7 @@ class TrialStatus(Enum):
         return cls.UNKNOWN
 
 
-class TrialPhase(Enum):
+class TrialPhase(IntEnum):
     EARLY_PHASE_1 = 1  # Early Phase 1
     PHASE_1 = 2  # Phase 1
     PHASE_1_2 = 3  # Phase 1/Phase 2
@@ -118,7 +121,7 @@ class TrialPhase(Enum):
         return cls.UNKNOWN
 
 
-class TerminationReason(Enum):
+class TerminationReason(IntEnum):
     FUTILITY = 1
     SAFETY = 2
     BUSINESS = 3
@@ -134,13 +137,16 @@ class TerminationReason(Enum):
     NOT_SAFETY = 13
     LOGISTICS = 14
     NOT_EFFICACY = 15
+    OTHER = 16
 
     @classmethod
     def _missing_(cls, value):
         reason = classify_by_keywords(
-            [str(value)], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
+            [value],  # type: ignore
+            TERMINATION_KEYWORD_MAP,
+            TerminationReason.OTHER,
         )
-        return reason[0]
+        return reason[0][0]
 
 
 TERMINATION_KEYWORD_MAP = {
@@ -186,7 +192,6 @@ TERMINATION_KEYWORD_MAP = {
         "inclusions?",
         "recruit(?:ment|ing)?s?",
         "lack of (?:eligibile )?(?:participants?|subjects?|patients?)",
-        "lack of ",
     ],
     TerminationReason.LOSS_OF_FOLLOW_UP: ["lost to follow up"],
     TerminationReason.INVESTIGATOR: ["investigator", "PI"],
@@ -244,9 +249,7 @@ class BaseTrial(TypedDict):
     # randomization: str # TODO
     sponsor: str
     start_date: date
-    # sponsor_type: str # TODO
     title: str
-    # termination_reason: str
 
 
 class TrialRecord(BaseTrial):
@@ -272,7 +275,6 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
     """
     return (
         "nct_id" in trial
-        and "duration" in trial
         and "end_date" in trial
         and "start_date" in trial
         and "last_updated_date" in trial
@@ -283,11 +285,22 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
         and "enrollment" in trial
         and "interventions" in trial
         and "sponsor" in trial
+    )
+
+
+def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
+    """
+    Check if dict is a trial record
+    """
+    return (
+        # is_trial_record(trial)
+        "duration" in trial
+        and "termination_reason" in trial
         and "sponsor_type" in trial
     )
 
 
-def is_trial_record_list(trials: list[dict]) -> TypeGuard[list[TrialSummary]]:
+def is_trial_summary_list(trials: list[dict]) -> TypeGuard[list[TrialSummary]]:
     """
     Check if list of trial records
     """
@@ -326,7 +339,7 @@ def get_trial_summary(trial: dict) -> TrialSummary:
             "conditions": dedup(trial["conditions"]),
             "duartion": __calc_duration(trial["start_date"], trial["end_date"]),
             "phase": TrialPhase(trial["phase"]),
-            "sponsor_type": SponsorType(trial["sponsor"]),
+            "sponsor_type": SponsorType(trial["sponsor"]),  # type: ignore
             "status": TrialStatus(trial["status"]),
         },
     )

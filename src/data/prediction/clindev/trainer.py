@@ -24,7 +24,7 @@ from .constants import (
     TEXT_FIELDS,
     TRUE_THRESHOLD,
 )
-from .core import DNN
+from .core import TrialCharacteristicsModel, TrialDurationModel
 from .types import AllInput, DnnInput
 from .utils import prepare_inputs
 
@@ -36,7 +36,7 @@ class ModelTrainer:
 
     def __init__(
         self,
-        dnn_input_dim: int,
+        input_dim: int,
         optimizer: Optional[torch.optim.Optimizer] = None,
     ):
         """
@@ -48,11 +48,17 @@ class ModelTrainer:
         """
         torch.device("mps")
 
-        logging.info("DNN input dim: %s", dnn_input_dim)
-        self.model = DNN(dnn_input_dim, round(dnn_input_dim / 2))
-        self.optimizer = optimizer or OPTIMIZER_CLASS(self.model.parameters(), lr=LR)
+        self.stage1_model = TrialCharacteristicsModel(input_dim, round(input_dim / 2))
+        self.stage2_model = TrialDurationModel(input_dim, round(input_dim / 2))
+
+        self.stage1_optimizer = optimizer or OPTIMIZER_CLASS(
+            self.stage1_model.parameters(), lr=LR
+        )
+        self.stage2_optimizer = optimizer or OPTIMIZER_CLASS(
+            self.stage2_model.parameters(), lr=LR
+        )
         self.criterion = nn.BCEWithLogitsLoss()
-        self.dnn_input_dim = dnn_input_dim
+        self.input_dim = input_dim
 
         self.precision = Precision(average=True)
         self.recall = Recall(average=True)
