@@ -4,6 +4,10 @@ Regex utilities
 
 import regex as re
 from typing import Iterable, Literal, Optional, Sequence, Union
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
@@ -119,11 +123,15 @@ def expand_re(re_str: str, max_len: int = 1000) -> list[str]:
     # lazy import
     import exrex
 
-    if exrex.count(re_str) < max_len:
-        return list(exrex.generate(re_str))
+    try:
+        if exrex.count(re_str) < max_len:
+            return list(exrex.generate(re_str))
 
-    else:
-        raise Exception("Regex too complex to expand")
+        else:
+            raise Exception("Regex too complex to expand")
+    except Exception as e:
+        logger.error("Failed to expand regex %s: %s. Returning raw str.", re_str, e)
+        return [re_str]
 
 
 def expand_res(re_strs: list[str]) -> list[list[str]]:
