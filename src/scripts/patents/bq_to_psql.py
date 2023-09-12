@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    # "biosym_annotations_source": None,
+    "biosym_annotations_source": None,
     APPLICATIONS_TABLE: {
         "column": "priority_date",
         "size": timedelta(days=730),
@@ -35,13 +35,13 @@ EXPORT_TABLES = {
         "starting_value": datetime(2000, 1, 1),
         "ending_value": datetime(2023, 1, 1),
     },
-    # GPR_ANNOTATIONS_TABLE: {
-    #     "column": "confidence",
-    #     "size": 0.0125,
-    #     "starting_value": 0.774,
-    #     "ending_value": 0.91,  # max 0.90
-    #     "transform": lambda x: x,
-    # },
+    GPR_ANNOTATIONS_TABLE: {
+        "column": "confidence",
+        "size": 0.0125,
+        "starting_value": 0.774,
+        "ending_value": 0.91,  # max 0.90
+        "transform": lambda x: x,
+    },
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -105,7 +105,7 @@ def export_bq_tables(today):
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    # create_patent_applications_table()
+    create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
         if shard_spec is None:

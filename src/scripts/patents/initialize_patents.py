@@ -21,7 +21,12 @@ from scripts.patents.bq.copy_tables import copy_patent_tables
 from scripts.patents.bq_to_psql import copy_bq_to_psql
 from scripts.patents.psql.terms import create_patent_terms
 
-from ._constants import APPLICATIONS_TABLE, GPR_ANNOTATIONS_TABLE, TEXT_FIELDS
+from ._constants import (
+    APPLICATIONS_TABLE,
+    ANNOTATIONS_TABLE,
+    GPR_ANNOTATIONS_TABLE,
+    TEXT_FIELDS,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -32,10 +37,9 @@ def __create_annotations_table():
     Create a table of annotations for use in app queries
     """
     logger.info("Create a table of annotations for use in app queries")
-    annotations_table = "annotations"
 
     client = PsqlDatabaseClient()
-    client.delete_table(annotations_table, is_cascade=True)
+    client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     entity_query = f"""
         WITH terms AS (
@@ -102,18 +106,17 @@ def __create_annotations_table():
         FROM terms
         ORDER BY character_offset_start
     """
-    client.create_from_select(entity_query, annotations_table)
+    client.create_from_select(entity_query, ANNOTATIONS_TABLE)
 
     client.create_indices(
         [
             {
-                "table": annotations_table,
+                "table": ANNOTATIONS_TABLE,
                 "column": "publication_number",
             },
             {
-                "table": annotations_table,
+                "table": ANNOTATIONS_TABLE,
                 "column": "term",
-                "is_tgrm": True,
             },
         ]
     )
@@ -125,15 +128,22 @@ def __create_annotations_table():
             publication_number,
             ARRAY_AGG(term) AS terms,
             ARRAY_AGG(domain) AS domains
-        FROM {annotations_table}
+        FROM {ANNOTATIONS_TABLE}
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)
-    client.create_index(
-        {
-            "table": AGGREGATED_ANNOTATIONS_TABLE,
-            "column": "publication_number",
-        }
+    client.create_indices(
+        [
+            {
+                "table": AGGREGATED_ANNOTATIONS_TABLE,
+                "column": "publication_number",
+            },
+            {
+                "table": AGGREGATED_ANNOTATIONS_TABLE,
+                "column": "terms",
+                "is_gin": True,
+            },
+        ]
     )
 
 

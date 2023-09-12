@@ -45,11 +45,19 @@ def __copy_gpr_annotations():
     client.delete_table(GPR_ANNOTATIONS_TABLE)
 
     # 3.7TB query
+    # NOTE: mixed mins/maxes
     query = f"""
-        SELECT a.publication_number, max(ocid) as ocid, a.preferred_name as preferred_name, max(a.domain) as domain,
-        max(a.source) as source, array_agg(distinct a.source) as sources, max(a.confidence) as confidence,
-        max(a.character_offset_start) as character_offset_start, max(a.character_offset_end) as character_offset_end,
-        FROM `patents-public-data.google_patents_research.annotations` a,
+        SELECT a.publication_number,
+        a.preferred_name as preferred_name,
+        max(ocid) as ocid,
+        'diseases' as domain,
+        (array_agg(a.source order by a.character_offset_start asc))[0] as source,
+        array_agg(distinct a.source) as sources,
+        (array_agg(a.confidence order by a.character_offset_start asc))[0] as confidence,
+        min(a.character_offset_start) as character_offset_start,
+        min(a.character_offset_end) as character_offset_end,
+        FROM
+        `patents-public-data.google_patents_research.annotations` a,
         `{BQ_DATASET_ID}.publications` p
         WHERE a.publication_number = p.publication_number
         AND a.domain='diseases'

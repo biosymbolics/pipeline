@@ -273,7 +273,7 @@ def get_patent_attribute_map():
             "chinese medicine",
             "tibetian medicine",
         ],
-        "COMBINATION": ["combo", "combination"],
+        "COMBINATION": ["combo of", "combination of"],
         "COMPOUND_OR_MECHANISM": [
             # TODO: remove drug?
             *flatten(expand_res(ALL_INTERVENTION_BASE_TERMS)),
@@ -422,13 +422,14 @@ def get_patent_attribute_map():
             "culturing",
             "manufacture",
             "preparation",
-            "process",
+            # "process",
             "synthesis",
-            "system",
-            "produce",
+            "system for",
+            # "produce",
             "method of making",
             "method for producing",
             "production method",
+            "process for preparing",
         ],
         "TREATMENT": [
             "treatment",
