@@ -451,5 +451,6 @@ def get_trial_summary(trial: dict) -> TrialSummary:
             "randomization": TrialRandomization(trial["randomization"]),
             "sponsor_type": SponsorType(trial["sponsor"]),  # type: ignore
             "status": TrialStatus(trial["status"]),
+            "termination_reason": TerminationReason(trial["termination_reason"]),
         },
     )
