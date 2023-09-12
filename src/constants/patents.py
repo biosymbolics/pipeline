@@ -372,7 +372,7 @@ def get_patent_attribute_map():
             "pest control",
             "machine learning",
         ],
-        "METHOD_OF_USE": ["method of use"],  # see PROCESS
+        "METHOD_OF_USE": ["method of use", "methods of their use"],  # see PROCESS
         "METHOD_OF_ADMINISTRATION": [
             "delivery",
             "dosing",
@@ -403,19 +403,24 @@ def get_patent_attribute_map():
         "PEDIATRIC": ["pediatric", "paediatric"],
         "PLATFORM": ["platform"],
         "PROCESS": [
+            *expand_res(
+                [
+                    "process(?:es)? for preparing",
+                    "process(?:es)? to produce",
+                    "process(?:es)? to make",
+                    "methods? of making",
+                    "methods? for producing",
+                ]
+            ),
             "culture",
             "culturing",
             "manufacture",
             "preparation",
             "procedure",
-            # "process",
             "synthesis",
             "system for",
-            # "produce",
-            "method of making",
-            "method for producing",
-            "preparation method" "production method",
-            "process for preparing",
+            "preparation method",
+            "production method",
         ],
         "OBSTETRIC": [
             "obstetric",

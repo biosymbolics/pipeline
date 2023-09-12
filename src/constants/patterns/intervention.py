@@ -74,6 +74,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "metabolite",
     "(?:(?:neo|peri)[ -]?)?adjuvant",
     "phototherap(?:y|ie)",
+    "polymorph",
     "precursor",
     "primer",
     "pro[ -]?drug",
