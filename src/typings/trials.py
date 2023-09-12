@@ -266,12 +266,13 @@ class TrialSummary(BaseTrial):
     termination_reason: TerminationReason
 
 
-def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
+def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
     """
     Check if dict is a trial record
     """
     return (
         "nct_id" in trial
+        and "duration" in trial
         and "end_date" in trial
         and "start_date" in trial
         and "last_updated_date" in trial
@@ -282,7 +283,15 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
         and "enrollment" in trial
         and "interventions" in trial
         and "sponsor" in trial
+        and "sponsor_type" in trial
     )
+
+
+def is_trial_record_list(trials: list[dict]) -> TypeGuard[list[TrialSummary]]:
+    """
+    Check if list of trial records
+    """
+    return all(is_trial_record(trial) for trial in trials)
 
 
 def __calc_duration(start_date: date | None, end_date: date | None) -> int:

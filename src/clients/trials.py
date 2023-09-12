@@ -2,7 +2,7 @@ import time
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from typings.trials import TrialSummary, get_trial_summary
+from typings.trials import TrialSummary, get_trial_summary, is_trial_record_list
 
 
 logger = logging.getLogger(__name__)
@@ -27,11 +27,13 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         ORDER BY start_date DESC
         limit {limit}
     """
-    records = PsqlDatabaseClient().select(query, [status])
+    trials = PsqlDatabaseClient().select(query, [status])
 
-    if len(records) == 0:
+    if len(trials) == 0:
         raise ValueError(f"No trials found for status {status}")
-    trials = [get_trial_summary(rec) for rec in records]
+
+    if not is_trial_record_list(trials):
+        raise ValueError(f"Trials are not in summary format: {trials[0:10]}")
 
     logger.info(
         "Trial fetch for status %s took %s seconds",
