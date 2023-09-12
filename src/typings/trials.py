@@ -11,6 +11,7 @@ class TrialStatus(Enum):
     TERMINATED = 5  # Terminated
     COMPLETED = 6  # Completed
     UNKNOWN = 7  # Unknown status
+    NA = 8  # Not Applicable
 
     @classmethod
     def _missing_(cls, value):
@@ -27,6 +28,7 @@ class TrialStatus(Enum):
             "Suspended": cls.SUSPENDED,
             "Terminated": cls.TERMINATED,
             "Completed": cls.COMPLETED,
+            "Not Applicable": cls.NA,
         }
         if value in status_term_map:
             return status_term_map[value]

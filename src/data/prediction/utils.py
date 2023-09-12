@@ -28,6 +28,9 @@ from utils.tensor import batch_as_tensors
 
 MAX_ITEMS_PER_CAT = 20
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def is_tensor_list(
     embeddings: list[torch.Tensor] | list[Primitive],
@@ -92,8 +95,14 @@ def encode_category(field: str, df: pl.DataFrame) -> tuple[LabelEncoder, list[An
     """
     encoder = LabelEncoder()
     new_list = df.select(pl.col(field)).to_series().to_list()
+    logger.info("Encoding field %s (ex: %s)", field, new_list[0:5])
     encoder.fit(flatten(new_list))
-    values = [encoder.transform([x] if isinstance(x, str) else x) for x in new_list]
+    values = [
+        encoder.transform([x] if isinstance(x, str) else x)
+        for x in new_list
+        if x is not None  # TODO: shouldn't be necessary; pre-clean
+    ]
+    logger.info("Finished encoding field %s", field)
     return (encoder, values)
 
 
@@ -214,6 +223,7 @@ def get_feature_embeddings(
         embedding_dim (int, optional): Embedding dimension. Defaults to EMBEDDING_DIM.
     """
 
+    logger.info("Getting feature embeddings")
     _items = [*items]
     random.shuffle(_items)
 
@@ -233,4 +243,6 @@ def get_feature_embeddings(
             return combo_cat_feats
 
     embeddings = [get_all_features(i) for i, _ in enumerate(items)]
+
+    logger.info("Finished with feature embeddings")
     return embeddings

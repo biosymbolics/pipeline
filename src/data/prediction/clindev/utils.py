@@ -15,6 +15,9 @@ from typings.trials import TrialSummary
 
 from .types import DnnInput
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def prepare_inputs(
     trials: Sequence[TrialSummary],
@@ -25,12 +28,13 @@ def prepare_inputs(
     """
     Prepare data for DNN
     """
+    logger.info("Preparing inputs for DNN")
     embeddings = get_feature_embeddings(trials, dnn_categorical_fields, dnn_text_fields)  # type: ignore
     x1 = resize_and_batch(embeddings, batch_size)
 
     y_vals = [trial["end_date"] - trial["start_date"] for trial in trials]
     y = batch_and_pad(cast(list[Primitive], y_vals), batch_size)
-    logging.info(
+    logger.info(
         "X1: %s, Y: %s (t: %s, f: %s)",
         x1.size(),
         y.size(),
