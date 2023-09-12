@@ -1,10 +1,57 @@
 from datetime import date, datetime
 from enum import Enum
 from typing import TypeGuard, TypedDict, cast
-from core.ner.classifier import classify_by_keywords
+from constants.company import LARGE_PHARMA_KEYWORDS
 
+from core.ner.classifier import classify_by_keywords
 from utils.list import dedup
-from utils.re import expand_res
+
+
+class SponsorType(Enum):
+    UNIVERSITY = 1
+    INDUSTRY_LARGE = 2  # big pharma
+    INDUSTRY = 3
+    GOVERNMENTAL = 3
+    HEALTH_SYSTEM = 4
+    OTHER = 5
+
+    @classmethod
+    def _missing_(cls, value):
+        reason = classify_by_keywords(
+            [str(value)], cast(dict[str, list[str]], TERMINATION_KEYWORD_MAP), "OTHER"
+        )
+        return reason[0]
+
+
+SPONSOR_KEYWORD_MAP = {
+    SponsorType.UNIVERSITY: [
+        "univ(?:ersity)?",
+        "univ(?:ersities)?",
+        "college",
+        "research hospital",
+    ],
+    SponsorType.INDUSTRY_LARGE: LARGE_PHARMA_KEYWORDS,
+    SponsorType.INDUSTRY: [
+        "(?:bio)?pharma(?:ceutical)s?",
+        "biotech(?:nology)",
+        "llc",
+        "corp",
+    ],
+    SponsorType.GOVERNMENTAL: [
+        "government",
+        "govt",
+        "federal",
+        "state",
+        "us health",
+        "veterans affairs",
+    ],
+    SponsorType.HEALTH_SYSTEM: [
+        "hospital",
+        "health system",
+        "healthcare",
+        "medical system",
+    ],
+}
 
 
 class TrialStatus(Enum):
@@ -147,10 +194,10 @@ TERMINATION_KEYWORD_MAP = {
     TerminationReason.COVID: ["covid", "coronavirus", "pandemic"],
     TerminationReason.OVERSIGHT: [
         "IRB",
-        "ethics",
+        "ethics",  # "ethics committee",
         "Institutional Review Board",
         "certification",
-        "FDA Hold",
+        "FDA",
     ],
     TerminationReason.SUPPLY_CHAIN: [
         "supply",
@@ -174,10 +221,6 @@ TERMINATION_KEYWORD_MAP = {
 }
 
 
-def get_termination_reason(why_stopped: str) -> str:
-    return why_stopped
-
-
 class BaseTrial(TypedDict):
     """
     Base trial info
@@ -197,7 +240,6 @@ class BaseTrial(TypedDict):
     interventions: list[str]
     # intervention_design: str # TODO (whatever it is called - non-inferiority, superiority; active vs placebo comparator)
     last_updated_date: date
-    phase: str
     # primary_endpoint: str # TODO (non-trivial)
     # randomization: str # TODO
     sponsor: str
@@ -208,6 +250,7 @@ class BaseTrial(TypedDict):
 
 
 class TrialRecord(BaseTrial):
+    phase: str
     status: str
 
 
@@ -217,7 +260,10 @@ class TrialSummary(BaseTrial):
     """
 
     duration: int  # in days
+    phase: TrialPhase
+    sponsor_type: SponsorType
     status: TrialStatus
+    termination_reason: TerminationReason
 
 
 def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
@@ -259,8 +305,6 @@ def get_trial_summary(trial: dict) -> TrialSummary:
     - calculates duration
 
     TODO:
-    - sponsor_type
-    - termination_reason
     - primary endpoint
     """
     if not is_trial_record(trial):
@@ -273,6 +317,7 @@ def get_trial_summary(trial: dict) -> TrialSummary:
             "conditions": dedup(trial["conditions"]),
             "duartion": __calc_duration(trial["start_date"], trial["end_date"]),
             "phase": TrialPhase(trial["phase"]),
+            "sponsor_type": SponsorType(trial["sponsor"]),
             "status": TrialStatus(trial["status"]),
         },
     )
