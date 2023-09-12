@@ -2,27 +2,18 @@
 Utils for patent eNPV model
 """
 
-from typing import Sequence, TypeGuard, cast
+from typing import Sequence, cast
 import logging
-import random
-import numpy as np
-from collections import namedtuple
-from pydash import flatten
 import torch
-from sklearn.calibration import LabelEncoder
-from sklearn.decomposition import PCA
-import polars as pl
-from torch import nn
-import torch.nn.functional as F
 
-from core.ner.spacy import Spacy
 from data.prediction.patent_pos.types import AllInput, DnnInput, GnnInput
+from data.prediction.utils import (
+    batch_and_pad,
+    get_feature_embeddings,
+    resize_and_batch,
+)
 from typings.core import Primitive
 from typings.patents import ApprovedPatentApplication as PatentApplication
-from utils.list import batch
-from utils.tensor import batch_as_tensors
-
-from .constants import EMBEDDING_DIM, MAX_STRING_LEN, MAX_CATS_PER_LIST, TEXT_FEATURES
 
 
 # Query for approval data
@@ -49,184 +40,6 @@ group by p.ndc_product_code;
 """
 
 
-def is_tensor_list(
-    embeddings: list[torch.Tensor] | list[Primitive],
-) -> TypeGuard[list[torch.Tensor]]:
-    return isinstance(embeddings[0], torch.Tensor)
-
-
-def get_string_values(patent: PatentApplication, field: str) -> list:
-    val = patent.get(field)
-    if isinstance(val, list):
-        return [v[0:MAX_STRING_LEN] for v in val]
-    if val is None:
-        return [None]
-    return [val[0:MAX_STRING_LEN]]
-
-
-def encode_category(field, df):
-    le = LabelEncoder()
-    new_list = df.select(pl.col(field)).to_series().to_list()
-    le.fit(flatten(new_list))
-    values = [le.transform([x] if isinstance(x, str) else x) for x in new_list]
-    return (le, values)
-
-
-def get_feature_embeddings(
-    patents: Sequence[PatentApplication],
-    categorical_fields: list[str],
-    text_fields: list[str] = [],
-    embedding_dim: int = EMBEDDING_DIM,
-):
-    """
-    Get embeddings for patent features
-
-    Args:
-        patents (Sequence[PatentApplication]): List of patents
-        categorical_fields (list[str]): List of fields to embed as categorical variables
-        text_fields (list[str]): List of fields to embed as text
-        embedding_dim (int, optional): Embedding dimension. Defaults to EMBEDDING_DIM.
-    """
-    nlp = Spacy.get_instance(disable=["ner"])
-    pca = PCA(n_components=TEXT_FEATURES)
-
-    _patents = [*patents]
-    random.shuffle(_patents)
-    df = pl.from_dicts(_patents, infer_schema_length=1000)  # type: ignore
-    size_map = dict(
-        [
-            (field, df.select(pl.col(field).flatten()).n_unique())
-            for field in categorical_fields
-        ]
-    )
-    embedding_layers = dict(
-        [
-            (field, nn.Embedding(size_map[field], embedding_dim))
-            for field in categorical_fields
-        ]
-    )
-
-    label_encoders = [encode_category(field, df) for field in categorical_fields]
-    CatTuple = namedtuple("CatTuple", categorical_fields)  # type: ignore
-    cat_feats = [
-        CatTuple(*fv)._asdict() for fv in zip(*[enc[1] for enc in label_encoders])
-    ]
-
-    cat_tensors: list[list[torch.Tensor]] = [
-        [
-            embedding_layers[field](
-                torch.tensor(patent[field][0:MAX_CATS_PER_LIST], dtype=torch.int)
-            )
-            for field in categorical_fields
-        ]
-        for patent in cat_feats
-    ]
-    max_len_0 = max(f.size(0) for f in flatten(cat_tensors))
-    max_len_1 = max(f.size(1) for f in flatten(cat_tensors))
-    padded_cat_tensors = [
-        [
-            F.pad(f, (0, max_len_1 - f.size(1), 0, max_len_0 - f.size(0)))
-            if f.size(0) > 0
-            else torch.empty([max_len_0, max_len_1])
-            for f in cat_tensor
-        ]
-        for cat_tensor in cat_tensors
-    ]
-    cat_feats = [torch.cat(tensor_set) for tensor_set in padded_cat_tensors]
-
-    text_feats = []
-    if len(text_fields) > 0:
-        text_vectors = [
-            np.concatenate(
-                [
-                    tv
-                    for tv in [
-                        np.array(
-                            [
-                                token.vector
-                                for value in get_string_values(patent, field)
-                                for token in nlp(value)
-                            ]
-                        )
-                        for field in text_fields
-                    ]
-                    if len(tv.shape) > 1
-                ]
-            )
-            for patent in patents
-        ]
-
-        pca_model = pca.fit(np.concatenate(text_vectors, axis=0))
-        text_feats = [
-            torch.flatten(torch.tensor(pca_model.transform(text_vector)))
-            for text_vector in text_vectors
-        ]
-        max_len = max(f.size(0) for f in flatten(text_feats))
-        text_feats = [F.pad(f, (0, max_len - f.size(0))) for f in text_feats]
-
-    def get_patent_features(i: int) -> torch.Tensor:
-        combo_text_feats = (
-            torch.flatten(text_feats[i]) if len(text_fields) > 0 else None
-        )
-        combo_cat_feats = torch.flatten(cat_feats[i])
-        combined = (
-            torch.cat([combo_cat_feats, combo_text_feats], dim=0)
-            if combo_text_feats is not None
-            else combo_cat_feats
-        )
-        return combined
-
-    embeddings = [get_patent_features(i) for i, _ in enumerate(patents)]
-    return embeddings
-
-
-def __batch(
-    items: list[torch.Tensor] | list[Primitive], batch_size: int
-) -> torch.Tensor:
-    """
-    Batch a list of tensors or primitives
-
-    Args:
-        items (list[torch.Tensor] | list[Primitive]): List of tensors or primitives
-        batch_size (int): Batch size
-    """
-    if not is_tensor_list(items):
-        # then list of primitives
-        batches = batch_as_tensors(cast(list[Primitive], items), batch_size)
-        num_dims = 1
-    else:
-        num_dims = len(items[0].size()) + 1
-        batches = batch(items, batch_size)
-        batches = [torch.stack(b) for b in batches]
-
-    def get_batch_pad(b: torch.Tensor):
-        if num_dims == 1:
-            return (0, batch_size - b.size(0))
-
-        if num_dims == 2:
-            return (0, 0, 0, batch_size - b.size(0))
-
-        raise ValueError("Unsupported number of dimensions: %s" % num_dims)
-
-    batches = [F.pad(b, get_batch_pad(b)) for b in batches]
-
-    logging.info("Batches: %s (%s)", len(batches), [b.size() for b in batches])
-    return torch.stack(batches)
-
-
-def resize_and_batch(embeddings: list[torch.Tensor], batch_size: int) -> torch.Tensor:
-    """
-    Size embeddings into batches
-
-    Args:
-        embeddings (list[torch.Tensor]): List of embeddings
-        batch_size (int): Batch size
-    """
-    max_len = max(e.size(0) for e in embeddings)
-    padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
-    return __batch(padded_emb, batch_size)
-
-
 def prepare_inputs(
     patents: Sequence[PatentApplication],
     batch_size: int,
@@ -248,14 +61,14 @@ def prepare_inputs(
         Prepare data for DNN
         """
         embeddings = get_feature_embeddings(
-            patents, dnn_categorical_fields, dnn_text_fields
+            patents, dnn_categorical_fields, dnn_text_fields  # type: ignore
         )
         x1 = resize_and_batch(embeddings, batch_size)
 
         y_vals = [
             (1.0 if patent["approval_date"] is not None else 0.0) for patent in patents
         ]
-        y = __batch(cast(list[Primitive], y_vals), batch_size)
+        y = batch_and_pad(cast(list[Primitive], y_vals), batch_size)
         logging.info(
             "X1: %s, Y: %s (t: %s, f: %s)",
             x1.size(),
@@ -274,10 +87,10 @@ def prepare_inputs(
         Prepare inputs for GNN
         """
         # TODO: enirch with pathways, targets, disease pathways
-        embeddings = get_feature_embeddings(patents, gnn_categorical_fields)
+        embeddings = get_feature_embeddings(patents, gnn_categorical_fields)  # type: ignore
         x2 = resize_and_batch(embeddings, batch_size)
         edge_index = [torch.tensor([i, i]) for i in range(len(patents))]
-        ei = __batch(edge_index, batch_size)
+        ei = batch_and_pad(edge_index, batch_size)
         # logging.info("X2: %s, EI %s", x2.size(), ei.size())
 
         return {"x2": x2, "edge_index": ei}

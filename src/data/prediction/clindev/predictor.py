@@ -1,24 +1,20 @@
 import logging
 import sys
-from typing import cast
 import torch
 from ignite.metrics import Precision, Recall
 
-from clients.patents import patent_client
+from data.prediction.constants import DEFAULT_BATCH_SIZE, DEFAULT_TRUE_THRESHOLD
 from data.types import ModelMetrics
+from typings.trials import TrialSummary
 from utils.tensor import pad_or_truncate_to_size
-from typings.patents import ApprovedPatentApplication as PatentApplication
 
 from .constants import (
-    BATCH_SIZE,
     CATEGORICAL_FIELDS,
     CHECKPOINT_PATH,
-    GNN_CATEGORICAL_FIELDS,
     TEXT_FIELDS,
-    TRUE_THRESHOLD,
 )
-from .core import CombinedModel
-from .types import AllInput
+from .core import DNN
+from .types import DnnInput
 from .utils import prepare_inputs
 
 
@@ -39,11 +35,9 @@ class ModelPredictor:
         self,
         checkpoint: str = "checkpoint_95.pt",
         dnn_input_dim: int = 5860,
-        gnn_input_dim: int = 480,
     ):
         self.dnn_input_dim = dnn_input_dim
-        self.gnn_input_dim = gnn_input_dim
-        model = CombinedModel(dnn_input_dim, gnn_input_dim)
+        model = DNN(dnn_input_dim, round(dnn_input_dim / 2))
         checkpoint_obj = torch.load(
             f"{CHECKPOINT_PATH}/{checkpoint}",
             map_location=torch.device("mps"),
@@ -66,8 +60,8 @@ class ModelPredictor:
             input_dict (AllInput): Dictionary of input tensors
             prediction (torch.Tensor): Tensor of predictions (1d)
         """
-        y_true = y_input > TRUE_THRESHOLD
-        y_pred = prediction > TRUE_THRESHOLD
+        y_true = y_input > DEFAULT_TRUE_THRESHOLD
+        y_pred = prediction > DEFAULT_TRUE_THRESHOLD
         self.precision.update((y_pred, y_true))
         self.recall.update((y_pred, y_true))
 
@@ -82,18 +76,19 @@ class ModelPredictor:
 
         return metrics
 
-    def predict_tensor(self, input_dict: AllInput) -> torch.Tensor:
+    def predict_tensor(self, input_dict: DnnInput) -> torch.Tensor:
         """
         Predict probability of success for a given tensor input
 
         Args:
-            input_dict (AllInput): Dictionary of input tensors
+            input_dict (DnnInput): Dictionary of input tensors
 
         Returns:
             torch.Tensor: Tensor of predictions (1d)
         """
         x1_padded = pad_or_truncate_to_size(
-            input_dict["x1"], (input_dict["x1"].size(0), BATCH_SIZE, self.dnn_input_dim)
+            input_dict["x1"],
+            (input_dict["x1"].size(0), DEFAULT_BATCH_SIZE, self.dnn_input_dim),
         )
         num_batches = x1_padded.size(0)
 
@@ -103,32 +98,30 @@ class ModelPredictor:
 
         return output
 
-    def predict(
-        self, patents: list[PatentApplication]
-    ) -> tuple[torch.Tensor, ModelMetrics]:
+    def predict(self, trials: list[TrialSummary]) -> tuple[torch.Tensor, ModelMetrics]:
         """
-        Predict probability of success for a given input
+        Predict trial stuff
 
         Args:
-            patents (list[PatentApplication]): List of patent applications
+            trials (list[TrialSummary]): List of trials
 
         Returns:
-            list[float]: Probabilities of success
+            list[float]: output predictions
         """
         input_dict = prepare_inputs(
-            patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS
+            trials, DEFAULT_BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS
         )
 
         predictions = self.predict_tensor(input_dict)
         actuals = torch.flatten(input_dict["y"])
 
-        for i, patent in enumerate(patents):
+        for i, trial in enumerate(trials):
             logging.info(
                 "Patent %s (pred: %s, act: %s): %s (%s)",
-                patent["publication_number"],
-                (predictions[i] > TRUE_THRESHOLD).item(),
-                (actuals[i] > TRUE_THRESHOLD).item(),
-                patent["title"],
+                trial["nct_id"],
+                (predictions[i] > DEFAULT_TRUE_THRESHOLD).item(),
+                (actuals[i] > DEFAULT_TRUE_THRESHOLD).item(),
+                trial["title"],
                 predictions[i].item(),
             )
 
@@ -137,13 +130,10 @@ class ModelPredictor:
         return (predictions, metrics)
 
 
-def main(terms: list[str]):
-    patents = cast(
-        list[PatentApplication],
-        patent_client.search(terms, min_patent_years=0, limit=1000),
-    )
+def main():
+    trials = []  # TODO
     predictor = ModelPredictor()
-    preds, metrics = predictor.predict(patents)
+    preds, metrics = predictor.predict(trials)
     logging.info(
         "Prediction mean: %s, min: %s and max: %s",
         preds.mean().item(),
@@ -157,16 +147,10 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m core.models.patent_pos.predictor [patent search term(s)]
-            Trains patent PoS (probability of success) model
-
-            Example:
-                >>> python3 -m core.models.patent_pos.predictor asthma
+            Usage: python3 -m core.models.clindev.predictor
+            Trains trial attribute model
             """
         )
         sys.exit()
 
-    if not sys.argv[1:]:
-        raise ValueError("Please provide a patent search term")
-
-    main(sys.argv[1:])
+    main()
