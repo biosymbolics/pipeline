@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import TypeGuard, TypedDict, cast
-from constants.company import LARGE_PHARMA_KEYWORDS
+from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 
 from core.ner.classifier import classify_string, create_lookup_map
 from utils.classes import ByDefinitionOrderEnum
@@ -105,6 +105,9 @@ class SponsorType(ByDefinitionOrderEnum):
     UNIVERSITY = "UNIVERSITY"
     GOVERNMENTAL = "GOVERNMENTAL"
     HEALTH_SYSTEM = "HEALTH_SYSTEM"
+    FOUNDATION = "FOUNDATION"
+    OTHER_ORGANIZATION = "OTHER_ORGANIZATION"
+    INDIVIDUAL = "INDIVIDUAL"
     OTHER = "OTHER"
 
     @classmethod
@@ -119,30 +122,61 @@ SPONSOR_KEYWORD_MAP = create_lookup_map(
         SponsorType.UNIVERSITY: [
             "univ(?:ersity)?",
             "univ(?:ersities)?",
-            "college",
-            "research hospital",
+            "colleges?",
+            "research hospitals?",
+            "institutes?",
+            "schools?",
+            "NYU",
+            "Universitaire?s?",
+            "l'Université",
+            "Université",
+            "Universita",
+            "Universitari",
+            "Institut",
+            "education",
+            "Universidad",
         ],
         SponsorType.INDUSTRY_LARGE: LARGE_PHARMA_KEYWORDS,
         SponsorType.INDUSTRY: [
-            "(?:bio)?pharma(?:ceutical)s?",
-            "biotech(?:nology)",
-            "llc",
-            "corp",
+            *COMPANY_STRINGS,
+            "laboratories",
+            "Procter and Gamble",
+            "3M",
+            "Neuroscience$",
+            "associates",
+            "medical$",
         ],
         SponsorType.GOVERNMENTAL: [
             "government",
             "govt",
             "federal",
+            "national",
             "state",
             "us health",
             "veterans affairs",
+            "NIH",
+            "VA",
+            "European Organisation",
+            "EORTC",
+            "Assistance Publique",
+            "FDA",
+            "Bureau",
+            "Authority",
         ],
         SponsorType.HEALTH_SYSTEM: [
-            "hospital",
-            "health system",
             "healthcare",
-            "medical system",
+            "(?:medical|cancer|health) (?:center|centre|system|hospital)s?",
+            "clinics?",
+            "districts?",
         ],
+        SponsorType.FOUNDATION: ["foundatations?", "trusts?"],
+        SponsorType.OTHER_ORGANIZATION: [
+            "Research Network",
+            "Alliance",
+            "Group$",
+            "research cent(?:er|re)s?",
+        ],
+        SponsorType.INDIVIDUAL: [r"M\.?D\.?"],
     }
 )
 

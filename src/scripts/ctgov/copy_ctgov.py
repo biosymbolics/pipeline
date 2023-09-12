@@ -64,6 +64,7 @@ def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
 def ingest_trials():
     """
     Copy patent clinical trials from ctgov to patents
+    TODO: use sponsors table to get agency_class
     """
 
     source_sql = f"""
@@ -78,7 +79,7 @@ def ingest_trials():
         AND study_type = 'Interventional'
         AND designs.nct_id = studies.nct_id
         AND interventions.intervention_type = 'Drug'
-        AND interventions.name not in ('Placebo', 'placebo')
+        AND not interventions.name ~* '(?:saline|placebo)'
         group by studies.nct_id
     """
 

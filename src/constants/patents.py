@@ -1,4 +1,5 @@
 from pydash import flatten
+from constants.company import COMPANY_STRINGS
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
 
@@ -32,137 +33,24 @@ METHOD_OF_USE_IPC_CODES = [
     "H04R",  # Methods of using audio or acoustic systems
 ]
 
-COMPANY_SUPPRESSIONS_DEFINITE = [
+COMPANY_SUPPRESSIONS = [
     "»",
     "«",
-    r"L\.?T\.?D\.?",
-    r"I\.?N\.?C\.?",
-    "CORP(?:ORATION)?",
-    "COMPANY",
-    "consumer[ ]?care",
-    r"C\.?O\.?",
-    r"D\.?B\.?A",
-    r"L\.?L\.?C",
-    "LIMITED",
-    r"P\.?L\.?C",
-    r"L\.?P\.?",
-    r"L\.?L\.?P\.?",
-    "GMBH",
-    "AB",
-    "AG",
-    "alumni",
-    r"b\.?v\.?",
     "eeig",
-    "grp",
-    "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
-    "health[ ]?system",
-    "HLDGS?",
-    "HOLDINGS",
-    "international",
-    "intl",
-    "IP",
-    "INTELLECTUAL PROPERTY",
-    r"I\.?N\.?C\.?",
-    r"I\.?N\.?D\.?",
-    "INDUSTRY",
-    "INDUSTRIES",
-    "INVEST(?:MENTS)?",
-    "PATENTS?",
     "THE",
     r"^\s*-",
     r"^\s*&",
 ]
 
-COMPANY_SUPPRESSIONS_MAYBE = [
-    "AGENCY",
-    "APS",
-    "A[/]?S",
-    "ASSETS",
-    "ASD",
-    "AVG",
-    "(?<!for |of |and )BIOLOGY?",
-    "(?<!for |of |and )BIOL(?:OGICALS?)?",
-    "(?<!for |of |and )BIOSCI(?:ENCES?)?",
-    "(?<!for |of |and )BIOSCIENCES?",
-    "BIOTECH?(?:NOLOGY)?",
-    "BUS",
-    "BV",
-    "CA",
-    "CHEM(?:ICAL)?(?:S)?",
-    "COMMONWEALTH",
-    "COOP",
-    "CONSUMER",
-    "CROPSCIENCE",
-    "DEV(?:ELOPMENT)?",
-    "DIAGNOSTICS?",
-    "EDU(?:CATION)?",
-    "ELECTRONICS?",
-    "ENG",
-    "ENTERP(?:RISE)?S?",
-    "europharm",
-    "FARM",
-    "FARMA",
-    "FOUND(?:ATION)?",
-    "GROUP",
-    "GLOBAL",
-    "H",
-    "(?<!for |of |and )HEALTH(?:CARE)?",
-    "HEALT",
-    "HIGH TECH",
-    "HIGHER",
-    "IDEC",
-    "INT",
-    "KG",
-    r"k\.?k\.?",
-    "LICENSING",
-    "LTS",
-    "LIFE[ ]?SCIENCES?",
-    "MANI(?:UFACTURING)?",
-    "MFG",
-    "Manufacturing",
-    "MATERIAL[ ]?SCIENCE",
-    "MED(?:ICAL)?(?: college)?(?: of)?",
-    "molecular",
-    "NETWORK",
-    "No {0-9}",  # No 2
-    "NV",
-    "OPERATIONS?",
-    "PARTICIPATIONS?",
-    "PARTNERSHIPS?",
-    "PETROCHEMICALS?",
-    "(?bio[ -]?)?PHARMA?S?",
-    "(?bio[ -]?)?PHARMACEUTICAL?S?",
-    "PHARAMACEUTICAL?S?",
-    "PLANT",
-    "PLC",
-    "Plastics",
-    "PRIVATE",
-    "PROD",
-    "PRODUCTS?",
-    "PTE",
-    "PTY",
-    "(?<!for |of )R and D",
-    "(?<!for |of )R&Db?",
+UNIVERSITY_SUPPRESSIONS = [
     "REGENTS?",
-    "RES",
-    "(?<!for |of )RES & (?:TECH|DEV)",
-    "(?<!for |of )RESEARCH(?: (?:&|and) DEV(?:ELOPMENT)?)?",
-    "SA",
-    "SCI",
-    "SCIENT",
-    "(?<!for |of |and )sciences?",
-    "SCIENTIFIC",
     "School Of Medicine",
-    "SE",
-    "SERV(?:ICES?)?",
-    "SPA",
-    "SYNTHELABO",
-    "SYS",
-    "SYST(?:EM)?S?",
-    "TECH",
-    "(?<!of |and )TECHNOLOG(?:Y|IES)?",
-    "TECHNOLOGY SERVICES?",
-    "THERAPEUTICS?",
+    "alumni",
+]
+
+HEALTH_SYSTEM_SUPPRESSIONS = [
+    "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
+    "health[ ]?system",
 ]
 
 
@@ -192,9 +80,10 @@ COUNTRIES = [
     "USA",
 ]
 
-COMPANY_SUPPRESSIONS = [
-    *COMPANY_SUPPRESSIONS_DEFINITE,
-    *COMPANY_SUPPRESSIONS_MAYBE,
+OWNER_SUPPRESSIONS = [
+    *COMPANY_SUPPRESSIONS,
+    *UNIVERSITY_SUPPRESSIONS,
+    *COMPANY_STRINGS,
     *[f"(?<!of ){c}" for c in COUNTRIES],
 ]
 
@@ -248,7 +137,10 @@ COMPANY_MAP = {
     "Dana[- ]?Farber": "Dana Farber",
     "Novo Nordisk": "Novo Nordisk",
     "Astrazeneca": "AstraZeneca",
+    "Alexion": "AstraZeneca",
     "bristol[- ]?myers squibb": "Bristol-Myers Squibb",
+    "Celgene": "Bristol-Myers Squibb",
+    "Samsung": "Samsung",
 }
 
 OWNER_TERM_MAP = {
