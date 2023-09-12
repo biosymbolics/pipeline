@@ -16,7 +16,7 @@ TRIALS_TABLE = "trials"
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
-IS_LOCAL = os.environ.get("ENV") == "local"
+IS_LOCAL = not os.environ.get("ENV") or os.environ.get("ENV") == "local"
 IS_DEPLOYED = not IS_LOCAL
 BASE_DATABASE_URL = "postgres://:@localhost:5432"
 DATABASE_URL = (

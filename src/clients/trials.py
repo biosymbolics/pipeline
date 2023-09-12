@@ -26,7 +26,9 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         limit {limit}
     """
     records = PsqlDatabaseClient().select(query, [status])
-    print(records[0])
+
+    if len(records) == 0:
+        raise ValueError(f"No trials found for status {status}")
     trials = [get_trial_summary(rec) for rec in records]
 
     logger.info(

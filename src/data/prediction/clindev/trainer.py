@@ -6,6 +6,10 @@ import torch
 import torch.nn as nn
 from ignite.metrics import Precision, Recall
 
+import system
+
+system.initialize()
+
 from clients.trials import fetch_trials
 
 
@@ -136,7 +140,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=10000)
+        trials = fetch_trials("Completed", limit=100000)  # 96001
         input_dict = prepare_inputs(trials, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS)
         dnn_input_dim = input_dict["x1"].size(2)
         model = ModelTrainer(dnn_input_dim)
@@ -151,7 +155,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m core.models.clindev.trainer
+            Usage: python3 -m data.prediction.clindev.trainer
             """
         )
         sys.exit()
