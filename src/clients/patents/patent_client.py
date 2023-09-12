@@ -149,8 +149,6 @@ def __get_query_pieces(
     is_id_search = any([t.startswith("WO-") for t in terms])
     lower_terms = [t.lower() for t in terms]
 
-    fields = [*FIELDS, "1 as search_rank"]
-
     # if ids, ignore most of the standard criteria
     if is_id_search:
         if not all([t.startswith("WO-") for t in terms]):
@@ -158,7 +156,7 @@ def __get_query_pieces(
 
         return {
             "annotation_join_condition": f"AND apps.publication_number = any(%s)",
-            "fields": fields,
+            "fields": [*FIELDS, "1 as search_rank"],
             "where": "",
             "params": [terms],
         }
@@ -169,7 +167,7 @@ def __get_query_pieces(
     base_params = {
         # exp decay scaling for search terms; higher is better
         "fields": [
-            *fields,
+            *FIELDS,
             f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
         ],
         "where": f"WHERE priority_date > '{max_priority_date}'::date",
@@ -225,11 +223,11 @@ def _search(
         SELECT {", ".join(qp["fields"])},
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM applications AS apps
-        JOIN annotations as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
         ) -- for returning all annotations
+        JOIN annotations as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
