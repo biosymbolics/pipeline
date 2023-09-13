@@ -187,7 +187,6 @@ class ModelTrainer:
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,
         )
-        # input_dim = input_dict["x1"].size(2)
         input_dim = math.prod(input_dict["x1"].shape[2:])  # 576
         stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
         y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
