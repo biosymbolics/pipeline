@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+class MaskLayer(nn.Module):
+    def __init__(self, target_idxs: tuple[int, ...]):
+        super().__init__()
+        self.target_idxs = target_idxs
+
+    def forward(self, x):
+        mask = torch.ones_like(x)  # tensor of 1s
+        mask[:, ~torch.tensor(self.target_idxs)] = 0  # mask out non-target indices
+        return x * mask
+
+
 class TwoStageModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
@@ -30,6 +41,7 @@ class TwoStageModel(nn.Module):
 
     def __init__(
         self,
+        target_idxs: tuple[int, ...],
         input_size: int,
         stage1_hidden_size: int = 64,
         stage1_output_size: int = 32,
@@ -42,6 +54,8 @@ class TwoStageModel(nn.Module):
         # Stage 1 model
         self.stage1_model = nn.Sequential(
             nn.Linear(input_size, stage1_hidden_size),
+            nn.Linear(stage1_hidden_size, stage1_hidden_size),  # mask layer
+            MaskLayer(target_idxs),
             nn.ReLU(),
             nn.Linear(stage1_hidden_size, stage1_output_size),
         )
@@ -62,7 +76,10 @@ class TwoStageModel(nn.Module):
         return OPTIMIZER_CLASS(self.stage2_model.parameters(), lr=LR)
 
     def forward(self, x):
-        x1_pred = self.stage1_model(x)  # Stage 1 inference
-        x2 = torch.cat((x, x1_pred.detach()), dim=1)
-        x2_pred = self.stage2_model(x2)  # Stage 2 inference
-        return (x1_pred, x2_pred)
+        print("X shape", x.size())
+        y1_pred = self.stage1_model(x)  # Stage 1 inference
+        print("X1 pred", y1_pred.size())
+        x2 = torch.cat((x, y1_pred), dim=1)
+        print("X2 cat", x2.size())
+        y2_pred = self.stage2_model(x2)  # Stage 2 inference
+        return (y1_pred, y2_pred)

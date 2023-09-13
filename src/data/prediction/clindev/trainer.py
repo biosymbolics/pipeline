@@ -1,9 +1,11 @@
 import logging
+import math
 import os
 import sys
 import torch
 import torch.nn as nn
-from ignite.metrics import Precision, Recall
+from ignite.metrics import Precision, Recall, MeanAbsoluteError
+from data.prediction.constants import DEFAULT_BATCH_SIZE
 
 import system
 
@@ -39,6 +41,7 @@ class ModelTrainer:
 
     def __init__(
         self,
+        target_idxs: tuple[int, ...],
         input_dim: int,
         stage1_output_dim: int,
     ):
@@ -52,31 +55,21 @@ class ModelTrainer:
         torch.device("mps")
 
         self.input_dim = input_dim
-        self.model = TwoStageModel(input_dim, stage1_output_size=stage1_output_dim)
+        self.model = TwoStageModel(
+            target_idxs, input_dim, stage1_output_size=stage1_output_dim
+        )
 
         self.stage1_optimizer = self.model.stage1_optimizer
         self.stage2_optimizer = self.model.stage2_optimizer
 
-        self.stage1_criterion = nn.BCEWithLogitsLoss()
+        self.stage1_criterion = nn.L1Loss()  # embedding-to-embedding loss calc
         self.stage2_criterion = nn.MSELoss()
 
         logger.info("Initialized model with input dim of %s", input_dim)
 
-        self.stage1_precision = Precision(average=True)
-        self.stage1_recall = Recall(average=True)
-        self.stage1_f1 = (
-            2
-            * (self.stage1_precision * self.stage1_recall)
-            / (self.stage1_precision + self.stage1_recall)
-        )
-
-        self.stage2_precision = Precision(average=True)
-        self.stage2_recall = Recall(average=True)
-        self.stage2_f1 = (
-            2
-            * (self.stage2_precision * self.stage2_recall)
-            / (self.stage2_precision + self.stage2_recall)
-        )
+        self.stage1_precision = Precision(average=True, is_multilabel=True)
+        self.stage1_recall = Recall(average=True, is_multilabel=True)
+        self.stage2_mae = MeanAbsoluteError()
 
     def __call__(self, *args, **kwargs):
         """
@@ -111,6 +104,7 @@ class ModelTrainer:
     def train(
         self,
         input_dict: DnnInput,
+        y1_field_indexes,
         start_epoch: int = 0,
         num_epochs: int = 100,
     ):
@@ -129,32 +123,36 @@ class ModelTrainer:
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
-                x1_pred, x2_pred = self.model(batch["x1"])
+
+                input = batch["x1"].view(batch["x1"].size(0), -1)  # TODO
+
+                y1_logits, y2_logits = self.model(input)
 
                 # STAGE 1 backprop
                 self.stage1_optimizer.zero_grad()
-                stage1_loss = self.stage1_criterion(x1_pred, batch["y1"])
+                y1_pred = y1_logits.view(batch["y1"].size())
+                stage1_loss = self.stage1_criterion(y1_pred, batch["y1"])
                 logging.info("Stage 1 loss: %s", stage1_loss)
-                stage1_loss.backward(retain_graph=True)
-                self.stage1_optimizer.step()
+                # stage1_loss.backward(retain_graph=True)
 
                 # STAGE 2 backprop
-                self.stage2_optimizer.zero_grad()
-                stage2_loss = self.stage2_criterion(x2_pred, batch["y2"])
+                # self.stage2_optimizer.zero_grad()
+                stage2_loss = self.stage2_criterion(y2_logits, batch["y2"])
                 logging.info("Stage 2 loss: %s", stage2_loss)
-                stage2_loss.backward(retain_graph=True)
-                self.stage2_optimizer.step()
+                # stage2_loss.backward(retain_graph=True)
+                # self.stage2_optimizer.step()
 
-                # update status
-                y1_pred = x1_pred > TRUE_THRESHOLD
-                y1_true = batch["y1"] > TRUE_THRESHOLD
-                self.stage1_precision.update((y1_pred, y1_true))
-                self.stage1_recall.update((y1_pred, y1_true))
+                loss = stage1_loss + stage2_loss
+                loss.backward(retain_graph=True)
+                self.stage1_optimizer.step()
 
-                y2_pred = x2_pred > TRUE_THRESHOLD
-                y2_true = batch["y2"] > TRUE_THRESHOLD
-                self.stage2_precision.update((y2_pred, y2_true))
-                self.stage2_recall.update((y2_pred, y2_true))
+                y_pred_classes = y1_pred > TRUE_THRESHOLD
+                y_true_classes = batch["y1"] > TRUE_THRESHOLD
+
+                self.stage1_precision.update((y_pred_classes, y_true_classes))
+                self.stage1_recall.update((y_pred_classes, y_true_classes))
+
+                self.stage2_mae.update((y2_logits, batch["y2"]))
 
                 self.evaluate()
             if epoch % SAVE_FREQUENCY == 0:
@@ -168,23 +166,19 @@ class ModelTrainer:
         try:
             logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
             logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
-            logging.info("Stage 1 F1 score: %s", self.stage1_f1.compute())
 
             self.stage1_precision.reset()
             self.stage1_recall.reset()
 
-            logging.info("Stage 2 Precision: %s", self.stage2_precision.compute())
-            logging.info("Stage 2 Recall: %s", self.stage2_recall.compute())
-            logging.info("Stage 2 F1 score: %s", self.stage2_f1.compute())
+            logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
+            self.stage2_mae.reset()
 
-            self.stage2_precision.reset()
-            self.stage2_recall.reset()
         except Exception as e:
             logging.warning("Failed to evaluate: %s", e)
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=10000)  # 96001
+        trials = fetch_trials("COMPLETED", limit=100000)  # 96001
         input_dict = prepare_inputs(
             trials,
             BATCH_SIZE,
@@ -193,10 +187,12 @@ class ModelTrainer:
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,
         )
-        input_dim = input_dict["x1"].size(2)
-        stage1_output_dim = input_dict["y1"].size(2)
-        model = ModelTrainer(input_dim, stage1_output_dim)
-        model.train(input_dict)
+        # input_dim = input_dict["x1"].size(2)
+        input_dim = math.prod(input_dict["x1"].shape[2:])  # 576
+        stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
+        y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
+        model = ModelTrainer(y1_field_indexes, input_dim, stage1_output_dim)
+        model.train(input_dict, y1_field_indexes)
 
 
 def main():
