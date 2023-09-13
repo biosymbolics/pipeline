@@ -4,7 +4,6 @@ Utils for patent eNPV model
 
 from typing import Sequence, cast
 import logging
-
 from torch import unsqueeze
 
 from data.prediction.utils import (
@@ -35,6 +34,7 @@ def prepare_inputs(
     logger.info("Preparing inputs for DNN")
     embeddings = get_feature_embeddings(trials, categorical_fields, text_fields)  # type: ignore
     x1 = resize_and_batch(embeddings, batch_size)
+    x1_inputs = x1.view(x1.size(0), -1)
 
     y1_field_indexes = tuple(n for n in range(len(y1_categorical_fields)))
     y1 = x1[:, :, y1_field_indexes, :]
@@ -47,4 +47,4 @@ def prepare_inputs(
         y1.size(),
         y2.size(),
     )
-    return {"x1": x1, "y1": y1, "y2": y2}
+    return {"x1": x1, "x1_inputs": x1_inputs, "y1": y1, "y2": y2}

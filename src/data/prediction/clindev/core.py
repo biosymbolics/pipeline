@@ -15,14 +15,17 @@ logger.setLevel(logging.INFO)
 
 
 class MaskLayer(nn.Module):
-    def __init__(self, target_idxs: tuple[int, ...]):
+    def __init__(self, target_idxs: tuple[int, ...], orig_shape: tuple[int, ...]):
         super().__init__()
         self.target_idxs = target_idxs
+        self.orig_shape = orig_shape
 
     def forward(self, x):
-        mask = torch.ones_like(x)  # tensor of 1s
+        _x = x.clone().view(self.orig_shape)
+        mask = torch.ones_like(_x)  # tensor of 1s
         mask[:, ~torch.tensor(self.target_idxs)] = 0  # mask out non-target indices
-        return x * mask
+        masked = _x * mask
+        return masked.view(x.shape)
 
 
 class TwoStageModel(nn.Module):
@@ -43,20 +46,22 @@ class TwoStageModel(nn.Module):
         self,
         target_idxs: tuple[int, ...],
         input_size: int,
+        original_shape: tuple[int, ...],
         stage1_hidden_size: int = 64,
         stage1_output_size: int = 32,
         stage2_hidden_size: int = 64,
     ):
-        torch.device("mps")
-
         super().__init__()
+        torch.device("mps")
 
         # Stage 1 model
         self.stage1_model = nn.Sequential(
+            nn.Linear(input_size, input_size),
+            # nn.Dropout(0.1),
+            MaskLayer(target_idxs, original_shape),
             nn.Linear(input_size, stage1_hidden_size),
-            nn.Linear(stage1_hidden_size, stage1_hidden_size),  # mask layer
-            MaskLayer(target_idxs),
             nn.ReLU(),
+            nn.Dropout(0.1),
             nn.Linear(stage1_hidden_size, stage1_output_size),
         )
 
@@ -68,18 +73,11 @@ class TwoStageModel(nn.Module):
         )
 
     @property
-    def stage1_optimizer(self):
+    def optimizer(self):
         return OPTIMIZER_CLASS(self.stage1_model.parameters(), lr=LR)
 
-    @property
-    def stage2_optimizer(self):
-        return OPTIMIZER_CLASS(self.stage2_model.parameters(), lr=LR)
-
     def forward(self, x):
-        print("X shape", x.size())
         y1_pred = self.stage1_model(x)  # Stage 1 inference
-        print("X1 pred", y1_pred.size())
         x2 = torch.cat((x, y1_pred), dim=1)
-        print("X2 cat", x2.size())
         y2_pred = self.stage2_model(x2)  # Stage 2 inference
         return (y1_pred, y2_pred)

@@ -44,6 +44,7 @@ class ModelTrainer:
         target_idxs: tuple[int, ...],
         input_dim: int,
         stage1_output_dim: int,
+        original_shape: tuple[int, ...],
     ):
         """
         Initialize model
@@ -56,13 +57,15 @@ class ModelTrainer:
 
         self.input_dim = input_dim
         self.model = TwoStageModel(
-            target_idxs, input_dim, stage1_output_size=stage1_output_dim
+            target_idxs,
+            input_dim,
+            original_shape=original_shape,
+            stage1_output_size=stage1_output_dim,
         )
 
-        self.stage1_optimizer = self.model.stage1_optimizer
-        self.stage2_optimizer = self.model.stage2_optimizer
+        self.optimizer = self.model.optimizer
 
-        self.stage1_criterion = nn.L1Loss()  # embedding-to-embedding loss calc
+        self.stage1_criterion = nn.CrossEntropyLoss()
         self.stage2_criterion = nn.MSELoss()
 
         logger.info("Initialized model with input dim of %s", input_dim)
@@ -88,8 +91,7 @@ class ModelTrainer:
         """
         checkpoint = {
             "model_state_dict": self.model.state_dict(),
-            "stage1_optimizer_state_dict": self.stage1_optimizer.state_dict(),
-            "stage2_optimizer_state_dict": self.stage2_optimizer.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
             "epoch": epoch,
         }
         checkpoint_name = f"checkpoint_{epoch}.pt"
@@ -104,7 +106,6 @@ class ModelTrainer:
     def train(
         self,
         input_dict: DnnInput,
-        y1_field_indexes,
         start_epoch: int = 0,
         num_epochs: int = 100,
     ):
@@ -124,34 +125,33 @@ class ModelTrainer:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
 
-                input = batch["x1"].view(batch["x1"].size(0), -1)  # TODO
-
+                # input = batch["x1_inputs"].view(-1)
+                input = batch["x1"].view(batch["x1"].size(0), -1)
                 y1_logits, y2_logits = self.model(input)
-
-                # STAGE 1 backprop
-                self.stage1_optimizer.zero_grad()
                 y1_pred = y1_logits.view(batch["y1"].size())
-                stage1_loss = self.stage1_criterion(y1_pred, batch["y1"])
-                logging.info("Stage 1 loss: %s", stage1_loss)
-                # stage1_loss.backward(retain_graph=True)
+                y1_pred_prob = torch.argmax(y1_pred, dim=1).float()
+                y1_true_prob = torch.argmax(batch["y1"], dim=1).float()
 
-                # STAGE 2 backprop
-                # self.stage2_optimizer.zero_grad()
+                self.optimizer.zero_grad()
+
+                # STAGE 1
+                stage1_loss = self.stage1_criterion(y1_pred_prob, y1_true_prob)
+                logging.info("Stage 1 loss: %s", stage1_loss)
+
+                # STAGE 2
                 stage2_loss = self.stage2_criterion(y2_logits, batch["y2"])
                 logging.info("Stage 2 loss: %s", stage2_loss)
-                # stage2_loss.backward(retain_graph=True)
-                # self.stage2_optimizer.step()
 
+                # combine loss and backprop both at the same time
                 loss = stage1_loss + stage2_loss
                 loss.backward(retain_graph=True)
-                self.stage1_optimizer.step()
+                self.optimizer.step()
 
-                y_pred_classes = y1_pred > TRUE_THRESHOLD
-                y_true_classes = batch["y1"] > TRUE_THRESHOLD
+                y_pred_classes = y1_pred_prob > TRUE_THRESHOLD
+                y_true_classes = y1_true_prob > TRUE_THRESHOLD
 
                 self.stage1_precision.update((y_pred_classes, y_true_classes))
                 self.stage1_recall.update((y_pred_classes, y_true_classes))
-
                 self.stage2_mae.update((y2_logits, batch["y2"]))
 
                 self.evaluate()
@@ -178,7 +178,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=100000)  # 96001
+        trials = fetch_trials("COMPLETED", limit=10000)  # 96001
         input_dict = prepare_inputs(
             trials,
             BATCH_SIZE,
@@ -187,11 +187,13 @@ class ModelTrainer:
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,
         )
-        input_dim = math.prod(input_dict["x1"].shape[2:])  # 576
+        input_dim = math.prod(input_dict["x1"].shape[2:])
         stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
         y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
-        model = ModelTrainer(y1_field_indexes, input_dim, stage1_output_dim)
-        model.train(input_dict, y1_field_indexes)
+        model = ModelTrainer(
+            y1_field_indexes, input_dim, stage1_output_dim, input_dict["x1"].shape[1:]
+        )
+        model.train(input_dict)
 
 
 def main():
