@@ -15,7 +15,7 @@ import polars as pl
 from core.ner.spacy import Spacy
 from typings.core import Primitive
 from utils.list import batch
-from utils.tensor import batch_as_tensors, pad_or_truncate_to_size
+from utils.tensor import batch_as_tensors, array_to_tensor
 
 from .constants import (
     DEFAULT_EMBEDDING_DIM,
@@ -24,10 +24,15 @@ from .constants import (
 )
 
 
-MAX_ITEMS_PER_CAT = 20
+MAX_ITEMS_PER_CAT = 4
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+VectorizedFeatures = namedtuple(
+    "VectorizedFeatures", ["encodings", "embeddings", "embedding_weights"]
+)
 
 
 def is_tensor_list(
@@ -147,74 +152,61 @@ def __get_text_embeddings(
     return text_feats
 
 
-def __get_cat_embeddings(
+def __vectorize_categories(
     items: Sequence[dict],
     categorical_fields: list[str],
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-) -> list[torch.Tensor]:
+) -> VectorizedFeatures:
     """
     Get category embeddings given a list of dicts
     """
     df = pl.from_dicts(items, infer_schema_length=1000)  # type: ignore
-    count_map = dict(
-        [
-            (field, df.select(pl.col(field).flatten()).n_unique())
-            for field in categorical_fields
-        ]
+    max_count = max(
+        [df.select(pl.col(field).flatten()).n_unique() for field in categorical_fields]
     )
 
-    embedding_layers = dict(
-        [
-            (field, nn.Embedding(count_map[field], embedding_dim))
-            for field in categorical_fields
-        ]
+    embedding_layers = [nn.Embedding(max_count, embedding_dim)] * len(
+        categorical_fields
     )
+    embedding_weights = [layer.weight for layer in embedding_layers]
+    combined_weights = torch.cat(embedding_weights, dim=1)
+    embedding_layer = nn.Embedding.from_pretrained(combined_weights)
+    # de_embed_layer = nn.Embedding.from_pretrained(combined_weights.transpose(0, 1))
 
     # one encoder per field
     label_encoders = [encode_category(field, df) for field in categorical_fields]
     FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
-    encoded_records = [
+    encoded_dicts = [
         FeatureTuple(*fv)._asdict() for fv in zip(*[enc[1] for enc in label_encoders])
     ]
 
-    # list[Tensor] == all tensors for a given field (multi-valued)
-    # list[list[Tensor]] == all tensors for all fields
-    embedded_records: list[list[torch.Tensor]] = [
-        [
-            torch.flatten(
-                embedding_layers[field](
-                    torch.tensor(record[field][0:MAX_ITEMS_PER_CAT], dtype=torch.int)
-                )
-            )
-            for field in categorical_fields
-        ]
-        for record in encoded_records
+    # e.g. [[[413], [2]], [[436, 440], [2]]]
+    encoded_records = [
+        [dict[field][0:MAX_ITEMS_PER_CAT] for field in categorical_fields]
+        for dict in encoded_dicts
     ]
-    max_len_0 = max(f.size(0) for f in flatten(embedded_records))
-    # max_len_1 = max(f.size(1) for f in flatten(embedded_records))
+    # torch.Size([2000, 6, 4])
+    encodings = array_to_tensor(
+        encoded_records, (*np.array(encoded_records).shape, MAX_ITEMS_PER_CAT)
+    )
+    flat_encodings = encodings.view(encodings.size(0), -1)
+    embeddings = embedding_layer(flat_encodings)
 
-    embed_records_padded = [
-        [
-            # pad_or_truncate_to_size(e, (max_len_0))
-            F.pad(e, (0, max_len_0 - e.size(0)))
-            # if e.size(0) > 0
-            # else torch.empty([max_len_0, max_len_1])
-            for e in embed
-        ]
-        for embed in embedded_records
-    ]
-    cat_feats = [torch.stack(rec, dim=0) for rec in embed_records_padded]
-    return cat_feats
+    return VectorizedFeatures(
+        encodings=encodings,
+        embeddings=embeddings,
+        embedding_weights=combined_weights,
+    )
 
 
-def get_feature_embeddings(
+def vectorize_features(
     records: Sequence[dict],
     categorical_fields: list[str],
     text_fields: list[str] = [],
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-) -> list[torch.Tensor]:
+) -> VectorizedFeatures:
     """
     Get category and text embeddings given a list of dicts
 
@@ -229,22 +221,23 @@ def get_feature_embeddings(
     # _records = [*records]
     # random.shuffle(_items)
 
-    cat_feats = __get_cat_embeddings(records, categorical_fields, embedding_dim)
-    text_feats = (
-        __get_text_embeddings(records, text_fields) if len(text_fields) > 1 else []
+    #  torch.Size([2000, 6, 3])
+    vectorized_cats = __vectorize_categories(records, categorical_fields, embedding_dim)
+    vectorized_text = (
+        __get_text_embeddings(records, text_fields) if len(text_fields) > 1 else None
     )
 
     def get_all_features(i: int) -> torch.Tensor:
-        combo_text_feats = (
-            torch.flatten(text_feats[i]) if len(text_fields) > 0 else None
-        )
-        combo_cat_feats = cat_feats[i]
-        if combo_text_feats is not None:
-            return torch.cat([combo_cat_feats, combo_text_feats], dim=0)
+        if vectorized_text is not None:
+            return torch.cat([vectorized_cats.embeddings[i], vectorized_text[i]], dim=0)
         else:
-            return combo_cat_feats
+            return vectorized_cats.embeddings[i]
 
     embeddings = [get_all_features(i) for i, _ in enumerate(records)]
 
     logger.info("Finished with feature embeddings")
-    return embeddings
+    return VectorizedFeatures(
+        encodings=vectorized_cats.encodings,
+        embedding_weights=vectorized_cats.embedding_weights,
+        embeddings=embeddings,
+    )

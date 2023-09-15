@@ -25,7 +25,7 @@ from .constants import (
     Y1_CATEGORICAL_FIELDS,
     Y2_FIELD,
 )
-from .core import TwoStageModel
+from .model import TwoStageModel
 from .types import DnnInput
 from .utils import prepare_inputs
 
@@ -65,14 +65,15 @@ class ModelTrainer:
 
         self.optimizer = self.model.optimizer
 
-        self.stage1_criterion = nn.CrossEntropyLoss()
-        self.stage2_criterion = nn.MSELoss()
+        self.stage1_criterion = nn.MSELoss()  # nn.CrossEntropyLoss()
+        # self.stage2_criterion = nn.MSELoss()
 
         logger.info("Initialized model with input dim of %s", input_dim)
 
-        self.stage1_precision = Precision(average=True, is_multilabel=True)
-        self.stage1_recall = Recall(average=True, is_multilabel=True)
-        self.stage2_mae = MeanAbsoluteError()
+        self.stage1_precision = Precision(is_multilabel=True)
+        self.stage1_recall = Recall(is_multilabel=True)
+        self.stage1_mae = MeanAbsoluteError()
+        # self.stage2_mae = MeanAbsoluteError()
 
     def __call__(self, *args, **kwargs):
         """
@@ -106,6 +107,7 @@ class ModelTrainer:
     def train(
         self,
         input_dict: DnnInput,
+        embedding_weights,
         start_epoch: int = 0,
         num_epochs: int = 100,
     ):
@@ -125,34 +127,47 @@ class ModelTrainer:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
 
-                # input = batch["x1_inputs"].view(-1)
                 input = batch["x1"].view(batch["x1"].size(0), -1)
                 y1_logits, y2_logits = self.model(input)
-                y1_pred = y1_logits.view(batch["y1"].size())
-                y1_pred_prob = torch.argmax(y1_pred, dim=1).float()
-                y1_true_prob = torch.argmax(batch["y1"], dim=1).float()
+
+                y1_pred_embeds = y1_logits.view(-1, 3, 48)  # 3, 6, 8
+                y1_preds = y1_pred_embeds
+
+                y1_true = batch["y1"]  # with embeds
+
+                # y1_true = batch["y1_categories"] # just encoded
+                # Project logits into embedding space
+                # y1_preds = y1_pred_embeds @ embedding_weights.transpose(0, 1)
+                # hypothetically those can now be compared with CEL
+
+                # print(
+                #     "y1_preds",
+                #     y1_preds.size(),
+                #     y1_preds[0:1],
+                #     "Y1true",
+                #     y1_true.size(),
+                #     y1_true[0:1],
+                # )
 
                 self.optimizer.zero_grad()
 
                 # STAGE 1
-                stage1_loss = self.stage1_criterion(y1_pred_prob, y1_true_prob)
+                stage1_loss = self.stage1_criterion(y1_preds, y1_true)
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
-                stage2_loss = self.stage2_criterion(y2_logits, batch["y2"])
-                logging.info("Stage 2 loss: %s", stage2_loss)
+                # stage2_loss = self.stage2_criterion(y2_logits, batch["y2"])
+                # logging.info("Stage 2 loss: %s", stage2_loss)
 
                 # combine loss and backprop both at the same time
-                loss = stage1_loss + stage2_loss
+                loss = stage1_loss.requires_grad_()  # + stage2_loss
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                y_pred_classes = y1_pred_prob > TRUE_THRESHOLD
-                y_true_classes = y1_true_prob > TRUE_THRESHOLD
-
-                self.stage1_precision.update((y_pred_classes, y_true_classes))
-                self.stage1_recall.update((y_pred_classes, y_true_classes))
-                self.stage2_mae.update((y2_logits, batch["y2"]))
+                self.stage1_mae.update((y1_preds, batch["y1"]))
+                # self.stage1_precision.update((y1_preds, y1_true))
+                # self.stage1_recall.update((y1_preds, y1_true))
+                # self.stage2_mae.update((y2_logits, batch["y2"]))
 
                 self.evaluate()
             if epoch % SAVE_FREQUENCY == 0:
@@ -164,22 +179,24 @@ class ModelTrainer:
         Output evaluation metrics (precision, recall, F1)
         """
         try:
-            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
-            logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
+            # logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
+            # logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
 
-            self.stage1_precision.reset()
-            self.stage1_recall.reset()
+            # self.stage1_precision.reset()
+            # self.stage1_recall.reset()
+            logging.info("Stage 1 MAE: %s", self.stage1_mae.compute())
+            self.stage1_mae.reset()
 
-            logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
-            self.stage2_mae.reset()
+            # logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
+            # self.stage2_mae.reset()
 
         except Exception as e:
             logging.warning("Failed to evaluate: %s", e)
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=10000)  # 96001
-        input_dict = prepare_inputs(
+        trials = fetch_trials("COMPLETED", limit=20000)  # 96001
+        input_dict, embedding_layer = prepare_inputs(
             trials,
             BATCH_SIZE,
             CATEGORICAL_FIELDS,
@@ -188,12 +205,13 @@ class ModelTrainer:
             Y2_FIELD,
         )
         input_dim = math.prod(input_dict["x1"].shape[2:])
+        # size of y1, which is derived from x1 (thus includes embeds)
         stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
         y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
         model = ModelTrainer(
             y1_field_indexes, input_dim, stage1_output_dim, input_dict["x1"].shape[1:]
         )
-        model.train(input_dict)
+        model.train(input_dict, embedding_layer)
 
 
 def main():

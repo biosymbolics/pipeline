@@ -2,8 +2,10 @@
 Tensor utilities
 """
 import logging
+from typing import Sequence
 import torch
 import torch.nn.functional as F
+import numpy as np
 from utils.list import BATCH_SIZE, batch
 
 from typings.core import Primitive
@@ -55,3 +57,27 @@ def batch_as_tensors(
     """
     batches = batch(items, batch_size)
     return [torch.tensor(batch) for batch in batches]
+
+
+def is_array_like(data):
+    if isinstance(data, Sequence):
+        return True
+    if type(data) == np.ndarray:
+        return True
+    return False
+
+
+def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
+    """
+    Turn a list (of lists (of lists)) into a tensor
+
+    Args:
+        data (list): list (of lists (of lists))
+        shape (tuple[int, ...]): Shape of the desired output tensor (TODO: automatically infer)
+    """
+    if is_array_like(data) and len(data) > 0 and is_array_like(data[0]):
+        tensors = [array_to_tensor(d, shape[1:]) for d in data]
+        return torch.stack(tensors)
+    if is_array_like(data):
+        return pad_or_truncate_to_size(torch.tensor(data), shape)
+    return data  # type: ignore

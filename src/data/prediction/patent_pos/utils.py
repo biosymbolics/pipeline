@@ -9,7 +9,7 @@ import torch
 from data.prediction.patent_pos.types import AllInput, DnnInput, GnnInput
 from data.prediction.utils import (
     batch_and_pad,
-    get_feature_embeddings,
+    vectorize_features,
     resize_and_batch,
 )
 from typings.core import Primitive
@@ -60,7 +60,7 @@ def prepare_inputs(
         """
         Prepare data for DNN
         """
-        embeddings = get_feature_embeddings(
+        embeddings = vectorize_features(
             patents, dnn_categorical_fields, dnn_text_fields  # type: ignore
         )
         x1 = resize_and_batch(embeddings, batch_size)
@@ -87,7 +87,7 @@ def prepare_inputs(
         Prepare inputs for GNN
         """
         # TODO: enirch with pathways, targets, disease pathways
-        embeddings = get_feature_embeddings(patents, gnn_categorical_fields)  # type: ignore
+        embeddings = vectorize_features(patents, gnn_categorical_fields)  # type: ignore
         x2 = resize_and_batch(embeddings, batch_size)
         edge_index = [torch.tensor([i, i]) for i in range(len(patents))]
         ei = batch_and_pad(edge_index, batch_size)

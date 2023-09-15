@@ -61,7 +61,7 @@ class TwoStageModel(nn.Module):
             MaskLayer(target_idxs, original_shape),
             nn.Linear(input_size, stage1_hidden_size),
             nn.ReLU(),
-            nn.Dropout(0.1),
+            # nn.Dropout(0.1),
             nn.Linear(stage1_hidden_size, stage1_output_size),
         )
 
@@ -78,6 +78,6 @@ class TwoStageModel(nn.Module):
 
     def forward(self, x):
         y1_pred = self.stage1_model(x)  # Stage 1 inference
-        x2 = torch.cat((x, y1_pred), dim=1)
-        y2_pred = self.stage2_model(x2)  # Stage 2 inference
-        return (y1_pred, y2_pred)
+        # x2 = torch.cat((x, y1_pred), dim=1)
+        # y2_pred = self.stage2_model(x2)  # Stage 2 inference
+        return (y1_pred, None)
