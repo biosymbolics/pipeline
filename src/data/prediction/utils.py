@@ -161,17 +161,18 @@ def __vectorize_categories(
     Get category embeddings given a list of dicts
     """
     df = pl.from_dicts(items, infer_schema_length=1000)  # type: ignore
-    max_count = max(
-        [df.select(pl.col(field).flatten()).n_unique() for field in categorical_fields]
+    # {'design': 5, 'masking': 5, 'randomization': 3, 'conditions': 1045, 'interventions': 1505, 'phase': 8}
+    max_sixes = dict(
+        [
+            (field, df.select(pl.col(field).flatten()).n_unique())
+            for field in categorical_fields
+        ]
     )
 
-    embedding_layers = [nn.Embedding(max_count, embedding_dim)] * len(
-        categorical_fields
-    )
-    embedding_weights = [layer.weight for layer in embedding_layers]
-    combined_weights = torch.cat(embedding_weights, dim=1)
-    embedding_layer = nn.Embedding.from_pretrained(combined_weights)
-    # de_embed_layer = nn.Embedding.from_pretrained(combined_weights.transpose(0, 1))
+    embedding_layers = [
+        nn.Embedding(size, embedding_dim) for size in max_sixes.values()
+    ]
+    embedding_weights = [e.weight for e in embedding_layers]
 
     # one encoder per field
     label_encoders = [encode_category(field, df) for field in categorical_fields]
@@ -187,17 +188,33 @@ def __vectorize_categories(
         [dict[field][0:MAX_ITEMS_PER_CAT] for field in categorical_fields]
         for dict in encoded_dicts
     ]
+
     # torch.Size([2000, 6, 4])
     encodings = array_to_tensor(
         encoded_records, (*np.array(encoded_records).shape, MAX_ITEMS_PER_CAT)
     )
-    flat_encodings = encodings.view(encodings.size(0), -1)
-    embeddings = embedding_layer(flat_encodings)
+
+    embedded_records: list[list[torch.Tensor]] = [
+        [
+            torch.Tensor(embedding_layers[i](dict[i][0:MAX_ITEMS_PER_CAT]))
+            for i in range(len(categorical_fields))
+        ]
+        for dict in encodings
+    ]
+
+    embeddings = array_to_tensor(
+        embedded_records,
+        (
+            len(embedded_records),
+            len(embedded_records[0]),
+            *embedded_records[0][0].shape,
+        ),
+    )
 
     return VectorizedFeatures(
         encodings=encodings,
         embeddings=embeddings,
-        embedding_weights=combined_weights,
+        embedding_weights=embedding_weights,
     )
 
 

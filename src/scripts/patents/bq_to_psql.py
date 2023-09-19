@@ -27,21 +27,24 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": None,
-    APPLICATIONS_TABLE: {
-        "column": "priority_date",
-        "size": timedelta(days=730),
-        "transform": lambda x: int(x.strftime("%Y%m%d")),
-        "starting_value": datetime(2000, 1, 1),
-        "ending_value": datetime(2023, 1, 1),
+    "biosym_annotations_source": {
+        "column": "domain",
+        "values": ["attributes", "compounds", "diseases", "mechanisms"],
     },
-    GPR_ANNOTATIONS_TABLE: {
-        "column": "confidence",
-        "size": 0.0125,
-        "starting_value": 0.774,
-        "ending_value": 0.91,  # max 0.90
-        "transform": lambda x: x,
-    },
+    # APPLICATIONS_TABLE: {
+    #     "column": "priority_date",
+    #     "size": timedelta(days=730),
+    #     "transform": lambda x: int(x.strftime("%Y%m%d")),
+    #     "starting_value": datetime(2000, 1, 1),
+    #     "ending_value": datetime(2023, 1, 1),
+    # },
+    # GPR_ANNOTATIONS_TABLE: {
+    #     "column": "confidence",
+    #     "size": 0.0125,
+    #     "starting_value": 0.774,
+    #     "ending_value": 0.91,  # max 0.90
+    #     "transform": lambda x: x,
+    # },
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -100,6 +103,13 @@ def create_patent_applications_table():
     client.create_from_select(applications, APPLICATIONS_TABLE)
 
 
+def shared_and_export(shard_query: str, shared_table_name: str, table: str, value: str):
+    db_client.create_from_select(shard_query, shared_table_name)
+    destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
+    db_client.export_table_to_storage(shared_table_name, destination_uri)
+    db_client.delete_table(shared_table_name)
+
+
 def export_bq_tables(today):
     """
     Export tables from BigQuery to GCS
@@ -111,6 +121,14 @@ def export_bq_tables(today):
         if shard_spec is None:
             destination_uri = f"gs://{GCS_BUCKET}/{table}.csv"
             db_client.export_table_to_storage(table, destination_uri)
+        if "values" in shard_spec:
+            for value in shard_spec["values"]:
+                shared_table_name = f"{table}_shard_tmp"
+                shard_query = f"""
+                    SELECT * FROM `{BQ_DATASET_ID}.{table}`
+                    WHERE {shard_spec["column"]} = '{value}'
+                """
+                shared_and_export(shard_query, shared_table_name, table, value)
         else:
             shared_table_name = f"{table}_shard_tmp"
             current_shard = shard_spec["starting_value"]
@@ -124,16 +142,7 @@ def export_bq_tables(today):
                     WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
                     AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
                 """
-                db_client.create_from_select(shard_query, shared_table_name)
-
-                # Define the destination in GCS
-                destination_uri = (
-                    f"gs://{GCS_BUCKET}/{today}/{table}_shard_{current_shard}.json"
-                )
-                db_client.export_table_to_storage(shared_table_name, destination_uri)
-
-                db_client.delete_table(shared_table_name)
-                current_shard = shard_end
+                shared_and_export(shard_query, shared_table_name, table, current_shard)
 
 
 # alter table applications alter column priority_date type date USING priority_date::date;

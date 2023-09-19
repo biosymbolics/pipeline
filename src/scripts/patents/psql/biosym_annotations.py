@@ -4,7 +4,7 @@ To run after NER is complete
 import sys
 import logging
 from typing import Literal
-from pydash import compact
+from pydash import compact, flatten
 
 from system import initialize
 
@@ -223,7 +223,7 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
 
 DELETION_TERMS = [
     "crystal structure",
-    "standard tibetan language",
+    "standard tibetian language",
     "present tricyclic",
     "topical surface",
     "cell",
@@ -787,9 +787,6 @@ def clean_up_junk():
         f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) where term ~ '.*[)]' and not term ~ '.*[(].*';",
         # leading/trailing whitespace
         rf"update {WORKING_TABLE} set term=trim(term) where trim(term) <> term",
-        # fixes some sentences
-        f"update {WORKING_TABLE} set "
-        + "term=regexp_extract(term, '(.{10,})(?:[.] [A-Z][A-Za-z0-9]{3,}).*') where term ~ '.{10,}[.] [A-Z][A-Za-z0-9]{3,}'",
     ]
     client = DatabaseClient()
     for sql in queries:
@@ -829,7 +826,7 @@ def remove_common_terms():
     logging.info("Removing common terms")
     common_terms = [
         *DELETION_TERMS,
-        *expand_res(INTERVENTION_BASE_TERMS),
+        *flatten(expand_res(INTERVENTION_BASE_TERMS)),
     ]
 
     or_re = get_or_re([f"{t}s?" for t in common_terms])
@@ -904,8 +901,6 @@ def normalize_domains():
         WHERE lower(ut.term) = md.lot and ut.domain <> md.new_domain;
     """
 
-    # update is much faster w/o this index, and it isn't needed from here on out anyway
-    client.execute_query("drop index trgm_index_biosym_annotations_term")
     client.execute_query(normalize_sql)
 
 
@@ -918,35 +913,38 @@ def populate_working_biosym_annotations():
     logging.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-        WORKING_TABLE,
-    )
+    # client.create_from_select(
+    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+    #     WORKING_TABLE,
+    # )
 
-    # add indices after initial load
-    client.create_indices(
-        [
-            {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
-        ]
-    )
+    # # add indices after initial load
+    # client.create_indices(
+    #     [
+    #         {"table": WORKING_TABLE, "column": "publication_number"},
+    #         {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
+    #     ]
+    # )
 
-    fix_unmatched()
-    clean_up_junk()
+    # fix_unmatched()
+    # clean_up_junk()
 
     # round 1 (leaves in stuff used by for/of)
-    remove_trailing_leading(REMOVAL_WORDS_PRE)
-    fix_of_for_annotations()
+    # remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # fix_of_for_annotations()
 
     # round 2 (removes trailing "compound" etc)
-    remove_trailing_leading(REMOVAL_WORDS_POST)
+    # remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
     # select term from biosym_annotations where length(term) > 150 and term like '%and%';
-    clean_up_junk()
+    # clean_up_junk()
 
-    remove_common_terms()  # remove one-off generic terms
+    # big updates are much faster w/o this index, and it isn't needed from here on out anyway
+    # client.execute_query("drop index trgm_index_biosym_annotations_term")
+
+    # remove_common_terms()  # remove one-off generic terms
     remove_substrings()  # less specific terms in set with more specific terms
 
     # normalize_domains is **much** faster w/o this index

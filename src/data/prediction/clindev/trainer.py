@@ -2,12 +2,15 @@ import logging
 import math
 import os
 import sys
+import numpy as np
 import torch
 import torch.nn as nn
 from ignite.metrics import Precision, Recall, MeanAbsoluteError
+import torch.nn.functional as F
 from data.prediction.constants import DEFAULT_BATCH_SIZE
 
 import system
+from utils.tensor import reverse_embedding, pad_or_truncate_to_size
 
 system.initialize()
 
@@ -21,7 +24,6 @@ from .constants import (
     CATEGORICAL_FIELDS,
     SAVE_FREQUENCY,
     TEXT_FIELDS,
-    TRUE_THRESHOLD,
     Y1_CATEGORICAL_FIELDS,
     Y2_FIELD,
 )
@@ -70,8 +72,8 @@ class ModelTrainer:
 
         logger.info("Initialized model with input dim of %s", input_dim)
 
-        self.stage1_precision = Precision(is_multilabel=True)
-        self.stage1_recall = Recall(is_multilabel=True)
+        self.stage1_precision = Precision(average=None, is_multilabel=True)
+        self.stage1_recall = Recall(average=None, is_multilabel=True)
         self.stage1_mae = MeanAbsoluteError()
         # self.stage2_mae = MeanAbsoluteError()
 
@@ -108,6 +110,7 @@ class ModelTrainer:
         self,
         input_dict: DnnInput,
         embedding_weights,
+        y1_field_indexes,
         start_epoch: int = 0,
         num_epochs: int = 100,
     ):
@@ -127,32 +130,19 @@ class ModelTrainer:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
 
+                # input = torch.Size([256, 192]) from torch.Size([256, 3, 4, 8])
                 input = batch["x1"].view(batch["x1"].size(0), -1)
+
+                # y1_logits = torch.Size([256, 96])
                 y1_logits, y2_logits = self.model(input)
 
-                y1_pred_embeds = y1_logits.view(-1, 3, 48)  # 3, 6, 8
-                y1_preds = y1_pred_embeds
-
-                y1_true = batch["y1"]  # with embeds
-
-                # y1_true = batch["y1_categories"] # just encoded
-                # Project logits into embedding space
-                # y1_preds = y1_pred_embeds @ embedding_weights.transpose(0, 1)
-                # hypothetically those can now be compared with CEL
-
-                # print(
-                #     "y1_preds",
-                #     y1_preds.size(),
-                #     y1_preds[0:1],
-                #     "Y1true",
-                #     y1_true.size(),
-                #     y1_true[0:1],
-                # )
+                y1_true = batch["y1"]  # embeddings (torch.Size([256, 3, 4, 8]))
+                y1_pred_embeds = y1_logits.view(y1_true.shape)
 
                 self.optimizer.zero_grad()
 
                 # STAGE 1
-                stage1_loss = self.stage1_criterion(y1_preds, y1_true)
+                stage1_loss = self.stage1_criterion(y1_pred_embeds, y1_true)
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
@@ -164,8 +154,31 @@ class ModelTrainer:
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                self.stage1_mae.update((y1_preds, batch["y1"]))
-                # self.stage1_precision.update((y1_preds, y1_true))
+                self.stage1_mae.update((y1_pred_embeds, batch["y1"]))
+
+                y1_true_cat = batch["y1_categories"]  # only encoded, not embedded
+
+                # torch.Size([8, 13])
+
+                print("y1_logits", y1_logits.shape)  # torch.Size([256, 96])
+
+                y1_preds_cat = reverse_embedding(
+                    y1_logits.view(y1_true.shape),
+                    [
+                        w
+                        for i, w in enumerate(embedding_weights)
+                        if i in y1_field_indexes
+                    ],
+                )
+
+                print(
+                    "y1_preds_cat",
+                    y1_preds_cat.shape,
+                    y1_preds_cat[0],
+                    "y1_true_cat",
+                    y1_true_cat[0],
+                )
+                self.stage1_precision.update((y1_true_cat, y1_preds_cat))
                 # self.stage1_recall.update((y1_preds, y1_true))
                 # self.stage2_mae.update((y2_logits, batch["y2"]))
 
@@ -179,10 +192,10 @@ class ModelTrainer:
         Output evaluation metrics (precision, recall, F1)
         """
         try:
-            # logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
+            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
             # logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
 
-            # self.stage1_precision.reset()
+            self.stage1_precision.reset()
             # self.stage1_recall.reset()
             logging.info("Stage 1 MAE: %s", self.stage1_mae.compute())
             self.stage1_mae.reset()
@@ -195,8 +208,8 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=20000)  # 96001
-        input_dict, embedding_layer = prepare_inputs(
+        trials = fetch_trials("COMPLETED", limit=2000)  # 96001
+        input_dict, embedding_weights = prepare_inputs(
             trials,
             BATCH_SIZE,
             CATEGORICAL_FIELDS,
@@ -211,7 +224,7 @@ class ModelTrainer:
         model = ModelTrainer(
             y1_field_indexes, input_dim, stage1_output_dim, input_dict["x1"].shape[1:]
         )
-        model.train(input_dict, embedding_layer)
+        model.train(input_dict, embedding_weights, y1_field_indexes)
 
 
 def main():

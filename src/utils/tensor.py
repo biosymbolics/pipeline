@@ -75,9 +75,49 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
         data (list): list (of lists (of lists))
         shape (tuple[int, ...]): Shape of the desired output tensor (TODO: automatically infer)
     """
+    if (
+        is_array_like(data)
+        and len(data) > 0
+        and all(map(lambda d: isinstance(d, torch.Tensor), data))
+    ):
+        stacked = torch.stack(data)  # type: ignore
+        return pad_or_truncate_to_size(stacked, shape)
     if is_array_like(data) and len(data) > 0 and is_array_like(data[0]):
         tensors = [array_to_tensor(d, shape[1:]) for d in data]
         return torch.stack(tensors)
     if is_array_like(data):
         return pad_or_truncate_to_size(torch.tensor(data), shape)
     return data  # type: ignore
+
+
+def reverse_embedding(
+    embedded_tensor: torch.Tensor, weight_tensors: list[torch.Tensor]
+):
+    """
+    Reverse multi-field/multi-select embeddings
+
+    Args:
+        embedded_tensor: [batch_size, num_fields, max_selections, emb_size]
+        weight_tensors: [num_fields, num_selections, emb_size]
+    """
+
+    def get_encoding_idx_by_field(field_index: int):
+        w = weight_tensors[field_index].unsqueeze(0)
+
+        # outputs batch_size x selections x emb_size (1 per field)
+        field_slice = embedded_tensor[:, field_index, :, :]
+
+        # (batch_size x max selections) x emb_size
+        field_select_slice = field_slice.reshape(-1, field_slice.shape[-1])
+
+        def get_encoding_idx(i):
+            dist = (field_select_slice[i] - w).abs().sum(dim=1)
+            encoding_idx = dist.argmin().item()
+            return encoding_idx
+
+        distances = [get_encoding_idx(i) for i in range(field_select_slice.shape[0])]
+        return torch.tensor(distances).reshape(field_slice.size(0), field_slice.size(1))
+
+    outputs = [get_encoding_idx_by_field(i) for i in range(len(weight_tensors))]
+    output = torch.stack(outputs, dim=1)
+    return output

@@ -341,7 +341,7 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "mutant",
     "negative",
     "receptor",
-    "recobinant",
+    "recombinant",
     "selective",
     "tri(?:cyclic)?",
     "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
