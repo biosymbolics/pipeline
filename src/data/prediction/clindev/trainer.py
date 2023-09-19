@@ -162,6 +162,9 @@ class ModelTrainer:
                 self.save_checkpoint(epoch)
 
     def calculate_metrics(self, batch, y1_preds: torch.Tensor, y2_preds: torch.Tensor):
+        """
+        Calculate metrics for a batch
+        """
         y1_true = batch["y1"]
         y2_true = batch["y2"]
         self.stage1_mae.update((y1_preds, y1_true))
@@ -169,13 +172,18 @@ class ModelTrainer:
         self.calculate_discrete_metrics(batch, y1_preds)
 
     def calculate_discrete_metrics(self, batch, y1_pred: torch.Tensor):
+        """
+        Calculate discrete metrics for a batch (precision/recall/f1)
+        """
         y1_pred_cats = reverse_embedding(y1_pred, self.y1_embedding_weights)
         y1_preds_oh = reduce_last_dim(y1_pred_cats, force=True, return_one_hot=True)
 
         y1_true_cats = batch["y1_categories"]
         y1_true_oh = reduce_last_dim(y1_true_cats, return_one_hot=True)
 
-        logger.info("y1_true_oh: %s, y1_preds_oh", y1_true_oh.shape, y1_preds_oh.shape)
+        logger.info(
+            "y1_true_oh: %s, y1_preds_oh: %s", y1_true_oh.shape, y1_preds_oh.shape
+        )
         self.stage1_precision.update((y1_true_oh, y1_preds_oh))
         self.stage1_recall.update((y1_true_oh, y1_preds_oh))
 
@@ -184,13 +192,12 @@ class ModelTrainer:
         Output evaluation metrics (precision, recall, F1)
         """
         try:
-            print("Disabled evaluation")
-            # logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
-            # logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
+            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
+            logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
             logging.info("Stage 1 MAE: %s", self.stage1_mae.compute())
 
-            # self.stage1_precision.reset()
-            # self.stage1_recall.reset()
+            self.stage1_precision.reset()
+            self.stage1_recall.reset()
             self.stage1_mae.reset()
 
             logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
