@@ -2,19 +2,16 @@ import logging
 import math
 import os
 import sys
-import numpy as np
 import torch
 import torch.nn as nn
 from ignite.metrics import Precision, Recall, MeanAbsoluteError
-import torch.nn.functional as F
-from data.prediction.constants import DEFAULT_BATCH_SIZE
 
 import system
-from utils.tensor import reverse_embedding, pad_or_truncate_to_size
 
 system.initialize()
 
 from clients.trials import fetch_trials
+from utils.tensor import reduce_last_dim, reverse_embedding
 
 
 from .constants import (
@@ -43,10 +40,10 @@ class ModelTrainer:
 
     def __init__(
         self,
-        target_idxs: tuple[int, ...],
         input_dim: int,
         stage1_output_dim: int,
         original_shape: tuple[int, ...],
+        embedding_weights: list[torch.Tensor],
     ):
         """
         Initialize model
@@ -58,8 +55,11 @@ class ModelTrainer:
         torch.device("mps")
 
         self.input_dim = input_dim
+        self.y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
+        self.embedding_weights = embedding_weights
+
         self.model = TwoStageModel(
-            target_idxs,
+            self.y1_field_indexes,
             input_dim,
             original_shape=original_shape,
             stage1_output_size=stage1_output_dim,
@@ -109,8 +109,6 @@ class ModelTrainer:
     def train(
         self,
         input_dict: DnnInput,
-        embedding_weights,
-        y1_field_indexes,
         start_epoch: int = 0,
         num_epochs: int = 100,
     ):
@@ -132,11 +130,10 @@ class ModelTrainer:
 
                 # input = torch.Size([256, 192]) from torch.Size([256, 3, 4, 8])
                 input = batch["x1"].view(batch["x1"].size(0), -1)
+                y1_true = batch["y1"]
 
-                # y1_logits = torch.Size([256, 96])
                 y1_logits, y2_logits = self.model(input)
 
-                y1_true = batch["y1"]  # embeddings (torch.Size([256, 3, 4, 8]))
                 y1_pred_embeds = y1_logits.view(y1_true.shape)
 
                 self.optimizer.zero_grad()
@@ -154,50 +151,46 @@ class ModelTrainer:
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                self.stage1_mae.update((y1_pred_embeds, batch["y1"]))
+                self.calculate_metrics(batch, y1_logits)
 
-                y1_true_cat = batch["y1_categories"]  # only encoded, not embedded
-
-                # torch.Size([8, 13])
-
-                print("y1_logits", y1_logits.shape)  # torch.Size([256, 96])
-
-                y1_preds_cat = reverse_embedding(
-                    y1_logits.view(y1_true.shape),
-                    [
-                        w
-                        for i, w in enumerate(embedding_weights)
-                        if i in y1_field_indexes
-                    ],
-                )
-
-                print(
-                    "y1_preds_cat",
-                    y1_preds_cat.shape,
-                    y1_preds_cat[0],
-                    "y1_true_cat",
-                    y1_true_cat[0],
-                )
-                self.stage1_precision.update((y1_true_cat, y1_preds_cat))
-                # self.stage1_recall.update((y1_preds, y1_true))
-                # self.stage2_mae.update((y2_logits, batch["y2"]))
-
-                self.evaluate()
             if epoch % SAVE_FREQUENCY == 0:
                 self.evaluate()
                 self.save_checkpoint(epoch)
+
+    def calculate_metrics(self, batch, y1_logits):
+        y1_pred_embeds = y1_logits.view(batch["y1"].shape)
+        self.stage1_mae.update((y1_pred_embeds, batch["y1"]))
+
+        y1_preds_categories = reverse_embedding(
+            y1_logits.view(batch["y1"].shape),
+            [
+                w
+                for i, w in enumerate(self.embedding_weights)
+                if i in self.y1_field_indexes
+            ],
+        )
+
+        y1_true_cat_oh = reduce_last_dim(batch["y1_categories"], return_one_hot=True)
+        y1_preds_oh = reduce_last_dim(
+            y1_preds_categories, force=True, return_one_hot=True
+        )
+
+        self.stage1_precision.update((y1_true_cat_oh, y1_preds_oh))
+        self.stage1_recall.update((y1_true_cat_oh, y1_preds_oh))
+        # self.stage2_mae.update((y2_logits, batch["y2"]))
 
     def evaluate(self):
         """
         Output evaluation metrics (precision, recall, F1)
         """
         try:
-            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
+            print("Disabled evaluation")
+            # logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
             # logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
-
-            self.stage1_precision.reset()
-            # self.stage1_recall.reset()
             logging.info("Stage 1 MAE: %s", self.stage1_mae.compute())
+
+            # self.stage1_precision.reset()
+            # self.stage1_recall.reset()
             self.stage1_mae.reset()
 
             # logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
@@ -220,11 +213,10 @@ class ModelTrainer:
         input_dim = math.prod(input_dict["x1"].shape[2:])
         # size of y1, which is derived from x1 (thus includes embeds)
         stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
-        y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
         model = ModelTrainer(
-            y1_field_indexes, input_dim, stage1_output_dim, input_dict["x1"].shape[1:]
+            input_dim, stage1_output_dim, input_dict["x1"].shape[1:], embedding_weights
         )
-        model.train(input_dict, embedding_weights, y1_field_indexes)
+        model.train(input_dict)
 
 
 def main():

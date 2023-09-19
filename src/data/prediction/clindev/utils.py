@@ -31,21 +31,21 @@ def prepare_inputs(
     text_fields: list[str],
     y1_categorical_fields: list[str],  # e.g. randomization
     y2_field: str,
-) -> tuple[DnnInput, nn.Embedding]:
+) -> tuple[DnnInput, list[torch.Tensor]]:
     """
     Prepare data for DNN
     """
     logger.info("Preparing inputs for DNN")
     vectorized_feats = vectorize_features(trials, categorical_fields, text_fields)  # type: ignore
 
-    # X1 shape torch.Size([8, 256, 6, 4, 8]) -> (num cats) x (max items per cat) x (embed size)
+    # (batches) x (seq length) x (num cats) x (max items per cat) x (embed size)
     x1 = resize_and_batch(vectorized_feats.embeddings, batch_size)
 
     y1_field_indexes = tuple(n for n in range(len(y1_categorical_fields)))
-    # y1: torch.Size([8, 256, 3, 4, 8])
+    # (batches) x (seq length) x (num cats) x (max items per cat) x (embed size)
     y1 = x1[:, :, y1_field_indexes, :]
 
-    # y1_categories: torch.Size([8, 256, 3, 4])
+    # (batches) x (seq length) x (num cats) x (max items per cat)
     y1_categories = resize_and_batch(
         vectorized_feats.encodings[:, y1_field_indexes], batch_size
     )
@@ -66,10 +66,3 @@ def prepare_inputs(
         "y1_categories": y1_categories,
         "y2": y2,
     }, vectorized_feats.embedding_weights
-
-
-"""
-Output dim: mult of all non-batched dims
-1. turn into original dim
-2. de-encode
-"""

@@ -59,7 +59,10 @@ def batch_as_tensors(
     return [torch.tensor(batch) for batch in batches]
 
 
-def is_array_like(data):
+def is_array_like(data: object) -> bool:
+    """
+    Check if data is array-like
+    """
     if isinstance(data, Sequence):
         return True
     if type(data) == np.ndarray:
@@ -90,19 +93,17 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
     return data  # type: ignore
 
 
-def reverse_embedding(
-    embedded_tensor: torch.Tensor, weight_tensors: list[torch.Tensor]
-):
+def reverse_embedding(embedded_tensor: torch.Tensor, weights: list[torch.Tensor]):
     """
     Reverse multi-field/multi-select embeddings
 
     Args:
         embedded_tensor: [batch_size, num_fields, max_selections, emb_size]
-        weight_tensors: [num_fields, num_selections, emb_size]
+        weights: [dict_size, emb_size]
     """
 
     def get_encoding_idx_by_field(field_index: int):
-        w = weight_tensors[field_index].unsqueeze(0)
+        w = weights[field_index].unsqueeze(0)
 
         # outputs batch_size x selections x emb_size (1 per field)
         field_slice = embedded_tensor[:, field_index, :, :]
@@ -118,6 +119,31 @@ def reverse_embedding(
         distances = [get_encoding_idx(i) for i in range(field_select_slice.shape[0])]
         return torch.tensor(distances).reshape(field_slice.size(0), field_slice.size(1))
 
-    outputs = [get_encoding_idx_by_field(i) for i in range(len(weight_tensors))]
+    outputs = [get_encoding_idx_by_field(i) for i in range(len(weights))]
     output = torch.stack(outputs, dim=1)
     return output
+
+
+def reduce_last_dim(
+    tensor: torch.Tensor, force: bool = False, return_one_hot: bool = False
+) -> torch.Tensor:
+    """
+    Reduce the last dim of a tensor to a single value, if appropriate
+    (all valued at zero except the last, or force=true)
+
+    Used in cases where the tensor contains categories that *can* have multiple values,
+    but in this case we want to treat them as having a single value
+    """
+    size = tensor.size(-1) - 1
+
+    if torch.all(tensor[..., :size] == 0) or force == True:
+        squeezed = tensor[..., -1:].squeeze()
+
+        if return_one_hot:
+            # assumes interger values
+            num_classes = int(torch.max(tensor).item()) + 1
+            return F.one_hot(squeezed, num_classes=num_classes)
+
+        return squeezed
+
+    return tensor

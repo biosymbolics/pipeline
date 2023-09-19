@@ -24,7 +24,7 @@ from .constants import (
 )
 
 
-MAX_ITEMS_PER_CAT = 4
+MAX_ITEMS_PER_CAT = 20
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
