@@ -73,14 +73,14 @@ class ModelTrainer:
         self.optimizer = self.model.optimizer
 
         self.stage1_criterion = nn.MSELoss()  # nn.CrossEntropyLoss()
-        # self.stage2_criterion = nn.MSELoss()
+        self.stage2_criterion = nn.MSELoss()
 
         logger.info("Initialized model with input dim of %s", input_dim)
 
         self.stage1_precision = Precision(average=None, is_multilabel=True)
         self.stage1_recall = Recall(average=None, is_multilabel=True)
         self.stage1_mae = MeanAbsoluteError()
-        # self.stage2_mae = MeanAbsoluteError()
+        self.stage2_mae = MeanAbsoluteError()
 
     def __call__(self, *args, **kwargs):
         """
@@ -133,39 +133,40 @@ class ModelTrainer:
                 logging.info("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
 
-                # input = torch.Size([256, 192]) from torch.Size([256, 3, 4, 8])
                 input = batch["x1"].view(batch["x1"].size(0), -1)
                 y1_true = batch["y1"]
+                y2_true = batch["y2"]
 
                 y1_logits, y2_logits = self.model(input)
-                y1_pred = y1_logits.view(y1_true.shape)
+                y1_preds = y1_logits.view(y1_true.shape)
 
                 self.optimizer.zero_grad()
 
                 # STAGE 1
-                stage1_loss = self.stage1_criterion(y1_pred, y1_true)
+                stage1_loss = self.stage1_criterion(y1_preds, y1_true)
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
-                # stage2_loss = self.stage2_criterion(y2_logits, batch["y2"])
-                # logging.info("Stage 2 loss: %s", stage2_loss)
+                stage2_loss = self.stage2_criterion(y2_logits, y2_true)
+                logging.info("Stage 2 loss: %s", stage2_loss)
 
                 # combine loss and backprop both at the same time
-                loss = stage1_loss.requires_grad_()  # + stage2_loss
+                loss = stage1_loss + stage2_loss
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                self.calculate_metrics(batch, y1_pred)
+                self.calculate_metrics(batch, y1_preds, y2_logits)
 
             if epoch % SAVE_FREQUENCY == 0:
                 self.evaluate()
                 self.save_checkpoint(epoch)
 
-    def calculate_metrics(self, batch, y1_pred: torch.Tensor):
+    def calculate_metrics(self, batch, y1_preds: torch.Tensor, y2_preds: torch.Tensor):
         y1_true = batch["y1"]
-        self.stage1_mae.update((y1_pred, y1_true))
-        # self.stage2_mae.update((y2_logits, batch["y2"]))
-        self.calculate_discrete_metrics(batch, y1_pred)
+        y2_true = batch["y2"]
+        self.stage1_mae.update((y1_preds, y1_true))
+        self.stage2_mae.update((y2_preds, y2_true))
+        self.calculate_discrete_metrics(batch, y1_preds)
 
     def calculate_discrete_metrics(self, batch, y1_pred: torch.Tensor):
         y1_pred_cats = reverse_embedding(y1_pred, self.y1_embedding_weights)
@@ -174,6 +175,7 @@ class ModelTrainer:
         y1_true_cats = batch["y1_categories"]
         y1_true_oh = reduce_last_dim(y1_true_cats, return_one_hot=True)
 
+        logger.info("y1_true_oh: %s, y1_preds_oh", y1_true_oh.shape, y1_preds_oh.shape)
         self.stage1_precision.update((y1_true_oh, y1_preds_oh))
         self.stage1_recall.update((y1_true_oh, y1_preds_oh))
 
@@ -191,8 +193,8 @@ class ModelTrainer:
             # self.stage1_recall.reset()
             self.stage1_mae.reset()
 
-            # logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
-            # self.stage2_mae.reset()
+            logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
+            self.stage2_mae.reset()
 
         except Exception as e:
             logging.warning("Failed to evaluate: %s", e)

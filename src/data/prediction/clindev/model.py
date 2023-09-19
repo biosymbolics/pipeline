@@ -76,8 +76,8 @@ class TwoStageModel(nn.Module):
     def optimizer(self):
         return OPTIMIZER_CLASS(self.stage1_model.parameters(), lr=LR)
 
-    def forward(self, x):
+    def forward(self, x) -> tuple[torch.Tensor, torch.Tensor]:
         y1_pred = self.stage1_model(x)  # Stage 1 inference
-        # x2 = torch.cat((x, y1_pred), dim=1)
-        # y2_pred = self.stage2_model(x2)  # Stage 2 inference
-        return (y1_pred, None)
+        x2 = torch.cat((x, y1_pred), dim=1)
+        y2_pred = self.stage2_model(x2)  # Stage 2 inference
+        return (y1_pred, y2_pred)
