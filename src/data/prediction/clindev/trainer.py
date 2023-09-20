@@ -18,16 +18,16 @@ from utils.tensor import reduce_last_dim, reverse_embedding
 
 from .constants import (
     BATCH_SIZE,
-    CATEGORICAL_FIELDS,
+    MULTI_SELECT_CATEGORICAL_FIELDS,
+    SINGLE_SELECT_CATEGORICAL_FIELDS,
     CHECKPOINT_PATH,
-    CATEGORICAL_FIELDS,
     SAVE_FREQUENCY,
     TEXT_FIELDS,
     Y1_CATEGORICAL_FIELDS,
     Y2_FIELD,
 )
 from .model import TwoStageModel
-from .types import DnnInput
+from .types import DnnInput, TwoStageModelSizes
 from .utils import prepare_inputs
 
 
@@ -54,24 +54,35 @@ class ModelTrainer:
         """
         torch.device("mps")
 
-        # size of y1, which is derived from x1 (thus includes embeds)
-        stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
+        self.input_dim = 128  # arbitrary
 
-        self.input_dim = math.prod(input_dict["x1"].shape[2:])
         self.y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
         self.embedding_weights = embedding_weights
         self.y1_embedding_weights = [
-            w
-            for i, w in enumerate(self.embedding_weights)
-            if i in self.y1_field_indexes
+            w for i, w in enumerate(embedding_weights) if i in self.y1_field_indexes
         ]
+
+        sizes = TwoStageModelSizes(
+            multi_select_input=math.prod(input_dict["multi_select_x"].shape[2:]),
+            single_select_input=math.prod(input_dict["single_select_x"].shape[2:]),
+            text_input=math.prod(input_dict["text_x"].shape[2:])
+            if input_dict["text_x"]
+            else 0,
+            stage1_input=self.input_dim,
+            stage2_input=math.prod(input_dict["y1"].shape[2:]),
+            stage1_hidden=round(self.input_dim / 2),
+            stage1_embedded_output=math.prod(input_dict["y1"].shape[2:]),
+            stage1_prob_output=len(Y1_CATEGORICAL_FIELDS),  # all single-select
+            stage2_hidden=round(self.input_dim / 2),
+            stage2_output=1,
+        )
+        logging.info("Model sizes: %s", sizes)
 
         self.model = TwoStageModel(
             self.y1_field_indexes,
-            self.input_dim,
-            original_shape=input_dict["x1"].shape[1:],
-            stage1_embedded_output_size=stage1_output_dim,
-            stage1_prob_output_size=len(Y1_CATEGORICAL_FIELDS) * MAX_ITEMS_PER_CAT,
+            # TODO! used only for masking outputs based on y1_field_indexes
+            original_shape=input_dict["single_select_x"].shape[1:],
+            sizes=sizes,
         )
 
         self.optimizer = self.model.optimizer
@@ -129,19 +140,25 @@ class ModelTrainer:
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
-        num_batches = input_dict["x1"].size(0)
+        num_batches = input_dict["multi_select_x"].size(0)
 
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
-                batch: DnnInput = {k: v[i] for k, v in input_dict.items()}  # type: ignore
+                batch: DnnInput = {k: v[i] for k, v in input_dict.items() if v is not None}  # type: ignore
+                batch_size = batch["multi_select_x"].size(0)
 
-                input = batch["x1"].view(batch["x1"].size(0), -1)
                 y1_true = batch["y1"]
                 y2_true = batch["y2"]
 
-                y1_logits, y2_logits, y1_probs = self.model(input)
+                y1_logits, y2_logits, y1_probs = self.model(
+                    batch["multi_select_x"].view(batch_size, -1),
+                    batch["single_select_x"].view(batch_size, -1),
+                    batch["text_x"].view(batch_size, -1)
+                    if "text_x" in batch and batch["text_x"] is not None
+                    else None,
+                )
                 y1_preds = y1_logits.view(y1_true.shape)
 
                 self.optimizer.zero_grad()
@@ -224,10 +241,11 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials():
         trials = fetch_trials("COMPLETED", limit=2000)
-        input_dict, embedding_weights, _ = prepare_inputs(
+        input_dict, embedding_weights = prepare_inputs(
             trials,
             BATCH_SIZE,
-            CATEGORICAL_FIELDS,
+            SINGLE_SELECT_CATEGORICAL_FIELDS,
+            MULTI_SELECT_CATEGORICAL_FIELDS,
             TEXT_FIELDS,
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,

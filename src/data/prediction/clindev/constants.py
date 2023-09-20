@@ -15,7 +15,7 @@ OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = 1  # DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
-Y1_CATEGORICAL_FIELDS: list[str] = [
+SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "design",
     "masking",
     "randomization",
@@ -24,8 +24,8 @@ Y1_CATEGORICAL_FIELDS: list[str] = [
     # "facilities", ??
     # "countries" ??
 ]
-CATEGORICAL_FIELDS: list[str] = [
-    *Y1_CATEGORICAL_FIELDS,  # stage 1 predictions assist in stage 2 duration prediction
+Y1_CATEGORICAL_FIELDS: list[str] = SINGLE_SELECT_CATEGORICAL_FIELDS
+MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "conditions",
     "interventions",
     # "termination_reason",

@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import logging
 
+from data.prediction.clindev.types import TwoStageModelSizes
+
 from .constants import (
     LR,
     OPTIMIZER_CLASS,
@@ -35,7 +37,7 @@ class TwoStageModel(nn.Module):
     Loading:
         >>> import torch; import system; system.initialize();
         >>> from core.models.clindev.core import DNN
-        >>> model = DNN()
+        >>> model = TwoStageModel()
         >>> checkpoint = torch.load("clindev_model_checkpoints/checkpoint_15.pt", map_location=torch.device('mps'))
         >>> model.load_state_dict(checkpoint["model_state_dict"])
         >>> model.eval()
@@ -45,36 +47,43 @@ class TwoStageModel(nn.Module):
     def __init__(
         self,
         target_idxs: tuple[int, ...],
-        input_size: int,
         original_shape: tuple[int, ...],
-        stage1_hidden_size: int = 64,
-        stage1_embedded_output_size: int = 32,
-        stage1_prob_output_size: int = 32,
-        stage2_hidden_size: int = 64,
+        sizes: TwoStageModelSizes,
     ):
         super().__init__()
         torch.device("mps")
 
+        self.input_model = nn.ModuleDict(
+            {
+                "multi_select": nn.Linear(sizes.multi_select_input, sizes.stage1_input),
+                "single_select": nn.Linear(
+                    sizes.single_select_input, sizes.stage1_input
+                ),
+                "text": nn.Linear(sizes.text_input, sizes.stage1_input),
+            }
+        )
         # Stage 1 model
         self.stage1_model = nn.Sequential(
-            nn.Linear(input_size, input_size),
+            nn.Linear(sizes.stage1_input, sizes.stage1_input),
             MaskLayer(target_idxs, original_shape),
-            nn.Linear(input_size, stage1_hidden_size),
+            nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
             nn.ReLU(),
             # nn.Dropout(0.1),
-            nn.Linear(stage1_hidden_size, stage1_embedded_output_size),
+            nn.Linear(sizes.stage1_hidden, sizes.stage1_embedded_output),
         )
 
         # used for calc of loss / evaluation of stage1 separately
         self.stage1_probs_model = nn.Sequential(
-            nn.Linear(stage1_embedded_output_size, stage1_prob_output_size),
+            nn.Linear(sizes.stage1_embedded_output, sizes.stage1_prob_output),
         )
 
         # Stage 2 model
         self.stage2_model = nn.Sequential(
-            nn.Linear(input_size + stage1_embedded_output_size, stage2_hidden_size),
+            nn.Linear(
+                sizes.stage2_input + sizes.stage1_embedded_output, sizes.stage2_hidden
+            ),
             nn.ReLU(),
-            nn.Linear(stage2_hidden_size, 1),  # Output size of 1 (duration)
+            nn.Linear(sizes.stage2_hidden, sizes.stage2_output),
         )
 
     @property
@@ -86,7 +95,15 @@ class TwoStageModel(nn.Module):
             lr=LR,
         )
 
-    def forward(self, x) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(
+        self, multi_select_x, single_select_x, text_x
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x = self.input_model["multi_select"].forward(multi_select_x)
+        x = self.input_model["single_select"].forward(single_select_x)
+
+        if text_x is not None:
+            x = self.input_model["text"].forward(text_x)
+
         y1_pred = self.stage1_model(x)
         y1_probs = self.stage1_probs_model(y1_pred)
         x2 = torch.cat((x, y1_pred), dim=1)

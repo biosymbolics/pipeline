@@ -1,4 +1,5 @@
-from typing import Any, Iterable, Sequence, TypeGuard, cast
+from functools import partial
+from typing import Any, Iterable, NamedTuple, Optional, Sequence, TypeGuard, cast
 import logging
 import random
 from collections import namedtuple
@@ -30,10 +31,26 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-VectorizedFeatures = namedtuple(
-    "VectorizedFeatures",
-    ["encodings", "embeddings", "embedding_weights", "category_size_map"],
-)
+class VectorizedCategories(NamedTuple):
+    encodings: torch.Tensor
+    embeddings: torch.Tensor
+    weights: list[torch.Tensor]
+
+
+class VectorizedFeatures(NamedTuple):
+    # TODO: this can have any combo of feats
+    # required for single; only for single
+    encodings: torch.Tensor
+    # required for single; only for single
+    embedding_weights: list[torch.Tensor]
+    multi_select_embeddings: torch.Tensor
+    single_select_embeddings: torch.Tensor
+    text_embeddings: Optional[torch.Tensor]
+
+
+class EmbeddedCategories(NamedTuple):
+    embeddings: torch.Tensor
+    weights: list[torch.Tensor]
 
 
 def is_tensor_list(
@@ -139,7 +156,7 @@ def get_string_values(item: dict, field: str) -> list:
 def __get_text_embeddings(
     items: Sequence[dict],
     text_fields: list[str] = [],
-) -> list[torch.Tensor]:
+) -> torch.Tensor:
     """
     Get text embeddings given a list of dicts
     """
@@ -172,33 +189,35 @@ def __get_text_embeddings(
     ]
     max_len = max(f.size(0) for f in flatten(text_feats))
     text_feats = [F.pad(f, (0, max_len - f.size(0))) for f in text_feats]
-    return text_feats
+
+    tensor = array_to_tensor(
+        text_feats,
+        (
+            len(text_feats),
+            len(text_feats[0]),
+            *text_feats[0][0].shape,
+        ),
+    )
+
+    return tensor
 
 
-def __vectorize_categories(
+def __encode_categories(
     items: Sequence[dict],
     categorical_fields: list[str],
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-) -> VectorizedFeatures:
+):
     """
-    Get category embeddings given a list of dicts
+    Get category **encodings** given a list of dicts
     """
     FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
-
     df = pl.from_dicts(items, infer_schema_length=1000)  # type: ignore
-    # {'design': 5, 'masking': 5, 'randomization': 3, 'conditions': 1045, 'interventions': 1505, 'phase': 8}
+
     max_sizes = dict(
         [
             (field, df.select(pl.col(field).flatten()).n_unique())
             for field in categorical_fields
         ]
     )
-    print("MAX SIXES", max_sizes)
-
-    embedding_layers = [
-        nn.Embedding(size, embedding_dim) for size in max_sizes.values()
-    ]
-    embedding_weights = [e.weight for e in embedding_layers]
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = encode_categories(categorical_fields, df)
@@ -214,9 +233,32 @@ def __vectorize_categories(
         encoded_records, (len(items), len(categorical_fields), MAX_ITEMS_PER_CAT)
     )
 
+    return encodings, max_sizes
+
+
+def __embed_categories(
+    encodings: torch.Tensor,
+    categorical_fields: list[str],
+    max_sizes: dict[str, int],
+    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+) -> EmbeddedCategories:
+    """
+    Get category embeddings given a list of dicts
+
+    Usage:
+    ```
+    encodings, max_sizes = __encode_categories(items, categorical_fields)
+    __embed_categories(encodings, categorical_fields, max_sizes)
+    ```
+    """
+
+    embedding_layers = [nn.Embedding(s, embedding_dim) for s in max_sizes.values()]
+    weights = [e.weight for e in embedding_layers]
+
     embedded_records: list[list[torch.Tensor]] = [
         [
-            torch.Tensor(embedding_layers[i](enc[i][0:MAX_ITEMS_PER_CAT]))
+            torch.Tensor(embedding_layers[i](enc[i][0:max_items_per_cat]))
             for i in range(len(categorical_fields))
         ]
         for enc in encodings
@@ -231,18 +273,65 @@ def __vectorize_categories(
         ),
     )
 
-    return VectorizedFeatures(
+    return EmbeddedCategories(embeddings=embeddings, weights=weights)
+
+
+def __vectorize_categories(
+    records: Sequence[dict],
+    categorical_fields: list[str],
+    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+):
+    encodings, max_sizes = __encode_categories(records, categorical_fields)
+
+    embeddings, weights = __embed_categories(
+        encodings,
+        categorical_fields,
+        max_sizes,
+        max_items_per_cat=max_items_per_cat,
+        embedding_dim=embedding_dim,
+    )
+
+    return VectorizedCategories(
         encodings=encodings,
         embeddings=embeddings,
-        embedding_weights=embedding_weights,
-        category_size_map=max_sizes,
+        weights=weights,
+    )
+
+
+def __vectorize_single_select_categories(
+    records: Sequence[dict],
+    categorical_fields: list[str],
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+):
+    return __vectorize_categories(
+        records,
+        categorical_fields,
+        max_items_per_cat=1,
+        embedding_dim=embedding_dim,
+    )
+
+
+def __vectorize_multi_select_categories(
+    records: Sequence[dict],
+    categorical_fields: list[str],
+    max_items_per_cat: int,
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+):
+    return __vectorize_categories(
+        records,
+        categorical_fields,
+        max_items_per_cat=max_items_per_cat,
+        embedding_dim=embedding_dim,
     )
 
 
 def vectorize_features(
     records: Sequence[dict],
-    categorical_fields: list[str],
+    single_select_categorical_fields: list[str],
+    multi_select_categorical_fields: list[str],
     text_fields: list[str] = [],
+    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
 ) -> VectorizedFeatures:
     """
@@ -259,23 +348,28 @@ def vectorize_features(
     # _records = [*records]
     # random.shuffle(_items)
 
-    vectorized_cats = __vectorize_categories(records, categorical_fields, embedding_dim)
+    vectorized_single_select = __vectorize_single_select_categories(
+        records,
+        single_select_categorical_fields,
+        embedding_dim,
+    )
+
+    vectorized_multi_select = __vectorize_multi_select_categories(
+        records,
+        multi_select_categorical_fields,
+        max_items_per_cat,
+        embedding_dim,
+    )
+
     vectorized_text = (
         __get_text_embeddings(records, text_fields) if len(text_fields) > 1 else None
     )
 
-    def get_all_features(i: int) -> torch.Tensor:
-        if vectorized_text is not None:
-            return torch.cat([vectorized_cats.embeddings[i], vectorized_text[i]], dim=0)
-        else:
-            return vectorized_cats.embeddings[i]
-
-    embeddings = [get_all_features(i) for i, _ in enumerate(records)]
-
     logger.info("Finished with feature embeddings")
     return VectorizedFeatures(
-        encodings=vectorized_cats.encodings,
-        embedding_weights=vectorized_cats.embedding_weights,
-        embeddings=embeddings,
-        category_size_map=vectorized_cats.category_size_map,
+        encodings=vectorized_single_select.encodings,
+        embedding_weights=vectorized_single_select.weights,
+        multi_select_embeddings=vectorized_multi_select.embeddings,
+        single_select_embeddings=vectorized_single_select.embeddings,
+        text_embeddings=vectorized_text,
     )
