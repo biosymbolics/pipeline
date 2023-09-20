@@ -3,6 +3,7 @@ import math
 import os
 import sys
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 from ignite.metrics import Precision, Recall, MeanAbsoluteError
 
@@ -11,6 +12,7 @@ import system
 system.initialize()
 
 from clients.trials import fetch_trials
+from data.prediction.utils import MAX_ITEMS_PER_CAT
 from utils.tensor import reduce_last_dim, reverse_embedding
 
 
@@ -40,9 +42,7 @@ class ModelTrainer:
 
     def __init__(
         self,
-        input_dim: int,
-        stage1_output_dim: int,
-        original_shape: tuple[int, ...],
+        input_dict: DnnInput,
         embedding_weights: list[torch.Tensor],
     ):
         """
@@ -54,7 +54,10 @@ class ModelTrainer:
         """
         torch.device("mps")
 
-        self.input_dim = input_dim
+        # size of y1, which is derived from x1 (thus includes embeds)
+        stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
+
+        self.input_dim = math.prod(input_dict["x1"].shape[2:])
         self.y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
         self.embedding_weights = embedding_weights
         self.y1_embedding_weights = [
@@ -65,17 +68,18 @@ class ModelTrainer:
 
         self.model = TwoStageModel(
             self.y1_field_indexes,
-            input_dim,
-            original_shape=original_shape,
-            stage1_output_size=stage1_output_dim,
+            self.input_dim,
+            original_shape=input_dict["x1"].shape[1:],
+            stage1_embedded_output_size=stage1_output_dim,
+            stage1_prob_output_size=len(Y1_CATEGORICAL_FIELDS) * MAX_ITEMS_PER_CAT,
         )
 
         self.optimizer = self.model.optimizer
 
-        self.stage1_criterion = nn.MSELoss()  # nn.CrossEntropyLoss()
+        self.stage1_criterion = nn.BCEWithLogitsLoss()
         self.stage2_criterion = nn.MSELoss()
 
-        logger.info("Initialized model with input dim of %s", input_dim)
+        logger.info("Initialized model with input dim of %s", self.input_dim)
 
         self.stage1_precision = Precision(average=None, is_multilabel=True)
         self.stage1_recall = Recall(average=None, is_multilabel=True)
@@ -137,13 +141,19 @@ class ModelTrainer:
                 y1_true = batch["y1"]
                 y2_true = batch["y2"]
 
-                y1_logits, y2_logits = self.model(input)
+                y1_logits, y2_logits, y1_probs = self.model(input)
                 y1_preds = y1_logits.view(y1_true.shape)
 
                 self.optimizer.zero_grad()
 
                 # STAGE 1
-                stage1_loss = self.stage1_criterion(y1_preds, y1_true)
+                y1_predictions = (
+                    y1_probs.reshape(batch["y1_categories"].shape)
+                ).float()
+                stage1_loss = self.stage1_criterion(
+                    y1_predictions, batch["y1_categories"].float()
+                )
+
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
@@ -151,7 +161,9 @@ class ModelTrainer:
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
                 # combine loss and backprop both at the same time
-                loss = stage1_loss + stage2_loss
+                loss = stage1_loss + (math.log(stage2_loss) * 0.01)
+                logging.info("Total loss: %s", loss)
+
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
@@ -165,11 +177,14 @@ class ModelTrainer:
         """
         Calculate metrics for a batch
         """
-        y1_true = batch["y1"]
-        y2_true = batch["y2"]
-        self.stage1_mae.update((y1_preds, y1_true))
-        self.stage2_mae.update((y2_preds, y2_true))
-        self.calculate_discrete_metrics(batch, y1_preds)
+        try:
+            y1_true = batch["y1"]
+            y2_true = batch["y2"]
+            self.stage1_mae.update((y1_preds, y1_true))
+            self.stage2_mae.update((y2_preds, y2_true))
+            self.calculate_discrete_metrics(batch, y1_preds)
+        except Exception as e:
+            logging.warning("Failed to calculate metrics: %s", e)
 
     def calculate_discrete_metrics(self, batch, y1_pred: torch.Tensor):
         """
@@ -208,8 +223,8 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=2000)  # 96001
-        input_dict, embedding_weights = prepare_inputs(
+        trials = fetch_trials("COMPLETED", limit=2000)
+        input_dict, embedding_weights, _ = prepare_inputs(
             trials,
             BATCH_SIZE,
             CATEGORICAL_FIELDS,
@@ -217,12 +232,8 @@ class ModelTrainer:
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,
         )
-        input_dim = math.prod(input_dict["x1"].shape[2:])
-        # size of y1, which is derived from x1 (thus includes embeds)
-        stage1_output_dim = math.prod(input_dict["y1"].shape[2:])
-        model = ModelTrainer(
-            input_dim, stage1_output_dim, input_dict["x1"].shape[1:], embedding_weights
-        )
+
+        model = ModelTrainer(input_dict, embedding_weights)
         model.train(input_dict)
 
 

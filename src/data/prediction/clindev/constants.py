@@ -10,7 +10,7 @@ CHECKPOINT_PATH = "clindev_model_checkpoints"
 
 
 BATCH_SIZE = DEFAULT_BATCH_SIZE
-LR = 1e-7  # DEFAULT_LR
+LR = DEFAULT_LR
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = 1  # DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
@@ -19,6 +19,7 @@ Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
     "masking",
     "randomization",
+    "phase",
     # "comparator",
     # "facilities", ??
     # "countries" ??
@@ -27,7 +28,6 @@ CATEGORICAL_FIELDS: list[str] = [
     *Y1_CATEGORICAL_FIELDS,  # stage 1 predictions assist in stage 2 duration prediction
     "conditions",
     "interventions",
-    "phase",
     # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []

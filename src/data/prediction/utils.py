@@ -1,8 +1,8 @@
-from typing import Any, Sequence, TypeGuard, cast
+from typing import Any, Iterable, Sequence, TypeGuard, cast
 import logging
 import random
 from collections import namedtuple
-from pydash import flatten
+from pydash import compact, flatten
 import numpy as np
 import polars as pl
 import torch
@@ -31,7 +31,8 @@ logger.setLevel(logging.INFO)
 
 
 VectorizedFeatures = namedtuple(
-    "VectorizedFeatures", ["encodings", "embeddings", "embedding_weights"]
+    "VectorizedFeatures",
+    ["encodings", "embeddings", "embedding_weights", "category_size_map"],
 )
 
 
@@ -70,7 +71,9 @@ def batch_and_pad(
     return torch.stack(batches)
 
 
-def resize_and_batch(embeddings: list[torch.Tensor], batch_size: int) -> torch.Tensor:
+def resize_and_batch(
+    embeddings: list[torch.Tensor] | torch.Tensor, batch_size: int
+) -> torch.Tensor:
     """
     Size embeddings into batches
 
@@ -83,25 +86,45 @@ def resize_and_batch(embeddings: list[torch.Tensor], batch_size: int) -> torch.T
     return batch_and_pad(padded_emb, batch_size)
 
 
-def encode_category(field: str, df: pl.DataFrame) -> tuple[LabelEncoder, list[Any]]:
+def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[int]]:
     """
     Encode a categorical field from a dataframe
 
     Args:
         field (str): Field to encode
         df (pl.DataFrame): Dataframe to encode from
+        offset (int, optional): Offset to apply to encoded values. Defaults to 0.
     """
+
+    def apply_offset(vals) -> list[int]:
+        return [v + offset for v in vals]
+
+    values = flatten(compact(df.select(pl.col(field)).to_series().to_list()))
+    logger.info("Encoding field %s (e.g.: %s)", field, values[0:5])
     encoder = LabelEncoder()
-    new_list = df.select(pl.col(field)).to_series().to_list()
-    logger.info("Encoding field %s (ex: %s)", field, new_list[0:5])
-    encoder.fit(flatten(new_list))
-    values = [
-        encoder.transform([x] if isinstance(x, str) else x)
-        for x in new_list
-        if x is not None  # TODO: shouldn't be necessary; pre-clean
+    encoder.fit(values)
+    encoded_values = [
+        apply_offset(encoder.transform([v] if isinstance(v, str) else v))
+        for v in values
     ]
-    logger.info("Finished encoding field %s", field)
-    return (encoder, values)
+    logger.info("Finished encoding field %s (%s)", field, encoded_values[0])
+    return cast(list[list[int]], encoded_values)
+
+
+def encode_categories(fields: list[str], df: pl.DataFrame) -> Iterable[list[list[int]]]:
+    """
+    Encode a list of categorical fields from a dataframe
+    Applies an offset so that encoded values are unique across fields.
+
+    Args:
+        fields (list[str]): Fields to encode
+        df (pl.DataFrame): Dataframe to encode from
+    """
+    offset = 0
+    for field in fields:
+        res = encode_category(field, df)
+        offset += len(res)
+        yield res
 
 
 def get_string_values(item: dict, field: str) -> list:
@@ -160,28 +183,26 @@ def __vectorize_categories(
     """
     Get category embeddings given a list of dicts
     """
+    FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
+
     df = pl.from_dicts(items, infer_schema_length=1000)  # type: ignore
     # {'design': 5, 'masking': 5, 'randomization': 3, 'conditions': 1045, 'interventions': 1505, 'phase': 8}
-    max_sixes = dict(
+    max_sizes = dict(
         [
             (field, df.select(pl.col(field).flatten()).n_unique())
             for field in categorical_fields
         ]
     )
+    print("MAX SIXES", max_sizes)
 
     embedding_layers = [
-        nn.Embedding(size, embedding_dim) for size in max_sixes.values()
+        nn.Embedding(size, embedding_dim) for size in max_sizes.values()
     ]
     embedding_weights = [e.weight for e in embedding_layers]
 
-    # one encoder per field
-    label_encoders = [encode_category(field, df) for field in categorical_fields]
-    FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
-
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
-    encoded_dicts = [
-        FeatureTuple(*fv)._asdict() for fv in zip(*[enc[1] for enc in label_encoders])
-    ]
+    encodings_list = encode_categories(categorical_fields, df)
+    encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
 
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
@@ -189,17 +210,16 @@ def __vectorize_categories(
         for dict in encoded_dicts
     ]
 
-    # torch.Size([2000, 6, 4])
     encodings = array_to_tensor(
-        encoded_records, (*np.array(encoded_records).shape, MAX_ITEMS_PER_CAT)
+        encoded_records, (len(items), len(categorical_fields), MAX_ITEMS_PER_CAT)
     )
 
     embedded_records: list[list[torch.Tensor]] = [
         [
-            torch.Tensor(embedding_layers[i](dict[i][0:MAX_ITEMS_PER_CAT]))
+            torch.Tensor(embedding_layers[i](enc[i][0:MAX_ITEMS_PER_CAT]))
             for i in range(len(categorical_fields))
         ]
-        for dict in encodings
+        for enc in encodings
     ]
 
     embeddings = array_to_tensor(
@@ -215,6 +235,7 @@ def __vectorize_categories(
         encodings=encodings,
         embeddings=embeddings,
         embedding_weights=embedding_weights,
+        category_size_map=max_sizes,
     )
 
 
@@ -238,7 +259,6 @@ def vectorize_features(
     # _records = [*records]
     # random.shuffle(_items)
 
-    #  torch.Size([2000, 6, 3])
     vectorized_cats = __vectorize_categories(records, categorical_fields, embedding_dim)
     vectorized_text = (
         __get_text_embeddings(records, text_fields) if len(text_fields) > 1 else None
@@ -257,4 +277,5 @@ def vectorize_features(
         encodings=vectorized_cats.encodings,
         embedding_weights=vectorized_cats.embedding_weights,
         embeddings=embeddings,
+        category_size_map=vectorized_cats.category_size_map,
     )

@@ -93,12 +93,14 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
     return data  # type: ignore
 
 
-def reverse_embedding(embedded_tensor: torch.Tensor, weights: list[torch.Tensor]):
+def reverse_embedding(
+    embedded_tensor: torch.Tensor, weights: list[torch.Tensor]
+) -> torch.Tensor:
     """
     Reverse multi-field/multi-select embeddings
 
     Args:
-        embedded_tensor: [batch_size, num_fields, max_selections, emb_size]
+        embedded_tensor: [seq_length, num_fields, max_selections, emb_size]
         weights: [dict_size, emb_size]
     """
 
@@ -133,6 +135,11 @@ def reduce_last_dim(
 
     Used in cases where the tensor contains categories that *can* have multiple values,
     but in this case we want to treat them as having a single value
+
+    Args:
+        tensor (torch.Tensor): Tensor to reduce
+        force (bool, optional): Force reduction. Defaults to False.
+        return_one_hot (bool, optional): Return one-hot encoding. Defaults to False.
     """
     size = tensor.size(-1) - 1
 
@@ -141,7 +148,10 @@ def reduce_last_dim(
 
         if return_one_hot:
             # assumes interger values
-            num_classes = int(torch.max(tensor).item()) + 1
+            num_classes = 8  # int(torch.max(tensor).item()) + 1
+            for i in range(squeezed.size(1)):
+                t = squeezed[:, i].view(-1)
+                print(i, ":", [v.item() for v in t if v > 0][0:50])
             return F.one_hot(squeezed, num_classes=num_classes)
 
         return squeezed
