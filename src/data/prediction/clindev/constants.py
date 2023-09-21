@@ -16,15 +16,18 @@ SAVE_FREQUENCY = 1  # DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    "design",
-    "masking",
-    "randomization",
     "phase",
+    # enrollment!!! (not cat tho)
     # "comparator",
     # "facilities", ??
     # "countries" ??
 ]
-Y1_CATEGORICAL_FIELDS: list[str] = SINGLE_SELECT_CATEGORICAL_FIELDS
+Y1_CATEGORICAL_FIELDS: list[str] = [
+    # no phase
+    "design",
+    "masking",
+    "randomization",
+]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "conditions",
     "interventions",

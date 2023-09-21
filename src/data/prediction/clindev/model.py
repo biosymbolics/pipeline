@@ -1,6 +1,7 @@
 """
 Trial characteristic and duration prediction model
 """
+from pydash import flatten
 import torch
 import torch.nn as nn
 import logging
@@ -14,20 +15,6 @@ from .constants import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class MaskLayer(nn.Module):
-    def __init__(self, target_idxs: tuple[int, ...], orig_shape: tuple[int, ...]):
-        super().__init__()
-        self.target_idxs = target_idxs
-        self.orig_shape = orig_shape
-
-    def forward(self, x):
-        _x = x.clone().view(self.orig_shape)  # clone?
-        mask = torch.ones_like(_x)  # tensor of 1s
-        mask[:, ~torch.tensor(self.target_idxs)] = 0  # mask out non-target indices
-        masked = _x * mask
-        return masked.view(x.shape)
 
 
 class TwoStageModel(nn.Module):
@@ -46,8 +33,6 @@ class TwoStageModel(nn.Module):
 
     def __init__(
         self,
-        target_idxs: tuple[int, ...],
-        original_shape: tuple[int, ...],
         sizes: TwoStageModelSizes,
     ):
         super().__init__()
@@ -56,16 +41,16 @@ class TwoStageModel(nn.Module):
         self.input_model = nn.ModuleDict(
             {
                 "multi_select": nn.Linear(sizes.multi_select_input, sizes.stage1_input),
+                "text": nn.Linear(sizes.text_input, sizes.stage1_input),
                 "single_select": nn.Linear(
                     sizes.single_select_input, sizes.stage1_input
                 ),
-                "text": nn.Linear(sizes.text_input, sizes.stage1_input),
             }
         )
+
         # Stage 1 model
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
-            MaskLayer(target_idxs, original_shape),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
             nn.ReLU(),
             # nn.Dropout(0.1),
@@ -73,15 +58,22 @@ class TwoStageModel(nn.Module):
         )
 
         # used for calc of loss / evaluation of stage1 separately
-        self.stage1_probs_model = nn.Sequential(
-            nn.Linear(sizes.stage1_embedded_output, sizes.stage1_prob_output),
+        self.stage1_output_models = dict(
+            [
+                (
+                    field,
+                    nn.Sequential(
+                        nn.Linear(sizes.stage1_embedded_output, size),
+                        nn.Softmax(),
+                    ),
+                )
+                for field, size in sizes.stage1_output_map.items()
+            ]
         )
 
         # Stage 2 model
         self.stage2_model = nn.Sequential(
-            nn.Linear(
-                sizes.stage2_input + sizes.stage1_embedded_output, sizes.stage2_hidden
-            ),
+            nn.Linear(sizes.stage1_embedded_output, sizes.stage2_hidden),
             nn.ReLU(),
             nn.Linear(sizes.stage2_hidden, sizes.stage2_output),
         )
@@ -90,22 +82,32 @@ class TwoStageModel(nn.Module):
     def optimizer(self):
         return OPTIMIZER_CLASS(
             list(self.stage1_model.parameters())
-            + list(self.stage1_probs_model.parameters())
+            + flatten(
+                [
+                    list(model.parameters())
+                    for model in self.stage1_output_models.values()
+                ]
+            )
             + list(self.stage2_model.parameters()),
             lr=LR,
         )
 
     def forward(
         self, multi_select_x, single_select_x, text_x
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
         x = self.input_model["multi_select"].forward(multi_select_x)
         x = self.input_model["single_select"].forward(single_select_x)
-
         if text_x is not None:
             x = self.input_model["text"].forward(text_x)
 
         y1_pred = self.stage1_model(x)
-        y1_probs = self.stage1_probs_model(y1_pred)
-        x2 = torch.cat((x, y1_pred), dim=1)
-        y2_pred = self.stage2_model(x2)
-        return (y1_pred, y2_pred, y1_probs)
+
+        y1_probs_dict = dict(
+            [
+                (field, model(y1_pred))
+                for field, model in self.stage1_output_models.items()
+            ]
+        )
+        y_probs = torch.cat(list(y1_probs_dict.values()), dim=1)
+        y2_pred = self.stage2_model(y1_pred)
+        return (y1_pred, y2_pred, y_probs, y1_probs_dict)

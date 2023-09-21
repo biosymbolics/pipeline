@@ -32,9 +32,17 @@ logger.setLevel(logging.INFO)
 
 
 class VectorizedCategories(NamedTuple):
+    category_size_map: dict[str, int]
     encodings: torch.Tensor
     embeddings: torch.Tensor
     weights: list[torch.Tensor]
+
+
+class VectorizedAndBatched(NamedTuple):
+    embedding_weights: list[torch.Tensor]
+    multi_select_x: torch.Tensor
+    single_select_x: torch.Tensor
+    text_x: Optional[torch.Tensor]
 
 
 class VectorizedFeatures(NamedTuple):
@@ -128,22 +136,6 @@ def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[
     return cast(list[list[int]], encoded_values)
 
 
-def encode_categories(fields: list[str], df: pl.DataFrame) -> Iterable[list[list[int]]]:
-    """
-    Encode a list of categorical fields from a dataframe
-    Applies an offset so that encoded values are unique across fields.
-
-    Args:
-        fields (list[str]): Fields to encode
-        df (pl.DataFrame): Dataframe to encode from
-    """
-    offset = 0
-    for field in fields:
-        res = encode_category(field, df)
-        offset += len(res)
-        yield res
-
-
 def get_string_values(item: dict, field: str) -> list:
     val = item.get(field)
     if isinstance(val, list):
@@ -202,9 +194,10 @@ def __get_text_embeddings(
     return tensor
 
 
-def __encode_categories(
+def encode_categories(
     items: Sequence[dict],
     categorical_fields: list[str],
+    max_items_per_cat: int,
 ):
     """
     Get category **encodings** given a list of dicts
@@ -219,18 +212,27 @@ def __encode_categories(
         ]
     )
 
+    def __do_encode_categories(
+        fields: list[str], df: pl.DataFrame
+    ) -> Iterable[list[list[int]]]:
+        offset = 0
+        for field in fields:
+            res = encode_category(field, df)
+            offset += len(res)
+            yield res
+
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
-    encodings_list = encode_categories(categorical_fields, df)
+    encodings_list = __do_encode_categories(categorical_fields, df)
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
 
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
-        [dict[field][0:MAX_ITEMS_PER_CAT] for field in categorical_fields]
+        [dict[field][0:max_items_per_cat] for field in categorical_fields]
         for dict in encoded_dicts
     ]
 
     encodings = array_to_tensor(
-        encoded_records, (len(items), len(categorical_fields), MAX_ITEMS_PER_CAT)
+        encoded_records, (len(items), len(categorical_fields), max_items_per_cat)
     )
 
     return encodings, max_sizes
@@ -240,7 +242,7 @@ def __embed_categories(
     encodings: torch.Tensor,
     categorical_fields: list[str],
     max_sizes: dict[str, int],
-    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
 ) -> EmbeddedCategories:
     """
@@ -248,7 +250,7 @@ def __embed_categories(
 
     Usage:
     ```
-    encodings, max_sizes = __encode_categories(items, categorical_fields)
+    encodings, max_sizes = encode_categories(items, categorical_fields)
     __embed_categories(encodings, categorical_fields, max_sizes)
     ```
     """
@@ -279,10 +281,12 @@ def __embed_categories(
 def __vectorize_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
-    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-):
-    encodings, max_sizes = __encode_categories(records, categorical_fields)
+) -> VectorizedCategories:
+    encodings, max_sizes = encode_categories(
+        records, categorical_fields, max_items_per_cat
+    )
 
     embeddings, weights = __embed_categories(
         encodings,
@@ -293,17 +297,18 @@ def __vectorize_categories(
     )
 
     return VectorizedCategories(
+        category_size_map=max_sizes,
         encodings=encodings,
         embeddings=embeddings,
         weights=weights,
     )
 
 
-def __vectorize_single_select_categories(
+def vectorize_single_select_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-):
+) -> VectorizedCategories:
     return __vectorize_categories(
         records,
         categorical_fields,
@@ -312,12 +317,12 @@ def __vectorize_single_select_categories(
     )
 
 
-def __vectorize_multi_select_categories(
+def vectorize_multi_select_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
     max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-):
+) -> VectorizedCategories:
     return __vectorize_categories(
         records,
         categorical_fields,
@@ -348,13 +353,13 @@ def vectorize_features(
     # _records = [*records]
     # random.shuffle(_items)
 
-    vectorized_single_select = __vectorize_single_select_categories(
+    vectorized_single_select = vectorize_single_select_categories(
         records,
         single_select_categorical_fields,
         embedding_dim,
     )
 
-    vectorized_multi_select = __vectorize_multi_select_categories(
+    vectorized_multi_select = vectorize_multi_select_categories(
         records,
         multi_select_categorical_fields,
         max_items_per_cat,
@@ -372,4 +377,48 @@ def vectorize_features(
         multi_select_embeddings=vectorized_multi_select.embeddings,
         single_select_embeddings=vectorized_single_select.embeddings,
         text_embeddings=vectorized_text,
+    )
+
+
+def vectorize_and_batch_features(
+    batch_size: int,
+    records: Sequence[dict],
+    single_select_categorical_fields: list[str],
+    multi_select_categorical_fields: list[str],
+    text_fields: list[str] = [],
+    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+) -> VectorizedAndBatched:
+    """
+    Vectorizes and batches input features
+    """
+    feats = vectorize_features(
+        records,
+        single_select_categorical_fields,
+        multi_select_categorical_fields,
+        text_fields,
+        max_items_per_cat,
+        embedding_dim,
+    )
+
+    multi_select = resize_and_batch(feats.multi_select_embeddings, batch_size)
+    single_select = resize_and_batch(feats.single_select_embeddings, batch_size)
+    text = (
+        resize_and_batch(feats.text_embeddings, batch_size)  # type: ignore
+        if feats.text_embeddings is not None
+        else None
+    )
+
+    logger.info(
+        "multi_select_x: %s, single_select_x: %s, text_x: %s",
+        multi_select.size(),
+        single_select.size(),
+        text.size() if text is not None else None,
+    )
+
+    return VectorizedAndBatched(
+        multi_select_x=multi_select,
+        single_select_x=single_select,
+        text_x=text,
+        embedding_weights=feats.embedding_weights,
     )
