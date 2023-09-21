@@ -9,6 +9,7 @@ import torch.nn as nn
 from ignite.metrics import Precision, Recall, MeanAbsoluteError
 
 import system
+from utils.tensor import pad_or_truncate_to_size
 
 system.initialize()
 
@@ -81,8 +82,8 @@ class ModelTrainer:
 
         logger.info("Initialized model with input dim of %s", self.input_dim)
 
-        self.stage1_precision = Precision(average=None, is_multilabel=True)
-        self.stage1_recall = Recall(average=None, is_multilabel=True)
+        self.stage1_precision = Precision(average=None)
+        self.stage1_recall = Recall(average=None)
         self.stage1_mae = MeanAbsoluteError()
         self.stage2_mae = MeanAbsoluteError()
 
@@ -135,14 +136,20 @@ class ModelTrainer:
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
-                batch: DnnInput = {k: v[i] for k, v in input_dict.items() if v is not None}  # type: ignore
+                try:
+                    batch: DnnInput = {k: v[i] for k, v in input_dict.items() if v is not None}  # type: ignore
+                except Exception as e:
+                    logging.warning(
+                        "Failed to get batch %s: %s. This should not happen.", i, e
+                    )
+                    continue
+
                 batch_size = batch["multi_select_x"].size(0)
 
                 y1_true = batch["y1"]
                 y2_true = batch["y2"]
 
-                # y1_logits = torch.Size([256, 64])
-                y1_logits, y2_logits, y1_probs, y1_probs_dict = self.model(
+                y1_logits, y2_logits, y1_probs, _ = self.model(
                     batch["multi_select_x"].view(batch_size, -1),
                     batch["single_select_x"].view(batch_size, -1),
                     batch["text_x"].view(batch_size, -1)
@@ -162,7 +169,7 @@ class ModelTrainer:
                 )[:-1]
 
                 y1_probs_by_field = torch.tensor_split(y1_probs, y1_idxs, dim=1)
-                y1_true_by_field = torch.split(batch["y1_categories"], 1, dim=1)
+                y1_true_by_field = list(torch.split(batch["y1_categories"], 1, dim=1))
 
                 field_losses = [
                     self.stage1_criterion(
@@ -175,32 +182,29 @@ class ModelTrainer:
                 ]
 
                 stage1_loss = torch.stack(field_losses).sum()
-                print("stage1_loss grad fn", stage1_loss.grad_fn)
-
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
-                # combine loss and backprop both at the same time
                 loss = stage1_loss + (math.log(stage2_loss) * 0.01)
                 logging.info("Total loss: %s", loss)
 
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                self.calculate_metrics(batch, y1_preds, y1_probs, y2_logits)
+                self.calculate_continuous_metrics(batch, y1_preds, y2_logits)
+                self.calculate_discrete_metrics(y1_probs_by_field, y1_true_by_field)
 
             if epoch % SAVE_FREQUENCY == 0:
                 self.evaluate()
                 self.save_checkpoint(epoch)
 
-    def calculate_metrics(
+    def calculate_continuous_metrics(
         self,
         batch,
         y1_preds: torch.Tensor,
-        y1_probs: torch.Tensor,
         y2_preds: torch.Tensor,
     ):
         """
@@ -208,38 +212,27 @@ class ModelTrainer:
         """
         y1_true = batch["y1"]
         y2_true = batch["y2"]
-        print(y1_preds.shape, y1_true.shape, y2_preds.shape, y2_true.shape)
         self.stage1_mae.update((y1_preds, y1_true))
         self.stage2_mae.update((y2_preds, y2_true))
-        self.calculate_discrete_metrics(batch, y1_preds, y1_probs)
 
     def calculate_discrete_metrics(
-        self, batch: DnnInput, y1_pred: torch.Tensor, y1_probs: torch.Tensor
+        self,
+        y1_probs_by_field: list[torch.Tensor],
+        y1_true_by_field: list[torch.Tensor],
     ):
         """
         Calculate discrete metrics for a batch (precision/recall/f1)
         """
-        print("YPROBS", y1_probs.shape, y1_probs[0:2])
-        y1_pred_cats = (y1_probs > 0.5).float()
-        y1_true_cats = batch["y1_categories"]
 
-        y1_preds_oh = (
-            y1_pred_cats  # F.one_hot(y1_pred_cats.squeeze(), num_classes=num_classes)
-        )
-        y1_true_oh = (
-            y1_true_cats  # F.one_hot(y1_true_cats.squeeze(), num_classes=num_classes)
-        )
-
-        # y1_true_oh: torch.Size([256, 3, 5]), y1_preds_oh: torch.Size([256, 5])
-        logger.info(
-            "y1_true_oh: %s (%s), y1_preds_oh: %s (%s)",
-            y1_true_oh.shape,
-            y1_true_oh[0:2],
-            y1_preds_oh.shape,
-            y1_preds_oh[0:2],
-        )
-        self.stage1_precision.update((y1_true_oh, y1_preds_oh))
-        self.stage1_recall.update((y1_true_oh, y1_preds_oh))
+        # pad because ohe size is different for each field
+        max_idx_0 = max([t.shape[0] for t in y1_probs_by_field])
+        max_idx_1 = max([t.shape[1] for t in y1_probs_by_field])
+        for y1_probs, y1_true in zip(y1_probs_by_field, y1_true_by_field):
+            y1_pred_cats = pad_or_truncate_to_size(
+                (y1_probs > 0.5).float(), (max_idx_0, max_idx_1)
+            )
+            self.stage1_precision.update((y1_pred_cats, y1_true.squeeze()))
+            self.stage1_recall.update((y1_pred_cats, y1_true.squeeze()))
 
     def evaluate(self):
         """

@@ -64,7 +64,7 @@ class TwoStageModel(nn.Module):
                     field,
                     nn.Sequential(
                         nn.Linear(sizes.stage1_embedded_output, size),
-                        nn.Softmax(),
+                        nn.Sigmoid(),
                     ),
                 )
                 for field, size in sizes.stage1_output_map.items()
