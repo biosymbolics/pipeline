@@ -124,14 +124,25 @@ def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[
     def apply_offset(vals) -> list[int]:
         return [v + offset for v in vals]
 
-    values = flatten(compact(df.select(pl.col(field)).to_series().to_list()))
-    logger.info("Encoding field %s (e.g.: %s)", field, values[0:5])
+    values = df.select(pl.col(field)).to_series().to_list()
+    logger.info(
+        "Encoding field %s (e.g.: %s) length: %s", field, values[0:5], len(values)
+    )
     encoder = LabelEncoder()
-    encoder.fit(values)
+    # flatten list values; only apply here otherwise value error
+    encoder.fit(flatten(values))
     encoded_values = [
         apply_offset(encoder.transform([v] if isinstance(v, str) else v))
         for v in values
     ]
+
+    if df.shape[0] != len(encoded_values):
+        raise ValueError(
+            "Encoded values length does not match dataframe length: %s != %s",
+            len(encoded_values),
+            df.shape[0],
+        )
+
     logger.info("Finished encoding field %s (%s)", field, encoded_values[0])
     return cast(list[list[int]], encoded_values)
 
@@ -195,7 +206,7 @@ def __get_text_embeddings(
 
 
 def encode_categories(
-    items: Sequence[dict],
+    records: Sequence[dict],
     categorical_fields: list[str],
     max_items_per_cat: int,
 ):
@@ -203,7 +214,7 @@ def encode_categories(
     Get category **encodings** given a list of dicts
     """
     FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
-    df = pl.from_dicts(items, infer_schema_length=1000)  # type: ignore
+    df = pl.from_dicts(records, infer_schema_length=1000)  # type: ignore
 
     max_sizes = dict(
         [
@@ -222,7 +233,7 @@ def encode_categories(
             yield res
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
-    encodings_list = __do_encode_categories(categorical_fields, df)
+    encodings_list = list(__do_encode_categories(categorical_fields, df))
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
 
     # e.g. [[[413], [2]], [[436, 440], [2]]]
@@ -232,7 +243,7 @@ def encode_categories(
     ]
 
     encodings = array_to_tensor(
-        encoded_records, (len(items), len(categorical_fields), max_items_per_cat)
+        encoded_records, (len(records), len(categorical_fields), max_items_per_cat)
     )
 
     return encodings, max_sizes

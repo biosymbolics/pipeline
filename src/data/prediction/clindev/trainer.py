@@ -136,14 +136,7 @@ class ModelTrainer:
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
                 logging.info("Starting batch %s out of %s", i, num_batches)
-                try:
-                    batch: DnnInput = {k: v[i] for k, v in input_dict.items() if v is not None}  # type: ignore
-                except Exception as e:
-                    logging.warning(
-                        "Failed to get batch %s: %s. This should not happen.", i, e
-                    )
-                    continue
-
+                batch: DnnInput = {f: v[i] for f, v in input_dict.items() if v is not None}  # type: ignore
                 batch_size = batch["multi_select_x"].size(0)
 
                 y1_true = batch["y1"]
