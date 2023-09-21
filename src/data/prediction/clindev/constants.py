@@ -10,20 +10,21 @@ CHECKPOINT_PATH = "clindev_model_checkpoints"
 
 
 BATCH_SIZE = DEFAULT_BATCH_SIZE
-LR = DEFAULT_LR
+EMBEDDING_DIM = 16
+LR = 1e-3  # DEFAULT_LR
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = 1  # DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
+    "sponsor_type",
     # enrollment!!! (not cat tho)
     # "comparator",
     # "facilities", ??
     # "countries" ??
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
-    # no phase
     "design",
     "masking",
     "randomization",

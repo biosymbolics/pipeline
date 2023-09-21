@@ -3,7 +3,7 @@ from typing import Any, Iterable, NamedTuple, Optional, Sequence, TypeGuard, cas
 import logging
 import random
 from collections import namedtuple
-from pydash import compact, flatten
+from pydash import compact, flatten, uniq
 import numpy as np
 import polars as pl
 import torch
@@ -39,7 +39,6 @@ class VectorizedCategories(NamedTuple):
 
 
 class VectorizedAndBatched(NamedTuple):
-    embedding_weights: list[torch.Tensor]
     multi_select_x: torch.Tensor
     single_select_x: torch.Tensor
     text_x: Optional[torch.Tensor]
@@ -49,8 +48,6 @@ class VectorizedFeatures(NamedTuple):
     # TODO: this can have any combo of feats
     # required for single; only for single
     encodings: torch.Tensor
-    # required for single; only for single
-    embedding_weights: list[torch.Tensor]
     multi_select_embeddings: torch.Tensor
     single_select_embeddings: torch.Tensor
     text_embeddings: Optional[torch.Tensor]
@@ -97,21 +94,28 @@ def batch_and_pad(
 
 
 def resize_and_batch(
-    embeddings: list[torch.Tensor] | torch.Tensor, batch_size: int
+    tensors: list[torch.Tensor] | torch.Tensor, batch_size: int
 ) -> torch.Tensor:
     """
     Size embeddings into batches
 
     Args:
-        embeddings (list[torch.Tensor]): List of embeddings
+        tensors (list[torch.Tensor]): List of tensors
         batch_size (int): Batch size
     """
-    max_len = max(e.size(0) for e in embeddings)
-    padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in embeddings]
+    sizes = [e.size(0) for e in tensors if len(e.size()) > 1]
+
+    if len(sizes) > 0:
+        max_len = max(sizes)
+        padded_emb = [F.pad(f, (0, max_len - f.size(0))) for f in tensors]
+    else:
+        padded_emb = [f for f in tensors]
     return batch_and_pad(padded_emb, batch_size)
 
 
-def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[int]]:
+def encode_category(
+    field: str, df: pl.DataFrame, offset: int = 0
+) -> tuple[list[list[int]], int]:
     """
     Encode a categorical field from a dataframe
 
@@ -135,6 +139,7 @@ def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[
         apply_offset(encoder.transform([v] if isinstance(v, str) else v))
         for v in values
     ]
+    uniq_count = len(uniq(flatten(encoded_values)))
 
     if df.shape[0] != len(encoded_values):
         raise ValueError(
@@ -144,7 +149,7 @@ def encode_category(field: str, df: pl.DataFrame, offset: int = 0) -> list[list[
         )
 
     logger.info("Finished encoding field %s (%s)", field, encoded_values[0])
-    return cast(list[list[int]], encoded_values)
+    return cast(list[list[int]], encoded_values), uniq_count
 
 
 def get_string_values(item: dict, field: str) -> list:
@@ -228,13 +233,14 @@ def encode_categories(
     ) -> Iterable[list[list[int]]]:
         offset = 0
         for field in fields:
-            res = encode_category(field, df)
-            offset += len(res)
-            yield res
+            recs, count = encode_category(field, df, offset)
+            # offset += count
+            yield recs
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = list(__do_encode_categories(categorical_fields, df))
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
+    print("encoded_dicts", encoded_dicts[0:10])
 
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
@@ -384,7 +390,6 @@ def vectorize_features(
     logger.info("Finished with feature embeddings")
     return VectorizedFeatures(
         encodings=vectorized_single_select.encodings,
-        embedding_weights=vectorized_single_select.weights,
         multi_select_embeddings=vectorized_multi_select.embeddings,
         single_select_embeddings=vectorized_single_select.embeddings,
         text_embeddings=vectorized_text,
@@ -431,5 +436,4 @@ def vectorize_and_batch_features(
         multi_select_x=multi_select,
         single_select_x=single_select,
         text_x=text,
-        embedding_weights=feats.embedding_weights,
     )

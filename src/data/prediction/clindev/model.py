@@ -58,17 +58,19 @@ class TwoStageModel(nn.Module):
         )
 
         # used for calc of loss / evaluation of stage1 separately
-        self.stage1_output_models = dict(
-            [
-                (
-                    field,
-                    nn.Sequential(
-                        nn.Linear(sizes.stage1_embedded_output, size),
-                        nn.Sigmoid(),
-                    ),
-                )
-                for field, size in sizes.stage1_output_map.items()
-            ]
+        self.stage1_output_models = nn.ModuleDict(
+            dict(
+                [
+                    (
+                        field,
+                        nn.Sequential(
+                            nn.Linear(sizes.stage1_embedded_output, size),
+                            # nn.Softmax(),
+                        ),
+                    )
+                    for field, size in sizes.stage1_output_map.items()
+                ]
+            )
         )
 
         # Stage 2 model
@@ -94,20 +96,18 @@ class TwoStageModel(nn.Module):
 
     def forward(
         self, multi_select_x, single_select_x, text_x
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
-        x = self.input_model["multi_select"].forward(multi_select_x)
-        x = self.input_model["single_select"].forward(single_select_x)
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x = self.input_model["multi_select"](multi_select_x)
+        x = self.input_model["single_select"](single_select_x)
+
         if text_x is not None:
-            x = self.input_model["text"].forward(text_x)
+            x = self.input_model["text"](text_x)
 
         y1_pred = self.stage1_model(x)
+        # print(self.stage1_model[0].weight)
 
-        y1_probs_dict = dict(
-            [
-                (field, model(y1_pred))
-                for field, model in self.stage1_output_models.items()
-            ]
+        y_probs = torch.cat(
+            [model(y1_pred) for model in self.stage1_output_models.values()], dim=1
         )
-        y_probs = torch.cat(list(y1_probs_dict.values()), dim=1)
         y2_pred = self.stage2_model(y1_pred)
-        return (y1_pred, y2_pred, y_probs, y1_probs_dict)
+        return (y1_pred, y2_pred, y_probs)

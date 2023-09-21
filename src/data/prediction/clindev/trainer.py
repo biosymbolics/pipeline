@@ -3,6 +3,7 @@ import logging
 import math
 import os
 import sys
+from typing import Sequence
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -76,7 +77,6 @@ class ModelTrainer:
         logging.info("Model sizes: %s", sizes)
 
         self.model = TwoStageModel(sizes)
-        self.optimizer = self.model.optimizer
         self.stage1_criterion = nn.CrossEntropyLoss()
         self.stage2_criterion = nn.MSELoss()
 
@@ -104,7 +104,7 @@ class ModelTrainer:
         """
         checkpoint = {
             "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
+            "optimizer_state_dict": self.model.optimizer.state_dict(),
             "epoch": epoch,
         }
         checkpoint_name = f"checkpoint_{epoch}.pt"
@@ -139,10 +139,13 @@ class ModelTrainer:
                 batch: DnnInput = {f: v[i] for f, v in input_dict.items() if v is not None}  # type: ignore
                 batch_size = batch["multi_select_x"].size(0)
 
+                # place before any loss calculation
+                self.model.optimizer.zero_grad()
+
                 y1_true = batch["y1"]
                 y2_true = batch["y2"]
 
-                y1_logits, y2_logits, y1_probs, _ = self.model(
+                y1_logits, y2_logits, y1_probs = self.model(
                     batch["multi_select_x"].view(batch_size, -1),
                     batch["single_select_x"].view(batch_size, -1),
                     batch["text_x"].view(batch_size, -1)
@@ -150,8 +153,6 @@ class ModelTrainer:
                     else None,
                 )
                 y1_preds = y1_logits.view(y1_true.shape)
-
-                self.optimizer.zero_grad()
 
                 # STAGE 1
                 # indexes with which to split y1_probs into 1 tensor per field
@@ -162,7 +163,7 @@ class ModelTrainer:
                 )[:-1]
 
                 y1_probs_by_field = torch.tensor_split(y1_probs, y1_idxs, dim=1)
-                y1_true_by_field = list(torch.split(batch["y1_categories"], 1, dim=1))
+                y1_true_by_field = torch.split(batch["y1_categories"], 1, dim=1)
 
                 field_losses = [
                     self.stage1_criterion(
@@ -185,7 +186,7 @@ class ModelTrainer:
                 logging.info("Total loss: %s", loss)
 
                 loss.backward(retain_graph=True)
-                self.optimizer.step()
+                self.model.optimizer.step()
 
                 self.calculate_continuous_metrics(batch, y1_preds, y2_logits)
                 self.calculate_discrete_metrics(y1_probs_by_field, y1_true_by_field)
@@ -210,8 +211,8 @@ class ModelTrainer:
 
     def calculate_discrete_metrics(
         self,
-        y1_probs_by_field: list[torch.Tensor],
-        y1_true_by_field: list[torch.Tensor],
+        y1_probs_by_field: Sequence[torch.Tensor],
+        y1_true_by_field: Sequence[torch.Tensor],
     ):
         """
         Calculate discrete metrics for a batch (precision/recall/f1)
@@ -220,9 +221,11 @@ class ModelTrainer:
         # pad because ohe size is different for each field
         max_idx_0 = max([t.shape[0] for t in y1_probs_by_field])
         max_idx_1 = max([t.shape[1] for t in y1_probs_by_field])
+
+        # TODO: needs to be separate aggregators
         for y1_probs, y1_true in zip(y1_probs_by_field, y1_true_by_field):
             y1_pred_cats = pad_or_truncate_to_size(
-                (y1_probs > 0.5).float(), (max_idx_0, max_idx_1)
+                (y1_probs.detach() > 0.5).float(), (max_idx_0, max_idx_1)
             )
             self.stage1_precision.update((y1_pred_cats, y1_true.squeeze()))
             self.stage1_recall.update((y1_pred_cats, y1_true.squeeze()))

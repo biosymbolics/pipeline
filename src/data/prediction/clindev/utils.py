@@ -5,7 +5,6 @@ Utils for patent eNPV model
 from typing import Sequence, cast
 import logging
 import torch
-from data.prediction.constants import DEFAULT_EMBEDDING_DIM
 
 from data.prediction.utils import (
     batch_and_pad,
@@ -16,6 +15,7 @@ from data.prediction.utils import (
 from typings.core import Primitive
 from typings.trials import TrialSummary
 
+from .constants import EMBEDDING_DIM
 from .types import DnnInput
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def prepare_inputs(
     text_fields: list[str],
     y1_categorical_fields: list[str],  # e.g. cat fields to predict, e.g. randomization
     y2_field: str,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    embedding_dim: int = EMBEDDING_DIM,
 ) -> tuple[DnnInput, dict[str, int]]:
     """
     Prepare data for DNN
