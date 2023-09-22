@@ -9,11 +9,11 @@ import torch.nn as nn
 from ignite.metrics import Precision, Recall, MeanAbsoluteError, MeanSquaredError
 
 import system
-from utils.tensor import pad_or_truncate_to_size
 
 system.initialize()
 
 from clients.trials import fetch_trials
+from utils.tensor import pad_or_truncate_to_size
 
 
 from .constants import (
@@ -227,14 +227,17 @@ class ModelTrainer:
                 "Y1probs[0:1]: %s VS actual: %s", y1_probs_cats[0:1], y1_true[0:1]
             )
 
+            # ignite.metrics uses 64 bit
             y1_pred_cats = pad_or_truncate_to_size(
                 (y1_probs_cats > 0.5).float(), (max_idx_0, max_idx_1)
-            )
+            ).to("cpu")
+
+            _y1_true = y1_true.squeeze().to("cpu")
 
             # TODO: this is wrong since it jams all the fields together
             # (Thus it will underestimate precision/recall by quite a bit)
-            self.stage1_precision.update((y1_pred_cats, y1_true.squeeze()))
-            self.stage1_recall.update((y1_pred_cats, y1_true.squeeze()))
+            self.stage1_precision.update((y1_pred_cats, _y1_true))
+            self.stage1_recall.update((y1_pred_cats, _y1_true))
 
     def evaluate(self):
         """

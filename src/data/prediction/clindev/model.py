@@ -57,7 +57,7 @@ class TwoStageModel(nn.Module):
             ]
             if v.in_features > 0
         }
-        self.input_model = nn.ModuleDict(input_layers)
+        self.input_model = nn.ModuleDict(input_layers).to("mps")
 
         # Stage 1 model
         self.stage1_model = nn.Sequential(
@@ -66,7 +66,7 @@ class TwoStageModel(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_embedded_output),
-        )
+        ).to("mps")
 
         # used for calc of loss / evaluation of stage1 separately
         self.stage1_output_models = nn.ModuleDict(
@@ -82,7 +82,7 @@ class TwoStageModel(nn.Module):
                     for field, size in sizes.stage1_output_map.items()
                 ]
             )
-        )
+        ).to("mps")
 
         # Stage 2 model
         self.stage2_model = nn.Sequential(
@@ -90,7 +90,7 @@ class TwoStageModel(nn.Module):
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
             nn.Dropout(0.1),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
-        )
+        ).to("mps")
 
     @property
     def optimizer(self):

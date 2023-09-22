@@ -191,7 +191,7 @@ def __get_text_embeddings(
         ),
     )
 
-    return tensor
+    return tensor.to("mps")
 
 
 def encode_categories(
@@ -264,7 +264,7 @@ def __embed_categories(
             len(embedded_records[0]),
             *embedded_records[0][0].shape,
         ),
-    )
+    ).to("mps")
 
     return EmbeddedCategories(embeddings=embeddings, weights=weights)
 

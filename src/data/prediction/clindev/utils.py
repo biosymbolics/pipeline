@@ -68,13 +68,13 @@ def prepare_inputs(
 
     return (
         {
-            "multi_select_x": batched_feats.multi_select,
-            "single_select_x": batched_feats.single_select,
-            "text_x": batched_feats.text,
-            "quantitative_x": batched_feats.quantitative,
-            "y1": y1,
-            "y1_categories": y1_categories,
-            "y2": y2,
+            "multi_select_x": batched_feats.multi_select.to("mps"),
+            "single_select_x": batched_feats.single_select.to("mps"),
+            "text_x": batched_feats.text.to("mps"),
+            "quantitative_x": batched_feats.quantitative.to("mps"),
+            "y1": y1.to("mps"),
+            "y1_categories": y1_categories.to("mps"),
+            "y2": y2.to("mps"),
         },
         vectorized_y1.category_size_map,
     )

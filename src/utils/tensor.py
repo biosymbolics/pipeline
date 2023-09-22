@@ -124,36 +124,3 @@ def reverse_embedding(
     outputs = [get_encoding_idx_by_field(i) for i in range(len(weights))]
     output = torch.stack(outputs, dim=1)
     return output
-
-
-def reduce_last_dim(
-    tensor: torch.Tensor, force: bool = False, return_one_hot: bool = False
-) -> torch.Tensor:
-    """
-    Reduce the last dim of a tensor to a single value, if appropriate
-    (all valued at zero except the last, or force=true)
-
-    Used in cases where the tensor contains categories that *can* have multiple values,
-    but in this case we want to treat them as having a single value
-
-    Args:
-        tensor (torch.Tensor): Tensor to reduce
-        force (bool, optional): Force reduction. Defaults to False.
-        return_one_hot (bool, optional): Return one-hot encoding. Defaults to False.
-    """
-    size = tensor.size(-1) - 1
-
-    if torch.all(tensor[..., :size] == 0) or force == True:
-        squeezed = tensor[..., -1:].squeeze()
-
-        if return_one_hot:
-            # assumes interger values
-            num_classes = 8  # int(torch.max(tensor).item()) + 1
-            for i in range(squeezed.size(1)):
-                t = squeezed[:, i].view(-1)
-                print(i, ":", [v.item() for v in t if v > 0][0:50])
-            return F.one_hot(squeezed, num_classes=num_classes)
-
-        return squeezed
-
-    return tensor
