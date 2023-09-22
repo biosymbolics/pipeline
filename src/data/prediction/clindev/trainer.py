@@ -182,6 +182,7 @@ class ModelTrainer:
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
+                # Total
                 loss = stage1_loss + (math.log(stage2_loss) * 0.01)
                 logging.info("Total loss: %s", loss)
 
@@ -222,7 +223,6 @@ class ModelTrainer:
         max_idx_0 = max([t.shape[0] for t in y1_probs_by_field])
         max_idx_1 = max([t.shape[1] for t in y1_probs_by_field])
 
-        # TODO: needs to be separate aggregators
         for y1_probs, y1_true in zip(y1_probs_by_field, y1_true_by_field):
             y1_pred_cats = pad_or_truncate_to_size(
                 (y1_probs.detach() > 0.5).float(), (max_idx_0, max_idx_1)
@@ -251,7 +251,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=2000)
+        trials = fetch_trials("COMPLETED", limit=100000)
         input_dict, y1_category_size_map = prepare_inputs(
             trials,
             BATCH_SIZE,
