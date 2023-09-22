@@ -65,7 +65,7 @@ class TwoStageModel(nn.Module):
                         field,
                         nn.Sequential(
                             nn.Linear(sizes.stage1_embedded_output, size),
-                            # nn.Softmax(),
+                            # nn.Softmax(), # CEL does softmax
                         ),
                     )
                     for field, size in sizes.stage1_output_map.items()
@@ -104,7 +104,7 @@ class TwoStageModel(nn.Module):
             x = self.input_model["text"](text_x)
 
         y1_pred = self.stage1_model(x)
-        # print(self.stage1_model[0].weight)
+        print(self.stage1_model[0].weight)
 
         y_probs = torch.cat(
             [model(y1_pred) for model in self.stage1_output_models.values()], dim=1

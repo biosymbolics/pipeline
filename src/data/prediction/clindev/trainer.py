@@ -183,7 +183,7 @@ class ModelTrainer:
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
                 # Total
-                loss = stage1_loss + (math.log(stage2_loss) * 0.01)
+                loss = stage1_loss + (math.log(stage2_loss) * 0.02)
                 logging.info("Total loss: %s", loss)
 
                 loss.backward(retain_graph=True)
@@ -212,7 +212,7 @@ class ModelTrainer:
 
     def calculate_discrete_metrics(
         self,
-        y1_probs_by_field: Sequence[torch.Tensor],
+        y1_logits_by_field: Sequence[torch.Tensor],
         y1_true_by_field: Sequence[torch.Tensor],
     ):
         """
@@ -220,13 +220,18 @@ class ModelTrainer:
         """
 
         # pad because ohe size is different for each field
-        max_idx_0 = max([t.shape[0] for t in y1_probs_by_field])
-        max_idx_1 = max([t.shape[1] for t in y1_probs_by_field])
+        max_idx_0 = max([t.shape[0] for t in y1_logits_by_field])
+        max_idx_1 = max([t.shape[1] for t in y1_logits_by_field])
 
-        for y1_probs, y1_true in zip(y1_probs_by_field, y1_true_by_field):
+        for y1_preds, y1_true in zip(y1_logits_by_field, y1_true_by_field):
+            y1_probs_cats = nn.Softmax(dim=1)(y1_preds.detach())
+
+            print("Y1probs", y1_probs_cats[0:1], "VS", y1_true[0:1])
+
             y1_pred_cats = pad_or_truncate_to_size(
-                (y1_probs.detach() > 0.5).float(), (max_idx_0, max_idx_1)
+                (y1_probs_cats > 0.5).float(), (max_idx_0, max_idx_1)
             )
+
             self.stage1_precision.update((y1_pred_cats, y1_true.squeeze()))
             self.stage1_recall.update((y1_pred_cats, y1_true.squeeze()))
 
@@ -251,7 +256,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=100000)
+        trials = fetch_trials("COMPLETED", limit=2000)
         input_dict, y1_category_size_map = prepare_inputs(
             trials,
             BATCH_SIZE,
