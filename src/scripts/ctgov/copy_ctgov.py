@@ -20,10 +20,11 @@ SINGLE_FIELDS = {
     "studies.nct_id": "nct_id",
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
+    "studies.brief_title": "title",
     "studies.completion_date": "end_date",  # Actual or est.
+    "enrollment_type": "enrollment_type",
     "studies.last_update_posted_date": "last_updated_date",
     "studies.why_stopped": "why_stopped",
-    "studies.brief_title": "title",
     "studies.phase": "phase",
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
     "studies.overall_status": "status",  # vs last_known_status

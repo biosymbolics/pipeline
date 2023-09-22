@@ -2,8 +2,9 @@
 Utils for patent eNPV model
 """
 
-from typing import Sequence, cast
+from typing import Any, Callable, Sequence, cast
 import logging
+from typing_extensions import TypeVar
 import torch
 
 from data.prediction.utils import (
@@ -28,9 +29,11 @@ def prepare_inputs(
     single_select_categorical_fields: list[str],
     multi_select_categorical_fields: list[str],
     text_fields: list[str],
+    quantitative_fields: list[str],
     y1_categorical_fields: list[str],  # e.g. cat fields to predict, e.g. randomization
     y2_field: str,
     embedding_dim: int = EMBEDDING_DIM,
+    flatten_batch: bool = False,
 ) -> tuple[DnnInput, dict[str, int]]:
     """
     Prepare data for DNN
@@ -43,7 +46,9 @@ def prepare_inputs(
         single_select_categorical_fields,
         multi_select_categorical_fields,
         text_fields,
+        quantitative_fields,
         embedding_dim=embedding_dim,
+        flatten_batch=flatten_batch,
     )
 
     # (batches) x (seq length) x (num cats) x (items per cat)
@@ -63,9 +68,10 @@ def prepare_inputs(
 
     return (
         {
-            "multi_select_x": batched_feats.multi_select_x,
-            "single_select_x": batched_feats.single_select_x,
-            "text_x": batched_feats.text_x,
+            "multi_select_x": batched_feats.multi_select,
+            "single_select_x": batched_feats.single_select,
+            "text_x": batched_feats.text,
+            "quantitative_x": batched_feats.quantitative,
             "y1": y1,
             "y1_categories": y1_categories,
             "y2": y2,

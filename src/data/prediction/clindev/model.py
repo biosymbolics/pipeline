@@ -38,22 +38,33 @@ class TwoStageModel(nn.Module):
         super().__init__()
         torch.device("mps")
 
-        self.input_model = nn.ModuleDict(
-            {
-                "multi_select": nn.Linear(sizes.multi_select_input, sizes.stage1_input),
-                "text": nn.Linear(sizes.text_input, sizes.stage1_input),
-                "single_select": nn.Linear(
-                    sizes.single_select_input, sizes.stage1_input
+        input_layers = {
+            k: v
+            for k, v in [
+                (
+                    "multi_select",
+                    nn.Linear(sizes.multi_select_input, sizes.stage1_input),
                 ),
-            }
-        )
+                (
+                    "quantitative",
+                    nn.Linear(sizes.quantitative_input, sizes.stage1_input),
+                ),
+                (
+                    "single_select",
+                    nn.Linear(sizes.single_select_input, sizes.stage1_input),
+                ),
+                ("text", nn.Linear(sizes.text_input, sizes.stage1_input)),
+            ]
+            if v.in_features > 0
+        }
+        self.input_model = nn.ModuleDict(input_layers)
 
         # Stage 1 model
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
             nn.ReLU(),
-            # nn.Dropout(0.1),
+            nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_embedded_output),
         )
 
@@ -76,7 +87,9 @@ class TwoStageModel(nn.Module):
         # Stage 2 model
         self.stage2_model = nn.Sequential(
             nn.Linear(sizes.stage1_embedded_output, sizes.stage2_hidden),
-            nn.Linear(sizes.stage2_hidden, sizes.stage2_output),
+            nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
+            nn.Dropout(0.1),
+            nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
         )
 
     @property
@@ -91,26 +104,32 @@ class TwoStageModel(nn.Module):
             )
             + list(self.stage2_model.parameters()),
             lr=LR,
+            weight_decay=1e-7,
         )
 
     def forward(
-        self, multi_select_x, single_select_x, text_x
+        self, multi_select_x, single_select_x, text_x, quantitative_x
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
         print(self.stage2_model[0].weight)
         print(self.stage1_model[0].weight)
         """
+
         x = self.input_model["multi_select"](multi_select_x)
         x = self.input_model["single_select"](single_select_x)
 
-        if text_x is not None:
+        if len(text_x) > 0:
             x = self.input_model["text"](text_x)
+
+        if len(quantitative_x) > 0:
+            x = self.input_model["quantitative"](quantitative_x)
 
         y1_pred = self.stage1_model(x)
 
         y_probs = torch.cat(
-            [model(y1_pred) for model in self.stage1_output_models.values()], dim=1
+            [model(y1_pred) for model in self.stage1_output_models.values()],
+            dim=1,
         )
         y2_pred = self.stage2_model(y1_pred)
 

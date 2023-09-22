@@ -25,7 +25,7 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         AND duration > 0
         AND array_length(conditions, 1) > 0
         AND array_length(interventions, 1) > 0
-        -- AND sponsor_type in ('INDUSTRY', 'INDUSTRY_LARGE', 'OTHER')
+        AND sponsor_type in ('INDUSTRY', 'INDUSTRY_LARGE', 'OTHER')
         ORDER BY start_date DESC
         limit {limit}
     """

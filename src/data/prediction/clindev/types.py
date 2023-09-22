@@ -1,4 +1,4 @@
-from typing import Optional, NamedTuple, TypedDict
+from typing import NamedTuple, TypedDict
 import torch
 
 
@@ -7,7 +7,8 @@ DnnInput = TypedDict(
     {
         "multi_select_x": torch.Tensor,
         "single_select_x": torch.Tensor,
-        "text_x": Optional[torch.Tensor],
+        "text_x": torch.Tensor,  # can be empty
+        "quantitative_x": torch.Tensor,  # can be empty
         "y1_categories": torch.Tensor,  # used as y1_true (encodings)
         "y1": torch.Tensor,  # embedded y1_true
         "y2": torch.Tensor,
@@ -30,3 +31,4 @@ class TwoStageModelSizes(NamedTuple):
     stage1_output_map: dict[str, int]
     stage2_hidden: int  # = 64
     stage2_output: int  # = 1
+    quantitative_input: int

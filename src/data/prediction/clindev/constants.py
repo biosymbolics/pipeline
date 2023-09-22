@@ -19,7 +19,6 @@ TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
-    # enrollment!!! (not cat tho)
     # "comparator",
     # "facilities", ??
     # "countries" ??
@@ -35,4 +34,17 @@ MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []
+QUANTITATIVE_FIELDS: list[str] = [
+    "enrollment",
+]
 Y2_FIELD = "duration"
+
+
+# INFO:root:Stage 1 MSE: 77.90966796875 80
+# INFO:root:Stage 2 MAE: 114.396240234375 115
+# INFO:root:Stage 1 MSE: 102.35175323486328
+# INFO:root:Stage 2 MAE: 115.066650390625
+# INFO:root:Stage 1 MSE: 96.32074737548828
+# INFO:root:Stage 2 MAE: 121.72994995117188
+# INFO:root:Stage 1 MSE: 63.16200256347656
+# INFO:root:Stage 2 MAE: 120.18370056152344
