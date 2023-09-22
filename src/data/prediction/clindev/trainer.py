@@ -179,9 +179,7 @@ class ModelTrainer:
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
-                logger.info(
-                    "STAGE2 y2_pred[0:1] %s vs %s", y2_logits[0:1], y2_true[0:1]
-                )
+                logger.info("y2_pred[0:1] %s vs %s", y2_logits[0:1], y2_true[0:1])
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
@@ -263,7 +261,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials():
-        trials = fetch_trials("COMPLETED", limit=2000)
+        trials = fetch_trials("COMPLETED", limit=20000)
         input_dict, y1_category_size_map = prepare_inputs(
             trials,
             BATCH_SIZE,
