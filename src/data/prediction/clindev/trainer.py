@@ -7,7 +7,7 @@ from typing import Sequence
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from ignite.metrics import Precision, Recall, MeanAbsoluteError
+from ignite.metrics import Precision, Recall, MeanAbsoluteError, MeanSquaredError
 
 import system
 from utils.tensor import pad_or_truncate_to_size
@@ -84,7 +84,7 @@ class ModelTrainer:
 
         self.stage1_precision = Precision(average=None)
         self.stage1_recall = Recall(average=None)
-        self.stage1_mae = MeanAbsoluteError()
+        self.stage1_mse = MeanSquaredError()
         self.stage2_mae = MeanAbsoluteError()
 
     def __call__(self, *args, **kwargs):
@@ -179,11 +179,14 @@ class ModelTrainer:
                 logging.info("Stage 1 loss: %s", stage1_loss)
 
                 # STAGE 2
+                logger.info(
+                    "STAGE2 y2_pred[0:1] %s vs %s", y2_logits[0:1], y2_true[0:1]
+                )
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
                 logging.info("Stage 2 loss: %s", stage2_loss)
 
                 # Total
-                loss = stage1_loss + (math.log(stage2_loss) * 0.02)
+                loss = stage1_loss + torch.mul(torch.log(stage2_loss), 0.5)
                 logging.info("Total loss: %s", loss)
 
                 loss.backward(retain_graph=True)
@@ -207,7 +210,7 @@ class ModelTrainer:
         """
         y1_true = batch["y1"]
         y2_true = batch["y2"]
-        self.stage1_mae.update((y1_preds, y1_true))
+        self.stage1_mse.update((y1_preds, y1_true))
         self.stage2_mae.update((y2_preds, y2_true))
 
     def calculate_discrete_metrics(
@@ -226,12 +229,16 @@ class ModelTrainer:
         for y1_preds, y1_true in zip(y1_logits_by_field, y1_true_by_field):
             y1_probs_cats = nn.Softmax(dim=1)(y1_preds.detach())
 
-            print("Y1probs", y1_probs_cats[0:1], "VS", y1_true[0:1])
+            logger.info(
+                "Y1probs[0:1]: %s VS actual: %s", y1_probs_cats[0:1], y1_true[0:1]
+            )
 
             y1_pred_cats = pad_or_truncate_to_size(
                 (y1_probs_cats > 0.5).float(), (max_idx_0, max_idx_1)
             )
 
+            # TODO: this is wrong since it jams all the fields together
+            # (Thus it will underestimate precision/recall by quite a bit)
             self.stage1_precision.update((y1_pred_cats, y1_true.squeeze()))
             self.stage1_recall.update((y1_pred_cats, y1_true.squeeze()))
 
@@ -242,11 +249,11 @@ class ModelTrainer:
         try:
             logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
             logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
-            logging.info("Stage 1 MAE: %s", self.stage1_mae.compute())
+            logging.info("Stage 1 MSE: %s", self.stage1_mse.compute())
 
             self.stage1_precision.reset()
             self.stage1_recall.reset()
-            self.stage1_mae.reset()
+            self.stage1_mse.reset()
 
             logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
             self.stage2_mae.reset()
