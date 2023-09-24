@@ -9,6 +9,7 @@ import logging
 from data.prediction.clindev.types import TwoStageModelSizes
 
 from .constants import (
+    DEVICE,
     LR,
     OPTIMIZER_CLASS,
 )
@@ -36,28 +37,28 @@ class TwoStageModel(nn.Module):
         sizes: TwoStageModelSizes,
     ):
         super().__init__()
-        torch.device("mps")
+        torch.device(DEVICE)
 
         input_layers = {
             k: v
             for k, v in [
                 (
                     "multi_select",
-                    nn.Linear(sizes.multi_select_input, sizes.stage1_input),
+                    nn.Linear(sizes.multi_select_input, sizes.multi_select_input),
                 ),
                 (
                     "quantitative",
-                    nn.Linear(sizes.quantitative_input, sizes.stage1_input),
+                    nn.Linear(sizes.quantitative_input, sizes.quantitative_input),
                 ),
                 (
                     "single_select",
-                    nn.Linear(sizes.single_select_input, sizes.stage1_input),
+                    nn.Linear(sizes.single_select_input, sizes.single_select_input),
                 ),
-                ("text", nn.Linear(sizes.text_input, sizes.stage1_input)),
+                ("text", nn.Linear(sizes.text_input, sizes.text_input)),
             ]
             if v.in_features > 0
         }
-        self.input_model = nn.ModuleDict(input_layers).to("mps")
+        self.input_model = nn.ModuleDict(input_layers).to(DEVICE)
 
         # Stage 1 model
         # TODO: make contrastive??
@@ -66,11 +67,8 @@ class TwoStageModel(nn.Module):
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(sizes.stage1_hidden, sizes.stage1_hidden),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(sizes.stage1_hidden, sizes.stage1_embedded_output),
-        ).to("mps")
+            nn.Linear(sizes.stage1_hidden, sizes.stage1_output),
+        ).to(DEVICE)
 
         # used for calc of loss / evaluation of stage1 separately
         self.stage1_output_models = nn.ModuleDict(
@@ -79,22 +77,22 @@ class TwoStageModel(nn.Module):
                     (
                         field,
                         nn.Sequential(
-                            nn.Linear(sizes.stage1_embedded_output, size),
+                            nn.Linear(sizes.stage1_output, size),
                             # nn.Softmax(), # CEL does softmax
                         ),
                     )
                     for field, size in sizes.stage1_output_map.items()
                 ]
             )
-        ).to("mps")
+        ).to(DEVICE)
 
         # Stage 2 model
         self.stage2_model = nn.Sequential(
-            nn.Linear(sizes.stage1_embedded_output, sizes.stage2_hidden),
+            nn.Linear(sizes.stage1_output, sizes.stage2_hidden),
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
             nn.Dropout(0.1),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
-        ).to("mps")
+        ).to(DEVICE)
 
     @property
     def optimizer(self):
@@ -108,7 +106,7 @@ class TwoStageModel(nn.Module):
             )
             + list(self.stage2_model.parameters()),
             lr=LR,
-            weight_decay=1e-7,
+            weight_decay=1e-4,
         )
 
     def forward(
@@ -120,16 +118,23 @@ class TwoStageModel(nn.Module):
         print(self.stage1_model[0].weight)
         """
 
-        x = self.input_model["multi_select"](multi_select_x)
-        x = self.input_model["single_select"](single_select_x)
-
+        all_inputs = []
         if len(text_x) > 0:
-            x = self.input_model["text"](text_x)
+            all_inputs.append(self.input_model["text"](text_x))
 
         if len(quantitative_x) > 0:
-            x = self.input_model["quantitative"](quantitative_x)
+            all_inputs.append(self.input_model["quantitative"](quantitative_x))
+
+        if len(multi_select_x) > 0:
+            all_inputs.append(self.input_model["multi_select"](multi_select_x))
+
+        if len(single_select_x) > 0:
+            all_inputs.append(self.input_model["single_select"](single_select_x))
+
+        x = torch.cat(all_inputs, dim=1)
 
         y1_pred = self.stage1_model(x)
+        # print(self.stage1_model[0].weight)
 
         y_probs = torch.cat(
             [model(y1_pred) for model in self.stage1_output_models.values()],

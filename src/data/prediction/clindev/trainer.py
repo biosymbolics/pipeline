@@ -1,24 +1,31 @@
+import copy
 from itertools import accumulate
 import logging
 import math
 import os
+import random
 import sys
-from typing import Sequence
+from typing import Sequence, cast
 import torch
 import torch.nn as nn
-from ignite.metrics import Precision, Recall, MeanAbsoluteError, MeanSquaredError
+from ignite.metrics import (
+    ClassificationReport,
+    Accuracy,
+    MeanAbsoluteError,
+    MeanSquaredError,
+)
 
 import system
 
 system.initialize()
 
 from clients.trials import fetch_trials
-from utils.tensor import pad_or_truncate_to_size
 
 
 from .constants import (
     BATCH_SIZE,
     CHECKPOINT_PATH,
+    DEVICE,
     MULTI_SELECT_CATEGORICAL_FIELDS,
     SINGLE_SELECT_CATEGORICAL_FIELDS,
     QUANTITATIVE_FIELDS,
@@ -51,11 +58,9 @@ class ModelTrainer:
 
         Args:
             input_dim (int): Input dimension for DNN
-            stage1_output_dim (int): Output dimension for stage 1 DNN
+            y1_category_size_map (dict[str, int]): Map of y1 category to number of cats (e.g. randomization -> 2)
         """
-        torch.device("mps")
-
-        self.input_dim = 128  # arbitrary
+        torch.device(DEVICE)
 
         self.y1_category_size_map = y1_category_size_map
         self.y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
@@ -63,16 +68,12 @@ class ModelTrainer:
         # assumes all _x fields are batch x seq_len x N
         sizes = TwoStageModelSizes(
             multi_select_input=input_dict["multi_select_x"].size(-1),
+            quantitative_input=input_dict["quantitative_x"].size(-1),
             single_select_input=input_dict["single_select_x"].size(-1),
             text_input=input_dict["text_x"].size(-1),
-            quantitative_input=input_dict["quantitative_x"].size(-1),
-            stage1_input=self.input_dim,
-            stage2_input=math.prod(input_dict["y1"].shape[2:]),
-            stage1_hidden=round(self.input_dim / 2),
-            stage1_embedded_output=math.prod(input_dict["y1"].shape[2:]),
+            stage1_output=math.prod(input_dict["y1"].shape[2:]),
             stage1_output_map=y1_category_size_map,
-            stage2_hidden=round(self.input_dim / 2),
-            stage2_output=1,
+            stage2_output=input_dict["y2"].size(-1),
         )
         logging.info("Model sizes: %s", sizes)
 
@@ -80,8 +81,11 @@ class ModelTrainer:
         self.stage1_criterion = nn.CrossEntropyLoss()
         self.stage2_criterion = nn.MSELoss()
 
-        self.stage1_precision = {k: Precision() for k in y1_category_size_map.keys()}
-        self.stage1_recall = {k: Recall() for k in y1_category_size_map.keys()}
+        self.stage1_cp = {
+            k: ClassificationReport(output_dict=True)
+            for k in y1_category_size_map.keys()
+        }
+        self.stage1_accuracy = {k: Accuracy() for k in y1_category_size_map.keys()}
         self.stage1_mse = MeanSquaredError()
         self.stage2_mae = MeanAbsoluteError()
 
@@ -131,9 +135,13 @@ class ModelTrainer:
         """
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
+            _input_dict = {f: v.detach().clone() for f, v in input_dict.items()}  # type: ignore
             for i in range(num_batches):
                 logging.debug("Starting batch %s out of %s", i, num_batches)
-                batch: DnnInput = {f: v[i] for f, v in input_dict.items() if v is not None}  # type: ignore
+                batch: DnnInput = cast(
+                    DnnInput,
+                    {f: v[i] for f, v in _input_dict.items() if v is not None},
+                )
 
                 # place before any loss calculation
                 self.model.optimizer.zero_grad()
@@ -162,25 +170,32 @@ class ModelTrainer:
                     y1.squeeze() for y1 in torch.split(batch["y1_categories"], 1, dim=1)
                 ]
 
-                field_losses = [
-                    self.stage1_criterion(y1_by_field.float(), y1_true_set)
-                    for y1_by_field, y1_true_set in zip(
-                        y1_probs_by_field, y1_true_by_field
-                    )
-                ]
+                stage1_loss = torch.stack(
+                    [
+                        self.stage1_criterion(y1_by_field.float(), y1_true_set)
+                        for y1_by_field, y1_true_set in zip(
+                            y1_probs_by_field,
+                            y1_true_by_field,
+                        )
+                    ]
+                ).sum()
 
-                stage1_loss = torch.stack(field_losses).sum()
-                logging.debug("Batch %s Stage 1 loss: %s", i, stage1_loss)
+                logging.debug(
+                    "Batch %s Stage 1 loss: %s", i, stage1_loss.detach().item()
+                )
 
                 # STAGE 2
+                # note: can be very large thus the log/0.5 when combining with stage 1
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
-                logging.debug("Batch %s Stage 2 loss: %s", i, stage2_loss)
+                logging.debug(
+                    "Batch %s Stage 2 loss: %s", i, stage2_loss.detach().item()
+                )
 
                 # Total
                 loss = stage1_loss + torch.mul(torch.log(stage2_loss), 0.5)
-                logging.info("Batch %s Total loss: %s", i, loss)
+                logging.info("Batch %s Total loss: %s", i, loss.detach().item())
 
-                loss.backward(retain_graph=True)
+                loss.backward()
                 self.model.optimizer.step()
 
                 self.calculate_continuous_metrics(batch, y1_preds, y2_logits)
@@ -210,7 +225,7 @@ class ModelTrainer:
         y1_true_by_field: Sequence[torch.Tensor],
     ):
         """
-        Calculate discrete metrics for a batch (precision/recall/f1)
+        Calculate discrete metrics for a batch
         """
 
         for i, (y1_preds, y1_true) in enumerate(
@@ -218,24 +233,25 @@ class ModelTrainer:
         ):
             k = list(self.y1_category_size_map.keys())[i]
             # ignite.metrics uses 64 bit, not supported by MPS
-            y1_probs_cats = nn.Softmax(dim=1)(y1_preds.detach()).to("cpu")
-            y1_pred_cats = (y1_probs_cats > 0.5).float()
+            y1_pred_cats = y1_preds.detach().to("cpu")
 
-            self.stage1_precision[k].update((y1_pred_cats, y1_true.to("cpu")))
-            self.stage1_recall[k].update((y1_pred_cats, y1_true.to("cpu")))
+            self.stage1_cp[k].update((y1_pred_cats, y1_true.to("cpu")))
+            self.stage1_accuracy[k].update((y1_pred_cats, y1_true.to("cpu")))
 
     def evaluate(self):
         """
-        Output evaluation metrics (precision, recall, F1)
+        Output evaluation metrics
         """
         try:
             for k in self.y1_category_size_map.keys():
                 logging.info(
-                    "Stage1 %s Precision: %s", k, self.stage1_precision[k].compute()
+                    "Stage1 %s Metrics: %s", k, self.stage1_cp[k].compute()["macro avg"]
                 )
-                logging.info("Stage1 %s Recall: %s", k, self.stage1_recall[k].compute())
-                self.stage1_precision[k].reset()
-                self.stage1_recall[k].reset()
+                logging.info(
+                    "Stage1 %s Accuracy: %s", k, self.stage1_accuracy[k].compute()
+                )
+                self.stage1_cp[k].reset()
+                self.stage1_accuracy[k].reset()
 
             logging.info("Stage1 MSE: %s", self.stage1_mse.compute())
             logging.info("Stage2 MAE: %s", self.stage2_mae.compute())
@@ -247,7 +263,9 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = fetch_trials("COMPLETED", limit=2000)
+        trials = sorted(
+            fetch_trials("COMPLETED", limit=2000), key=lambda x: random.random()
+        )
         input_dict, y1_category_size_map = prepare_inputs(
             trials,
             batch_size,

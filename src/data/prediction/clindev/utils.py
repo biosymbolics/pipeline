@@ -2,9 +2,8 @@
 Utils for patent eNPV model
 """
 
-from typing import Any, Callable, Sequence, cast
+from typing import Sequence, cast
 import logging
-from typing_extensions import TypeVar
 import torch
 
 from data.prediction.utils import (
@@ -16,7 +15,7 @@ from data.prediction.utils import (
 from typings.core import Primitive
 from typings.trials import TrialSummary
 
-from .constants import EMBEDDING_DIM
+from .constants import DEVICE, EMBEDDING_DIM
 from .types import DnnInput
 
 logger = logging.getLogger(__name__)
@@ -49,10 +48,11 @@ def prepare_inputs(
         quantitative_fields,
         embedding_dim=embedding_dim,
         flatten_batch=flatten_batch,
+        device=DEVICE,
     )
 
     # (batches) x (seq length) x (num cats) x (items per cat)
-    vectorized_y1 = vectorize_single_select(trials, y1_categorical_fields, embedding_dim)  # type: ignore
+    vectorized_y1 = vectorize_single_select(trials, y1_categorical_fields, embedding_dim, device=DEVICE)  # type: ignore
     y1 = resize_and_batch(vectorized_y1.embeddings, batch_size)
     y1_categories = resize_and_batch(vectorized_y1.encodings.squeeze(), batch_size)
     y2_vals = [float(trial[y2_field]) for trial in trials]
@@ -68,13 +68,13 @@ def prepare_inputs(
 
     return (
         {
-            "multi_select_x": batched_feats.multi_select.to("mps"),
-            "single_select_x": batched_feats.single_select.to("mps"),
-            "text_x": batched_feats.text.to("mps"),
-            "quantitative_x": batched_feats.quantitative.to("mps"),
-            "y1": y1.to("mps"),
-            "y1_categories": y1_categories.to("mps"),
-            "y2": y2.to("mps"),
+            "multi_select_x": batched_feats.multi_select.to(DEVICE),
+            "single_select_x": batched_feats.single_select.to(DEVICE),
+            "text_x": batched_feats.text.to(DEVICE),
+            "quantitative_x": batched_feats.quantitative.to(DEVICE),
+            "y1": y1.to(DEVICE),
+            "y1_categories": y1_categories.to(DEVICE),
+            "y2": y2.to(DEVICE),
         },
         vectorized_y1.category_size_map,
     )

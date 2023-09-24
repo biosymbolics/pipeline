@@ -22,13 +22,30 @@ class TwoStageModelSizes(NamedTuple):
     """
 
     multi_select_input: int
+    quantitative_input: int
     single_select_input: int
     text_input: int
-    stage1_input: int
-    stage2_input: int
-    stage1_hidden: int  # = 64
-    stage1_embedded_output: int  # = 32
+    stage1_output: int
     stage1_output_map: dict[str, int]
-    stage2_hidden: int  # = 64
-    stage2_output: int  # = 1
-    quantitative_input: int
+    stage2_output: int
+
+    @property
+    def stage1_input(self):
+        return (
+            self.multi_select_input
+            + self.quantitative_input
+            + self.single_select_input
+            + self.text_input
+        )
+
+    @property
+    def stage1_hidden(self):
+        return round(self.stage1_input * (2 / 3))
+
+    @property
+    def stage2_hidden(self):
+        return round(self.stage1_input * (2 / 3))
+
+    @property
+    def stage2_input(self):
+        return self.stage1_input

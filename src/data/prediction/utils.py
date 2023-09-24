@@ -148,6 +148,7 @@ def get_string_values(item: dict, field: str) -> list:
 def __get_text_embeddings(
     records: Sequence[dict],
     text_fields: list[str] = [],
+    device: str = "cpu",
 ) -> torch.Tensor:
     """
     Get text embeddings given a list of dicts
@@ -191,7 +192,7 @@ def __get_text_embeddings(
         ),
     )
 
-    return tensor.to("mps")
+    return tensor.to(device)
 
 
 def encode_categories(
@@ -235,6 +236,7 @@ def __embed_categories(
     max_sizes: dict[str, int],
     max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    device: str = "cpu",
 ) -> EmbeddedCategories:
     """
     Get category embeddings given a list of dicts
@@ -264,7 +266,7 @@ def __embed_categories(
             len(embedded_records[0]),
             *embedded_records[0][0].shape,
         ),
-    ).to("mps")
+    ).to(device)
 
     return EmbeddedCategories(embeddings=embeddings, weights=weights)
 
@@ -274,6 +276,7 @@ def __vectorize_categories(
     categorical_fields: list[str],
     max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    device: str = "cpu",
 ) -> VectorizedCategories:
     encodings, max_sizes = encode_categories(
         records, categorical_fields, max_items_per_cat
@@ -285,6 +288,7 @@ def __vectorize_categories(
         max_sizes,
         max_items_per_cat=max_items_per_cat,
         embedding_dim=embedding_dim,
+        device=device,
     )
 
     return VectorizedCategories(
@@ -299,12 +303,14 @@ def vectorize_single_select_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    device: str = "cpu",
 ) -> VectorizedCategories:
     return __vectorize_categories(
         records,
         categorical_fields,
         max_items_per_cat=1,
         embedding_dim=embedding_dim,
+        device=device,
     )
 
 
@@ -313,12 +319,14 @@ def vectorize_multi_select_categories(
     categorical_fields: list[str],
     max_items_per_cat: int,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    device: str = "cpu",
 ) -> VectorizedCategories:
     return __vectorize_categories(
         records,
         categorical_fields,
         max_items_per_cat=max_items_per_cat,
         embedding_dim=embedding_dim,
+        device=device,
     )
 
 
@@ -330,6 +338,7 @@ def vectorize_features(
     quantitative_fields: list[str] = [],
     max_items_per_cat: int = MAX_ITEMS_PER_CAT,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
+    device: str = "cpu",
 ) -> VectorizedFeatures:
     """
     Get category and text embeddings given a list of dicts
@@ -348,9 +357,7 @@ def vectorize_features(
     # random.shuffle(_items)
 
     vectorized_single_select = vectorize_single_select_categories(
-        records,
-        single_select_categorical_fields,
-        embedding_dim,
+        records, single_select_categorical_fields, embedding_dim, device=device
     )
 
     vectorized_multi_select = vectorize_multi_select_categories(
@@ -358,10 +365,11 @@ def vectorize_features(
         multi_select_categorical_fields,
         max_items_per_cat,
         embedding_dim,
+        device=device,
     )
 
     vectorized_text = (
-        __get_text_embeddings(records, text_fields)
+        __get_text_embeddings(records, text_fields, device)
         if len(text_fields) > 1
         else torch.Tensor()
     )
@@ -393,6 +401,7 @@ def vectorize_and_batch_features(
     max_items_per_cat: int = MAX_ITEMS_PER_CAT,
     embedding_dim: int = DEFAULT_EMBEDDING_DIM,
     flatten_batch: bool = False,
+    device: str = "cpu",
 ) -> VectorizedFeatures:
     """
     Vectorizes and batches input features
@@ -405,6 +414,7 @@ def vectorize_and_batch_features(
         quantitative_fields,
         max_items_per_cat,
         embedding_dim,
+        device=device,
     )
 
     feature_dict = dict(
