@@ -106,7 +106,7 @@ class TwoStageModel(nn.Module):
             )
             + list(self.stage2_model.parameters()),
             lr=LR,
-            weight_decay=1e-4,
+            weight_decay=1e-8,
         )
 
     def forward(

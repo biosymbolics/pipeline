@@ -40,12 +40,12 @@ class TwoStageModelSizes(NamedTuple):
 
     @property
     def stage1_hidden(self):
-        return round(self.stage1_input * (2 / 3))
-
-    @property
-    def stage2_hidden(self):
-        return round(self.stage1_input * (2 / 3))
+        return round(self.stage1_input * (3 / 2))
 
     @property
     def stage2_input(self):
         return self.stage1_input
+
+    @property
+    def stage2_hidden(self):
+        return round(self.stage2_input * (2 / 3))
