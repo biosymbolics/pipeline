@@ -60,9 +60,13 @@ class TwoStageModel(nn.Module):
         self.input_model = nn.ModuleDict(input_layers).to("mps")
 
         # Stage 1 model
+        # TODO: make contrastive??
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(sizes.stage1_hidden, sizes.stage1_hidden),
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_embedded_output),

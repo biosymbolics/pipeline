@@ -80,10 +80,8 @@ class ModelTrainer:
         self.stage1_criterion = nn.CrossEntropyLoss()
         self.stage2_criterion = nn.MSELoss()
 
-        logger.info("Initialized model with input dim of %s", self.input_dim)
-
-        self.stage1_precision = Precision(average=None)
-        self.stage1_recall = Recall(average=None)
+        self.stage1_precision = {k: Precision() for k in y1_category_size_map.keys()}
+        self.stage1_recall = {k: Recall() for k in y1_category_size_map.keys()}
         self.stage1_mse = MeanSquaredError()
         self.stage2_mae = MeanAbsoluteError()
 
@@ -121,7 +119,7 @@ class ModelTrainer:
         input_dict: DnnInput,
         num_batches: int,
         start_epoch: int = 0,
-        num_epochs: int = 100,
+        num_epochs: int = 500,
     ):
         """
         Train model
@@ -134,7 +132,7 @@ class ModelTrainer:
         for epoch in range(start_epoch, num_epochs):
             logging.info("Starting epoch %s", epoch)
             for i in range(num_batches):
-                logging.info("Starting batch %s out of %s", i, num_batches)
+                logging.debug("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = {f: v[i] for f, v in input_dict.items() if v is not None}  # type: ignore
 
                 # place before any loss calculation
@@ -160,28 +158,27 @@ class ModelTrainer:
                 )[:-1]
 
                 y1_probs_by_field = torch.tensor_split(y1_probs, y1_idxs, dim=1)
-                y1_true_by_field = torch.split(batch["y1_categories"], 1, dim=1)
+                y1_true_by_field = [
+                    y1.squeeze() for y1 in torch.split(batch["y1_categories"], 1, dim=1)
+                ]
 
                 field_losses = [
-                    self.stage1_criterion(
-                        y1_by_field.float(),
-                        y1_true_set.squeeze(),
-                    )
+                    self.stage1_criterion(y1_by_field.float(), y1_true_set)
                     for y1_by_field, y1_true_set in zip(
                         y1_probs_by_field, y1_true_by_field
                     )
                 ]
 
                 stage1_loss = torch.stack(field_losses).sum()
-                logging.info("Batch %s Stage 1 loss: %s", i, stage1_loss)
+                logging.debug("Batch %s Stage 1 loss: %s", i, stage1_loss)
 
                 # STAGE 2
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
-                logging.info("Batch %s Stage 2 loss: %s", i, stage2_loss)
+                logging.debug("Batch %s Stage 2 loss: %s", i, stage2_loss)
 
                 # Total
                 loss = stage1_loss + torch.mul(torch.log(stage2_loss), 0.5)
-                logging.info("Total loss: %s", loss)
+                logging.info("Batch %s Total loss: %s", i, loss)
 
                 loss.backward(retain_graph=True)
                 self.model.optimizer.step()
@@ -216,43 +213,33 @@ class ModelTrainer:
         Calculate discrete metrics for a batch (precision/recall/f1)
         """
 
-        # pad because ohe size is different for each field
-        max_idx_0 = max([t.shape[0] for t in y1_logits_by_field])
-        max_idx_1 = max([t.shape[1] for t in y1_logits_by_field])
+        for i, (y1_preds, y1_true) in enumerate(
+            zip(y1_logits_by_field, y1_true_by_field)
+        ):
+            k = list(self.y1_category_size_map.keys())[i]
+            # ignite.metrics uses 64 bit, not supported by MPS
+            y1_probs_cats = nn.Softmax(dim=1)(y1_preds.detach()).to("cpu")
+            y1_pred_cats = (y1_probs_cats > 0.5).float()
 
-        for y1_preds, y1_true in zip(y1_logits_by_field, y1_true_by_field):
-            y1_probs_cats = nn.Softmax(dim=1)(y1_preds.detach())
-
-            logger.info(
-                "Y1probs[0:1]: %s VS actual: %s", y1_probs_cats[0:1], y1_true[0:1]
-            )
-
-            # ignite.metrics uses 64 bit
-            y1_pred_cats = pad_or_truncate_to_size(
-                (y1_probs_cats > 0.5).float(), (max_idx_0, max_idx_1)
-            ).to("cpu")
-
-            _y1_true = y1_true.squeeze().to("cpu")
-
-            # TODO: this is wrong since it jams all the fields together
-            # (Thus it will underestimate precision/recall by quite a bit)
-            self.stage1_precision.update((y1_pred_cats, _y1_true))
-            self.stage1_recall.update((y1_pred_cats, _y1_true))
+            self.stage1_precision[k].update((y1_pred_cats, y1_true.to("cpu")))
+            self.stage1_recall[k].update((y1_pred_cats, y1_true.to("cpu")))
 
     def evaluate(self):
         """
         Output evaluation metrics (precision, recall, F1)
         """
         try:
-            logging.info("Stage 1 Precision: %s", self.stage1_precision.compute())
-            logging.info("Stage 1 Recall: %s", self.stage1_recall.compute())
-            logging.info("Stage 1 MSE: %s", self.stage1_mse.compute())
+            for k in self.y1_category_size_map.keys():
+                logging.info(
+                    "Stage1 %s Precision: %s", k, self.stage1_precision[k].compute()
+                )
+                logging.info("Stage1 %s Recall: %s", k, self.stage1_recall[k].compute())
+                self.stage1_precision[k].reset()
+                self.stage1_recall[k].reset()
 
-            self.stage1_precision.reset()
-            self.stage1_recall.reset()
+            logging.info("Stage1 MSE: %s", self.stage1_mse.compute())
+            logging.info("Stage2 MAE: %s", self.stage2_mae.compute())
             self.stage1_mse.reset()
-
-            logging.info("Stage 2 MAE: %s", self.stage2_mae.compute())
             self.stage2_mae.reset()
 
         except Exception as e:
