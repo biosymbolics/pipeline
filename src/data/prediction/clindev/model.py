@@ -18,13 +18,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class AuxDecoder(nn.Module):
+class OutputCorrelation(nn.Module):
+    """
+    Model to learn based on output correlation
+    (design/randomization/masking are correlated)
+    """
+
     def __init__(self, other_outputs_size, this_output_size):
         super().__init__()
-        # Decoder inputs for each other field
-        # self.dec_inputs = nn.ModuleList(
-        #     [nn.Linear(hidden_size, hidden_size) for f in input_fields]
-        # )
         self.decoder = nn.Linear(other_outputs_size, this_output_size)
 
     def forward(self, *inputs):
@@ -32,11 +33,11 @@ class AuxDecoder(nn.Module):
         return self.decoder(x)
 
     @staticmethod
-    def create(output_field, stage1_output_map) -> "AuxDecoder":
+    def create(output_field, stage1_output_map) -> "OutputCorrelation":
         hidden_size = sum(
             [s for f, s in stage1_output_map.items() if f != output_field]
         )
-        return AuxDecoder(hidden_size, stage1_output_map[output_field])
+        return OutputCorrelation(hidden_size, stage1_output_map[output_field])
 
 
 class TwoStageModel(nn.Module):
@@ -128,7 +129,7 @@ class TwoStageModel(nn.Module):
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
             nn.BatchNorm1d(sizes.stage1_hidden),
             nn.ReLU(),
-            nn.Dropout(0.1),
+            # nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_output),
         ).to(device)
 
@@ -142,10 +143,10 @@ class TwoStageModel(nn.Module):
             )
         ).to(device)
 
-        self.aux_decoders = nn.ModuleDict(
+        self.correlation_decoders = nn.ModuleDict(
             dict(
                 [
-                    (f, AuxDecoder.create(f, sizes.stage1_output_map).to(device))
+                    (f, OutputCorrelation.create(f, sizes.stage1_output_map).to(device))
                     for f in sizes.stage1_output_map.keys()
                 ]
             )
@@ -156,7 +157,7 @@ class TwoStageModel(nn.Module):
             nn.Linear(sizes.stage1_output, sizes.stage2_hidden),
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
             nn.BatchNorm1d(round(sizes.stage2_hidden / 2)),
-            nn.Dropout(0.1),
+            # nn.Dropout(0.1),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
         ).to(device)
 
@@ -165,12 +166,12 @@ class TwoStageModel(nn.Module):
         return OPTIMIZER_CLASS(
             list(self.multi_select_embeddings.parameters())
             + list(self.single_select_embeddings.parameters())
-            + list(self.aux_decoders.parameters())
+            + list(self.correlation_decoders.parameters())
             + list(self.stage1_model.parameters())
             + list(self.stage1_output_models.parameters())
             + list(self.stage2_model.parameters()),
             lr=LR,
-            weight_decay=1e-5,
+            weight_decay=1e-4,
         )
 
     def forward(
@@ -228,12 +229,11 @@ class TwoStageModel(nn.Module):
         y1_probs_list = [model(y1_pred) for model in self.stage1_output_models.values()]
         y1_probs = torch.cat(y1_probs_list, dim=1).to(self.device)
 
-        # outputs guessed based on the other outputs
-        # (to teach the model their relationships)
+        # outputs guessed based on the other outputs (to learn relationships)
         y1_aux_probs = torch.cat(
             [
                 model(*[y1_prob for i2, y1_prob in enumerate(y1_probs_list) if i2 != i])
-                for i, model in enumerate(self.aux_decoders.values())
+                for i, model in enumerate(self.correlation_decoders.values())
             ],
             dim=1,
         ).to(self.device)

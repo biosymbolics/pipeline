@@ -8,8 +8,8 @@ from typing import Sequence, cast
 import torch
 import torch.nn as nn
 from ignite.metrics import (
-    ClassificationReport,
     Accuracy,
+    ClassificationReport,
     MeanAbsoluteError,
 )
 

@@ -11,8 +11,8 @@ CHECKPOINT_PATH = "clindev_model_checkpoints"
 BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
-LR = 1e-4
-MAX_ITEMS_PER_CAT = 5  # DEFAULT_MAX_ITEMS_PER_CAT
+LR = 1e-3
+MAX_ITEMS_PER_CAT = 10  # DEFAULT_MAX_ITEMS_PER_CAT
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
@@ -81,15 +81,6 @@ Y2_FIELD = "duration"
 # INFO:root:Stage1 randomization Accuracy: 0.70615234375
 # INFO:root:Stage2 MAE: 304.4075927734375
 
-# # with aux loss & smmoth
-# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.5218667449368947, 'recall': 0.9998125585754452, 'f1-score': 0.685780406274106}, '3': {'precision': 0.42105263157894735, 'recall': 0.005970149253731343, 'f1-score': 0.011773362766740222}, '4': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, 'macro avg': {'precision': 0.1885838753031684, 'recall': 0.20115654156583532, 'f1-score': 0.13951075380816924}}
-# INFO:root:Stage1 design Accuracy: 0.5216796875
-# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.5755842864246643, 'recall': 0.5065645514223195, 'f1-score': 0.5388733705772806}, '2': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '3': {'precision': 0.034898681247989706, 'recall': 0.6027777777777777, 'f1-score': 0.06597750076010936}, '4': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, 'macro avg': {'precision': 0.1220965935345308, 'recall': 0.22186846584001946, 'f1-score': 0.12097017426747798}}
-# INFO:root:Stage1 masking Accuracy: 0.247265625
-# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.7181240840254031, 'recall': 0.9993201903467029, 'f1-score': 0.835702103467879}, 'macro avg': {'precision': 0.23937469467513436, 'recall': 0.33310673011556763, 'f1-score': 0.2785673678226263}}
-# INFO:root:Stage1 randomization Accuracy: 0.7177734375
-# INFO:root:Stage2 MAE: 301.7379638671875
-
 # higher weight decay
 # INFO:root:Stage1 design Metrics: {'precision': 0.3044067955148667, 'recall': 0.211263168118451, 'f1-score': 0.16326977421929}
 # INFO:root:Stage1 design Accuracy: 0.52294921875
@@ -127,11 +118,11 @@ Y2_FIELD = "duration"
 # INFO:root:Stage2 MAE: 146.845751953125
 
 
-# 20,000
-# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.9540229885057471, 'recall': 0.17418677859391396, 'f1-score': 0.29458740017746193}, '1': {'precision': 0.6882438246820954, 'recall': 0.9177720952533163, 'f1-score': 0.7866061216243052}, '2': {'precision': 0.5689475937136916, 'recall': 0.364362639514392, 'f1-score': 0.44423223834988496}, 'macro avg': {'precision': 0.7370714689671781, 'recall': 0.48544050445387404, 'f1-score': 0.508475253383884}}
-# INFO:root:Stage1 design Accuracy: 0.675966796875
-# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.44333284650211774, 'recall': 0.3100612870275792, 'f1-score': 0.3649095389793828}, '1': {'precision': 0.6145526057030481, 'recall': 0.8212709167436608, 'f1-score': 0.7030309421493408}, '2': {'precision': 0.3890909090909091, 'recall': 0.38021608643457383, 'f1-score': 0.38460230722525757}, '3': {'precision': 0.0038461538461538464, 'recall': 0.0004932182490752158, 'f1-score': 0.0008743169398905089}, '4': {'precision': 0.1346433770014556, 'recall': 0.04006497022198159, 'f1-score': 0.06175415171492912}, 'macro avg': {'precision': 0.31709317842873685, 'recall': 0.31042129573537414, 'f1-score': 0.3030342514017602}}
-# INFO:root:Stage1 masking Accuracy: 0.530869140625
-# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.5296370041353959, 'recall': 0.4408839779005525, 'f1-score': 0.48120230999373753}, '1': {'precision': 0.8037383177570093, 'recall': 0.029284903518728717, 'f1-score': 0.056510787427444906}, '2': {'precision': 0.7863429181011492, 'recall': 0.9258778190122752, 'f1-score': 0.8504247731920912}, 'macro avg': {'precision': 0.7065727466645182, 'recall': 0.46534890014385216, 'f1-score': 0.4627126235377579}}
-# INFO:root:Stage1 randomization Accuracy: 0.737294921875
-# INFO:root:Stage2 MAE: 455.6866015625
+# 2000, batch size of 32 + batch norm + wider + higher weight decay
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.5039808917197452, 'recall': 0.34590163934426227, 'f1-score': 0.4102397926117947}, '1': {'precision': 0.7935799625737728, 'recall': 0.8842020850040097, 'f1-score': 0.8364436352602027}, '2': {'precision': 0.6260920209668026, 'recall': 0.5795148247978437, 'f1-score': 0.601903695408734}, 'macro avg': {'precision': 0.6412176250867735, 'recall': 0.6032061830487052, 'f1-score': 0.6161957077602438}}
+# INFO:root:Stage1 design Accuracy: 0.7279233870967742
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.33764553686934023, 'recall': 0.15263157894736842, 'f1-score': 0.21022956101490092}, '1': {'precision': 0.6708860759493671, 'recall': 0.8688524590163934, 'f1-score': 0.7571428571428567}, '2': {'precision': 0.5143658023826209, 'recall': 0.6142259414225941, 'f1-score': 0.5598779557589622}, '3': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '4': {'precision': 0.3551912568306011, 'recall': 0.15568862275449102, 'f1-score': 0.21648626144879224}, 'macro avg': {'precision': 0.37561773440638585, 'recall': 0.3582797204281694, 'f1-score': 0.3487473270731024}}
+# INFO:root:Stage1 masking Accuracy: 0.5881048387096774
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.6313269493844049, 'recall': 0.5381924198250729, 'f1-score': 0.5810513062637703}, '1': {'precision': 0.4838709677419355, 'recall': 0.11920529801324503, 'f1-score': 0.19128586609989343}, '2': {'precision': 0.8441731141199227, 'recall': 0.9373154362416107, 'f1-score': 0.8883093753975315}, 'macro avg': {'precision': 0.6531236770820877, 'recall': 0.5315710513599762, 'f1-score': 0.5535488492537318}}
+# INFO:root:Stage1 randomization Accuracy: 0.8060483870967742
+# INFO:root:Stage2 MAE: 145.19381300403225
