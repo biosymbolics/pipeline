@@ -39,11 +39,10 @@ TEXT_FIELDS: list[str] = []
 
 
 QUANTITATIVE_FIELDS: list[str] = [
-    # "enrollment",
     "start_date",
 ]
 
-# enrollment + duration have very low correlation, high covariance
+# Side note: enrollment + duration have very low correlation, high covariance
 # (low corr is perhaps why it doesn't offer much loss reduction)
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",

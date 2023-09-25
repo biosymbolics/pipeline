@@ -181,10 +181,6 @@ class ModelTrainer:
                     ]
                 ).sum()
 
-                logger.debug(
-                    "Batch %s Stage 1 loss: %s", i, stage1_loss.detach().item()
-                )
-
                 y1_corr_probs_by_field = torch.tensor_split(
                     y1_corr_probs, y1_idxs, dim=1
                 )
@@ -198,20 +194,21 @@ class ModelTrainer:
                     ]
                 ).sum()
 
-                logger.debug(
-                    "Batch %s Stage 1 corr loss: %s",
-                    i,
-                    stage1_corr_loss.detach().item(),
-                )
-
                 # STAGE 2
                 # note: can be very large thus the log/0.5 when combining with stage 1
                 stage2_loss = self.stage2_criterion(y2_preds, y2_true)
-                logger.info("Batch %s Stage 2 loss: %s", i, stage2_loss.detach().item())
 
                 # Total
                 loss = stage1_loss + torch.mul(stage1_corr_loss, 0.1) + stage2_loss
-                logger.debug("Batch %s Total loss: %s", i, loss.detach().item())
+
+                logger.debug(
+                    "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s)",
+                    i,
+                    loss.detach().item(),
+                    stage1_loss.detach().item(),
+                    stage1_corr_loss.detach().item(),
+                    stage2_loss.detach().item(),
+                )
 
                 loss.backward()
                 self.model.optimizer.step()
