@@ -68,7 +68,7 @@ def batch_and_pad(
         batch_size (int): Batch size
     """
     if len(tensors) == 0:
-        return torch.empty(batch_size, 0)  # return batch-sized but empty tensor
+        return torch.Tensor()  # return empty tensor
 
     if not is_tensor_list(tensors):
         # then list of primitives

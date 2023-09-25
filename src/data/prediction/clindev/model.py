@@ -123,7 +123,10 @@ class TwoStageModel(nn.Module):
         # TODO: make contrastive??
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
+            # nn.BatchNorm1d(sizes.stage1_input),
+            # nn.ReLU(),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
+            nn.BatchNorm1d(sizes.stage1_hidden),
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_output),
@@ -152,6 +155,7 @@ class TwoStageModel(nn.Module):
         self.stage2_model = nn.Sequential(
             nn.Linear(sizes.stage1_output, sizes.stage2_hidden),
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
+            nn.BatchNorm1d(round(sizes.stage2_hidden / 2)),
             nn.Dropout(0.1),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
         ).to(device)

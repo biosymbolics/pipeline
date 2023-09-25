@@ -138,7 +138,11 @@ class ModelTrainer:
                 logging.debug("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = cast(
                     DnnInput,
-                    {f: v[i] for f, v in _input_dict.items() if v is not None},
+                    {
+                        f: v[i] if len(v) > i else torch.Tensor()
+                        for f, v in _input_dict.items()
+                        if v is not None
+                    },
                 )
 
                 # place before any loss calculation

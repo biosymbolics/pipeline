@@ -8,7 +8,7 @@ from data.prediction.constants import (
 CHECKPOINT_PATH = "clindev_model_checkpoints"
 
 
-BATCH_SIZE = 1024  # DEFAULT_BATCH_SIZE
+BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
 LR = 1e-4
@@ -107,3 +107,31 @@ Y2_FIELD = "duration"
 # INFO:root:Stage1 randomization Metrics: {'precision': 0.40118861024033436, 'recall': 0.27401801140094983, 'f1-score': 0.24998637689635714}
 # INFO:root:Stage1 randomization Accuracy: 0.7006209935897436
 # INFO:root:Stage2 MAE: 351.2637970753205
+
+
+# LR = 1e-4
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.9876543209876543, 'recall': 0.1702127659574468, 'f1-score': 0.29038112522685994}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.5503326426000654, 'recall': 0.9458294283036551, 'f1-score': 0.6958080529509094}, '3': {'precision': 0.3713163064833006, 'recall': 0.141044776119403, 'f1-score': 0.2044348296376416}, '4': {'precision': 0.7941176470588235, 'recall': 0.11454545454545455, 'f1-score': 0.20021186440677946}, 'macro avg': {'precision': 0.5406841834259688, 'recall': 0.27432648498519185, 'f1-score': 0.2781671744444381}}
+# INFO:root:Stage1 design Accuracy: 0.5609375
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.4736481861738535, 'recall': 0.9085339168490153, 'f1-score': 0.6226754649070181}, '2': {'precision': 0.24789915966386555, 'recall': 0.049269311064718165, 'f1-score': 0.08220132358063366}, '3': {'precision': 0.06781750924784218, 'recall': 0.1527777777777778, 'f1-score': 0.09393680614859053}, '4': {'precision': 0.37433155080213903, 'recall': 0.07734806629834254, 'f1-score': 0.12820512820512794}, 'macro avg': {'precision': 0.23273928117754003, 'recall': 0.23758581439797072, 'f1-score': 0.18540374456827408}}
+# INFO:root:Stage1 masking Accuracy: 0.42919921875
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.8744113029827315, 'recall': 0.2841836734693878, 'f1-score': 0.4289564882556792}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.7611784371082323, 'recall': 0.9906186267845003, 'f1-score': 0.8608731612217161}, 'macro avg': {'precision': 0.5451965800303212, 'recall': 0.4249341000846294, 'f1-score': 0.4299432164924651}}
+# INFO:root:Stage1 randomization Accuracy: 0.76591796875
+
+# remove rare y1 outputs from training set
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.5068087625814092, 'recall': 0.40956937799043064, 'f1-score': 0.45302990209049965}, '1': {'precision': 0.6752781211372064, 'recall': 0.8678316123907863, 'f1-score': 0.7595411887382684}, '2': {'precision': 0.24295010845986983, 'recall': 0.06037735849056604, 'f1-score': 0.09671848013816893}, 'macro avg': {'precision': 0.4750123307261618, 'recall': 0.4459261162905943, 'f1-score': 0.436429856988979}}
+# INFO:root:Stage1 design Accuracy: 0.62802734375
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.8764845605700713, 'recall': 0.1868354430379747, 'f1-score': 0.30801335559265414}, '1': {'precision': 0.4965493834144134, 'recall': 0.95, 'f1-score': 0.6522029868489481}, '2': {'precision': 0.7748344370860927, 'recall': 0.1465553235908142, 'f1-score': 0.24648876404494355}, '3': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '4': {'precision': 0.22580645161290322, 'recall': 0.14166666666666666, 'f1-score': 0.17410387710314512}, 'macro avg': {'precision': 0.4747349665366961, 'recall': 0.2850114866590911, 'f1-score': 0.27616179671793817}}
+# INFO:root:Stage1 masking Accuracy: 0.510546875
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.8791208791208791, 'recall': 0.12276214833759591, 'f1-score': 0.21543985637342888}, '1': {'precision': 0.5961538461538461, 'recall': 0.04078947368421053, 'f1-score': 0.07635467980295554}, '2': {'precision': 0.7535047907211296, 'recall': 0.9928239202657807, 'f1-score': 0.856766055045871}, 'macro avg': {'precision': 0.7429265053319517, 'recall': 0.3854585140958624, 'f1-score': 0.3828535304074185}}
+# INFO:root:Stage1 randomization Accuracy: 0.7560546875
+# INFO:root:Stage2 MAE: 146.845751953125
+
+
+# 20,000
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.9540229885057471, 'recall': 0.17418677859391396, 'f1-score': 0.29458740017746193}, '1': {'precision': 0.6882438246820954, 'recall': 0.9177720952533163, 'f1-score': 0.7866061216243052}, '2': {'precision': 0.5689475937136916, 'recall': 0.364362639514392, 'f1-score': 0.44423223834988496}, 'macro avg': {'precision': 0.7370714689671781, 'recall': 0.48544050445387404, 'f1-score': 0.508475253383884}}
+# INFO:root:Stage1 design Accuracy: 0.675966796875
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.44333284650211774, 'recall': 0.3100612870275792, 'f1-score': 0.3649095389793828}, '1': {'precision': 0.6145526057030481, 'recall': 0.8212709167436608, 'f1-score': 0.7030309421493408}, '2': {'precision': 0.3890909090909091, 'recall': 0.38021608643457383, 'f1-score': 0.38460230722525757}, '3': {'precision': 0.0038461538461538464, 'recall': 0.0004932182490752158, 'f1-score': 0.0008743169398905089}, '4': {'precision': 0.1346433770014556, 'recall': 0.04006497022198159, 'f1-score': 0.06175415171492912}, 'macro avg': {'precision': 0.31709317842873685, 'recall': 0.31042129573537414, 'f1-score': 0.3030342514017602}}
+# INFO:root:Stage1 masking Accuracy: 0.530869140625
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.5296370041353959, 'recall': 0.4408839779005525, 'f1-score': 0.48120230999373753}, '1': {'precision': 0.8037383177570093, 'recall': 0.029284903518728717, 'f1-score': 0.056510787427444906}, '2': {'precision': 0.7863429181011492, 'recall': 0.9258778190122752, 'f1-score': 0.8504247731920912}, 'macro avg': {'precision': 0.7065727466645182, 'recall': 0.46534890014385216, 'f1-score': 0.4627126235377579}}
+# INFO:root:Stage1 randomization Accuracy: 0.737294921875
+# INFO:root:Stage2 MAE: 455.6866015625
