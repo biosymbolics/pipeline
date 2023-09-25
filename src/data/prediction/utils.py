@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from sklearn.calibration import LabelEncoder
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import KBinsDiscretizer
 import polars as pl
 
 from core.ner.spacy import Spacy
@@ -57,6 +58,31 @@ def to_float(value: int | float | date) -> float:
     return float(value)
 
 
+def bin_quantitative_values(
+    values: Sequence[float | int] | pl.Series, n_bins: int = 10
+) -> Sequence[list[int]]:
+    """
+    Bins quantiative values, turning them into categorical
+    (currently using strategy kmeans:
+    see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html)
+
+    Args:
+        values (Sequence[float | int]): List of values
+        n_bins (int): Number of bins
+
+    Returns:
+        Sequence[list[int]]: List of lists of binned values (e.g. [[0.0], [2.0], [5.0], [0.0], [0.0]])
+            (a list of lists because that matches our other categorical vars)
+    """
+    binner = KBinsDiscretizer(
+        n_bins=n_bins, encode="ordinal", strategy="kmeans", subsample=None
+    )
+    X = np.array(values).reshape(-1, 1)
+    Xt = binner.fit_transform(X)
+    res = Xt.tolist()
+    return res
+
+
 def batch_and_pad(
     tensors: list[torch.Tensor] | list[Primitive], batch_size: int
 ) -> torch.Tensor:
@@ -85,7 +111,7 @@ def batch_and_pad(
 
     batches = [F.pad(b, get_batch_pad(b)) for b in batches]
 
-    logging.info("Batches: %s (%s)", len(batches), [b.size() for b in batches])
+    logging.info("Batches: %s (%s ...)", len(batches), [b.size() for b in batches[0:5]])
 
     return torch.stack(batches)
 
@@ -258,6 +284,30 @@ def encode_multi_select_categories(
         max_items_per_cat=max_items_per_cat,
         device=device,
     )
+
+
+def encode_quantitative_fields(
+    records: Sequence[dict],
+    fields: list[str],
+) -> Sequence[dict]:
+    """
+    Encode quantitative fields into categorical
+    (Intended for use as a preprocessing step, so that the
+    newly categorical fields can be encoded as embeddings)
+
+    Args:
+        records (Sequence[dict]): List of dicts
+        fields (list[str]): List of fields to encode
+
+    Returns:
+        Sequence[dict]: List of dicts with encoded fields
+    """
+    df = pl.from_dicts(records, infer_schema_length=1000)  # type: ignore
+    for field in fields:
+        df = df.with_columns(
+            [pl.col(field).map_batches(lambda v: pl.Series(bin_quantitative_values(v)))]
+        )
+    return df.to_dicts()
 
 
 def encode_features(

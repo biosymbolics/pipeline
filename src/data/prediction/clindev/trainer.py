@@ -2,16 +2,11 @@ from itertools import accumulate
 import logging
 import math
 import os
-import random
 import sys
 from typing import Sequence, cast
 import torch
 import torch.nn as nn
-from ignite.metrics import (
-    Accuracy,
-    ClassificationReport,
-    MeanAbsoluteError,
-)
+from ignite.metrics import Accuracy, ClassificationReport
 
 import system
 
@@ -28,6 +23,7 @@ from .constants import (
     MULTI_SELECT_CATEGORICAL_FIELDS,
     SINGLE_SELECT_CATEGORICAL_FIELDS,
     QUANTITATIVE_FIELDS,
+    QUANTITATIVE_TO_CATEGORY_FIELDS,
     SAVE_FREQUENCY,
     TEXT_FIELDS,
     Y1_CATEGORICAL_FIELDS,
@@ -35,7 +31,7 @@ from .constants import (
 )
 from .model import TwoStageModel
 from .types import AllCategorySizes, DnnInput, TwoStageModelSizes
-from .utils import prepare_inputs
+from .utils import prepare_inputs, preprocess_inputs
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +57,7 @@ class ModelTrainer:
             category_sizes (AllCategorySizes): Sizes of categorical fields
         """
         torch.device(DEVICE)
+        self.device = DEVICE
 
         self.category_sizes = category_sizes
 
@@ -73,19 +70,22 @@ class ModelTrainer:
             text_input=input_dict["text_x"].size(-1),
             stage1_output_map=category_sizes.y1,
             stage1_output=math.prod(input_dict["y1"].shape[2:]),
-            stage2_output=math.prod(input_dict["y2"].shape[2:]),
+            stage2_output=10,  # math.prod(input_dict["y2"].shape[2:]), # should be num values
         )
-        logging.info("Model sizes: %s", sizes)
+        logger.info("Model sizes: %s", sizes)
 
         self.model = TwoStageModel(sizes)
         self.stage1_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
-        self.stage2_criterion = nn.MSELoss()
+        self.stage2_criterion = nn.CrossEntropyLoss()
 
-        self.stage1_cp = {
-            k: ClassificationReport(output_dict=True) for k in category_sizes.y1.keys()
+        self.stage1_metrics = {
+            "cp": {k: ClassificationReport() for k in category_sizes.y1.keys()},
+            "accuracy": {k: Accuracy() for k in category_sizes.y1.keys()},
         }
-        self.stage1_accuracy = {k: Accuracy() for k in category_sizes.y1.keys()}
-        self.stage2_mae = MeanAbsoluteError()
+        self.stage2_metrics = {
+            "cp": ClassificationReport(),
+            "accuracy": Accuracy(),
+        }
 
     def __call__(self, *args, **kwargs):
         """
@@ -111,9 +111,9 @@ class ModelTrainer:
 
         try:
             torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
-            logging.info("Saved checkpoint %s", checkpoint_name)
+            logger.info("Saved checkpoint %s", checkpoint_name)
         except Exception as e:
-            logging.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
+            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
             raise e
 
     def train(
@@ -132,10 +132,10 @@ class ModelTrainer:
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
         for epoch in range(start_epoch, num_epochs):
-            logging.info("Starting epoch %s", epoch)
+            logger.info("Starting epoch %s", epoch)
             _input_dict = {f: v.detach().clone() for f, v in input_dict.items()}  # type: ignore
             for i in range(num_batches):
-                logging.debug("Starting batch %s out of %s", i, num_batches)
+                logger.debug("Starting batch %s out of %s", i, num_batches)
                 batch: DnnInput = cast(
                     DnnInput,
                     {
@@ -148,9 +148,9 @@ class ModelTrainer:
                 # place before any loss calculation
                 self.model.optimizer.zero_grad()
 
-                y2_true = batch["y2"]
+                y2_true = batch["y2"].squeeze().int()
 
-                _, y2_logits, y1_probs, y1_aux_probs = self.model(
+                _, y2_preds, y1_probs, y1_corr_probs = self.model(
                     torch.split(batch["multi_select_x"], 1, dim=1),
                     torch.split(batch["single_select_x"], 1, dim=1),
                     batch["text_x"],
@@ -181,79 +181,76 @@ class ModelTrainer:
                     ]
                 ).sum()
 
-                logging.debug(
+                logger.debug(
                     "Batch %s Stage 1 loss: %s", i, stage1_loss.detach().item()
                 )
 
-                y1_aux_probs_by_field = torch.tensor_split(y1_aux_probs, y1_idxs, dim=1)
-                stage1_aux_loss = torch.stack(
+                y1_corr_probs_by_field = torch.tensor_split(
+                    y1_corr_probs, y1_idxs, dim=1
+                )
+                stage1_corr_loss = torch.stack(
                     [
                         self.stage1_criterion(y1_by_field.float(), y1_true_set)
                         for y1_by_field, y1_true_set in zip(
-                            y1_aux_probs_by_field,
+                            y1_corr_probs_by_field,
                             y1_true_by_field,
                         )
                     ]
                 ).sum()
 
-                logging.debug(
-                    "Batch %s Stage 1 aux loss: %s", i, stage1_aux_loss.detach().item()
+                logger.debug(
+                    "Batch %s Stage 1 corr loss: %s",
+                    i,
+                    stage1_corr_loss.detach().item(),
                 )
 
                 # STAGE 2
                 # note: can be very large thus the log/0.5 when combining with stage 1
-                stage2_loss = self.stage2_criterion(y2_logits, y2_true)
-                logging.debug(
-                    "Batch %s Stage 2 loss: %s", i, stage2_loss.detach().item()
-                )
+                stage2_loss = self.stage2_criterion(y2_preds, y2_true)
+                logger.info("Batch %s Stage 2 loss: %s", i, stage2_loss.detach().item())
 
                 # Total
-                loss = (
-                    stage1_loss
-                    + torch.mul(stage1_aux_loss, 0.1)
-                    + torch.mul(torch.log(stage2_loss), 0.6)
-                )
-                logging.info("Batch %s Total loss: %s", i, loss.detach().item())
+                loss = stage1_loss + torch.mul(stage1_corr_loss, 0.1) + stage2_loss
+                logger.debug("Batch %s Total loss: %s", i, loss.detach().item())
 
                 loss.backward()
                 self.model.optimizer.step()
 
-                self.calculate_continuous_metrics(batch, y2_logits)
-                self.calculate_discrete_metrics(y1_probs_by_field, y1_true_by_field)
+                self.calculate_metrics(
+                    y1_probs_by_field, y1_true_by_field, y2_preds, y2_true
+                )
 
             if epoch % SAVE_FREQUENCY == 0:
                 self.evaluate()
                 self.save_checkpoint(epoch)
 
-    def calculate_continuous_metrics(
-        self,
-        batch,
-        y2_preds: torch.Tensor,
-    ):
-        """
-        Calculate metrics for a batch
-        """
-        y2_true = batch["y2"]
-        self.stage2_mae.update((y2_preds, y2_true))
-
-    def calculate_discrete_metrics(
+    def calculate_metrics(
         self,
         y1_logits_by_field: Sequence[torch.Tensor],
         y1_true_by_field: Sequence[torch.Tensor],
+        y2_preds: torch.Tensor,
+        y2_true: torch.Tensor,
     ):
         """
         Calculate discrete metrics for a batch
+        (Conversion to CPU because ignite has prob with MPS)
         """
 
         for i, (y1_preds, y1_true) in enumerate(
             zip(y1_logits_by_field, y1_true_by_field)
         ):
-            k = list(self.category_sizes.y1.keys())[i]
-            # ignite.metrics uses 64 bit, not supported by MPS
-            y1_pred_cats = y1_preds.detach().to("cpu")
+            cpu_y1_preds = y1_preds.detach().to("cpu")
+            cpu_y1_true = y1_true.detach().to("cpu")
 
-            self.stage1_cp[k].update((y1_pred_cats, y1_true.to("cpu")))
-            self.stage1_accuracy[k].update((y1_pred_cats, y1_true.to("cpu")))
+            k = list(self.category_sizes.y1.keys())[i]
+
+            for metric in self.stage1_metrics.values():
+                metric[k].update((cpu_y1_preds, cpu_y1_true))
+
+        cpu_y2_preds = y2_preds.detach().to("cpu")
+        cpu_y2_true = y2_true.detach().to("cpu")
+        for metric in self.stage2_metrics.values():
+            metric.update((cpu_y2_preds, cpu_y2_true))
 
     def evaluate(self):
         """
@@ -261,23 +258,21 @@ class ModelTrainer:
         """
         try:
             for k in self.category_sizes.y1.keys():
-                logging.info("Stage1 %s Metrics: %s", k, self.stage1_cp[k].compute())
-                logging.info(
-                    "Stage1 %s Accuracy: %s", k, self.stage1_accuracy[k].compute()
-                )
-                self.stage1_cp[k].reset()
-                self.stage1_accuracy[k].reset()
+                for metric in self.stage1_metrics.values():
+                    logger.info("Stage1 %s: %s", k, metric[k].compute())
+                    metric[k].reset()
 
-            logging.info("Stage2 MAE: %s", self.stage2_mae.compute())
-            self.stage2_mae.reset()
+            for metric in self.stage2_metrics.values():
+                logger.info("Stage2: %s", metric.compute())
+                metric.reset()
 
         except Exception as e:
-            logging.warning("Failed to evaluate: %s", e)
+            logger.warning("Failed to evaluate: %s", e)
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = sorted(
-            fetch_trials("COMPLETED", limit=2000), key=lambda x: random.random()
+        trials = preprocess_inputs(
+            fetch_trials("COMPLETED", limit=2000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
         input_dict, category_sizes = prepare_inputs(
             trials,

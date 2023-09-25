@@ -2,6 +2,8 @@
 Utils for patent eNPV model
 """
 
+from functools import reduce
+import random
 from typing import Sequence, cast
 import logging
 import torch
@@ -9,6 +11,7 @@ import torch
 from data.prediction.utils import (
     batch_and_pad,
     encode_and_batch_features,
+    encode_quantitative_fields,
     resize_and_batch,
     encode_single_select_categories as vectorize_single_select,
 )
@@ -20,6 +23,24 @@ from .types import AllCategorySizes, DnnInput
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list[str]):
+    """
+    Input record preprocessing
+
+    - shuffles
+    - converts quantitative fields to categorical as desired
+    """
+    transformations = [
+        lambda inputs: sorted(inputs, key=lambda x: random.random()),
+        lambda inputs: encode_quantitative_fields(inputs, quant_to_cat_fields),
+    ]
+    output = reduce(lambda x, f: f(x), transformations, records)
+
+    print("OUTPUT", output[0:2])
+
+    return output
 
 
 def prepare_inputs(
@@ -53,15 +74,15 @@ def prepare_inputs(
     # (batches) x (seq length) x (num cats) x (items per cat)
     y1_size_map, vectorized_y1 = vectorize_single_select(trials, y1_categorical_fields, device=device)  # type: ignore
     y1 = resize_and_batch(vectorized_y1, batch_size)
-    y1_categories = resize_and_batch(vectorized_y1, batch_size)  # .squeeze()
-    y2_vals = [float(trial[y2_field]) for trial in trials]
+    y1_categories = resize_and_batch(vectorized_y1, batch_size)
+    y2 = resize_and_batch(
+        torch.Tensor([trial[y2_field] for trial in trials]).to(device), batch_size
+    )
 
     # (batches) x (seq length) x 1
-    y2 = torch.unsqueeze(
-        batch_and_pad(cast(list[Primitive], y2_vals), batch_size), 2
-    ).to(device)
+    # y2 = torch.unsqueeze(batch_and_pad(y2_vals, batch_size), 2).to(device)
     logger.info(
-        "y1: %s, y1_categories: %s, Y2: %s",
+        "y1: %s, y1_categories: %s, y2: %s",
         y1.size(),
         y1_categories.size(),
         y2.size(),

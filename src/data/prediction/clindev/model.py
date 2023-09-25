@@ -159,6 +159,7 @@ class TwoStageModel(nn.Module):
             nn.BatchNorm1d(round(sizes.stage2_hidden / 2)),
             # nn.Dropout(0.1),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
+            nn.Softmax(),
         ).to(device)
 
     @property
