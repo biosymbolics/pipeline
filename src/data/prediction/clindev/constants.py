@@ -8,10 +8,10 @@ from data.prediction.constants import (
 CHECKPOINT_PATH = "clindev_model_checkpoints"
 
 
-BATCH_SIZE = DEFAULT_BATCH_SIZE
+BATCH_SIZE = 1024  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
-LR = 1e-6
+LR = 1e-4
 MAX_ITEMS_PER_CAT = 5  # DEFAULT_MAX_ITEMS_PER_CAT
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
@@ -35,10 +35,13 @@ MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []
+
+# enrollment + duration have very low correlation, high covariance
+# (low corr is perhaps why it doesn't offer much loss reduction)
 QUANTITATIVE_FIELDS: list[str] = [
     "enrollment",
     "start_date",
-]  # enrollment + duration have very low correlation, high covariance
+]
 Y2_FIELD = "duration"
 
 
@@ -68,6 +71,24 @@ Y2_FIELD = "duration"
 # INFO:root:Stage1 randomization Metrics: {'precision': 0.5785, 'recall': 0.37414965986394555, 'f1-score': 0.3552587237980494}
 # INFO:root:Stage1 randomization Accuracy: 0.74169921875
 # INFO:root:Stage2 MAE: 155.61978149414062
+
+# with aux loss
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.19007751937984496, 'recall': 0.9781914893617021, 'f1-score': 0.3183037646040672}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.46112115732368897, 'recall': 0.04779756326148079, 'f1-score': 0.08661684782608679}, '3': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '4': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, 'macro avg': {'precision': 0.1302397353407068, 'recall': 0.2051978105246366, 'f1-score': 0.08098412248603079}}
+# INFO:root:Stage1 design Accuracy: 0.2044921875
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.23510413186323645, 'recall': 0.881419624217119, 'f1-score': 0.3711974679092664}, '3': {'precision': 0.0782312925170068, 'recall': 0.06388888888888888, 'f1-score': 0.07033639143730837}, '4': {'precision': 0.12202688728024819, 'recall': 0.13111111111111112, 'f1-score': 0.12640599892876223}, 'macro avg': {'precision': 0.08707246233209828, 'recall': 0.2152839248434238, 'f1-score': 0.1135879716550674}}
+# INFO:root:Stage1 masking Accuracy: 0.219921875
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.3584158415841584, 'recall': 0.0923469387755102, 'f1-score': 0.14685598377281914}, '1': {'precision': 0.20754716981132076, 'recall': 0.011827956989247311, 'f1-score': 0.022380467955238962}, '2': {'precision': 0.7270192109068374, 'recall': 0.957687074829932, 'f1-score': 0.8265617660873643}, 'macro avg': {'precision': 0.43099407410077223, 'recall': 0.3539539901982298, 'f1-score': 0.3319327392718075}}
+# INFO:root:Stage1 randomization Accuracy: 0.70615234375
+# INFO:root:Stage2 MAE: 304.4075927734375
+
+# # with aux loss & smmoth
+# INFO:root:Stage1 design Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.5218667449368947, 'recall': 0.9998125585754452, 'f1-score': 0.685780406274106}, '3': {'precision': 0.42105263157894735, 'recall': 0.005970149253731343, 'f1-score': 0.011773362766740222}, '4': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, 'macro avg': {'precision': 0.1885838753031684, 'recall': 0.20115654156583532, 'f1-score': 0.13951075380816924}}
+# INFO:root:Stage1 design Accuracy: 0.5216796875
+# INFO:root:Stage1 masking Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.5755842864246643, 'recall': 0.5065645514223195, 'f1-score': 0.5388733705772806}, '2': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '3': {'precision': 0.034898681247989706, 'recall': 0.6027777777777777, 'f1-score': 0.06597750076010936}, '4': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, 'macro avg': {'precision': 0.1220965935345308, 'recall': 0.22186846584001946, 'f1-score': 0.12097017426747798}}
+# INFO:root:Stage1 masking Accuracy: 0.247265625
+# INFO:root:Stage1 randomization Metrics: {'0': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}, '2': {'precision': 0.7181240840254031, 'recall': 0.9993201903467029, 'f1-score': 0.835702103467879}, 'macro avg': {'precision': 0.23937469467513436, 'recall': 0.33310673011556763, 'f1-score': 0.2785673678226263}}
+# INFO:root:Stage1 randomization Accuracy: 0.7177734375
+# INFO:root:Stage2 MAE: 301.7379638671875
 
 # higher weight decay
 # INFO:root:Stage1 design Metrics: {'precision': 0.3044067955148667, 'recall': 0.211263168118451, 'f1-score': 0.16326977421929}

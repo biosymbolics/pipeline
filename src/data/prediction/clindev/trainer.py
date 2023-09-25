@@ -78,7 +78,7 @@ class ModelTrainer:
         logging.info("Model sizes: %s", sizes)
 
         self.model = TwoStageModel(sizes)
-        self.stage1_criterion = nn.CrossEntropyLoss()
+        self.stage1_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
         self.stage2_criterion = nn.MSELoss()
 
         self.stage1_cp = {
@@ -146,7 +146,7 @@ class ModelTrainer:
 
                 y2_true = batch["y2"]
 
-                _, y2_logits, y1_probs = self.model(
+                _, y2_logits, y1_probs, y1_aux_probs = self.model(
                     torch.split(batch["multi_select_x"], 1, dim=1),
                     torch.split(batch["single_select_x"], 1, dim=1),
                     batch["text_x"],
@@ -181,6 +181,21 @@ class ModelTrainer:
                     "Batch %s Stage 1 loss: %s", i, stage1_loss.detach().item()
                 )
 
+                y1_aux_probs_by_field = torch.tensor_split(y1_aux_probs, y1_idxs, dim=1)
+                stage1_aux_loss = torch.stack(
+                    [
+                        self.stage1_criterion(y1_by_field.float(), y1_true_set)
+                        for y1_by_field, y1_true_set in zip(
+                            y1_aux_probs_by_field,
+                            y1_true_by_field,
+                        )
+                    ]
+                ).sum()
+
+                logging.debug(
+                    "Batch %s Stage 1 aux loss: %s", i, stage1_aux_loss.detach().item()
+                )
+
                 # STAGE 2
                 # note: can be very large thus the log/0.5 when combining with stage 1
                 stage2_loss = self.stage2_criterion(y2_logits, y2_true)
@@ -189,7 +204,11 @@ class ModelTrainer:
                 )
 
                 # Total
-                loss = stage1_loss + torch.mul(torch.log(stage2_loss), 0.5)
+                loss = (
+                    stage1_loss
+                    + torch.mul(stage1_aux_loss, 0.1)
+                    + torch.mul(torch.log(stage2_loss), 0.6)
+                )
                 logging.info("Batch %s Total loss: %s", i, loss.detach().item())
 
                 loss.backward()
@@ -254,7 +273,7 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = sorted(
-            fetch_trials("COMPLETED", limit=20000), key=lambda x: random.random()
+            fetch_trials("COMPLETED", limit=2000), key=lambda x: random.random()
         )
         input_dict, category_sizes = prepare_inputs(
             trials,

@@ -18,6 +18,27 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+class AuxDecoder(nn.Module):
+    def __init__(self, other_outputs_size, this_output_size):
+        super().__init__()
+        # Decoder inputs for each other field
+        # self.dec_inputs = nn.ModuleList(
+        #     [nn.Linear(hidden_size, hidden_size) for f in input_fields]
+        # )
+        self.decoder = nn.Linear(other_outputs_size, this_output_size)
+
+    def forward(self, *inputs):
+        x = torch.cat(inputs, dim=1)
+        return self.decoder(x)
+
+    @staticmethod
+    def create(output_field, stage1_output_map) -> "AuxDecoder":
+        hidden_size = sum(
+            [s for f, s in stage1_output_map.items() if f != output_field]
+        )
+        return AuxDecoder(hidden_size, stage1_output_map[output_field])
+
+
 class TwoStageModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
@@ -27,6 +48,7 @@ class TwoStageModel(nn.Module):
     - enrich interventions with MoA (but may bias - those that have MoA mappings are those that are more likely to have been successful)
     - biobert for tokenization of conditions and interventions (tokens have meaning e.g. in biologic names)
     - masked learning of relationship between design, masking, randomization
+    - constrastive learning for stage 1
 
 
     Loading:
@@ -111,11 +133,20 @@ class TwoStageModel(nn.Module):
         self.stage1_output_models = nn.ModuleDict(
             dict(
                 [
-                    (field, nn.Linear(sizes.stage1_output, size))
-                    for field, size in sizes.stage1_output_map.items()
+                    (f, nn.Linear(sizes.stage1_output, size))
+                    for f, size in sizes.stage1_output_map.items()
                 ]
             )
         ).to(device)
+
+        self.aux_decoders = nn.ModuleDict(
+            dict(
+                [
+                    (f, AuxDecoder.create(f, sizes.stage1_output_map).to(device))
+                    for f in sizes.stage1_output_map.keys()
+                ]
+            )
+        )
 
         # Stage 2 model
         self.stage2_model = nn.Sequential(
@@ -130,6 +161,7 @@ class TwoStageModel(nn.Module):
         return OPTIMIZER_CLASS(
             list(self.multi_select_embeddings.parameters())
             + list(self.single_select_embeddings.parameters())
+            + list(self.aux_decoders.parameters())
             + list(self.stage1_model.parameters())
             + list(self.stage1_output_models.parameters())
             + list(self.stage2_model.parameters()),
@@ -143,14 +175,13 @@ class TwoStageModel(nn.Module):
         single_select_x: list[torch.Tensor],
         text_x: torch.Tensor,
         quantitative_x: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
         print(self.stage2_model[0].weight)
         print(self.stage1_model[0].weight)
+        print(list(self.multi_select_embeddings.values())[0].weight[0:10])
         """
-
-        # print(list(self.multi_select_embeddings.values())[0].weight[0:10])
 
         all_inputs = []
         if len(text_x) > 0:
@@ -190,11 +221,19 @@ class TwoStageModel(nn.Module):
         x = torch.cat(all_inputs, dim=1).to(self.device)
 
         y1_pred = self.stage1_model(x).to(self.device)
+        y1_probs_list = [model(y1_pred) for model in self.stage1_output_models.values()]
+        y1_probs = torch.cat(y1_probs_list, dim=1).to(self.device)
 
-        y_probs = torch.cat(
-            [model(y1_pred) for model in self.stage1_output_models.values()],
+        # outputs guessed based on the other outputs
+        # (to teach the model their relationships)
+        y1_aux_probs = torch.cat(
+            [
+                model(*[y1_prob for i2, y1_prob in enumerate(y1_probs_list) if i2 != i])
+                for i, model in enumerate(self.aux_decoders.values())
+            ],
             dim=1,
         ).to(self.device)
+
         y2_pred = self.stage2_model(y1_pred).to(self.device)
 
-        return (y1_pred, y2_pred, y_probs)
+        return (y1_pred, y2_pred, y1_probs, y1_aux_probs)
