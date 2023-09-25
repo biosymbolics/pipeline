@@ -244,7 +244,7 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(
-            fetch_trials("COMPLETED", limit=2000), QUANTITATIVE_TO_CATEGORY_FIELDS
+            fetch_trials("COMPLETED", limit=20000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
         input_dict, category_sizes = prepare_inputs(
             trials,

@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import logging
 
+from data.prediction.clindev.utils import embed_cat_inputs
+
 
 from .constants import (
     DEVICE,
@@ -197,32 +199,16 @@ class TwoStageModel(nn.Module):
             all_inputs.append(self.input_model["quantitative"](quantitative_x))
 
         if len(multi_select_x) > 0:
-            ms_input = torch.cat(
-                [
-                    el(x)
-                    for x, el in zip(
-                        multi_select_x,
-                        self.multi_select_embeddings.values(),
-                    )
-                ],
-                dim=1,
-            ).to(self.device)
-            ms_input = ms_input.view(*ms_input.shape[0:1], -1)
-            all_inputs.append(self.input_model["multi_select"](ms_input))
+            inputs = embed_cat_inputs(
+                multi_select_x, self.multi_select_embeddings, self.device
+            )
+            all_inputs.append(self.input_model["multi_select"](inputs))
 
         if len(single_select_x) > 0:
-            ss_input = torch.cat(
-                [
-                    el(x)
-                    for x, el in zip(
-                        single_select_x,
-                        self.single_select_embeddings.values(),
-                    )
-                ],
-                dim=1,
-            ).to(self.device)
-            ss_input = ss_input.view(*ss_input.shape[0:1], -1)
-            all_inputs.append(self.input_model["single_select"](ss_input))
+            inputs = embed_cat_inputs(
+                single_select_x, self.single_select_embeddings, self.device
+            )
+            all_inputs.append(self.input_model["single_select"](inputs))
 
         x = torch.cat(all_inputs, dim=1).to(self.device)
 

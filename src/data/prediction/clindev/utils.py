@@ -5,18 +5,17 @@ Utils for patent eNPV model
 from functools import reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence, cast
+from typing import Callable, Sequence
 import logging
 import torch
+import torch.nn as nn
 
 from data.prediction.utils import (
-    batch_and_pad,
     encode_and_batch_features,
     encode_quantitative_fields,
     resize_and_batch,
     encode_single_select_categories as vectorize_single_select,
 )
-from typings.core import Primitive
 from typings.trials import TrialSummary
 
 from .constants import DEVICE, MAX_ITEMS_PER_CAT
@@ -38,8 +37,6 @@ def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list
         lambda inputs: encode_quantitative_fields(inputs, quant_to_cat_fields),
     ]
     output = reduce(lambda x, f: f(x), transformations, records)
-
-    print("OUTPUT", output[0:2])
 
     return output
 
@@ -127,3 +124,28 @@ def calc_categories_loss(
         ]
     ).sum()
     return loss, y1_probs_by_field, y1_true_by_field
+
+
+def embed_cat_inputs(
+    input: list[torch.Tensor], embeddings: nn.ModuleDict, device: str
+) -> torch.Tensor:
+    """
+    Embed categorical inputs
+
+    Args:
+        input (list[torch.Tensor]): List of categorical inputs as encodings/tensors
+        embeddings (nn.ModuleDict): Embedding layers
+        device (str): Device to use
+    """
+    cats_input = torch.cat(
+        [
+            el(x)
+            for x, el in zip(
+                input,
+                embeddings.values(),
+            )
+        ],
+        dim=1,
+    ).to(device)
+    cats_input = cats_input.view(*cats_input.shape[0:1], -1)
+    return cats_input
