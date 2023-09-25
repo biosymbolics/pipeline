@@ -1,4 +1,3 @@
-from itertools import accumulate
 import logging
 import math
 import os
@@ -31,7 +30,7 @@ from .constants import (
 )
 from .model import TwoStageModel
 from .types import AllCategorySizes, DnnInput, TwoStageModelSizes
-from .utils import prepare_inputs, preprocess_inputs
+from .utils import calc_categories_loss, prepare_inputs, preprocess_inputs
 
 
 logger = logging.getLogger(__name__)
@@ -148,9 +147,10 @@ class ModelTrainer:
                 # place before any loss calculation
                 self.model.optimizer.zero_grad()
 
+                y1_true = batch["y1"]
                 y2_true = batch["y2"].squeeze().int()
 
-                _, y2_preds, y1_probs, y1_corr_probs = self.model(
+                y1_probs, y1_corr_probs, y2_preds = self.model(
                     torch.split(batch["multi_select_x"], 1, dim=1),
                     torch.split(batch["single_select_x"], 1, dim=1),
                     batch["text_x"],
@@ -158,47 +158,23 @@ class ModelTrainer:
                 )
 
                 # STAGE 1
-                # indexes with which to split y1_probs into 1 tensor per field
-                y1_idxs = list(
-                    accumulate(
-                        list(self.category_sizes.y1.values()),
-                        lambda x, y: x + y,
-                    )
-                )[:-1]
-
-                y1_probs_by_field = torch.tensor_split(y1_probs, y1_idxs, dim=1)
-                y1_true_by_field = [
-                    y1.squeeze() for y1 in torch.split(batch["y1_categories"], 1, dim=1)
-                ]
-
-                stage1_loss = torch.stack(
-                    [
-                        self.stage1_criterion(y1_by_field.float(), y1_true_set)
-                        for y1_by_field, y1_true_set in zip(
-                            y1_probs_by_field,
-                            y1_true_by_field,
-                        )
-                    ]
-                ).sum()
-
-                y1_corr_probs_by_field = torch.tensor_split(
-                    y1_corr_probs, y1_idxs, dim=1
+                # main stage 1 categorical loss
+                stage1_loss, y1_probs_by_field, y1_true_by_field = calc_categories_loss(
+                    y1_probs, y1_true, self.category_sizes.y1, self.stage1_criterion
                 )
-                stage1_corr_loss = torch.stack(
-                    [
-                        self.stage1_criterion(y1_by_field.float(), y1_true_set)
-                        for y1_by_field, y1_true_set in zip(
-                            y1_corr_probs_by_field,
-                            y1_true_by_field,
-                        )
-                    ]
-                ).sum()
+
+                # corr stage 1 categorical loss (guessing vals based on peer outputs)
+                stage1_corr_loss, _, _ = calc_categories_loss(
+                    y1_corr_probs,
+                    y1_true,
+                    self.category_sizes.y1,
+                    self.stage1_criterion,
+                )
 
                 # STAGE 2
-                # note: can be very large thus the log/0.5 when combining with stage 1
                 stage2_loss = self.stage2_criterion(y2_preds, y2_true)
 
-                # Total
+                # TOTAL
                 loss = stage1_loss + torch.mul(stage1_corr_loss, 0.1) + stage2_loss
 
                 logger.debug(
@@ -223,7 +199,7 @@ class ModelTrainer:
 
     def calculate_metrics(
         self,
-        y1_logits_by_field: Sequence[torch.Tensor],
+        y1_preds_by_field: Sequence[torch.Tensor],
         y1_true_by_field: Sequence[torch.Tensor],
         y2_preds: torch.Tensor,
         y2_true: torch.Tensor,
@@ -232,14 +208,13 @@ class ModelTrainer:
         Calculate discrete metrics for a batch
         (Conversion to CPU because ignite has prob with MPS)
         """
+        preds_by_trues = zip(y1_preds_by_field, y1_true_by_field)
 
-        for i, (y1_preds, y1_true) in enumerate(
-            zip(y1_logits_by_field, y1_true_by_field)
-        ):
+        for i, (y1_preds, y1_true) in enumerate(preds_by_trues):
+            k = list(self.category_sizes.y1.keys())[i]
+
             cpu_y1_preds = y1_preds.detach().to("cpu")
             cpu_y1_true = y1_true.detach().to("cpu")
-
-            k = list(self.category_sizes.y1.keys())[i]
 
             for metric in self.stage1_metrics.values():
                 metric[k].update((cpu_y1_preds, cpu_y1_true))

@@ -3,8 +3,9 @@ Utils for patent eNPV model
 """
 
 from functools import reduce
+from itertools import accumulate
 import random
-from typing import Sequence, cast
+from typing import Callable, Sequence, cast
 import logging
 import torch
 
@@ -100,3 +101,29 @@ def prepare_inputs(
         },
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
     )
+
+
+def calc_categories_loss(
+    y1_probs: torch.Tensor,
+    y1_true: torch.Tensor,
+    category_sizes: dict[str, int],
+    criterion: Callable,
+) -> tuple[torch.Tensor, list[torch.Tensor], list[torch.Tensor]]:
+    """
+    For multi-categorical output, add up loss across categories
+    """
+
+    # indexes with which to split y1_probs into 1 tensor per field
+    indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]
+    y1_probs_by_field = torch.tensor_split(y1_probs, indices, dim=1)
+    y1_true_by_field = [y1.squeeze() for y1 in torch.split(y1_true, 1, dim=1)]
+    loss = torch.stack(
+        [
+            criterion(y1_by_field.float(), y1_true_set)
+            for y1_by_field, y1_true_set in zip(
+                y1_probs_by_field,
+                y1_true_by_field,
+            )
+        ]
+    ).sum()
+    return loss, y1_probs_by_field, y1_true_by_field

@@ -181,7 +181,7 @@ class TwoStageModel(nn.Module):
         single_select_x: list[torch.Tensor],
         text_x: torch.Tensor,
         quantitative_x: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
         print(self.stage2_model[0].weight)
@@ -241,4 +241,4 @@ class TwoStageModel(nn.Module):
 
         y2_pred = self.stage2_model(y1_pred).to(self.device)
 
-        return (y1_pred, y2_pred, y1_probs, y1_aux_probs)
+        return (y1_probs, y1_aux_probs, y2_pred)
