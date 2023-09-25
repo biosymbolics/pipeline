@@ -22,7 +22,7 @@ from .constants import (
 )
 
 
-MAX_ITEMS_PER_CAT = 20
+DEFAULT_MAX_ITEMS_PER_CAT = 20
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -217,7 +217,6 @@ def encode_categories(
             for field in categorical_fields
         ]
     )
-    print("SIZE MAP", size_map)
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = [encode_category(field, df) for field in categorical_fields]
@@ -230,7 +229,8 @@ def encode_categories(
     ]
 
     encodings = array_to_tensor(
-        encoded_records, (len(records), len(categorical_fields), max_items_per_cat)
+        encoded_records,
+        (len(records), len(categorical_fields), max_items_per_cat),
     ).to(device)
 
     return EncodedCategories(category_size_map=size_map, encodings=encodings)
@@ -253,7 +253,10 @@ def encode_multi_select_categories(
     device: str = "cpu",
 ) -> EncodedCategories:
     return encode_categories(
-        records, categorical_fields, max_items_per_cat=max_items_per_cat, device=device
+        records,
+        categorical_fields,
+        max_items_per_cat=max_items_per_cat,
+        device=device,
     )
 
 
@@ -263,7 +266,7 @@ def encode_features(
     multi_select_categorical_fields: list[str],
     text_fields: list[str] = [],
     quantitative_fields: list[str] = [],
-    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     device: str = "cpu",
 ) -> tuple[EncodedFeatures, CategorySizes]:
     """
@@ -326,7 +329,7 @@ def encode_and_batch_features(
     multi_select_categorical_fields: list[str],
     text_fields: list[str] = [],
     quantitative_fields: list[str] = [],
-    max_items_per_cat: int = MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     flatten_batch: bool = False,
     device: str = "cpu",
 ) -> tuple[EncodedFeatures, CategorySizes]:

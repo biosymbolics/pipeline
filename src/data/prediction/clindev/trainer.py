@@ -64,7 +64,6 @@ class ModelTrainer:
 
         self.category_sizes = category_sizes
 
-        # assumes all _x fields are batch x seq_len x N
         sizes = TwoStageModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
@@ -239,9 +238,7 @@ class ModelTrainer:
         """
         try:
             for k in self.category_sizes.y1.keys():
-                logging.info(
-                    "Stage1 %s Metrics: %s", k, self.stage1_cp[k].compute()["macro avg"]
-                )
+                logging.info("Stage1 %s Metrics: %s", k, self.stage1_cp[k].compute())
                 logging.info(
                     "Stage1 %s Accuracy: %s", k, self.stage1_accuracy[k].compute()
                 )
@@ -257,7 +254,7 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = sorted(
-            fetch_trials("COMPLETED", limit=2000), key=lambda x: random.random()
+            fetch_trials("COMPLETED", limit=20000), key=lambda x: random.random()
         )
         input_dict, category_sizes = prepare_inputs(
             trials,

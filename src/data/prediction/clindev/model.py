@@ -1,7 +1,6 @@
 """
 Trial characteristic and duration prediction model
 """
-import math
 import torch
 import torch.nn as nn
 import logging
@@ -23,9 +22,16 @@ class TwoStageModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
 
+    TODO:
+    - normalized mesh conditions
+    - enrich interventions with MoA (but may bias - those that have MoA mappings are those that are more likely to have been successful)
+    - biobert for tokenization of conditions and interventions (tokens have meaning e.g. in biologic names)
+    - masked learning of relationship between design, masking, randomization
+
+
     Loading:
         >>> import torch; import system; system.initialize();
-        >>> from core.models.clindev.core import DNN
+        >>> from core.models.clindev.model import TwoStageModel
         >>> model = TwoStageModel()
         >>> checkpoint = torch.load("clindev_model_checkpoints/checkpoint_15.pt", map_location=torch.device('mps'))
         >>> model.load_state_dict(checkpoint["model_state_dict"])

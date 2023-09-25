@@ -1,6 +1,5 @@
 from data.prediction.constants import (
     DEFAULT_BATCH_SIZE,
-    DEFAULT_LR,
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
     DEFAULT_TRUE_THRESHOLD,
@@ -12,9 +11,10 @@ CHECKPOINT_PATH = "clindev_model_checkpoints"
 BATCH_SIZE = DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
-LR = 1e-5
+LR = 1e-6
+MAX_ITEMS_PER_CAT = 5  # DEFAULT_MAX_ITEMS_PER_CAT
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
-SAVE_FREQUENCY = 1  # DEFAULT_SAVE_FREQUENCY
+SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
@@ -35,7 +35,10 @@ MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []
-QUANTITATIVE_FIELDS: list[str] = ["enrollment", "start_date"]
+QUANTITATIVE_FIELDS: list[str] = [
+    "enrollment",
+    "start_date",
+]  # enrollment + duration have very low correlation, high covariance
 Y2_FIELD = "duration"
 
 
@@ -47,14 +50,6 @@ Y2_FIELD = "duration"
 # INFO:root:Stage1 randomization Metrics: {'precision': 0.44463306265185776, 'recall': 0.28662344452298383, 'f1-score': 0.27285090366887976}
 # INFO:root:Stage1 randomization Accuracy: 0.7072315705128205
 # INFO:root:Stage2 MAE: 290.42245092147436
-
-# INFO:root:Stage1 design Metrics: {'precision': 0.31244435525015696, 'recall': 0.21763423794761128, 'f1-score': 0.215961569157166}
-# INFO:root:Stage1 design Accuracy: 0.6038661858974359
-# INFO:root:Stage1 masking Metrics: {'precision': 0.2217068272850087, 'recall': 0.217618508944308, 'f1-score': 0.19688181390819567}
-# INFO:root:Stage1 masking Accuracy: 0.5076121794871795
-# INFO:root:Stage1 randomization Metrics: {'precision': 0.4403132965149109, 'recall': 0.2894988931883505, 'f1-score': 0.2830657397447446}
-# INFO:root:Stage1 randomization Accuracy: 0.7073317307692307
-# INFO:root:Stage2 MAE: 357.19786658653845
 
 # (only 2000c)
 # INFO:root:Stage1 design Metrics: {'precision': 0.41458479521617725, 'recall': 0.29075154497309463, 'f1-score': 0.27267735527793896}
@@ -82,3 +77,12 @@ Y2_FIELD = "duration"
 # INFO:root:Stage1 randomization Metrics: {'precision': 0.4572053831715986, 'recall': 0.3592052870167855, 'f1-score': 0.3332139953930379}
 # INFO:root:Stage1 randomization Accuracy: 0.7275390625
 # INFO:root:Stage2 MAE: 156.21859741210938
+
+# 10,000
+# INFO:root:Stage1 design Metrics: {'precision': 0.18245140297881934, 'recall': 0.18110410312022598, 'f1-score': 0.157358222229351}
+# INFO:root:Stage1 design Accuracy: 0.5765224358974359
+# INFO:root:Stage1 masking Metrics: {'precision': 0.1314500884096779, 'recall': 0.17943782271280673, 'f1-score': 0.13533546050584264}
+# INFO:root:Stage1 masking Accuracy: 0.4795673076923077
+# INFO:root:Stage1 randomization Metrics: {'precision': 0.40118861024033436, 'recall': 0.27401801140094983, 'f1-score': 0.24998637689635714}
+# INFO:root:Stage1 randomization Accuracy: 0.7006209935897436
+# INFO:root:Stage2 MAE: 351.2637970753205

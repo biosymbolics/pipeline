@@ -15,7 +15,7 @@ from data.prediction.utils import (
 from typings.core import Primitive
 from typings.trials import TrialSummary
 
-from .constants import DEVICE
+from .constants import DEVICE, MAX_ITEMS_PER_CAT
 from .types import AllCategorySizes, DnnInput
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ def prepare_inputs(
         text_fields,
         quantitative_fields,
         flatten_batch=False,
+        max_items_per_cat=MAX_ITEMS_PER_CAT,
         device=device,
     )
 
