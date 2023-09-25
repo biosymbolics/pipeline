@@ -1,4 +1,3 @@
-import copy
 from itertools import accumulate
 import logging
 import math
@@ -12,7 +11,6 @@ from ignite.metrics import (
     ClassificationReport,
     Accuracy,
     MeanAbsoluteError,
-    MeanSquaredError,
 )
 
 import system
@@ -26,6 +24,7 @@ from .constants import (
     BATCH_SIZE,
     CHECKPOINT_PATH,
     DEVICE,
+    EMBEDDING_DIM,
     MULTI_SELECT_CATEGORICAL_FIELDS,
     SINGLE_SELECT_CATEGORICAL_FIELDS,
     QUANTITATIVE_FIELDS,
@@ -35,7 +34,7 @@ from .constants import (
     Y2_FIELD,
 )
 from .model import TwoStageModel
-from .types import DnnInput, TwoStageModelSizes
+from .types import AllCategorySizes, DnnInput, TwoStageModelSizes
 from .utils import prepare_inputs
 
 
@@ -51,29 +50,31 @@ class ModelTrainer:
     def __init__(
         self,
         input_dict: DnnInput,
-        y1_category_size_map: dict[str, int],
+        category_sizes: AllCategorySizes,
+        embedding_dim: int = EMBEDDING_DIM,
     ):
         """
         Initialize model
 
         Args:
             input_dim (int): Input dimension for DNN
-            y1_category_size_map (dict[str, int]): Map of y1 category to number of cats (e.g. randomization -> 2)
+            category_sizes (AllCategorySizes): Sizes of categorical fields
         """
         torch.device(DEVICE)
 
-        self.y1_category_size_map = y1_category_size_map
-        self.y1_field_indexes = tuple(n for n in range(len(Y1_CATEGORICAL_FIELDS)))
+        self.category_sizes = category_sizes
 
         # assumes all _x fields are batch x seq_len x N
         sizes = TwoStageModelSizes(
-            multi_select_input=input_dict["multi_select_x"].size(-1),
+            categories_by_field=category_sizes,
+            embedding_dim=embedding_dim,
+            multi_select_input=math.prod(input_dict["multi_select_x"].shape[2:]),
             quantitative_input=input_dict["quantitative_x"].size(-1),
-            single_select_input=input_dict["single_select_x"].size(-1),
+            single_select_input=math.prod(input_dict["single_select_x"].shape[2:]),
             text_input=input_dict["text_x"].size(-1),
+            stage1_output_map=category_sizes.y1,
             stage1_output=math.prod(input_dict["y1"].shape[2:]),
-            stage1_output_map=y1_category_size_map,
-            stage2_output=input_dict["y2"].size(-1),
+            stage2_output=math.prod(input_dict["y2"].shape[2:]),
         )
         logging.info("Model sizes: %s", sizes)
 
@@ -82,11 +83,9 @@ class ModelTrainer:
         self.stage2_criterion = nn.MSELoss()
 
         self.stage1_cp = {
-            k: ClassificationReport(output_dict=True)
-            for k in y1_category_size_map.keys()
+            k: ClassificationReport(output_dict=True) for k in category_sizes.y1.keys()
         }
-        self.stage1_accuracy = {k: Accuracy() for k in y1_category_size_map.keys()}
-        self.stage1_mse = MeanSquaredError()
+        self.stage1_accuracy = {k: Accuracy() for k in category_sizes.y1.keys()}
         self.stage2_mae = MeanAbsoluteError()
 
     def __call__(self, *args, **kwargs):
@@ -146,22 +145,21 @@ class ModelTrainer:
                 # place before any loss calculation
                 self.model.optimizer.zero_grad()
 
-                y1_true = batch["y1"]
                 y2_true = batch["y2"]
 
-                y1_logits, y2_logits, y1_probs = self.model(
-                    batch["multi_select_x"],
-                    batch["single_select_x"],
+                _, y2_logits, y1_probs = self.model(
+                    torch.split(batch["multi_select_x"], 1, dim=1),
+                    torch.split(batch["single_select_x"], 1, dim=1),
                     batch["text_x"],
                     batch["quantitative_x"],
                 )
-                y1_preds = y1_logits.view(y1_true.shape)
 
                 # STAGE 1
                 # indexes with which to split y1_probs into 1 tensor per field
                 y1_idxs = list(
                     accumulate(
-                        list(self.y1_category_size_map.values()), lambda x, y: x + y
+                        list(self.category_sizes.y1.values()),
+                        lambda x, y: x + y,
                     )
                 )[:-1]
 
@@ -198,7 +196,7 @@ class ModelTrainer:
                 loss.backward()
                 self.model.optimizer.step()
 
-                self.calculate_continuous_metrics(batch, y1_preds, y2_logits)
+                self.calculate_continuous_metrics(batch, y2_logits)
                 self.calculate_discrete_metrics(y1_probs_by_field, y1_true_by_field)
 
             if epoch % SAVE_FREQUENCY == 0:
@@ -208,15 +206,12 @@ class ModelTrainer:
     def calculate_continuous_metrics(
         self,
         batch,
-        y1_preds: torch.Tensor,
         y2_preds: torch.Tensor,
     ):
         """
         Calculate metrics for a batch
         """
-        y1_true = batch["y1"]
         y2_true = batch["y2"]
-        self.stage1_mse.update((y1_preds, y1_true))
         self.stage2_mae.update((y2_preds, y2_true))
 
     def calculate_discrete_metrics(
@@ -231,7 +226,7 @@ class ModelTrainer:
         for i, (y1_preds, y1_true) in enumerate(
             zip(y1_logits_by_field, y1_true_by_field)
         ):
-            k = list(self.y1_category_size_map.keys())[i]
+            k = list(self.category_sizes.y1.keys())[i]
             # ignite.metrics uses 64 bit, not supported by MPS
             y1_pred_cats = y1_preds.detach().to("cpu")
 
@@ -243,7 +238,7 @@ class ModelTrainer:
         Output evaluation metrics
         """
         try:
-            for k in self.y1_category_size_map.keys():
+            for k in self.category_sizes.y1.keys():
                 logging.info(
                     "Stage1 %s Metrics: %s", k, self.stage1_cp[k].compute()["macro avg"]
                 )
@@ -253,9 +248,7 @@ class ModelTrainer:
                 self.stage1_cp[k].reset()
                 self.stage1_accuracy[k].reset()
 
-            logging.info("Stage1 MSE: %s", self.stage1_mse.compute())
             logging.info("Stage2 MAE: %s", self.stage2_mae.compute())
-            self.stage1_mse.reset()
             self.stage2_mae.reset()
 
         except Exception as e:
@@ -266,7 +259,7 @@ class ModelTrainer:
         trials = sorted(
             fetch_trials("COMPLETED", limit=2000), key=lambda x: random.random()
         )
-        input_dict, y1_category_size_map = prepare_inputs(
+        input_dict, category_sizes = prepare_inputs(
             trials,
             batch_size,
             SINGLE_SELECT_CATEGORICAL_FIELDS,
@@ -275,10 +268,9 @@ class ModelTrainer:
             QUANTITATIVE_FIELDS,
             Y1_CATEGORICAL_FIELDS,
             Y2_FIELD,
-            flatten_batch=True,
         )
 
-        model = ModelTrainer(input_dict, y1_category_size_map)
+        model = ModelTrainer(input_dict, category_sizes)
 
         num_batches = round(len(trials) / batch_size)
         model.train(input_dict, num_batches)

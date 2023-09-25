@@ -1,11 +1,11 @@
-from typing import Any, Iterable, NamedTuple, Sequence, TypeGuard, cast
+from datetime import date
+from typing import NamedTuple, Sequence, TypeGuard, cast
 import logging
 from collections import namedtuple
 from pydash import flatten
 import numpy as np
 import polars as pl
 import torch
-from torch import nn
 import torch.nn.functional as F
 from sklearn.calibration import LabelEncoder
 from sklearn.decomposition import PCA
@@ -17,7 +17,6 @@ from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
 
 from .constants import (
-    DEFAULT_EMBEDDING_DIM,
     DEFAULT_MAX_STRING_LEN,
     DEFAULT_TEXT_FEATURES,
 )
@@ -29,29 +28,33 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class VectorizedCategories(NamedTuple):
-    category_size_map: dict[str, int]
-    encodings: torch.Tensor
-    embeddings: torch.Tensor
-    weights: list[torch.Tensor]
+class CategorySizes(NamedTuple):
+    multi_select: dict[str, int]
+    single_select: dict[str, int]
 
 
-class VectorizedFeatures(NamedTuple):
+class EncodedFeatures(NamedTuple):
     multi_select: torch.Tensor
+    quantitative: torch.Tensor
     single_select: torch.Tensor
     text: torch.Tensor
-    quantitative: torch.Tensor
 
 
-class EmbeddedCategories(NamedTuple):
-    embeddings: torch.Tensor
-    weights: list[torch.Tensor]
+class EncodedCategories(NamedTuple):
+    category_size_map: dict[str, int]
+    encodings: torch.Tensor
 
 
 def is_tensor_list(
     embeddings: list[torch.Tensor] | list[Primitive],
 ) -> TypeGuard[list[torch.Tensor]]:
     return len(embeddings) > 0 and isinstance(embeddings[0], torch.Tensor)
+
+
+def to_float(value: int | float | date) -> float:
+    if isinstance(value, date):
+        return float(value.year)
+    return float(value)
 
 
 def batch_and_pad(
@@ -83,6 +86,7 @@ def batch_and_pad(
     batches = [F.pad(b, get_batch_pad(b)) for b in batches]
 
     logging.info("Batches: %s (%s)", len(batches), [b.size() for b in batches])
+
     return torch.stack(batches)
 
 
@@ -199,7 +203,8 @@ def encode_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
     max_items_per_cat: int,
-):
+    device: str = "cpu",
+) -> EncodedCategories:
     """
     Get category **encodings** given a list of dicts
     """
@@ -212,6 +217,7 @@ def encode_categories(
             for field in categorical_fields
         ]
     )
+    print("SIZE MAP", size_map)
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = [encode_category(field, df) for field in categorical_fields]
@@ -225,121 +231,41 @@ def encode_categories(
 
     encodings = array_to_tensor(
         encoded_records, (len(records), len(categorical_fields), max_items_per_cat)
-    )
-
-    return encodings, size_map
-
-
-def __embed_categories(
-    encodings: torch.Tensor,
-    categorical_fields: list[str],
-    max_sizes: dict[str, int],
-    max_items_per_cat: int,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-    device: str = "cpu",
-) -> EmbeddedCategories:
-    """
-    Get category embeddings given a list of dicts
-
-    Usage:
-    ```
-    encodings, max_sizes = encode_categories(items, categorical_fields)
-    __embed_categories(encodings, categorical_fields, max_sizes)
-    ```
-    """
-
-    embedding_layers = [nn.Embedding(s, embedding_dim) for s in max_sizes.values()]
-    weights = [e.weight for e in embedding_layers]
-
-    embedded_records: list[list[torch.Tensor]] = [
-        [
-            torch.Tensor(embedding_layers[i](enc[i][0:max_items_per_cat]))
-            for i in range(len(categorical_fields))
-        ]
-        for enc in encodings
-    ]
-
-    embeddings = array_to_tensor(
-        embedded_records,
-        (
-            len(embedded_records),
-            len(embedded_records[0]),
-            *embedded_records[0][0].shape,
-        ),
     ).to(device)
 
-    return EmbeddedCategories(embeddings=embeddings, weights=weights)
+    return EncodedCategories(category_size_map=size_map, encodings=encodings)
 
 
-def __vectorize_categories(
+def encode_single_select_categories(
+    records: Sequence[dict],
+    categorical_fields: list[str],
+    device: str = "cpu",
+) -> EncodedCategories:
+    return encode_categories(
+        records, categorical_fields, max_items_per_cat=1, device=device
+    )
+
+
+def encode_multi_select_categories(
     records: Sequence[dict],
     categorical_fields: list[str],
     max_items_per_cat: int,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
     device: str = "cpu",
-) -> VectorizedCategories:
-    encodings, max_sizes = encode_categories(
-        records, categorical_fields, max_items_per_cat
-    )
-
-    embeddings, weights = __embed_categories(
-        encodings,
-        categorical_fields,
-        max_sizes,
-        max_items_per_cat=max_items_per_cat,
-        embedding_dim=embedding_dim,
-        device=device,
-    )
-
-    return VectorizedCategories(
-        category_size_map=max_sizes,
-        encodings=encodings,
-        embeddings=embeddings,
-        weights=weights,
+) -> EncodedCategories:
+    return encode_categories(
+        records, categorical_fields, max_items_per_cat=max_items_per_cat, device=device
     )
 
 
-def vectorize_single_select_categories(
-    records: Sequence[dict],
-    categorical_fields: list[str],
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-    device: str = "cpu",
-) -> VectorizedCategories:
-    return __vectorize_categories(
-        records,
-        categorical_fields,
-        max_items_per_cat=1,
-        embedding_dim=embedding_dim,
-        device=device,
-    )
-
-
-def vectorize_multi_select_categories(
-    records: Sequence[dict],
-    categorical_fields: list[str],
-    max_items_per_cat: int,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
-    device: str = "cpu",
-) -> VectorizedCategories:
-    return __vectorize_categories(
-        records,
-        categorical_fields,
-        max_items_per_cat=max_items_per_cat,
-        embedding_dim=embedding_dim,
-        device=device,
-    )
-
-
-def vectorize_features(
+def encode_features(
     records: Sequence[dict],
     single_select_categorical_fields: list[str],
     multi_select_categorical_fields: list[str],
     text_fields: list[str] = [],
     quantitative_fields: list[str] = [],
     max_items_per_cat: int = MAX_ITEMS_PER_CAT,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
     device: str = "cpu",
-) -> VectorizedFeatures:
+) -> tuple[EncodedFeatures, CategorySizes]:
     """
     Get category and text embeddings given a list of dicts
 
@@ -349,49 +275,51 @@ def vectorize_features(
         multi_select_categorical_fields (list[str]): List of fields to embed as multi select categorical variables
         text_fields (list[str]): List of fields to embed as text
         quantitative_fields (list[str]): List of fields to embed as quantitative variables
-        embedding_dim (int, optional): Embedding dimension. Defaults to EMBEDDING_DIM.
     """
 
     logger.info("Getting feature embeddings")
-    # _records = [*records]
-    # random.shuffle(_items)
 
-    vectorized_single_select = vectorize_single_select_categories(
-        records, single_select_categorical_fields, embedding_dim, device=device
+    single_select = encode_single_select_categories(
+        records, single_select_categorical_fields, device=device
     )
 
-    vectorized_multi_select = vectorize_multi_select_categories(
+    multi_select = encode_multi_select_categories(
         records,
         multi_select_categorical_fields,
         max_items_per_cat,
-        embedding_dim,
         device=device,
     )
 
-    vectorized_text = (
+    text = (
         __get_text_embeddings(records, text_fields, device)
         if len(text_fields) > 1
         else torch.Tensor()
     )
 
-    vectorized_quantitative = (
+    quantitative = (
         F.normalize(
-            torch.Tensor([[r[field] for field in quantitative_fields] for r in records])
+            torch.Tensor(
+                [[to_float(r[field]) for field in quantitative_fields] for r in records]
+            ).to(device),
         )
         if len(quantitative_fields) > 0
         else torch.Tensor()
     )
 
-    logger.info("Finished with feature embeddings")
-    return VectorizedFeatures(
-        multi_select=vectorized_multi_select.embeddings,
-        single_select=vectorized_single_select.embeddings,
-        text=vectorized_text,
-        quantitative=vectorized_quantitative,
+    logger.info("Finished with feature encodings")
+
+    return EncodedFeatures(
+        multi_select=multi_select.encodings,
+        quantitative=quantitative,
+        single_select=single_select.encodings,
+        text=text,
+    ), CategorySizes(
+        multi_select=multi_select.category_size_map,
+        single_select=single_select.category_size_map,
     )
 
 
-def vectorize_and_batch_features(
+def encode_and_batch_features(
     batch_size: int,
     records: Sequence[dict],
     single_select_categorical_fields: list[str],
@@ -399,30 +327,25 @@ def vectorize_and_batch_features(
     text_fields: list[str] = [],
     quantitative_fields: list[str] = [],
     max_items_per_cat: int = MAX_ITEMS_PER_CAT,
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM,
     flatten_batch: bool = False,
     device: str = "cpu",
-) -> VectorizedFeatures:
+) -> tuple[EncodedFeatures, CategorySizes]:
     """
     Vectorizes and batches input features
     """
-    feats = vectorize_features(
+    feats, sizes = encode_features(
         records,
         single_select_categorical_fields,
         multi_select_categorical_fields,
         text_fields,
         quantitative_fields,
         max_items_per_cat,
-        embedding_dim,
         device=device,
     )
 
     feature_dict = dict(
         (f, resize_and_batch(t, batch_size)) for f, t in feats._asdict().items()
     )
-
-    for f, t in feature_dict.items():
-        logger.info("Feature %s: %s", f, t.size())
 
     # optionally turn into (seq length) x (everything else)
     if flatten_batch:
@@ -431,11 +354,14 @@ def vectorize_and_batch_features(
             for f, t in feature_dict.items()
         )
 
-    batched = VectorizedFeatures(**feature_dict)
+    batched_feats = EncodedFeatures(**feature_dict)
 
     logger.info(
         "Feature Sizes: %s",
-        [(f, t.shape if t is not None else None) for f, t in batched._asdict().items()],
+        [
+            (f, t.shape if t is not None else None)
+            for f, t in batched_feats._asdict().items()
+        ],
     )
 
-    return batched
+    return batched_feats, sizes
