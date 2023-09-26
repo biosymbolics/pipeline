@@ -31,20 +31,20 @@ EXPORT_TABLES = {
         "column": "domain",
         "values": ["attributes", "compounds", "diseases", "mechanisms"],
     },
-    # APPLICATIONS_TABLE: {
-    #     "column": "priority_date",
-    #     "size": timedelta(days=730),
-    #     "transform": lambda x: int(x.strftime("%Y%m%d")),
-    #     "starting_value": datetime(2000, 1, 1),
-    #     "ending_value": datetime(2023, 1, 1),
-    # },
-    # GPR_ANNOTATIONS_TABLE: {
-    #     "column": "confidence",
-    #     "size": 0.0125,
-    #     "starting_value": 0.774,
-    #     "ending_value": 0.91,  # max 0.90
-    #     "transform": lambda x: x,
-    # },
+    APPLICATIONS_TABLE: {
+        "column": "priority_date",
+        "size": timedelta(days=730),
+        "transform": lambda x: int(x.strftime("%Y%m%d")),
+        "starting_value": datetime(2000, 1, 1),
+        "ending_value": datetime(2023, 1, 1),
+    },
+    GPR_ANNOTATIONS_TABLE: {
+        "column": "confidence",
+        "size": 0.0125,
+        "starting_value": 0.774,
+        "ending_value": 0.91,  # max 0.90
+        "transform": lambda x: x,
+    },
 }
 
 GCS_BUCKET = "biosym-patents"
