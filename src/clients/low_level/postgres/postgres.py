@@ -288,13 +288,16 @@ class PsqlDatabaseClient(DatabaseClient):
 
         results = source_client.execute_query(source_sql)
         records = results["data"]
+        logger.info("Records in memory")
 
         # transform schema if method provided
         if transform_schema:
+            logger.info("Transforming records")
             schema = transform_schema(results["columns"])
         else:
             schema = results["columns"]
 
+        logger.info("Creating table/inserting records (%s)", len(records))
         # add records
         dest_client.create_and_insert(
             records,

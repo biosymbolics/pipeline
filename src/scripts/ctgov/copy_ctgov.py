@@ -32,26 +32,24 @@ SINGLE_FIELDS = {
     "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
     "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
     "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
+    "drop_withdrawals.reasons": "dropout_reasons",
+    "drop_withdrawals.dropout_count": "dropout_count",
+    "outcome_analyses.non_inferiority_types": "hypothesis_types",
 }
 
 MULTI_FIELDS = {
-    "interventions.name": "interventions",
     "conditions.name": "conditions",
-    "drop_withdrawals.reason": "dropout_reasons",
+    "mesh_conditions.mesh_term": "mesh_conditions",
     "design_groups.group_type": "arm_types",
-    "outcome_analyses.non_inferiority_type": "hypothesis_types",
+    "interventions.name": "interventions",
     "outcomes.title": "primary_outcomes",
 }
 
-SINGLE_FIELDS_SQL = [
-    f"(array_agg({f}))[1] as {new_f}" for f, new_f in SINGLE_FIELDS.items()
-]
+SINGLE_FIELDS_SQL = [f"max({f}) as {new_f}" for f, new_f in SINGLE_FIELDS.items()]
 MULI_FIELDS_SQL = [
     f"array_agg(distinct {f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()
 ]
-ADDITIONAL_FIELDS = [
-    "sum(drop_withdrawals.count) as dropout_count",
-]
+
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
@@ -76,34 +74,41 @@ def ingest_trials():
     TODO: use sponsors table to get agency_class
     """
 
+    # reported_events (event_type == 'serious', adverse_event_term, subjects_affected)
+    # subqueries to avoid combinatorial explosion
     source_sql = f"""
         select {", ".join(FIELDS)},
         0 as duration,
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason
-        from studies,
-        interventions,
-        conditions,
-        browse_conditions as mesh_conditions, -- mesh_type == mesh_list?
+        from
         designs,
-        design_groups
-        -- reported_events (event_type == 'serious', adverse_event_term, subjects_affected)
-        LEFT JOIN drop_withdrawals on drop_withdrawals.nct_id = studies.nct_id
-        LEFT JOIN outcome_analyses on outcome_analyses.nct_id = studies.nct_id
-        LEFT JOIN outcome on outcome.nct_id = studies.nct_id AND outcome.outcome_type = 'Primary'
-        where studies.nct_id = interventions.nct_id
-        AND studies.nct_id = conditions.nct_id
-        AND study_type = 'Interventional'
+        design_groups,
+        studies
+        JOIN conditions on conditions.nct_id = studies.nct_id
+        JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
+        JOIN outcomes on outcomes.nct_id = studies.nct_id AND outcomes.outcome_type = 'Primary'
+        JOIN interventions on interventions.nct_id = studies.nct_id AND intervention_type = 'Drug'
+        LEFT JOIN (
+            select nct_id, sum(count) as dropout_count, array_agg(reason) as reasons
+            from drop_withdrawals
+            group by nct_id
+        ) drop_withdrawals on drop_withdrawals.nct_id = studies.nct_id
+        LEFT JOIN (
+            select
+            nct_id,
+            array_agg(non_inferiority_type) as non_inferiority_types
+            from outcome_analyses
+            group by nct_id
+        ) outcome_analyses on outcome_analyses.nct_id = studies.nct_id
+        where study_type = 'Interventional'
         AND designs.nct_id = studies.nct_id
         AND design_groups.nct_id = studies.nct_id
-        AND outcome.nct_id = studies.nct_id
-        AND interventions.intervention_type = 'Drug'
-        AND not interventions.name ~* '(?:saline|placebo)'
         group by studies.nct_id
     """
 
-    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]))
+    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]), link=False)
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -158,7 +163,7 @@ def create_patent_to_trial():
         where a.publication_number=a.publication_number
         AND p.publication_number=a.publication_number
         AND t.normalized_sponsor = any(a.terms) -- sponsor match
-        AND t.interventions && a.terms -- intervention match
+        AND t.interventions::text[] && a.terms -- intervention match
         AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
     """
     client.create_from_select(att_query, "patent_to_trial")
