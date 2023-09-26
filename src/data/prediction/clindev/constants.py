@@ -21,7 +21,6 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
     "enrollment",
-    # "comparator",
     # "facilities", ??
     # "countries" ??
 ]
@@ -29,9 +28,11 @@ Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
     "masking",
     "randomization",
+    "comparator_type",
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    "conditions",
+    "conditions",  # typically only the specific condition
+    "mesh_conditions",  # normalized; includes ancestors
     "interventions",
     # "termination_reason",
 ]
@@ -48,7 +49,7 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
 ]
-Y2_FIELD = "duration"
+Y2_FIELD = "duration"  # TODO: include distance measure
 
 
 # lower LR (1e-3), no dropout

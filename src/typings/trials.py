@@ -1,10 +1,13 @@
 from datetime import date, datetime
-from typing import TypeGuard, TypedDict, cast
-from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
+from typing import Sequence, TypeGuard, TypedDict, cast
+import logging
 
+from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
 from utils.classes import ByDefinitionOrderEnum
-from utils.list import dedup
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class TrialRandomization(ByDefinitionOrderEnum):
@@ -351,13 +354,93 @@ TERMINATION_KEYWORD_MAP = create_lookup_map(
 )
 
 
+class HypothesisType(ByDefinitionOrderEnum):
+    SUPERIORITY = "SUPERIORITY"
+    NON_INFERIORITY = "NON_INFERIORITY"
+    EQUIVALENCE = "EQUIVALENCE"
+    MULTIPLE = "MULTIPLE"
+    NON_SUPERIORITY = "NON_SUPERIORITY"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def _missing_(cls, value):
+        if value is None:
+            return cls.UNKNOWN
+        if isinstance(value, Sequence):
+            if len(value) == 0:
+                return cls.UNKNOWN
+            if len(value) == 1:
+                return HYPOTHESIS_TYPE_KEYWORD_MAP[value[0]]
+            else:
+                return cls.MULTIPLE
+        else:
+            logger.warning("Hypothesis type is not a sequence: %s", value)
+            return cls.OTHER
+
+
+HYPOTHESIS_TYPE_KEYWORD_MAP = {
+    "Superiority": HypothesisType.SUPERIORITY,
+    "Superiority or Other": HypothesisType.SUPERIORITY,
+    "Superiority or Other (legacy)": HypothesisType.SUPERIORITY,
+    "Non-Inferiority": HypothesisType.NON_INFERIORITY,
+    "Equivalence": HypothesisType.EQUIVALENCE,
+    "Non-Inferiority or Equivalence": HypothesisType.NON_SUPERIORITY,
+    "Non-Inferiority or Equivalence (legacy)": HypothesisType.NON_SUPERIORITY,
+    "Other": HypothesisType.OTHER,
+}
+
+
+class ComparisonType(ByDefinitionOrderEnum):
+    ACTIVE = "ACTIVE"
+    PLACEBO = "PLACEBO"
+    NO_INTERVENTION = "NO_INTERVENTION"
+    UNKNOWN = "UNKNOWN"
+    NA = "NA"
+    OTHER = "OTHER"
+
+    @classmethod
+    def find(cls, value, design: TrialDesign | None = None):
+        if isinstance(value, Sequence):
+            if len(value) == 0:
+                return cls.UNKNOWN
+            if "Active Comparator" in value:
+                if "Experimental" in value:
+                    return cls.ACTIVE
+                if (
+                    len(value) == 1 or "Other" in value
+                ) and design != TrialDesign.SINGLE_GROUP:
+                    return cls.PLACEBO  # just guessing
+            if "Placebo Comparator" in value or "Sham Comparator" in value:
+                return cls.PLACEBO
+            if "No Intervention" in value:
+                return cls.NO_INTERVENTION
+            if "Experimental" in value:
+                if design == TrialDesign.SINGLE_GROUP:
+                    return cls.NA
+                if design in [
+                    TrialDesign.PARALLEL,
+                    TrialDesign.CROSSOVER,
+                    TrialDesign.FACTORIAL,
+                ]:
+                    # assume only experimental given parallel/xover or factorial, assume that means active comp
+                    return cls.ACTIVE
+                return cls.UNKNOWN
+            if "Other" in value:
+                if design == TrialDesign.SINGLE_GROUP:
+                    return cls.NA
+                return cls.OTHER
+            if "No Intervention" in value:
+                return cls.NA
+            return cls.UNKNOWN
+        else:
+            logger.warning("Comparison type is not a sequence: %s", value)
+            return cls.UNKNOWN
+
+
 class BaseTrial(TypedDict):
     """
     Base trial info
-
-    TODO:
-    - conditions -> disesases ?
-    - interventions -> compounds ?
     """
 
     nct_id: str
@@ -391,8 +474,10 @@ class TrialSummary(BaseTrial):
     Patent trial info
     """
 
+    comparison_type: ComparisonType
     design: TrialDesign
     duration: int  # in days
+    hypothesis_type: HypothesisType
     masking: TrialMasking
     phase: TrialPhase
     purpose: TrialPurpose
@@ -408,6 +493,7 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
     """
     return (
         "nct_id" in trial
+        and "arm_types" in trial
         and "end_date" in trial
         and "start_date" in trial
         and "last_updated_date" in trial
@@ -415,6 +501,7 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
         and "title" in trial
         and "phase" in trial
         and "conditions" in trial
+        and "mesh_conditions" in trial
         and "enrollment" in trial
         and "interventions" in trial
         and "sponsor" in trial
@@ -428,8 +515,10 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
     _is_trial_record = is_trial_record(trial)
     return (
         _is_trial_record
+        and "comparison_type" in trial
         and "duration" in trial
         and "design" in trial
+        and "hypothesis_type" in trial
         and "masking" in trial
         and "purpose" in trial
         and "randomization" in trial
@@ -468,17 +557,20 @@ def get_trial_summary(trial: dict) -> TrialSummary:
     if not is_trial_record(trial):
         raise ValueError("Invalid trial record")
 
+    design = TrialDesign(trial["design"])
     return cast(
         TrialSummary,
         {
             **trial,
-            "design": TrialDesign(trial["design"]),
+            "comparison_type": ComparisonType.find(trial["arm_types"], design),
+            "design": design,
             "duration": __calc_duration(trial["start_date"], trial["end_date"]),
+            "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "masking": TrialMasking(trial["masking"]),
             "phase": TrialPhase(trial["phase"]),
             "purpose": TrialPurpose(trial["purpose"]),
             "randomization": TrialRandomization(trial["randomization"]),
-            "sponsor_type": SponsorType(trial["sponsor"]),  # type: ignore
+            "sponsor_type": SponsorType(trial["sponsor"]),
             "status": TrialStatus(trial["status"]),
             "termination_reason": TerminationReason(trial["termination_reason"]),
         },

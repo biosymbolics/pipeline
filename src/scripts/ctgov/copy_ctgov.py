@@ -79,32 +79,31 @@ def ingest_trials():
     source_sql = f"""
         select {", ".join(FIELDS)},
         0 as duration,
+        '' as comparison_type,
+        '' as hypothesis_type,
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason
-        from
-        designs,
-        design_groups,
-        studies
+        from designs, studies
         JOIN conditions on conditions.nct_id = studies.nct_id
-        JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
-        JOIN outcomes on outcomes.nct_id = studies.nct_id AND outcomes.outcome_type = 'Primary'
         JOIN interventions on interventions.nct_id = studies.nct_id AND intervention_type = 'Drug'
+        LEFT JOIN design_groups on design_groups.nct_id = studies.nct_id
+        LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
+        LEFT JOIN outcomes on outcomes.nct_id = studies.nct_id AND outcomes.outcome_type = 'Primary'
         LEFT JOIN (
-            select nct_id, sum(count) as dropout_count, array_agg(reason) as reasons
+            select nct_id, sum(count) as dropout_count, array_agg(distinct reason) as reasons
             from drop_withdrawals
             group by nct_id
         ) drop_withdrawals on drop_withdrawals.nct_id = studies.nct_id
         LEFT JOIN (
             select
             nct_id,
-            array_agg(non_inferiority_type) as non_inferiority_types
+            array_agg(distinct non_inferiority_type) as non_inferiority_types
             from outcome_analyses
             group by nct_id
         ) outcome_analyses on outcome_analyses.nct_id = studies.nct_id
         where study_type = 'Interventional'
         AND designs.nct_id = studies.nct_id
-        AND design_groups.nct_id = studies.nct_id
         group by studies.nct_id
     """
 
@@ -125,6 +124,9 @@ def ingest_trials():
 
     # NOTE: this is a flaw. synonym_map is populated with trial sponsors,
     # so this will only work if we're loading trials for a subsequent time.
+    # TODO: this isn't working as expected; maybe some sponsors are missing from synonym_map?
+    # e.g. "respirion pharmaceuticals pty ltd" -> "respirion"
+    # "british university in egypt" -> "british university"
     client.execute_query(
         """
         update trials set normalized_sponsor=sm.term from
