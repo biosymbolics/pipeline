@@ -50,7 +50,7 @@ MULI_FIELDS_SQL = [
     f"array_agg(distinct {f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()
 ]
 ADDITIONAL_FIELDS = [
-    "sum(drop_withdrawals.count) as dropouts",
+    "sum(drop_withdrawals.count) as dropout_count",
 ]
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 

@@ -361,21 +361,23 @@ class BaseTrial(TypedDict):
     """
 
     nct_id: str
+    arm_types: list[str]
     conditions: list[str]
+    dropout_count: int
+    dropout_reasons: list[str]
     end_date: date
     enrollment: int
+    hypothesis_types: list[str]
     interventions: list[str]
     last_updated_date: date
+    mesh_conditions: list[str]
+    primary_outcomes: list[str]
     sponsor: str
     start_date: date
     title: str
 
 
 class TrialRecord(BaseTrial):
-    # TODO non-inferiority, superiority
-    # TODO comparator type (ACTIVE CONTROL, PLACEBO, etc.)
-    # TODO dropout
-    # TODO primary endpoint
     design: str
     masking: str
     phase: str
@@ -462,9 +464,6 @@ def get_trial_summary(trial: dict) -> TrialSummary:
     - formats start and end date
     - calculates duration
     - etc
-
-    TODO:
-    - primary endpoint
     """
     if not is_trial_record(trial):
         raise ValueError("Invalid trial record")
@@ -473,7 +472,6 @@ def get_trial_summary(trial: dict) -> TrialSummary:
         TrialSummary,
         {
             **trial,
-            "conditions": dedup(trial["conditions"]),
             "design": TrialDesign(trial["design"]),
             "duration": __calc_duration(trial["start_date"], trial["end_date"]),
             "masking": TrialMasking(trial["masking"]),
