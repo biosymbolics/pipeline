@@ -2,17 +2,16 @@ import logging
 import math
 import os
 import sys
-from typing import Sequence, cast
+from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
 import torch
 import torch.nn as nn
-from ignite.metrics import Accuracy, ClassificationReport
+from ignite.metrics import Accuracy, ClassificationReport, MeanAbsoluteError
 
 import system
 
 system.initialize()
 
 from clients.trials import fetch_trials
-
 
 from .constants import (
     BATCH_SIZE,
@@ -31,6 +30,11 @@ from .constants import (
 from .model import TwoStageModel
 from .types import AllCategorySizes, DnnInput, TwoStageModelSizes
 from .utils import calc_categories_loss, prepare_inputs, preprocess_inputs
+
+
+class MetricWrapper(NamedTuple):
+    metric: Any
+    transform: Optional[Callable]
 
 
 logger = logging.getLogger(__name__)
@@ -81,9 +85,14 @@ class ModelTrainer:
             "cp": {k: ClassificationReport() for k in category_sizes.y1.keys()},
             "accuracy": {k: Accuracy() for k in category_sizes.y1.keys()},
         }
+
         self.stage2_metrics = {
-            "cp": ClassificationReport(),
-            "accuracy": Accuracy(),
+            "cp": MetricWrapper(metric=ClassificationReport(), transform=None),
+            "accuracy": MetricWrapper(metric=Accuracy(), transform=None),
+            "mae": MetricWrapper(
+                metric=MeanAbsoluteError(),
+                transform=lambda x: torch.argmax(x, dim=1),
+            ),
         }
 
     def __call__(self, *args, **kwargs):
@@ -221,8 +230,11 @@ class ModelTrainer:
 
         cpu_y2_preds = y2_preds.detach().to("cpu")
         cpu_y2_true = y2_true.detach().to("cpu")
-        for metric in self.stage2_metrics.values():
-            metric.update((cpu_y2_preds, cpu_y2_true))
+        for metric, transform in self.stage2_metrics.values():
+            if transform:
+                metric.update((transform(cpu_y2_preds), cpu_y2_true))
+            else:
+                metric.update((cpu_y2_preds, cpu_y2_true))
 
     def evaluate(self):
         """
@@ -234,7 +246,7 @@ class ModelTrainer:
                     logger.info("Stage1 %s: %s", k, metric[k].compute())
                     metric[k].reset()
 
-            for metric in self.stage2_metrics.values():
+            for metric, _ in self.stage2_metrics.values():
                 logger.info("Stage2: %s", metric.compute())
                 metric.reset()
 
@@ -244,7 +256,7 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(
-            fetch_trials("COMPLETED", limit=20000), QUANTITATIVE_TO_CATEGORY_FIELDS
+            fetch_trials("COMPLETED", limit=2000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
         input_dict, category_sizes = prepare_inputs(
             trials,
