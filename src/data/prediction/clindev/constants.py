@@ -28,13 +28,15 @@ Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
     "masking",
     "randomization",
-    "comparator_type",
+    "comparison_type",
+    # "hypothesis_type"
+    # "termination_reason",
+    # dropout_count
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "conditions",  # typically only the specific condition
     "mesh_conditions",  # normalized; includes ancestors
     "interventions",
-    # "termination_reason",
 ]
 TEXT_FIELDS: list[str] = []
 
@@ -48,6 +50,7 @@ QUANTITATIVE_FIELDS: list[str] = [
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
+    # dropout_count
 ]
 Y2_FIELD = "duration"  # TODO: include distance measure
 
@@ -70,3 +73,5 @@ Y2_FIELD = "duration"  # TODO: include distance measure
 # INFO:root:Stage1 randomization Metrics: {'precision': 0.8552756044490288, 'recall': 0.7361480323623094, 'f1-score': 0.7572132673289986}
 # INFO:root:Stage1 randomization Accuracy: 0.9251008064516129
 # INFO:root:Stage2 MAE: 62.788142641129035
+
+# new data (mesh conditions, comparator type)
