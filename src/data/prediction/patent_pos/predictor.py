@@ -5,8 +5,8 @@ import torch
 from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
+from data.types import ModelMetrics
 from utils.tensor import pad_or_truncate_to_size
-from data.prediction.patent_pos.core import CombinedModel
 from typings.patents import ApprovedPatentApplication as PatentApplication
 
 from .constants import (
@@ -17,7 +17,8 @@ from .constants import (
     TEXT_FIELDS,
     TRUE_THRESHOLD,
 )
-from .types import AllInput, ModelMetrics
+from .core import CombinedModel
+from .types import AllInput
 from .utils import prepare_inputs
 
 
@@ -139,7 +140,7 @@ class ModelPredictor:
 def main(terms: list[str]):
     patents = cast(
         list[PatentApplication],
-        patent_client.search(terms, None, 0, limit=1000),
+        patent_client.search(terms, min_patent_years=0, limit=1000),
     )
     predictor = ModelPredictor()
     preds, metrics = predictor.predict(patents)
@@ -157,7 +158,7 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m core.models.patent_pos.predictor [patent search term(s)]
-            Trains patent PoS (probability of success) model
+            Predicts with patent PoS (probability of success) model
 
             Example:
                 >>> python3 -m core.models.patent_pos.predictor asthma

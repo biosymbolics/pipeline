@@ -116,7 +116,12 @@ class PsqlDatabaseClient(DatabaseClient):
 
     @nonoverride
     def handle_error(
-        self, conn, e: Exception, is_rollback: bool = False, ignore_error: bool = False
+        self,
+        conn,
+        e: Exception,
+        is_rollback: bool = False,
+        ignore_error: bool = False,
+        query: str | None = "",
     ) -> ExecuteResult:
         if ignore_error:
             logger.info("Acceptable error executing query: %s", e)
@@ -124,7 +129,12 @@ class PsqlDatabaseClient(DatabaseClient):
         elif isinstance(e, NoResults):
             logger.debug("No results executing query (not an error)")
         else:
-            logger.error("Error executing query (%s). Rolling back? %s", e, is_rollback)
+            logger.error(
+                "Error executing query %s (%s). Rolling back? %s",
+                e,
+                query or "unspecified",
+                is_rollback,
+            )
             if is_rollback:
                 conn.rollback()
             self.client.put_conn(conn)
@@ -197,7 +207,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 self.client.put_conn(conn)
                 return {"data": [], "columns": {}}
             except Exception as e:
-                return self.handle_error(conn, e, is_rollback=True)
+                return self.handle_error(conn, e, query=query, is_rollback=True)
 
     @overrides(DatabaseClient)
     def _create(self, table_name: str, columns: list[str] | dict[str, str]):
@@ -288,13 +298,16 @@ class PsqlDatabaseClient(DatabaseClient):
 
         results = source_client.execute_query(source_sql)
         records = results["data"]
+        logger.info("Records in memory")
 
         # transform schema if method provided
         if transform_schema:
+            logger.info("Transforming records")
             schema = transform_schema(results["columns"])
         else:
             schema = results["columns"]
 
+        logger.info("Creating table/inserting records (%s)", len(records))
         # add records
         dest_client.create_and_insert(
             records,

@@ -1,7 +1,7 @@
 from pydash import flatten
+from constants.company import COMPANY_STRINGS
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
-from utils.re import expand_res
 
 BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))
@@ -33,137 +33,24 @@ METHOD_OF_USE_IPC_CODES = [
     "H04R",  # Methods of using audio or acoustic systems
 ]
 
-COMPANY_SUPPRESSIONS_DEFINITE = [
+COMPANY_SUPPRESSIONS = [
     "»",
     "«",
-    r"L\.?T\.?D\.?",
-    r"I\.?N\.?C\.?",
-    "CORP(?:ORATION)?",
-    "COMPANY",
-    "consumer[ ]?care",
-    r"C\.?O\.?",
-    r"D\.?B\.?A",
-    r"L\.?L\.?C",
-    "LIMITED",
-    r"P\.?L\.?C",
-    r"L\.?P\.?",
-    r"L\.?L\.?P\.?",
-    "GMBH",
-    "AB",
-    "AG",
-    "alumni",
-    r"b\.?v\.?",
     "eeig",
-    "grp",
-    "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
-    "health[ ]?system",
-    "HLDGS?",
-    "HOLDINGS",
-    "international",
-    "intl",
-    "IP",
-    "INTELLECTUAL PROPERTY",
-    r"I\.?N\.?C\.?",
-    r"I\.?N\.?D\.?",
-    "INDUSTRY",
-    "INDUSTRIES",
-    "INVEST(?:MENTS)?",
-    "PATENTS?",
     "THE",
     r"^\s*-",
     r"^\s*&",
 ]
 
-COMPANY_SUPPRESSIONS_MAYBE = [
-    "AGENCY",
-    "APS",
-    "A[/]?S",
-    "ASSETS",
-    "ASD",
-    "AVG",
-    "(?<!for |of |and )BIOLOGY?",
-    "(?<!for |of |and )BIOL(?:OGICALS?)?",
-    "(?<!for |of |and )BIOSCI(?:ENCES?)?",
-    "(?<!for |of |and )BIOSCIENCES?",
-    "BIOTECH?(?:NOLOGY)?",
-    "BUS",
-    "BV",
-    "CA",
-    "CHEM(?:ICAL)?(?:S)?",
-    "COMMONWEALTH",
-    "COOP",
-    "CONSUMER",
-    "CROPSCIENCE",
-    "DEV(?:ELOPMENT)?",
-    "DIAGNOSTICS?",
-    "EDU(?:CATION)?",
-    "ELECTRONICS?",
-    "ENG",
-    "ENTERP(?:RISE)?S?",
-    "europharm",
-    "FARM",
-    "FARMA",
-    "FOUND(?:ATION)?",
-    "GROUP",
-    "GLOBAL",
-    "H",
-    "(?<!for |of |and )HEALTH(?:CARE)?",
-    "HEALT",
-    "HIGH TECH",
-    "HIGHER",
-    "IDEC",
-    "INT",
-    "KG",
-    r"k\.?k\.?",
-    "LICENSING",
-    "LTS",
-    "LIFE[ ]?SCIENCES?",
-    "MANI(?:UFACTURING)?",
-    "MFG",
-    "Manufacturing",
-    "MATERIAL[ ]?SCIENCE",
-    "MED(?:ICAL)?(?: college)?(?: of)?",
-    "molecular",
-    "NETWORK",
-    "No {0-9}",  # No 2
-    "NV",
-    "OPERATIONS?",
-    "PARTICIPATIONS?",
-    "PARTNERSHIPS?",
-    "PETROCHEMICALS?",
-    "PHARMA?S?",
-    "PHARMACEUTICAL?S?",
-    "PHARAMACEUTICAL?S?",
-    "PLANT",
-    "PLC",
-    "Plastics",
-    "PRIVATE",
-    "PROD",
-    "PRODUCTS?",
-    "PTE",
-    "PTY",
-    "(?<!for |of )R and D",
-    "(?<!for |of )R&Db?",
+UNIVERSITY_SUPPRESSIONS = [
     "REGENTS?",
-    "RES",
-    "(?<!for |of )RES & (?:TECH|DEV)",
-    "(?<!for |of )RESEARCH(?: (?:&|and) DEV(?:ELOPMENT)?)?",
-    "SA",
-    "SCI",
-    "SCIENT",
-    "(?<!for |of |and )sciences?",
-    "SCIENTIFIC",
     "School Of Medicine",
-    "SE",
-    "SERV(?:ICES?)?",
-    "SPA",
-    "SYNTHELABO",
-    "SYS",
-    "SYST(?:EM)?S?",
-    "TECH",
-    "(?<!of |and )TECHNOLOG(?:Y|IES)?",
-    "TECHNOLOGY SERVICES?",
-    "THERAPEUTICS?",
+    "alumni",
+]
+
+HEALTH_SYSTEM_SUPPRESSIONS = [
+    "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
+    "health[ ]?system",
 ]
 
 
@@ -193,9 +80,10 @@ COUNTRIES = [
     "USA",
 ]
 
-COMPANY_SUPPRESSIONS = [
-    *COMPANY_SUPPRESSIONS_DEFINITE,
-    *COMPANY_SUPPRESSIONS_MAYBE,
+OWNER_SUPPRESSIONS = [
+    *COMPANY_SUPPRESSIONS,
+    *UNIVERSITY_SUPPRESSIONS,
+    *COMPANY_STRINGS,
     *[f"(?<!of ){c}" for c in COUNTRIES],
 ]
 
@@ -249,7 +137,10 @@ COMPANY_MAP = {
     "Dana[- ]?Farber": "Dana Farber",
     "Novo Nordisk": "Novo Nordisk",
     "Astrazeneca": "AstraZeneca",
+    "Alexion": "AstraZeneca",
     "bristol[- ]?myers squibb": "Bristol-Myers Squibb",
+    "Celgene": "Bristol-Myers Squibb",
+    "Samsung": "Samsung",
 }
 
 OWNER_TERM_MAP = {
@@ -276,7 +167,7 @@ def get_patent_attribute_map():
         "COMBINATION": ["combo of", "combination of"],
         "COMPOUND_OR_MECHANISM": [
             # TODO: remove drug?
-            *flatten(expand_res(ALL_INTERVENTION_BASE_TERMS)),
+            *flatten(ALL_INTERVENTION_BASE_TERMS),
             "molecule",
             "receptor",
             "therapeutic",  # TODO: will probably over-match
@@ -403,15 +294,11 @@ def get_patent_attribute_map():
         "PEDIATRIC": ["pediatric", "paediatric"],
         "PLATFORM": ["platform"],
         "PROCESS": [
-            *expand_res(
-                [
-                    "process(?:es)? for preparing",
-                    "process(?:es)? to produce",
-                    "process(?:es)? to make",
-                    "methods? of making",
-                    "methods? for producing",
-                ]
-            ),
+            "process(?:es)? for preparing",
+            "process(?:es)? to produce",
+            "process(?:es)? to make",
+            "methods? of making",
+            "methods? for producing",
             "culture",
             "culturing",
             "manufacture",

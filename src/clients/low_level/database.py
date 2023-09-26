@@ -47,6 +47,7 @@ class DatabaseClient:
     def create_from_select(self, query: str, new_table_name: str):
         """
         Create a new table from a query
+        Drops table if existing.
 
         Args:
             query (str): SQL query
@@ -129,12 +130,8 @@ class DatabaseClient:
 
         for i, b in enumerate(batched):
             logging.debug("Inserting batch %s into table %s", i, table_name)
-            try:
-                _records = transform(b) if transform else b
-                self._insert(table_name, _records)
-            except Exception as e:
-                logging.error("Error inserting rows: %s", e)
-                raise e
+            _records = transform(b) if transform else b
+            self._insert(table_name, _records)
 
             logging.debug("Successfully inserted %s rows", len(b))
 

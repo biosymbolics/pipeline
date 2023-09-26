@@ -219,6 +219,7 @@ def _search(
 
     qp = __get_query_pieces(terms, query_type, min_patent_years, is_exhaustive)
 
+    # remove dups from annotations
     query = f"""
         SELECT {", ".join(qp["fields"])},
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved

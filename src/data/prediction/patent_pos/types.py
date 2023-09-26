@@ -13,7 +13,3 @@ AllInput = TypedDict(
         "edge_index": torch.Tensor,
     },
 )
-
-ModelMetrics = TypedDict(
-    "ModelMetrics", {"precision": float, "recall": float, "f1": float}
-)

@@ -170,7 +170,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m core.models.patent_pos.trainer
+            Usage: python3 -m data.prediction.patent_pos.trainer
             Trains patent PoS (probability of success) model
             """
         )
