@@ -50,7 +50,6 @@ class TwoStageModel(nn.Module):
     - normalized mesh conditions
     - enrich interventions with MoA (but may bias - those that have MoA mappings are those that are more likely to have been successful)
     - biobert for tokenization of conditions and interventions (tokens have meaning e.g. in biologic names)
-    - masked learning of relationship between design, masking, randomization
     - constrastive learning for stage 1
 
 

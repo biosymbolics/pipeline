@@ -120,7 +120,7 @@ class ModelTrainer:
         input_dict: DnnInput,
         num_batches: int,
         start_epoch: int = 0,
-        num_epochs: int = 500,
+        num_epochs: int = 100,
     ):
         """
         Train model

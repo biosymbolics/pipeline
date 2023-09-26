@@ -21,8 +21,7 @@ SINGLE_FIELDS = {
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
     "studies.brief_title": "title",
-    "studies.completion_date": "end_date",  # Actual or est.
-    "enrollment_type": "enrollment_type",
+    "studies.primary_completion_date": "end_date",  # Actual or est.
     "studies.last_update_posted_date": "last_updated_date",
     "studies.why_stopped": "why_stopped",
     "studies.phase": "phase",
@@ -38,12 +37,21 @@ SINGLE_FIELDS = {
 MULTI_FIELDS = {
     "interventions.name": "interventions",
     "conditions.name": "conditions",
+    "drop_withdrawals.reason": "dropout_reasons",
+    "design_groups.group_type": "arm_types",
+    "outcome_analyses.non_inferiority_type": "hypothesis_types",
+    "outcomes.title": "primary_outcomes",
 }
 
 SINGLE_FIELDS_SQL = [
     f"(array_agg({f}))[1] as {new_f}" for f, new_f in SINGLE_FIELDS.items()
 ]
-MULI_FIELDS_SQL = [f"array_agg({f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()]
+MULI_FIELDS_SQL = [
+    f"array_agg(distinct {f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()
+]
+ADDITIONAL_FIELDS = [
+    "sum(drop_withdrawals.count) as dropouts",
+]
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
@@ -74,11 +82,22 @@ def ingest_trials():
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason
-        from studies, interventions, conditions, designs
+        from studies,
+        interventions,
+        conditions,
+        browse_conditions as mesh_conditions, -- mesh_type == mesh_list?
+        designs,
+        design_groups
+        -- reported_events (event_type == 'serious', adverse_event_term, subjects_affected)
+        LEFT JOIN drop_withdrawals on drop_withdrawals.nct_id = studies.nct_id
+        LEFT JOIN outcome_analyses on outcome_analyses.nct_id = studies.nct_id
+        LEFT JOIN outcome on outcome.nct_id = studies.nct_id AND outcome.outcome_type = 'Primary'
         where studies.nct_id = interventions.nct_id
         AND studies.nct_id = conditions.nct_id
         AND study_type = 'Interventional'
         AND designs.nct_id = studies.nct_id
+        AND design_groups.nct_id = studies.nct_id
+        AND outcome.nct_id = studies.nct_id
         AND interventions.intervention_type = 'Drug'
         AND not interventions.name ~* '(?:saline|placebo)'
         group by studies.nct_id
