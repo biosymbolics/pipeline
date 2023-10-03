@@ -1,3 +1,4 @@
+from functools import partial
 import logging
 import math
 import os
@@ -6,6 +7,7 @@ from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, ClassificationReport, MeanAbsoluteError
+from data.types import FieldLists
 
 import system
 
@@ -28,8 +30,14 @@ from .constants import (
     Y2_FIELD,
 )
 from .model import TwoStageModel
-from .types import AllCategorySizes, DnnInput, TwoStageModelSizes
-from .utils import calc_categories_loss, prepare_inputs, preprocess_inputs
+from .types import AllCategorySizes, ModelInput, TwoStageModelSizes
+from .utils import (
+    calc_categories_loss,
+    prepare_inputs,
+    preprocess_inputs,
+    split_categories,
+    split_train_and_test,
+)
 
 
 class MetricWrapper(NamedTuple):
@@ -48,7 +56,7 @@ class ModelTrainer:
 
     def __init__(
         self,
-        input_dict: DnnInput,
+        input_dict: ModelInput,
         category_sizes: AllCategorySizes,
         embedding_dim: int = EMBEDDING_DIM,
     ):
@@ -56,23 +64,29 @@ class ModelTrainer:
         Initialize model
 
         Args:
-            input_dim (int): Input dimension for DNN
+            input_dict (ModelInput): Input dict
             category_sizes (AllCategorySizes): Sizes of categorical fields
+            embedding_dim (int, optional): Embedding dimension. Defaults to 16.
         """
         torch.device(DEVICE)
         self.device = DEVICE
 
-        self.category_sizes = category_sizes
+        self.y1_category_sizes = category_sizes.y1
+        self.input_dict = input_dict
+
+        training_input_dict, test_input_dict = split_train_and_test(input_dict)
+        self.training_input_dict = training_input_dict
+        self.test_input_dict = test_input_dict
 
         sizes = TwoStageModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
-            multi_select_input=math.prod(input_dict["multi_select_x"].shape[2:]),
-            quantitative_input=input_dict["quantitative_x"].size(-1),
-            single_select_input=math.prod(input_dict["single_select_x"].shape[2:]),
-            text_input=input_dict["text_x"].size(-1),
+            multi_select_input=math.prod(input_dict.multi_select.shape[2:]),
+            quantitative_input=input_dict.quantitative.size(-1),
+            single_select_input=math.prod(input_dict.single_select.shape[2:]),
+            text_input=input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(input_dict["y1"].shape[2:]),
+            stage1_output=math.prod(input_dict.y1_true.shape[2:]),
             stage2_output=10,  # math.prod(input_dict["y2"].shape[2:]), # should be num values
         )
         logger.info("Model sizes: %s", sizes)
@@ -124,86 +138,129 @@ class ModelTrainer:
             logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
             raise e
 
+    def calc_loss(
+        self,
+        i: int,
+        batch: ModelInput,
+        y1_probs: torch.Tensor,
+        y1_corr_probs: torch.Tensor,
+        y2_preds: torch.Tensor,
+    ) -> torch.Tensor:
+        # STAGE 1
+        # main stage 1 categorical loss
+        y1_probs_by_field, y1_true_by_field = split_categories(
+            y1_probs, batch.y1_true, self.y1_category_sizes
+        )
+        stage1_loss = calc_categories_loss(
+            y1_probs_by_field,
+            y1_true_by_field,
+            self.stage1_criterion,
+        )
+
+        # corr stage 1 categorical loss (guessing vals based on peer outputs)
+        y1_corr_probs_by_field, _ = split_categories(
+            y1_corr_probs, batch.y1_true, self.y1_category_sizes
+        )
+        stage1_corr_loss = calc_categories_loss(
+            y1_corr_probs_by_field,
+            y1_true_by_field,
+            self.stage1_criterion,
+        )
+
+        # STAGE 2
+        stage2_loss = self.stage2_criterion(y2_preds, batch.y2_true)
+
+        # TOTAL
+        loss = stage1_loss + torch.mul(stage1_corr_loss, 0.1) + stage2_loss
+
+        logger.debug(
+            "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s)",
+            i,
+            loss.detach().item(),
+            stage1_loss.detach().item(),
+            stage1_corr_loss.detach().item(),
+            stage2_loss.detach().item(),
+        )
+
+        self.calculate_metrics(
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_true
+        )
+
+        return loss
+
+    @staticmethod
+    def __get_batch(i: int, input_dict: ModelInput) -> ModelInput:
+        """
+        Get input_dict for batch i
+        """
+        batch = cast(
+            ModelInput,
+            {
+                f: input_dict[f][i] if len(input_dict[f]) > i else torch.Tensor()
+                for f in input_dict
+                if input_dict[f] is not None
+            },
+        )
+        return batch
+
+    def __train_batch(self, i: int, input_dict: ModelInput):
+        """
+        Train model on a single batch
+
+        Args:
+            i (int): Batch index
+            num_batches (int): Number of batches
+            input_dict (ModelInput): Input dict
+        """
+        batch = ModelTrainer.__get_batch(i, input_dict)
+
+        # place before any loss calculation
+        self.model.optimizer.zero_grad()
+
+        y1_probs, y1_corr_probs, y2_preds = self.model(
+            torch.split(batch.multi_select, 1, dim=1),
+            torch.split(batch.single_select, 1, dim=1),
+            batch.text,
+            batch.quantitative,
+        )
+
+        # TOTAL
+        loss = self.calc_loss(i, batch, y1_probs, y1_corr_probs, y2_preds)
+
+        loss.backward()
+        self.model.optimizer.step()
+
     def train(
         self,
-        input_dict: DnnInput,
-        num_batches: int,
         start_epoch: int = 0,
-        num_epochs: int = 100,
+        num_epochs: int = 250,
     ):
         """
         Train model
 
         Args:
-            input_dict (DnnInput): Dictionary of input tensors
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
+        num_batches = self.training_input_dict.multi_select.size(0)
+
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
-            _input_dict = {f: v.detach().clone() for f, v in input_dict.items()}  # type: ignore
+            _input_dict = cast(
+                ModelInput,
+                {k: self.input_dict[k].detach().clone() for k in self.input_dict},
+            )
             for i in range(num_batches):
-                logger.debug("Starting batch %s out of %s", i, num_batches)
-                batch: DnnInput = cast(
-                    DnnInput,
-                    {
-                        f: v[i] if len(v) > i else torch.Tensor()
-                        for f, v in _input_dict.items()
-                        if v is not None
-                    },
-                )
-
-                # place before any loss calculation
-                self.model.optimizer.zero_grad()
-
-                y1_true = batch["y1"]
-                y2_true = batch["y2"].squeeze().int()
-
-                y1_probs, y1_corr_probs, y2_preds = self.model(
-                    torch.split(batch["multi_select_x"], 1, dim=1),
-                    torch.split(batch["single_select_x"], 1, dim=1),
-                    batch["text_x"],
-                    batch["quantitative_x"],
-                )
-
-                # STAGE 1
-                # main stage 1 categorical loss
-                stage1_loss, y1_probs_by_field, y1_true_by_field = calc_categories_loss(
-                    y1_probs, y1_true, self.category_sizes.y1, self.stage1_criterion
-                )
-
-                # corr stage 1 categorical loss (guessing vals based on peer outputs)
-                stage1_corr_loss, _, _ = calc_categories_loss(
-                    y1_corr_probs,
-                    y1_true,
-                    self.category_sizes.y1,
-                    self.stage1_criterion,
-                )
-
-                # STAGE 2
-                stage2_loss = self.stage2_criterion(y2_preds, y2_true)
-
-                # TOTAL
-                loss = stage1_loss + torch.mul(stage1_corr_loss, 0.1) + stage2_loss
-
-                logger.debug(
-                    "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s)",
-                    i,
-                    loss.detach().item(),
-                    stage1_loss.detach().item(),
-                    stage1_corr_loss.detach().item(),
-                    stage2_loss.detach().item(),
-                )
-
-                loss.backward()
-                self.model.optimizer.step()
-
-                self.calculate_metrics(
-                    y1_probs_by_field, y1_true_by_field, y2_preds, y2_true
-                )
+                logger.info("Starting batch %s out of %s", i, num_batches)
+                self.__train_batch(i, _input_dict)
 
             if epoch % SAVE_FREQUENCY == 0:
-                self.evaluate()
+                self.log_metrics("Training")
+                num_eval_batches = self.test_input_dict.multi_select.size(0)
+                for te in range(0, num_eval_batches):
+                    batch = ModelTrainer.__get_batch(te, self.test_input_dict)
+                    self.evaluate(batch, self.y1_category_sizes)
+                self.log_metrics("Evaluation")
                 self.save_checkpoint(epoch)
 
     def calculate_metrics(
@@ -220,7 +277,7 @@ class ModelTrainer:
         preds_by_trues = zip(y1_preds_by_field, y1_true_by_field)
 
         for i, (y1_preds, y1_true) in enumerate(preds_by_trues):
-            k = list(self.category_sizes.y1.keys())[i]
+            k = list(self.y1_category_sizes.keys())[i]
 
             cpu_y1_preds = y1_preds.detach().to("cpu")
             cpu_y1_true = y1_true.detach().to("cpu")
@@ -236,43 +293,66 @@ class ModelTrainer:
             else:
                 metric.update((cpu_y2_preds, cpu_y2_true))
 
-    def evaluate(self):
+    def log_metrics(self, stage: str = "Training"):
         """
-        Output evaluation metrics
+        Log metrics
         """
         try:
-            for k in self.category_sizes.y1.keys():
-                for metric in self.stage1_metrics.values():
-                    logger.info("Stage1 %s: %s", k, metric[k].compute())
+            for k in self.y1_category_sizes.keys():
+                for name, metric in self.stage1_metrics.items():
+                    logger.info(
+                        "%s Stage1 %s %s: %s", stage, k, name, metric[k].compute()
+                    )
                     metric[k].reset()
 
-            for metric, _ in self.stage2_metrics.values():
-                logger.info("Stage2: %s", metric.compute())
-                metric.reset()
+            for name in self.stage2_metrics.keys():
+                metric, _ = self.stage2_metrics[name]
+                logger.info("%s Stage2 %s: %s", stage, name, metric.compute())  # type: ignore
+                metric.reset()  # type: ignore
 
         except Exception as e:
             logger.warning("Failed to evaluate: %s", e)
+
+    def evaluate(self, input_dict: ModelInput, category_sizes: dict[str, int]):
+        """
+        Evaluate model on eval/test set
+        """
+        y1_probs, _, y2_preds = self.model(
+            torch.split(input_dict.multi_select, 1, dim=1),
+            torch.split(input_dict.single_select, 1, dim=1),
+            input_dict.text,
+            input_dict.quantitative,
+        )
+
+        y1_probs_by_field, y1_true_by_field = split_categories(
+            y1_probs, input_dict.y1_true, category_sizes
+        )
+
+        self.calculate_metrics(
+            y1_probs_by_field, y1_true_by_field, y2_preds, input_dict.y2_true
+        )
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(
             fetch_trials("COMPLETED", limit=2000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
-        input_dict, category_sizes = prepare_inputs(
-            trials,
-            batch_size,
-            SINGLE_SELECT_CATEGORICAL_FIELDS,
-            MULTI_SELECT_CATEGORICAL_FIELDS,
-            TEXT_FIELDS,
-            QUANTITATIVE_FIELDS,
-            Y1_CATEGORICAL_FIELDS,
-            Y2_FIELD,
+
+        field_lists = FieldLists(
+            single_select=SINGLE_SELECT_CATEGORICAL_FIELDS,
+            multi_select=MULTI_SELECT_CATEGORICAL_FIELDS,
+            text=TEXT_FIELDS,
+            quantitative=QUANTITATIVE_FIELDS,
+            y1_categorical=Y1_CATEGORICAL_FIELDS,
+            y2=Y2_FIELD,
+        )
+
+        input_dict, category_sizes, num_batches = prepare_inputs(
+            trials, field_lists, batch_size, DEVICE
         )
 
         model = ModelTrainer(input_dict, category_sizes)
-
-        num_batches = round(len(trials) / batch_size)
-        model.train(input_dict, num_batches)
+        model.train()
 
 
 def main():

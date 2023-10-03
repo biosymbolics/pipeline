@@ -13,6 +13,8 @@ from sklearn.preprocessing import KBinsDiscretizer
 import polars as pl
 
 from core.ner.spacy import Spacy
+from data.prediction.clindev.types import ModelInput
+from data.types import FieldLists
 from typings.core import Primitive
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
@@ -107,7 +109,8 @@ def batch_and_pad(
 
     def get_batch_pad(b: torch.Tensor):
         zeros = ([0, 0] * (num_dims - 1)) + [0]
-        return (*zeros, batch_size - b.size(0))
+        batch_dim = (batch_size if batch_size > -1 else len(tensors)) - b.size(0)
+        return (*zeros, batch_dim)
 
     batches = [F.pad(b, get_batch_pad(b)) for b in batches]
 
@@ -312,10 +315,7 @@ def encode_quantitative_fields(
 
 def encode_features(
     records: Sequence[dict],
-    single_select_categorical_fields: list[str],
-    multi_select_categorical_fields: list[str],
-    text_fields: list[str] = [],
-    quantitative_fields: list[str] = [],
+    field_lists: FieldLists,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     device: str = "cpu",
 ) -> tuple[EncodedFeatures, CategorySizes]:
@@ -324,38 +324,40 @@ def encode_features(
 
     Args:
         records (Sequence[dict]): List of dicts
-        single_select_categorical_fields (list[str]): List of fields to embed as single select categorical variables
-        multi_select_categorical_fields (list[str]): List of fields to embed as multi select categorical variables
-        text_fields (list[str]): List of fields to embed as text
-        quantitative_fields (list[str]): List of fields to embed as quantitative variables
+        field_lists (FieldLists): Field lists
+        max_items_per_cat (int): Max items per category
+        device (str): Device to use
     """
 
     logger.info("Getting feature embeddings")
 
     single_select = encode_single_select_categories(
-        records, single_select_categorical_fields, device=device
+        records, field_lists.single_select, device=device
     )
 
     multi_select = encode_multi_select_categories(
         records,
-        multi_select_categorical_fields,
+        field_lists.multi_select,
         max_items_per_cat,
         device=device,
     )
 
     text = (
-        __get_text_embeddings(records, text_fields, device)
-        if len(text_fields) > 1
+        __get_text_embeddings(records, field_lists.text, device)
+        if len(field_lists.text) > 1
         else torch.Tensor()
     )
 
     quantitative = (
         F.normalize(
             torch.Tensor(
-                [[to_float(r[field]) for field in quantitative_fields] for r in records]
+                [
+                    [to_float(r[field]) for field in field_lists.quantitative]
+                    for r in records
+                ]
             ).to(device),
         )
-        if len(quantitative_fields) > 0
+        if len(field_lists.quantitative) > 0
         else torch.Tensor()
     )
 
@@ -373,39 +375,22 @@ def encode_features(
 
 
 def encode_and_batch_features(
-    batch_size: int,
     records: Sequence[dict],
-    single_select_categorical_fields: list[str],
-    multi_select_categorical_fields: list[str],
-    text_fields: list[str] = [],
-    quantitative_fields: list[str] = [],
+    field_lists: FieldLists,
+    batch_size: int,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
-    flatten_batch: bool = False,
     device: str = "cpu",
 ) -> tuple[EncodedFeatures, CategorySizes]:
     """
     Vectorizes and batches input features
     """
     feats, sizes = encode_features(
-        records,
-        single_select_categorical_fields,
-        multi_select_categorical_fields,
-        text_fields,
-        quantitative_fields,
-        max_items_per_cat,
-        device=device,
+        records, field_lists, max_items_per_cat, device=device
     )
 
     feature_dict = dict(
         (f, resize_and_batch(t, batch_size)) for f, t in feats._asdict().items()
     )
-
-    # optionally turn into (seq length) x (everything else)
-    if flatten_batch:
-        feature_dict = dict(
-            (f, t.view(*t.shape[0:2], -1) if len(t.shape) > 2 else t)
-            for f, t in feature_dict.items()
-        )
 
     batched_feats = EncodedFeatures(**feature_dict)
 

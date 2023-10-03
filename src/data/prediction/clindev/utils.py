@@ -5,7 +5,7 @@ Utils for patent eNPV model
 from functools import reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence
+from typing import Callable, Sequence, cast
 import logging
 import torch
 import torch.nn as nn
@@ -16,13 +16,16 @@ from data.prediction.utils import (
     resize_and_batch,
     encode_single_select_categories as vectorize_single_select,
 )
+from data.types import FieldLists
 from typings.trials import TrialSummary
 
 from .constants import DEVICE, MAX_ITEMS_PER_CAT
-from .types import AllCategorySizes, DnnInput
+from .types import AllCategorySizes, ModelInput
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+TRAINING_PROPORTION = 0.8
 
 
 def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list[str]):
@@ -41,40 +44,61 @@ def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list
     return output
 
 
+def split_train_and_test(
+    input_dict: ModelInput, training_proportion: float = TRAINING_PROPORTION
+) -> tuple[ModelInput, ModelInput]:
+    """
+    Split out training and test data
+
+    Args:
+        input_dict (ModelInput): Input data
+        training_proportion (float): Proportion of data to use for training
+    """
+    total_records = input_dict.y1_true.size(0)
+    training_input_dict = {
+        k: torch.split(input_dict[k], round(total_records * training_proportion))[0]
+        for k in input_dict
+    }
+    test_input_dict = {
+        k: torch.split(input_dict[k], round(total_records * training_proportion))[1]
+        if len(input_dict[k]) == total_records
+        else input_dict[k]
+        for k in input_dict
+    }
+
+    return cast(ModelInput, training_input_dict), cast(ModelInput, test_input_dict)
+
+
 def prepare_inputs(
     trials: Sequence[TrialSummary],
+    field_lists: FieldLists,
     batch_size: int,
-    single_select_categorical_fields: list[str],
-    multi_select_categorical_fields: list[str],
-    text_fields: list[str],
-    quantitative_fields: list[str],
-    y1_categorical_fields: list[str],  # e.g. cat fields to predict, e.g. randomization
-    y2_field: str,
     device: str = DEVICE,
-) -> tuple[DnnInput, AllCategorySizes]:
+) -> tuple[ModelInput, AllCategorySizes, int]:
     """
-    Prepare data for DNN
+    Prepare data for model
     """
-    logger.info("Preparing inputs for DNN")
+    logger.info("Preparing inputs for model")
 
     batched_feats, sizes = encode_and_batch_features(
-        batch_size,
         trials,  # type: ignore
-        single_select_categorical_fields,
-        multi_select_categorical_fields,
-        text_fields,
-        quantitative_fields,
-        flatten_batch=False,
+        field_lists=field_lists,
+        batch_size=batch_size,
         max_items_per_cat=MAX_ITEMS_PER_CAT,
         device=device,
     )
 
     # (batches) x (seq length) x (num cats) x (items per cat)
-    y1_size_map, vectorized_y1 = vectorize_single_select(trials, y1_categorical_fields, device=device)  # type: ignore
+    y1_size_map, vectorized_y1 = vectorize_single_select(trials, field_lists.y1_categorical, device=device)  # type: ignore
     y1 = resize_and_batch(vectorized_y1, batch_size)
     y1_categories = resize_and_batch(vectorized_y1, batch_size)
-    y2 = resize_and_batch(
-        torch.Tensor([trial[y2_field] for trial in trials]).to(device), batch_size
+    y2 = (
+        resize_and_batch(
+            torch.Tensor([trial[field_lists.y2] for trial in trials]).to(device),
+            batch_size,
+        )
+        .squeeze()
+        .int()
     )
 
     # (batches) x (seq length) x 1
@@ -88,32 +112,39 @@ def prepare_inputs(
 
     return (
         {
-            "multi_select_x": batched_feats.multi_select,
-            "single_select_x": batched_feats.single_select,
-            "text_x": batched_feats.text,
-            "quantitative_x": batched_feats.quantitative,
-            "y1": y1,
+            **batched_feats._asdict(),
+            "y1_true": y1,
             "y1_categories": y1_categories,
-            "y2": y2,
+            "y2_true": y2,
         },
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
+        round(len(batched_feats.multi_select) / batch_size),
     )
 
 
-def calc_categories_loss(
-    y1_probs: torch.Tensor,
-    y1_true: torch.Tensor,
+def split_categories(
+    preds: torch.Tensor,
+    trues: torch.Tensor,
     category_sizes: dict[str, int],
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    """
+    For multi-categorical output, split into 1 tensor per field
+    """
+    # indexes with which to split probs into 1 tensor per field
+    indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]
+    preds_by_field = torch.tensor_split(preds, indices, dim=1)
+    trues_by_field = [t.squeeze() for t in torch.split(trues, 1, dim=1)]
+    return preds_by_field, trues_by_field
+
+
+def calc_categories_loss(
+    y1_probs_by_field: list[torch.Tensor],
+    y1_true_by_field: list[torch.Tensor],
     criterion: Callable,
-) -> tuple[torch.Tensor, list[torch.Tensor], list[torch.Tensor]]:
+) -> torch.Tensor:
     """
     For multi-categorical output, add up loss across categories
     """
-
-    # indexes with which to split y1_probs into 1 tensor per field
-    indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]
-    y1_probs_by_field = torch.tensor_split(y1_probs, indices, dim=1)
-    y1_true_by_field = [y1.squeeze() for y1 in torch.split(y1_true, 1, dim=1)]
     loss = torch.stack(
         [
             criterion(y1_by_field.float(), y1_true_set)
@@ -123,7 +154,7 @@ def calc_categories_loss(
             )
         ]
     ).sum()
-    return loss, y1_probs_by_field, y1_true_by_field
+    return loss
 
 
 def embed_cat_inputs(

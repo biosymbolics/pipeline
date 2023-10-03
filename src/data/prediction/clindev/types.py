@@ -9,18 +9,14 @@ class AllCategorySizes(NamedTuple):
     y1: dict[str, int]
 
 
-DnnInput = TypedDict(
-    "DnnInput",
-    {
-        "multi_select_x": torch.Tensor,
-        "single_select_x": torch.Tensor,
-        "text_x": torch.Tensor,  # can be empty
-        "quantitative_x": torch.Tensor,  # can be empty
-        "y1_categories": torch.Tensor,  # used as y1_true (encodings)
-        "y1": torch.Tensor,  # embedded y1_true
-        "y2": torch.Tensor,
-    },
-)
+class ModelInput(NamedTuple):
+    multi_select: torch.Tensor
+    single_select: torch.Tensor
+    text: torch.Tensor  # can be empty
+    quantitative: torch.Tensor  # can be empty
+    y1_categories: torch.Tensor  # used as y1_true (encodings)
+    y1_true: torch.Tensor  # embedded y1_true
+    y2_true: torch.Tensor
 
 
 class TwoStageModelSizes(NamedTuple):

@@ -52,6 +52,8 @@ def batch(items: list[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
         items (list): list to batch
         batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
     """
+    if batch_size == -1:
+        return [items]
     return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 

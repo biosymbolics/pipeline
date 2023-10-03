@@ -47,11 +47,9 @@ class TwoStageModel(nn.Module):
     Predicts characteristics of a clinical trial
 
     TODO:
-    - normalized mesh conditions
     - enrich interventions with MoA (but may bias - those that have MoA mappings are those that are more likely to have been successful)
     - biobert for tokenization of conditions and interventions (tokens have meaning e.g. in biologic names)
     - constrastive learning for stage 1
-
 
     Loading:
         >>> import torch; import system; system.initialize();
@@ -178,10 +176,10 @@ class TwoStageModel(nn.Module):
 
     def forward(
         self,
-        multi_select_x: list[torch.Tensor],
-        single_select_x: list[torch.Tensor],
-        text_x: torch.Tensor,
-        quantitative_x: torch.Tensor,
+        multi_select: list[torch.Tensor],
+        single_select: list[torch.Tensor],
+        text: torch.Tensor,
+        quantitative: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
@@ -191,21 +189,21 @@ class TwoStageModel(nn.Module):
         """
 
         all_inputs = []
-        if len(text_x) > 0:
-            all_inputs.append(self.input_model["text"](text_x))
+        if len(text) > 0:
+            all_inputs.append(self.input_model["text"](text))
 
-        if len(quantitative_x) > 0:
-            all_inputs.append(self.input_model["quantitative"](quantitative_x))
+        if len(quantitative) > 0:
+            all_inputs.append(self.input_model["quantitative"](quantitative))
 
-        if len(multi_select_x) > 0:
+        if len(multi_select) > 0:
             inputs = embed_cat_inputs(
-                multi_select_x, self.multi_select_embeddings, self.device
+                multi_select, self.multi_select_embeddings, self.device
             )
             all_inputs.append(self.input_model["multi_select"](inputs))
 
-        if len(single_select_x) > 0:
+        if len(single_select) > 0:
             inputs = embed_cat_inputs(
-                single_select_x, self.single_select_embeddings, self.device
+                single_select, self.single_select_embeddings, self.device
             )
             all_inputs.append(self.input_model["single_select"](inputs))
 
@@ -216,7 +214,7 @@ class TwoStageModel(nn.Module):
         y1_probs = torch.cat(y1_probs_list, dim=1).to(self.device)
 
         # outputs guessed based on the other outputs (to learn relationships)
-        y1_aux_probs = torch.cat(
+        y1_corr_probs = torch.cat(
             [
                 model(*[y1_prob for i2, y1_prob in enumerate(y1_probs_list) if i2 != i])
                 for i, model in enumerate(self.correlation_decoders.values())
@@ -226,4 +224,4 @@ class TwoStageModel(nn.Module):
 
         y2_pred = self.stage2_model(y1_pred).to(self.device)
 
-        return (y1_probs, y1_aux_probs, y2_pred)
+        return (y1_probs, y1_corr_probs, y2_pred)
