@@ -1,5 +1,5 @@
 import math
-from typing import NamedTuple, TypedDict
+from typing import NamedTuple
 import torch
 
 
@@ -7,16 +7,6 @@ class AllCategorySizes(NamedTuple):
     multi_select: dict[str, int]
     single_select: dict[str, int]
     y1: dict[str, int]
-
-
-class ModelInput(NamedTuple):
-    multi_select: torch.Tensor
-    single_select: torch.Tensor
-    text: torch.Tensor  # can be empty
-    quantitative: torch.Tensor  # can be empty
-    y1_categories: torch.Tensor  # used as y1_true (encodings)
-    y1_true: torch.Tensor  # embedded y1_true
-    y2_true: torch.Tensor
 
 
 class TwoStageModelSizes(NamedTuple):

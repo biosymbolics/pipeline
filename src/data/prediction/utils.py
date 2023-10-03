@@ -13,7 +13,6 @@ from sklearn.preprocessing import KBinsDiscretizer
 import polars as pl
 
 from core.ner.spacy import Spacy
-from data.prediction.clindev.types import ModelInput
 from data.types import FieldLists
 from typings.core import Primitive
 from utils.list import batch
@@ -41,6 +40,16 @@ class EncodedFeatures(NamedTuple):
     quantitative: torch.Tensor
     single_select: torch.Tensor
     text: torch.Tensor
+
+
+class ModelInput(NamedTuple):
+    multi_select: torch.Tensor
+    quantitative: torch.Tensor
+    single_select: torch.Tensor
+    text: torch.Tensor
+    y1_categories: torch.Tensor  # used as y1_true (encodings)
+    y1_true: torch.Tensor  # embedded y1_true
+    y2_true: torch.Tensor
 
 
 class EncodedCategories(NamedTuple):

@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from data.prediction.utils import (
+    ModelInput,
     encode_and_batch_features,
     encode_quantitative_fields,
     resize_and_batch,
@@ -20,7 +21,7 @@ from data.types import FieldLists
 from typings.trials import TrialSummary
 
 from .constants import DEVICE, MAX_ITEMS_PER_CAT
-from .types import AllCategorySizes, ModelInput
+from .types import AllCategorySizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -55,16 +56,20 @@ def split_train_and_test(
         training_proportion (float): Proportion of data to use for training
     """
     total_records = input_dict.y1_true.size(0)
-    training_input_dict = {
-        k: torch.split(input_dict[k], round(total_records * training_proportion))[0]
-        for k in input_dict
-    }
-    test_input_dict = {
-        k: torch.split(input_dict[k], round(total_records * training_proportion))[1]
-        if len(input_dict[k]) == total_records
-        else input_dict[k]
-        for k in input_dict
-    }
+    training_input_dict = ModelInput(
+        **{
+            k: torch.split(v, round(total_records * training_proportion))[0]
+            for k, v in input_dict._asdict().items()
+        }
+    )
+    test_input_dict = ModelInput(
+        **{
+            k: torch.split(v, round(total_records * training_proportion))[1]
+            if len(v) == total_records
+            else v
+            for k, v in input_dict._asdict().items()
+        }
+    )
 
     return cast(ModelInput, training_input_dict), cast(ModelInput, test_input_dict)
 
@@ -111,12 +116,12 @@ def prepare_inputs(
     )
 
     return (
-        {
-            **batched_feats._asdict(),
-            "y1_true": y1,
-            "y1_categories": y1_categories,
-            "y2_true": y2,
-        },
+        ModelInput(
+            *batched_feats,
+            y1_true=y1,
+            y1_categories=y1_categories,
+            y2_true=y2,
+        ),
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
         round(len(batched_feats.multi_select) / batch_size),
     )

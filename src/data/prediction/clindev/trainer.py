@@ -7,13 +7,14 @@ from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, ClassificationReport, MeanAbsoluteError
-from data.types import FieldLists
 
 import system
 
 system.initialize()
 
 from clients.trials import fetch_trials
+from data.prediction.utils import ModelInput
+from data.types import FieldLists
 
 from .constants import (
     BATCH_SIZE,
@@ -30,7 +31,7 @@ from .constants import (
     Y2_FIELD,
 )
 from .model import TwoStageModel
-from .types import AllCategorySizes, ModelInput, TwoStageModelSizes
+from .types import AllCategorySizes, TwoStageModelSizes
 from .utils import (
     calc_categories_loss,
     prepare_inputs,
@@ -193,13 +194,12 @@ class ModelTrainer:
         """
         Get input_dict for batch i
         """
-        batch = cast(
-            ModelInput,
-            {
-                f: input_dict[f][i] if len(input_dict[f]) > i else torch.Tensor()
-                for f in input_dict
-                if input_dict[f] is not None
-            },
+        batch = ModelInput(
+            **{
+                f: v[i] if len(v) > i else torch.Tensor()
+                for f, v in input_dict._asdict().items()
+                if v is not None
+            }
         )
         return batch
 
@@ -246,9 +246,8 @@ class ModelTrainer:
 
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
-            _input_dict = cast(
-                ModelInput,
-                {k: self.input_dict[k].detach().clone() for k in self.input_dict},
+            _input_dict = ModelInput(
+                **{k: v.detach().clone() for k, v in self.input_dict._asdict().items()},
             )
             for i in range(num_batches):
                 logger.info("Starting batch %s out of %s", i, num_batches)
