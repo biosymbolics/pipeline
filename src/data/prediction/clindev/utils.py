@@ -70,7 +70,7 @@ def split_train_and_test(
     return cast(ModelInput, training_input_dict), cast(ModelInput, test_input_dict)
 
 
-def prepare_inputs(
+def prepare_data(
     trials: Sequence[TrialSummary],
     field_lists: FieldLists,
     batch_size: int,
@@ -93,22 +93,23 @@ def prepare_inputs(
     y1_size_map, vectorized_y1 = vectorize_single_select(trials, field_lists.y1_categorical, device=device)  # type: ignore
     y1 = resize_and_batch(vectorized_y1, batch_size)
     y1_categories = resize_and_batch(vectorized_y1, batch_size)
-    y2 = (
-        resize_and_batch(
-            torch.Tensor([trial[field_lists.y2] for trial in trials]).to(device),
-            batch_size,
-        )
-        .squeeze()
-        .int()
+    all_y2 = (
+        torch.Tensor([trial[field_lists.y2] for trial in trials])
+        .type(torch.int64)
+        .to(device)
+    )
+    y2 = resize_and_batch(all_y2, batch_size).squeeze()
+    y2_oh = resize_and_batch(
+        torch.zeros(all_y2.size(0), 10).to(device).scatter_(1, all_y2, 1), batch_size
     )
 
     # (batches) x (seq length) x 1
-    # y2 = torch.unsqueeze(batch_and_pad(y2_vals, batch_size), 2).to(device)
     logger.info(
-        "y1: %s, y1_categories: %s, y2: %s",
+        "y1: %s, y1_categories: %s, y2: %s, y2_oh: %s",
         y1.size(),
         y1_categories.size(),
         y2.size(),
+        y2_oh.size(),
     )
 
     return (
@@ -117,6 +118,7 @@ def prepare_inputs(
             y1_true=y1,
             y1_categories=y1_categories,
             y2_true=y2,
+            y2_oh_true=y2_oh
         ),
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
         round(len(batched_feats.multi_select) / batch_size),

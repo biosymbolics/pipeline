@@ -123,11 +123,11 @@ class TwoStageModel(nn.Module):
         # TODO: make contrastive??
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
-            # nn.Dropout(0.1),
-            # nn.BatchNorm1d(sizes.stage1_input),
-            # nn.ReLU(),
+            nn.Dropout(0.01),
+            nn.BatchNorm1d(sizes.stage1_input),
+            nn.ReLU(),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
-            nn.Dropout(0.1),
+            nn.Dropout(0.2),
             nn.BatchNorm1d(sizes.stage1_hidden),
             nn.ReLU(),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_output),
@@ -155,8 +155,11 @@ class TwoStageModel(nn.Module):
         # Stage 2 model
         self.stage2_model = nn.Sequential(
             nn.Linear(sizes.stage1_output, sizes.stage2_hidden),
+            nn.Dropout(0.01),
+            nn.BatchNorm1d(sizes.stage2_hidden),
+            nn.ReLU(),
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
-            nn.Dropout(0.1),
+            nn.Dropout(0.2),
             nn.BatchNorm1d(round(sizes.stage2_hidden / 2)),
             nn.ReLU(),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
