@@ -1,5 +1,6 @@
 from datetime import date
-from typing import NamedTuple, Sequence, TypeGuard, cast
+from functools import reduce
+from typing import Literal, NamedTuple, Sequence, TypeGuard, cast
 import logging
 from collections import namedtuple
 from pydash import flatten
@@ -10,6 +11,7 @@ import torch.nn.functional as F
 from sklearn.calibration import LabelEncoder
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import KBinsDiscretizer
+from kneed import KneeLocator
 import polars as pl
 
 from core.ner.spacy import Spacy
@@ -50,6 +52,7 @@ class ModelInput(NamedTuple):
     y1_categories: torch.Tensor  # used as y1_true (encodings)
     y1_true: torch.Tensor  # embedded y1_true
     y2_true: torch.Tensor
+    y2_oh_true: torch.Tensor
 
 
 class EncodedCategories(NamedTuple):
@@ -69,24 +72,98 @@ def to_float(value: int | float | date) -> float:
     return float(value)
 
 
+def estimate_n_bins(
+    data: list[str] | list[int] | list[float],
+    kbins_strategy: Literal["uniform", "quantile", "kmeans"],
+    bins_to_test=range(3, 20),
+):
+    """
+    Estimate the optimal number of bins
+    for use with bin_quantitative_values
+
+    Calculates gini_impurity and uses elbow method to find optimal number of bins
+
+    Args:
+        data (list[str] | list[int] | list[float]): List of values
+        bins_to_test (range): Range of bins to test
+        kbins_strategy (str): Strategy to use for KBinsDiscretizer
+    """
+
+    def elbow(
+        values: Sequence[float],
+        bins: Sequence[int],
+        strategy: Literal["first", "default"] = "first",
+    ) -> int:
+        # https://arvkevi-kneed.streamlit.app/
+        # https://github.com/arvkevi/kneed
+        kneedle = KneeLocator(
+            bins, values, direction="decreasing", curve="concave", online=True
+        )
+
+        if kneedle.elbow is None:
+            logger.warning("No elbow found for bins %s, using last index", bins)
+            return len(bins) - 1
+
+        if strategy == "first":
+            return kneedle.all_elbows.pop()
+
+        return int(kneedle.elbow)
+
+    def gini_impurity(original, binned):
+        hist, _ = np.histogram(original)
+        gini_before = 1 - np.sum([p**2 for p in hist / len(original)])
+
+        def bin_gini(bin):
+            p = np.mean(binned == bin)
+            return p * (1 - p)
+
+        gini_after = reduce(lambda acc, bin: acc + bin_gini(bin), np.unique(binned))
+
+        return gini_before - gini_after
+
+    def score_bin(n_bins):
+        est = KBinsDiscretizer(
+            n_bins=n_bins, encode="ordinal", strategy=kbins_strategy, subsample=None
+        )
+        bin_data = est.fit_transform(np.array(data).reshape(-1, 1))
+        return gini_impurity(data, bin_data)
+
+    scores = [score_bin(n_bins) for n_bins in bins_to_test]
+    winner = elbow(scores, bins_to_test)
+
+    return winner
+
+
 def bin_quantitative_values(
-    values: Sequence[float | int] | pl.Series, n_bins: int = 10
+    values: Sequence[float | int] | pl.Series,
+    field: str,
+    n_bins: int | None = None,
+    kbins_strategy: Literal["uniform", "quantile", "kmeans"] = "kmeans",
 ) -> Sequence[list[int]]:
     """
     Bins quantiative values, turning them into categorical
-    (currently using strategy kmeans:
-    see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html)
+    @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html
+
+    NOTE: specify n_bins when doing inference; i.e. ensure it matches with how the model was trained.
 
     Args:
         values (Sequence[float | int]): List of values
+        field (str): Field name (used for logging)
         n_bins (int): Number of bins
+        kbins_strategy (str): Strategy to use for KBinsDiscretizer
 
     Returns:
         Sequence[list[int]]: List of lists of binned values (e.g. [[0.0], [2.0], [5.0], [0.0], [0.0]])
             (a list of lists because that matches our other categorical vars)
     """
+    if n_bins is None:
+        n_bins = estimate_n_bins(list(values), kbins_strategy=kbins_strategy)
+        logger.info(
+            "Using estimated optimal n_bins value of %s for field %s", n_bins, field
+        )
+
     binner = KBinsDiscretizer(
-        n_bins=n_bins, encode="ordinal", strategy="kmeans", subsample=None
+        n_bins=n_bins, encode="ordinal", strategy=kbins_strategy, subsample=None
     )
     X = np.array(values).reshape(-1, 1)
     Xt = binner.fit_transform(X)
@@ -174,7 +251,7 @@ def encode_category(field: str, df: pl.DataFrame) -> list[list[int]]:
             df.shape[0],
         )
 
-    logger.info("Finished encoding field %s (%s)", field, encoded_values[0])
+    logger.info("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
     return cast(list[list[int]], encoded_values)
 
 
@@ -317,7 +394,11 @@ def encode_quantitative_fields(
     df = pl.from_dicts(records, infer_schema_length=1000)  # type: ignore
     for field in fields:
         df = df.with_columns(
-            [pl.col(field).map_batches(lambda v: pl.Series(bin_quantitative_values(v)))]
+            [
+                pl.col(field).map_batches(
+                    lambda v: pl.Series(bin_quantitative_values(v, field))
+                )
+            ]
         )
     return df.to_dicts()
 

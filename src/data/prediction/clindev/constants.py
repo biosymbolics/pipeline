@@ -52,7 +52,7 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "duration",
     # dropout_count
 ]
-Y2_FIELD = "duration"  # TODO: include distance measure
+Y2_FIELD = "duration"
 
 
 # new data (mesh conditions, comparator type) - BIG improvement (stage2 CEL was 0.32 before)
@@ -144,17 +144,35 @@ Y2_FIELD = "duration"  # TODO: include distance measure
 # INFO:__main__:Evaluation Stage2 mae: 1.0224680656934306
 
 
-# INFO:__main__:Training Stage2 accuracy: 0.479369872379216
-# INFO:__main__:Training Stage2 mae: 0.9765439835916135
-# INFO:__main__:Evaluation Stage2 accuracy: 0.4336222627737226
-# INFO:__main__:Evaluation Stage2 mae: 1.0238366788321167
-# INFO:__main__:Training Stage2 accuracy: 0.48094804010938924
-# INFO:__main__:Training Stage2 mae: 0.9766579307201458
-# INFO:__main__:Evaluation Stage2 accuracy: 0.43396441605839414
-# INFO:__main__:Evaluation Stage2 mae: 1.026117700729927
+# INFO:__main__:Training Stage1 design accuracy: 0.7
+# INFO:__main__:Training Stage1 masking accuracy: 0.56
+# INFO:__main__:Training Stage1 randomization accuracy: 0.75
+# INFO:__main__:Training Stage1 comparison_type accuracy: 0.5
+# INFO:__main__:Training Stage2 accuracy: 0.46
+# INFO:__main__:Training Stage2 mae: 1.0
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.67
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.52
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.73
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.45
+# INFO:__main__:Evaluation Stage2 accuracy: 0.44
+# INFO:__main__:Evaluation Stage2 mae: 1.02
 
-# INFO:__main__:Training Stage2 accuracy: 0.48357452142206014
-# INFO:__main__:Training Stage2 mae: 0.9757748404740201
 
-# INFO:__main__:Evaluation Stage2 accuracy: 0.4252965328467153
-# INFO:__main__:Evaluation Stage2 mae: 1.041742700729927
+# INFO:__main__:Training Stage2 accuracy: 0.76
+# INFO:__main__:Training Stage2 mae: 0.32
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.67
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.42
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.7
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.46
+# INFO:__main__:Evaluation Stage2 accuracy: 0.52
+# INFO:__main__:Evaluation Stage2 mae: 0.56
+# INFO:__main__:Saved checkpoint checkpoint_35
+# INFO:__main__:Training Stage2 accuracy: 0.34
+# INFO:__main__:Training Stage2 mae: 2.17
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.65
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.44
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.73
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.46
+# INFO:__main__:Evaluation Stage2 accuracy: 0.14
+# INFO:__main__:Evaluation Stage2 mae: 2.85
+# INFO:__main__:Saved checkpoint checkpoint_20.pt
