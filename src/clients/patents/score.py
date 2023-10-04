@@ -65,6 +65,10 @@ def calc_and_explain_suitability_score(
 def calc_adj_patent_years(py: int) -> int:
     """
     Calculate the adjusted patent years based on the patent years remaining.
+
+    TODO:
+    - patent term extensions (+5, no more than 14 years at approval - https://www.fr.com/insights/ip-law-essentials/intro-patent-term-extension/)
+    - "new use" extension
     **FAKE**
     """
     variance_modifier = 10  # arbitrary-ish

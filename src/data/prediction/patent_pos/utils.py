@@ -6,7 +6,7 @@ from typing import Sequence, cast
 import logging
 import torch
 
-from data.prediction.patent_pos.types import AllInput, DnnInput, GnnInput
+from data.prediction.patent_pos.types import AllInput, ModelInput, GnnInput
 from data.prediction.utils import (
     batch_and_pad,
     encode_features,
@@ -56,7 +56,7 @@ def prepare_inputs(
         dnn_categorical_fields: list[str],
         dnn_text_fields: list[str],
         batch_size: int,
-    ) -> DnnInput:
+    ) -> ModelInput:
         """
         Prepare data for DNN
         """
