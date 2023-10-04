@@ -123,12 +123,13 @@ class TwoStageModel(nn.Module):
         # TODO: make contrastive??
         self.stage1_model = nn.Sequential(
             nn.Linear(sizes.stage1_input, sizes.stage1_input),
+            # nn.Dropout(0.1),
             # nn.BatchNorm1d(sizes.stage1_input),
             # nn.ReLU(),
             nn.Linear(sizes.stage1_input, sizes.stage1_hidden),
+            nn.Dropout(0.1),
             nn.BatchNorm1d(sizes.stage1_hidden),
             nn.ReLU(),
-            # nn.Dropout(0.1),
             nn.Linear(sizes.stage1_hidden, sizes.stage1_output),
         ).to(device)
 
@@ -155,8 +156,9 @@ class TwoStageModel(nn.Module):
         self.stage2_model = nn.Sequential(
             nn.Linear(sizes.stage1_output, sizes.stage2_hidden),
             nn.Linear(sizes.stage2_hidden, round(sizes.stage2_hidden / 2)),
+            nn.Dropout(0.1),
             nn.BatchNorm1d(round(sizes.stage2_hidden / 2)),
-            # nn.Dropout(0.1),
+            nn.ReLU(),
             nn.Linear(round(sizes.stage2_hidden / 2), sizes.stage2_output),
             nn.Softmax(),
         ).to(device)
@@ -171,7 +173,7 @@ class TwoStageModel(nn.Module):
             + list(self.stage1_output_models.parameters())
             + list(self.stage2_model.parameters()),
             lr=LR,
-            weight_decay=1e-4,
+            weight_decay=1e-3,
         )
 
     def forward(

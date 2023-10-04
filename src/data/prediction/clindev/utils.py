@@ -56,17 +56,13 @@ def split_train_and_test(
         training_proportion (float): Proportion of data to use for training
     """
     total_records = input_dict.y1_true.size(0)
+    split_idx = round(total_records * training_proportion)
     training_input_dict = ModelInput(
-        **{
-            k: torch.split(v, round(total_records * training_proportion))[0]
-            for k, v in input_dict._asdict().items()
-        }
+        **{k: torch.split(v, split_idx)[0] for k, v in input_dict._asdict().items()}
     )
     test_input_dict = ModelInput(
         **{
-            k: torch.split(v, round(total_records * training_proportion))[1]
-            if len(v) == total_records
-            else v
+            k: torch.split(v, split_idx)[1] if len(v) == total_records else v
             for k, v in input_dict._asdict().items()
         }
     )
@@ -134,6 +130,11 @@ def split_categories(
 ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
     """
     For multi-categorical output, split into 1 tensor per field
+
+    Args:
+        preds (torch.Tensor): Predicted values
+        trues (torch.Tensor): True values
+        category_sizes (dict[str, int]): Sizes of each category
     """
     # indexes with which to split probs into 1 tensor per field
     indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]

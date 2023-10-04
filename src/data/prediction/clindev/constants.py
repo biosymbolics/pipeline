@@ -117,3 +117,44 @@ Y2_FIELD = "duration"  # TODO: include distance measure
 # INFO:__main__:Stage2: {"0": {"precision": 0.5624618945758544, "recall": 0.8088268073408128, "f1-score": 0.6635134640937178}, "1": {"precision": 0.42780407720875374, "recall": 0.5370685342671335, "f1-score": 0.47624962293947465}, "2": {"precision": 0.3942672855506661, "recall": 0.37019951889061836, "f1-score": 0.38185453855472634}, "3": {"precision": 0.4057713347921225, "recall": 0.1417921146953405, "f1-score": 0.21014980344937453}, "4": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "5": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "6": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "7": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "8": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "9": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "macro avg": {"precision": 0.1790304592127397, "recall": 0.18578869751939053, "f1-score": 0.17317674290372934}}
 # INFO:__main__:Stage2: 0.48659
 # INFO:__main__:Stage2: 1.174635
+
+
+# INFO:__main__:Starting batch 1096 out of 1097
+# INFO:__main__:Training Stage1 design cp: {"0": {"precision": 0.5505202080832333, "recall": 0.30708705357142857, "f1-score": 0.39425419114486265}, "1": {"precision": 0.7402836945113292, "recall": 0.8809569729531157, "f1-score": 0.8045173005229362}, "2": {"precision": 0.6755313230221431, "recall": 0.4984912244688494, "f1-score": 0.5736626389331817}, "macro avg": {"precision": 0.6554450752055686, "recall": 0.5621784169977979, "f1-score": 0.5908113768669936}}
+# INFO:__main__:Training Stage1 design accuracy: 0.716214676390155
+# INFO:__main__:Training Stage1 masking cp: {"0": {"precision": 0.36059970480851394, "recall": 0.38872295882763436, "f1-score": 0.37413357691687665}, "1": {"precision": 0.6536870180717742, "recall": 0.8830417460592414, "f1-score": 0.7512489377274978}, "2": {"precision": 0.29212468001806957, "recall": 0.18789346246973365, "f1-score": 0.22869267947659977}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "macro avg": {"precision": 0.2612822805796715, "recall": 0.2919316334713219, "f1-score": 0.27081503882419483}}
+# INFO:__main__:Training Stage1 masking accuracy: 0.5481597538742023
+# INFO:__main__:Training Stage1 randomization cp: {"0": {"precision": 0.5359913620731025, "recall": 0.43179768041237115, "f1-score": 0.4782856938943007}, "1": {"precision": 0.4923936067783555, "recall": 0.11512832057631697, "f1-score": 0.18662190271138165}, "2": {"precision": 0.8017217057410835, "recall": 0.952866606690112, "f1-score": 0.8707841444592674}, "macro avg": {"precision": 0.6100355581975138, "recall": 0.4999308692262667, "f1-score": 0.51189724702165}}
+# INFO:__main__:Training Stage1 randomization accuracy: 0.7547117137648132
+# INFO:__main__:Training Stage1 comparison_type cp: {"0": {"precision": 0.49049276914836637, "recall": 0.5535555368986651, "f1-score": 0.5201195894830669}, "1": {"precision": 0.5625815987190541, "recall": 0.5839427256456149, "f1-score": 0.5730631704410006}, "2": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.5085934603692445, "recall": 0.6351884433743865, "f1-score": 0.5648851189985995}, "5": {"precision": 0.381294964028777, "recall": 0.005536693653695482, "f1-score": 0.01091489471245428}, "macro avg": {"precision": 0.3238271320442403, "recall": 0.2963705665953937, "f1-score": 0.2781637956058536}}
+# INFO:__main__:Training Stage1 comparison_type accuracy: 0.513947128532361
+# INFO:__main__:Training Stage2 cp: {"0": {"precision": 0.5811565359206126, "recall": 0.7276801938219261, "f1-score": 0.6462167374883773}, "1": {"precision": 0.4059834326008078, "recall": 0.5766433294437961, "f1-score": 0.47649351171105975}, "2": {"precision": 0.36264976270286414, "recall": 0.32554744525547447, "f1-score": 0.34309846772167746}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "5": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "6": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "7": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "8": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "9": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "macro avg": {"precision": 0.13497897312242846, "recall": 0.16298709685211968, "f1-score": 0.14658087169211145}}
+# INFO:__main__:Training Stage2 accuracy: 0.47075546946216956
+# INFO:__main__:Training Stage2 mae: 0.9837055606198724
+# INFO:__main__:Evaluation Stage1 design cp: {"0": {"precision": 0.482367758186398, "recall": 0.39081632653061227, "f1-score": 0.43179255918827464}, "1": {"precision": 0.7157296272899558, "recall": 0.8356997971602435, "f1-score": 0.7710761378136959}, "2": {"precision": 0.5895249695493301, "recall": 0.40930232558139534, "f1-score": 0.4831544796605935}, "macro avg": {"precision": 0.5958741183418946, "recall": 0.5452728164240837, "f1-score": 0.562007725554188}}
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.6709625912408759
+# INFO:__main__:Evaluation Stage1 masking cp: {"0": {"precision": 0.33458177278401996, "recall": 0.28480340063761955, "f1-score": 0.30769230769230715}, "1": {"precision": 0.6267744833782569, "recall": 0.8279136007595538, "f1-score": 0.7134383309470234}, "2": {"precision": 0.29918800749531543, "recall": 0.3031645569620253, "f1-score": 0.30116315624017553}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "macro avg": {"precision": 0.25210885273151845, "recall": 0.28317631167183976, "f1-score": 0.2644587589759012}}
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.5135720802919708
+# INFO:__main__:Evaluation Stage1 randomization cp: {"0": {"precision": 0.4796747967479675, "recall": 0.3439119170984456, "f1-score": 0.4006035458317611}, "1": {"precision": 0.42424242424242425, "recall": 0.07894736842105263, "f1-score": 0.1331220285261487}, "2": {"precision": 0.7758274152485596, "recall": 0.939935064935065, "f1-score": 0.8500330323717238}, "macro avg": {"precision": 0.5599148787463171, "recall": 0.4542647834848544, "f1-score": 0.4612528689098778}}
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.7304972627737226
+# INFO:__main__:Evaluation Stage1 comparison_type cp: {"0": {"precision": 0.4464775846294602, "recall": 0.49426063470627957, "f1-score": 0.46915558404101854}, "1": {"precision": 0.473432518597237, "recall": 0.46919431279620855, "f1-score": 0.47130388786035393}, "2": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.4781734635267088, "recall": 0.5950679056468906, "f1-score": 0.5302547770700632}, "5": {"precision": 0.312, "recall": 0.04262295081967213, "f1-score": 0.07499999999999979}, "macro avg": {"precision": 0.28501392779223433, "recall": 0.2668576339948418, "f1-score": 0.25761904149523923}}
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.46293339416058393
+# INFO:__main__:Evaluation Stage2 cp: {"0": {"precision": 0.5779896013864818, "recall": 0.6794567062818336, "f1-score": 0.6246293116903381}, "1": {"precision": 0.36363636363636365, "recall": 0.5658914728682171, "f1-score": 0.44275966641394954}, "2": {"precision": 0.31216111541440744, "recall": 0.2507778469197262, "f1-score": 0.2781228433402341}, "3": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "4": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "5": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "6": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "7": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "8": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "9": {"precision": 0.0, "recall": 0.0, "f1-score": 0.0}, "macro avg": {"precision": 0.12537870804372528, "recall": 0.14961260260697767, "f1-score": 0.13455118214445216}}
+# INFO:__main__:Evaluation Stage2 accuracy: 0.4406934306569343
+# INFO:__main__:Evaluation Stage2 mae: 1.0224680656934306
+
+
+# INFO:__main__:Training Stage2 accuracy: 0.479369872379216
+# INFO:__main__:Training Stage2 mae: 0.9765439835916135
+# INFO:__main__:Evaluation Stage2 accuracy: 0.4336222627737226
+# INFO:__main__:Evaluation Stage2 mae: 1.0238366788321167
+# INFO:__main__:Training Stage2 accuracy: 0.48094804010938924
+# INFO:__main__:Training Stage2 mae: 0.9766579307201458
+# INFO:__main__:Evaluation Stage2 accuracy: 0.43396441605839414
+# INFO:__main__:Evaluation Stage2 mae: 1.026117700729927
+
+# INFO:__main__:Training Stage2 accuracy: 0.48357452142206014
+# INFO:__main__:Training Stage2 mae: 0.9757748404740201
+
+# INFO:__main__:Evaluation Stage2 accuracy: 0.4252965328467153
+# INFO:__main__:Evaluation Stage2 mae: 1.041742700729927

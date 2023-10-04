@@ -57,7 +57,8 @@ class ModelTrainer:
 
     def __init__(
         self,
-        input_dict: ModelInput,
+        training_input_dict: ModelInput,
+        test_input_dict: ModelInput,
         category_sizes: AllCategorySizes,
         embedding_dim: int = EMBEDDING_DIM,
     ):
@@ -73,21 +74,19 @@ class ModelTrainer:
         self.device = DEVICE
 
         self.y1_category_sizes = category_sizes.y1
-        self.input_dict = input_dict
 
-        training_input_dict, test_input_dict = split_train_and_test(input_dict)
         self.training_input_dict = training_input_dict
         self.test_input_dict = test_input_dict
 
         sizes = TwoStageModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
-            multi_select_input=math.prod(input_dict.multi_select.shape[2:]),
-            quantitative_input=input_dict.quantitative.size(-1),
-            single_select_input=math.prod(input_dict.single_select.shape[2:]),
-            text_input=input_dict.text.size(-1),
+            multi_select_input=math.prod(training_input_dict.multi_select.shape[2:]),
+            quantitative_input=training_input_dict.quantitative.size(-1),
+            single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
+            text_input=training_input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(input_dict.y1_true.shape[2:]),
+            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]),
             stage2_output=10,  # math.prod(input_dict["y2"].shape[2:]), # should be num values
         )
         logger.info("Model sizes: %s", sizes)
@@ -97,12 +96,12 @@ class ModelTrainer:
         self.stage2_criterion = nn.CrossEntropyLoss()
 
         self.stage1_metrics = {
-            "cp": {k: ClassificationReport() for k in category_sizes.y1.keys()},
+            # "cp": {k: ClassificationReport() for k in category_sizes.y1.keys()},
             "accuracy": {k: Accuracy() for k in category_sizes.y1.keys()},
         }
 
         self.stage2_metrics = {
-            "cp": MetricWrapper(metric=ClassificationReport(), transform=None),
+            # "cp": MetricWrapper(metric=ClassificationReport(), transform=None),
             "accuracy": MetricWrapper(metric=Accuracy(), transform=None),
             "mae": MetricWrapper(
                 metric=MeanAbsoluteError(),
@@ -247,10 +246,13 @@ class ModelTrainer:
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
             _input_dict = ModelInput(
-                **{k: v.detach().clone() for k, v in self.input_dict._asdict().items()},
+                **{
+                    k: v.detach().clone()
+                    for k, v in self.training_input_dict._asdict().items()
+                },
             )
             for i in range(num_batches):
-                logger.info("Starting batch %s out of %s", i, num_batches)
+                logger.debug("Starting batch %s out of %s", i, num_batches)
                 self.__train_batch(i, _input_dict)
 
             if epoch % SAVE_FREQUENCY == 0:
@@ -300,13 +302,19 @@ class ModelTrainer:
             for k in self.y1_category_sizes.keys():
                 for name, metric in self.stage1_metrics.items():
                     logger.info(
-                        "%s Stage1 %s %s: %s", stage, k, name, metric[k].compute()
+                        "%s Stage1 %s %s: %s",
+                        stage,
+                        k,
+                        name,
+                        metric[k].compute().__round__(2),  # type: ignore
                     )
                     metric[k].reset()
 
             for name in self.stage2_metrics.keys():
                 metric, _ = self.stage2_metrics[name]
-                logger.info("%s Stage2 %s: %s", stage, name, metric.compute())  # type: ignore
+                logger.info(
+                    "%s Stage2 %s: %s", stage, name, metric.compute().__round__(2)  # type: ignore
+                )
                 metric.reset()  # type: ignore
 
         except Exception as e:
@@ -334,7 +342,7 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(
-            fetch_trials("COMPLETED", limit=2000), QUANTITATIVE_TO_CATEGORY_FIELDS
+            fetch_trials("COMPLETED", limit=50000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
 
         field_lists = FieldLists(
@@ -346,11 +354,13 @@ class ModelTrainer:
             y2=Y2_FIELD,
         )
 
-        input_dict, category_sizes, num_batches = prepare_inputs(
+        input_dict, category_sizes, _ = prepare_inputs(
             trials, field_lists, batch_size, DEVICE
         )
 
-        model = ModelTrainer(input_dict, category_sizes)
+        training_input_dict, test_input_dict = split_train_and_test(input_dict)
+
+        model = ModelTrainer(training_input_dict, test_input_dict, category_sizes)
         model.train()
 
 
