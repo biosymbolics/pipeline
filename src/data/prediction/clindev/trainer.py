@@ -179,7 +179,7 @@ class ModelTrainer:
         # TOTAL
         loss = stage1_loss + stage1_corr_loss + stage2_ce_loss + stage2_mse_loss
 
-        logger.info(
+        logger.debug(
             "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s (%s))",
             i,
             loss.detach().item(),
