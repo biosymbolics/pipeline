@@ -5,7 +5,7 @@ import logging
 
 from constants.patents import (
     COMPANY_MAP,
-    COMPANY_SUPPRESSIONS,
+    OWNER_SUPPRESSIONS,
     OWNER_TERM_MAP,
 )
 from core.ner.utils import cluster_terms
@@ -36,7 +36,7 @@ def clean_owners(owners: list[str]) -> list[str]:
             - University Of Alabama At Birmingham  -> University Of Alabama
             - University of Colorado, Denver -> University of Colorado
         """
-        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(COMPANY_SUPPRESSIONS)}\b)"
+        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(OWNER_SUPPRESSIONS)}\b)"
         pre_suppress_re = "^the"
         suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$)|\(.+\))"
 

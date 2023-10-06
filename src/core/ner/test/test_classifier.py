@@ -22,7 +22,7 @@ class TestClassifier(unittest.TestCase):
                     "Food supplement for combating asthma made from medicinal plants. The food supplement for combating asthma contains certain nutrients such as vitamins, minerals and unsaturated fatty acids that combat infections and inflammations of the respiratory system, soothe and act favourably on dilation of the bronchi, and provide relief to persons suffering from breathing difficulties caused by congestion or lack of air."
                 ],
                 "attribute_map": PATENT_ATTRIBUTE_MAP,
-                "expected_output": [["COMPOUND_OR_MECHANISM", "IRRELEVANT", "PROCESS"]],
+                "expected_output": [["NUTRITIONAL"]],
             },
             {
                 "docs": [

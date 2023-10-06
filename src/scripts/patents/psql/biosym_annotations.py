@@ -945,7 +945,7 @@ def populate_working_biosym_annotations():
     client.execute_query("drop index trgm_index_biosym_annotations_term")
 
     remove_common_terms()  # remove one-off generic terms
-    remove_substrings()  # less specific terms in set with more specific terms
+    # remove_substrings()  # less specific terms in set with more specific terms
 
     # normalize_domains is **much** faster w/o this index
     normalize_domains()
@@ -961,31 +961,29 @@ if __name__ == "__main__":
     Checks:
 
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930)
+    (556,711 -> 567,398 -> 908,930 -> 1,793,462)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723 -> 3,697,848)
+    (2,555,158 -> 2,539,723 -> 3,697,848 -> 6,434,563)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428 -> 4,405,141)
+    (2,812,965 -> 2,786,428 -> 4,405,141 -> 7,265,719)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
-    (3,748,417 -> 3,748,417 -> 5,552,648)
+    (3,748,417 -> 3,748,417 -> 5,552,648 -> 9,911,948)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3032462
     compounds  | 1474950
     diseases   |  829121
     mechanisms | 1444346
     --
-    assignees  | 3288088
-    attributes | 3021418
-    compounds  | 3056458
-    diseases   | 1776624
-    inventors  | 3984539
-    mechanisms | 3895219
+    attributes | 3721861
+    compounds  | 3448590
+    diseases   |  824851
+    mechanisms | 5638507
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283)
+    (14,910 -> 15,206 -> 37,283 -> 34,083)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872)
+    (38,315 -> 39,039 -> 76,872 -> 74,050)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874)
+    (70,439 -> 69,715 -> 103,874 -> 165,806)
 
 
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;

@@ -95,7 +95,11 @@ def get_suffix_entitiy_re(
     return soe_re + ALPHA_CHARS(prefix_count) + get_or_re(core_suffix_res) + eoe_re
 
 
-def lemmatize_tail(term: str | Doc, exception_pattern: str | None = None) -> str:
+def lemmatize_tail(
+    term: str | Doc,
+    exception_pattern: str | None = None,
+    lemma_tags: list[str] | None = None,
+) -> str:
     """
     Lemmatizes the tail of a term
 
@@ -103,6 +107,11 @@ def lemmatize_tail(term: str | Doc, exception_pattern: str | None = None) -> str
     "heart attacks" -> "heart attack"
     but not
     "fast reacting phenotypes" -> "fast reacting phenotype"
+
+    Args:
+        term (str): term to lemmatize
+        exception_pattern (str): regex pattern to match against the term. If matched, returns the term as-is
+        lemma_tags (list[str]): list of spacy tags to lemmatize (default: None)
     """
     if isinstance(term, str):
         nlp = Spacy.get_instance()
@@ -115,12 +124,19 @@ def lemmatize_tail(term: str | Doc, exception_pattern: str | None = None) -> str
     if exception_pattern is not None and re.match(exception_pattern, doc.text):
         return doc.text
 
+    def maybe_lemmatize(token, i):
+        is_last = i == len(doc) - 1
+
+        if not is_last:
+            return token.text_with_ws
+
+        if lemma_tags is None or token.tag_ in lemma_tags:
+            return token.lemma_
+        return token.text_with_ws
+
     # include all tokens as-is except for the last
     tail_lemmatized = "".join(
-        [
-            token.text_with_ws if i < len(doc) - 1 else token.lemma_
-            for i, token in enumerate(doc)
-        ]
+        [maybe_lemmatize(token, i) for i, token in enumerate(doc)]
     ).strip()
 
     return tail_lemmatized
@@ -137,6 +153,22 @@ def lemmatize_tails(
 
     for doc in docs:
         yield lemmatize_tail(doc, exception_pattern)
+
+
+def depluralize_tails(
+    terms: list[str],
+    n_process: int = 1,
+) -> Iterable[str]:
+    """
+    Singularize last terms
+    """
+    nlp = Spacy.get_instance()._nlp
+    docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
+
+    plural_pos_tags = ["NNS", "NNPS"]
+
+    for doc in docs:
+        yield lemmatize_tail(doc, lemma_tags=plural_pos_tags)
 
 
 def lemmatize_all(term: str | Doc) -> str:

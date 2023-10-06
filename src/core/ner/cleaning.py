@@ -21,7 +21,7 @@ from typings.core import is_string_list
 
 from .spacy import Spacy
 from .types import DocEntity, is_entity_doc_list
-from .utils import lemmatize_tails, normalize_by_pos, rearrange_terms
+from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
@@ -287,11 +287,10 @@ class EntityCleaner:
             remove_chars,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
             partial(rearrange_terms, n_process=n_process),
-            # partial(
-            #     lemmatize_tails,
-            #     n_process=n_process,
-            #     exception_pattern=f"{ALL_INTERVENTION_BASE_TERMS_RE}$",
-            # ),
+            partial(
+                depluralize_tails,
+                n_process=n_process,
+            ),
             partial(normalize_by_pos, n_process=n_process),
             normalize_phrases,  # order matters (after rearrange)
             remove_extra_spaces,

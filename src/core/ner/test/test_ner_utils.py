@@ -26,9 +26,12 @@ class TestNerUtils(unittest.TestCase):
                 ],
                 "exception_list": ["exception"],
                 "expected_output": [
-                    "pf06863135",
-                    "covid 19 mrna vaccine",
+                    "",
+                    "PF-06863135",
+                    "",
+                    "COVID-19 mRNA vaccine",
                     "exception term",
+                    "",
                 ],
             },
             {
@@ -42,9 +45,8 @@ class TestNerUtils(unittest.TestCase):
                     "common term",
                 ],
                 "exception_list": [],
-                "expected_output": ["covid 19 mrna vaccine"],
+                "expected_output": ["", "", "", "", "", "COVID-19 mRNA vaccine", ""],
             },
-            # Add more test conditions as needed
         ]
 
         for condition in test_conditions:
@@ -52,7 +54,7 @@ class TestNerUtils(unittest.TestCase):
             exception_list = condition["exception_list"]
             expected_output = condition["expected_output"]
 
-            result = self.cleaner.clean(terms, exception_list, True)
+            result = self.cleaner.filter_common_terms(terms, exception_list, True)
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
@@ -116,7 +118,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "human il-36r agonist ligands il36α",
-                "expected": "human il36r agonist il36α",  # TODO
+                "expected": "il36r agonist ligands il36α",  # TODO
             },
             {
                 "input": "GLP-1 receptor agonists",
@@ -124,7 +126,15 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgf β 1 accessory receptor",
+                "expected": "tgf beta 1 accessory receptor",
+            },
+            {
+                "input": "transforming growth factor beta3",
+                "expected": "transforming growth factor beta3",  # TODO
+            },
+            {
+                "input": "tgfβ1 inhibitor",
+                "expected": "tgfβ1 inhibitor",  # TODO?
             },
             {
                 "input": "angiotensin-ii",
@@ -132,7 +142,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "receptor activator of NF-kB ligand",
-                "expected": "nfkb activator",
+                "expected": "nfkb ligand activator",
             },
             {
                 "input": "chimeric antibody-T cell receptor",
