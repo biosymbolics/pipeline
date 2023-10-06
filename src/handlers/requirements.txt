@@ -2,12 +2,12 @@
 
 boto3
 bs4
-dotenv
 langchain
 openai
 polars
 psycopg[binary,pool]
 pydash
+python-dotenv
 regex
 requests
 sec_api
