@@ -938,16 +938,14 @@ def populate_working_biosym_annotations():
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
-    # select term from biosym_annotations where length(term) > 150 and term like '%and%';
     clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
     client.execute_query("drop index trgm_index_biosym_annotations_term")
 
     remove_common_terms()  # remove one-off generic terms
-    # remove_substrings()  # less specific terms in set with more specific terms
+    # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
 
-    # normalize_domains is **much** faster w/o this index
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations
