@@ -33,7 +33,7 @@ class ModelInfo(TypedDict):
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-MONGO_URI = os.environ["MONGO_URI"]
+MONGO_URI = os.environ.get("MONGO_URI")
 
 
 def get_storage_context(
@@ -49,6 +49,9 @@ def get_storage_context(
         kwargs (Mapping[str, Any]): kwargs for vector store
     """
     logger.info("Loading storage context for %s", index_name)
+
+    if MONGO_URI is None:
+        raise ValueError("MONGO_URI not set")
 
     if storage_type == "pinecone":
         logger.info("Loading pinecone vector store context")

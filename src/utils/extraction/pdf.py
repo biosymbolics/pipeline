@@ -11,8 +11,6 @@ import polars as pl
 
 from utils.file import save_as_pickle
 
-API_KEY = os.environ["UNSTRUCTURED_API_KEY"]
-
 
 def get_tables(filename: str) -> list[pl.DataFrame]:
     """

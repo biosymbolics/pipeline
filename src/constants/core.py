@@ -20,7 +20,9 @@ IS_LOCAL = not os.environ.get("ENV") or os.environ.get("ENV") == "local"
 IS_DEPLOYED = not IS_LOCAL
 BASE_DATABASE_URL = "postgres://:@localhost:5432"
 DATABASE_URL = (
-    os.environ["DATABASE_URL"] if IS_DEPLOYED else "postgres://:@localhost:5432/patents"
+    os.environ.get("DATABASE_URL")
+    if IS_DEPLOYED
+    else "postgres://:@localhost:5432/patents"
 )
 DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 

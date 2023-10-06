@@ -11,8 +11,8 @@ import logging
 from typings.indices import NamespaceKey
 
 
-API_KEY = os.environ["PINECONE_API_KEY"]
-PINECONE_ENVIRONMENT = os.environ["PINECONE_ENVIRONMENT"]
+API_KEY = os.environ.get("PINECONE_API_KEY")
+PINECONE_ENVIRONMENT = os.environ.get("PINECONE_ENVIRONMENT")
 
 
 def get_metadata_filters(namespace: NamespaceKey) -> MetadataFilters:
@@ -40,6 +40,9 @@ def get_vector_store(
         index_name (str): name of index.
         pinecone_args (Mapping[str, Any]): additional args to pass to pinecone.create_index. Defaults to {}.
     """
+    if API_KEY is None or PINECONE_ENVIRONMENT is None:
+        raise ValueError("Pinecone API key or environment not set")
+
     pinecone.init(api_key=API_KEY, environment=PINECONE_ENVIRONMENT)
 
     if index_name not in pinecone.list_indexes():

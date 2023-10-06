@@ -20,9 +20,9 @@ from utils.classes import overrides, nonoverride
 
 T = TypeVar("T", bound=Mapping)
 
-BQ_PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
+BQ_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 BQ_DATASET = "patents"
-BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET
+BQ_DATASET_ID = BQ_PROJECT + "." + BQ_DATASET if BQ_PROJECT is not None else None
 
 CREDENTIALS_PATH = "/biosymbolics/pipeline/google/credentials"
 DEFAULT_USE_SERVICE_ACCOUNT = False
@@ -50,6 +50,8 @@ class BigQueryClient(bigquery.Client):
 
 class BQDatabaseClient(DatabaseClient):
     def __init__(self, use_service_account: bool = False):
+        if BQ_DATASET_ID is None:
+            raise ValueError("BigQuery dataset (BQ_DATASET_ID) not set")
         self.client = BigQueryClient(use_service_account=use_service_account)
 
     @staticmethod
@@ -60,7 +62,7 @@ class BQDatabaseClient(DatabaseClient):
         """
         return (
             f"{BQ_DATASET_ID}.{table_name}"
-            if BQ_DATASET_ID not in table_name
+            if BQ_DATASET_ID or "" not in table_name
             else table_name
         )
 

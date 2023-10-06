@@ -12,7 +12,9 @@ def initialize():
     logging.basicConfig(level=logging.INFO)
 
     logging.info("Loading environment variables from .env file")
-    load_dotenv("/Users/kristinlindquist/development/pipeline/.env")
+    res = load_dotenv(".env")
+    if res is False:
+        logging.warning("No .env file found")
 
 
 if __name__ == "__main__":

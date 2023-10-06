@@ -10,7 +10,7 @@ from sec_api import ExtractorApi, QueryApi, RenderApi
 from utils.extraction.product_table import extract_product_tables
 from sources.sec.types import ExtractReturnType, SecFiling
 
-API_KEY = os.environ["SEC_API_KEY"]
+API_KEY = os.environ.get("SEC_API_KEY")
 
 
 class SecApiClient:
@@ -19,6 +19,9 @@ class SecApiClient:
     """
 
     def __init__(self):
+        if API_KEY is None:
+            raise ValueError("SEC API key not set")
+
         self.client = None
 
     def get_client(self) -> QueryApi:
