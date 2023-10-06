@@ -2,10 +2,14 @@
 Functions to initialize the terms and synonym tables
 """
 from itertools import groupby
+import sys
 from typing import Optional, TypedDict
 import logging
-
 from pydash import flatten
+
+import system
+
+system.initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
@@ -229,10 +233,10 @@ class TermAssembler:
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT lower(term) as term, domain, COUNT(*) as count
+                SELECT lower(original_term) as term, domain, COUNT(*) as count
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(term) > 0
-                group by lower(term), domain
+                where length(original_term) > 0
+                group by lower(original_term), domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -359,3 +363,11 @@ def create_patent_terms():
     populate_working_biosym_annotations()
 
     TermAssembler.run()
+
+
+if __name__ == "__main__":
+    if "-h" in sys.argv:
+        print("Usage: python3 -m scripts.patents.psql.terms")
+        sys.exit()
+
+    create_patent_terms()

@@ -7,7 +7,7 @@ import regex as re
 import sys
 import polars as pl
 from pydash import compact
-from transformers import AutoTokenizer  # type: ignore
+from transformers import AutoTokenizer
 
 import system
 
@@ -23,7 +23,7 @@ def get_annotations():
     query = """
         SELECT
         ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text,
-        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, term, domain
+        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term, domain
         FROM
         (
             select publication_number, array_agg(domain) as domains
