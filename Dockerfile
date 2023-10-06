@@ -11,7 +11,7 @@ COPY . .
 # RUN yum install build-essential -y
 # RUN yum install gcc gcc-c++ kernel-devel make -y
 
-RUN pip install -r requirements-torch-inference.txt
+RUN pip install -r requirements.txt
 
 # Copy modules whl
 # RUN echo "Copying data module whl..."
