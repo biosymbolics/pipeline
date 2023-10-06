@@ -137,7 +137,7 @@ def estimate_n_bins(
 def bin_quantitative_values(
     values: Sequence[float | int] | pl.Series,
     field: str,
-    n_bins: int | None = None,
+    n_bins: int | None = 5,
     kbins_strategy: Literal["uniform", "quantile", "kmeans"] = "kmeans",
 ) -> Sequence[list[int]]:
     """
