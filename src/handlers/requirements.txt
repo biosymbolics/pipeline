@@ -2,6 +2,7 @@
 
 boto3
 bs4
+dotenv
 langchain
 openai
 polars
