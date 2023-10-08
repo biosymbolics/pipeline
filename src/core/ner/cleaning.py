@@ -41,56 +41,7 @@ CHAR_SUPPRESSIONS = {
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
 INCLUSION_SUPPRESSIONS = ["phase", "trial"]
-DEFAULT_EXCEPTION_LIST: list[str] = [
-    "hiv",
-    "asthma",
-    "obesity",
-    "covid",
-    "diabetes",
-    "kidney",
-    "liver",
-    "heart",
-    "lung",
-    "cancer",
-    "arthritis",
-    "stroke",
-    "dementia",
-    "trauma",
-    "insulin",
-    "depression",
-    "anxiety",
-    "g",  # g protein coupled receptor
-    "pain",
-    "cardiovascular",
-    "respiratory",
-    "aging",
-    "cardiac",
-    "polymers",
-    "gene",
-    "fatty",
-    "abuse",
-    "motion",
-    "panic",
-    "addiction",
-    "mood",
-    "regulatory",
-    "region",
-    "viral",
-    "chronic",
-    "joint",
-    "digits",
-    "protein",
-    "complex",
-    "death",
-    "coding" "regulation",
-    "mrna",
-    "cell",
-    "nervous",  # CNS
-    "group",
-    "plasma",
-    "antibody",
-    "dry",  # dry eye
-]
+DEFAULT_EXCEPTION_LIST: list[str] = []
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(i)",  # so common in patents, e.g. "general formula (I)"
@@ -155,8 +106,8 @@ class EntityCleaner:
     def filter_common_terms(
         self,
         terms: list[str],
-        exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
         n_process: int = 1,
+        exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
     ) -> list[str]:
         """
         Filter out common terms from a list of terms, e.g. "vaccine candidates"
@@ -382,10 +333,7 @@ class EntityCleaner:
         cleaning_steps: list[CleanFunction] = [
             lambda terms, n_process: self.__suppress(terms),
             self.normalize_terms,
-            # partial(
-            #     self.filter_common_terms,
-            #     exception_list=common_exception_list,
-            # ),
+            self.filter_common_terms,
         ]
 
         terms = [self.__get_text(ent) for ent in entities]

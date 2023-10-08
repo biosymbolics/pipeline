@@ -206,7 +206,10 @@ def main():
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m scripts.binder.binder_data_prep\nPreps data for training the binder model"
+            """
+            Usage: python3 -m scripts.binder.binder_data_prep
+            Preps data for training the binder model
+            """
         )
         sys.exit()
 

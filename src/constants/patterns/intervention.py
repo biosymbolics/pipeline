@@ -40,6 +40,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "(?:(?:neuro|immuno)[- ]?)?modulat(?:or|ion|ing|e)s?(?: binding)?",
     "(?:(?:t[ -]cell )?engag(?:er|ing|e|ment)(?: receptor)?|tce(?:r))",
     "activity",
+    "action",
     "adjuvant",
     "agent",
     "analgesic",
@@ -272,7 +273,6 @@ ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 INTERVENTION_PREFIXES_GENERIC = [
     "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "activ(?:ity|ed)",
-    "actions?",
     "capable",
     "contributing",
     "function(?:al)?s?",

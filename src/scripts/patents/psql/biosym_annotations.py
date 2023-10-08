@@ -5,6 +5,7 @@ import sys
 import logging
 from typing import Literal
 from pydash import compact, flatten
+from core.ner.cleaning import EntityCleaner
 
 from system import initialize
 
@@ -46,11 +47,15 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "prevention": "leading",
     "encoding": "trailing",
     "discreet": "all",
+    "good": "all",
     "properties": "trailing",
     "derived": "all",
     "library": "all",
     "more": "leading",
+    "technique": "trailing",
     "classic": "all",
+    "present": "leading",
+    "invention": "all",
     "excellent": "all",
     "construct": "trailing",
     "particular": "all",
@@ -184,6 +189,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "contemplated": "all",
     "is indicative of": "all",
     "via": "leading",
+    "effect": "trailing",
     "effective": "all",
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
@@ -677,7 +683,7 @@ def fix_of_for_annotations():
 
     prefix_re = "|".join([p + " " for p in prefixes])
 
-    # inhibition of apoptosis signal-regulating kinase 1 (ASK1)
+    # e.g. inhibition of apoptosis signal-regulating kinase 1 (ASK1)
     def get_query(re_term: str, field: TextField):
         sql = f"""
             UPDATE {WORKING_TABLE} ba
@@ -685,7 +691,7 @@ def fix_of_for_annotations():
             FROM applications a
             WHERE ba.publication_number=a.publication_number
             AND original_term ~* '^(?:{prefix_re})*{re_term}$'
-            AND a.{field} ~* '.*{re_term} (?:of|for|the|that|to|comprising|against|(?:directed |effective |with efficacy )?against).*'
+            AND a.{field} ~* '.*{re_term} (?:of|for|the|that|to|comprising|(?:directed |effective |with efficacy )?against).*'
         """
         return sql
 
@@ -828,6 +834,7 @@ def remove_common_terms():
     common_terms = [
         *DELETION_TERMS,
         *flatten(expand_res(INTERVENTION_BASE_TERMS)),
+        *EntityCleaner().common_words,
     ]
 
     or_re = get_or_re([f"{t}s?" for t in common_terms])
@@ -942,7 +949,9 @@ def populate_working_biosym_annotations():
     clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    client.execute_query("drop index trgm_index_biosym_annotations_term")
+    client.execute_query(
+        "drop index trgm_index_biosym_annotations_original_term", ignore_error=True
+    )
 
     remove_common_terms()  # remove one-off generic terms
     # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
@@ -978,11 +987,11 @@ if __name__ == "__main__":
     diseases   |  824851
     mechanisms | 5638507
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083)
+    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050)
+    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806)
+    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019)
 
 
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
