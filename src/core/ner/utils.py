@@ -199,19 +199,20 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
 
-    # "useful in the treatment of disorders responsive to the (inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
+    # key: desired adposition term, value: regex that is mapped to adposition
     adp_map = {
         "of": r"of (?:the|a|an)\b",
         "with": r"associated with\b",
         "against": r"against\b",
         "targeting": r"targeting\b",
+        "involving": r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
+        "caused by": r"(?:caused|mediated|characterized) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
         # antibody to
-        # "by": r"mediated by\b",
     }
 
     def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
-        subbed = [re.sub(adp_ext, adp_term, t, flags=re.DOTALL) for t in _terms]
-        final = __rearrange_adp(subbed, adp_term=adp_term, n_process=n_process)
+        normalized = [re.sub(adp_ext, adp_term, t, flags=re.DOTALL) for t in _terms]
+        final = __rearrange_adp(normalized, adp_term=adp_term, n_process=n_process)
         return final
 
     steps = [

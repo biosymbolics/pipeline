@@ -5,7 +5,7 @@ import sys
 import logging
 from typing import Literal
 from pydash import compact, flatten
-from core.ner.cleaning import EntityCleaner
+import polars as pl
 
 from system import initialize
 
@@ -22,6 +22,7 @@ from constants.patterns.intervention import (
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
 )
+from core.ner.cleaning import EntityCleaner
 from utils.re import expand_res, get_or_re
 
 
@@ -57,6 +58,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "present": "leading",
     "invention": "all",
     "excellent": "all",
+    "optimal": "all",
     "construct": "trailing",
     "particular": "all",
     "useful": "all",
@@ -90,6 +92,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "efficacy": "all",
     "advanced": "all",
     "promising": "all",
+    "pharmaceutical compositions?(?: comprising)?": "all",
     "therapeutic procedure": "all",
     "therapeautic?": "all",
     "therapeutic(?:ally)?": "all",
@@ -104,6 +107,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "portion": "trailing",
     "intermediate": "all",
     "suitable": "all",
+    "and uses thereof": "all",
     "procedure": "all",  # TODO
     "relevant": "all",
     "patient": "all",
@@ -228,41 +232,42 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
 
 
 DELETION_TERMS = [
+    "particle size",
     "crystal structure",
     "standard tibetian language",
     "present tricyclic",
     "topical surface",
     "cell",
     "wherein(?: a)?",
-    "computer-readable",
+    "computer-read",
     "pharmaceutical composition",
     "compound i",
     "wherein said compound",
     "fragment of",
-    "pharmaceutically[- ]acceptable",
+    "pharmaceutically[- ]accept",
     "pharmacological composition",
     "pharmacological",
     "therapeutically",
-    "general formula ([A-Z0-9]+)",
     "medicine compound",
     "receptacle",
     "liver",
     "unsubstituted",
-    "compound i",
     "medicinal composition",
     "compound",
     "disease",
     "medicine compounds of formula",
+    "compound of",
     "therapy",
     "geographic location",
     "quantitation",
     "(?:administrative )?procedure",
     "endoscope",
-    "optionally substituted",
+    "optionally substitut",
     "suction",
-    "compound 1",
-    "prognosticating",
-    "formula",
+    "prognosticat",
+    "(?:general )?formula(?: i{1,3}){0,3}(?: [0-9a-z]){0,3}",
+    "component(?: i{1,3})?(?: [0-9a-z])?",
+    "compound(?: i{1,3})?(?: [0-9a-z])?",
     "absorbent article",
     ".*plunger",
     "adhesive",
@@ -271,7 +276,7 @@ DELETION_TERMS = [
     "aqueous",
     "medicinal",
     "conduit",
-    "pharmaceutically",
+    "pharmaceutical",
     "topical",
     "heterocyclic",
     "recombinant technique",
@@ -285,13 +290,15 @@ DELETION_TERMS = [
     "amide",
     "amine",
     "single chain",
-    "recombinantly",
+    "recombinant",
     "aperture",
     "scaffold",
     "lipid",
     "intraocular len",
-    "curable",
-    "injectable",
+    "cur",
+    "inject",
+    "co-",
+    "(?:.* )?region",
     "absorbent body",
     "antibody[ -]?drug",
     "inorganic",
@@ -317,14 +324,14 @@ DELETION_TERMS = [
     "biocompatible",
     "recombinant",
     "composition comprising",
-    "computer-readable medium",
+    "computer-read medium",
     "single nucleotide polymorphism",
     "popical",
     "transgene",
     "heterocyclic",
     "target protein",
     "biologically active",
-    "polymerizable",
+    "polymeriz",
     "biosensor",
     "ophthalmic",
     "urea",
@@ -354,7 +361,27 @@ DELETION_TERMS = [
     "diamine",
     "gelatin",
     "ketone",
+    "jaw",
+    "transferr",
+    "single bond",
+    "target tissue",
+    "reaction",
+    "reaction mixture",
+    "concentration",
+    "culture",
+    "host cells",
+    "ameliorating",
+    "by-",
+    "(?:.* )? temperature",
+    "(?:.* )? ratio",
+    "(?:.* )? site",
+    "droplets",
+    "substantially free",
+    "topically",
     # device
+    "computer program",
+    "(?:.* )?device",
+    "(?:.* )?instrument",
     "(?:.* )?hinge",
     "(?:.* )?dispenser",
     "(?:.* )?probe",
@@ -378,22 +405,23 @@ DELETION_TERMS = [
     "(?:.* )?sensor",
     "(?:.* )?wafer",
     "tampon",
+    "sheet",
     "absorbent pad",
     "(?:.* )?syringe(?: .*)?",
-    "(?:.* )?canister",
+    "(?:.* )?canist",
     "bioreactor",
     "(?:.* )?tether",
-    "(?:.* )?mouthpiece",
+    "(?:.* )?mouthpiec",
     "(?:.* )?transducer",
-    "electrical stimulation",
+    "electrical stimulat",
     "(?:.* )?toothbrush",
     "(?:.* )?strut",
-    "(?:.* )?suture",
+    "(?:.* )?sutur",
     "(?:.* )?cannula",
     "(?:.* )?stent",
     "(?:.* )?capacitor",
     "(?:.* )?mass spectrometry",
-    "accelerometer",
+    "acceleromet",
     "container",
     "reservoir",
     "elongated housing",
@@ -408,12 +436,12 @@ DELETION_TERMS = [
     "(?:.* )?balloon",
     "(?:.* )?stapler",
     "internal combustion engine",
-    "capsule",
-    "valve",
-    "solubility",
+    "capsul",
+    "valv",
+    "solub",
     "compressor",
     "forcep",
-    "beam splitter",
+    "beam splitt",
     ".*transceiver",
     ".*piezoelectric.*",
     ".*ultrasonic.*",
@@ -436,6 +464,7 @@ DELETION_TERMS = [
     "inflatable bladder",
     "blower",
     "fastening mean",
+    "(?:.* )?battery",
     "piezoelectric.*",
     "handpiece",
     "reagent kit",
@@ -456,23 +485,27 @@ DELETION_TERMS = [
     "(?:.* )?indicator",
     "(?:.* )?pump",
     "robot.*" "(?:.* )?sponge",
+    "fuel cell",
+    "(?:.* )?chamber",
     # "(?:.* )?generator",??
     # end device
+    "(?:.* )?ratio",
     "diluent",
     "bifunctional",
     "inhibitory",
     "tubular member",
-    "specific antibodie",
+    "specific antibod",
+    "base layer",
     "catalytic",
     "gene delivery",
+    "attachment",
     "said protein",
     "fibrous",
     "in vitro",
     "polypeptides present",
     "volatile",
     "amino acid",
-    "human(?:ized)? antibody",
-    "human(?:ized)? antibodie",
+    "human(?:ized)? antibod",
     "silica",
     # procedure
     "(?:.* )?ablation",
@@ -495,18 +528,18 @@ DELETION_TERMS = [
     "cell culture techniques",
     # diagnostic
     "(?:.* )?testing",
-    "(?:.* )?detection",
+    "(?:.* )?detect",
     "(?:.* )?diagnostic",
     "(?:.* )?diagnosis",
-    "analyte",
+    "analyt",
     "(?:.* )?scopy" "(?:.* )?reagent",
     "dielectric",
     "aroma",
     "crystalline",
-    "edible",
-    "saline",
+    "edibl",
+    "salin",
     "pharmaceutically salt",
-    "citrate",
+    "citrat",
     "non-therapeutic",
     "functional",
     "medicinal agent",
@@ -525,9 +558,9 @@ DELETION_TERMS = [
     "biocompatibility",
     "porous",
     "intraocular lens",
-    "dispensing",
-    "impedance",
-    "radioactive",
+    "dispens",
+    "impedanc",
+    "radioact",
     "prevention of cancer",
     "endotracheal tube",
     "cancer diagnosis",
@@ -537,17 +570,24 @@ DELETION_TERMS = [
     "therapeutical",
     "ingredient",
     "conductive",
+    "coupling",
+    "particle diameter",
+    "operator",
     "elastic",
-    "microcapsule",
+    "microcapsul",
     "hydrophilic",
     "(?:medication |drug |therapy |dose |dosing |dosage |treatment |therapeutic |administration |daily |multiple |delivery |suitable |chronic |suitable |clinical |extended |convenient |effective |detailed |present )+regimen",
     "stylet",
     "monotherapy",
+    "embodiment",
+    "epoxy resin",
     "aerosol",
     "pharmacologically active agent",
     "left atrium",
     "sulfur",
     "quantification",
+    "target site",
+    "(?:.* )?rate",
     "computer-implemented",
     "flexible",
     "corresponding",
@@ -560,28 +600,29 @@ DELETION_TERMS = [
     "absorbent core",
     "heart valve",
     "nonwoven",
-    "curable",
+    "cur",
     "sanitary napkin",
     ".*catheter.*",
     "extracellular vesicle",
     "target antigen",
-    "water-soluble",
-    "illustrative",
+    "water[- ]?soluble",
+    "illustrat",
     "metal",
     "superabsorbent",
-    "expandable member",
+    "expandable memb",
     "lipase",
     "femoral",
     "obturator",
     "fructose",
     "respiratory",
-    "said antibody",
-    "computer[ -]?readable",
+    "said antibod",
+    "computer[ -]?read",
     "sweetener",
     ".*administration",
     ".*patient",
     "field of .*",
     "femur",
+    "synergistic",
     "immunogenic",
     "organic solvent",
     "bacterium",
@@ -598,15 +639,15 @@ DELETION_TERMS = [
     "pyrimidine",
     "phenol",
     "said",
-    "reporter",
-    "solvate",
+    "report",
+    "solvat",
     "nutrient",
     "sterilization",
     "carbonyl",
     "aldehyde",
     "cancer stem cell",
     "cancer cell",
-    "cross[- ]?linked",
+    "cross[- ]?link",
     "nucleic acid",
     "elongated body",
     "lactic acid",
@@ -619,9 +660,9 @@ DELETION_TERMS = [
     "volatile organic",
     "fluorescent",
     "regeneration",
-    "emulsion",
+    "emuls",
     "resilient",
-    "biodegradable",
+    "biodegrad",
     "biomaterial",
     "T cell receptor",
     "cleansing",
@@ -630,10 +671,11 @@ DELETION_TERMS = [
     "elongated shaft",
     "transdermal",
     "brachytherapy",
-    "particulate",
+    "particulat",
     ".* delivery",
-    "perfume",
+    "perfum",
     "cosmetic",
+    "embodiment",
 ]
 
 
@@ -641,6 +683,8 @@ def remove_substrings():
     """
     Removes substrings from annotations
     (annotations that are substrings of other annotations for that publication_number)
+
+    Note: good to run pre-training
     """
     temp_table = "names_to_remove"
     query = rf"""
@@ -831,34 +875,41 @@ def remove_common_terms():
     Remove common original terms
     """
     logging.info("Removing common terms")
+    client = DatabaseClient()
     common_terms = [
         *DELETION_TERMS,
         *flatten(expand_res(INTERVENTION_BASE_TERMS)),
         *EntityCleaner().common_words,
     ]
 
-    or_re = get_or_re([f"{t}s?" for t in common_terms])
-    common_del_query = f"""
-        delete from {WORKING_TABLE}
-        where
-        original_term=''
-        OR original_term is null
-        OR original_term ~* '^{or_re}$'
-    """
-
-    del_queries = [
-        common_del_query,
-        f"delete FROM {WORKING_TABLE} "
-        + r"where original_term ~* '^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$'",
-        f"delete FROM {WORKING_TABLE} "
-        + r"where original_term ~ '^[0-9., ]+$'",  # only numbers . and ,
-        rf"delete from {WORKING_TABLE} where length(original_term) > 150 and original_term ~* '\y(?:and|or)\y';",  # sentences
-        rf"delete from {WORKING_TABLE}  where length(original_term) > 150 and original_term ~* '.*[.;] .*';",  # sentences
-        f"delete FROM {WORKING_TABLE} where original_term ~* '^said .*'",  # arg
-        f"delete FROM {WORKING_TABLE} where length(trim(original_term)) < 3 or original_term is null",
+    common_terms_re = get_or_re(
+        [
+            f"{t}(?:e|r|i|a|o|ng|on|ze|d|ly|ty|ble|nce|le|lit|y|l|st)*s?"
+            for t in common_terms
+        ]
+    )
+    del_term_res = [
+        f"^{common_terms_re}$",
+        "^[(][0-9a-z]{1,4}[)]?[.,]?[ ]?$",
+        "^[0-9., ]+$",  # del if only numbers . and ,
+        # OR length(original_term) > 150 and original_term ~* '\y(?:and|or)\y' -- del if sentence
+        # OR length(original_term) > 150 and original_term ~* '.*[.;] .*' -- del if sentence
+        "^said .*",
     ]
-    for del_query in del_queries:
-        DatabaseClient().execute_query(del_query)
+    del_term_re = get_or_re(del_term_res)
+    result = client.select(f"select distinct original_term from {WORKING_TABLE}")
+    terms = pl.Series([r.get("original_term") for r in result])
+
+    delete_terms = terms.filter(terms.str.contains(del_term_re).to_list()).to_list()
+
+    del_query = f"""
+        delete from {WORKING_TABLE}
+        where original_term=ANY(%s)
+        or original_term is null
+        or original_term = ''
+        or length(trim(original_term)) < 3
+    """
+    DatabaseClient().execute_query(del_query, (delete_terms,))
 
 
 def normalize_domains():

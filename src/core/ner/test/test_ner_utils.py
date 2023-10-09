@@ -137,6 +137,42 @@ class TestNerUtils(unittest.TestCase):
                 "expected": "tgfβ1 inhibitor",  # TODO?
             },
             {
+                "input": "tgf β superfamily type ii receptor",
+                "expected": "tgf β superfamily type ii receptor",  # TODO
+            },
+            {
+                "input": "tgf-beta superfamily proteins",
+                "expected": "tgf-beta superfamily proteins",  # TODO
+            },
+            {
+                "input": "anti tgf β 1 antibody",
+                "expected": "anti tgf β 1 antibody",  # TODO
+            },
+            {
+                "input": "tgfβ",
+                "expected": "tgfβ",  # TODO
+            },
+            {
+                "input": "tgfb inhibitor",
+                "expected": "tgfb inhibitor",  # TODO
+            },
+            {
+                "input": "tgfb1",
+                "expected": "tgfb1",  # TODO
+            },
+            {
+                "input": "(tumor necrosis factor)-α inhibitor tgf",
+                "expected": "(tumor necrosis factor)-α inhibitor tgf",  # TODO
+            },
+            {
+                "input": "tgf-β1",
+                "expected": "tgf-β1",  # TODO
+            },
+            {
+                "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
+                "expected": "transforming growth factor β (tgfβ) overexpression disorders",  # TODO
+            },
+            {
                 "input": "angiotensin-ii",
                 "expected": "angiotensin ii",
             },
@@ -199,10 +235,15 @@ class TestNerUtils(unittest.TestCase):
             self.assertEqual(result, [expected])
 
     def test_rearrange_of(self):
+        # diseases in which tgfβ is instrumental
         test_conditions = [
             {
                 "input": "related diseases of abnormal pulmonary function",
                 "expected": "abnormal pulmonary function related diseases",
+            },
+            {
+                "input": "diseases involving tgfβ",
+                "expected": "diseases involving tgfβ",
             },
             {
                 "input": "suturing lacerations of the meniscus",

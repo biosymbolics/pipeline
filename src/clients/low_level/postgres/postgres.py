@@ -2,7 +2,7 @@
 Low-level Postgres client
 """
 import time
-from typing import Any, Callable, Mapping, TypeVar
+from typing import Any, Callable, Mapping, Sequence, TypeVar
 import logging
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -37,7 +37,7 @@ class PsqlClient:
 
     def __init__(
         self,
-        uri: str = DATABASE_URL,
+        uri: str = DATABASE_URL or "",
     ):
         logger.info(
             "Creating new psql connection pool (min: %s, max: %s)",
@@ -82,7 +82,7 @@ class PsqlDatabaseClient(DatabaseClient):
     ```
     """
 
-    def __init__(self, uri_or_db: str = DATABASE_URL):
+    def __init__(self, uri_or_db: str = DATABASE_URL or ""):
         if not uri_or_db.startswith("postgres://"):
             logger.warning("Passed non-uri string; assuming db name. Expanding to uri.")
             uri = f"{BASE_DATABASE_URL}/{uri_or_db}"
@@ -147,7 +147,7 @@ class PsqlDatabaseClient(DatabaseClient):
     def execute_query(
         self,
         query: str,
-        values: list = [],
+        values: Sequence = [],
         ignore_error: bool = False,
     ) -> ExecuteResult:
         """
