@@ -23,11 +23,13 @@ def get_annotations():
     query = """
         SELECT
         ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text,
-        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term, domain
+        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term as term, domain
         FROM
         (
             select publication_number, array_agg(domain) as domains
-            FROM biosym_annotations group by publication_number
+            FROM biosym_annotations
+            WHERE domain in ('compounds', 'diseases', 'mechanisms')
+            group by publication_number
         ) s,
         biosym_annotations b_anns,
         applications apps

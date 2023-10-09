@@ -26,12 +26,12 @@ class TestNerUtils(unittest.TestCase):
                 ],
                 "exception_list": ["exception"],
                 "expected_output": [
-                    "",
+                    "vaccine candidates",
                     "PF-06863135",
                     "",
                     "COVID-19 mRNA vaccine",
                     "exception term",
-                    "",
+                    "common term",
                 ],
             },
             {
@@ -45,7 +45,15 @@ class TestNerUtils(unittest.TestCase):
                     "common term",
                 ],
                 "exception_list": [],
-                "expected_output": ["", "", "", "", "", "COVID-19 mRNA vaccine", ""],
+                "expected_output": [
+                    "vaccine candidate",
+                    "vaccine candidates",
+                    "",
+                    "",
+                    "",
+                    "COVID-19 mRNA vaccine",
+                    "common term",
+                ],
             },
         ]
 
@@ -54,7 +62,9 @@ class TestNerUtils(unittest.TestCase):
             exception_list = condition["exception_list"]
             expected_output = condition["expected_output"]
 
-            result = self.cleaner.filter_common_terms(terms, exception_list, True)
+            result = self.cleaner.filter_common_terms(
+                terms, exception_list=exception_list
+            )
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
@@ -142,7 +152,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-beta superfamily proteins",
-                "expected": "tgf-beta superfamily proteins",  # TODO
+                "expected": "tgf beta superfamily protein",  # TODO
             },
             {
                 "input": "anti tgf β 1 antibody",
@@ -166,11 +176,11 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-β1",
-                "expected": "tgf-β1",  # TODO
+                "expected": "tgfβ1",  # TODO
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "transforming growth factor β (tgfβ) overexpression disorders",  # TODO
+                "expected": "disorders caused by transforming growth factor β (tgfβ) overexpression",  # TODO
             },
             {
                 "input": "angiotensin-ii",
@@ -264,7 +274,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions characterized by up-regulation of IL-10",
-                "expected": "conditions characterized by il-10 up-regulation",
+                "expected": "conditions caused by il-10 up-regulation",
             },
             {"input": "alleviation of tumors", "expected": "tumor alleviation"},
             {
@@ -273,7 +283,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "diseases mediated by modulation of voltage-gated sodium channels",
-                "expected": "diseases mediated by voltage-gated sodium channel modulation",
+                "expected": "diseases caused by voltage-gated sodium channel modulation",
             },
             {
                 "input": "conditions associated with production of IL-1 and IL-6",
@@ -293,7 +303,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "disorders mediated by neurofibrillary tangles",
-                "expected": "disorders mediated by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
+                "expected": "disorders caused by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
             },
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",

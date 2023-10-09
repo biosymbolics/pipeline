@@ -206,7 +206,7 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
         "against": r"against\b",
         "targeting": r"targeting\b",
         "involving": r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
-        "caused by": r"(?:caused|mediated|characterized) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
+        "caused by": r"(?:caused|mediated|characteri[sz]ed) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
         # antibody to
     }
 
