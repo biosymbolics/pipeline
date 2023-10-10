@@ -6,6 +6,7 @@ import logging
 from typing import Literal
 from pydash import compact, flatten
 import polars as pl
+from constants.patterns.device import DEVICE_RES
 
 from system import initialize
 
@@ -240,6 +241,7 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
 
 
 DELETION_TERMS = [
+    *DEVICE_RES,
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # OR length(original_term) > 150 and original_term ~* '\y(?:and|or)\y' -- del if sentence
@@ -306,13 +308,6 @@ DELETION_TERMS = [
     "operator",
     "field of .*",
     # thing (unwanted because wrong type of thing)
-    "aromatic ring",  # industrial
-    "thermoplastic polymer",  # industrial
-    "polymer matrix",  # industrial
-    "polyolefin",  # industrial
-    "polyisocyanate",  # industrial
-    "alkaline",  # industrial
-    "trifluoromethyl",  # industrial
     "(?:.* )?arrangement",
     "(?:.* )?position",
     "(?:.* )?frame",
@@ -337,17 +332,12 @@ DELETION_TERMS = [
     "body part",
     "(?:.* )?patent",
     "(?:.* )?pathway",
-    "pest control",
     "(?:.* )?animal",
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
     "(?:.* )?reaction",
     "(?:.* )?cosmetic",
     "(?:.* )?fragrance",
-    "ethylene",
-    "alkylat",
-    "carbonyl",
-    "aldehyde",
     "silica",
     "keratin",
     "perfum",
@@ -368,7 +358,6 @@ DELETION_TERMS = [
     "(?:.* )?signal",
     "(?:.* )?layer",
     "(?:.* )?surface",  # device?
-    "thermoplastic",
     # effect
     "detrimental",
     "(?:.* )?absorb",
@@ -425,7 +414,8 @@ DELETION_TERMS = [
     "(?:.* )?valve",  # device
     "(?:.* )?atrium",
     "(?:.* )?nail",  # device
-    "(?:.* )?joint",  # treatment of diseases.
+    "(?:.* )?joint",
+    "(?:.* )?cavity",
     "urea",
     "gastrointestinal(?: tract)?",
     "cartilage",
@@ -438,6 +428,7 @@ DELETION_TERMS = [
     "pulmonary",
     "uterus",
     "lung",
+    "plasma",
     "spinal column",
     "muscle",
     "kidney",
@@ -445,7 +436,6 @@ DELETION_TERMS = [
     "pancreas",
     "ocular",
     "spleen",
-    "(?:.* )?cavity",
     "gallbladder",
     "bladder",
     "ureter",
@@ -533,6 +523,7 @@ DELETION_TERMS = [
     "multi[ -]?function",
     "symmetric(?:al)?",
     "biocompatible",
+    "biocompatibilt",
     "bioactivit",
     "medicinal",
     "cellular",
@@ -562,7 +553,6 @@ DELETION_TERMS = [
     "dermatological",
     "bifunctional",
     "in vitro",
-    "volatile",
     "fibrous",
     "biodegrad",
     "resilient",
@@ -593,12 +583,9 @@ DELETION_TERMS = [
     "acidic",
     "unsubstituted",
     "gaseous",
-    "phenolic",
     "aromatic",
     "conjugated",
     "polymeric",
-    "inorganic",
-    "heterocyclic",
     "oligomeric",
     "synergistic",
     "immunogenic",
@@ -645,8 +632,6 @@ DELETION_TERMS = [
     "(?:.* )?step",
     "(?:.* )?value",
     "(?:.* )?time",
-    # body stuff
-    "plasma",
     # roa
     "aerosol(?:[- ]?forming)?",
     "parenteral",
@@ -673,200 +658,6 @@ DELETION_TERMS = [
     "(?:.* )?memory",
     # material
     "(?:.* )?metal",
-    # device
-    "(?:.* )?pacemaker",
-    "(?:.* )?glass",
-    "(?:.* )?linkage",  # ??
-    "(?:.* )?rubber",  # ??
-    "(?:.* )?tank",
-    "(?:.* )?computer.*",
-    "(?:.* )?latch",
-    "(?:.* )?manifold",
-    "(?:.* )?clip",
-    "(?:.* )?belt",
-    "(?:.* )?pivot",
-    "(?:.* )?mask",
-    "(?:.* )?board",
-    "(?:.* )?bridge",
-    "(?:.* )?cuff",
-    "(?:.* )?pouch",
-    "(?:.* )?container",
-    "mobile",
-    "(?:.* )?fiber",  # TODO could be bio
-    "(?:.* )?conductor",
-    "(?:.* )?connector",
-    "(?:.* )?effector",
-    "(?:.* )?head",
-    "(?:.* )?tape",
-    "(?:.* )?inlet",
-    "(?:.* )?outlet",
-    "(?:.* )?source",  # TODO
-    "(?:.* )?strip",  # e.g. test strip
-    "core[ -]?shell",  # what is this?
-    "stop(?:per)?",
-    "(?:.* )?window",
-    "(?:.* )?solid state",
-    "(?:.*)?wire",  # e.g. guidewire
-    "(?:.* )?bed",
-    "(?:.* )?prosthetic",
-    "(?:.* )?equipment",
-    "(?:.* )?generator",
-    "(?:.* )?(?:micro)?channel",
-    "(?:.* )?light[ -]?emitt(?:er|ing)s?.*",
-    "(?:.* )?cathode",
-    "(?:.* )?dielectric",
-    "(?:.* )?mandrel",
-    "(?:.* )?stylet",
-    "(?:.* )?coupling",
-    "(?:.* )?attachment",
-    "(?:.* )?shaft",
-    "(?:.* )?body",
-    "(?:.* )?aperture",
-    "(?:.* )?biosensor",
-    "(?:.* )?conduit",
-    "(?:.* )?sheath",
-    "(?:.* )?compartment",
-    "(?:.* )?receptacle",
-    "(?:.* )?endoscope",
-    "(?:.* )?article",
-    "(?:.* )?nozzle",
-    "(?:.* )?plastic",
-    "(?:.* )?table",
-    ".*mechanical.*",
-    "(?:.* )?holder",
-    "(?:.* )?circuit",
-    "(?:.* )?liner",
-    "(?:.* )?paper",
-    "(?:.* )?light",
-    "(?:.* )?solar cell.*",
-    "(?:.* )?ground",
-    "(?:.* )?waveform",
-    "(?:.* )?tool",
-    "(?:.* )?centrifug",
-    "(?:.* )?centrifugat",
-    "(?:.* )?current",
-    "(?:.* )?surfac",
-    "(?:.* )?field",
-    "(?:.* )?mou?ld",  # molding, moulded
-    "(?:.* )?napkin",
-    "(?:.* )?display",
-    "(?:.*[ -])?scale",
-    "(?:.* )?imag",  # imaging
-    "(?:.* )?port",
-    "(?:.* )?seperat",
-    "(?:.* )?(?:bio)?reactor",
-    "(?:.* )?program",
-    "(?:.* )?plat",  # plate
-    "(?:.* )?vessel",
-    "(?:.* )?device",
-    "(?:.* )?motor",
-    "(?:.* )?(?:bio[ -]?)?film",
-    "(?:.* )?instrument",
-    "(?:.* )?hinge",
-    "(?:.* )?dispens",
-    "(?:.* )?tip",
-    "(?:.* )?prob",  # probe
-    "(?:.* )?rod",
-    "(?:.* )?prosthesis",
-    "(?:.* )?catheter.*",
-    "(?:.* )?trocar",
-    "(?:.* )?electrode",
-    "(?:.* )?fasten",
-    "(?:.* )?waveguide",
-    "(?:.* )?spacer",
-    "(?:.* )?radiat",
-    "(?:.* )?implant",
-    "(?:.* )?actuat",
-    "(?:.* )?clamp",
-    "(?:.* )?spectromet",
-    "(?:.* )?fabric",
-    "(?:.* )?diaper",
-    "(?:.* )?coil",
-    "(?:.* )?apparatus(?:es)?",
-    "(?:.* )?sens",  # sensor
-    "(?:.* )?waf",  # wafer
-    "(?:.* )?tampon",
-    "(?:.* )?(?:top)?sheet",
-    "(?:.* )?pad",
-    "(?:.* )?syringe(?: .*)?",
-    "(?:.* )?canist",
-    "(?:.* )?tether",
-    "(?:.* )?camera" "(?:.* )?mouthpiec",
-    "(?:.* )?transduc",
-    "electrical stimulat",
-    "(?:.* )?toothbrush",
-    "(?:.* )?strut",
-    "(?:.* )?sutur",
-    "(?:.* )?cannula",
-    "(?:.* )?stent",
-    "(?:.* )?capacit",
-    "acceleromet",
-    "contain",
-    "(?:.* )?reservoir",
-    "(?:.* )?housing",
-    "(?:.* )?inject",
-    "(?:.* )?diaphragm",
-    "(?:.* )?cartridge",
-    "(?:.* )?plunger",
-    "(?:.* )?ultrasound(?: .*)?",
-    "(?:.* )?piston",
-    "(?:.* )?balloon",
-    "(?:.* )?stapl",
-    "(?:.* )?engine",
-    "(?:.* )?gasket",
-    "(?:.* )?wave",
-    "(?:.* )?pump",
-    "(?:.* )?article",
-    "(?:.* )?screw",
-    "(?:.* )?cytomet",
-    "(?:.* )?appliance",
-    "(?:.* )?blow",
-    "(?:.* )?tube",
-    "(?:.* )?lancet",
-    "(?:.* )?capsul",
-    "(?:.* )?valv",
-    "(?:.* )?bladder",
-    "solub",
-    "(?:.* )?compressor",
-    "(?:.* )?forcep",
-    "(?:.* )?splitt",  # splitter
-    "(?:.* )?battery",
-    "(?:.* )?blad",  # blade
-    "(?:.* )?needl",
-    "(?:.* )?wheelchair",
-    "(?:.* )?machine",
-    "(?:.* )?applicat",
-    "(?:.* )?monit",
-    "(?:.* )?irrigat",
-    "(?:.* )?accelerat",
-    "(?:.* )?indicat",
-    "(?:.* )?pump",
-    "(?:.* )?chamber",
-    "(?:.* )?sponge",
-    "(?:.* )?textile",
-    "(?:.* )?lead",
-    "(?:.* )?block",  # TODO: procedure?
-    ".*graphy",
-    ".*transceiver",
-    ".*piezoelectric.*",
-    ".*ultrasonic.*",
-    "impeller",
-    "transmit",
-    "slider",
-    "abutment",
-    "interferometer",
-    "fastening mean",
-    "piezoelectric.*",
-    "handpiece",
-    "reagent kit",
-    "(?:.* )?diode",
-    "anvil",
-    "centrifugal force",
-    "implant .*",
-    "robot.*",
-    "(?:fuel|electrochemical) cell",
-    # "(?:.* )?generator",??
-    # end device
     # non-medical procedure or process
     "pattern form",  # pattern forming
     "crystallizat",
@@ -880,7 +671,6 @@ DELETION_TERMS = [
     "(?:.* )?electrolysis",
     "(?:.* )?incision",
     "(?:.* )?graft",
-    "prognosticat",
     "(?:.* )?ablation",
     "(?:.* )?technique",
     "(?:.* )?retract",
@@ -893,6 +683,7 @@ DELETION_TERMS = [
     "sealant",
     "microelectronic",
     # agtech
+    "pest control",
     "(?:.* )?feedstock",
     "(?:.* )?biomass",
     "(?:.* )?agrochemical",
@@ -907,14 +698,35 @@ DELETION_TERMS = [
     "biodiesel",
     "plant growth regulator",
     # end agtech
+    # start industrial
+    "aromatic ring",  # industrial
+    "thermoplastic polymer",  # industrial
+    "polymer matrix",  # industrial
+    "polyolefin",  # industrial
+    "polyisocyanate",  # industrial
+    "alkaline",  # industrial
+    "trifluoromethyl",  # industrial
+    "thermoplastic",
+    "ethylene",
+    "alkylat",
+    "carbonyl",
+    "aldehyde",
+    "volatile",
+    "inorganic",
+    "phenolic",
+    "heterocyclic",
+    # end industrial
+    # start military
     "explosive",
-    # diagnostic
+    # end military
+    # diagnostic or lab
     "(?:.* )?polymerase chain reaction",
     "(?:.* )?testing",
     "(?:.* )?detect",
     "(?:.* )?diagnostic",
     "(?:.* )?diagnosis",
-    "analyt",
+    "(?:.* )?analyt",  # analyte
+    "prognosticat",
     "(?:.* )?scopy" "(?:.* )?reagent",
     # end diagnostic
 ]
