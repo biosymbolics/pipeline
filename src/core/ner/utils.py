@@ -204,10 +204,10 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
         "of": get_or_re(
             [
                 r"of (?:the|a|an)\b",
-                r"(?:caused|mediated|characteri[sz]ed|influenced) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
+                r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed by(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
                 r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
                 r"targeting\b",
-                r"(?:relevant|related) to\b",
+                r"(?:relevant(?: to)?) to\b",
             ]
         ),
         "with": r"associated with\b",
