@@ -8,6 +8,7 @@ import sys
 import polars as pl
 from pydash import compact
 from transformers import AutoTokenizer
+import logging
 
 import system
 
@@ -17,8 +18,17 @@ from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import DEFAULT_BASE_NLP_MODEL
 from utils.file import save_json_as_file
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def get_annotations():
+    """
+    Get annotations for binder model
+    Takes ~2 min as of 10/10/23
+    """
+    logger.info("Getting annotations from database")
+
     client = PsqlDatabaseClient()
     query = """
         SELECT
@@ -108,6 +118,8 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
     and saves to file.
     """
 
+    logger.info("Formatting data into binder format")
+
     formatted = (
         (
             df.explode("indices")
@@ -192,6 +204,7 @@ def create_binder_data():
     """
     annotations = get_annotations()
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+    logger.info("Getting entity indices for %s annotations", annotations.shape[0])
     df = annotations.with_columns(
         pl.struct(["text", "term"])
         .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
