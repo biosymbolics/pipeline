@@ -1,5 +1,5 @@
 """
-Patent client
+Patent reports
 """
 
 from typing import Any, Callable, Sequence, cast
@@ -26,6 +26,7 @@ def aggregate(
 ) -> Sequence[PatentsReport]:
     """
     Aggregate summary stats
+    Returns one report per (x_dimension x y_dimension)
 
     Args:
         patents (pl.Sequence[PatentApplication]): list of patent applications
@@ -52,7 +53,8 @@ def aggregate(
         if len(y_dim) > 0:
             col_df = (
                 # apply y_transform; keep y around
-                df.with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
+                df.explode(y_dim)
+                .with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
                 .select(
                     pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
                     pl.col("y"),

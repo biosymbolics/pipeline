@@ -250,7 +250,9 @@ def __rearrange_adp(
 
         # get ADP index for the specific term we're looking for
         specific_adp_indices = [
-            t.i for t in doc if t.text == adp_term and t.pos_ == "ADP"
+            t.i
+            for i, t in enumerate(doc)
+            if t.text == adp_term and t.pos_ == "ADP" and i > 0
         ]
 
         if len(specific_adp_indices) > 1:
