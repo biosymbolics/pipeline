@@ -148,7 +148,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf β superfamily type ii receptor",
-                "expected": "tgfβ superfamily type ii receptor",  # TODO
+                "expected": "tgfβii receptor",  # TODO
             },
             {
                 "input": "tgf-beta superfamily proteins",
@@ -175,8 +175,16 @@ class TestNerUtils(unittest.TestCase):
                 "expected": "(tumor necrosis factor)-α inhibitor tgf",  # TODO
             },
             {
+                "input": "EGFR vIII mRNA",
+                "expected": "egfr viii mrna",
+            },
+            {
                 "input": "tgf-β1",
                 "expected": "tgfβ1",
+            },
+            {
+                "input": "anti-TGF-β siRNA",
+                "expected": "anti tgfβ sirna",
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",

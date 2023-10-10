@@ -106,6 +106,15 @@ PHRASE_MAP = {
     "peginterferon": "pegylated interferon",
     "([a-z]{1,3}) ([0-9]+)": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
     "PEG": "pegylated",
-    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?([0-9]))?": r"tgfβ\1",
+    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:superfamily type )?([0-9]|v?i{1,3}))?": r"tgfβ\1",
+    # superfamily type ii
     "(?:tgf|transforming growth factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfα\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfα\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:b|β)(?:beta)?(?:[ -]?([0-9]))?": r"tnfβ\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:g|γ)(?:amma)?(?:[ -]?([0-9]))?": r"tnfγ\1",
+    "(?:tnfr|tumor necrosis factor receptors?)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfrα\1",
+    "(?:egf|epidermal growth factor)": r"egf",
+    "(?:egfr|epidermal growth factor receptor)(?:[ ]?([v?i{1,3}|[0-9]))": r"egfr\1",
+    # vascular endothelial growth factor (VEGF), VEGFR1
+    # fibroblast growth factor (FGF), fibroblast growth factor receptor 2
 }
