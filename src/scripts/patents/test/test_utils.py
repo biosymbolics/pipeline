@@ -31,6 +31,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Genentech, Inc.",
                     "canadian institutes of health research (cihr)",
                     "agency for innovation by science and technology",
+                    "janssen pharmaceuticals inc",
                 ],
                 "expected_output": [
                     "Pfizer",
@@ -56,6 +57,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "Genentech",
                     "Canadian Institutes Of Health",
                     "Agency For Innovation By And Technology",
+                    "Janssen",
                 ],
             },
         ]

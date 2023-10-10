@@ -85,10 +85,6 @@ class SynonymMapper:
         """
         terms = existing_terms or load_json_from_file(TERMS_FILE)
 
-        if not isinstance(terms, list):
-            logging.error("Terms must be a list, instead is type %s", type(terms))
-            raise Exception("Terms must be a list")
-
         # Persist term -> synonyms as synonyms
         synonym_map = {
             og_term: row["term"]

@@ -22,17 +22,21 @@ def get_annotations():
     client = PsqlDatabaseClient()
     query = """
         SELECT
-        ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text,
-        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term, domain
+        ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text, -- both title + abs and abs + title to improve generalizability
+        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term as term, domain
         FROM
         (
-            select publication_number, array_agg(domain) as domains
-            FROM biosym_annotations group by publication_number
+            select publication_number, array_agg(distinct domain) as domains
+            FROM biosym_annotations
+            WHERE domain in ('compounds', 'diseases', 'mechanisms')
+            AND publication_number ~ '.*A1' -- limit total count, effective reduce dups
+            group by publication_number
         ) s,
         biosym_annotations b_anns,
         applications apps
         where b_anns.publication_number = apps.publication_number
         AND s.publication_number = apps.publication_number
+        AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
         and 'mechanisms' = any(s.domains)
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
@@ -206,7 +210,10 @@ def main():
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m scripts.binder.binder_data_prep\nPreps data for training the binder model"
+            """
+            Usage: python3 -m scripts.binder.binder_data_prep
+            Preps data for training the binder model
+            """
         )
         sys.exit()
 

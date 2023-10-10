@@ -39,7 +39,6 @@ def __create_annotations_table():
     logger.info("Create a table of annotations for use in app queries")
 
     client = PsqlDatabaseClient()
-    client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     entity_query = f"""
         WITH terms AS (

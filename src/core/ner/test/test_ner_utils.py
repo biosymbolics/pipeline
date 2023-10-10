@@ -26,12 +26,12 @@ class TestNerUtils(unittest.TestCase):
                 ],
                 "exception_list": ["exception"],
                 "expected_output": [
-                    "",
+                    "vaccine candidates",
                     "PF-06863135",
                     "",
                     "COVID-19 mRNA vaccine",
                     "exception term",
-                    "",
+                    "common term",
                 ],
             },
             {
@@ -45,7 +45,15 @@ class TestNerUtils(unittest.TestCase):
                     "common term",
                 ],
                 "exception_list": [],
-                "expected_output": ["", "", "", "", "", "COVID-19 mRNA vaccine", ""],
+                "expected_output": [
+                    "vaccine candidate",
+                    "vaccine candidates",
+                    "",
+                    "",
+                    "",
+                    "COVID-19 mRNA vaccine",
+                    "common term",
+                ],
             },
         ]
 
@@ -54,7 +62,9 @@ class TestNerUtils(unittest.TestCase):
             exception_list = condition["exception_list"]
             expected_output = condition["expected_output"]
 
-            result = self.cleaner.filter_common_terms(terms, exception_list, True)
+            result = self.cleaner.filter_common_terms(
+                terms, exception_list=exception_list
+            )
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
@@ -124,17 +134,82 @@ class TestNerUtils(unittest.TestCase):
                 "input": "GLP-1 receptor agonists",
                 "expected": "glp1 agonist",
             },
+            # tgf beta r1 inhibitor
             {
                 "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgf beta 1 accessory receptor",
+                "expected": "tgfβ1 accessory receptor",
+            },
+            {
+                "input": "inhibitor of tgfβ1 activity",
+                "expected": "tgfβ1 inhibitor",
+            },
+            {
+                "input": "tgf beta antisense oligonucleotide",
+                "expected": "tgfβ antisense oligonucleotide",
+            },
+            {
+                "input": "tgfβ receptor 1",
+                "expected": "tgfβ receptor 1",  # TODO
+            },
+            {
+                "input": "transforming growth factor β (tgfβ) antagonist",
+                "expected": "tgfβ (tgfβ) antagonist",
             },
             {
                 "input": "transforming growth factor beta3",
-                "expected": "transforming growth factor beta3",  # TODO
+                "expected": "tgfβ3",
             },
             {
                 "input": "tgfβ1 inhibitor",
-                "expected": "tgfβ1 inhibitor",  # TODO?
+                "expected": "tgfβ1 inhibitor",
+            },
+            {
+                "input": "tgf β superfamily type ii receptor",
+                "expected": "tgfβii receptor",  # TODO
+            },
+            {
+                "input": "tgf-beta superfamily proteins",
+                "expected": "tgfβ superfamily protein",
+            },
+            {
+                "input": "anti tgf β 1 antibody",
+                "expected": "anti tgfβ1 antibody",
+            },
+            {
+                "input": "tgfβ",
+                "expected": "tgfβ",
+            },
+            {
+                "input": "TGF-β type I receptor",
+                "expected": "tgfβi receptor",  # TGFβRI
+            },
+            {
+                "input": "tgfb inhibitor",
+                "expected": "tgfβ inhibitor",
+            },
+            {
+                "input": "tgfb1",
+                "expected": "tgfβ1",
+            },
+            {
+                "input": "(tumor necrosis factor)-α inhibitor tgf",
+                "expected": "(tumor necrosis factor)-α inhibitor tgf",  # TODO
+            },
+            {
+                "input": "EGFR vIII mRNA",
+                "expected": "egfr viii mrna",
+            },
+            {
+                "input": "tgf-β1",
+                "expected": "tgfβ1",
+            },
+            {
+                "input": "anti-TGF-β siRNA",
+                "expected": "anti tgfβ sirna",
+            },
+            {
+                "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
+                "expected": "tgfβ (tgfβ) overexpression disorder",  # TODO
             },
             {
                 "input": "angiotensin-ii",
@@ -199,10 +274,19 @@ class TestNerUtils(unittest.TestCase):
             self.assertEqual(result, [expected])
 
     def test_rearrange_of(self):
+        # diseases in which tgfβ is instrumental
         test_conditions = [
             {
                 "input": "related diseases of abnormal pulmonary function",
                 "expected": "abnormal pulmonary function related diseases",
+            },
+            {
+                "input": "diseases involving tgfβ",
+                "expected": "tgfβ diseases",
+            },
+            {
+                "input": "cancer and other disease states influenced by tgf beta",
+                "expected": "tgf beta cancer and other disease states",  # TODO
             },
             {
                 "input": "suturing lacerations of the meniscus",
@@ -223,7 +307,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions characterized by up-regulation of IL-10",
-                "expected": "conditions characterized by il-10 up-regulation",
+                "expected": "il-10 up-regulation conditions",
             },
             {"input": "alleviation of tumors", "expected": "tumor alleviation"},
             {
@@ -232,7 +316,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "diseases mediated by modulation of voltage-gated sodium channels",
-                "expected": "diseases mediated by voltage-gated sodium channel modulation",
+                "expected": "voltage-gated sodium channel modulation diseases",
             },
             {
                 "input": "conditions associated with production of IL-1 and IL-6",
@@ -252,7 +336,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "disorders mediated by neurofibrillary tangles",
-                "expected": "disorders mediated by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
+                "expected": "neurofibrillary tangle disorders",  # ok but ideally 'neurofibrillary tangle mediated disorders'
             },
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",
