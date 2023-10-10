@@ -1,5 +1,6 @@
 from pydash import flatten
 from constants.company import COMPANY_STRINGS
+from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.patents import SuitabilityScoreMap
 
@@ -173,29 +174,7 @@ def get_patent_attribute_map():
             "therapeutic",  # TODO: will probably over-match
         ],
         "DEVICE": [
-            "apparatus",
-            "autoinjector",
-            "auto-injector",
-            "cannula",
-            "computer",
-            "device",
-            "dressing",
-            "drug matrix",
-            "electronic",
-            "implant",
-            "infusion pump",
-            "injector",
-            "instrument",
-            "needle",
-            "packaging",
-            "probe",
-            "prosthesis",
-            "scan",
-            "sensor",
-            "stent",
-            "syringe",
-            "video",
-            "wearable",
+            *HIGH_LIKELIHOOD_DEVICES,
         ],
         "DIAGNOSTIC": [
             "analysis",
