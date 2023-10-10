@@ -1,5 +1,5 @@
 """
-Patent client
+Patent reports
 """
 
 from typing import Any, Callable, Sequence, cast
@@ -26,6 +26,7 @@ def aggregate(
 ) -> Sequence[PatentsReport]:
     """
     Aggregate summary stats
+    Returns one report per (x_dimension x y_dimension)
 
     Args:
         patents (pl.Sequence[PatentApplication]): list of patent applications
