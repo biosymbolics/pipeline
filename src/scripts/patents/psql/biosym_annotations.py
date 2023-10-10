@@ -51,6 +51,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "good": "all",
     "target": "leading",
     "properties": "trailing",
+    "administration(?: of)?": "all",
+    "treatment of": "leading",
     "derived": "all",
     "library": "all",
     "more": "leading",
@@ -72,6 +74,9 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "in": "leading",
     "recombinant": "all",
     "novel": "all",
+    "striking": "all",
+    "excessive": "leading",
+    "more": "leading",
     "exceptional": "all",
     "non[ -]?toxic": "leading",
     "(?:non )?selective": "leading",
@@ -1261,16 +1266,16 @@ if __name__ == "__main__":
     diseases   |  829121
     mechanisms | 1444346
     --
-    attributes | 3721861
-    compounds  | 3448590
-    diseases   |  824851
-    mechanisms | 5638507
+    attributes | 1539269
+    compounds  | 2132844
+    diseases   |  750829
+    mechanisms | 3312896
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239)
+    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 18,254)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714)
+    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 47,376)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019)
+    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 117,418)
 
 
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;

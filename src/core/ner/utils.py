@@ -201,12 +201,17 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
     # key: desired adposition term, value: regex that is mapped to adposition
     adp_map = {
-        "of": r"of (?:the|a|an)\b",
+        "of": get_or_re(
+            [
+                r"of (?:the|a|an)\b",
+                r"(?:caused|mediated|characteri[sz]ed|influenced) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
+                r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
+                r"targeting\b",
+                r"(?:relevant|related) to\b",
+            ]
+        ),
         "with": r"associated with\b",
         "against": r"against\b",
-        "targeting": r"targeting\b",
-        "involving": r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
-        "caused by": r"(?:caused|mediated|characteri[sz]ed) by\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
         # antibody to
     }
 
@@ -228,7 +233,10 @@ def __rearrange_adp(
 ) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
-    turning "inhibitors of the kinase" into "kinase inhibitors"
+    turning "inhibitors of the kinase" into "kinase inhibitors".
+
+    Will recursively process multiple instances of the adposition, e.g.
+    turning "conditions caused by up-regulation of IL-10" -> "IL-10 up-regulation conditions".
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
@@ -236,14 +244,31 @@ def __rearrange_adp(
     docs = nlp.pipe(terms, n_process=n_process)
 
     def __rearrange(doc: Doc) -> str:
-        tokens = doc
         # get indices of all ADPs, to use those as stopping points
-        all_adp_indices = [t.i for t in tokens if t.pos_ == "ADP"]
+        # refusing to consider the first ADP (if any) because it's likely to be a preposition
+        all_adp_indices = [t.i for i, t in enumerate(doc) if t.pos_ == "ADP" and i > 0]
 
         # get ADP index for the specific term we're looking for
         specific_adp_indices = [
-            t.i for t in tokens if t.text == adp_term and t.pos_ == "ADP"
+            t.i for t in doc if t.text == adp_term and t.pos_ == "ADP"
         ]
+
+        if len(specific_adp_indices) > 1:
+            # recursively process doc
+            head_doc = __rearrange(
+                nlp(
+                    "".join(
+                        [t.text_with_ws for t in doc[specific_adp_indices[0] + 1 :]]
+                    )
+                )
+            )
+
+            tail_doc = __rearrange(
+                nlp("".join([t.text_with_ws for t in doc[0 : specific_adp_indices[0]]]))
+            )
+
+            return f"{head_doc} {tail_doc}".strip()
+
         adp_index = specific_adp_indices[0] if len(specific_adp_indices) > 0 else None
 
         if adp_index is None:
@@ -259,16 +284,17 @@ def __rearrange_adp(
             before_start_idx = (
                 max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
             )
-            before_tokens = tokens[before_start_idx:adp_index]
+
+            before_tokens = doc[before_start_idx:adp_index]
             before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
 
             # all ADPs after
             after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
             # stop at the first ADP after (if any)
             after_start_idx = (
-                min(after_adp_indices) if len(after_adp_indices) > 0 else len(tokens)
+                min(after_adp_indices) if len(after_adp_indices) > 0 else len(doc)
             )
-            after_tokens = tokens[adp_index + 1 : after_start_idx]
+            after_tokens = doc[adp_index + 1 : after_start_idx]
             after_phrase = lemmatize_tail(
                 "".join([t.text_with_ws for t in after_tokens])
             )
@@ -276,12 +302,12 @@ def __rearrange_adp(
             # if we cut off stuff from the beginning, put back
             # e.g. (diseases associated with) expression of GU Protein
             other_stuff = (
-                "".join([t.text_with_ws for t in tokens[0:before_start_idx]])
+                "".join([t.text_with_ws for t in doc[0:before_start_idx]])
                 if before_start_idx > 0
                 else ""
             )
 
-            return f"{other_stuff}{after_phrase} {before_phrase}"
+            return f"{other_stuff}{after_phrase} {before_phrase}".strip()
         except Exception as e:
             logging.error("Error in rearrange_adp, returning orig text: %s", e)
             return doc.text

@@ -134,9 +134,26 @@ class TestNerUtils(unittest.TestCase):
                 "input": "GLP-1 receptor agonists",
                 "expected": "glp1 agonist",
             },
+            # tgf beta r1 inhibitor
             {
                 "input": "tgf-beta 1 accessory receptor",
                 "expected": "tgfβ1 accessory receptor",
+            },
+            {
+                "input": "inhibitor of tgfβ1 activity",
+                "expected": "tgfβ1 inhibitor",
+            },
+            {
+                "input": "tgf beta antisense oligonucleotide",
+                "expected": "tgfβ antisense oligonucleotide",
+            },
+            {
+                "input": "tgfβ receptor 1",
+                "expected": "tgfβ receptor 1",  # TODO
+            },
+            {
+                "input": "transforming growth factor β (tgfβ) antagonist",
+                "expected": "tgfβ (tgfβ) antagonist",
             },
             {
                 "input": "transforming growth factor beta3",
@@ -161,6 +178,10 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "tgfβ",
                 "expected": "tgfβ",
+            },
+            {
+                "input": "TGF-β type I receptor",
+                "expected": "tgfβi receptor",  # TGFβRI
             },
             {
                 "input": "tgfb inhibitor",
@@ -188,7 +209,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "disorders caused by tgfβ (tgfβ) overexpression",  # TODO
+                "expected": "tgfβ (tgfβ) overexpression disorder",  # TODO
             },
             {
                 "input": "angiotensin-ii",
@@ -261,7 +282,11 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "diseases involving tgfβ",
-                "expected": "diseases involving tgfβ",
+                "expected": "tgfβ diseases",
+            },
+            {
+                "input": "cancer and other disease states influenced by tgf beta",
+                "expected": "tgf beta cancer and other disease states",  # TODO
             },
             {
                 "input": "suturing lacerations of the meniscus",
@@ -282,7 +307,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions characterized by up-regulation of IL-10",
-                "expected": "conditions caused by il-10 up-regulation",
+                "expected": "il-10 up-regulation conditions",
             },
             {"input": "alleviation of tumors", "expected": "tumor alleviation"},
             {
@@ -291,7 +316,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "diseases mediated by modulation of voltage-gated sodium channels",
-                "expected": "diseases caused by voltage-gated sodium channel modulation",
+                "expected": "voltage-gated sodium channel modulation diseases",
             },
             {
                 "input": "conditions associated with production of IL-1 and IL-6",
@@ -311,7 +336,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "disorders mediated by neurofibrillary tangles",
-                "expected": "disorders caused by neurofibrillary tangles",  # ok but ideally 'neurofibrillary tangle mediated disorders'
+                "expected": "neurofibrillary tangle disorders",  # ok but ideally 'neurofibrillary tangle mediated disorders'
             },
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",

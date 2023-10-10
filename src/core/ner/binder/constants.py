@@ -27,13 +27,13 @@ NER_TYPES = [
 ]
 
 
-LOW_VALUE_MOA_PREFIX = (
-    "(?:(?:axis|binding|formula|pathway|receptor|(?:non )?selective|small molecule)[ ])"
-)
+LOW_VALUE_MOA_PREFIX = "(?:(?:axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
 
 
 LOW_VALUE_MOA_POSTFIX_RE = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
 
+# e.g. "production enhancer" -> "enhancer"
+# e.g. "blahblah derivative" -> "blahblah"
 MOA_PATTERNS = {
     f"{LOW_VALUE_MOA_PREFIX}?{pattern}(?:[ ]{LOW_VALUE_MOA_POSTFIX_RE})?": f" {canonical} "  # extra space removed later
     for pattern, canonical in PRIMARY_BASE_TERMS.items()
@@ -60,6 +60,7 @@ PHRASE_MAP = {
     "diseases? and condition": "diseases",
     "diseases? and disorder": "diseases",
     "disorders? and disease": "diseases",
+    "expression disorders?": "diseases",
     "disease state": "diseases",
     "diseases and condition": "diseases",
     "pathological condition": "diseases",
@@ -106,7 +107,7 @@ PHRASE_MAP = {
     "peginterferon": "pegylated interferon",
     "([a-z]{1,3}) ([0-9]+)": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
     "PEG": "pegylated",
-    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:superfamily type )?([0-9]|v?i{1,3}))?": r"tgfβ\1",
+    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:(?:superfamily )?type )?([0-9]|v?i{1,3}))?": r"tgfβ\1",
     # superfamily type ii
     "(?:tgf|transforming growth factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfα\1",
     "(?:tnf|tumor necrosis factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfα\1",
