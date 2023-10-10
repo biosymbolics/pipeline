@@ -935,7 +935,7 @@ def remove_common_terms():
         *EntityCleaner().common_words,
     ]
 
-    common_terms_re = get_or_re([f"{t}?" for t in common_terms])
+    common_terms_re = get_or_re(common_terms)
     del_term_res = [
         # .? - to capture things like "gripping" from "grip"
         f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$",
