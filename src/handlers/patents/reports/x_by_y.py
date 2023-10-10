@@ -24,25 +24,25 @@ class XByYReportEvent(TypedDict):
     queryStringParameters: XByYReportParams
 
 
-def x_by_y_report(event: XByYReportEvent, context):
+def x_by_y(event: XByYReportEvent, context):
     """
     Get an x by y report
 
     Invocation:
-    - Local: `serverless invoke local --function patents-x-by-y --param='ENV=local' --data='{"queryStringParameters": { "x": "assignees", y: "diseases", terms":"asthma" }}'`
-    - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", y: "diseases", "terms":"asthma" }}'`
+    - Local: `serverless invoke local --function patents-x-by-y --param='ENV=local' --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
+    - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/x_by_y?terms=asthma&x=assignees&y=diseases`
     """
     params = parse_params(event.get("queryStringParameters", {}), 10000)
-    x_dimension = params.get("x")
-    y_dimension = params.get("y")
+    x_dimension = event.get("queryStringParameters", {}).get("x")
+    y_dimension = event.get("queryStringParameters", {}).get("y")
 
     if (
         not params
         or len(params["terms"]) < 1
         or not all([len(t) > 1 for t in params["terms"]])
-        or not x_dimension
-        or not y_dimension
+        or x_dimension is None
+        or y_dimension is None
     ):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "body": "Missing params(s)"}
@@ -59,7 +59,6 @@ def x_by_y_report(event: XByYReportEvent, context):
             patents,
             x_dimensions=[x_dimension],
             y_dimensions=[y_dimension],
-            y_transform=lambda y: y.year,
         )
 
         report = reports[0]

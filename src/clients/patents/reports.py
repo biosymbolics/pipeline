@@ -53,7 +53,8 @@ def aggregate(
         if len(y_dim) > 0:
             col_df = (
                 # apply y_transform; keep y around
-                df.with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
+                df.explode(y_dim)
+                .with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
                 .select(
                     pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
                     pl.col("y"),
