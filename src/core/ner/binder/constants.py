@@ -106,4 +106,6 @@ PHRASE_MAP = {
     "peginterferon": "pegylated interferon",
     "([a-z]{1,3}) ([0-9]+)": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
     "PEG": "pegylated",
+    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?([0-9]))?": r"tgfβ\1",
+    "(?:tgf|transforming growth factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfα\1",
 }

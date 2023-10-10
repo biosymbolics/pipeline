@@ -136,39 +136,39 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgf beta 1 accessory receptor",
+                "expected": "tgfβ1 accessory receptor",
             },
             {
                 "input": "transforming growth factor beta3",
-                "expected": "transforming growth factor beta3",  # TODO
+                "expected": "tgfβ3",
             },
             {
                 "input": "tgfβ1 inhibitor",
-                "expected": "tgfβ1 inhibitor",  # TODO?
+                "expected": "tgfβ1 inhibitor",
             },
             {
                 "input": "tgf β superfamily type ii receptor",
-                "expected": "tgf β superfamily type ii receptor",  # TODO
+                "expected": "tgfβ superfamily type ii receptor",  # TODO
             },
             {
                 "input": "tgf-beta superfamily proteins",
-                "expected": "tgf beta superfamily protein",  # TODO
+                "expected": "tgfβ superfamily protein",
             },
             {
                 "input": "anti tgf β 1 antibody",
-                "expected": "anti tgf β 1 antibody",  # TODO
+                "expected": "anti tgfβ1 antibody",
             },
             {
                 "input": "tgfβ",
-                "expected": "tgfβ",  # TODO
+                "expected": "tgfβ",
             },
             {
                 "input": "tgfb inhibitor",
-                "expected": "tgfb inhibitor",  # TODO
+                "expected": "tgfβ inhibitor",
             },
             {
                 "input": "tgfb1",
-                "expected": "tgfb1",  # TODO
+                "expected": "tgfβ1",
             },
             {
                 "input": "(tumor necrosis factor)-α inhibitor tgf",
@@ -176,11 +176,11 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-β1",
-                "expected": "tgfβ1",  # TODO
+                "expected": "tgfβ1",
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "disorders caused by transforming growth factor β (tgfβ) overexpression",  # TODO
+                "expected": "disorders caused by tgfβ (tgfβ) overexpression",  # TODO
             },
             {
                 "input": "angiotensin-ii",
