@@ -181,7 +181,6 @@ def create_patent_to_trial():
             },
         ]
     )
-    client.insert_into_table
 
 
 def copy_ctgov():

@@ -39,6 +39,8 @@ def __create_annotations_table():
     logger.info("Create a table of annotations for use in app queries")
 
     client = PsqlDatabaseClient()
+    # to delete materialized view
+    client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     entity_query = f"""
         WITH terms AS (
@@ -83,16 +85,16 @@ def __create_annotations_table():
 
                 UNION ALL
 
-                --- biosym (our) annotations
+                --- biosym annotations
                 SELECT
                     publication_number,
-                    LOWER(case when syn_map.term is null then ba.term else syn_map.term end) as term,
+                    LOWER(case when syn_map.term is null then ba.original_term else syn_map.term end) as term,
                     domain,
                     source,
                     character_offset_start,
                     character_offset_end
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                LEFT JOIN synonym_map syn_map ON LOWER(ba.term) = syn_map.synonym
+                LEFT JOIN synonym_map syn_map ON LOWER(ba.original_term) = syn_map.synonym
                 WHERE length(ba.term) > 0
         )
         SELECT
@@ -284,19 +286,18 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
     # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
     # update annotations set term=regexp_replace(term, ' protein$', '', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
-    # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:family )?protein$';
+    # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:(?:super)?family )?protein$';
     # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
-    # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) adc)', 'adc') where term ~* '\y(?:target(?:ed|ing) adc)\y';
     # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
     # update annotations set term=regexp_replace(term, ', human', '', 'i') where term ~* ', human$';
-    # update annotations set term=regexp_replace(term, 'modulat(?:e|ing|ion)$', 'modulator') where term ~* '\y modulat(?:e|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'activate$', 'activator') where term ~* '\y activate$';
-    # update annotations set term=regexp_replace(term, 'stimulat(?:e|ing|ion)$', 'stimulator') where term ~* '\y stimulat(?:e|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'stabili(?:s|z)(?:e|ing|ion)$', 'stabilizer') where term ~* '\y stabili(?:s|z)(?:e|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'inhibit(?:ion|ing)$', 'inhibitor') where term ~* '\y inhibit(?:ion|ing)$';
+    # update annotations set term=regexp_replace(term, 'modulat(?:ed?|ing|ion)$', 'modulator') where term ~* '\y modulat(?:ed?|ing|ion)$';
+    # update annotations set term=regexp_replace(term, 'activat(?:ed?|ing|ion)$', 'activator') where term ~* '\y activat(?:ed?|ing|ion)$'; -- 0 recs
+    # update annotations set term=regexp_replace(term, 'stimulat(?:ed?|ing|ion)$', 'stimulator') where term ~* '\y stimulat(?:ed?|ing|ion)$';
+    # update annotations set term=regexp_replace(term, 'stabili[sz](?:ed?|ing|ion)$', 'stabilizer') where term ~* '\y stabili[sz](?:ed?|ing|ion)$';
+    # update annotations set term=regexp_replace(term, 'inhibit(?:ion|ing|ed)$', 'inhibitor') where term ~* '\y inhibit(?:ion|ing|ed)$';
     # update annotations set term=regexp_replace(term, 'agonist(?:ic)? action$', 'agonist') where term ~* 'agonist(?:ic)? action$';
     # update annotations set term=regexp_replace(term, 'receptor activat(?:ion|or)$', 'activator') where term ~* 'receptor activat(?:ion|or)$';
-    # update annotations set term=regexp_replace(term, 'agonism$', 'agonist') where term ~* 'agonism$';
+    # update annotations set term=regexp_replace(term, 'agon(?:ism|i[zs])(?:ing|ed|e)$', 'agonist') where term ~* 'agon(?:ism|i[zs])(?:ing|ed|e)$';
     # update annotations set term=regexp_replace(term, '^([a-z]{2,3}[0-9]{0,2}) ([a-zαβγδεζηθικλμνξοπρστυφχψω]{1}[ ])', '\1\2') where term ~* '^[a-z]{2,3}[0-9]{0,2} [a-zαβγδεζηθικλμνξοπρστυφχψω]{1} (?:inhibitor|modulator|antagonist|agonist|protein|(?:poly)?peptide|antibody|isoform|domain|bispecific|chain|activator|stimulator|dna)';
     # update annotations set term=regexp_replace(term, '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$', '', 'i') where term ~* '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$';
     # update annotations set term=regexp_replace(term, '^vitro', 'in-vitro', 'i') where term ~* '^vitro .*';
@@ -308,6 +309,7 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
     # update annotations set term=regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
     # update annotations set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
+    # leading "inhibiting" -> trailing "inhibitor"
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ To run after NER is complete
 import sys
 import logging
 from typing import Literal
-from pydash import compact, flatten
+from pydash import compact
 import polars as pl
 from constants.patterns.device import DEVICE_RES
 
@@ -19,12 +19,13 @@ from constants.core import (
 )
 from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
+    INTERVENTION_PREFIXES_GENERIC,
     MECHANISM_BASE_TERMS,
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
 )
 from core.ner.cleaning import EntityCleaner
-from utils.re import expand_res, get_or_re
+from utils.re import get_or_re
 
 
 TextField = Literal["title", "abstract"]
@@ -33,6 +34,7 @@ WordPlace = Literal["leading", "trailing", "all"]
 
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
 REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
+    **{k: "leading" for k in INTERVENTION_PREFIXES_GENERIC},
     "such": "all",
     "method": "all",
     "obtainable": "all",
@@ -47,13 +49,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "recognition": "trailing",
     "binding": "trailing",
     "prevention": "leading",
-    "encoding": "trailing",
     "discreet": "all",
-    "good": "all",
-    "target": "leading",
     "properties": "trailing",
     "administration(?: of)?": "all",
-    "treatment of": "leading",
+    "treatment(?: of)?": "all",
     "derived": "all",
     "library": "all",
     "more": "leading",
@@ -61,39 +60,23 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "classic": "all",
     "present": "leading",
     "invention": "all",
-    "excellent": "all",
     "various": "leading",
-    "significant": "all",
-    "super": "all",  # ??
-    "optimal": "all",
     "construct": "trailing",
     "particular": "all",
-    "useful": "all",
     "uses(?: thereof| of)": "all",
     "designer": "all",
     "thereof": "all",
-    "capable": "all",
     "specific": "all",
     "in": "leading",
-    "recombinant": "all",
-    "novel": "all",
-    "good": "leading",
-    "striking": "all",
-    "excessive": "leading",
     "more": "leading",
-    "exceptional": "all",
     "a": "leading",
     "non[ -]?toxic": "leading",
     "(?:non )?selective": "leading",
     "adequate": "leading",
-    "improved": "all",
-    "improving": "all",
-    "new": "leading",
+    "improv(?:ed|ing)": "all",
     r"\y[(]?e[.]?g[.]?,?": "all",
     "-targeted": "all",
     "long[ -]?acting": "leading",
-    "potent": "all",
-    "inventive": "all",
     "other": "leading",
     "more": "leading",
     "of": "trailing",
@@ -102,14 +85,9 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "efficacy": "all",
-    "advanced": "all",
-    "promising": "all",
     "pharmaceutical compositions?(?: comprising)?": "all",
     "therapeutic procedure": "all",
-    "therapeautic?": "all",
-    "therapeutic(?:ally)?": "all",
     "therefor": "all",
-    "prophylactic": "all",
     "(?:co[ -]?)?therapy": "trailing",
     "(?:pharmaceutical |chemical )?composition": "trailing",
     "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
@@ -122,13 +100,9 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "procedure": "all",  # TODO
     "relevant": "all",
     "patient": "all",
-    "acceptable": "all",
     "thereto": "all",
-    "exemplary": "all",
     "against": "trailing",
-    "usable": "all",
     "other": "leading",
-    "suitable": "all",
     "use of": "leading",
     "certain": "all",
     "working": "leading",
@@ -142,8 +116,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "for": "trailing",
     "=": "trailing",
     "unit(?:[(]s[)])?": "trailing",
-    "measurement": "all",
-    "measuring": "all",
+    "measur(?:ement|ing)": "all",
     "system": "trailing",
     "[.]": "trailing",
     "analysis": "all",
@@ -159,14 +132,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "processing(?: of)?": "all",
     "lead candidate": "all",
     "control": "trailing",
-    "modified": "all",
     "variant": "trailing",
-    "variety": "trailing",
-    "varieties": "trailing",
-    "family": "trailing",
+    "variet(?:y|ie)": "trailing",
+    "famil(?:y|ie)": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    "pure": "all",
-    "chemically (?:modified)?": "all",
     "based": "trailing",
     "an?": "leading",
     "active": "all",
@@ -180,7 +149,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "first": "all",
     "second": "all",
     "abnormal": "all",
-    "atypical": "all",
     "inappropriate": "all",
     "compounds as": "all",
     "formula [(][ivxab]{1,3}[)]": "trailing",
@@ -197,29 +165,27 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "similar": "all",
     "contemplated": "all",
     "predictable": "all",
-    "convenient": "all",
     "dosing": "leading",
-    "preferred": "leading",
     "conventional": "leading",
-    "clinically[ -]?proven": "all",
-    "proven": "all",
     "contemplated": "all",
     "is indicative of": "all",
     "via": "leading",
     "effect": "trailing",
-    "effective": "all",
+    "level": "trailing",
+    "disclosed": "all",
+    "wild type": "all",  # TODO
     "(?:high|low)[ -]?dose": "all",
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "mutant": "leading",
-    "mutated": "leading",
     "activatable": "all",
+    "type": "leading",
     # model/source
     "murine": "all",
+    "primate": "all",
     "mouse": "all",
     "mice": "all",
-    "human(?:ized|ised)?": "all",  # ??
+    "human": "all",  # ??
     "rat": "all",
     "rodent": "all",
     "rabbit": "all",
@@ -248,8 +214,6 @@ DELETION_TERMS = [
     *DEVICE_RES,
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
-    # OR length(original_term) > 150 and original_term ~* '\y(?:and|or)\y' -- del if sentence
-    # OR length(original_term) > 150 and original_term ~* '.*[.;] .*' -- del if sentence
     # mangled
     "optionally other modification",
     "co[- ]?operate",
@@ -832,40 +796,30 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
     logging.info("Removing trailing/leading words")
 
     # \y === \b in postgres re
-    def get_remove_words():
+    def get_remove_word_sqls():
+        # to avoid short-chain phosphatidylcholine lipids -> -chain phosphatidylcholine lipids
+        WB = "(?:^|$|[;,.: ])"  # no dash wb
+
         def get_sql(place: str):
+            words = [t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place]
+            if len(words) == 0:
+                return None
+            words_re = get_or_re(words, "+")
             if place == "trailing":
-                words = [
-                    t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place
-                ]
-                if len(words) == 0:
-                    return None
-                words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}$', '', 'gi'))
-                    where original_term ~* '.*\y{words_re}$'
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '{WB}{words_re}$', '', 'gi'))
+                    where original_term ~* '.*{WB}{words_re}$'
                 """
             elif place == "leading":
-                words = [
-                    t[0] + r"s?[ ]*" for t in removal_word_set.items() if t[1] == place
-                ]
-                if len(words) == 0:
-                    return None
-                words_re = get_or_re(words, "+")
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^{words_re}\y', '', 'gi'))
-                    where original_term ~* '^{words_re}\y.*'
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^{words_re}{WB}', '', 'gi'))
+                    where original_term ~* '^{words_re}{WB}.*'
                 """
             elif place == "all":
-                words = [
-                    t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place
-                ]
-                if len(words) == 0:
-                    return None
-                words_re = get_or_re(words, "+")
+                # todo: \y minus dash
                 return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '\y{words_re}\y', ' ', 'gi'))
-                    where original_term ~* '.*\y{words_re}\y.*'
+                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '{WB}{words_re}{WB}', ' ', 'gi'))
+                    where original_term ~* '.*{WB}{words_re}{WB}.*'
                 """
             else:
                 raise ValueError(f"Unknown place: {place}")
@@ -873,7 +827,7 @@ def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
         return compact([get_sql(place) for place in ["all", "leading", "trailing"]])
 
     client = DatabaseClient()
-    for sql in get_remove_words():
+    for sql in get_remove_word_sqls():
         client.execute_query(sql)
 
 
@@ -945,18 +899,19 @@ def remove_common_terms():
         f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$",
     ]
     del_term_re = "(?i)" + get_or_re(del_term_res)
-    print(del_term_re)
     result = client.select(f"select distinct original_term from {WORKING_TABLE}")
     terms = pl.Series([r.get("original_term") for r in result])
 
     delete_terms = terms.filter(terms.str.contains(del_term_re)).to_list()
 
-    del_query = f"""
+    del_query = rf"""
         delete from {WORKING_TABLE}
         where original_term=ANY(%s)
         or original_term is null
         or original_term = ''
         or length(trim(original_term)) < 3
+        or (length(original_term) > 150 and original_term ~* '\y(?:and|or)\y') -- del if sentence
+        or (length(original_term) > 150 and original_term ~* '.*[.;] .*') -- del if sentence
     """
     DatabaseClient().execute_query(del_query, (delete_terms,))
 
@@ -1098,7 +1053,7 @@ if __name__ == "__main__":
     DELETE FROM terms
     WHERE id IN
         (SELECT id
-        FROM
+        FROM#
             (SELECT id,
             ROW_NUMBER() OVER( PARTITION BY original_term, domain, character_offset_start, character_offset_end, publication_number
             ORDER BY id ) AS row_num

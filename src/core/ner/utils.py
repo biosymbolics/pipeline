@@ -200,6 +200,7 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     """
 
     # key: desired adposition term, value: regex that is mapped to adposition
+    # e.g. caused by -> of
     adp_map = {
         "of": get_or_re(
             [
@@ -207,6 +208,7 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
                 r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed by(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
                 r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
                 r"targeting\b",
+                r"resulting(?: from)?\b",
                 r"(?:relevant(?: to)?) to\b",
             ]
         ),

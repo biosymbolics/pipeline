@@ -10,10 +10,7 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from constants.patterns.intervention import (
-    ALL_INTERVENTION_BASE_TERMS_RE,
-    INTERVENTION_PREFIXES_GENERIC_RE,
-)
+from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
