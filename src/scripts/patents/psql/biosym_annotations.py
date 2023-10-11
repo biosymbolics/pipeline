@@ -1,18 +1,20 @@
 """
 To run after NER is complete
 """
+from functools import reduce
+import re
 import sys
 import logging
-from typing import Literal
+from typing import Literal, TypedDict
 from pydash import compact
 import polars as pl
-from constants.patterns.device import DEVICE_RES
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient as DatabaseClient
+from constants.patterns.device import DEVICE_RES
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
@@ -29,7 +31,9 @@ from utils.re import get_or_re
 
 
 TextField = Literal["title", "abstract"]
-WordPlace = Literal["leading", "trailing", "all"]
+WordPlace = Literal[
+    "leading", "trailing", "all", "conditional_all", "conditional_trailing"
+]
 
 
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
@@ -49,6 +53,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "recognition": "trailing",
     "binding": "trailing",
     "prevention": "leading",
+    "that": "trailing",
     "discreet": "all",
     "properties": "trailing",
     "administration(?: of)?": "all",
@@ -74,7 +79,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "(?:non )?selective": "leading",
     "adequate": "leading",
     "improv(?:ed|ing)": "all",
-    r"\y[(]?e[.]?g[.]?,?": "all",
+    r"\b[(]?e[.]?g[.]?,?": "all",
     "-targeted": "all",
     "long[ -]?acting": "leading",
     "other": "leading",
@@ -195,19 +200,22 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "mammal(?:ian)?": "all",
 }
 
-REMOVAL_WORDS_POST: dict[str, WordPlace] = dict(
-    [
-        (t, "trailing")
-        for t in [
-            *COMPOUND_BASE_TERMS_GENERIC,
-            "activity",
-            "agent",
-            "effect",
-            "pro[ -]?drug",
-            "mediated?",
+REMOVAL_WORDS_POST: dict[str, WordPlace] = {
+    **dict(
+        [
+            (t, "conditional_trailing")
+            for t in [
+                *COMPOUND_BASE_TERMS_GENERIC,
+                "activity",
+                "agent",
+                "effect",
+                "pro[ -]?drug",
+                "mediated?",
+            ]
         ]
-    ]
-)
+    ),
+    **REMOVAL_WORDS_PRE,
+}
 
 
 DELETION_TERMS = [
@@ -736,99 +744,195 @@ def remove_substrings():
     client.delete_table(temp_table)
 
 
-def fix_of_for_annotations():
+EXPAND_CONNECTING_RE = "(?:(?:of|for|the|that|to|comprising|(?:directed |effective |with efficacy )?against)[ ]?)"
+
+
+def expand_annotations(
+    base_terms_to_expand: list[str] = INTERVENTION_BASE_TERMS,
+    prefix_terms: list[str] = INTERVENTION_PREFIXES,
+):
     """
-    Handles "inhibitors of XYZ" and the like, which neither GPT or SpaCyNER were good at finding
-    (but high hopes for binder)
+    Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
-    logging.info("Fixing of/for annotations")
-
-    terms = INTERVENTION_BASE_TERMS
-    prefixes = INTERVENTION_PREFIXES
-
-    prefix_re = "|".join([p + " " for p in prefixes])
-
-    # e.g. inhibition of apoptosis signal-regulating kinase 1 (ASK1)
-    def get_query(re_term: str, field: TextField):
-        sql = f"""
-            UPDATE {WORKING_TABLE} ba
-            SET original_term=(substring({field}, '(?i)((?:{prefix_re})*{re_term} (?:of |for |the |that |to |comprising |(?:directed |effective |with efficacy )?against )+(?:(?:the|a) )?.*?)(?:and|useful|for|,|.|$)'))
-            FROM applications a
-            WHERE ba.publication_number=a.publication_number
-            AND original_term ~* '^(?:{prefix_re})*{re_term}$'
-            AND a.{field} ~* '.*{re_term} (?:of|for|the|that|to|comprising|(?:directed |effective |with efficacy )?against).*'
+    client = DatabaseClient()
+    prefix_re = get_or_re([p + " " for p in prefix_terms], "*")
+    terms_re = get_or_re([f"{t}s?" for t in base_terms_to_expand])
+    terms = client.select(
+        rf"""
+        SELECT original_term, concat(title, '. ', abstract) as text
+        FROM biosym_annotations ann, applications app
+        where ann.publication_number = app.publication_number
+        AND length(original_term) > 1
+        AND original_term  ~* '^(?:{prefix_re})*{terms_re}[ ]?$'
+        AND concat(title, '. ', abstract) ~* '.*{terms_re} {EXPAND_CONNECTING_RE}.*'
+        limit 1000
         """
-        return sql
+    )
+    return _expand_terms(terms, prefix_re)
 
-    def get_hyphen_query(term, field: TextField):
-        re_term = term + "s?"
-        sql = f"""
-            UPDATE {WORKING_TABLE} ba
-            SET original_term=(substring(title, '(?i)([A-Za-z0-9]+-{re_term})'))
-            FROM applications a
-            WHERE ba.publication_number=a.publication_number
-            AND original_term ~* '^{re_term}$'
-            AND a.{field} ~* '.*[A-Za-z0-9]+-{re_term}.*'
-        """
-        return sql
 
+TermMap = TypedDict("TermMap", {"original_term": str, "cleaned_term": str})
+
+
+def _expand_terms(records: list[dict], prefix_re: str):
+    """
+    Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
+    """
+    logging.info("Expanding of/for annotations")
+
+    # 'scaffold that can withstand the shear '
+    # polynucleotides to determine the risk of tumor in animals
+    # monomers comprising a conjugated diene other than isoprene using a catalytic system containing: at least one hydrocarbon solvent
+    # 'genes that '
+    # a cell comprising and expressing the same (cell comprising)
+    # 'inhibiting the negative effects of beta-amyloid in the brain of an animal comprising administering an effective amount of a compound '
+    # Designing modulators for alpha-1, 3 galactosyltransferases based on a structural model.
+    # The present invention provides amino acid sequences of peptides that are encoded by genes within the human genome
+    stop_words = [
+        "to be",
+        "that (?:are|is)",  # TODO: gene that is XYZ
+        "(?:and [a-z]{3,})?thereof",
+    ]
+    hyphen_replace_re = "(?i)([A-Za-z0-9]+-{re_term})"
+    hyphen_re = ".*[A-Za-z0-9]+-{re_term}.*"
+    maybe_stop_words = [
+        *stop_words,
+        "useful",
+        "for",
+        "(?:such )?that",
+        "can",
+        "is",
+        ":",
+        "are",
+        "or",
+        "(?:of |to |for )? the(?:se)?",
+        "and",
+        "by",
+        "where",
+        "within",
+        "between",
+        "through",
+    ]  # within
+    stop_punct_re = get_or_re([",", r"\.", ";", "$"])
+    first_stop_re = rf"(?:{get_or_re(stop_words, '+', enforce_word_boundaries=True)}|{stop_punct_re})"
+    second_stop_re = rf"(?:{get_or_re(maybe_stop_words, '+', enforce_word_boundaries=True)}|{stop_punct_re})"
+
+    IDEAL_MAX_LENGTH = 5
+
+    def get_expansion_re(term: str, reduce_length: bool) -> str:
+        re_to_use = second_stop_re if reduce_length else first_stop_re
+        return (
+            rf"({prefix_re}{term} {EXPAND_CONNECTING_RE}+(?:(?:the|a) )?.*?){re_to_use}"
+        )
+
+    def get_term(text, original_term, reduce_length: bool = False):
+        fixed_terms = re.findall(
+            get_expansion_re(original_term, reduce_length),
+            text,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        term = fixed_terms[0].strip() if len(fixed_terms) > 0 else None
+        if term is None:
+            return None
+        if reduce_length and len(term.split(" ")) > IDEAL_MAX_LENGTH:
+            return None
+        return term
+
+    def extract_fixed_term(record: dict) -> TermMap | None:
+        fixed_term = get_term(record["text"], record["original_term"])
+        if len((fixed_term or "").split(" ")) > IDEAL_MAX_LENGTH:
+            fixed_term = get_term(record["text"], record["original_term"], True)
+
+        if fixed_term is not None and fixed_term != record["original_term"]:
+            return {
+                "original_term": record["original_term"],
+                "cleaned_term": fixed_term,
+            }
+        else:
+            return None
+
+    fixed_terms = compact([extract_fixed_term(r) for r in records])
+    _update_annotation_values(fixed_terms)
+
+
+def _update_annotation_values(term_to_fixed_term: list[TermMap]):
     client = DatabaseClient()
 
-    for term in terms:
-        for field in TEXT_FIELDS:
-            try:
-                sql = get_hyphen_query(term, field)
-                client.execute_query(sql)
-            except Exception as e:
-                logging.error(e)
+    temp_table_name = "temp_annotations"
 
-    # loop over term sets, in which the term may be in another form than the title variant
-    for term in terms:
-        for field in TEXT_FIELDS:
-            try:
-                sql = get_query(term, field)
-                client.execute_query(sql)
-            except Exception as e:
-                logging.error(e)
+    print(term_to_fixed_term)
+
+    client.create_and_insert(term_to_fixed_term, temp_table_name)
+    # Update DB in one query
+    sql = f"""
+        UPDATE {WORKING_TABLE}
+        SET original_term = tt.cleaned_term
+        FROM {temp_table_name} tt
+        WHERE {WORKING_TABLE}.original_term = tt.original_term
+    """
+
+    client.execute_query(sql)
+    client.delete_table(temp_table_name)
 
 
-def remove_trailing_leading(removal_word_set: dict[str, WordPlace]):
+def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
+    client = DatabaseClient()
+    records = client.select(
+        f"SELECT distinct original_term FROM {WORKING_TABLE} where length(original_term) > 1"
+    )
+    terms: list[str] = [r["original_term"] for r in records]
+    return _remove_trailing_leading(terms, removal_terms)
+
+
+def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlace]):
     logging.info("Removing trailing/leading words")
 
-    # \y === \b in postgres re
-    def get_remove_word_sqls():
-        # to avoid short-chain phosphatidylcholine lipids -> -chain phosphatidylcholine lipids
+    def get_leading_trailing_re(place: str) -> re.Pattern:
         WB = "(?:^|$|[;,.: ])"  # no dash wb
+        all_words = [t[0] + "s?[ ]*" for t in removal_terms.items() if t[1] == place]
 
-        def get_sql(place: str):
-            words = [t[0] + "s?[ ]*" for t in removal_word_set.items() if t[1] == place]
-            if len(words) == 0:
-                return None
-            words_re = get_or_re(words, "+")
-            if place == "trailing":
-                return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '{WB}{words_re}$', '', 'gi'))
-                    where original_term ~* '.*{WB}{words_re}$'
-                """
-            elif place == "leading":
-                return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^{words_re}{WB}', '', 'gi'))
-                    where original_term ~* '^{words_re}{WB}.*'
-                """
-            elif place == "all":
-                # todo: \y minus dash
-                return rf"""
-                    update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '{WB}{words_re}{WB}', ' ', 'gi'))
-                    where original_term ~* '.*{WB}{words_re}{WB}.*'
-                """
-            else:
-                raise ValueError(f"Unknown place: {place}")
+        if len(all_words) == 0:
+            return re.compile("^$")
 
-        return compact([get_sql(place) for place in ["all", "leading", "trailing"]])
+        or_re = get_or_re(all_words, "+")
+        if place == "trailing":
+            final_re = rf"{WB}{or_re}$"
+        elif place == "conditional_trailing":
+            # e.g. to avoid "bio-affecting substances" -> "bio-affecting"
+            final_re = rf"(?<!(?:the|ing|\ban?)){WB}{or_re}$"
+        elif place == "leading":
+            final_re = rf"^{or_re}{WB}"
+        elif place == "conditional_all":
+            final_re = rf"(?<!(?:the|ing)){WB}{or_re}{WB}"
+        else:
+            final_re = rf"{WB}{or_re}{WB}"
 
-    client = DatabaseClient()
-    for sql in get_remove_word_sqls():
-        client.execute_query(sql)
+        return re.compile(final_re, re.IGNORECASE | re.MULTILINE)
+
+    # without p=p, lambda will use the last value of p
+    steps = [
+        lambda s, p=p, r=r: re.sub(get_leading_trailing_re(p), r, s)
+        for p, r in {
+            "trailing": "",
+            "conditional_trailing": "",
+            "leading": "",
+            "all": " ",
+            "conditional_all": " ",
+        }.items()
+    ]
+
+    clean_terms = [reduce(lambda s, f: f(s), steps, term) for term in terms]
+
+    _update_annotation_values(
+        [
+            {
+                "original_term": original_term,
+                "cleaned_term": cleaned_term,
+            }
+            for original_term, cleaned_term in zip(terms, clean_terms)
+            if cleaned_term != original_term
+        ]
+    )
 
 
 def clean_up_junk():
@@ -994,7 +1098,7 @@ def populate_working_biosym_annotations():
 
     # round 1 (leaves in stuff used by for/of)
     remove_trailing_leading(REMOVAL_WORDS_PRE)
-    fix_of_for_annotations()
+    expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
@@ -1062,7 +1166,10 @@ if __name__ == "__main__":
     """
     if "-h" in sys.argv:
         print(
-            "Usage: python3 -m scripts.patents.clean_extractions \nCleans up extracted annotations"
+            """
+            Usage: python3 -m scripts.patents.psql.biosym_annotations
+            Imports/cleans biosym_annotations (followed by a subsequent stage)
+            """
         )
         sys.exit()
 

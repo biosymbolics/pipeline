@@ -36,7 +36,7 @@ PRIMARY_BASE_TERMS: dict[str, str] = {
     "suppress(?:or|ion|ing|ant)?": "suppressor",
     "stimulat(?:or|ion|ing|ant|e)?": "stimulator",
     "sensitiz(?:ation|ing|e|er)": "sensitizer",
-    "strip(?:er|ing|ped|ping)": "stripper",
+    "strip(?:per|ping|ped|ping)": "stripper",
     "stabiliz(?:er|ing|e|ion)": "stabilizer",
     "thicken(?:er|ing|ed)": "thickener",
     "transport(?:er|ing|ation)?": "transporter",
@@ -209,7 +209,6 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "assembl(?:y|ie)",
     "base",
     "binder",
-    "biomolecule",
     "blend",
     "(?:di|nano)?bod(?:y|ie)",  # ??
     "(?:bio)?material",
@@ -255,9 +254,9 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "medium",
     "member",
     "(?:micro|nano)?[ -]?particle",
-    "(?:small|macro)?[ -]?molecule",
-    "moiet(?:y|ie)",
-    "motif",
+    "(?:small|macro|bio)?[ -]?molecule",
+    "moiet(?:y|ie)",  # ??
+    "motif",  # ??
     "nutrient",
     "nutraceutical",
     "ointment",
@@ -281,7 +280,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "slurr(?:y|ie)",
     "solution",
     "spray",
-    "strain",
+    "strain",  # ??
     "strand",
     "substance",
     "substitute",
@@ -433,7 +432,6 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "receptor",
     "recombinant",
     "selective",
-    "tri(?:cyclic)?",
     "(?:un[ -]?)?substituted",
     "(?:(?:bi|mono|multi|poly)[- ]?)clonal",
     "(?:(?:bi|mono|multi|poly)[- ]?)specific",

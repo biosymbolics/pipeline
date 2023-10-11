@@ -27,21 +27,26 @@ NER_TYPES = [
 ]
 
 
-LOW_VALUE_MOA_PREFIX = "(?:(?:axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
-
-
-LOW_VALUE_MOA_POSTFIX_RE = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
+LOW_INFO_MOA_PREFIX = "(?:(?:axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
+GENERIC_COMPOUND_TERM = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
 
 # e.g. "production enhancer" -> "enhancer"
 # e.g. "blahblah derivative" -> "blahblah"
 MOA_PATTERNS = {
-    f"{LOW_VALUE_MOA_PREFIX}?{pattern}(?:[ ]{LOW_VALUE_MOA_POSTFIX_RE})?": f" {canonical} "  # extra space removed later
+    f"{LOW_INFO_MOA_PREFIX}?{pattern}(?:[ ]{GENERIC_COMPOUND_TERM})?": f" {canonical} "  # extra space removed later
+    for pattern, canonical in PRIMARY_BASE_TERMS.items()
+}
+
+# inhibitory activity -> inhibitor
+ACTIVITY_MOA_PATTERNS = {
+    f"{pattern}(?:[ ]activity|action)": f" {canonical} "
     for pattern, canonical in PRIMARY_BASE_TERMS.items()
 }
 
 
 PHRASE_MAP = {
     **MOA_PATTERNS,
+    **ACTIVITY_MOA_PATTERNS,
     "analogue": "analog",
     "activating": "activator",
     "antibody conjugate": "antibody",
@@ -84,6 +89,7 @@ PHRASE_MAP = {
     "gpcrs?": "g protein-coupled receptors",
     "homologue": "homolog",
     "ifn": "interferon",
+    "immunisation": "immunization",
     "kinases": "kinase",
     "non[ -]?steroidal": "nonsteroidal",
     "protein kinase": "kinase",
