@@ -5,9 +5,11 @@ from functools import reduce
 import re
 import sys
 import logging
-from typing import Literal, TypedDict
+from typing_extensions import NotRequired
+from typing import Literal, Optional, TypedDict
 from pydash import compact
 import polars as pl
+from core.ner.spacy import Spacy
 
 from system import initialize
 
@@ -184,7 +186,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "soluble": "leading",
     "competitive": "leading",
     "activatable": "all",
-    "type": "leading",
+    # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",
     "primate": "all",
@@ -744,7 +746,22 @@ def remove_substrings():
     client.delete_table(temp_table)
 
 
-EXPAND_CONNECTING_RE = "(?:(?:of|for|the|that|to|comprising|(?:directed |effective |with efficacy )?against)[ ]?)"
+# no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
+# TODO: (sstr4) agonists
+EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
+# when expanding annotations, we don't want to make it too long
+EXPANSION_CUTOFF_TOKENS = 6
+# leave longer terms alone
+POTENTIAL_EXPANSION_MAX_TOKENS = 4
+
+TermMap = TypedDict(
+    "TermMap",
+    {"original_term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
+)
+
+
+# e.g. '(sstr4) agonists', which NER has a prob with
+TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
 
 
 def expand_annotations(
@@ -759,92 +776,103 @@ def expand_annotations(
     terms_re = get_or_re([f"{t}s?" for t in base_terms_to_expand])
     terms = client.select(
         rf"""
-        SELECT original_term, concat(title, '. ', abstract) as text
+        SELECT original_term, concat(title, '. ', abstract) as text, app.publication_number
         FROM biosym_annotations ann, applications app
         where ann.publication_number = app.publication_number
         AND length(original_term) > 1
         AND original_term  ~* '^(?:{prefix_re})*{terms_re}[ ]?$'
-        AND concat(title, '. ', abstract) ~* '.*{terms_re} {EXPAND_CONNECTING_RE}.*'
-        limit 1000
+        AND array_length(string_to_array(original_term, ' '), 1) <= {POTENTIAL_EXPANSION_MAX_TOKENS}
+        AND (
+            concat(title, '. ', abstract) ~* '.*{terms_re} {EXPAND_CONNECTING_RE}.*'
+            OR
+            concat(title, '. ', abstract) ~* '.*{TARGET_PARENS} {terms_re}.*' -- e.g. '(sstr4) agonists', which NER has a prob with
+        )
+        AND domain not in ('attributes', 'assignees')
         """
     )
-    return _expand_terms(terms, prefix_re)
+    return _expand_annotations(terms)
 
 
-TermMap = TypedDict("TermMap", {"original_term": str, "cleaned_term": str})
-
-
-def _expand_terms(records: list[dict], prefix_re: str):
+def _expand_annotations(records: list[dict]):
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
     logging.info("Expanding of/for annotations")
 
-    # 'scaffold that can withstand the shear '
-    # polynucleotides to determine the risk of tumor in animals
-    # monomers comprising a conjugated diene other than isoprene using a catalytic system containing: at least one hydrocarbon solvent
-    # 'genes that '
-    # a cell comprising and expressing the same (cell comprising)
-    # 'inhibiting the negative effects of beta-amyloid in the brain of an animal comprising administering an effective amount of a compound '
-    # Designing modulators for alpha-1, 3 galactosyltransferases based on a structural model.
-    # The present invention provides amino acid sequences of peptides that are encoded by genes within the human genome
-    stop_words = [
-        "to be",
-        "that (?:are|is)",  # TODO: gene that is XYZ
-        "(?:and [a-z]{3,})?thereof",
-    ]
-    hyphen_replace_re = "(?i)([A-Za-z0-9]+-{re_term})"
-    hyphen_re = ".*[A-Za-z0-9]+-{re_term}.*"
-    maybe_stop_words = [
-        *stop_words,
-        "useful",
-        "for",
-        "(?:such )?that",
-        "can",
-        "is",
-        ":",
-        "are",
-        "or",
-        "(?:of |to |for )? the(?:se)?",
-        "and",
-        "by",
-        "where",
-        "within",
-        "between",
-        "through",
-    ]  # within
-    stop_punct_re = get_or_re([",", r"\.", ";", "$"])
-    first_stop_re = rf"(?:{get_or_re(stop_words, '+', enforce_word_boundaries=True)}|{stop_punct_re})"
-    second_stop_re = rf"(?:{get_or_re(maybe_stop_words, '+', enforce_word_boundaries=True)}|{stop_punct_re})"
-
-    IDEAL_MAX_LENGTH = 5
-
-    def get_expansion_re(term: str, reduce_length: bool) -> str:
-        re_to_use = second_stop_re if reduce_length else first_stop_re
-        return (
-            rf"({prefix_re}{term} {EXPAND_CONNECTING_RE}+(?:(?:the|a) )?.*?){re_to_use}"
+    def get_parens_term(text, original_term):
+        """
+        Returns expanded term in cases like agonists -> (sstr4) agonists
+        TODO: typically is more like 'somatostatin receptor subtype 4 (sstr4) agonists'
+        """
+        possible_parens_term = re.findall(
+            f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
         )
 
-    def get_term(text, original_term, reduce_length: bool = False):
-        fixed_terms = re.findall(
-            get_expansion_re(original_term, reduce_length),
-            text,
-            flags=re.IGNORECASE | re.MULTILINE,
-        )
-        term = fixed_terms[0].strip() if len(fixed_terms) > 0 else None
-        if term is None:
+        if len(possible_parens_term) == 0:
             return None
-        if reduce_length and len(term.split(" ")) > IDEAL_MAX_LENGTH:
+
+        return possible_parens_term[0]
+
+    def get_term(text, original_term):
+        """
+        Returns expanded term
+        Looks until it finds the next dobj or other suitable ending dep.
+        @see https://downloads.cs.stanford.edu/nlp/software/dependencies_manual.pdf
+
+        TODO:
+        -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
+        -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
+        """
+        appox_orig_len = len(original_term.split(" "))
+
+        # term and all following text.
+        # todo: ignores multiple matches, and we could consider preceeding stuff.
+        possible_term_texts = re.findall(original_term + ".*", text, re.IGNORECASE)
+
+        if len(possible_term_texts) == 0:
             return None
-        return term
+
+        doc = Spacy.get_instance()(possible_term_texts[0])
+        subtree = list(doc[0].subtree)  # syntactic subtree around the term
+        deps = [t.dep_ for t in subtree]
+
+        ending_deps = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
+        ending_idxs = [
+            deps.index(dep)
+            for dep in ending_deps
+            # avoid PRON (pronoun)
+            if dep in deps and subtree[deps.index(dep)].pos_ in ["NOUN", "PROPN"]
+            # don't consider if expansion contains "OR" or "AND"
+            and "cc" not in deps[appox_orig_len : deps.index(dep)]
+        ]
+        next_ending_idx = min(ending_idxs) if len(ending_idxs) > 0 else -1
+        if next_ending_idx > 0 and next_ending_idx <= EXPANSION_CUTOFF_TOKENS:
+            expanded = subtree[0 : next_ending_idx + 1]
+            expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
+
+            if next_ending_idx < (appox_orig_len - 1):
+                logging.error(
+                    "SHORTENING TERM!. %s -> %s",
+                    original_term,
+                    expanded_term,
+                )
+            return expanded_term
+
+        return None
 
     def extract_fixed_term(record: dict) -> TermMap | None:
-        fixed_term = get_term(record["text"], record["original_term"])
-        if len((fixed_term or "").split(" ")) > IDEAL_MAX_LENGTH:
-            fixed_term = get_term(record["text"], record["original_term"], True)
+        # check for hyphenated term edge-case
+        fixed_term = get_parens_term(record["text"], record["original_term"])
 
-        if fixed_term is not None and fixed_term != record["original_term"]:
+        if not fixed_term:
+            fixed_term = get_term(record["text"], record["original_term"])
+
+        if (
+            fixed_term is not None
+            and fixed_term.lower() != record["original_term"].lower()
+        ):
             return {
+                "publication_number": record["publication_number"],
                 "original_term": record["original_term"],
                 "cleaned_term": fixed_term,
             }
@@ -858,17 +886,21 @@ def _expand_terms(records: list[dict], prefix_re: str):
 def _update_annotation_values(term_to_fixed_term: list[TermMap]):
     client = DatabaseClient()
 
+    # check publication_number if we have it
+    check_id = (
+        len(term_to_fixed_term) > 0
+        and term_to_fixed_term[0].get("publication_number") is not None
+    )
+
     temp_table_name = "temp_annotations"
-
-    print(term_to_fixed_term)
-
     client.create_and_insert(term_to_fixed_term, temp_table_name)
-    # Update DB in one query
+
     sql = f"""
         UPDATE {WORKING_TABLE}
         SET original_term = tt.cleaned_term
         FROM {temp_table_name} tt
         WHERE {WORKING_TABLE}.original_term = tt.original_term
+        {f"AND {WORKING_TABLE}.publication_number = tt.publication_number" if check_id else ""}
     """
 
     client.execute_query(sql)
@@ -887,19 +919,21 @@ def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
 def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlace]):
     logging.info("Removing trailing/leading words")
 
-    def get_leading_trailing_re(place: str) -> re.Pattern:
+    def get_leading_trailing_re(place: str) -> re.Pattern | None:
         WB = "(?:^|$|[;,.: ])"  # no dash wb
         all_words = [t[0] + "s?[ ]*" for t in removal_terms.items() if t[1] == place]
 
         if len(all_words) == 0:
-            return re.compile("^$")
+            return None
 
         or_re = get_or_re(all_words, "+")
         if place == "trailing":
             final_re = rf"{WB}{or_re}$"
         elif place == "conditional_trailing":
             # e.g. to avoid "bio-affecting substances" -> "bio-affecting"
-            final_re = rf"(?<!(?:the|ing|\ban?)){WB}{or_re}$"
+            lbs = ["(?<!(?:the|ing))", r"(?<!\ba)", r"(?<!\ban)"]
+            lb = get_or_re(lbs)
+            final_re = rf"{lb}{WB}{or_re}$"
         elif place == "leading":
             final_re = rf"^{or_re}{WB}"
         elif place == "conditional_all":
@@ -911,7 +945,7 @@ def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlac
 
     # without p=p, lambda will use the last value of p
     steps = [
-        lambda s, p=p, r=r: re.sub(get_leading_trailing_re(p), r, s)
+        lambda s, p=p, r=r: re.sub(get_leading_trailing_re(p), r, s)  # type: ignore
         for p, r in {
             "trailing": "",
             "conditional_trailing": "",
@@ -919,6 +953,7 @@ def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlac
             "all": " ",
             "conditional_all": " ",
         }.items()
+        if get_leading_trailing_re(p) is not None
     ]
 
     clean_terms = [reduce(lambda s, f: f(s), steps, term) for term in terms]
@@ -1098,6 +1133,9 @@ def populate_working_biosym_annotations():
 
     # round 1 (leaves in stuff used by for/of)
     remove_trailing_leading(REMOVAL_WORDS_PRE)
+
+    remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
+    # after remove_substrings to avoid expanding substrings into something (potentially) mangled
     expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
@@ -1113,7 +1151,6 @@ def populate_working_biosym_annotations():
     )
 
     remove_common_terms()  # remove one-off generic terms
-    # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
 
     normalize_domains()
 
