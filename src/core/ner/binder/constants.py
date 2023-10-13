@@ -27,7 +27,7 @@ NER_TYPES = [
 ]
 
 
-LOW_INFO_MOA_PREFIX = "(?:(?:axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
+LOW_INFO_MOA_PREFIX = "(?:(?:asymmetric|axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
 GENERIC_COMPOUND_TERM = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
 
 # e.g. "production enhancer" -> "enhancer"
@@ -85,8 +85,9 @@ PHRASE_MAP = {
     # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
     "diarrhoea": "diarrhea",
     "faecal": "fecal",
-    "g[ -]?protein[ -]?coupled[ -]?receptor": "g protein-coupled receptors",
-    "gpcrs?": "g protein-coupled receptors",
+    "g[ -]?protein[ -]?(?:coupled|linked)[ -]?receptor": "gpcr",
+    "g[-]?pcrs?": "gpcr",
+    "gplrs?": "gpcr",
     "homologue": "homolog",
     "ifn": "interferon",
     "immunisation": "immunization",

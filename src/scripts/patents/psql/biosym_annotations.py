@@ -6,10 +6,9 @@ import re
 import sys
 import logging
 from typing_extensions import NotRequired
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 from pydash import compact
 import polars as pl
-from core.ner.spacy import Spacy
 
 from system import initialize
 
@@ -29,8 +28,12 @@ from constants.patterns.intervention import (
     INTERVENTION_PREFIXES,
 )
 from core.ner.cleaning import EntityCleaner
+from core.ner.spacy import Spacy
+from utils.list import batch
 from utils.re import get_or_re
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 TextField = Literal["title", "abstract"]
 WordPlace = Literal[
@@ -72,6 +75,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "particular": "all",
     "uses(?: thereof| of)": "all",
     "designer": "all",
+    "obvious": "leading",
     "thereof": "all",
     "specific": "all",
     "in": "leading",
@@ -189,6 +193,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",
+    "monkey": "all",
     "primate": "all",
     "mouse": "all",
     "mice": "all",
@@ -738,7 +743,7 @@ def remove_substrings():
         )
     """
 
-    logging.info("Removing substrings")
+    logger.info("Removing substrings")
     client = DatabaseClient()
 
     client.create_from_select(query, temp_table)
@@ -774,7 +779,7 @@ def expand_annotations(
     client = DatabaseClient()
     prefix_re = get_or_re([p + " " for p in prefix_terms], "*")
     terms_re = get_or_re([f"{t}s?" for t in base_terms_to_expand])
-    terms = client.select(
+    records = client.select(
         rf"""
         SELECT original_term, concat(title, '. ', abstract) as text, app.publication_number
         FROM biosym_annotations ann, applications app
@@ -783,21 +788,25 @@ def expand_annotations(
         AND original_term  ~* '^(?:{prefix_re})*{terms_re}[ ]?$'
         AND array_length(string_to_array(original_term, ' '), 1) <= {POTENTIAL_EXPANSION_MAX_TOKENS}
         AND (
-            concat(title, '. ', abstract) ~* '.*{terms_re} {EXPAND_CONNECTING_RE}.*'
+            concat(title, '. ', abstract) ~* concat('.*', original_term, ' {EXPAND_CONNECTING_RE}.*')
             OR
-            concat(title, '. ', abstract) ~* '.*{TARGET_PARENS} {terms_re}.*' -- e.g. '(sstr4) agonists', which NER has a prob with
+            concat(title, '. ', abstract) ~* concat('.*{TARGET_PARENS} ', original_term, '.*') -- e.g. '(sstr4) agonists', which NER has a prob with
         )
         AND domain not in ('attributes', 'assignees')
         """
     )
-    return _expand_annotations(terms)
+    batched = batch(records, 50000)
+    logger.info("Expanding annotations for %s records", len(records))
+    return _expand_annotations(batched)
 
 
-def _expand_annotations(records: list[dict]):
+def _expand_annotations(batched_records: list[list[dict]]):
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
-    logging.info("Expanding of/for annotations")
+    logger.info("Expanding of/for annotations")
+
+    nlp = Spacy.get_instance(disable=["ner"])
 
     def get_parens_term(text, original_term):
         """
@@ -813,7 +822,7 @@ def _expand_annotations(records: list[dict]):
 
         return possible_parens_term[0]
 
-    def get_term(text, original_term):
+    def get_term(record: dict):
         """
         Returns expanded term
         Looks until it finds the next dobj or other suitable ending dep.
@@ -823,17 +832,37 @@ def _expand_annotations(records: list[dict]):
         -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
         -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
         """
+        original_term = record["original_term"]
+        publication_number = record["publication_number"]
+
+        text_doc = doc_map[publication_number]
         appox_orig_len = len(original_term.split(" "))
-
-        # term and all following text.
-        # todo: ignores multiple matches, and we could consider preceeding stuff.
-        possible_term_texts = re.findall(original_term + ".*", text, re.IGNORECASE)
-
-        if len(possible_term_texts) == 0:
+        s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
+        if s is None:
+            logger.error("No term text: %s, %s", original_term, record["text"])
             return None
+        char_to_token_idx = {t.idx: t.i for t in text_doc}
 
-        doc = Spacy.get_instance()(possible_term_texts[0])
-        subtree = list(doc[0].subtree)  # syntactic subtree around the term
+        start_idx = char_to_token_idx.get(s.start())
+
+        # check -1 in case of hyphenated term
+        if start_idx is None:
+            start_idx = char_to_token_idx.get(s.start() - 1)
+
+        if start_idx is None:
+            logger.error(
+                "START INDEX is None for %s: %s (%s) %s \n%s",
+                original_term,
+                start_idx,
+                s.start(),
+                char_to_token_idx,
+                record["text"],
+            )
+            return None
+        doc = text_doc[start_idx:]
+
+        # syntactic subtree around the term
+        subtree = list([d for d in doc[0].subtree if d.i >= start_idx])
         deps = [t.dep_ for t in subtree]
 
         ending_deps = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
@@ -851,8 +880,8 @@ def _expand_annotations(records: list[dict]):
             expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
 
             if next_ending_idx < (appox_orig_len - 1):
-                logging.error(
-                    "SHORTENING TERM!. %s -> %s",
+                logger.error(
+                    "Shortening term (unexpected): %s -> %s",
                     original_term,
                     expanded_term,
                 )
@@ -865,7 +894,7 @@ def _expand_annotations(records: list[dict]):
         fixed_term = get_parens_term(record["text"], record["original_term"])
 
         if not fixed_term:
-            fixed_term = get_term(record["text"], record["original_term"])
+            fixed_term = get_term(record)
 
         if (
             fixed_term is not None
@@ -879,8 +908,18 @@ def _expand_annotations(records: list[dict]):
         else:
             return None
 
-    fixed_terms = compact([extract_fixed_term(r) for r in records])
-    _update_annotation_values(fixed_terms)
+    for i, records in enumerate(batched_records):
+        docs = nlp.pipe([r["text"] for r in records], n_process=2)
+        doc_map = dict(zip([r["publication_number"] for r in records], docs))
+        logger.info(
+            "Created docs for annotation expansion, batch %s (%s)", i, len(records)
+        )
+        fixed_terms = compact([extract_fixed_term(r) for r in records])
+
+        if len(fixed_terms) > 0:
+            _update_annotation_values(fixed_terms)
+        else:
+            logger.warning("No terms to fix for batch %s", i)
 
 
 def _update_annotation_values(term_to_fixed_term: list[TermMap]):
@@ -917,7 +956,7 @@ def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
 
 
 def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlace]):
-    logging.info("Removing trailing/leading words")
+    logger.info("Removing trailing/leading words")
 
     def get_leading_trailing_re(place: str) -> re.Pattern | None:
         WB = "(?:^|$|[;,.: ])"  # no dash wb
@@ -974,7 +1013,7 @@ def clean_up_junk():
     """
     Remove trailing junk and silly matches
     """
-    logging.info("Removing junk")
+    logger.info("Removing junk")
 
     queries = [
         # removes evertyhing after a newline
@@ -999,7 +1038,7 @@ def fix_unmatched():
     Example: 3 -d]pyrimidine derivatives -> Pyrrolo [2, 3 -d]pyrimidine derivatives
     """
 
-    logging.info("Fixing unmatched parens")
+    logger.info("Fixing unmatched parens")
 
     def get_query(field, char_set):
         sql = f"""
@@ -1024,7 +1063,7 @@ def remove_common_terms():
     """
     Remove common original terms
     """
-    logging.info("Removing common terms")
+    logger.info("Removing common terms")
     client = DatabaseClient()
     common_terms = [
         *DELETION_TERMS,
@@ -1112,7 +1151,7 @@ def populate_working_biosym_annotations():
     - Performs various cleanups and deletions
     """
     client = DatabaseClient()
-    logging.info(
+    logger.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
     client.create_from_select(
@@ -1125,13 +1164,14 @@ def populate_working_biosym_annotations():
         [
             {"table": WORKING_TABLE, "column": "publication_number"},
             {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+            {"table": WORKING_TABLE, "column": "domain"},
         ]
     )
 
     fix_unmatched()
     clean_up_junk()
 
-    # round 1 (leaves in stuff used by for/of)
+    # # round 1 (leaves in stuff used by for/of)
     remove_trailing_leading(REMOVAL_WORDS_PRE)
 
     remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
@@ -1147,7 +1187,11 @@ def populate_working_biosym_annotations():
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
     client.execute_query(
-        "drop index trgm_index_biosym_annotations_original_term", ignore_error=True
+        """
+        drop index trgm_index_biosym_annotations_original_term;
+        drop idnex index_biosym_annotations_domain;
+        """,
+        ignore_error=True,
     )
 
     remove_common_terms()  # remove one-off generic terms

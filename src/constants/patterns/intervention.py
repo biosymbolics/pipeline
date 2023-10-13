@@ -343,6 +343,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "activ(?:ity|ated)",
     "advanced",
+    "asymmetric",  # TODO: move to specific?
     "atypical",
     "capable",
     "contributing",
