@@ -1190,7 +1190,7 @@ def populate_working_biosym_annotations():
     client.execute_query(
         """
         drop index trgm_index_biosym_annotations_original_term;
-        drop idnex index_biosym_annotations_domain;
+        drop index index_biosym_annotations_domain;
         """,
         ignore_error=True,
     )
