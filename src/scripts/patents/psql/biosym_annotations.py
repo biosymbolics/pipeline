@@ -9,6 +9,7 @@ from typing_extensions import NotRequired
 from typing import Literal, TypedDict
 from pydash import compact
 import polars as pl
+from spacy.tokens import Doc
 
 from system import initialize
 
@@ -822,7 +823,7 @@ def _expand_annotations(batched_records: list[list[dict]]):
 
         return possible_parens_term[0]
 
-    def get_term(record: dict):
+    def get_term(record: dict, doc_map: dict[str, Doc]):
         """
         Returns expanded term
         Looks until it finds the next dobj or other suitable ending dep.
@@ -832,7 +833,7 @@ def _expand_annotations(batched_records: list[list[dict]]):
         -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
         -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
         """
-        original_term = record["original_term"]
+        original_term = record["original_term"].strip(" -")
         publication_number = record["publication_number"]
 
         text_doc = doc_map[publication_number]
@@ -845,15 +846,15 @@ def _expand_annotations(batched_records: list[list[dict]]):
 
         start_idx = char_to_token_idx.get(s.start())
 
-        # check -1 in case of hyphenated term
+        # check -1 in case of hyphenated term in text
+        # TODO: [number average molecular weight]×[content mass ratio] (content)
         if start_idx is None:
             start_idx = char_to_token_idx.get(s.start() - 1)
 
         if start_idx is None:
             logger.error(
-                "START INDEX is None for %s: %s (%s) %s \n%s",
+                "START INDEX is None for %s: %s %s \n%s",
                 original_term,
-                start_idx,
                 s.start(),
                 char_to_token_idx,
                 record["text"],
@@ -889,12 +890,12 @@ def _expand_annotations(batched_records: list[list[dict]]):
 
         return None
 
-    def extract_fixed_term(record: dict) -> TermMap | None:
+    def extract_fixed_term(record: dict, doc_map: dict[str, Doc]) -> TermMap | None:
         # check for hyphenated term edge-case
         fixed_term = get_parens_term(record["text"], record["original_term"])
 
         if not fixed_term:
-            fixed_term = get_term(record)
+            fixed_term = get_term(record, doc_map)
 
         if (
             fixed_term is not None
@@ -914,7 +915,7 @@ def _expand_annotations(batched_records: list[list[dict]]):
         logger.info(
             "Created docs for annotation expansion, batch %s (%s)", i, len(records)
         )
-        fixed_terms = compact([extract_fixed_term(r) for r in records])
+        fixed_terms = compact([extract_fixed_term(r, doc_map) for r in records])
 
         if len(fixed_terms) > 0:
             _update_annotation_values(fixed_terms)
