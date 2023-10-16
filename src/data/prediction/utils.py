@@ -15,6 +15,7 @@ from kneed import KneeLocator
 import polars as pl
 
 from core.ner.spacy import Spacy
+from data.prediction.clindev.constants import InputRecord
 from data.types import FieldLists, InputFieldLists
 from typings.core import Primitive
 from utils.list import batch
@@ -267,7 +268,7 @@ def get_string_values(item: dict, field: str) -> list:
 
 
 def __get_text_embeddings(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     text_fields: list[str] = [],
     device: str = "cpu",
 ) -> torch.Tensor:
@@ -284,7 +285,7 @@ def __get_text_embeddings(
                     np.array(
                         [
                             token.vector
-                            for value in get_string_values(record, field)
+                            for value in get_string_values(record._asdict(), field)
                             for token in nlp(value)
                         ]
                     )
@@ -317,7 +318,7 @@ def __get_text_embeddings(
 
 
 def encode_categories(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     categorical_fields: list[str],
     max_items_per_cat: int,
     device: str = "cpu",
@@ -354,7 +355,7 @@ def encode_categories(
 
 
 def encode_single_select_categories(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     categorical_fields: list[str],
     device: str = "cpu",
 ) -> EncodedCategories:
@@ -364,7 +365,7 @@ def encode_single_select_categories(
 
 
 def encode_multi_select_categories(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     categorical_fields: list[str],
     max_items_per_cat: int,
     device: str = "cpu",
@@ -406,7 +407,7 @@ def encode_quantitative_fields(
 
 
 def encode_features(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     field_lists: FieldLists | InputFieldLists,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     device: str = "cpu",
@@ -444,7 +445,7 @@ def encode_features(
         F.normalize(
             torch.Tensor(
                 [
-                    [to_float(r[field]) for field in field_lists.quantitative]
+                    [to_float(r[field]) for field in field_lists.quantitative]  # type: ignore
                     for r in records
                 ]
             ).to(device),
@@ -467,7 +468,7 @@ def encode_features(
 
 
 def encode_and_batch_features(
-    records: Sequence[dict],
+    records: Sequence[InputRecord],
     field_lists: FieldLists | InputFieldLists,
     batch_size: int,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,

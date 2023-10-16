@@ -13,6 +13,7 @@ from .constants import (
     BATCH_SIZE,
     CHECKPOINT_PATH,
     DEVICE,
+    InputRecord,
     input_field_lists,
 )
 from .model import TwoStageModel
@@ -76,7 +77,10 @@ class ModelPredictor:
         )
 
     def predict(
-        self, records: list[dict], batch_size: int = BATCH_SIZE, device: str = DEVICE
+        self,
+        records: list[InputRecord],
+        batch_size: int = BATCH_SIZE,
+        device: str = DEVICE,
     ):
         inputs = prepare_input_data(
             records,
@@ -100,12 +104,12 @@ class ModelPredictor:
         return predictions
 
 
-def predict(records: list[dict]):
+def predict(records: list[InputRecord]):
     predictor = ModelPredictor()
     return predictor.predict(records)
 
 
-def predict_single(record: dict):
+def predict_single(record: InputRecord):
     predictor = ModelPredictor()
     return predictor.predict([record])
 
@@ -115,6 +119,7 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m data.prediction.clindev.predictor --field: value
+            (fields )
             """
         )
         sys.exit()
@@ -124,4 +129,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     fields = dict(x.split("=") for x in args.fields)
 
-    predict_single(fields)
+    record = InputRecord(*fields.items())
+    predict_single(record)

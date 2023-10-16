@@ -21,6 +21,7 @@ from .constants import (
     EMBEDDING_DIM,
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     SAVE_FREQUENCY,
+    InputRecord,
     field_lists,
     input_field_lists,
 )
@@ -359,7 +360,7 @@ class ModelTrainer:
 
     @staticmethod
     def predict(
-        records: list[dict], batch_size: int = BATCH_SIZE, device: str = DEVICE
+        records: list[InputRecord], batch_size: int = BATCH_SIZE, device: str = DEVICE
     ):
         batched_feats = prepare_input_data(
             records,

@@ -5,7 +5,7 @@ Utils for patent eNPV model
 from functools import reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence
+from typing import Callable, Sequence, cast
 import logging
 import torch
 import torch.nn as nn
@@ -21,7 +21,7 @@ from data.prediction.utils import (
 from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
 
-from .constants import DEVICE, MAX_ITEMS_PER_CAT
+from .constants import DEVICE, MAX_ITEMS_PER_CAT, InputRecord
 from .types import AllCategorySizes
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def split_train_and_test(
 
 
 def prepare_input_data(
-    records: list[dict],
+    records: Sequence[InputRecord],
     input_field_lists: InputFieldLists,
     batch_size: int,
     device: str,
@@ -103,8 +103,10 @@ def prepare_data(
     """
     logger.info("Preparing inputs for model")
 
+    records = cast(Sequence[InputRecord], trials)
+
     batched_feats, sizes = encode_and_batch_features(
-        trials,  # type: ignore
+        records,
         field_lists=field_lists,
         batch_size=batch_size,
         max_items_per_cat=MAX_ITEMS_PER_CAT,

@@ -1,5 +1,6 @@
+from collections import namedtuple
+from typing import NamedTuple
 from data.prediction.constants import (
-    DEFAULT_BATCH_SIZE,
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
     DEFAULT_TRUE_THRESHOLD,
@@ -70,6 +71,9 @@ input_field_lists = InputFieldLists(
     text=TEXT_FIELDS,
     quantitative=QUANTITATIVE_FIELDS,
 )
+
+
+InputRecord = NamedTuple("InputRecord", list(input_field_lists._asdict().items()))  # type: ignore
 
 # with 5 buckets
 # INFO:__main__:Training Stage1 design accuracy: 0.79
