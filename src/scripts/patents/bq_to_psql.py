@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+from typing import Sequence
 from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
@@ -8,6 +9,7 @@ from pydash import compact
 import logging
 
 import system
+from typings.core import is_dict_list
 
 system.initialize()
 
@@ -110,7 +112,7 @@ def shared_and_export(shard_query: str, shared_table_name: str, table: str, valu
     db_client.delete_table(shared_table_name)
 
 
-def export_bq_tables(today):
+def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
@@ -186,34 +188,26 @@ def import_into_psql(today: str):
     for table in EXPORT_TABLES.keys():
         client.truncate_table(table)
 
-    def transform(s, c: str):
-        if c.endswith("_date") and s == 0:
-            logger.info("RETURNING NONE for %s %s", c, s)
+    def transform(value: str | dict | int | float | Sequence | pl.Series, col: str):
+        if col.endswith("_date") and isinstance(value, int) and value == 0:
+            # return none for zero-valued dates
             return None
-        if isinstance(s, dict):
+        if isinstance(value, dict):
             # TODO: this is a hack, only works because the first value is currently always the one we want
-            return compact(s.values())[0]
-        elif isinstance(s, list) or isinstance(s, pl.Series) and len(s) > 0:
-            if isinstance(s[0], dict):
-                return [compact(s1.values())[0] for s1 in s if len(s1) > 0]
-        return s
+            return compact(value.values())[0]
+        elif (isinstance(value, list) or isinstance(value, pl.Series)) and len(
+            value
+        ) > 0:
+            if is_dict_list(value):
+                return [compact(v.values())[0] for v in value if len(value) > 0]
+        return value
 
     def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
-        # figure out transformation before re-enabling.
-        nono_columns = [
-            "cited_by",
-            "citation",
-            "publication_date",
-        ]
         df = df.select(
-            *[
-                pl.col(c).map_elements(lambda s: transform(s, c))
-                for c in df.columns
-                if c not in nono_columns
-            ]
+            *[pl.col(c).map_elements(lambda s: transform(s, c)) for c in df.columns]
         )
 
         first_record = records[0]
@@ -242,7 +236,7 @@ def import_into_psql(today: str):
 
 def copy_bq_to_psql():
     today = datetime.now().strftime("%Y%m%d")
-    export_bq_tables(today)
+    export_bq_tables()
     import_into_psql(today)
 
     client = PsqlDatabaseClient()
@@ -284,7 +278,7 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y%m%d")
 
     if "-export" in sys.argv:
-        export_bq_tables(today)
+        export_bq_tables()
 
     if "-import" in sys.argv:
         import_into_psql(today)
