@@ -89,6 +89,10 @@ POTENTIAL_EXPANSION_MAX_TOKENS = 4
 EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
+# overrides POS, eg "inhibiting the expression of XYZ"
+EXPANSION_POS_OVERRIDE_TERMS = ["expression"]
+
+
 TermMap = TypedDict(
     "TermMap",
     {"original_term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
@@ -151,15 +155,18 @@ def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str
     -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
     -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
     """
-    appox_orig_len = len(original_term.split(" "))
     s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
+
+    # shouldn't happen
     if s is None:
-        logger.error("No term text: %s, %s", original_term, text)
+        logger.error("No term text in expansion: %s, %s", original_term, text)
         return None
+
     char_to_token_idx = {t.idx: t.i for t in text_doc}
 
     # starting index of the string (we're only looking forward)
     start_idx = char_to_token_idx.get(s.start())
+    end_idx = char_to_token_idx[s.end() - 1]
 
     # check -1 in case of hyphenated term in text
     # TODO: [number average molecular weight]×[content mass ratio] (content)
@@ -181,21 +188,14 @@ def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str
         # to avoid PRON (pronoun)
         if dep in deps and subtree[deps.index(dep)].pos_ in EXPANSION_ENDING_POS
         # don't consider if expansion contains "OR" or "AND" (tho in future we will)
-        and "cc" not in deps[appox_orig_len : deps.index(dep)]
+        and "cc" not in deps[end_idx : deps.index(dep)]  # TODO: use of end_idx untested
         # eg "inhibiting the expression of XYZ"
-        and "expression" not in subtree[deps.index(dep)].text.lower()
+        and subtree[deps.index(dep)].text.lower() not in EXPANSION_POS_OVERRIDE_TERMS
     ]
     next_ending_idx = min(ending_idxs) if len(ending_idxs) > 0 else -1
     if next_ending_idx > 0 and next_ending_idx <= EXPANSION_NUM_CUTOFF_TOKENS:
         expanded = subtree[0 : next_ending_idx + 1]
         expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
-
-        if next_ending_idx < (appox_orig_len - 1):
-            logger.error(
-                "Shortening term (unexpected): %s -> %s",
-                original_term,
-                expanded_term,
-            )
         return expanded_term
 
     return None
