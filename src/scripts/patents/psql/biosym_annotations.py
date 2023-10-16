@@ -295,9 +295,9 @@ def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlac
             final_re = rf"{WB}{or_re}$"
         elif place == "conditional_trailing":
             # e.g. to avoid "bio-affecting substances" -> "bio-affecting"
-            lbs = ["(?<!(?:the|ing|ed|ion))", r"(?<!\ba)", r"(?<!\ban)"]
-            lb = get_or_re(lbs)
-            final_re = rf"{lb}{WB}{or_re}$"
+            leading_exceptions = ["a", "an", "ed", "the", "ing", "ion"]
+            le_re = "".join([f"(?<!{e})" for e in leading_exceptions])  # NOT OR'd!
+            final_re = rf"{le_re}{WB}{or_re}$"
         elif place == "leading":
             final_re = rf"^{or_re}{WB}"
         elif place == "conditional_all":
