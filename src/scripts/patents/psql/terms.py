@@ -256,7 +256,7 @@ class TermAssembler:
                 "term": __normalize(row["term"], row["domain"]),
                 "count": row["count"] or 0,
                 "canonical_id": getattr(
-                    normalization_map.get(row["term"]) or (), "concept_id", None
+                    normalization_map.get(row["term"]) or (), "id", None
                 ),
                 "domain": row["domain"],
                 "original_term": row["term"],
