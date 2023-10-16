@@ -12,12 +12,11 @@ from data.prediction.utils import ModelInput
 
 from .constants import (
     BATCH_SIZE,
-    CHECKPOINT_PATH,
     DEVICE,
     InputRecord,
     input_field_lists,
 )
-from .model import TwoStageModel
+from .model import ClindevPredictionModel
 from .utils import prepare_input_data
 
 
@@ -33,6 +32,7 @@ class ModelPredictor:
     def __init__(
         self,
         checkpoint: str = "checkpoint_245.pt",
+        device: str = DEVICE,
     ):
         """
         Initialize model
@@ -40,29 +40,15 @@ class ModelPredictor:
         Args:
             sizes (TwoStageModelSizes): Model sizes
         """
-        torch.device(DEVICE)
-        self.device = DEVICE
-        self.model = self.__load_model(checkpoint, self.device)
+        torch.device(device)
+        self.device = device
+        self.model = ClindevPredictionModel(checkpoint, device)
 
     def __call__(self, *args, **kwargs):
         """
         Alias for self.predict
         """
         self.predict(*args, **kwargs)
-
-    @staticmethod
-    def __load_model(checkpoint: str, device: str):
-        # sizes: TwoStageModelSizes
-        sizes = None
-        logger.info("Model sizes: %s", sizes)
-        checkpoint_obj = torch.load(
-            f"{CHECKPOINT_PATH}/{checkpoint}",
-            map_location=torch.device(device),
-        )
-        model = TwoStageModel(checkpoint_obj["sizes"])
-        model.load_state_dict(checkpoint_obj["model_state_dict"])
-        model.eval()
-        return model
 
     @staticmethod
     def __get_batch(i: int, input_dict: ModelInput) -> ModelInput:
@@ -120,7 +106,8 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m data.prediction.clindev.predictor --field: value
-            (fields )
+
+            Example: python3 -m data.prediction.clindev.predictor --interventions hydroxychloroquine --conditions covid-19 --mesh_conditions covid-19
             """
         )
         sys.exit()

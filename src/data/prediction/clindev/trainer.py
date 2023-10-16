@@ -25,7 +25,7 @@ from .constants import (
     field_lists,
     input_field_lists,
 )
-from .model import TwoStageModel
+from .model import ClindevTrainingModel
 from .types import AllCategorySizes, TwoStageModelSizes
 from .utils import (
     calc_categories_loss,
@@ -87,7 +87,7 @@ class ModelTrainer:
         )
         logger.info("Model sizes: %s", sizes)
 
-        self.model = TwoStageModel(sizes)
+        self.model = ClindevTrainingModel(sizes)
         self.stage1_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
         self.stage2_ce_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
         self.stage2_mse_criterion = nn.MSELoss()

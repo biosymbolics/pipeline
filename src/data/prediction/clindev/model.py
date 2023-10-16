@@ -1,6 +1,7 @@
 """
 Trial characteristic and duration prediction model
 """
+from typing import Literal, Optional
 import torch
 import torch.nn as nn
 import logging
@@ -9,6 +10,7 @@ from data.prediction.clindev.utils import embed_cat_inputs
 
 
 from .constants import (
+    CHECKPOINT_PATH,
     DEVICE,
     LR,
     OPTIMIZER_CLASS,
@@ -63,12 +65,33 @@ class TwoStageModel(nn.Module):
 
     def __init__(
         self,
-        sizes: TwoStageModelSizes,
+        mode: Literal["train", "predict"],
+        sizes: Optional[TwoStageModelSizes],  # required if mode == "train"
+        checkpoint: Optional[str] = None,  # required if mode == "predict"
         device: str = DEVICE,
     ):
         super().__init__()
         torch.device(device)
         self.device = device
+
+        if mode == "train" and sizes is not None:
+            self.__initialize_model(sizes, device)
+        elif mode == "predict" and checkpoint is not None:
+            self.__load_model(checkpoint, device)
+        else:
+            raise ValueError(
+                f"Invalid mode: {mode}, checkpoint: {checkpoint}, sizes: {sizes}"
+            )
+
+    def __load_model(self, checkpoint: str, device: str):
+        checkpoint_obj = torch.load(
+            f"{CHECKPOINT_PATH}/{checkpoint}",
+            map_location=torch.device(device),
+        )
+        self.load_state_dict(checkpoint_obj["model_state_dict"])
+        self.eval()
+
+    def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
         embedding_dim = sizes.embedding_dim
 
         self.multi_select_embeddings = nn.ModuleDict(
@@ -230,3 +253,13 @@ class TwoStageModel(nn.Module):
         y2_pred = self.stage2_model(y1_pred).to(self.device)
 
         return (y1_probs, y1_corr_probs, y2_pred)
+
+
+class ClindevPredictionModel(TwoStageModel):
+    def __init__(self, checkpoint: str, device: str = DEVICE):
+        super().__init__("predict", None, checkpoint, device=device)
+
+
+class ClindevTrainingModel(TwoStageModel):
+    def __init__(self, sizes: TwoStageModelSizes, device: str = DEVICE):
+        super().__init__("predict", sizes, device=device)
