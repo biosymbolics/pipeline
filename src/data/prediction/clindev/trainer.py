@@ -12,28 +12,24 @@ import system
 system.initialize()
 
 from clients.trials import fetch_trials
-from data.prediction.utils import ModelInput
-from data.types import FieldLists
+from data.prediction.utils import ModelInputAndOutput
 
 from .constants import (
     BATCH_SIZE,
     CHECKPOINT_PATH,
     DEVICE,
     EMBEDDING_DIM,
-    MULTI_SELECT_CATEGORICAL_FIELDS,
-    SINGLE_SELECT_CATEGORICAL_FIELDS,
-    QUANTITATIVE_FIELDS,
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     SAVE_FREQUENCY,
-    TEXT_FIELDS,
-    Y1_CATEGORICAL_FIELDS,
-    Y2_FIELD,
+    field_lists,
+    input_field_lists,
 )
 from .model import TwoStageModel
 from .types import AllCategorySizes, TwoStageModelSizes
 from .utils import (
     calc_categories_loss,
     prepare_data,
+    prepare_input_data,
     preprocess_inputs,
     split_categories,
     split_train_and_test,
@@ -56,8 +52,8 @@ class ModelTrainer:
 
     def __init__(
         self,
-        training_input_dict: ModelInput,
-        test_input_dict: ModelInput,
+        training_input_dict: ModelInputAndOutput,
+        test_input_dict: ModelInputAndOutput,
         category_sizes: AllCategorySizes,
         embedding_dim: int = EMBEDDING_DIM,
     ):
@@ -65,7 +61,7 @@ class ModelTrainer:
         Initialize model
 
         Args:
-            input_dict (ModelInput): Input dict
+            input_dict (ModelInputAndOutput): Input dict
             category_sizes (AllCategorySizes): Sizes of categorical fields
             embedding_dim (int, optional): Embedding dimension. Defaults to 16.
         """
@@ -141,7 +137,7 @@ class ModelTrainer:
     def calc_loss(
         self,
         i: int,
-        batch: ModelInput,
+        batch: ModelInputAndOutput,
         y1_probs: torch.Tensor,
         y1_corr_probs: torch.Tensor,
         y2_preds: torch.Tensor,
@@ -196,11 +192,11 @@ class ModelTrainer:
         return loss
 
     @staticmethod
-    def __get_batch(i: int, input_dict: ModelInput) -> ModelInput:
+    def __get_batch(i: int, input_dict: ModelInputAndOutput) -> ModelInputAndOutput:
         """
         Get input_dict for batch i
         """
-        batch = ModelInput(
+        batch = ModelInputAndOutput(
             **{
                 f: v[i] if len(v) > i else torch.Tensor()
                 for f, v in input_dict._asdict().items()
@@ -209,14 +205,14 @@ class ModelTrainer:
         )
         return batch
 
-    def __train_batch(self, i: int, input_dict: ModelInput):
+    def __train_batch(self, i: int, input_dict: ModelInputAndOutput):
         """
         Train model on a single batch
 
         Args:
             i (int): Batch index
             num_batches (int): Number of batches
-            input_dict (ModelInput): Input dict
+            input_dict (ModelInputAndOutput): Input dict
         """
         batch = ModelTrainer.__get_batch(i, input_dict)
 
@@ -252,7 +248,7 @@ class ModelTrainer:
 
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
-            _input_dict = ModelInput(
+            _input_dict = ModelInputAndOutput(
                 **{
                     k: v.detach().clone()
                     for k, v in self.training_input_dict._asdict().items()
@@ -327,7 +323,7 @@ class ModelTrainer:
         except Exception as e:
             logger.warning("Failed to evaluate: %s", e)
 
-    def evaluate(self, input_dict: ModelInput, category_sizes: dict[str, int]):
+    def evaluate(self, input_dict: ModelInputAndOutput, category_sizes: dict[str, int]):
         """
         Evaluate model on eval/test set
         """
@@ -352,15 +348,6 @@ class ModelTrainer:
             fetch_trials("COMPLETED", limit=50000), QUANTITATIVE_TO_CATEGORY_FIELDS
         )
 
-        field_lists = FieldLists(
-            single_select=SINGLE_SELECT_CATEGORICAL_FIELDS,
-            multi_select=MULTI_SELECT_CATEGORICAL_FIELDS,
-            text=TEXT_FIELDS,
-            quantitative=QUANTITATIVE_FIELDS,
-            y1_categorical=Y1_CATEGORICAL_FIELDS,
-            y2=Y2_FIELD,
-        )
-
         input_dict, category_sizes, _ = prepare_data(
             trials, field_lists, batch_size, DEVICE
         )
@@ -369,6 +356,18 @@ class ModelTrainer:
 
         model = ModelTrainer(training_input_dict, test_input_dict, category_sizes)
         model.train()
+
+    @staticmethod
+    def predict(
+        records: list[dict], batch_size: int = BATCH_SIZE, device: str = DEVICE
+    ):
+        batched_feats = prepare_input_data(
+            records,
+            input_field_lists=input_field_lists,
+            batch_size=batch_size,
+            device=device,
+        )
+        return batched_feats
 
 
 def main():

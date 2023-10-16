@@ -169,8 +169,7 @@ def create_patent_to_trial():
         from trials t,
         aggregated_annotations a,
         applications p
-        where a.publication_number=a.publication_number
-        AND p.publication_number=a.publication_number
+        where p.publication_number=a.publication_number
         AND t.normalized_sponsor = any(a.terms) -- sponsor match
         AND t.interventions::text[] && a.terms -- intervention match
         AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed

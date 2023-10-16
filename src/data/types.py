@@ -6,6 +6,16 @@ ModelMetrics = TypedDict(
 )
 
 
+# keep in sync with FieldLists
+class InputFieldLists(NamedTuple):
+    single_select: list[str]
+    multi_select: list[str]
+    text: list[str]
+    quantitative: list[str]
+
+
+# keep in sync with InputFieldLists
+# sadly, FieldLists(InputFieldLists) doesn't work.
 class FieldLists(NamedTuple):
     single_select: list[str]
     multi_select: list[str]

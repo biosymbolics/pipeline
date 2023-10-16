@@ -4,6 +4,7 @@ from data.prediction.constants import (
     DEFAULT_SAVE_FREQUENCY,
     DEFAULT_TRUE_THRESHOLD,
 )
+from data.types import FieldLists, InputFieldLists
 
 CHECKPOINT_PATH = "clindev_model_checkpoints"
 
@@ -53,6 +54,22 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     # dropout_count
 ]
 Y2_FIELD = "duration"
+
+field_lists = FieldLists(
+    single_select=SINGLE_SELECT_CATEGORICAL_FIELDS,
+    multi_select=MULTI_SELECT_CATEGORICAL_FIELDS,
+    text=TEXT_FIELDS,
+    quantitative=QUANTITATIVE_FIELDS,
+    y1_categorical=Y1_CATEGORICAL_FIELDS,
+    y2=Y2_FIELD,
+)
+
+input_field_lists = InputFieldLists(
+    single_select=SINGLE_SELECT_CATEGORICAL_FIELDS,
+    multi_select=MULTI_SELECT_CATEGORICAL_FIELDS,
+    text=TEXT_FIELDS,
+    quantitative=QUANTITATIVE_FIELDS,
+)
 
 # with 5 buckets
 # INFO:__main__:Training Stage1 design accuracy: 0.79

@@ -5,19 +5,20 @@ Utils for patent eNPV model
 from functools import reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence, cast
+from typing import Callable, Sequence
 import logging
 import torch
 import torch.nn as nn
 
 from data.prediction.utils import (
     ModelInput,
+    ModelInputAndOutput,
     encode_and_batch_features,
     encode_quantitative_fields,
     resize_and_batch,
     encode_single_select_categories as vectorize_single_select,
 )
-from data.types import FieldLists
+from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
 
 from .constants import DEVICE, MAX_ITEMS_PER_CAT
@@ -46,28 +47,49 @@ def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list
 
 
 def split_train_and_test(
-    input_dict: ModelInput, training_proportion: float = TRAINING_PROPORTION
-) -> tuple[ModelInput, ModelInput]:
+    input_dict: ModelInputAndOutput, training_proportion: float = TRAINING_PROPORTION
+) -> tuple[ModelInputAndOutput, ModelInputAndOutput]:
     """
     Split out training and test data
 
     Args:
-        input_dict (ModelInput): Input data
+        input_dict (ModelInputAndOutput): Input data
         training_proportion (float): Proportion of data to use for training
     """
     total_records = input_dict.y1_true.size(0)
     split_idx = round(total_records * training_proportion)
-    training_input_dict = ModelInput(
+    training_input_dict = ModelInputAndOutput(
         **{k: torch.split(v, split_idx)[0] for k, v in input_dict._asdict().items()}
     )
-    test_input_dict = ModelInput(
+    test_input_dict = ModelInputAndOutput(
         **{
             k: torch.split(v, split_idx)[1] if len(v) == total_records else v
             for k, v in input_dict._asdict().items()
         }
     )
 
-    return cast(ModelInput, training_input_dict), cast(ModelInput, test_input_dict)
+    return training_input_dict, test_input_dict
+
+
+def prepare_input_data(
+    records: list[dict],
+    input_field_lists: InputFieldLists,
+    batch_size: int,
+    device: str,
+) -> ModelInput:
+    """
+    Prepare input data
+    """
+    # encode_and_batch_features, max_items_per_cat=MAX_ITEMS_PER_CAT
+    inputs, _ = encode_and_batch_features(
+        records,
+        field_lists=input_field_lists,
+        batch_size=batch_size,
+        max_items_per_cat=MAX_ITEMS_PER_CAT,
+        device=device,
+    )
+
+    return inputs
 
 
 def prepare_data(
@@ -75,7 +97,7 @@ def prepare_data(
     field_lists: FieldLists,
     batch_size: int,
     device: str = DEVICE,
-) -> tuple[ModelInput, AllCategorySizes, int]:
+) -> tuple[ModelInputAndOutput, AllCategorySizes, int]:
     """
     Prepare data for model
     """
@@ -113,7 +135,7 @@ def prepare_data(
     )
 
     return (
-        ModelInput(
+        ModelInputAndOutput(
             *batched_feats,
             y1_true=y1,
             y1_categories=y1_categories,

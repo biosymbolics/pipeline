@@ -1,6 +1,5 @@
 import math
 from typing import NamedTuple
-import torch
 
 
 class AllCategorySizes(NamedTuple):

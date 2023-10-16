@@ -15,7 +15,7 @@ from kneed import KneeLocator
 import polars as pl
 
 from core.ner.spacy import Spacy
-from data.types import FieldLists
+from data.types import FieldLists, InputFieldLists
 from typings.core import Primitive
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
@@ -37,14 +37,16 @@ class CategorySizes(NamedTuple):
     single_select: dict[str, int]
 
 
-class EncodedFeatures(NamedTuple):
+# keep in sync with ModelInputAndOutput
+class ModelInput(NamedTuple):
     multi_select: torch.Tensor
     quantitative: torch.Tensor
     single_select: torch.Tensor
     text: torch.Tensor
 
 
-class ModelInput(NamedTuple):
+# keep in sync with ModelInput
+class ModelInputAndOutput(NamedTuple):
     multi_select: torch.Tensor
     quantitative: torch.Tensor
     single_select: torch.Tensor
@@ -405,10 +407,10 @@ def encode_quantitative_fields(
 
 def encode_features(
     records: Sequence[dict],
-    field_lists: FieldLists,
+    field_lists: FieldLists | InputFieldLists,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     device: str = "cpu",
-) -> tuple[EncodedFeatures, CategorySizes]:
+) -> tuple[ModelInput, CategorySizes]:
     """
     Get category and text embeddings given a list of dicts
 
@@ -453,7 +455,7 @@ def encode_features(
 
     logger.info("Finished with feature encodings")
 
-    return EncodedFeatures(
+    return ModelInput(
         multi_select=multi_select.encodings,
         quantitative=quantitative,
         single_select=single_select.encodings,
@@ -466,11 +468,11 @@ def encode_features(
 
 def encode_and_batch_features(
     records: Sequence[dict],
-    field_lists: FieldLists,
+    field_lists: FieldLists | InputFieldLists,
     batch_size: int,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
     device: str = "cpu",
-) -> tuple[EncodedFeatures, CategorySizes]:
+) -> tuple[ModelInput, CategorySizes]:
     """
     Vectorizes and batches input features
     """
@@ -482,14 +484,11 @@ def encode_and_batch_features(
         (f, resize_and_batch(t, batch_size)) for f, t in feats._asdict().items()
     )
 
-    batched_feats = EncodedFeatures(**feature_dict)
+    inputs = ModelInput(**feature_dict)
 
     logger.info(
         "Feature Sizes: %s",
-        [
-            (f, t.shape if t is not None else None)
-            for f, t in batched_feats._asdict().items()
-        ],
+        [(f, t.shape if t is not None else None) for f, t in inputs._asdict().items()],
     )
 
-    return batched_feats, sizes
+    return inputs, sizes
