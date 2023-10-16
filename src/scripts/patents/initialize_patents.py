@@ -24,7 +24,7 @@ from .constants import (
     TEXT_FIELDS,
 )
 from .copy_approvals import copy_approvals
-from .copy_bq_patents import copy_patent_tables
+from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
 from .terms import create_patent_terms
 

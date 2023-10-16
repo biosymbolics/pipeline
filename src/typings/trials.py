@@ -546,7 +546,7 @@ def __calc_duration(start_date: date | None, end_date: date | None) -> int:
     return (end_date - start_date).days
 
 
-def get_trial_summary(trial: dict) -> TrialSummary:
+def dict_to_trial_summary(trial: dict) -> TrialSummary:
     """
     Get trial summary from db record
 

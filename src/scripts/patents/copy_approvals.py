@@ -176,10 +176,6 @@ def copy_approvals():
     copy_patent_to_approval()
 
 
-def main():
-    copy_approvals()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
@@ -190,4 +186,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    copy_approvals()

@@ -5,13 +5,14 @@ import sys
 import logging
 
 from system import initialize
+from utils.list import dedup
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
-from typings.trials import get_trial_summary
+from typings.trials import dict_to_trial_summary
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -62,10 +63,16 @@ def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
     - normalizes status etc.
     """
 
-    # intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
-    # logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
-    # normalized = tagger.extract_strings([dedup(i_set) for i_set in intervention_sets])
-    return [{**get_trial_summary(rec)} for rec in ctgov_records]
+    intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
+    logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
+    normalized_interventions = tagger.extract_strings(
+        [dedup(i_set) for i_set in intervention_sets]
+    )
+
+    return [
+        {**dict_to_trial_summary({**rec, "interventions": interventions})}
+        for rec, interventions in zip(ctgov_records, normalized_interventions)
+    ]
 
 
 def ingest_trials():
