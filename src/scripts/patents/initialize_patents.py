@@ -17,7 +17,7 @@ from constants.core import (
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
 
-from ._constants import (
+from .constants import (
     APPLICATIONS_TABLE,
     ANNOTATIONS_TABLE,
     GPR_ANNOTATIONS_TABLE,

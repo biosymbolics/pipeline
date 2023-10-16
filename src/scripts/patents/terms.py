@@ -17,10 +17,10 @@ from core.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .biosym_annotations import populate_working_biosym_annotations
+from .process_biosym_annotations import populate_working_biosym_annotations
 
-from .._constants import SYNONYM_MAP
-from ..utils import clean_owners
+from .constants import SYNONYM_MAP
+from .utils import clean_owners
 
 TERMS_FILE = "terms.json"
 TERMS_TABLE = "terms"
