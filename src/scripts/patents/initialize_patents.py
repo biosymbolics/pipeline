@@ -16,10 +16,6 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
-from scripts.patents.psql.copy_approvals import copy_approvals
-from scripts.patents.bq.copy_tables import copy_patent_tables
-from scripts.patents.bq_to_psql import copy_bq_to_psql
-from scripts.patents.psql.terms import create_patent_terms
 
 from ._constants import (
     APPLICATIONS_TABLE,
@@ -27,6 +23,10 @@ from ._constants import (
     GPR_ANNOTATIONS_TABLE,
     TEXT_FIELDS,
 )
+from .copy_approvals import copy_approvals
+from .copy_bq_tables import copy_patent_tables
+from .copy_patents_from_bq import copy_bq_to_psql
+from .terms import create_patent_terms
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

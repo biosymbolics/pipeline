@@ -9,12 +9,12 @@ from pydash import compact
 import logging
 
 import system
-from typings.core import is_dict_list
 
 system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
+from typings.core import is_dict_list
 
 from ._constants import (
     APPLICATIONS_TABLE,
@@ -53,36 +53,27 @@ GCS_BUCKET = "biosym-patents"
 # adjust this based on how large you want each shard to be
 
 
-INITIAL_COPY_FIELDS = [
-    # gpr_publications
+APPLICATION_COPY_FIELDS = [
+    # ** FROM gpr_publications **
     "gpr_pubs.publication_number as publication_number",
     "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
     "abstract",
     "all_publication_numbers",  # all the country-specific patents
     "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
     "application_number",
-    # "cited_by",
     "country",
     # "embedding_v1 as embeddings", # eventually use to determine our own similarity?
     "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s) as similar_patents",
     "title",
-    # "top_terms",
     "url",
-    # publications
-    # "application_kind",
+    # **FROM PUBLICATIONS **
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
-    # "citation",
     "claims_localized as claims",
-    # "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes", # no need given ipc
     "family_id",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
     "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
-    # "kind_code",
-    # "pct_number",
     # "priority_claim", # the patent id from which this patent gets its priority (country-specific patents)
     "priority_date",
-    # "spif_application_number",
-    # "spif_publication_number",
 ]
 
 
@@ -97,7 +88,7 @@ def create_patent_applications_table():
     client.delete_table(APPLICATIONS_TABLE)
 
     applications = f"""
-        SELECT {','.join(INITIAL_COPY_FIELDS)}
+        SELECT {','.join(APPLICATION_COPY_FIELDS)}
         FROM `{BQ_DATASET_ID}.publications` pubs,
         `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
@@ -151,9 +142,6 @@ def export_bq_tables():
 TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
     "character_offset_end": "INTEGER",
-    "publication_date": "DATE",
-    "filing_date": "DATE",
-    "grant_date": "DATE",
     "priority_date": "DATE",
 }
 
