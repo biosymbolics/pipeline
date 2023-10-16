@@ -25,7 +25,7 @@ from .constants import (
 )
 from .copy_approvals import copy_approvals
 from .copy_bq_patents import copy_patent_tables
-from .preprocess_bq_patents import copy_bq_to_psql
+from .import_bq_patents import copy_bq_to_psql
 from .terms import create_patent_terms
 
 logger = logging.getLogger(__name__)
