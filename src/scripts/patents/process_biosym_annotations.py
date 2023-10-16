@@ -80,7 +80,7 @@ def remove_substrings():
 TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
 
 # no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
-EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
+EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|encoding|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
 # when expanding annotations, we don't want to make it too long
 EXPANSION_NUM_CUTOFF_TOKENS = 7
 # leave longer terms alone
@@ -90,7 +90,7 @@ EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
 # overrides POS, eg "inhibiting the expression of XYZ"
-EXPANSION_POS_OVERRIDE_TERMS = ["expression"]
+EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding"]
 
 
 TermMap = TypedDict(

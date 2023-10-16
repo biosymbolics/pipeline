@@ -143,7 +143,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "factor [ivx]{1,3}",
     "fc(?:[- ]fusion )?(?: protein)?",
     "fusion",
-    "(?:hairpin|micro|messenger|sh|si|ds|m|hp|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?rna",
+    "(?:hairpin|micro|messenger|sh|si|ds|m|hp|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?rna(?: molecule| sequence)?",
     "(?:trans)?gene",
     "interferon",
     "isoform",
@@ -220,7 +220,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "candidate",
     "(?:micro[ -]?|nano[ -]?)?capsule",
     "(?:electro|bio)?[ -]?chemical",
-    "combination",
+    "(?:re[ -]?)?combination",
     "complex(?:es)?",
     "composition",
     "component",
@@ -350,8 +350,10 @@ ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 
 INTERVENTION_PREFIXES_GENERIC = [
     "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
+    "(?:bi|tri|dual|triple|inverse|reverse)(?:[- ]?acting)?",
     "activ(?:ity|ated)",
     "advanced",
+    "adjunct",
     "asymmetric",  # TODO: move to specific?
     "atypical",
     "bioavailabl",
@@ -419,7 +421,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "super",
     "suitable",
     "target(?:ing|ed)?",
-    "therapeutic(?:ally)?",
+    "(?:chemo[ -]?)?therapeutic(?:ally)?",
     "topical",
     "usable",
     "useful",

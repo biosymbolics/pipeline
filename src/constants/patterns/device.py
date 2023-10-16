@@ -6,9 +6,10 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?cannula",
     "(?:.* )?(?:back)?rest",
     "(?:.*[ -]?)?inject(?:or)?",  # autoinjector
-    "(?:.* )?packag",  # packaging
+    "(?:.* )?packag(?:ing|ed)(?: .*)?",  # packaging
     "(?:.*)?needl",  # microneedle
     "(?:.* )?bolus",
+    "(?:.* )?retainer",
     "(?:.* )?infusion pump",
     "(?:.* )?pacemaker",
     "(?:.* )?glass",
@@ -43,9 +44,13 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?equipment",
     "(?:.* )?generator",
     "(?:.* )?(?:micro)?channel",
+    "impression material",
     "(?:.* )?light[ -]?emitt(?:er|ing)s?.*",
     "(?:.* )?cathode",
+    "(?:.* )?delivery system",
     "(?:.* )?dielectric",
+    "(?:.* )?roller",
+    "building material",
     "(?:.* )?mandrel",
     "(?:.* )?stylet",
     "(?:.* )?coupling",
@@ -72,9 +77,11 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?centrifugat",
     "(?:.* )?current",
     "(?:.* )?surfac",
+    "(?:.* )?recording medium",
     "(?:.* )?field",
+    "(?:.* )?element",  # e.g. locking element # TODO probably excessive
     "(?:.* )?garment",
-    "(?:.* )?mou?ld",  # molding, moulded
+    "(?:.* )?mou?ld(?: .*)?",  # molding, moulded, molded product
     "(?:.* )?napkin",
     "(?:.* )?anvil",
     "(?:.* )?implant.*",
@@ -104,7 +111,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?hinge",
     "(?:.* )?instrument",
     "(?:.* )?vessel",
-    "(?:.* )?device",
+    "(?:.* )?device(?: .*)?",
     "(?:.* )?motor",
     "(?:.* )?electrode",
     "(?:.* )?camera",
@@ -129,7 +136,7 @@ DEVICE_RES = [
     "(?:.* )?display",
     "(?:.*[ -])?scale",
     "(?:.* )?imag",  # imaging
-    "(?:.* )?image (?:.*)?",
+    "(?:.* )?imag(?:e|ing) (?:.*)?",
     "(?:.* )?port",
     "(?:.* )?cutt(?:er|ing)",
     "(?:.* )?seperat",

@@ -4,6 +4,7 @@ from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC,
 )
 
+
 from .types import WordPlace
 
 REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
@@ -194,6 +195,13 @@ DELETION_TERMS = [
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "potentially useful",
+    "above protein",
+    "operating same",
+    "device capable",
+    "compounds for the",
+    "pre[ -]?treatment",
+    "enhancing the",
     "non-overlapping double-stranded regions separated",  # ??
     "(?:.* )? capable",  # material capable, etc
     "salt as an",
@@ -206,7 +214,7 @@ DELETION_TERMS = [
     "light[ -]?receiving",
     "resultant",
     "optionally other",
-    "above[ -]?mentioned",
+    "above[ -]?(?: mentioned)?",
     ".* of",
     ".* comprising",
     ".* tubular",
@@ -237,8 +245,11 @@ DELETION_TERMS = [
     "embodiment",
     "least partial",
     "reform",
-    "conformat",
+    "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "oxide",
+    "agricultural",
+    "system",
     "receptor",
     "product .*",
     "pathogen(?:ic)?",
@@ -252,7 +263,7 @@ DELETION_TERMS = [
     "medical purpose",
     "cell membrane",
     "(?:.* )?part",
-    "(?:product|reaction) mixture",  # single dose
+    "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system)",
     "(?:.* )?activit",
     "(?:.* )?member",
     "module",
@@ -261,7 +272,7 @@ DELETION_TERMS = [
     "operator",
     "field of .*",
     # thing (unwanted because wrong type of thing)
-    "(?:.* )?propert(?:y|ie)",
+    "(?:.* )?food" "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
     "leaflet",
@@ -304,6 +315,7 @@ DELETION_TERMS = [
     "aroma",
     "(?:.* )?reaction",
     "(?:.* )?cosmetic",
+    "(?:.* )?hair condition",
     "(?:.* )?fragrance",
     "silica",
     "perfum",
@@ -312,7 +324,7 @@ DELETION_TERMS = [
     "(?:.* )?location",
     "(?:.* )?mode",
     "(?:.* )?region",
-    "(?:tumou?r|eukaryotic|live|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?) cell",
+    "(?:tumou?r|eukaryotic|liv(?:e|ing)|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?|plant|cultur(?:ing|ed?)|individual) cell",
     "virus",  # generic
     "titanium dioxide",
     "microorganism",
@@ -323,32 +335,25 @@ DELETION_TERMS = [
     "(?:.* )?layer",
     "(?:.* )?surface",  # device?
     # effect
-    "deactivat",
+    "clean",  # cleaning
     "friction",
     "compressive force",
     "correcting dysfunction",
     # "bleaching",
     "vibrat",
-    "moisturi[zs]",
     "induc(?:es?d?|ing) differentiation",
     "cool",
     "connect",
     "deterioration",
     "detrimental",
-    "(?:.* )?absorb",
     "(?:.* )?disengage",
     "adjustment",
-    "lubricat",
-    "chain transfer",
     "(?:.* )?abrasive",
     "(?:.* )?retardancy",  # e.g. flame retardant
     "film[ -]?form",
     "heat transfer",
-    # "nucleating",
     "cell death",
     "deformable",
-    "(?:.* )?growth",  # TODO: disease?
-    "(?:.* )?resistance",
     "(?:.* )?addition",
     "ameliorat",
     "transformant",
@@ -371,6 +376,8 @@ DELETION_TERMS = [
     "(?:.* )?appendage",
     "(?:.* )?ventricle",
     "(?:.* )?aorta",
+    "(?:.* )?nostril",
+    "(?:.* )?nose",
     "(?:.* )?intervertebral disc",
     "(?:.* )?mucosa",
     "(?:.* )?retina",
@@ -386,7 +393,6 @@ DELETION_TERMS = [
     "(?:.* )?obturator",
     "(?:.* )?atrium",
     "tibial?",
-    "transdermal",
     "(?:.* )?femur",
     "(?:.* )?core",  # device
     "(?:.* )?vesicle",
@@ -445,6 +451,8 @@ DELETION_TERMS = [
     "venous",
     "lymph(?:atic)?(?: node| vessel)?",
     # category errors
+    "formability",
+    "(?:fe)?male",
     "(?:.*)?dimensional",
     "pathological",
     "consideration",
@@ -482,6 +490,17 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "integrated system",
+    "renewable resource",
+    "pillar",
+    "conditioned medium",
+    "potential difference",
+    "addition salt",
+    "layered product",
+    "indicia",
+    "addition salt",
+    "salt of the compound",  # TODO: possible noun exception
+    "starting material",
     "multi[- ]?component",
     "discret",  # discrete
     "problem",
@@ -505,7 +524,7 @@ DELETION_TERMS = [
     "attribute",
     "preform",
     "DNA sequence",
-    "(?:medical|treatment|operation) (?:fluid|zone|container|section|technology)",
+    "(?:medical|treatment|operation|reaction) (?:fluid|zone|container|section|technology)",
     "object",
     "(?:drug )?target",
     "biologically active",
@@ -530,6 +549,10 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
+    "serum-free",
+    "moldability",
+    "cellulosic",
+    "transgenic",
     "utility",
     "detachabl",
     "proximal",
@@ -561,6 +584,8 @@ DELETION_TERMS = [
     "substantially free",
     "therapeutically active",
     # characteristics / descriptors
+    "minimally invasive",
+    "adhesiveness",
     "helical",
     "ingestibl",
     "humaniz",  # humanized
@@ -615,38 +640,16 @@ DELETION_TERMS = [
     "optionally substitut",
     "non[ -]?invasive",
     "reinforc",
-    "(?:.* )?chain",
     "aqueous",
-    "(?:.* )?bond",
     "concentration",
-    "(?:.* )?conductive",
-    "(?:.* )?recombinant",
-    "(?:.* )?genetic",
     "(?:.* )?acidic",
     "(?:.* )?unsubstituted",
-    "(?:.* )?gaseous",
-    "(?:.* )?aromatic",
-    "(?:.* )?conjugated",
-    "(?:.* )?polymeric",
-    "(?:.* )?polymerizable",
-    "(?:.* )?oligomeric",
     "(?:.* )?synergistic",
-    "(?:.* )?immunogenic",
-    "(?:.* )?amphiphilic",
-    "(?:.* )?macrocyclic",
-    "(?:.* )?elastic",
-    "(?:.* )?catalytic",
     "(?:.* )?hydrophilic",
-    "(?:.* )?ophthalmic",
-    "(?:.* )?heterocyclic",
-    "(?:.* )?hydrophobic",
-    "(?:.* )?enzymatic",
-    "(?:.* )?lipophilic",
     "(?:.* )?biodegradabilit",
     "(?:.* )?affinity",
     "(?:.* )?residual",
     "(?:.* )?rigid",
-    "(?:.* )?cyclic",
     "(?:.* )?adverse",
     # physical process
     "elut",  # elution
@@ -680,7 +683,7 @@ DELETION_TERMS = [
     "(?:.* )?strength",
     "(?:.* )?population",
     "(?:.* )?end",
-    "(?:.*[ -])?temperatures?(?: range|high(?:er)?)?",
+    "(?:.*[ -])?temperatures?(?: range|high(?:er)?|low(?:er)?)?",
     "(?:.* )?ratio",
     "(?:.* )?deliver",
     "(?:.* )?step",
@@ -696,6 +699,13 @@ DELETION_TERMS = [
     "intravenous",
     "subcutaneous",
     "topical",
+    "(?:trans|intra)dermal",
+    "oral",
+    "rectal",
+    "vaginal",
+    "intrathecal",
+    "intraocular",
+    "intraperitoneal",
     # intangible thing
     "(?:.* )?concept",
     "(?:.* )?data",
@@ -712,21 +722,26 @@ DELETION_TERMS = [
     "(?:.* )?memory",
     # material
     "(?:.* )?metal",
+    "(?:.* )?metal oxide",
+    "(?:.* )?graphite",
+    "(?:.* )?graphene(?: oxide)?",
+    "(?:.* )?metal",  # temporary?
     # non-medical procedure or process"
     "session",
     "wash",
     "solid-liquid separation",
     "mix",
-    # "pattern form",  # pattern forming
+    "pattern form",  # pattern forming
     "crystallizat",
     "quantitat",
     "(?:administrative )?procedure",
     "support (?:.*)",  # ??
     "(?:.* )?communicat",
     "(?:.* )?sequenc",
-    # "thermoset",  # thermosetting
     "(?:.* )?(?:micro)?process",
     # procedure
+    "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",
+    "root canal",
     "punctur",  # puncture
     "transplant(?:at)",  # transplantation
     "(?:.* )?electrolysis",
@@ -746,32 +761,32 @@ DELETION_TERMS = [
     "sealant",
     "microelectronic",
     # agtech
+    "feed(?: material|substance)?",
     "pest control",
     "(?:.* )?feedstock",
     "(?:.* )?biomass",
     "(?:.* )?agrochemical",
-    "(?:.* )?herbicid(?:e|al)(?: activity)?",
-    "(?:.* )?insecticid(?:e|al)(?: activity)?",
-    "(?:.* )?biocid(?:e|al)(?: activity)?",
-    "(?:.* )?fungicid(?:e|al)(?: activity)?",
-    "(?:.* )?pesticid(?:e|al)(?: activity)?",
-    "(?:.* )?plant",
+    "(?:.* )?herbicid(?:e|al)(?: .*)?",
+    "(?:.* )?insecticid(?:e|al)(?: .*)?",
+    # "(?:.* )?biocid(?:e|al)(?: .*)?", # could be biomedical
+    # "(?:.* )?fungicid(?:e|al)(?: .*)?",  # could be biomedical
+    "(?:.* )?pesticid(?:e|al)(?: .*)?",
+    "(?:.* )?plant(?: cell)?",
     "drought tolerance",
     "biofuel",
     "biodiesel",
     "plant growth regulator",
     # end agtech
     # start industrial
+    "thermoset",  # thermosetting
+    "solvent system",
+    "biodegradable polymer",
     "corros",  # corrosion
     "asphalt",
     "heat exchang",
     "carbon black",
     "(?:.* )?composite",
     "(?:.* )?manufactur",
-    "(?:.* )?graphite",
-    "(?:.* )?metal",  # temporary?
-    "palladium",
-    "cobalt",
     "propane",
     "(?:.* )?energy",
     "electric(?:al) .*",
@@ -798,6 +813,7 @@ DELETION_TERMS = [
     "(?:.* )?contrast",
     "(?:.* )?screen",
     "(?:.* )?media",
+    "imaging agent",
     "(?:.* )?culture",
     "(?:.* )?polymerase chain reaction",
     "(?:.* )?test(?:ing)?",
@@ -805,7 +821,6 @@ DELETION_TERMS = [
     "(?:.* )?diagnostic",
     "(?:.* )?diagnosis",
     "(?:.* )?analyt",  # analyte
-    "reaction (?:vessel|mixture)",
     "(?:.* )?assay",
     "(?:.* )?microarray",
     "prognosticat",

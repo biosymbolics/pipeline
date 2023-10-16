@@ -114,6 +114,7 @@ albert
 alex
 alexand
 alfred
+algae
 algebra
 algeria
 al
@@ -620,6 +621,7 @@ cap
 capit
 capitol
 captain
+captur
 carb
 carbon
 cardiac
@@ -2125,6 +2127,7 @@ increasing
 incredib
 incur
 ind
+index
 industrial
 indeed
 independenc
@@ -2976,6 +2979,7 @@ not
 notr
 nov
 nova
+novel
 novelt
 novemb
 now
@@ -3135,6 +3139,7 @@ palestinian
 pam
 pamela
 pan
+panel
 panama
 pantyhos
 papua
@@ -4156,6 +4161,7 @@ sudan
 sudden
 suddenl
 su
+suffer
 sufficient
 sufficientl
 sugar
