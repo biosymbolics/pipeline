@@ -40,7 +40,8 @@ def get_or_re(
         re_strs (list[str]): list of regexes
         count (Optional[ReCount]): count to apply to regex (defaults to None, which is effectively {1})
         upper (Optional[int]): upper bound for count (defaults to None, which is effectively {1, 100})
-        permit_trailing_space (bool): whether to permit trailing space between each re
+        permit_trailing_space (bool): whether to permit trailing space between each re (defaults to False)
+        enforce_word_boundaries (bool): whether to enforce word boundaries (defaults to False)
     """
     re_strs = [*_re_strs]
     if enforce_word_boundaries:

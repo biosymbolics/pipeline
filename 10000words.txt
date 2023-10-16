@@ -826,6 +826,7 @@ commun
 comp
 compact
 compaq
+comparat
 comparab
 comparativ
 compatibilit
@@ -856,6 +857,7 @@ conceptu
 concerned
 concern
 concret
+condition
 conf
 conferenc
 confidenc
@@ -898,7 +900,9 @@ consultanc
 consultat
 consult
 consumpt
+contain
 contaminat
+contaminant
 contemporar
 context
 continual
@@ -1604,6 +1608,7 @@ fit
 fitt
 fiv
 fixtur
+fix
 fl
 flam
 flat
@@ -1985,6 +1990,7 @@ hierarch
 highland
 highlight
 highl
+high
 hik
 hilton
 h
@@ -2350,6 +2356,7 @@ kijij
 kilomet
 kim
 kinas
+kind
 kinda
 kingdom
 kirk
@@ -2537,6 +2544,7 @@ loung
 lov
 lovel
 lov
+lower
 lp
 lt
 ltd
@@ -3051,11 +3059,12 @@ operat
 oppos
 opt
 optim
+optimal
 optimizat
 optimiz
 optimum
 option
-optionall
+optional
 oracl
 orang
 orbit
@@ -3201,6 +3210,7 @@ permit
 perr
 persian
 persistent
+person
 personalit
 personaliz
 personal
@@ -3247,6 +3257,7 @@ pin
 p
 pink
 pion
+pip
 pipelin
 pirat
 pis
@@ -3313,6 +3324,7 @@ positiv
 posit
 poss
 possess
+post
 postag
 postpost
 pot
@@ -3378,6 +3390,7 @@ prison
 privac
 privat
 prix
+profil
 probabilit
 probabl
 prob
@@ -3440,6 +3453,7 @@ purs
 pursuant
 pursu
 pursuit
+push
 put
 pvc
 python
@@ -3448,6 +3462,7 @@ qatar
 qc
 qld
 quad
+qualit
 quantit
 quantif
 quantitativ
@@ -3728,6 +3743,7 @@ safet
 sag
 sagem
 sa
+said
 sak
 saline
 salad
@@ -3801,6 +3817,7 @@ seem
 s
 sega
 segment
+select
 selectiv
 selectivel
 self
@@ -3937,6 +3954,7 @@ slip
 slop
 slow
 slowl
+small
 smart
 smell
 smith
@@ -4050,6 +4068,7 @@ stainl
 stak
 stakehold
 stan
+standard
 stanford
 stanl
 star
@@ -4256,6 +4275,7 @@ tens
 tent
 terminat
 terminolog
+terminal
 terrac
 terrain
 terribl
@@ -4583,6 +4603,7 @@ vcr
 v
 vect
 vega
+vegetable
 vegetat
 velocit
 velvet
@@ -4652,6 +4673,7 @@ wagn
 wagon
 waiv
 wak
+wall
 wallac
 wallet
 walnut
@@ -4824,6 +4846,7 @@ yemen
 yen
 yesterda
 yet
+yield
 yn
 yo
 yoga

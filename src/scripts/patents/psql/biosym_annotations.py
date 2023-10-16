@@ -49,6 +49,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "method": "all",
     "obtainable": "all",
     "different": "all",
+    "-+": "leading",
     "stable": "all",
     "various": "all",
     "the": "leading",
@@ -129,7 +130,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "=": "trailing",
     "unit(?:[(]s[)])?": "trailing",
     "measur(?:ement|ing)": "all",
-    "system": "trailing",
+    # "system": "trailing", # CNS?
     "[.]": "trailing",
     "analysis": "all",
     "management": "all",
@@ -160,7 +161,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "efficient": "all",
     "first": "all",
     "second": "all",
-    "abnormal": "all",
+    "(?:ab)?normal": "all",
     "inappropriate": "all",
     "compounds as": "all",
     "formula [(][ivxab]{1,3}[)]": "trailing",
@@ -177,7 +178,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "similar": "all",
     "contemplated": "all",
     "predictable": "all",
-    "dosing": "leading",
+    "dos(?:e|ing|age)": "leading",
     "conventional": "leading",
     "contemplated": "all",
     "is indicative of": "all",
@@ -186,7 +187,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "level": "trailing",
     "disclosed": "all",
     "wild type": "all",  # TODO
-    "(?:high|low)[ -]?dose": "all",
+    "(?:high|low)[ -]?dos(?:e|ing|age)": "all",
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
@@ -195,6 +196,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     # model/source
     "murine": "all",
     "monkey": "all",
+    "non[ -]?human": "all",
     "primate": "all",
     "mouse": "all",
     "mice": "all",
@@ -218,7 +220,6 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = {
                 "agent",
                 "effect",
                 "pro[ -]?drug",
-                "mediated?",
             ]
         ]
     ),
@@ -231,10 +232,15 @@ DELETION_TERMS = [
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "(?:.* )? capable",  # material capable, etc
+    "salt as an",
+    "further",
+    "individual suffering",
+    ".{1,5}-",  # tri-
+    "(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
     "optionally other modification",
     "co[- ]?operate",
     "light[ -]?receiving",
-    "structure directing",
     "resultant",
     "optionally other",
     "above[ -]?mentioned",
@@ -242,6 +248,7 @@ DELETION_TERMS = [
     ".* comprising",
     ".* tubular",
     "composition (?:contain|compris)",
+    "[a-zA-Z0-9]+-containing",
     "by-",
     "cur",
     "co-",
@@ -269,7 +276,7 @@ DELETION_TERMS = [
     "reform",
     "conformat",
     # thing (unwanted because generic)
-    "carbon dioxide",  # generic
+    "receptor",
     "product .*",
     "pathogen(?:ic)?",
     "regenerative medicine",
@@ -279,11 +286,10 @@ DELETION_TERMS = [
     "single piece",
     "product gas",
     r"agent\(s\)",
-    "byproduct",
     "medical purpose",
     "cell membrane",
     "(?:.* )?part",
-    "product mixture",  # single dose
+    "(?:product|reaction) mixture",  # single dose
     "(?:.* )?activit",
     "(?:.* )?member",
     "module",
@@ -292,6 +298,18 @@ DELETION_TERMS = [
     "operator",
     "field of .*",
     # thing (unwanted because wrong type of thing)
+    "(?:.* )?propert(?:y|ie)",
+    "constraint",
+    "(?:side|adverse)[ -]?effect",
+    "leaflet",
+    "passageway",
+    "ability",
+    "determinat",  # determination
+    "anatomical structure",
+    "distract",  # distraction
+    "(?:.* )?configuration",
+    "considerat",  # consideration
+    "strateg(?:y|ie)",
     "(?:.* )?arrangement",
     "(?:.* )?position",
     "(?:.* )?frame",
@@ -312,7 +330,9 @@ DELETION_TERMS = [
     "(?:.* )?infant",
     "(?:.* )?prospect",
     "(?:.* )?room",
-    "(?:.* )?personnel",
+    "professional",
+    "(?:.* )?person(?:nel)?",
+    "guest",
     "body part",
     "(?:.* )?patent",
     "(?:.* )?pathway",
@@ -323,19 +343,16 @@ DELETION_TERMS = [
     "(?:.* )?cosmetic",
     "(?:.* )?fragrance",
     "silica",
-    "keratin",
     "perfum",
-    "propane",
     "bacteri(?:um|a)",
     "(?:.*)?station",
     "(?:.* )?location",
     "(?:.* )?mode",
     "(?:.* )?region",
-    "(?:tumou?r|eukaryotic|normal|animal|bacterial|single|skin|cancerous|insect) cell",
+    "(?:tumou?r|eukaryotic|live|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primarydiseased?) cell",
     "virus",  # generic
     "titanium dioxide",
     "microorganism",
-    "(?:.* )?metal",  # temporary?
     "(?:.* )?area",
     "(?:.* )?power",
     "(?:.* )?site",
@@ -343,6 +360,17 @@ DELETION_TERMS = [
     "(?:.* )?layer",
     "(?:.* )?surface",  # device?
     # effect
+    "deactivat",
+    "friction",
+    "compressive force",
+    "correcting dysfunction",
+    # "bleaching",
+    "vibrat",
+    "moisturi[zs]",
+    "induc(?:es?d?|ing) differentiation",
+    "cool",
+    "connect",
+    "deterioration",
     "detrimental",
     "(?:.* )?absorb",
     "(?:.* )?disengage",
@@ -353,7 +381,7 @@ DELETION_TERMS = [
     "(?:.* )?retardancy",  # e.g. flame retardant
     "film[ -]?form",
     "heat transfer",
-    "nucleating",
+    # "nucleating",
     "cell death",
     "deformable",
     "(?:.* )?growth",  # TODO: disease?
@@ -372,6 +400,7 @@ DELETION_TERMS = [
     "related (?:disorder|condition|disease)",
     "(?:disorder|condition|disease)s related",
     "disease",
+    "syndrome",
     "disorder",
     "dysfunction",
     # part or characteristic of body, or fluid
@@ -379,6 +408,9 @@ DELETION_TERMS = [
     "(?:.* )?appendage",
     "(?:.* )?ventricle",
     "(?:.* )?aorta",
+    "(?:.* )?intervertebral disc",
+    "(?:.* )?mucosa",
+    "(?:.* )?retina",
     "(?:.* )?artery",
     "(?:.* )?vein",
     "(?:.* )?tissue",
@@ -400,7 +432,18 @@ DELETION_TERMS = [
     "(?:.* )?nail",  # device
     "(?:.* )?joint",
     "(?:.* )?cavity",
+    "skin",
+    "hair",
+    "vascular",
+    "capillary",
+    "bodily",
+    "cornea",
+    "vertebra",
+    "spine",
+    "eye",
     "urea",
+    "blood",
+    "gastric",
     "gastrointestinal(?: tract)?",
     "cartilage",
     "jaw",
@@ -439,12 +482,18 @@ DELETION_TERMS = [
     "venous",
     "lymph(?:atic)?(?: node| vessel)?",
     # category errors
+    "(?:.*)?dimensional",
+    "pathological",
+    "consideration",
+    "combin",
+    "functionaliz",
+    "plurality",
+    "physical",
+    "demonstrat",
     "engaged position",
     "cell[- ]?free",
     "contribut",
     "advantage",
-    "cell cycle",
-    "cell wall",
     "(?:.* )?side",  # base end side
     "accept",
     "solid state",
@@ -470,13 +519,31 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "multi[- ]?component",
+    "potential therapeutic",
+    "discret",  # discrete
+    "problem",
+    "further",
+    "parent",
+    "structure(?: directing)?",
+    "technology",
+    "branch",
+    "(?:leading )?edge",
+    "approach",
+    "extension",
+    "space",
+    "point",
+    "mount",
+    "wall",
+    "cell(?: cycle| wall| line)",
+    "channel",  # todo?
     "design",
     "general structural",
     "piece",
     "attribute",
     "preform",
     "DNA sequence",
-    "(?:medical|treatment) (?:fluid|zone|container|section|technology)",
+    "(?:medical|treatment|operation) (?:fluid|zone|container|section|technology)",
     "object",
     "(?:drug )?target",
     "biologically active",
@@ -501,10 +568,27 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
-    "bioavailability",
+    "utility",
+    "detachabl",
+    "proximal",
+    "hydrogenat",  # hydrogenated
+    "chiral",
+    "embolic",
+    "traction",
+    "annular",
+    "molten",
+    "(?:solid )?phase",
+    "disinfect",  # disinfectant is fine, but not disinfecting
+    "(?:open |closed )?configuration",
+    "dispersib(?:le|ilit)",
+    "photodynamic",
+    "structural",
+    "accurate",
+    "bioavailabilit",
     "usefulness",
     "(?:.* )?conductivit",
     "multi[ -]?function",
+    "elastic(?:ity)?",
     "symmetric(?:al)?",
     "biocompatible",
     "biocompatibilt",
@@ -515,6 +599,16 @@ DELETION_TERMS = [
     "substantially free",
     "therapeutically active",
     # characteristics / descriptors
+    "helical",
+    "ingestibl",
+    "humaniz",  # humanized
+    "sheet-like",
+    "hydrophobicity",
+    "(?:high |low )?concentration",
+    "(?:.* )?acceptable",  # e.g. agrochemically acceptable
+    "solubilit",
+    "(?:.* )?refractive index",
+    "uniform(?:it)?",
     "(?:non[ -]?)?conductive",
     "granular",
     "luminescent",
@@ -542,8 +636,10 @@ DELETION_TERMS = [
     "resilient",
     "fluorescent",
     "superabsorbent",
-    "nonwoven",
+    "non[- ]?woven(.*)?",
     "crystalline",
+    "volatile",
+    "phenolic",
     "edibl",
     "non[ -]?therapeutic",
     "water[ -]?insoluble",
@@ -553,51 +649,66 @@ DELETION_TERMS = [
     "dispens",
     "impedanc",
     "radioact",
-    "cleansing",
+    # "cleans?(?:ing|er|ed)",
     "optionally substitut",
     "non[ -]?invasive",
     "reinforc",
     "single chain",
     "aqueous",
     "single bond",
+    "main",
+    "parallel",
+    "pair",
     "concentration",
     "(?:.* )?conductive",
-    "recombinant",
-    "genetic",
-    "acidic",
-    "unsubstituted",
-    "gaseous",
-    "aromatic",
-    "conjugated",
-    "polymeric",
-    "oligomeric",
-    "synergistic",
-    "immunogenic",
-    "macrocyclic",
-    "elastic",
-    "catalytic",
-    "hydrophilic",
-    "ophthalmic",
-    "heterocyclic",
-    "hydrophobic",
-    "enzymatic",
-    "lipophilic",
+    "(?:.* )?recombinant",
+    "(?:.* )?genetic",
+    "(?:.* )?acidic",
+    "(?:.* )?unsubstituted",
+    "(?:.* )?gaseous",
+    "(?:.* )?aromatic",
+    "(?:.* )?conjugated",
+    "(?:.* )?polymeric",
+    "(?:.* )?polymerizable",
+    "(?:.* )?oligomeric",
+    "(?:.* )?synergistic",
+    "(?:.* )?immunogenic",
+    "(?:.* )?amphiphilic",
+    "(?:.* )?macrocyclic",
+    "(?:.* )?elastic",
+    "(?:.* )?catalytic",
+    "(?:.* )?hydrophilic",
+    "(?:.* )?ophthalmic",
+    "(?:.* )?heterocyclic",
+    "(?:.* )?hydrophobic",
+    "(?:.* )?enzymatic",
+    "(?:.* )?lipophilic",
     "(?:.* )?biodegradabilit",
     "(?:.* )?affinity",
-    "residual",
-    "rigid",
-    "cyclic",
-    "adverse",
+    "(?:.* )?residual",
+    "(?:.* )?rigid",
+    "(?:.* )?cyclic",
+    "(?:.* )?adverse",
     # physical process
+    "elut",  # elution
     "drug release",
     "sustained[ -]?release",
     "disintegrat",
     "evaporat",
     "agglomerat",
     # measurable thing
+    "(?:.* )?curvature",
+    "(?:.* )?degree",
+    "spatial resolution",
+    "oxygen concentrat",
+    "(?:.* )?number",
+    "(?:.* )?cost",
+    "(?:.* )?distance",
+    "(?:.* )?frequency",  # also procedure or device
     "(?:.* )?torque",
+    "(?:.* )?divergence",
     "(?:.* )?weight",
-    "(?:.* )?wavelength",
+    "(?:.* )?wavelength(?: .*)?",
     "(?:.* )?charge",
     "(?:.* )?band",
     "(?:.* )?viscosity",
@@ -610,14 +721,14 @@ DELETION_TERMS = [
     "(?:.* )?strength",
     "(?:.* )?population",
     "(?:.* )?end",
-    "(?:.* )?temperature",
+    "(?:.*[ -])?temperatures?(?: range|high(?:er)?)?",
     "(?:.* )?ratio",
     "(?:.* )?deliver",
     "(?:.* )?step",
     "(?:.* )?value",
     "(?:.* )?time",
     # roa
-    "aerosol(?:[- ]?forming)?",
+    "aerosol",
     "parenteral",
     "inhalation",
     "insufflation",
@@ -628,6 +739,7 @@ DELETION_TERMS = [
     "subcutaneous",
     "topical",
     # intangible thing
+    "(?:.* )?concept",
     "(?:.* )?data",
     "(?:.* )?integer",
     "(?:.* )?language",
@@ -642,16 +754,23 @@ DELETION_TERMS = [
     "(?:.* )?memory",
     # material
     "(?:.* )?metal",
-    # non-medical procedure or process
-    "pattern form",  # pattern forming
+    # non-medical procedure or process"
+    "session",
+    "wash",
+    "solid-liquid separation",
+    "mix",
+    # "pattern form",  # pattern forming
     "crystallizat",
     "quantitat",
     "(?:administrative )?procedure",
     "support (?:.*)",  # ??
     "(?:.* )?communicat",
     "(?:.* )?sequenc",
+    # "thermoset",  # thermosetting
     "(?:.* )?(?:micro)?process",
     # procedure
+    "punctur",  # puncture
+    "transplant(?:at)",  # transplantation
     "(?:.* )?electrolysis",
     "(?:.* )?incision",
     "(?:.* )?graft",
@@ -662,6 +781,8 @@ DELETION_TERMS = [
     "(?:.* )?amplification",
     "(?:.* )?ablation",
     "(?:.* )?surger(?:y|ie)",
+    "(?:.* )?operat",
+    "(?:.* )?extraction",
     "brachytherapy",
     "radiotherapy",
     "sealant",
@@ -683,33 +804,53 @@ DELETION_TERMS = [
     "plant growth regulator",
     # end agtech
     # start industrial
+    "corros",  # corrosion
+    "asphalt",
+    "heat exchang",
+    "wood",
+    "carbon black",
+    "(?:.* )?composite",
+    "(?:.* )?manufactur",
+    "(?:.* )?graphite",
+    "(?:.* )?metal",  # temporary?
+    "palladium",
+    "cobalt",
+    "propane",
+    "(?:.* )?energy",
+    "electric(?:al) .*",
+    "formaldehyde",  # ??
     "aromatic ring",  # industrial
-    "thermoplastic polymer",  # industrial
     "polymer matrix",  # industrial
     "polyolefin",  # industrial
     "polyisocyanate",  # industrial
     "alkaline",  # industrial
     "trifluoromethyl",  # industrial
-    "thermoplastic",
+    "thermoplastic(?: .*)?",  # industrial
+    "(?:.* )?resin",
+    "(?:.* )?epoxy",
+    "(?:.* )?polyurethane",
     "ethylene",
     "alkylat",
     "carbonyl",
     "aldehyde",
-    "volatile",
-    "inorganic",
-    "phenolic",
-    "heterocyclic",
     # end industrial
     # start military
     "explosive",
     # end military
     # diagnostic or lab
+    "(?:.* )?contrast",
+    "(?:.* )?screen",
+    "(?:.* )?media",
+    "(?:.* )?culture",
     "(?:.* )?polymerase chain reaction",
-    "(?:.* )?testing",
+    "(?:.* )?test(?:ing)?",
     "(?:.* )?detect",
     "(?:.* )?diagnostic",
     "(?:.* )?diagnosis",
     "(?:.* )?analyt",  # analyte
+    "reaction (?:vessel|mixture)",
+    "(?:.* )?assay",
+    "(?:.* )?microarray",
     "prognosticat",
     "(?:.* )?scopy" "(?:.* )?reagent",
     # end diagnostic
@@ -753,12 +894,15 @@ def remove_substrings():
 
 
 # no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
-# TODO: (sstr4) agonists
 EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
 # when expanding annotations, we don't want to make it too long
 EXPANSION_CUTOFF_TOKENS = 6
 # leave longer terms alone
 POTENTIAL_EXPANSION_MAX_TOKENS = 4
+
+# modulating the expression
+# inhibiting the expression
+# inhibit expression
 
 TermMap = TypedDict(
     "TermMap",
@@ -971,7 +1115,7 @@ def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlac
             final_re = rf"{WB}{or_re}$"
         elif place == "conditional_trailing":
             # e.g. to avoid "bio-affecting substances" -> "bio-affecting"
-            lbs = ["(?<!(?:the|ing))", r"(?<!\ba)", r"(?<!\ban)"]
+            lbs = ["(?<!(?:the|ing|ed|ion))", r"(?<!\ba)", r"(?<!\ban)"]
             lb = get_or_re(lbs)
             final_re = rf"{lb}{WB}{or_re}$"
         elif place == "leading":
@@ -1079,13 +1223,15 @@ def remove_common_terms():
     ]
     del_term_re = "(?i)" + get_or_re(del_term_res)
     result = client.select(f"select distinct original_term from {WORKING_TABLE}")
-    terms = pl.Series([r.get("original_term") for r in result])
+    terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
 
     delete_terms = terms.filter(terms.str.contains(del_term_re)).to_list()
+    logger.info("Found %s terms to delete from %s", len(delete_terms), del_term_re)
+    logger.info("Deleting terms %s", delete_terms)
 
     del_query = rf"""
         delete from {WORKING_TABLE}
-        where original_term=ANY(%s)
+        where lower(original_term)=ANY(%s)
         or original_term is null
         or original_term = ''
         or length(trim(original_term)) < 3
@@ -1210,29 +1356,29 @@ if __name__ == "__main__":
     Checks:
 
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930 -> 1,793,462)
+    (556,711 -> 567,398 -> 908,930 -> 1,037,828)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723 -> 3,697,848 -> 6,434,563)
+    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428 -> 4,405,141 -> 7,265,719)
+    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'';
-    (3,748,417 -> 3,748,417 -> 5,552,648 -> 9,911,948)
+    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3032462
     compounds  | 1474950
     diseases   |  829121
     mechanisms | 1444346
     --
-    attributes | 1539269
-    compounds  | 2132844
-    diseases   |  750829
-    mechanisms | 3312896
+    attributes | 3721861
+    compounds  | 2572389
+    diseases   |  845771
+    mechanisms | 4225243
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 18,254)
+    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 47,376)
+    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 117,418)
+    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443)
 
 
     alter table terms ADD COLUMN id SERIAL PRIMARY KEY;

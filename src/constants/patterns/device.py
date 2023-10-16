@@ -4,9 +4,10 @@ HIGH_LIKELIHOOD_DEVICES = [
     ".*electronic.*",
     "(?:.* )?dressing",
     "(?:.* )?cannula",
+    "(?:.* )?(?:back)?rest",
     "(?:.*[ -]?)?inject(?:or)?",  # autoinjector
     "(?:.* )?packag",  # packaging
-    "(?:.* )?needl",
+    "(?:.*)?needl",  # microneedle
     "(?:.* )?bolus",
     "(?:.* )?infusion pump",
     "(?:.* )?pacemaker",
@@ -16,6 +17,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?computer.*",
     "(?:.* )?latch",
     "(?:.* )?manifold",
+    "(?:.* )?headgear",
     "(?:.* )?clip",
     "(?:.* )?belt",
     "(?:.* )?pivot",
@@ -36,6 +38,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?solid state",
     "(?:.*)?wire",  # e.g. guidewire
     "(?:.* )?bed",
+    "(?:.* )?switch",  # could potentially be biological
     "(?:.* )?prosthetic",
     "(?:.* )?equipment",
     "(?:.* )?generator",
@@ -56,6 +59,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?nozzle",
     "(?:.* )?plastic",
     "(?:.* )?holder",
+    "(?:.* )?flange",
     "(?:.* )?circuit",
     "(?:.* )?liner",
     "(?:.* )?paper",
@@ -69,14 +73,20 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?current",
     "(?:.* )?surfac",
     "(?:.* )?field",
+    "(?:.* )?garment",
     "(?:.* )?mou?ld",  # molding, moulded
     "(?:.* )?napkin",
     "(?:.* )?anvil",
     "(?:.* )?implant.*",
     "(?:.* )?wheelchair",
+    "(?:.* )?wall",
+    "(?:.* )?wheel",
+    "(?:.* )?manipulat",  # manipulator
     "(?:.* )?gasket",
+    "(?:.* )?ratchet",
     "(?:.* )?syringe(?: .*)?",
     "(?:.* )?canist",
+    "(?:.* )?slide",
     "(?:.* )?tether",
     "(?:.* )?spectromet",
     "(?:.* )?diaper",
@@ -85,7 +95,9 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?waveguide",
     "(?:.* )?implant",
     "(?:.* )?rod",
+    "(?:.* )?cushion",
     "(?:.* )?trocar",
+    "(?:.* )?liquid crystal(?: .*)?",
     "(?:.* )?prosthesis",
     "(?:.* )?catheter.*",
     "(?:.* )?(?:bio[ -]?)?film",
@@ -104,6 +116,7 @@ HIGH_LIKELIHOOD_DEVICES = [
 ]
 # for use in patents; might need adjustment to be more generally applicable.
 DEVICE_RES = [
+    *HIGH_LIKELIHOOD_DEVICES,
     "(?:.* )?linkage",  # ??
     "(?:.* )?head",
     "(?:.* )?source",  # TODO
@@ -116,7 +129,9 @@ DEVICE_RES = [
     "(?:.* )?display",
     "(?:.*[ -])?scale",
     "(?:.* )?imag",  # imaging
+    "(?:.* )?image (?:.*)?",
     "(?:.* )?port",
+    "(?:.* )?cutt(?:er|ing)",
     "(?:.* )?seperat",
     "(?:.* )?(?:bio)?reactor",
     "(?:.* )?program",
