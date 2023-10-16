@@ -16,14 +16,11 @@ from system import initialize
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient as DatabaseClient
-from constants.patterns.device import DEVICE_RES
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
 from constants.patterns.intervention import (
-    COMPOUND_BASE_TERMS_GENERIC,
-    INTERVENTION_PREFIXES_GENERIC,
     MECHANISM_BASE_TERMS,
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
@@ -33,822 +30,14 @@ from core.ner.spacy import Spacy
 from utils.list import batch
 from utils.re import get_or_re
 
+from .constants import DELETION_TERMS, REMOVAL_WORDS_POST, REMOVAL_WORDS_PRE
+from .types import WordPlace
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 TextField = Literal["title", "abstract"]
-WordPlace = Literal[
-    "leading", "trailing", "all", "conditional_all", "conditional_trailing"
-]
-
-
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
-REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
-    **{k: "leading" for k in INTERVENTION_PREFIXES_GENERIC},
-    "such": "all",
-    "method": "all",
-    "obtainable": "all",
-    "different": "all",
-    "-+": "leading",
-    "stable": "all",
-    "various": "all",
-    "the": "leading",
-    "example": "all",
-    "unwanted": "leading",
-    "comprised?": "all",
-    "contagious": "leading",
-    "recognition": "trailing",
-    "binding": "trailing",
-    "prevention": "leading",
-    "that": "trailing",
-    "discreet": "all",
-    "properties": "trailing",
-    "administration(?: of)?": "all",
-    "treatment(?: of)?": "all",
-    "derived": "all",
-    "library": "all",
-    "more": "leading",
-    "technique": "trailing",
-    "classic": "all",
-    "present": "leading",
-    "invention": "all",
-    "various": "leading",
-    "construct": "trailing",
-    "particular": "all",
-    "uses(?: thereof| of)": "all",
-    "designer": "all",
-    "obvious": "leading",
-    "thereof": "all",
-    "specific": "all",
-    "in": "leading",
-    "more": "leading",
-    "a": "leading",
-    "non[ -]?toxic": "leading",
-    "(?:non )?selective": "leading",
-    "adequate": "leading",
-    "improv(?:ed|ing)": "all",
-    r"\b[(]?e[.]?g[.]?,?": "all",
-    "-targeted": "all",
-    "long[ -]?acting": "leading",
-    "other": "leading",
-    "more": "leading",
-    "of": "trailing",
-    "symptom": "trailing",
-    "condition": "trailing",
-    "be": "trailing",
-    "use": "trailing",
-    "efficacy": "all",
-    "pharmaceutical compositions?(?: comprising)?": "all",
-    "therapeutic procedure": "all",
-    "therefor": "all",
-    "(?:co[ -]?)?therapy": "trailing",
-    "(?:pharmaceutical |chemical )?composition": "trailing",
-    "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
-    "treating": "all",
-    "contact": "trailing",
-    "portion": "trailing",
-    "intermediate": "all",
-    "suitable": "all",
-    "and uses thereof": "all",
-    "procedure": "all",  # TODO
-    "relevant": "all",
-    "patient": "all",
-    "thereto": "all",
-    "against": "trailing",
-    "other": "leading",
-    "use of": "leading",
-    "certain": "all",
-    "working": "leading",
-    "on": "trailing",
-    "in(?: a)?": "trailing",
-    "(?: ,)?and": "trailing",
-    "and ": "leading",
-    "the": "trailing",
-    "with": "trailing",
-    "of": "trailing",
-    "for": "trailing",
-    "=": "trailing",
-    "unit(?:[(]s[)])?": "trailing",
-    "measur(?:ement|ing)": "all",
-    # "system": "trailing", # CNS?
-    "[.]": "trailing",
-    "analysis": "all",
-    "management": "all",
-    "accelerated": "all",
-    "below": "trailing",
-    "diagnosis": "all",
-    "fixed": "leading",
-    "pharmacological": "all",
-    "acquisition": "all",
-    "production": "all",
-    "level": "trailing",
-    "processing(?: of)?": "all",
-    "lead candidate": "all",
-    "control": "trailing",
-    "variant": "trailing",
-    "variet(?:y|ie)": "trailing",
-    "famil(?:y|ie)": "trailing",
-    "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    "based": "trailing",
-    "an?": "leading",
-    "active": "all",
-    "wherein": "all",
-    "additional": "all",
-    "additive": "all",
-    "advantageous": "all",
-    "aforementioned": "all",
-    "aforesaid": "all",
-    "efficient": "all",
-    "first": "all",
-    "second": "all",
-    "(?:ab)?normal": "all",
-    "inappropriate": "all",
-    "compounds as": "all",
-    "formula [(][ivxab]{1,3}[)]": "trailing",
-    "is": "leading",
-    "engineered": "leading",
-    "engineered": "trailing",
-    "medicament": "all",
-    "medicinal": "all",
-    "sufficient": "all",
-    "due": "trailing",
-    "locate": "all",
-    "specification": "all",
-    "detect": "all",
-    "similar": "all",
-    "contemplated": "all",
-    "predictable": "all",
-    "dos(?:e|ing|age)": "leading",
-    "conventional": "leading",
-    "contemplated": "all",
-    "is indicative of": "all",
-    "via": "leading",
-    "effect": "trailing",
-    "level": "trailing",
-    "disclosed": "all",
-    "wild type": "all",  # TODO
-    "(?:high|low)[ -]?dos(?:e|ing|age)": "all",
-    "effects of": "all",
-    "soluble": "leading",
-    "competitive": "leading",
-    "activatable": "all",
-    # "type": "leading", # type II diabetes
-    # model/source
-    "murine": "all",
-    "monkey": "all",
-    "non[ -]?human": "all",
-    "primate": "all",
-    "mouse": "all",
-    "mice": "all",
-    "human": "all",  # ??
-    "rat": "all",
-    "rodent": "all",
-    "rabbit": "all",
-    "porcine": "all",
-    "bovine": "all",
-    "equine": "all",
-    "mammal(?:ian)?": "all",
-}
-
-REMOVAL_WORDS_POST: dict[str, WordPlace] = {
-    **dict(
-        [
-            (t, "conditional_trailing")
-            for t in [
-                *COMPOUND_BASE_TERMS_GENERIC,
-                "activity",
-                "agent",
-                "effect",
-                "pro[ -]?drug",
-            ]
-        ]
-    ),
-    **REMOVAL_WORDS_PRE,
-}
-
-
-DELETION_TERMS = [
-    *DEVICE_RES,
-    "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
-    "[0-9., ]+",  # del if only numbers . and ,
-    # mangled
-    "(?:.* )? capable",  # material capable, etc
-    "salt as an",
-    "further",
-    "individual suffering",
-    ".{1,5}-",  # tri-
-    "(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
-    "optionally other modification",
-    "co[- ]?operate",
-    "light[ -]?receiving",
-    "resultant",
-    "optionally other",
-    "above[ -]?mentioned",
-    ".* of",
-    ".* comprising",
-    ".* tubular",
-    "composition (?:contain|compris)",
-    "[a-zA-Z0-9]+-containing",
-    "by-",
-    "cur",
-    "co-",
-    "therefrom",
-    "said .*",
-    "quantify",
-    "citrat",
-    "functional",
-    "cross[ -]?linking",
-    "biocompatibility",
-    "particle diamet",
-    "embodiment",
-    "quantificat",
-    "(?:.* )?rate",
-    "correspond",
-    "water[- ]?soluble",
-    "illustrat",
-    "cross[- ]?link",
-    "antigen-binding",
-    "sterilization",
-    "regeneration",
-    "particulat",
-    "embodiment",
-    "least partial",
-    "reform",
-    "conformat",
-    # thing (unwanted because generic)
-    "receptor",
-    "product .*",
-    "pathogen(?:ic)?",
-    "regenerative medicine",
-    "basic amino acid",
-    "(?:.* )?characteristic",
-    "response",
-    "single piece",
-    "product gas",
-    r"agent\(s\)",
-    "medical purpose",
-    "cell membrane",
-    "(?:.* )?part",
-    "(?:product|reaction) mixture",  # single dose
-    "(?:.* )?activit",
-    "(?:.* )?member",
-    "module",
-    "group",
-    "product stream",
-    "operator",
-    "field of .*",
-    # thing (unwanted because wrong type of thing)
-    "(?:.* )?propert(?:y|ie)",
-    "constraint",
-    "(?:side|adverse)[ -]?effect",
-    "leaflet",
-    "passageway",
-    "ability",
-    "determinat",  # determination
-    "anatomical structure",
-    "distract",  # distraction
-    "(?:.* )?configuration",
-    "considerat",  # consideration
-    "strateg(?:y|ie)",
-    "(?:.* )?arrangement",
-    "(?:.* )?position",
-    "(?:.* )?frame",
-    "(?:.* )?feature",
-    "heat generat",
-    "(?:.* )?industry",
-    "impact modifier",
-    "scratch resistance",
-    "gene transfer",
-    "mother milk",
-    "drug development",
-    ".*administration",
-    ".*patient",
-    "(?:.* )?pest",
-    "(?:.* )?examinee",
-    "(?:.* )?staff",
-    "(?:.* )?trial",
-    "(?:.* )?infant",
-    "(?:.* )?prospect",
-    "(?:.* )?room",
-    "professional",
-    "(?:.* )?person(?:nel)?",
-    "guest",
-    "body part",
-    "(?:.* )?patent",
-    "(?:.* )?pathway",
-    "(?:.* )?animal",
-    "(?:.* )?retardant",  # e.g. flame retardant
-    "aroma",
-    "(?:.* )?reaction",
-    "(?:.* )?cosmetic",
-    "(?:.* )?fragrance",
-    "silica",
-    "perfum",
-    "bacteri(?:um|a)",
-    "(?:.*)?station",
-    "(?:.* )?location",
-    "(?:.* )?mode",
-    "(?:.* )?region",
-    "(?:tumou?r|eukaryotic|live|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?) cell",
-    "virus",  # generic
-    "titanium dioxide",
-    "microorganism",
-    "(?:.* )?area",
-    "(?:.* )?power",
-    "(?:.* )?site",
-    "(?:.* )?signal",
-    "(?:.* )?layer",
-    "(?:.* )?surface",  # device?
-    # effect
-    "deactivat",
-    "friction",
-    "compressive force",
-    "correcting dysfunction",
-    # "bleaching",
-    "vibrat",
-    "moisturi[zs]",
-    "induc(?:es?d?|ing) differentiation",
-    "cool",
-    "connect",
-    "deterioration",
-    "detrimental",
-    "(?:.* )?absorb",
-    "(?:.* )?disengage",
-    "adjustment",
-    "lubricat",
-    "chain transfer",
-    "(?:.* )?abrasive",
-    "(?:.* )?retardancy",  # e.g. flame retardant
-    "film[ -]?form",
-    "heat transfer",
-    # "nucleating",
-    "cell death",
-    "deformable",
-    "(?:.* )?growth",  # TODO: disease?
-    "(?:.* )?resistance",
-    "(?:.* )?addition",
-    "ameliorat",
-    "transformant",
-    "deformation",
-    "reduction",
-    "fixation",
-    "stiffen",
-    "suction",
-    # disease
-    "disease state",
-    "dysfunction",
-    "related (?:disorder|condition|disease)",
-    "(?:disorder|condition|disease)s related",
-    "disease",
-    "syndrome",
-    "disorder",
-    "dysfunction",
-    # part or characteristic of body, or fluid
-    "(?:.* )?urine",
-    "(?:.* )?appendage",
-    "(?:.* )?ventricle",
-    "(?:.* )?aorta",
-    "(?:.* )?intervertebral disc",
-    "(?:.* )?mucosa",
-    "(?:.* )?retina",
-    "(?:.* )?artery",
-    "(?:.* )?vein",
-    "(?:.* )?tissue",
-    "(?:.* )?septum",
-    "(?:.* )?vasculature",
-    "(?:.* )?tendon",
-    "(?:.* )?ligament",
-    "bone fragment",
-    "vertebral",
-    "(?:.* )?obturator",
-    "(?:.* )?atrium",
-    "tibial?",
-    "transdermal",
-    "(?:.* )?femur",
-    "(?:.* )?core",  # device
-    "(?:.* )?vesicle",
-    "(?:.* )?valve",  # device
-    "(?:.* )?atrium",
-    "(?:.* )?nail",  # device
-    "(?:.* )?joint",
-    "(?:.* )?cavity",
-    "skin",
-    "hair",
-    "vascular",
-    "capillary",
-    "bodily",
-    "cornea",
-    "vertebra",
-    "spine",
-    "eye",
-    "urea",
-    "blood",
-    "gastric",
-    "gastrointestinal(?: tract)?",
-    "cartilage",
-    "jaw",
-    "liver",
-    "heart",
-    "intraocular len",
-    "femoral",
-    "respiratory(?: tract)?",
-    "pulmonary",
-    "uterus",
-    "lung",
-    "plasma",
-    "spinal column",
-    "muscle",
-    "kidney",
-    "prostate",
-    "pancreas",
-    "ocular",
-    "spleen",
-    "gallbladder",
-    "bladder",
-    "ureter",
-    "urethra",
-    "esophagus",
-    "stomach",
-    "intestin(?:e|al)",
-    "colon",
-    "rectum",
-    "trachea",
-    "bronch(?:ial|us)",
-    "larynx",
-    "pharynx",
-    "nasal",
-    "sinus",
-    "arterial",
-    "venous",
-    "lymph(?:atic)?(?: node| vessel)?",
-    # category errors
-    "(?:.*)?dimensional",
-    "pathological",
-    "consideration",
-    "combin",
-    "functionaliz",
-    "plurality",
-    "physical",
-    "demonstrat",
-    "engaged position",
-    "cell[- ]?free",
-    "contribut",
-    "advantage",
-    "(?:.* )?side",  # base end side
-    "accept",
-    "solid state",
-    "susceptible",
-    "(?:.* )?typ",  # type
-    "processability",
-    "auxiliary",
-    "present tricyclic",
-    "wherein(?: a)?",
-    "particle size",
-    "fragment of",
-    "concentric(?:al)?",
-    "(?:.* )?coupled",
-    "(?:.* )?axis",
-    "(?:.* )?path",
-    "(?:.* )?pattern",
-    "(?:.* )?plan",
-    "(?:.* )?stage",  # ??
-    "(?:.* )?quantit",
-    "functional group",
-    "drug discovery",
-    "combinatorial",
-    "compound having",
-    "non-",
-    # generic
-    "multi[- ]?component",
-    "discret",  # discrete
-    "problem",
-    "further",
-    "parent",
-    "structure(?: directing)?",
-    "technology",
-    "branch",
-    "(?:leading )?edge",
-    "approach",
-    "extension",
-    "space",
-    "point",
-    "mount",
-    "wall",
-    "cell(?: cycle| wall| line)",
-    "channel",  # todo?
-    "design",
-    "general structural",
-    "piece",
-    "attribute",
-    "preform",
-    "DNA sequence",
-    "(?:medical|treatment|operation) (?:fluid|zone|container|section|technology)",
-    "object",
-    "(?:drug )?target",
-    "biologically active",
-    "(?:.* )?sample",
-    "therapeutically",
-    "pharmaceutically-",
-    "physiological",
-    "pharmaceutically[- ]accept",
-    "therapy",
-    "(?:general |chemical )?formula(?: i{1,3}){0,3}(?: [0-9a-z]){0,3}",
-    "components?(?: i{1,3})?(?: [0-9a-z])?",
-    "compounds?(?: i{1,3})?(?: [0-9a-z])?",
-    "(?:medicinal|bioactive|biological)(?: activity)?",
-    "(?:pharmaceutical|pharmacological|medicinal) composition(?: containing| comprising)?",
-    "medicine compound",
-    "wherein said compound",
-    "pharmaceutical",
-    "pharmacological",
-    "(?:.* )?compounds? of(?: formula)?",
-    "compound of",
-    "(?:pharmacologically|pharmaceutically|biologically) active agent",
-    "(?:bioactive |medicinal )?agent",
-    "chemical entit",
-    # general characteristic
-    "utility",
-    "detachabl",
-    "proximal",
-    "hydrogenat",  # hydrogenated
-    "chiral",
-    "embolic",
-    "traction",
-    "annular",
-    "molten",
-    "(?:solid )?phase",
-    "disinfect",  # disinfectant is fine, but not disinfecting
-    "(?:open |closed )?configuration",
-    "dispersib(?:le|ilit)",
-    "photodynamic",
-    "structural",
-    "accurate",
-    "bioavailabilit",
-    "usefulness",
-    "(?:.* )?conductivit",
-    "multi[ -]?function",
-    "elastic(?:ity)?",
-    "symmetric(?:al)?",
-    "biocompatible",
-    "biocompatibilt",
-    "bioactivit",
-    "medicinal",
-    "cellular",
-    "natural",
-    "substantially free",
-    "therapeutically active",
-    # characteristics / descriptors
-    "helical",
-    "ingestibl",
-    "humaniz",  # humanized
-    "sheet-like",
-    "hydrophobicity",
-    "(?:high |low )?concentration",
-    "(?:.* )?acceptable",  # e.g. agrochemically acceptable
-    "solubilit",
-    "(?:.* )?refractive index",
-    "uniform(?:it)?",
-    "(?:non[ -]?)?conductive",
-    "granular",
-    "luminescent",
-    "(?:.* )?bound",
-    "amorphous",
-    "purif",  # purified
-    "hardness",
-    "deactivate",  # ??
-    "(?:.* )?stability",
-    "planar",
-    "fatty",
-    "compressible",
-    "(?:.* )?bond",
-    "(?:.* )?perpendicular",
-    "(?:.* )?specificity",
-    "(?:.* )?domain",
-    "storage stability",
-    "conductive",
-    "flexible",
-    "dermatological",
-    "bifunctional",
-    "in vitro",
-    "fibrous",
-    "biodegrad",
-    "resilient",
-    "fluorescent",
-    "superabsorbent",
-    "non[- ]?woven(.*)?",
-    "crystalline",
-    "volatile",
-    "phenolic",
-    "edibl",
-    "(?:non[ -]?|potentially )?therapeutic",
-    "water[ -]?insoluble",
-    "unsaturat",
-    "adhes",
-    "porous",
-    "dispens",
-    "impedanc",
-    "radioact",
-    # "cleans?(?:ing|er|ed)",
-    "optionally substitut",
-    "non[ -]?invasive",
-    "reinforc",
-    "(?:.* )?chain",
-    "aqueous",
-    "(?:.* )?bond",
-    "concentration",
-    "(?:.* )?conductive",
-    "(?:.* )?recombinant",
-    "(?:.* )?genetic",
-    "(?:.* )?acidic",
-    "(?:.* )?unsubstituted",
-    "(?:.* )?gaseous",
-    "(?:.* )?aromatic",
-    "(?:.* )?conjugated",
-    "(?:.* )?polymeric",
-    "(?:.* )?polymerizable",
-    "(?:.* )?oligomeric",
-    "(?:.* )?synergistic",
-    "(?:.* )?immunogenic",
-    "(?:.* )?amphiphilic",
-    "(?:.* )?macrocyclic",
-    "(?:.* )?elastic",
-    "(?:.* )?catalytic",
-    "(?:.* )?hydrophilic",
-    "(?:.* )?ophthalmic",
-    "(?:.* )?heterocyclic",
-    "(?:.* )?hydrophobic",
-    "(?:.* )?enzymatic",
-    "(?:.* )?lipophilic",
-    "(?:.* )?biodegradabilit",
-    "(?:.* )?affinity",
-    "(?:.* )?residual",
-    "(?:.* )?rigid",
-    "(?:.* )?cyclic",
-    "(?:.* )?adverse",
-    # physical process
-    "elut",  # elution
-    "drug release",
-    "sustained[ -]?release",
-    "disintegrat",
-    "evaporat",
-    "agglomerat",
-    # measurable thing
-    "(?:.* )?curvature",
-    "(?:.* )?degree",
-    "spatial resolution",
-    "oxygen concentrat",
-    "(?:.* )?number",
-    "(?:.* )?cost",
-    "(?:.* )?distance",
-    "(?:.* )?frequency",  # also procedure or device
-    "(?:.* )?torque",
-    "(?:.* )?divergence",
-    "(?:.* )?weight",
-    "(?:.* )?wavelength(?: .*)?",
-    "(?:.* )?charge",
-    "(?:.* )?band",
-    "(?:.* )?viscosity",
-    "(?:.* )?volume",
-    "(?:.* )?distribution",
-    "(?:.* )?amount",
-    "refractive index",
-    "phase change",
-    "(?:.* )?pressure",
-    "(?:.* )?strength",
-    "(?:.* )?population",
-    "(?:.* )?end",
-    "(?:.*[ -])?temperatures?(?: range|high(?:er)?)?",
-    "(?:.* )?ratio",
-    "(?:.* )?deliver",
-    "(?:.* )?step",
-    "(?:.* )?value",
-    "(?:.* )?time",
-    # roa
-    "aerosol",
-    "parenteral",
-    "inhalation",
-    "insufflation",
-    "intranasal",
-    "intramuscular",
-    "intravenous",
-    "subcutaneous",
-    "topical",
-    # intangible thing
-    "(?:.* )?concept",
-    "(?:.* )?data",
-    "(?:.* )?integer",
-    "(?:.* )?language",
-    "(?:.* )?information",
-    "(?:.* )?report",
-    "(?:.* )?parameter",
-    "(?:.* )?constant",
-    "(?:.* )?longitudinal",
-    "(?:.* )?equivalent",
-    "(?:.* )?subset",
-    "time period",
-    "(?:.* )?memory",
-    # material
-    "(?:.* )?metal",
-    # non-medical procedure or process"
-    "session",
-    "wash",
-    "solid-liquid separation",
-    "mix",
-    # "pattern form",  # pattern forming
-    "crystallizat",
-    "quantitat",
-    "(?:administrative )?procedure",
-    "support (?:.*)",  # ??
-    "(?:.* )?communicat",
-    "(?:.* )?sequenc",
-    # "thermoset",  # thermosetting
-    "(?:.* )?(?:micro)?process",
-    # procedure
-    "punctur",  # puncture
-    "transplant(?:at)",  # transplantation
-    "(?:.* )?electrolysis",
-    "(?:.* )?incision",
-    "(?:.* )?graft",
-    "(?:.* )?ablation",
-    "(?:.* )?technique",
-    "(?:.* )?retract",
-    "(?:.* )?care",
-    "(?:.* )?amplification",
-    "(?:.* )?ablation",
-    "(?:.* )?surger(?:y|ie)",
-    "(?:.* )?operat",
-    "(?:.* )?extraction",
-    "brachytherapy",
-    "radiotherapy",
-    "sealant",
-    "microelectronic",
-    # agtech
-    "pest control",
-    "(?:.* )?feedstock",
-    "(?:.* )?biomass",
-    "(?:.* )?agrochemical",
-    "(?:.* )?herbicid(?:e|al)(?: activity)?",
-    "(?:.* )?insecticid(?:e|al)(?: activity)?",
-    "(?:.* )?biocid(?:e|al)(?: activity)?",
-    "(?:.* )?fungicid(?:e|al)(?: activity)?",
-    "(?:.* )?pesticid(?:e|al)(?: activity)?",
-    "(?:.* )?plant",
-    "drought tolerance",
-    "biofuel",
-    "biodiesel",
-    "plant growth regulator",
-    # end agtech
-    # start industrial
-    "corros",  # corrosion
-    "asphalt",
-    "heat exchang",
-    "carbon black",
-    "(?:.* )?composite",
-    "(?:.* )?manufactur",
-    "(?:.* )?graphite",
-    "(?:.* )?metal",  # temporary?
-    "palladium",
-    "cobalt",
-    "propane",
-    "(?:.* )?energy",
-    "electric(?:al) .*",
-    "formaldehyde",  # ??
-    "aromatic ring",  # industrial
-    "polymer matrix",  # industrial
-    "polyolefin",  # industrial
-    "polyisocyanate",  # industrial
-    "alkaline",  # industrial
-    "trifluoromethyl",  # industrial
-    "thermoplastic(?: .*)?",  # industrial
-    "(?:.* )?resin",
-    "(?:.* )?epoxy",
-    "(?:.* )?polyurethane",
-    "ethylene",
-    "alkylat",
-    "carbonyl",
-    "aldehyde",
-    # end industrial
-    # start military
-    "explosive",
-    # end military
-    # diagnostic or lab
-    "(?:.* )?contrast",
-    "(?:.* )?screen",
-    "(?:.* )?media",
-    "(?:.* )?culture",
-    "(?:.* )?polymerase chain reaction",
-    "(?:.* )?test(?:ing)?",
-    "(?:.* )?detect",
-    "(?:.* )?diagnostic",
-    "(?:.* )?diagnosis",
-    "(?:.* )?analyt",  # analyte
-    "reaction (?:vessel|mixture)",
-    "(?:.* )?assay",
-    "(?:.* )?microarray",
-    "prognosticat",
-    "(?:.* )?scopy" "(?:.* )?reagent",
-    # end diagnostic
-]
 
 
 def remove_substrings():
@@ -887,25 +76,23 @@ def remove_substrings():
     client.delete_table(temp_table)
 
 
+# e.g. '(sstr4) agonists', which NER has a prob with
+TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
+
 # no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
-EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
+EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
 # when expanding annotations, we don't want to make it too long
-EXPANSION_CUTOFF_TOKENS = 6
+EXPANSION_NUM_CUTOFF_TOKENS = 7
 # leave longer terms alone
 POTENTIAL_EXPANSION_MAX_TOKENS = 4
 
-# modulating the expression
-# inhibiting the expression
-# inhibit expression
+EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
+EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
 TermMap = TypedDict(
     "TermMap",
     {"original_term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
 )
-
-
-# e.g. '(sstr4) agonists', which NER has a prob with
-TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
 
 
 def expand_annotations(
@@ -939,6 +126,81 @@ def expand_annotations(
     return _expand_annotations(batched)
 
 
+def _extract_parens_term(text: str, original_term: str) -> str | None:
+    """
+    Returns expanded term in cases like agonists -> (sstr4) agonists
+    TODO: typically is more like 'somatostatin receptor subtype 4 (sstr4) agonists'
+    """
+    possible_parens_term = re.findall(
+        f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
+    )
+
+    if len(possible_parens_term) == 0:
+        return None
+
+    return possible_parens_term[0]
+
+
+def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str | None:
+    """
+    Returns expanded term
+    Looks until it finds the next dobj or other suitable ending dep.
+    @see https://downloads.cs.stanford.edu/nlp/software/dependencies_manual.pdf
+
+    TODO:
+    -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
+    -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
+    """
+    appox_orig_len = len(original_term.split(" "))
+    s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
+    if s is None:
+        logger.error("No term text: %s, %s", original_term, text)
+        return None
+    char_to_token_idx = {t.idx: t.i for t in text_doc}
+
+    # starting index of the string (we're only looking forward)
+    start_idx = char_to_token_idx.get(s.start())
+
+    # check -1 in case of hyphenated term in text
+    # TODO: [number average molecular weight]×[content mass ratio] (content)
+    if start_idx is None:
+        start_idx = char_to_token_idx.get(s.start() - 1)
+
+    if start_idx is None:
+        logger.error("start_idx none for %s\n%s", original_term, text)
+        return None
+    doc = text_doc[start_idx:]
+
+    # syntactic subtree around the term
+    subtree = list([d for d in doc[0].subtree if d.i >= start_idx])
+    deps = [t.dep_ for t in subtree]
+
+    ending_idxs = [
+        deps.index(dep)
+        for dep in EXPANSION_ENDING_DEPS
+        # to avoid PRON (pronoun)
+        if dep in deps and subtree[deps.index(dep)].pos_ in EXPANSION_ENDING_POS
+        # don't consider if expansion contains "OR" or "AND" (tho in future we will)
+        and "cc" not in deps[appox_orig_len : deps.index(dep)]
+        # eg "inhibiting the expression of XYZ"
+        and "expression" not in subtree[deps.index(dep)].text.lower()
+    ]
+    next_ending_idx = min(ending_idxs) if len(ending_idxs) > 0 else -1
+    if next_ending_idx > 0 and next_ending_idx <= EXPANSION_NUM_CUTOFF_TOKENS:
+        expanded = subtree[0 : next_ending_idx + 1]
+        expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
+
+        if next_ending_idx < (appox_orig_len - 1):
+            logger.error(
+                "Shortening term (unexpected): %s -> %s",
+                original_term,
+                expanded_term,
+            )
+        return expanded_term
+
+    return None
+
+
 def _expand_annotations(batched_records: list[list[dict]]):
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
@@ -947,101 +209,25 @@ def _expand_annotations(batched_records: list[list[dict]]):
 
     nlp = Spacy.get_instance(disable=["ner"])
 
-    def get_parens_term(text, original_term):
-        """
-        Returns expanded term in cases like agonists -> (sstr4) agonists
-        TODO: typically is more like 'somatostatin receptor subtype 4 (sstr4) agonists'
-        """
-        possible_parens_term = re.findall(
-            f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
-        )
-
-        if len(possible_parens_term) == 0:
-            return None
-
-        return possible_parens_term[0]
-
-    def get_term(record: dict, doc_map: dict[str, Doc]):
-        """
-        Returns expanded term
-        Looks until it finds the next dobj or other suitable ending dep.
-        @see https://downloads.cs.stanford.edu/nlp/software/dependencies_manual.pdf
-
-        TODO:
-        -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
-        -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
-        """
+    def fix_term(record: dict, doc_map: dict[str, Doc]) -> TermMap | None:
         original_term = record["original_term"].strip(" -")
         publication_number = record["publication_number"]
-
+        text = record["text"]
         text_doc = doc_map[publication_number]
-        appox_orig_len = len(original_term.split(" "))
-        s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
-        if s is None:
-            logger.error("No term text: %s, %s", original_term, record["text"])
-            return None
-        char_to_token_idx = {t.idx: t.i for t in text_doc}
 
-        start_idx = char_to_token_idx.get(s.start())
-
-        # check -1 in case of hyphenated term in text
-        # TODO: [number average molecular weight]×[content mass ratio] (content)
-        if start_idx is None:
-            start_idx = char_to_token_idx.get(s.start() - 1)
-
-        if start_idx is None:
-            logger.error(
-                "START INDEX is None for %s: %s %s \n%s",
-                original_term,
-                s.start(),
-                char_to_token_idx,
-                record["text"],
-            )
-            return None
-        doc = text_doc[start_idx:]
-
-        # syntactic subtree around the term
-        subtree = list([d for d in doc[0].subtree if d.i >= start_idx])
-        deps = [t.dep_ for t in subtree]
-
-        ending_deps = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
-        ending_idxs = [
-            deps.index(dep)
-            for dep in ending_deps
-            # avoid PRON (pronoun)
-            if dep in deps and subtree[deps.index(dep)].pos_ in ["NOUN", "PROPN"]
-            # don't consider if expansion contains "OR" or "AND"
-            and "cc" not in deps[appox_orig_len : deps.index(dep)]
-        ]
-        next_ending_idx = min(ending_idxs) if len(ending_idxs) > 0 else -1
-        if next_ending_idx > 0 and next_ending_idx <= EXPANSION_CUTOFF_TOKENS:
-            expanded = subtree[0 : next_ending_idx + 1]
-            expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
-
-            if next_ending_idx < (appox_orig_len - 1):
-                logger.error(
-                    "Shortening term (unexpected): %s -> %s",
-                    original_term,
-                    expanded_term,
-                )
-            return expanded_term
-
-        return None
-
-    def extract_fixed_term(record: dict, doc_map: dict[str, Doc]) -> TermMap | None:
         # check for hyphenated term edge-case
-        fixed_term = get_parens_term(record["text"], record["original_term"])
+        fixed_term = _extract_parens_term(record["text"], record["original_term"])
 
         if not fixed_term:
-            fixed_term = get_term(record, doc_map)
+            fixed_term = _extract_expansion_term(original_term, text, text_doc)
 
         if (
             fixed_term is not None
             and fixed_term.lower() != record["original_term"].lower()
         ):
             return {
-                "publication_number": record["publication_number"],
-                "original_term": record["original_term"],
+                "publication_number": publication_number,
+                "original_term": original_term,
                 "cleaned_term": fixed_term,
             }
         else:
@@ -1053,7 +239,7 @@ def _expand_annotations(batched_records: list[list[dict]]):
         logger.info(
             "Created docs for annotation expansion, batch %s (%s)", i, len(records)
         )
-        fixed_terms = compact([extract_fixed_term(r, doc_map) for r in records])
+        fixed_terms = compact([fix_term(r, doc_map) for r in records])
 
         if len(fixed_terms) > 0:
             _update_annotation_values(fixed_terms)
