@@ -1,4 +1,7 @@
-from typing import NamedTuple
+from types import UnionType
+from typing import NamedTuple, Type, TypeVar
+
+from pydash import flatten
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
@@ -70,7 +73,24 @@ input_field_lists = InputFieldLists(
 )
 
 
-InputRecord = NamedTuple("InputRecord", list(input_field_lists._asdict().items()))  # type: ignore
+def get_input_type(field_type: str) -> Type | UnionType:
+    if field_type == "single_select":
+        return str | int | float
+    if field_type == "multi_select":
+        return list[str | int | float]
+    if field_type == "text":
+        return str
+    if field_type == "quantitative":
+        return int | float
+    raise ValueError(f"Invalid field_type: {field_type}")
+
+
+fields_to_types: list[tuple[str, Type | UnionType]] = [
+    (fv, get_input_type(t))
+    for t, fvs in input_field_lists._asdict().items()
+    for fv in fvs
+]
+InputRecord = NamedTuple("InputRecord", fields_to_types)  # type: ignore
 
 # with 5 buckets
 # INFO:__main__:Training Stage1 design accuracy: 0.79

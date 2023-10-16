@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+from pydash import flatten
 import torch
 
 import system
@@ -31,7 +32,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint: str = "checkpoint_95.pt",
+        checkpoint: str = "checkpoint_245.pt",
     ):
         """
         Initialize model
@@ -124,11 +125,6 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--fields", nargs="*")
-    args = parser.parse_args()
-    fields = dict(x.split("=") for x in args.fields)
-
     standard_fields = {
         # "conditions": ["covid-19"],
         # "mesh_conditions": ["covid-19"],
@@ -139,5 +135,9 @@ if __name__ == "__main__":
         "start_date": 2024,
     }
 
-    record = InputRecord(*{**standard_fields, **fields}.items())
+    parser = argparse.ArgumentParser()
+    for field in flatten(input_field_lists._asdict().values()):
+        parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
+
+    record = InputRecord(*parser.parse_args().__dict__.items())
     predict_single(record)
