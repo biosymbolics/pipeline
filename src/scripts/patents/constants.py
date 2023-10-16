@@ -195,6 +195,7 @@ DELETION_TERMS = [
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "acid addition salt",
     "potentially useful",
     "above protein",
     "operating same",
@@ -263,7 +264,7 @@ DELETION_TERMS = [
     "medical purpose",
     "cell membrane",
     "(?:.* )?part",
-    "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system)",
+    "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system|medium)",
     "(?:.* )?activit",
     "(?:.* )?member",
     "module",
@@ -549,6 +550,7 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
+    "hydrophobic",
     "serum-free",
     "moldability",
     "cellulosic",
@@ -722,6 +724,9 @@ DELETION_TERMS = [
     "(?:.* )?memory",
     # material
     "(?:.* )?metal",
+    "cobalt",
+    "palladium",  # dental?
+    "chromium",
     "(?:.* )?metal oxide",
     "(?:.* )?graphite",
     "(?:.* )?graphene(?: oxide)?",
@@ -778,6 +783,10 @@ DELETION_TERMS = [
     "plant growth regulator",
     # end agtech
     # start industrial
+    "heat resistance",
+    "methanol",
+    "methane",
+    "phosphate",
     "thermoset",  # thermosetting
     "solvent system",
     "biodegradable polymer",
@@ -791,8 +800,11 @@ DELETION_TERMS = [
     "(?:.* )?energy",
     "electric(?:al) .*",
     "formaldehyde",  # ??
+    "metal catalyst",
+    "styrene",
     "aromatic ring",  # industrial
     "polymer matrix",  # industrial
+    "(?:quaternary )?ammonium",
     "polyolefin",  # industrial
     "polyisocyanate",  # industrial
     "alkaline",  # industrial

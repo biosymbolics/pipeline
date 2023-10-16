@@ -5,6 +5,7 @@ TODO: combine with biologics.py / moa.py / etc.
 from utils.re import get_or_re
 
 
+# period
 PRIMARY_BASE_TERMS: dict[str, str] = {
     "activat(?:or|ion|ing|e)?": "activator",
     "(?:super[ -]?)?agoni[sz](?:t|ing|er?|m)?": "agonist",
@@ -13,7 +14,7 @@ PRIMARY_BASE_TERMS: dict[str, str] = {
     "bind(?:er|ing)?": "binder",
     "block(?:er|ing|ade)?": "blocker",
     "chaperone": "chaperone",
-    "(?:co[ -]?|bio[ -]?)?cataly(?:st|ze|zing|zer)": "catalyst",
+    "(?:co[ -]?|bio[ -]?)?cataly(?:st|ze|zing|zer)(?: system)": "catalyst",
     "degrad(?:er|ation|ing|e)?": "degrader",
     "desensitiz(?:ation|ing|e|er)": "desensitizer",
     "disrupt(?:or|ion|ing)?": "disruptor",
@@ -118,7 +119,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:receptor |protein )?ligands?(?: binding| that bind)?",
     "(?:dna |nucleic acid )?fragments?(?: binding| that bind)?",
     "aggregate",
-    "amino acid",
+    "(?:amino |fatty |nucleic ) acid",
     "(?:neo)?antigen",
     "antigen[ -]binding fragment",
     "antigen presenting cell",
@@ -153,7 +154,6 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:natural killer|nkt|nkc)(?: cells)?",
     "lignin",
     "mutein",
-    "nucleic acid",
     "nuclease",
     "(?:oligo[ -])?nucleotides?(?: sequence)?",
     "(?:poly[ -]?)?peptides?(?: sequence)?",
@@ -243,6 +243,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "foam",
     "form(?:ula|a)?(?:tion)?",
     "function",
+    "gas(?:eous)?",
     "gel",
     "granule",
     # "group",

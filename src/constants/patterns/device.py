@@ -13,6 +13,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?infusion pump",
     "(?:.* )?pacemaker",
     "(?:.* )?glass",
+    "(?:.* )?nanotube",
     "(?:.* )?rubber",  # ??
     "(?:.* )?tank",
     "(?:.* )?computer.*",
@@ -81,7 +82,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?field",
     "(?:.* )?element",  # e.g. locking element # TODO probably excessive
     "(?:.* )?garment",
-    "(?:.* )?mou?ld(?: .*)?",  # molding, moulded, molded product
+    "(?:.* )?mou?ld(?:ed|ing)?(?: .*)?",  # molding, moulded, molded product
     "(?:.* )?napkin",
     "(?:.* )?anvil",
     "(?:.* )?implant.*",
