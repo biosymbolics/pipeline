@@ -162,16 +162,16 @@ def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str
         logger.error("No term text in expansion: %s, %s", original_term, text)
         return None
 
-    char_to_token_idx = {t.idx: t.i for t in text_doc}
+    char_to_tok_idx = {t.idx: t.i for t in text_doc}
 
     # starting index of the string (we're only looking forward)
-    start_idx = char_to_token_idx.get(s.start())
-    end_idx = char_to_token_idx[s.end() - 1]
+    start_idx = char_to_tok_idx.get(s.start())
+    end_idx = len(original_term.split(" "))  # approximate
 
     # check -1 in case of hyphenated term in text
     # TODO: [number average molecular weight]×[content mass ratio] (content)
     if start_idx is None:
-        start_idx = char_to_token_idx.get(s.start() - 1)
+        start_idx = char_to_tok_idx.get(s.start() - 1)
 
     if start_idx is None:
         logger.error("start_idx none for %s\n%s", original_term, text)
@@ -503,7 +503,7 @@ def populate_working_biosym_annotations():
 
     # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
     # # after remove_substrings to avoid expanding substrings into something (potentially) mangled
-    # expand_annotations()
+    expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
