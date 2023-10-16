@@ -24,8 +24,8 @@ from ._constants import (
     TEXT_FIELDS,
 )
 from .copy_approvals import copy_approvals
-from .copy_bq_tables import copy_patent_tables
-from .copy_patents_from_bq import copy_bq_to_psql
+from .copy_bq_patents import copy_patent_tables
+from .preprocess_bq_patents import copy_bq_to_psql
 from .terms import create_patent_terms
 
 logger = logging.getLogger(__name__)
