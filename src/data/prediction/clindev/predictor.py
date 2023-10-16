@@ -129,5 +129,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     fields = dict(x.split("=") for x in args.fields)
 
-    record = InputRecord(*fields.items())
+    standard_fields = {
+        # "conditions": ["covid-19"],
+        # "mesh_conditions": ["covid-19"],
+        # "interventions": ["hydroxychloroquine"],
+        "sponsor_type": "INDUSTRY",
+        "phase": "PHASE_3",
+        "enrollment": 10000,
+        "start_date": 2024,
+    }
+
+    record = InputRecord(*{**standard_fields, **fields}.items())
     predict_single(record)

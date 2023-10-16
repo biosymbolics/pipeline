@@ -1,4 +1,3 @@
-from collections import namedtuple
 from typing import NamedTuple
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
@@ -8,8 +7,6 @@ from data.prediction.constants import (
 from data.types import FieldLists, InputFieldLists
 
 CHECKPOINT_PATH = "clindev_model_checkpoints"
-
-
 BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
@@ -25,15 +22,6 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "enrollment",
     # "facilities", ??
     # "countries" ??
-]
-Y1_CATEGORICAL_FIELDS: list[str] = [
-    "design",
-    "masking",
-    "randomization",
-    "comparison_type",
-    # "hypothesis_type"
-    # "termination_reason",
-    # dropout_count
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "conditions",  # typically only the specific condition
@@ -52,6 +40,15 @@ QUANTITATIVE_FIELDS: list[str] = [
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
+    # dropout_count
+]
+Y1_CATEGORICAL_FIELDS: list[str] = [
+    "design",
+    "masking",
+    "randomization",
+    "comparison_type",
+    # "hypothesis_type"
+    # "termination_reason",
     # dropout_count
 ]
 Y2_FIELD = "duration"
