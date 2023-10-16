@@ -166,7 +166,7 @@ def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str
 
     # starting index of the string (we're only looking forward)
     start_idx = char_to_tok_idx.get(s.start())
-    end_idx = len(original_term.split(" "))  # approximate
+    appox_orig_len = len(original_term.split(" "))
 
     # check -1 in case of hyphenated term in text
     # TODO: [number average molecular weight]×[content mass ratio] (content)
@@ -188,7 +188,7 @@ def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str
         # to avoid PRON (pronoun)
         if dep in deps and subtree[deps.index(dep)].pos_ in EXPANSION_ENDING_POS
         # don't consider if expansion contains "OR" or "AND" (tho in future we will)
-        and "cc" not in deps[end_idx : deps.index(dep)]  # TODO: use of end_idx untested
+        and "cc" not in deps[appox_orig_len : deps.index(dep)]
         # eg "inhibiting the expression of XYZ"
         and subtree[deps.index(dep)].text.lower() not in EXPANSION_POS_OVERRIDE_TERMS
     ]
