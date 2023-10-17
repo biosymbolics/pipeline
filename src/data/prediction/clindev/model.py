@@ -1,9 +1,8 @@
 """
 Trial characteristic and duration prediction model
 """
-from abc import abstractmethod
 import os
-from typing import Literal, Optional
+from typing import Literal, Optional, Type, TypeVar, cast
 import torch
 import torch.nn as nn
 import logging
@@ -21,6 +20,9 @@ from .types import StageSizes, TwoStageModelSizes, TwoStageModelInputSizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+T = TypeVar("T", bound="SaveableModel")
 
 
 class SaveableModel(nn.Module):
@@ -45,24 +47,23 @@ class SaveableModel(nn.Module):
         Args:
             epoch (int): Epoch number
         """
-        checkpoint = {
-            "model_state_dict": self.state_dict(),
-            "epoch": epoch,
-        }
         checkpoint_name = f"{self.key}-checkpoint_{epoch}.pt"
 
         try:
-            torch.save(checkpoint, self.get_checkpoint_path(epoch))
+            torch.save(self, self.get_checkpoint_path(epoch))
             logger.info("Saved checkpoint %s", checkpoint_name)
         except Exception as e:
             logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
             raise e
 
     @classmethod
-    def load(cls, epoch: int) -> "SaveableModel":
-        model = torch.load(
-            cls.get_checkpoint_path(epoch),
-            map_location=torch.device(cls.device),
+    def load(cls: Type[T], epoch: int) -> T:
+        model = cast(
+            T,
+            torch.load(
+                cls.get_checkpoint_path(epoch),
+                map_location=torch.device(cls.device),
+            ),
         )
         model.eval()
         return model
@@ -193,7 +194,7 @@ class InputModel(SaveableModel):
         return x
 
     def eval(self):
-        # super().eval()
+        super().eval()
         for emb in [
             *self.multi_select_embeddings.values(),
             *self.single_select_embeddings.values(),
@@ -319,11 +320,11 @@ class TwoStageModel(nn.Module):
         self.stage2_model.save(epoch)
 
     def load(self, epoch: int):
-        self.input_model = InputModel().load(epoch)
-        self.stage1_model = Stage1Model().load(epoch)
-        self.stage1_output_model = Stage1Output().load(epoch)
-        self.correlation_decoders = OutputCorrelationDecoders().load(epoch)
-        self.stage2_model = Stage2Model().load(epoch)
+        self.input_model = InputModel.load(epoch)
+        self.stage1_model = Stage1Model.load(epoch)
+        self.stage1_output_model = Stage1Output.load(epoch)
+        self.correlation_decoders = OutputCorrelationDecoders.load(epoch)
+        self.stage2_model = Stage2Model.load(epoch)
 
     def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
         self.input_model = InputModel(sizes)
