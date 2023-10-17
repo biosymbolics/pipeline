@@ -26,6 +26,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "prevention": "leading",
     "that": "trailing",
     "discreet": "all",
+    "subject": "leading",
     "properties": "trailing",
     "administration(?: of)?": "all",
     "treatment(?: of)?": "all",
@@ -174,6 +175,9 @@ REMOVAL_WORDS_POST: dict[str, WordPlace] = {
         ]
     ),
     **REMOVAL_WORDS_PRE,
+    "(?:en)?coding": "trailing",
+    "being": "trailing",
+    "containing": "trailing",
 }
 
 DELETION_TERMS = [
@@ -302,8 +306,8 @@ DELETION_TERMS = [
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
     "(?:.* )?reaction",
-    "(?:.* )?cosmetic",
-    "(?:.* )?hair condition",
+    # "(?:.* )?cosmetic",
+    # "(?:.* )?hair condition",
     "(?:.* )?fragrance",
     "silica",
     "perfum",
@@ -791,7 +795,7 @@ DELETION_TERMS = [
     "(?:.* )?manufactur",
     "propane",
     "(?:.* )?energy",
-    "electric(?:al) .*",
+    "electric(?:al)(?:ly)?.*",
     "formaldehyde",  # ??
     "metal catalyst",
     "styrene",

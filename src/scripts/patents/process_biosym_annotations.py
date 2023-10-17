@@ -91,7 +91,7 @@ EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
 # overrides POS, eg "inhibiting the expression of XYZ"
-EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding"]
+EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding", "coding"]
 
 
 TermMap = TypedDict(
@@ -434,17 +434,17 @@ def normalize_domains():
     mechanism_re = get_or_re(mechanism_terms)
 
     queries = [
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
-        f"delete from biosym_annotations ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') like '%C01%' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
+        # f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
+        # f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
+        # f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
+        # f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
+        # f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
+        f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 
     for sql in queries:
@@ -481,32 +481,32 @@ def populate_working_biosym_annotations():
     - Performs various cleanups and deletions
     """
     client = DatabaseClient()
-    logger.info(
-        "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
-    )
-    client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-        WORKING_TABLE,
-    )
+    # logger.info(
+    #     "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
+    # )
+    # client.create_from_select(
+    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+    #     WORKING_TABLE,
+    # )
 
-    # add indices after initial load
-    client.create_indices(
-        [
-            {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
-            {"table": WORKING_TABLE, "column": "domain"},
-        ]
-    )
+    # # add indices after initial load
+    # client.create_indices(
+    #     [
+    #         {"table": WORKING_TABLE, "column": "publication_number"},
+    #         {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+    #         {"table": WORKING_TABLE, "column": "domain"},
+    #     ]
+    # )
 
-    fix_unmatched()
-    clean_up_junk()
+    # fix_unmatched()
+    # clean_up_junk()
 
-    # # round 1 (leaves in stuff used by for/of)
-    remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # # # round 1 (leaves in stuff used by for/of)
+    # remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
-    # after remove_substrings to avoid expanding substrings into something (potentially) mangled
-    expand_annotations()
+    # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
+    # # after remove_substrings to avoid expanding substrings into something (potentially) mangled
+    # expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
     remove_trailing_leading(REMOVAL_WORDS_POST)
@@ -538,8 +538,9 @@ if __name__ == "__main__":
     """
     Checks:
 
+    select original_term, count(*) from biosym_annotations group by original_term order by count(*) desc limit 2000;
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930 -> 1,037,828)
+    (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 826,706)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
     (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
@@ -562,18 +563,6 @@ if __name__ == "__main__":
     (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
     (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443)
-
-
-    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM#
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY original_term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
     """
     if "-h" in sys.argv:
         print(

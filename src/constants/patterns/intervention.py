@@ -160,6 +160,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "nuclease",
     "(?:oligo[ -])?nucleotides?(?: sequence)?",
     "(?:poly[ -]?)?peptides?(?: sequence)?",
+    "plasmid",
     "protease",
     "protein",
     "recognizer",
@@ -453,6 +454,7 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "(?:anti[ -]?sense)",
     "aromatic",
     "chimeric",
+    "chiral",
     "deuterat",  # deuterated
     "(?:non-?|mono|spiro|ali|bi|endo|tri|hetero|poly|macro)?cyclic",
     "(?:ion )?channel",
