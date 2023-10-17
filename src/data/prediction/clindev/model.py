@@ -128,15 +128,6 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
             self.to(self.device)
 
     def forward(self, x):
-        # STAGE1 x torch.Size([32, 4]) torch.Size([3, 4]) torch.Size([5, 4]) torch.Size([3, 4])
-        # newbad STAGE1 x torch.Size([32, 17]) torch.Size([3, 4]) torch.Size([5, 4]) torch.Size([3, 4])
-        print(
-            "STAGE1 x",
-            x.shape,
-            list(self.values())[0].weight.shape,
-            list(self.values())[1].weight.shape,
-            list(self.values())[2].weight.shape,
-        )
         values = list([module(x) for module in self.values()])
         return torch.cat(values, dim=1).to(self.device), values
 

@@ -1,7 +1,6 @@
 from types import UnionType
-from typing import NamedTuple, Type, TypeVar
+from typing import NamedTuple, Type
 
-from pydash import flatten
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
@@ -10,6 +9,7 @@ from data.prediction.constants import (
 from data.types import FieldLists, InputFieldLists
 
 CHECKPOINT_PATH = "clindev_model_checkpoints"
+BASE_ENCODER_DIRECTORY = "clindev_model_checkpoints/encoders"
 BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16

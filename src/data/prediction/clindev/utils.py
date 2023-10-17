@@ -22,6 +22,7 @@ from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
 
 from .constants import (
+    BASE_ENCODER_DIRECTORY,
     DEVICE,
     MAX_ITEMS_PER_CAT,
     QUANTITATIVE_TO_CATEGORY_FIELDS,
@@ -49,7 +50,9 @@ def preprocess_inputs(
     """
     transformations = [
         lambda inputs: sorted(inputs, key=lambda x: random.random()),
-        lambda inputs: encode_quantitative_fields(inputs, quant_to_cat_fields),
+        lambda inputs: encode_quantitative_fields(
+            inputs, quant_to_cat_fields, directory=BASE_ENCODER_DIRECTORY
+        ),
     ]
     output = reduce(lambda x, f: f(x), transformations, records)
 
@@ -95,6 +98,7 @@ def prepare_input_data(
         records,
         field_lists=input_field_lists,
         batch_size=batch_size,
+        directory=BASE_ENCODER_DIRECTORY,
         max_items_per_cat=MAX_ITEMS_PER_CAT,
         device=device,
     )
@@ -119,6 +123,7 @@ def prepare_data(
         records,
         field_lists=field_lists,
         batch_size=batch_size,
+        directory=BASE_ENCODER_DIRECTORY,
         max_items_per_cat=MAX_ITEMS_PER_CAT,
         device=device,
     )
