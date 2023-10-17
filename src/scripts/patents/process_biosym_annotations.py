@@ -540,29 +540,29 @@ if __name__ == "__main__":
 
     select original_term, count(*) from biosym_annotations group by original_term order by count(*) desc limit 2000;
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 826,706)
+    (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 777,772)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138)
+    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138 -> 4,866,248)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690)
+    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690 -> 5,445,856)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'';
-    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403)
+    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403 -> 6,749,193)
     select domain, count(*) from biosym_annotations group by domain;
-    attributes | 3032462
-    compounds  | 1474950
-    diseases   |  829121
-    mechanisms | 1444346
-    --
     attributes | 3721861
     compounds  | 2572389
     diseases   |  845771
     mechanisms | 4225243
+    ------------+---------
+    attributes | 3721861
+    compounds  | 2332852
+    diseases   |  810242
+    mechanisms | 3606099
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493)
+    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493 -> 21,758)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696)
+    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696 -> 55,104)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443)
+    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443 -> 119,331)
     """
     if "-h" in sys.argv:
         print(
