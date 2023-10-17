@@ -8,7 +8,6 @@ import torch.nn as nn
 import logging
 
 from data.prediction.clindev.utils import embed_cat_inputs
-from utils.model import od_to_dict
 
 from .constants import (
     CHECKPOINT_PATH,
@@ -16,7 +15,7 @@ from .constants import (
     LR,
     OPTIMIZER_CLASS,
 )
-from .types import TwoStageModelSizes
+from .types import StageSizes, TwoStageModelSizes, TwoStageModelInputSizes
 
 
 logger = logging.getLogger(__name__)
@@ -45,41 +44,165 @@ class OutputCorrelation(nn.Module):
         return OutputCorrelation(hidden_size, stage1_output_map[output_field])
 
 
-class Stage1Model(nn.Module):
-    def __init__(
-        self, input_size: int, hidden_size: int, output_size: int, device: str
-    ):
+class SaveableModel(nn.Module):
+    def __init__(self, key: str, device: str):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(input_size, input_size),
-            nn.Dropout(0.01),
-            nn.BatchNorm1d(input_size),
-            nn.ReLU(),
-            nn.Linear(input_size, hidden_size),
-            nn.Dropout(0.2),
-            nn.BatchNorm1d(hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, output_size),
-        ).to(device)
+        self.device = device
+        self.key = key
+
+    def get_checkpoint_name(self, epoch: int):
+        return f"{self.key}-checkpoint_{epoch}.pt"
+
+    def get_checkpoint_path(self, epoch: int):
+        return os.path.join(CHECKPOINT_PATH, self.get_checkpoint_name(epoch))
+
+    def save(self, epoch: int):
+        """
+        Save model checkpoint
+
+        Args:
+            epoch (int): Epoch number
+        """
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "epoch": epoch,
+        }
+        checkpoint_name = f"{self.key}-checkpoint_{epoch}.pt"
+
+        try:
+            torch.save(checkpoint, self.get_checkpoint_path(epoch))
+            logger.info("Saved checkpoint %s", checkpoint_name)
+        except Exception as e:
+            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
+            raise e
+
+    def load(self, epoch: int):
+        model = torch.load(
+            self.get_checkpoint_path(epoch),
+            map_location=torch.device(self.device),
+        )
+        model.eval()
+        return model
 
 
-class Stage2Model(nn.Module):
+class InputModel(SaveableModel):
     def __init__(
-        self, input_size: int, hidden_size: int, output_size: int, device: str
+        self, sizes: Optional[TwoStageModelInputSizes] = None, device: str = DEVICE
     ):
-        # Stage 2 model
-        self.model = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.Dropout(0.01),
-            nn.BatchNorm1d(hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, round(hidden_size / 2)),
-            nn.Dropout(0.2),
-            nn.BatchNorm1d(round(hidden_size / 2)),
-            nn.ReLU(),
-            nn.Linear(round(hidden_size / 2), output_size),
-            nn.Softmax(),
-        ).to(device)
+        super().__init__("input", device)
+
+        if sizes is not None:
+            logger.info("Initializing input model with sizes %s", sizes)
+            self.multi_select_embeddings = nn.ModuleDict(
+                {
+                    f: nn.Embedding(s, sizes.embedding_dim, device=self.device)
+                    for f, s in sizes.categories_by_field.multi_select.items()
+                }
+            )
+            self.multi_select = nn.Linear(
+                sizes.multi_select_input * sizes.embedding_dim,
+                sizes.multi_select_output,
+            )
+
+            self.single_select_embeddings = nn.ModuleDict(
+                {
+                    f: nn.Embedding(s, sizes.embedding_dim, device=self.device)
+                    for f, s in sizes.categories_by_field.single_select.items()
+                }
+            )
+            self.single_select = nn.Linear(
+                sizes.single_select_input * sizes.embedding_dim,
+                sizes.single_select_output,
+            )
+
+            self.quantitative = nn.Linear(
+                sizes.quantitative_input, sizes.quantitative_input
+            )
+            self.text = nn.Linear(sizes.text_input, sizes.text_input)
+
+    def forward(self, multi_select, single_select, text, quantitative):
+        all_inputs = []
+        if len(text) > 0:
+            all_inputs.append(self.input_model.text(text))
+
+        if len(quantitative) > 0:
+            all_inputs.append(self.input_model.quantitative(quantitative))
+
+        if len(multi_select) > 0:
+            inputs = embed_cat_inputs(
+                multi_select, self.multi_select_embeddings, self.device
+            )
+            all_inputs.append(self.input_model.multi_select(inputs))
+
+        if len(single_select) > 0:
+            inputs = embed_cat_inputs(
+                single_select, self.single_select_embeddings, self.device
+            )
+            all_inputs.append(self.input_model.single_select(inputs))
+
+        x = torch.cat(all_inputs, dim=1)
+        return x
+
+
+class Stage1Model(SaveableModel):
+    def __init__(self, sizes: Optional[StageSizes] = None, device: str = DEVICE):
+        super().__init__("stage1", device)
+        if sizes is not None:
+            logger.info("Initializing input model with sizes %s", sizes)
+            self.layer1 = nn.Sequential(
+                nn.Linear(sizes.input, sizes.input),
+                nn.Dropout(0.01),
+                nn.BatchNorm1d(sizes.input),
+                nn.ReLU(),
+            ).to(device)
+
+            self.layer2 = nn.Sequential(
+                nn.Linear(sizes.input, sizes.hidden),
+                nn.Dropout(0.2),
+                nn.BatchNorm1d(sizes.hidden),
+                nn.ReLU(),
+            ).to(device)
+
+            self.layer3 = nn.Sequential(
+                nn.Linear(sizes.hidden, sizes.output),
+            ).to(device)
+
+    def forward(self, *args, **kargs):
+        x = self.layer1(*args, **kargs)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        return x
+
+
+class Stage2Model(SaveableModel):
+    def __init__(self, sizes: Optional[StageSizes] = None, device: str = DEVICE):
+        super().__init__("stage2", device)
+
+        if sizes is not None:
+            self.layer1 = nn.Sequential(
+                nn.Linear(sizes.input, sizes.hidden),
+                nn.Dropout(0.01),
+                nn.BatchNorm1d(sizes.hidden),
+                nn.ReLU(),
+            ).to(device)
+
+            self.layer2 = nn.Sequential(
+                nn.Linear(sizes.hidden, round(sizes.hidden / 2)),
+                nn.Dropout(0.2),
+                nn.BatchNorm1d(round(sizes.hidden / 2)),
+                nn.ReLU(),
+            ).to(device)
+
+            self.layer3 = nn.Sequential(
+                nn.Linear(round(sizes.hidden / 2), sizes.output),
+                nn.Softmax(),
+            ).to(device)
+
+    def forward(self, *args, **kargs):
+        x = self.layer1(*args, **kargs)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        return x
 
 
 class TwoStageModel(nn.Module):
@@ -96,7 +219,7 @@ class TwoStageModel(nn.Module):
         self,
         mode: Literal["train", "predict", "none"],
         sizes: Optional[TwoStageModelSizes] = None,  # required if mode == "train"
-        checkpoint: Optional[str] = None,  # required if mode == "predict"
+        checkpoint_epoch: Optional[int] = None,  # required if mode == "predict"
         device: str = DEVICE,
     ):
         super().__init__()
@@ -105,13 +228,13 @@ class TwoStageModel(nn.Module):
 
         if mode == "train" and sizes is not None:
             self.__initialize_model(sizes, device)
-        elif mode == "predict" and checkpoint is not None:
-            return self.__load_model(checkpoint, device)
+        elif mode == "predict" and checkpoint_epoch is not None:
+            return self.__load_model(checkpoint_epoch)
         elif mode == "none":
             pass
         else:
             raise ValueError(
-                f"Invalid mode: {mode}, checkpoint: {checkpoint}, sizes: {sizes}"
+                f"Invalid mode: {mode}, checkpoint: {checkpoint_epoch}, sizes: {sizes}"
             )
 
     def save_checkpoint(self, epoch: int):
@@ -121,134 +244,21 @@ class TwoStageModel(nn.Module):
         Args:
             epoch (int): Epoch number
         """
-        checkpoint = {
-            "model_state_dict": self.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "epoch": epoch,
-        }
-        checkpoint_name = f"checkpoint_{epoch}.pt"
+        self.input_model.save(epoch)
+        self.stage1_model.save(epoch)
+        self.stage2_model.save(epoch)
 
-        try:
-            torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
-            logger.info("Saved checkpoint %s", checkpoint_name)
-        except Exception as e:
-            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
-            raise e
-
-    def __load_model(self, checkpoint: str, device: str):
-        checkpoint_obj = torch.load(
-            f"{CHECKPOINT_PATH}/{checkpoint}",
-            map_location=torch.device(device),
-        )
-
-        state = od_to_dict(checkpoint_obj["model_state_dict"])
-
-        def create_and_load(LayerOrModel, state, f, is_reversed: bool = True):
-            print("WIWIWIW", f, state.keys())
-
-            if state.get("weight") is not None:
-                shape = state.get("weight").shape
-
-                if is_reversed:
-                    shape = tuple(reversed(shape))
-                layer = LayerOrModel(*shape).to(device)
-                layer.load_state_dict(state)
-                return layer
-
-            if state.get("0") is not None:
-                print("0000keys", state.get("0").keys())
-                model = LayerOrModel(
-                    state["0"].weight.size(0),
-                    state["4"].weight.size(0),
-                    state["8"].weight.size(1),
-                ).to(device)
-                model.load_state_dict(state)
-                return model
-
-            raise ValueError(f"Invalid state: {state}")
-
-        self.input_model = nn.ModuleDict(
-            {
-                f: create_and_load(nn.Linear, v, f)
-                for f, v in state["input_model"].items()
-            }
-        )
-        self.multi_select_embeddings = nn.ModuleDict(
-            {
-                f: create_and_load(nn.Embedding, v, f, is_reversed=False)
-                for f, v in state["multi_select_embeddings"].items()
-            }
-        )
-        self.single_select_embeddings = nn.ModuleDict(
-            {
-                f: create_and_load(nn.Embedding, v, f, is_reversed=False)
-                for f, v in state["single_select_embeddings"].items()
-            }
-        )
-        self.stage1_model = create_and_load(
-            Stage1Model, state["stage1_model"], "stage1"
-        )
-        self.stage2_model = create_and_load(
-            Stage2Model, state["stage2_model"], "stage2"
-        )
-
-        self.eval()
+    def __load_model(self, epoch: int):
+        self.input_model = InputModel().load(epoch)
+        self.stage1_model = Stage1Model().load(epoch)
+        self.stage2_model = Stage2Model().load(epoch)
 
     def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
-        embedding_dim = sizes.embedding_dim
+        self.input_model = InputModel(sizes).to(device)
 
-        self.multi_select_embeddings = nn.ModuleDict(
-            {
-                f: nn.Embedding(s, embedding_dim, device=self.device)
-                for f, s in sizes.categories_by_field.multi_select.items()
-            }
-        )
-
-        self.single_select_embeddings = nn.ModuleDict(
-            {
-                f: nn.Embedding(s, embedding_dim, device=self.device)
-                for f, s in sizes.categories_by_field.single_select.items()
-            }
-        )
-
-        input_layers = {
-            k: v
-            for k, v in [
-                (
-                    "multi_select",
-                    nn.Linear(
-                        sizes.multi_select_input * embedding_dim,
-                        sizes.multi_select_output,
-                    ),
-                ),
-                (
-                    "quantitative",
-                    nn.Linear(sizes.quantitative_input, sizes.quantitative_input)
-                    if sizes.quantitative_input > 0
-                    else None,
-                ),
-                (
-                    "single_select",
-                    nn.Linear(
-                        sizes.single_select_input * embedding_dim,
-                        sizes.single_select_output,
-                    ),
-                ),
-                (
-                    "text",
-                    nn.Linear(sizes.text_input, sizes.text_input)
-                    if sizes.text_input > 0
-                    else None,
-                ),
-            ]
-            if v is not None
-        }
-        self.input_model = nn.ModuleDict(input_layers).to(device)
-
-        # Stage 1 model
-        # TODO: make contrastive??
         self.stage1_model = Stage1Model(
-            sizes.stage1_input, sizes.stage1_hidden, sizes.stage1_output, device=device
+            StageSizes(sizes.stage1_input, sizes.stage1_hidden, sizes.stage1_output),
+            device=device,
         )
 
         # used for calc of loss / evaluation of stage1 separately
@@ -271,7 +281,7 @@ class TwoStageModel(nn.Module):
         )
 
         self.stage2_model = Stage2Model(
-            sizes.stage2_input, sizes.stage2_hidden, 1, device
+            StageSizes(sizes.stage2_input, sizes.stage2_hidden, 1), device
         )
 
     @property
@@ -300,27 +310,9 @@ class TwoStageModel(nn.Module):
         print(self.stage1_model[0].weight)
         print(list(self.multi_select_embeddings.values())[0].weight[0:10])
         """
-
-        all_inputs = []
-        if len(text) > 0:
-            all_inputs.append(self.input_model["text"](text))
-
-        if len(quantitative) > 0:
-            all_inputs.append(self.input_model["quantitative"](quantitative))
-
-        if len(multi_select) > 0:
-            inputs = embed_cat_inputs(
-                multi_select, self.multi_select_embeddings, self.device
-            )
-            all_inputs.append(self.input_model["multi_select"](inputs))
-
-        if len(single_select) > 0:
-            inputs = embed_cat_inputs(
-                single_select, self.single_select_embeddings, self.device
-            )
-            all_inputs.append(self.input_model["single_select"](inputs))
-
-        x = torch.cat(all_inputs, dim=1).to(self.device)
+        x = self.input_model(multi_select, single_select, text, quantitative).device(
+            self.device
+        )
 
         y1_pred = self.stage1_model(x).to(self.device)
         y1_probs_list = [model(y1_pred) for model in self.stage1_output_models.values()]
@@ -341,8 +333,8 @@ class TwoStageModel(nn.Module):
 
 
 class ClindevPredictionModel(TwoStageModel):
-    def __init__(self, checkpoint: str, device: str = DEVICE):
-        super().__init__("predict", None, checkpoint, device=device)
+    def __init__(self, checkpoint_epoch: int, device: str = DEVICE):
+        super().__init__("predict", None, checkpoint_epoch, device=device)
 
 
 class ClindevTrainingModel(TwoStageModel):

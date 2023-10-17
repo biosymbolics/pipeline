@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import math
 from typing import NamedTuple
 
@@ -8,19 +9,14 @@ class AllCategorySizes(NamedTuple):
     y1: dict[str, int]
 
 
-class TwoStageModelSizes(NamedTuple):
-    """
-    Sizes of inputs and outputs for two-stage model
-    """
-
-    categories_by_field: AllCategorySizes
+@dataclass(frozen=True)
+class TwoStageModelInputSizes:
     multi_select_input: int
     quantitative_input: int
     single_select_input: int
     text_input: int
-    stage1_output: int
-    stage1_output_map: dict[str, int]
-    stage2_output: int
+
+    categories_by_field: AllCategorySizes
     embedding_dim: int
 
     @property
@@ -38,6 +34,17 @@ class TwoStageModelSizes(NamedTuple):
             * self.embedding_dim
             * math.log2(sum(self.categories_by_field.single_select.values()))
         )
+
+
+@dataclass(frozen=True)
+class TwoStageModelSizes(TwoStageModelInputSizes):
+    """
+    Sizes of inputs and outputs for two-stage model
+    """
+
+    stage1_output: int
+    stage1_output_map: dict[str, int]
+    stage2_output: int
 
     @property
     def stage1_input(self):
@@ -62,7 +69,7 @@ class TwoStageModelSizes(NamedTuple):
 
     def __str__(self):
         return (
-            " ".join([f"{f}: {v}" for f, v in self._asdict().items()])
+            " ".join([f"{f}: {v}" for f, v in self.__dict__.items()])
             + " "
             + f"multi_select_output: {self.multi_select_output} "
             f"single_select_output: {self.single_select_output} "
@@ -71,3 +78,10 @@ class TwoStageModelSizes(NamedTuple):
             f"stage2_input: {self.stage2_input} "
             f"stage2_hidden: {self.stage2_hidden} "
         )
+
+
+@dataclass(frozen=True)
+class StageSizes:
+    input: int
+    hidden: int
+    output: int

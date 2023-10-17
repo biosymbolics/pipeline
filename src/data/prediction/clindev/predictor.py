@@ -31,7 +31,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint: str = "checkpoint_245.pt",
+        checkpoint_epoch: int = 245,
         device: str = DEVICE,
     ):
         """
@@ -42,7 +42,7 @@ class ModelPredictor:
         """
         torch.device(device)
         self.device = device
-        self.model = ClindevPredictionModel(checkpoint, device)
+        self.model = ClindevPredictionModel(checkpoint_epoch, device)
 
     def __call__(self, *args, **kwargs):
         """
@@ -70,6 +70,7 @@ class ModelPredictor:
         device: str = DEVICE,
     ):
         inputs = prepare_input_data(
+            # no duration, since this is inference
             preprocess_inputs(records, ["enrollment"]),
             input_field_lists=input_field_lists,
             batch_size=batch_size,
