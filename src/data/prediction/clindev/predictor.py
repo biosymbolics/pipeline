@@ -17,7 +17,11 @@ from .constants import (
     input_field_lists,
 )
 from .model import ClindevPredictionModel
-from .utils import prepare_input_data, preprocess_inputs
+from .utils import (
+    prepare_input_data,
+    preprocess_inputs,
+    split_input_categories as split_categories,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +73,7 @@ class ModelPredictor:
         batch_size: int = BATCH_SIZE,
         device: str = DEVICE,
     ):
-        inputs = prepare_input_data(
+        inputs, category_sizes = prepare_input_data(
             # no duration, since this is inference
             preprocess_inputs(records, ["enrollment"]),
             input_field_lists=input_field_lists,
@@ -80,13 +84,14 @@ class ModelPredictor:
         def predict_batch(i: int):
             batch = ModelPredictor.__get_batch(i, inputs)
 
-            y1_probs, _, y2_preds = self.model(
+            _, _, y2_preds, y1_probs_list = self.model(
                 torch.split(batch.multi_select, 1, dim=1),
                 torch.split(batch.single_select, 1, dim=1),
                 batch.text,
                 batch.quantitative,
             )
-            return [y1_probs, y2_preds]
+            y2_pred = torch.argmax(y2_preds).item()
+            return [torch.argmax(y1).item() for y1 in y1_probs_list], y2_pred
 
         predictions = [predict_batch(i) for i in range(len(inputs.multi_select))]
         return predictions
@@ -128,4 +133,5 @@ if __name__ == "__main__":
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
     record = InputRecord(*parser.parse_args().__dict__.values())
-    predict_single(record)
+    res = predict_single(record)
+    print("RESULT:", res)

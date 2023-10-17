@@ -128,6 +128,15 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
             self.to(self.device)
 
     def forward(self, x):
+        # STAGE1 x torch.Size([32, 4]) torch.Size([3, 4]) torch.Size([5, 4]) torch.Size([3, 4])
+        # newbad STAGE1 x torch.Size([32, 17]) torch.Size([3, 4]) torch.Size([5, 4]) torch.Size([3, 4])
+        print(
+            "STAGE1 x",
+            x.shape,
+            list(self.values())[0].weight.shape,
+            list(self.values())[1].weight.shape,
+            list(self.values())[2].weight.shape,
+        )
         values = list([module(x) for module in self.values()])
         return torch.cat(values, dim=1).to(self.device), values
 
@@ -363,7 +372,7 @@ class TwoStageModel(nn.Module):
         single_select: list[torch.Tensor],
         text: torch.Tensor,
         quantitative: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
         print(self.stage2_model[0].weight)
@@ -379,7 +388,7 @@ class TwoStageModel(nn.Module):
 
         y2_pred = self.stage2_model(y1_pred).to(self.device)
 
-        return (y1_probs, y1_corr_probs, y2_pred)
+        return (y1_probs, y1_corr_probs, y2_pred, y1_probs_list)
 
 
 class ClindevPredictionModel(TwoStageModel):

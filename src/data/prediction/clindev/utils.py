@@ -27,7 +27,7 @@ from .constants import (
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     InputRecord,
 )
-from .types import AllCategorySizes
+from .types import AllCategorySizes, InputCategorySizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -86,12 +86,12 @@ def prepare_input_data(
     input_field_lists: InputFieldLists,
     batch_size: int,
     device: str,
-) -> ModelInput:
+) -> tuple[ModelInput, InputCategorySizes]:
     """
     Prepare input data
     """
     # encode_and_batch_features, max_items_per_cat=MAX_ITEMS_PER_CAT
-    inputs, _ = encode_and_batch_features(
+    inputs, category_sizes = encode_and_batch_features(
         records,
         field_lists=input_field_lists,
         batch_size=batch_size,
@@ -99,7 +99,7 @@ def prepare_input_data(
         device=device,
     )
 
-    return inputs
+    return inputs, InputCategorySizes(*category_sizes)
 
 
 def prepare_data(
@@ -159,6 +159,22 @@ def prepare_data(
     )
 
 
+def split_input_categories(
+    preds: torch.Tensor, category_sizes: dict[str, int]
+) -> list[torch.Tensor]:
+    """
+    For multi-categorical output, split into 1 tensor per field
+
+    Args:
+        preds (torch.Tensor): Predicted values
+        category_sizes (dict[str, int]): Sizes of each category
+    """
+    # indexes with which to split probs into 1 tensor per field
+    indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]
+    preds_by_field = torch.tensor_split(preds, indices, dim=1)
+    return preds_by_field
+
+
 def split_categories(
     preds: torch.Tensor,
     trues: torch.Tensor,
@@ -172,9 +188,7 @@ def split_categories(
         trues (torch.Tensor): True values
         category_sizes (dict[str, int]): Sizes of each category
     """
-    # indexes with which to split probs into 1 tensor per field
-    indices = list(accumulate(category_sizes.values(), lambda x, y: x + y))[:-1]
-    preds_by_field = torch.tensor_split(preds, indices, dim=1)
+    preds_by_field = split_input_categories(preds, category_sizes)
     trues_by_field = [t.squeeze() for t in torch.split(trues, 1, dim=1)]
     return preds_by_field, trues_by_field
 
