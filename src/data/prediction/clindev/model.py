@@ -1,6 +1,7 @@
 """
 Trial characteristic and duration prediction model
 """
+from abc import abstractmethod
 import os
 from typing import Literal, Optional
 import torch
@@ -23,16 +24,19 @@ logger.setLevel(logging.INFO)
 
 
 class SaveableModel(nn.Module):
-    def __init__(self, key: str, device: str):
+    key: str | None = None
+    device = DEVICE  # TODO can this be overwritten?
+
+    def __init__(self):
         super().__init__()
-        self.device = device
-        self.key = key
 
-    def get_checkpoint_name(self, epoch: int):
-        return f"{self.key}-checkpoint_{epoch}.pt"
+    @classmethod
+    def get_checkpoint_name(cls, epoch: int):
+        return f"{cls.key}-checkpoint_{epoch}.pt"
 
-    def get_checkpoint_path(self, epoch: int):
-        return os.path.join(CHECKPOINT_PATH, self.get_checkpoint_name(epoch))
+    @classmethod
+    def get_checkpoint_path(cls, epoch: int):
+        return os.path.join(CHECKPOINT_PATH, cls.get_checkpoint_name(epoch))
 
     def save(self, epoch: int):
         """
@@ -54,10 +58,11 @@ class SaveableModel(nn.Module):
             logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
             raise e
 
-    def load(self, epoch: int):
+    @classmethod
+    def load(cls, epoch: int) -> "SaveableModel":
         model = torch.load(
-            self.get_checkpoint_path(epoch),
-            map_location=torch.device(self.device),
+            cls.get_checkpoint_path(epoch),
+            map_location=torch.device(cls.device),
         )
         model.eval()
         return model
@@ -86,17 +91,16 @@ class OutputCorrelation(nn.Module):
 
 
 class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
-    def __init__(
-        self, output_map: Optional[dict[str, int]] = None, device: str = DEVICE
-    ):
-        super().__init__("correlation_decoders", device)
+    key = "correlation_decoders"
+    device = DEVICE
+
+    def __init__(self, output_map: Optional[dict[str, int]] = None):
+        super().__init__()
         if output_map is not None:
             for name in output_map.keys():
-                self.add_module(
-                    name, OutputCorrelation.create(name, output_map).to(device)
-                )
+                self.add_module(name, OutputCorrelation.create(name, output_map))
 
-            self.to(device)
+            self.to(self.device)
 
     def forward(self, y1_probs_list):
         values = [
@@ -107,18 +111,20 @@ class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
 
 
 class Stage1Output(SaveableModel, nn.ModuleDict):
+    key = "stage1_output"
+    device = DEVICE
+
     def __init__(
         self,
         input_size: Optional[int] = None,
         output_map: Optional[dict[str, int]] = None,
-        device: str = DEVICE,
     ):
-        super().__init__("stage1_output", device)
+        super().__init__()
         if output_map is not None and input_size is not None:
             for name, size in output_map.items():
                 self.add_module(name, nn.Linear(input_size, size))
 
-            self.to(device)
+            self.to(self.device)
 
     def forward(self, x):
         values = list([module(x) for module in self.values()])
@@ -126,10 +132,11 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
 
 
 class InputModel(SaveableModel):
-    def __init__(
-        self, sizes: Optional[TwoStageModelInputSizes] = None, device: str = DEVICE
-    ):
-        super().__init__("input", device)
+    key = "input"
+    device = DEVICE
+
+    def __init__(self, sizes: Optional[TwoStageModelInputSizes] = None):
+        super().__init__()
 
         if sizes is not None:
             logger.info("Initializing input model with sizes %s", sizes)
@@ -160,7 +167,7 @@ class InputModel(SaveableModel):
             )
             self.text = nn.Linear(sizes.text_input, sizes.text_input)
 
-            self.to(device)
+            self.to(self.device)
 
     def forward(self, multi_select, single_select, text, quantitative):
         all_inputs = []
@@ -185,10 +192,21 @@ class InputModel(SaveableModel):
         x = torch.cat(all_inputs, dim=1)
         return x
 
+    def eval(self):
+        # super().eval()
+        for emb in [
+            *self.multi_select_embeddings.values(),
+            *self.single_select_embeddings.values(),
+        ]:
+            emb.eval()
+
 
 class Stage1Model(SaveableModel):
-    def __init__(self, sizes: Optional[StageSizes] = None, device: str = DEVICE):
-        super().__init__("stage1", device)
+    key = "stage1"
+    device = DEVICE
+
+    def __init__(self, sizes: Optional[StageSizes] = None):
+        super().__init__()
         if sizes is not None:
             logger.info("Initializing stage1 model with sizes %s", sizes)
             self.layer1 = nn.Sequential(
@@ -209,7 +227,7 @@ class Stage1Model(SaveableModel):
                 nn.Linear(sizes.hidden, sizes.output),
             )
 
-            self.to(device)
+            self.to(self.device)
 
     def forward(self, input):
         x = self.layer1(input)
@@ -219,8 +237,11 @@ class Stage1Model(SaveableModel):
 
 
 class Stage2Model(SaveableModel):
-    def __init__(self, sizes: Optional[StageSizes] = None, device: str = DEVICE):
-        super().__init__("stage2", device)
+    key = "stage2"
+    device = DEVICE
+
+    def __init__(self, sizes: Optional[StageSizes] = None):
+        super().__init__()
 
         if sizes is not None:
             logger.info("Initializing stage2 model with sizes %s", sizes)
@@ -229,19 +250,21 @@ class Stage2Model(SaveableModel):
                 nn.Dropout(0.01),
                 nn.BatchNorm1d(sizes.hidden),
                 nn.ReLU(),
-            ).to(device)
+            )
 
             self.layer2 = nn.Sequential(
                 nn.Linear(sizes.hidden, round(sizes.hidden / 2)),
                 nn.Dropout(0.2),
                 nn.BatchNorm1d(round(sizes.hidden / 2)),
                 nn.ReLU(),
-            ).to(device)
+            )
 
             self.layer3 = nn.Sequential(
                 nn.Linear(round(sizes.hidden / 2), sizes.output),
                 nn.Softmax(),
-            ).to(device)
+            )
+
+            self.to(self.device)
 
     def forward(self, input):
         x = self.layer1(input)
@@ -303,26 +326,22 @@ class TwoStageModel(nn.Module):
         self.stage2_model = Stage2Model().load(epoch)
 
     def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
-        self.input_model = InputModel(sizes, device=device)
+        self.input_model = InputModel(sizes)
 
         self.stage1_model = Stage1Model(
             StageSizes(sizes.stage1_input, sizes.stage1_hidden, sizes.stage1_output),
-            device=device,
         )
 
         # used for calc of loss / evaluation of stage1 separately
         self.stage1_output_model = Stage1Output(
-            sizes.stage1_output, sizes.stage1_output_map, device
+            sizes.stage1_output, sizes.stage1_output_map
         )
 
         # used to learn correlations between outputs
-        self.correlation_decoders = OutputCorrelationDecoders(
-            sizes.stage1_output_map, device
-        )
+        self.correlation_decoders = OutputCorrelationDecoders(sizes.stage1_output_map)
 
         self.stage2_model = Stage2Model(
             StageSizes(sizes.stage2_input, sizes.stage2_hidden, sizes.stage2_output),
-            device,
         )
 
     @property
