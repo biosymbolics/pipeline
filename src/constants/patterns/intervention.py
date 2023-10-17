@@ -115,11 +115,11 @@ MECHANISM_BASE_TERMS = [
 BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:(?:glyco|fusion)[ -]?)?proteins?(?: binding)?",
     "(?:poly)peptides?(?: binding)?",
-    "(?:poly)?nucleo[ts]ides?(?: binding)?",
+    "(?:poly|di|tri)?nucleo[ts]ides?(?: binding)?",
     "(?:receptor |protein )?ligands?(?: binding| that bind)?",
     "(?:dna |nucleic acid |antibody )?(?:fragments?|sequences?)(?: binding| that bind)?",
     "aggregate",
-    "(?:amino |fatty |nucleic )acid",
+    "(?:amino |fatty |(?:poly|di|tri)nucleic )acid",
     "(?:neo)?antigen",
     "antigen[ -]binding fragment",
     "antigen presenting cell",
