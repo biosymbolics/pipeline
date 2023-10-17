@@ -190,27 +190,28 @@ class Stage1Model(SaveableModel):
     def __init__(self, sizes: Optional[StageSizes] = None, device: str = DEVICE):
         super().__init__("stage1", device)
         if sizes is not None:
-            logger.info("Initializing input model with sizes %s", sizes)
+            logger.info("Initializing stage1 model with sizes %s", sizes)
             self.layer1 = nn.Sequential(
                 nn.Linear(sizes.input, sizes.input),
                 nn.Dropout(0.01),
                 nn.BatchNorm1d(sizes.input),
                 nn.ReLU(),
-            ).to(device)
+            )
 
             self.layer2 = nn.Sequential(
                 nn.Linear(sizes.input, sizes.hidden),
                 nn.Dropout(0.2),
                 nn.BatchNorm1d(sizes.hidden),
                 nn.ReLU(),
-            ).to(device)
+            )
 
             self.layer3 = nn.Sequential(
                 nn.Linear(sizes.hidden, sizes.output),
-            ).to(device)
+            )
+
+            self.to(device)
 
     def forward(self, input):
-        print("STAGE11 INPUT SHAPE", input.shape)
         x = self.layer1(input)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -222,6 +223,7 @@ class Stage2Model(SaveableModel):
         super().__init__("stage2", device)
 
         if sizes is not None:
+            logger.info("Initializing stage2 model with sizes %s", sizes)
             self.layer1 = nn.Sequential(
                 nn.Linear(sizes.input, sizes.hidden),
                 nn.Dropout(0.01),
@@ -242,7 +244,6 @@ class Stage2Model(SaveableModel):
             ).to(device)
 
     def forward(self, input):
-        print("STAGE2 INPUT SHAPE", input.shape)
         x = self.layer1(input)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -273,7 +274,7 @@ class TwoStageModel(nn.Module):
         if mode == "train" and sizes is not None:
             self.__initialize_model(sizes, device)
         elif mode == "predict" and checkpoint_epoch is not None:
-            return self.__load_model(checkpoint_epoch)
+            return self.load(checkpoint_epoch)
         elif mode == "none":
             pass
         else:
@@ -320,7 +321,8 @@ class TwoStageModel(nn.Module):
         )
 
         self.stage2_model = Stage2Model(
-            StageSizes(sizes.stage2_input, sizes.stage2_hidden, 1), device
+            StageSizes(sizes.stage2_input, sizes.stage2_hidden, sizes.stage2_output),
+            device,
         )
 
     @property

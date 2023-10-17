@@ -241,7 +241,7 @@ class ModelTrainer:
                     batch = ModelTrainer.__get_batch(te, self.test_input_dict)
                     self.evaluate(batch, self.y1_category_sizes)
                 self.log_metrics("Evaluation")
-                self.model.save_checkpoint(epoch)
+                self.model.save(epoch)
 
     def calculate_metrics(
         self,

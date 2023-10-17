@@ -31,7 +31,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 245,
+        checkpoint_epoch: int = 5,
         device: str = DEVICE,
     ):
         """

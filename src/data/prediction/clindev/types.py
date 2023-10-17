@@ -61,7 +61,7 @@ class TwoStageModelSizes(TwoStageModelInputSizes):
 
     @property
     def stage2_input(self):
-        return self.stage1_input
+        return self.stage1_output
 
     @property
     def stage2_hidden(self):
