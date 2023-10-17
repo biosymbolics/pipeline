@@ -103,6 +103,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?waveguide",
     "(?:.* )?implant",
     "(?:.* )?rod",
+    "(?:.* )?conductive",
     "(?:.* )?cushion",
     "(?:.* )?trocar",
     "(?:.* )?liquid crystal(?: .*)?",

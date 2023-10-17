@@ -117,7 +117,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:poly)peptides?(?: binding)?",
     "(?:poly)?nucleo[ts]ides?(?: binding)?",
     "(?:receptor |protein )?ligands?(?: binding| that bind)?",
-    "(?:dna |nucleic acid )?fragments?(?: binding| that bind)?",
+    "(?:dna |nucleic acid |antibody )?(?:fragments?|sequences?)(?: binding| that bind)?",
     "aggregate",
     "(?:amino |fatty |nucleic ) acid",
     "(?:neo)?antigen",
@@ -134,17 +134,19 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "chemotherap(?:y|ie)",  # not necessary biologic, more class/descriptive
     "(?:adoptive )?cell(?: tranfer)?(?: therap(?:y|ie))?",
     "clone",
+    "conjugate",
     "(?:cell )?culture",
     "cytokine",
     "decomposition",
+    "(?:recombinant )?dna",
     "epitope",
     "exosome",
     "enzyme",
     "fab(?: region)?",
     "factor [ivx]{1,3}",
     "fc(?:[- ]fusion )?(?: protein)?",
-    "fusion",
-    "(?:hairpin|micro|messenger|sh|si|ds|m|hp|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?rna(?: molecule| sequence)?",
+    "fus(?:ed|ion)",
+    "(?:hairpin|micro|messenger|sh|si|ds|m|hp|recombinant|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?rna(?: molecule| sequence)?",
     "(?:trans)?gene",
     "interferon",
     "isoform",
@@ -153,6 +155,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:co[ -]?)?(?:di|mono|poly|oligo)mer",
     "(?:natural killer|nkt|nkc)(?: cells)?",
     "lignin",
+    "liposome",
     "mutein",
     "nuclease",
     "(?:oligo[ -])?nucleotides?(?: sequence)?",
@@ -162,7 +165,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "recognizer",
     "scaffold",
     "scfv",  # single-chain variable fragment
-    "liposome",
+    "sequence",
     "(?:expression )?vector",
     "stem cell",
     "(?:tumor[- ]?infiltrating )?lymphocyte",
@@ -178,8 +181,9 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "benzene",  # not biomedical?
     "cellulose",
     "(?:immuno[ -]?)?conjugat(?:ion|ing|e)",
-    "(?:small |antibody )?molecules?(?: binding)?",
+    "(?:small |antibody |dna |rna )?molecules?(?: binding)?",
     "carbonyl",
+    "carbene",
     "diamine",
     "elastomer",
     "emulsion",
@@ -205,6 +209,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
 
 
 COMPOUND_BASE_TERMS_GENERIC: list[str] = [
+    "additive",
     "administration(?: of)?",
     "aerosol",
     "aerogel",
@@ -217,12 +222,12 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "by[ -]?product",  # ??
     "(?:di|nano)?bod(?:y|ie)",  # ??
     "(?:bio)?material",
-    "candidate",
+    "(?:lead )?candidate",
     "(?:micro[ -]?|nano[ -]?)?capsule",
     "(?:electro|bio)?[ -]?chemical",
     "(?:re[ -]?)?combination",
     "complex(?:es)?",
-    "composition",
+    "(?:pharmaceutical |chemical )?composition",
     "component",
     "compound",
     "constituent",
@@ -232,7 +237,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "derivative",
     "detergent",
     "distillation",
-    "(?:single )?dose?(?:age)?(?: form| setting)?",
+    "(?:single )?dose?(?:age|ing)?(?: form| setting)?",
     "drop(?:let)",
     "drug",
     "element",
@@ -259,6 +264,8 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "leading",
     "librar(?:y|ies)",
     "(?:producing )?material",
+    "medicament",
+    "medication",
     "medium",
     "member",
     "(?:micro|nano)?[ -]?particle",
@@ -305,6 +312,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "treatment",
     "trailing",
     "variant",
+    "variet(?:y|ie)",
     "vehicle",
 ]
 
@@ -352,7 +360,7 @@ ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 INTERVENTION_PREFIXES_GENERIC = [
     "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "(?:bi|tri|dual|triple|inverse|reverse)(?:[- ]?acting)?",
-    "activ(?:ity|ated)",
+    "activ(?:ity|ated|atable)",
     "advanced",
     "adjunct",
     "asymmetric",  # TODO: move to specific?
@@ -368,6 +376,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "chemical(?:ly)?(?: modified| formula| structure)*",
     "clinically[ -]?proven",
     "convenient",
+    "derived",
     "dual",
     "effective",
     "exemplary",
@@ -447,6 +456,7 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "deuterat",  # deuterated
     "(?:non-?|mono|spiro|ali|bi|endo|tri|hetero|poly|macro)?cyclic",
     "(?:ion )?channel",
+    "fused",
     "inverse",
     "(?:irr)?reversible",
     "negative",

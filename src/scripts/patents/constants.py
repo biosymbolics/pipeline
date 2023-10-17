@@ -29,10 +29,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "properties": "trailing",
     "administration(?: of)?": "all",
     "treatment(?: of)?": "all",
-    "derived": "all",
     "library": "all",
     "more": "leading",
-    "technique": "trailing",
     "classic": "all",
     "present": "leading",
     "invention": "all",
@@ -62,11 +60,9 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "be": "trailing",
     "use": "trailing",
     "efficacy": "all",
-    "pharmaceutical compositions?(?: comprising)?": "all",
     "therapeutic procedure": "all",
     "therefor": "all",
     "(?:co[ -]?)?therapy": "trailing",
-    "(?:pharmaceutical |chemical )?composition": "trailing",
     "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
     "treating": "all",
     "contact": "trailing",
@@ -74,7 +70,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "intermediate": "all",
     "suitable": "all",
     "and uses thereof": "all",
-    "procedure": "all",  # TODO
     "relevant": "all",
     "patient": "all",
     "thereto": "all",
@@ -107,10 +102,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "production": "all",
     "level": "trailing",
     "processing(?: of)?": "all",
-    "lead candidate": "all",
     "control": "trailing",
-    "variant": "trailing",
-    "variet(?:y|ie)": "trailing",
     "famil(?:y|ie)": "trailing",
     "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
     "based": "trailing",
@@ -118,7 +110,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "active": "all",
     "wherein": "all",
     "additional": "all",
-    "additive": "all",
     "advantageous": "all",
     "aforementioned": "all",
     "aforesaid": "all",
@@ -127,12 +118,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "second": "all",
     "(?:ab)?normal": "all",
     "inappropriate": "all",
-    "compounds as": "all",
     "formula [(][ivxab]{1,3}[)]": "trailing",
     "is": "leading",
     "engineered": "leading",
     "engineered": "trailing",
-    "medicament": "all",
     "medicinal": "all",
     "sufficient": "all",
     "due": "trailing",
@@ -140,9 +129,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "specification": "all",
     "detect": "all",
     "similar": "all",
-    "contemplated": "all",
     "predictable": "all",
-    "dos(?:e|ing|age)": "leading",
     "conventional": "leading",
     "contemplated": "all",
     "is indicative of": "all",
@@ -155,7 +142,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "activatable": "all",
     # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",
@@ -273,7 +259,8 @@ DELETION_TERMS = [
     "operator",
     "field of .*",
     # thing (unwanted because wrong type of thing)
-    "(?:.* )?food" "(?:.* )?propert(?:y|ie)",
+    "(?:.* )?food",
+    "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
     "leaflet",
@@ -336,6 +323,7 @@ DELETION_TERMS = [
     "(?:.* )?layer",
     "(?:.* )?surface",  # device?
     # effect
+    "cell growth",
     "clean",  # cleaning
     "friction",
     "compressive force",
@@ -491,6 +479,7 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "(?:.* )?period",  # never used for menstruation
     "integrated system",
     "renewable resource",
     "pillar",
@@ -524,7 +513,6 @@ DELETION_TERMS = [
     "piece",
     "attribute",
     "preform",
-    "DNA sequence",
     "(?:medical|treatment|operation|reaction) (?:fluid|zone|container|section|technology)",
     "object",
     "(?:drug )?target",
@@ -598,7 +586,7 @@ DELETION_TERMS = [
     "solubilit",
     "(?:.* )?refractive index",
     "uniform(?:it)?",
-    "(?:non[ -]?)?conductive",
+    "(?:.* )?conductive",
     "granular",
     "luminescent",
     "(?:.* )?bound",
@@ -720,13 +708,15 @@ DELETION_TERMS = [
     "(?:.* )?longitudinal",
     "(?:.* )?equivalent",
     "(?:.* )?subset",
-    "time period",
     "(?:.* )?memory",
-    # material
+    # food
+    "(?:.* )?fermentation",
+    # material or materials
     "(?:.* )?metal",
     "cobalt",
-    "palladium",  # dental?
+    "block copolymer",
     "chromium",
+    "polymerizable",
     "(?:.* )?metal oxide",
     "(?:.* )?graphite",
     "(?:.* )?graphene(?: oxide)?",
@@ -745,6 +735,8 @@ DELETION_TERMS = [
     "(?:.* )?sequenc",
     "(?:.* )?(?:micro)?process",
     # procedure
+    "(?:.* )?procedure",
+    "(?:.* )?technique",
     "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",
     "root canal",
     "punctur",  # puncture
@@ -783,6 +775,7 @@ DELETION_TERMS = [
     "plant growth regulator",
     # end agtech
     # start industrial
+    "carboxylic acid",  # maybe keep?
     "heat resistance",
     "methanol",
     "methane",
@@ -802,6 +795,10 @@ DELETION_TERMS = [
     "formaldehyde",  # ??
     "metal catalyst",
     "styrene",
+    "curing agent",
+    "carbon dioxide",
+    "isocyanate",
+    "hydrogen",  # industrial
     "aromatic ring",  # industrial
     "polymer matrix",  # industrial
     "(?:quaternary )?ammonium",

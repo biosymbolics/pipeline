@@ -363,7 +363,7 @@ def create_patent_terms():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 -m scripts.patents.psql.terms")
+        print("Usage: python3 -m scripts.patents.terms")
         sys.exit()
 
     create_patent_terms()

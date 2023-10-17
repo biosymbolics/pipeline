@@ -50,6 +50,7 @@ def get_annotations():
         and 'mechanisms' = any(s.domains)
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
+        and domain in ('compounds', 'diseases', 'mechanisms')
         order by apps.publication_number
     """
     records = client.select(query)
