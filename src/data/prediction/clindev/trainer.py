@@ -16,7 +16,6 @@ from data.prediction.utils import ModelInputAndOutput
 
 from .constants import (
     BATCH_SIZE,
-    CHECKPOINT_PATH,
     DEVICE,
     EMBEDDING_DIM,
     SAVE_FREQUENCY,
@@ -321,7 +320,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=50000))
+        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
 
         input_dict, category_sizes, _ = prepare_data(
             trials, field_lists, batch_size, DEVICE

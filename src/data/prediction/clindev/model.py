@@ -85,6 +85,38 @@ class SaveableModel(nn.Module):
         return model
 
 
+class Stage1Output(SaveableModel):
+    def __init__(
+        self,
+        input_size: Optional[int] = None,
+        output_map: Optional[dict[str, int]] = None,
+        device: str = DEVICE,
+    ):
+        super().__init__("stage1_output", device)
+        if output_map is not None and input_size is not None:
+            self.decoders = nn.ModuleDict(
+                dict(
+                    [(f, nn.Linear(input_size, size)) for f, size in output_map.items()]
+                )
+            ).to(device)
+
+
+class OutputCorrelationDecoders(SaveableModel):
+    def __init__(
+        self, output_map: Optional[dict[str, int]] = None, device: str = DEVICE
+    ):
+        super().__init__("correlation_decoders", device)
+        if output_map is not None:
+            self.decoders = nn.ModuleDict(
+                dict(
+                    [
+                        (f, OutputCorrelation.create(f, output_map).to(device))
+                        for f in output_map.keys()
+                    ]
+                )
+            )
+
+
 class InputModel(SaveableModel):
     def __init__(
         self, sizes: Optional[TwoStageModelInputSizes] = None, device: str = DEVICE
@@ -237,7 +269,7 @@ class TwoStageModel(nn.Module):
                 f"Invalid mode: {mode}, checkpoint: {checkpoint_epoch}, sizes: {sizes}"
             )
 
-    def save_checkpoint(self, epoch: int):
+    def save(self, epoch: int):
         """
         Save model checkpoint
 
@@ -246,11 +278,15 @@ class TwoStageModel(nn.Module):
         """
         self.input_model.save(epoch)
         self.stage1_model.save(epoch)
+        self.stage1_output_model.save(epoch)
+        self.correlation_decoders.save(epoch)
         self.stage2_model.save(epoch)
 
-    def __load_model(self, epoch: int):
+    def load(self, epoch: int):
         self.input_model = InputModel().load(epoch)
         self.stage1_model = Stage1Model().load(epoch)
+        self.stage1_output_model = Stage1Output().load(epoch)
+        self.correlation_decoders = OutputCorrelationDecoders().load(epoch)
         self.stage2_model = Stage2Model().load(epoch)
 
     def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
@@ -262,23 +298,14 @@ class TwoStageModel(nn.Module):
         )
 
         # used for calc of loss / evaluation of stage1 separately
-        self.stage1_output_models = nn.ModuleDict(
-            dict(
-                [
-                    (f, nn.Linear(sizes.stage1_output, size))
-                    for f, size in sizes.stage1_output_map.items()
-                ]
-            )
-        ).to(device)
-
-        self.correlation_decoders = nn.ModuleDict(
-            dict(
-                [
-                    (f, OutputCorrelation.create(f, sizes.stage1_output_map).to(device))
-                    for f in sizes.stage1_output_map.keys()
-                ]
-            )
+        self.stage1_output_model = Stage1Output(
+            sizes.stage1_output, sizes.stage1_output_map, device
         )
+
+        # used to learn correlations between outputs
+        self.correlation_decoders = OutputCorrelationDecoders(
+            sizes.stage1_output_map, device
+        ).decoders
 
         self.stage2_model = Stage2Model(
             StageSizes(sizes.stage2_input, sizes.stage2_hidden, 1), device
@@ -291,7 +318,7 @@ class TwoStageModel(nn.Module):
             + list(self.single_select_embeddings.parameters())
             + list(self.correlation_decoders.parameters())
             + list(self.stage1_model.parameters())
-            + list(self.stage1_output_models.parameters())
+            + list(self.stage1_output_model.parameters())
             + list(self.stage2_model.parameters()),
             lr=LR,
             weight_decay=1e-3,
@@ -315,7 +342,7 @@ class TwoStageModel(nn.Module):
         )
 
         y1_pred = self.stage1_model(x).to(self.device)
-        y1_probs_list = [model(y1_pred) for model in self.stage1_output_models.values()]
+        y1_probs_list = [model(y1_pred) for model in self.stage1_output_model.values()]
         y1_probs = torch.cat(y1_probs_list, dim=1).to(self.device)
 
         # outputs guessed based on the other outputs (to learn relationships)
