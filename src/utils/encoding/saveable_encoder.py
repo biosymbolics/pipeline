@@ -41,7 +41,7 @@ class Encoder:
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
-    def encode(self, field: str, df: pl.DataFrame) -> list[list[int]]:
+    def _encode(self, field: str, df: pl.DataFrame) -> list[list[int]]:
         """
         Encode a categorical field from a dataframe
 
@@ -74,14 +74,12 @@ class Encoder:
         """
         raise NotImplementedError()
 
-    @staticmethod
-    def fit_transform(df: pl.DataFrame, field: str, directory: str) -> list[list[int]]:
+    def fit_transform(self, df: pl.DataFrame) -> list[list[int]]:
         """
         Fit and transform a dataframe
         """
-        instance = Encoder(LabelEncoder, field, directory)
-        encoded_values = instance.encode(field, df)
-        instance.save()
+        encoded_values = self._encode(self._field, df)
+        self.save()
         return encoded_values
 
 

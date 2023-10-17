@@ -124,12 +124,7 @@ class BinEncoder(Encoder):
         )
 
         X = np.array(values).reshape(-1, 1)
-        Xt = binner.fit_transform(
-            pl.DataFrame(X, schema=[field]),
-            field,
-            directory,
-        )
-        binner.save()
+        Xt = binner.fit_transform(pl.DataFrame(X, schema=[field]))
         return Xt
 
     def fit_transform(self, values, field, directory, n_bins, *args, **kwargs):

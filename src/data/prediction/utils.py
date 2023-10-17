@@ -146,7 +146,7 @@ def encode_categories(
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = [
-        LabelCategoryEncoder.fit_transform(df, field, directory)
+        LabelCategoryEncoder(field, directory).fit_transform(df)
         for field in categorical_fields
     ]
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
