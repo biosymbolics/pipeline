@@ -1,6 +1,10 @@
+from collections import defaultdict
+from functools import reduce
 import os
 from pathlib import Path
 import logging
+from typing import Any, OrderedDict
+from pydash import set_
 
 from clients.low_level.boto3 import fetch_s3_obj
 
@@ -36,3 +40,18 @@ def download_model_from_s3(model: str, dest: str = DEFAULT_LOCATION) -> str:
     fetch_s3_obj(object_name, filename)
 
     return filename
+
+
+def od_to_dict(obj: OrderedDict) -> dict:
+    """
+    Get obj from ordereddict
+
+    @see https://github.com/pytorch/pytorch/issues/15526
+    """
+
+    def reducer(acc, kv):
+        set_(acc, kv[0], kv[1])
+        return acc
+
+    dict_obj: dict[str, Any] = reduce(reducer, obj.items(), {})
+    return dict_obj

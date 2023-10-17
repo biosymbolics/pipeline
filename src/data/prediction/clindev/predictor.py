@@ -17,7 +17,7 @@ from .constants import (
     input_field_lists,
 )
 from .model import ClindevPredictionModel
-from .utils import prepare_input_data
+from .utils import prepare_input_data, preprocess_inputs
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class ModelPredictor:
         device: str = DEVICE,
     ):
         inputs = prepare_input_data(
-            records,
+            preprocess_inputs(records, ["enrollment"]),
             input_field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
@@ -126,5 +126,5 @@ if __name__ == "__main__":
     for field in flatten(input_field_lists._asdict().values()):
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
-    record = InputRecord(*parser.parse_args().__dict__.items())
+    record = InputRecord(*parser.parse_args().__dict__.values())
     predict_single(record)

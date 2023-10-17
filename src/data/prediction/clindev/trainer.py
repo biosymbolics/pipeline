@@ -19,7 +19,6 @@ from .constants import (
     CHECKPOINT_PATH,
     DEVICE,
     EMBEDDING_DIM,
-    QUANTITATIVE_TO_CATEGORY_FIELDS,
     SAVE_FREQUENCY,
     InputRecord,
     field_lists,
@@ -111,29 +110,6 @@ class ModelTrainer:
         Alias for self.train
         """
         self.train(*args, **kwargs)
-
-    def save_checkpoint(self, epoch: int):
-        """
-        Save model checkpoint
-
-        Args:
-            model (CombinedModel): Model to save
-            optimizer (torch.optim.Optimizer): Optimizer to save
-            epoch (int): Epoch number
-        """
-        checkpoint = {
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.model.optimizer.state_dict(),
-            "epoch": epoch,
-        }
-        checkpoint_name = f"checkpoint_{epoch}.pt"
-
-        try:
-            torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
-            logger.info("Saved checkpoint %s", checkpoint_name)
-        except Exception as e:
-            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
-            raise e
 
     def calc_loss(
         self,
@@ -266,7 +242,7 @@ class ModelTrainer:
                     batch = ModelTrainer.__get_batch(te, self.test_input_dict)
                     self.evaluate(batch, self.y1_category_sizes)
                 self.log_metrics("Evaluation")
-                self.save_checkpoint(epoch)
+                self.model.save_checkpoint(epoch)
 
     def calculate_metrics(
         self,
@@ -345,9 +321,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(
-            fetch_trials("COMPLETED", limit=50000), QUANTITATIVE_TO_CATEGORY_FIELDS
-        )
+        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=50000))
 
         input_dict, category_sizes, _ = prepare_data(
             trials, field_lists, batch_size, DEVICE

@@ -5,7 +5,7 @@ Utils for patent eNPV model
 from functools import reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence, cast
+from typing import Callable, Sequence, TypeVar, cast
 import logging
 import torch
 import torch.nn as nn
@@ -21,7 +21,12 @@ from data.prediction.utils import (
 from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
 
-from .constants import DEVICE, MAX_ITEMS_PER_CAT, InputRecord
+from .constants import (
+    DEVICE,
+    MAX_ITEMS_PER_CAT,
+    QUANTITATIVE_TO_CATEGORY_FIELDS,
+    InputRecord,
+)
 from .types import AllCategorySizes
 
 logger = logging.getLogger(__name__)
@@ -30,7 +35,12 @@ logger.setLevel(logging.INFO)
 TRAINING_PROPORTION = 0.8
 
 
-def preprocess_inputs(records: Sequence[TrialSummary], quant_to_cat_fields: list[str]):
+T = TypeVar("T", bound=Sequence[InputRecord | TrialSummary])
+
+
+def preprocess_inputs(
+    records: T, quant_to_cat_fields: list[str] = QUANTITATIVE_TO_CATEGORY_FIELDS
+) -> T:
     """
     Input record preprocessing
 

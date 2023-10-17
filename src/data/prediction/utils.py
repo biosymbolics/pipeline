@@ -238,7 +238,7 @@ def encode_category(field: str, df: pl.DataFrame) -> list[list[int]]:
     """
     values = df.select(pl.col(field)).to_series().to_list()
     logger.info(
-        "Encoding field %s (e.g.: %s) length: %s", field, values[0:5], len(values)
+        "Encoding field %s (e.g. %s) length: %s", field, values[0:5], len(values)
     )
     encoder = LabelEncoder()
     # flatten list values; only apply here otherwise value error
@@ -326,8 +326,12 @@ def encode_categories(
     """
     Get category **encodings** given a list of dicts
     """
+    dicts = [
+        record._asdict() if not isinstance(record, dict) else record
+        for record in records
+    ]
     FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
-    df = pl.from_dicts(records, infer_schema_length=1000)  # type: ignore
+    df = pl.from_dicts(dicts, infer_schema_length=1000)
 
     size_map = dict(
         [
