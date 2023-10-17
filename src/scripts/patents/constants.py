@@ -306,8 +306,8 @@ DELETION_TERMS = [
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
     "(?:.* )?reaction",
-    # "(?:.* )?cosmetic",
-    # "(?:.* )?hair condition",
+    "(?:.* )?cosmetic.*",  # may re-enable in the future
+    "(?:.* )?hair condition",  # may re-enable in the future
     "(?:.* )?fragrance",
     "silica",
     "perfum",
@@ -779,6 +779,7 @@ DELETION_TERMS = [
     "plant growth regulator",
     # end agtech
     # start industrial
+    "coating composition",
     "carboxylic acid",  # maybe keep?
     "heat resistance",
     "methanol",
