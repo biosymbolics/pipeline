@@ -161,14 +161,6 @@ def encode_categories(
     ]
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
 
-    print(
-        "SIZE ENDICS",
-        df,
-        len(encodings_list),
-        len(encodings_list[0]),
-        categorical_fields,
-    )
-
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
         [
