@@ -32,8 +32,13 @@ def get_annotations():
     client = PsqlDatabaseClient()
     query = """
         SELECT
-        ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text, -- both title + abs and abs + title to improve generalizability
-        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term as term, domain
+        (
+            CASE WHEN RANDOM() > 0.49
+            THEN concat(title, '\n', abstract)
+            ELSE concat(abstract, '\n', title)
+            END
+        ) as text, -- switch title + abs and abs + title to improve generalizability
+        s.publication_number as publication_number, original_term as term, domain
         FROM
         (
             select publication_number, array_agg(distinct domain) as domains
@@ -53,11 +58,10 @@ def get_annotations():
         and 'diseases' = any(s.domains)
         and domain in ('compounds', 'diseases', 'mechanisms')
         order by RANDOM()
-        limit 600000
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))
-    df = pl.DataFrame(records).explode("text", "publication_number")
+    df = pl.DataFrame(records)  # .explode("text", "publication_number")
     return df
 
 
