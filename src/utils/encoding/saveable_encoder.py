@@ -1,4 +1,5 @@
 import logging
+import os
 from pydash import flatten
 import polars as pl
 from sklearn.calibration import LabelEncoder
@@ -18,6 +19,9 @@ class Encoder:
         self.encoder_type = impl.__name__
         self._file = f"{self._directory}/{self._field}-{self.encoder_type}.joblib"
         self._encoder = self.load(*args, **kwargs)
+
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
     def load(self, *args, **kwargs):
         """
@@ -44,11 +48,11 @@ class Encoder:
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
-    def _encode_df(self, field, df: pl.DataFrame) -> list:
-        values = df.select(pl.col(field)).to_series().to_list()
-        return self._encode(field, values)  # .reshape(-1, 1))
+    def _encode_df(self, df: pl.DataFrame) -> list:
+        values = df.select(pl.col(self._field)).to_series().to_list()
+        return self._encode(values)  # .reshape(-1, 1))
 
-    def _encode(self, field: str, values: list | npt.NDArray) -> list:
+    def _encode(self, values: list | npt.NDArray) -> list:
         """
         Encode a categorical field from a dataframe
 
@@ -59,14 +63,16 @@ class Encoder:
         is_nested = isinstance(values[0], list)
 
         logger.info(
-            "Encoding field %s (vals %s) len: %s", field, values[0:5], len(values)
+            "Encoding field %s (e.g. %s) len: %s", self._field, values[0:5], len(values)
         )
         self._encoder.fit(flatten(values))
 
         _values = values if is_nested else [values]
         encoded_values = [self._encoder.transform(v) for v in _values]
 
-        logger.debug("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
+        logger.info(
+            "Finished encoding field %s (%s)", self._field, self._encoder.classes_
+        )
 
         return encoded_values[0] if not is_nested else encoded_values
 
@@ -81,9 +87,9 @@ class Encoder:
         Fit and transform a dataframe
         """
         if isinstance(data, pl.DataFrame):
-            encoded_values = self._encode_df(self._field, data)
+            encoded_values = self._encode_df(data)
         else:
-            encoded_values = self._encode(self._field, data)
+            encoded_values = self._encode(data)
 
         self.save()
         return encoded_values
@@ -92,25 +98,3 @@ class Encoder:
 class LabelCategoryEncoder(Encoder):
     def __init__(self, *args, **kargs):
         super().__init__(LabelEncoder, *args, **kargs)
-
-
-class QuantitativeEncoder(Encoder):
-    def __init__(self, *args, **kargs):
-        super().__init__(*args, **kargs)
-
-    def _encode(self, field: str, values: npt.NDArray) -> list:
-        """
-        Encode a categorical field from a dataframe
-
-        Args:
-            field (str): Field to encode
-            values (npt.NDArray): Values to encode
-        """
-        logger.info(
-            "Encoding field %s (e.g. %s) length: %s", field, values[0:5], len(values)
-        )
-
-        self._encoder.fit(values)
-        encoded_values = self._encoder.transform(values)
-
-        return encoded_values.tolist()

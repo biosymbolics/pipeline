@@ -62,7 +62,7 @@ class ModelPredictor:
         return ModelInput(
             **{
                 f: v[i] if len(v) > i else torch.Tensor()
-                for f, v in input_dict._asdict().items()
+                for f, v in input_dict.__dict__.items()
                 if v is not None
             }
         )
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     }
 
     parser = argparse.ArgumentParser()
-    for field in flatten(input_field_lists._asdict().values()):
+    for field in flatten(input_field_lists.__dict__.values()):
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
     record = InputRecord(*parser.parse_args().__dict__.values())

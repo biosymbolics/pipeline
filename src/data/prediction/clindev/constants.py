@@ -87,7 +87,7 @@ def get_input_type(field_type: str) -> Type | UnionType:
 
 fields_to_types: list[tuple[str, Type | UnionType]] = [
     (fv, get_input_type(t))
-    for t, fvs in input_field_lists._asdict().items()
+    for t, fvs in input_field_lists.__dict__.items()
     for fv in fvs
 ]
 InputRecord = NamedTuple("InputRecord", fields_to_types)  # type: ignore

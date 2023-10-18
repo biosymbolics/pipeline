@@ -372,9 +372,10 @@ class TwoStageModel(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
-        print(self.stage2_model[0].weight)
+        print(list(self.stage2_model.modules())[0].layer3[0].weight)
         print(self.stage1_model[0].weight)
         print(list(self.multi_select_embeddings.values())[0].weight[0:10])
+
         """
         x = self.input_model(multi_select, single_select, text, quantitative)
         y1_pred = self.stage1_model(x).to(self.device)

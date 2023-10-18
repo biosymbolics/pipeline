@@ -1,17 +1,7 @@
 from dataclasses import dataclass
 import math
-from typing import NamedTuple
 
-
-@dataclass(frozen=True)
-class InputCategorySizes:
-    multi_select: dict[str, int]
-    single_select: dict[str, int]
-
-
-@dataclass(frozen=True)
-class AllCategorySizes(InputCategorySizes):
-    y1: dict[str, int]
+from data.prediction.types import AllCategorySizes
 
 
 @dataclass(frozen=True)

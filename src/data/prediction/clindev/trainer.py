@@ -24,7 +24,7 @@ from .constants import (
     input_field_lists,
 )
 from .model import ClindevTrainingModel
-from .types import AllCategorySizes, TwoStageModelSizes
+from .types import TwoStageModelSizes
 from .utils import (
     calc_categories_loss,
     prepare_data,
@@ -34,6 +34,8 @@ from .utils import (
     split_train_and_test,
 )
 
+from ..types import AllCategorySizes
+
 
 class MetricWrapper(NamedTuple):
     metric: Any
@@ -42,6 +44,8 @@ class MetricWrapper(NamedTuple):
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+STAGE2_MSE_WEIGHT = 5
 
 
 class ModelTrainer:
@@ -82,7 +86,7 @@ class ModelTrainer:
             text_input=training_input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
             stage1_output=math.prod(training_input_dict.y1_true.shape[2:]),
-            stage2_output=10,  # math.prod(training_input_dict.y2_true.shape[2:]), # TODO: fix
+            stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
 
@@ -144,15 +148,16 @@ class ModelTrainer:
         )
 
         # STAGE 2
-        stage2_ce_loss = self.stage2_ce_criterion(y2_preds, batch.y2_true)
+        stage2_ce_loss = self.stage2_ce_criterion(y2_preds, batch.y2_oh_true)
         stage2_mse_loss = torch.mul(
-            self.stage2_mse_criterion(y2_preds, batch.y2_oh_true), 10
+            self.stage2_mse_criterion(torch.softmax(y2_preds, dim=1), batch.y2_true),
+            STAGE2_MSE_WEIGHT,
         )
 
         # TOTAL
         loss = stage1_loss + stage1_corr_loss + stage2_ce_loss + stage2_mse_loss
 
-        logger.debug(
+        logger.info(
             "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s (%s))",
             i,
             loss.detach().item(),
@@ -162,8 +167,9 @@ class ModelTrainer:
             stage2_mse_loss.detach().item(),
         )
 
+        # STAGE2 LOSS torch.Size([32, 5]) torch.Size([32, 5]) torch.Size([32, 1])
         self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_true
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
 
         return loss
@@ -175,18 +181,18 @@ class ModelTrainer:
         """
         Get input_dict for batch i
         """
-        if not all([len(v) > i or len(v) == 0 for v in input_dict._asdict().values()]):
+        if not all([len(v) > i or len(v) == 0 for v in input_dict.__dict__.values()]):
             logger.error(
                 "Batch %s is empty (%s)",
                 i,
-                [(k1, len(v1)) for k1, v1 in input_dict._asdict().items()],
+                [(k1, len(v1)) for k1, v1 in input_dict.__dict__.items()],
             )
             return None
 
         batch = ModelInputAndOutput(
             **{
                 f: v[i] if len(v) > 0 else torch.Tensor()
-                for f, v in input_dict._asdict().items()
+                for f, v in input_dict.__dict__.items()
             }
         )
         return batch
@@ -240,7 +246,7 @@ class ModelTrainer:
             _input_dict = ModelInputAndOutput(
                 **{
                     k: v.detach().clone()
-                    for k, v in self.training_input_dict._asdict().items()
+                    for k, v in self.training_input_dict.__dict__.items()
                 },
             )
             for i in range(num_batches):
@@ -282,11 +288,12 @@ class ModelTrainer:
             for metric in self.stage1_metrics.values():
                 metric[k].update((cpu_y1_preds, cpu_y1_true))
 
-        cpu_y2_preds = y2_preds.detach().to("cpu")
+        cpu_y2_preds = (torch.softmax(y2_preds.detach().to("cpu"), dim=1) > 0.5).float()
+        # print(y2_preds[0:5])
         cpu_y2_true = y2_true.detach().to("cpu")
         for metric, transform in self.stage2_metrics.values():
             if transform:
-                metric.update((transform(cpu_y2_preds), cpu_y2_true))
+                metric.update((transform(cpu_y2_preds), transform(cpu_y2_true)))
             else:
                 metric.update((cpu_y2_preds, cpu_y2_true))
 
@@ -320,6 +327,7 @@ class ModelTrainer:
         """
         Evaluate model on eval/test set
         """
+
         y1_probs, _, y2_preds, _ = self.model(
             torch.split(input_dict.multi_select, 1, dim=1),
             torch.split(input_dict.single_select, 1, dim=1),
@@ -332,7 +340,7 @@ class ModelTrainer:
         )
 
         self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, input_dict.y2_true
+            y1_probs_by_field, y1_true_by_field, y2_preds, input_dict.y2_oh_true
         )
 
     @staticmethod

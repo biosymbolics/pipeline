@@ -6,9 +6,10 @@ import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer
 from kneed import KneeLocator
 import polars as pl
+import numpy.typing as npt
 
 
-from .saveable_encoder import QuantitativeEncoder
+from .saveable_encoder import Encoder
 
 
 logger = logging.getLogger(__name__)
@@ -17,12 +18,13 @@ logger.setLevel(logging.INFO)
 KbinsStrategy = Literal["uniform", "quantile", "kmeans"]
 
 
-class BinEncoder(QuantitativeEncoder):
+class BinEncoder(Encoder):
     def __init__(
         self,
         field: str,
         directory: str,
-        n_bins: Optional[int] = None,
+        # if None, will estimate (TODO: must adjust size of stage2 output accordingly!)
+        n_bins: Optional[int] = 5,
         strategy: KbinsStrategy = "kmeans",
         encode: Literal["ordinal", "onehot", "onehot-dense"] = "ordinal",
         *args,
@@ -104,6 +106,34 @@ class BinEncoder(QuantitativeEncoder):
 
         return winner
 
+    def _encode(self, values: npt.NDArray) -> list:
+        """
+        Encode a quant field
+
+        Args:
+            values (npt.NDArray): Values to encode
+        """
+        logger.info(
+            "Encoding field %s (e.g. %s) length: %s",
+            self._field,
+            values[0:5],
+            len(values),
+        )
+
+        self._encoder.fit(values)
+        encoded_values = self._encoder.transform(values)
+
+        if self._encoder.n_bins_ != self.n_bins:
+            logger.error(
+                "Actual bins != n_bins: %s != %s", self._encoder.n_bins_, self.n_bins
+            )
+
+        logger.info(
+            "Finished encoding field %s (%s)", self._field, self._encoder.n_bins_
+        )
+
+        return encoded_values.tolist()
+
     def bin(
         self,
         values: Sequence[float | int] | pl.Series,
@@ -112,7 +142,6 @@ class BinEncoder(QuantitativeEncoder):
         Bins quantiative values, turning them into categorical
         @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html
 
-        NOTE: specify n_bins when doing inference; i.e. ensure it matches with how the model was trained.
 
         Args:
             values (Sequence[float | int]): List of values
@@ -129,9 +158,12 @@ class BinEncoder(QuantitativeEncoder):
                 self.n_bins,
                 self.field,
             )
+            logger.error(
+                "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
+            )
 
-        X = np.array(values).reshape(-1, 1)  # .tolist()
-        Xt = super().fit_transform(X)
+        X = np.array(values).reshape(-1, 1)
+        Xt = self._encode(X)
         return Xt
 
     def fit_transform(self, values, *args, **kwargs):

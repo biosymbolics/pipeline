@@ -14,10 +14,9 @@ import torch.nn as nn
 from data.prediction.utils import (
     ModelInput,
     ModelInputAndOutput,
-    encode_and_batch_features,
+    encode_and_batch_all,
+    encode_and_batch_input,
     encode_quantitative_fields,
-    resize_and_batch,
-    encode_single_select_categories as vectorize_single_select,
 )
 from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
@@ -29,7 +28,8 @@ from .constants import (
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     InputRecord,
 )
-from .types import AllCategorySizes, InputCategorySizes
+
+from ..types import AllCategorySizes, InputCategorySizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -76,7 +76,7 @@ def split_train_and_test(
     # len(v) == 0 if empty input
     split_input = {
         k: torch.split(v, split_idx) if len(v) > 0 else (torch.Tensor(), torch.Tensor())
-        for k, v in input_dict._asdict().items()
+        for k, v in input_dict.__dict__.items()
     }
 
     for i in range(2):
@@ -101,8 +101,7 @@ def prepare_input_data(
     """
     Prepare input data
     """
-    # encode_and_batch_features, max_items_per_cat=MAX_ITEMS_PER_CAT
-    inputs, category_sizes = encode_and_batch_features(
+    inputs, category_sizes = encode_and_batch_input(
         records,
         field_lists=input_field_lists,
         batch_size=batch_size,
@@ -111,7 +110,7 @@ def prepare_input_data(
         device=device,
     )
 
-    return inputs, InputCategorySizes(*category_sizes)
+    return inputs, category_sizes
 
 
 def prepare_data(
@@ -127,7 +126,7 @@ def prepare_data(
 
     records = cast(Sequence[InputRecord], trials)
 
-    batched_feats, sizes = encode_and_batch_features(
+    batched_feats, sizes = encode_and_batch_all(
         records,
         field_lists=field_lists,
         batch_size=batch_size,
@@ -136,47 +135,9 @@ def prepare_data(
         device=device,
     )
 
-    # (batches) x (seq length) x (num cats) x (items per cat)
-    y1_size_map, vectorized_y1 = vectorize_single_select(
-        records,
-        field_lists.y1_categorical,
-        directory=BASE_ENCODER_DIRECTORY,
-        device=device,
-    )
-    y1 = resize_and_batch(vectorized_y1, batch_size)
-    y1_categories = resize_and_batch(vectorized_y1, batch_size)
-    all_y2 = (
-        torch.Tensor([trial[field_lists.y2] for trial in trials])
-        .type(torch.int64)
-        .to(device)
-    )
-    y2 = resize_and_batch(all_y2, batch_size).squeeze()
-
-    # TODO: 10 (y2 output dim)
-    y2_oh = resize_and_batch(
-        torch.zeros(all_y2.size(0), 10).to(device).scatter_(1, all_y2, 1),
-        min(batch_size, all_y2.size(0)),
-    )
-
-    # (batches) x (seq length) x 1
-    logger.info(
-        "y1: %s, y1_categories: %s, y2: %s, y2_oh: %s",
-        y1.size(),
-        y1_categories.size(),
-        y2.size(),
-        y2_oh.size(),
-    )
-
     return (
-        ModelInputAndOutput(
-            *batched_feats,
-            y1_true=y1,
-            y1_categories=y1_categories,
-            y2_true=y2,
-            y2_oh_true=y2_oh,
-        ),
-        #  "AllCategorySizes" gets multiple values for keyword argument "y1"
-        AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
+        batched_feats,
+        sizes,
         round(len(batched_feats.multi_select) / batch_size),
     )
 

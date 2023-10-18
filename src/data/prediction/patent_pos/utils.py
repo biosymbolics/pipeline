@@ -104,36 +104,3 @@ def prepare_inputs(
             **__prepare_gnn_input(patents, gnn_categorical_fields, batch_size),
         },
     )
-
-
-# @classmethod
-# def load_checkpoint(
-#     cls, checkpoint_name: str, patents: Optional[Sequence[PatentApplication]] = None
-# ):
-#     """
-#     Load model from checkpoint. If patents provided, will start training from the next epoch
-
-#     Args:
-#         patents (Sequence[PatentApplication]): List of patents
-#         checkpoint_name (str): Checkpoint from which to resume
-#     """
-#     logging.info("Loading checkpoint %s", checkpoint_name)
-#     model = CombinedModel(100, 100)  # TODO!!
-#     checkpoint_file = os.path.join(CHECKPOINT_PATH, checkpoint_name)
-
-#     if not os.path.exists(checkpoint_file):
-#         raise Exception(f"Checkpoint {checkpoint_name} does not exist")
-
-#     checkpoint = torch.load(checkpoint_file)
-#     model.load_state_dict(checkpoint["model_state_dict"])
-#     optimizer = OPTIMIZER_CLASS(model.parameters(), lr=LR)
-#     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-#     logging.info("Loaded checkpoint %s", checkpoint_name)
-
-#     trainable_model = ModelTrainer(BATCH_SIZE, model, optimizer)
-
-#     if patents:
-#         trainable_model.train(patents, start_epoch=checkpoint["epoch"] + 1)
-
-#     return trainable_model
