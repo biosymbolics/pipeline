@@ -25,10 +25,6 @@ class Encoder:
         """
         try:
             encoder = load(self._file)
-            if not isinstance(encoder, self._impl):
-                raise ValueError(
-                    f"Encoder for field {self._field} is not of type {self.encoder_type}"
-                )
             logger.info(
                 "Using EXISTING encoder for %s (%s)", self._field, self.encoder_type
             )

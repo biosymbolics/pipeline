@@ -7,6 +7,7 @@ from itertools import accumulate
 import random
 from typing import Callable, Sequence, TypeVar, cast
 import logging
+from pydash import uniq
 import torch
 import torch.nn as nn
 
@@ -79,10 +80,11 @@ def split_train_and_test(
     }
 
     for i in range(2):
-        logger.warning(
-            "Split discrepancy: %s",
-            [(k, len(v[i])) for k, v in split_input.items()],
-        )
+        sizes = uniq([len(v[i]) for v in split_input.values() if len(v[i]) > 0])
+        if len(sizes) > 1:
+            raise ValueError(
+                f"Split discrepancy: {[(k, len(v[i])) for k, v in split_input.items()]}"
+            )
 
     train_input_dict = ModelInputAndOutput(**{k: v[0] for k, v in split_input.items()})
     test_input_dict = ModelInputAndOutput(**{k: v[1] for k, v in split_input.items()})
@@ -171,7 +173,7 @@ def prepare_data(
             y1_true=y1,
             y1_categories=y1_categories,
             y2_true=y2,
-            y2_oh_true=y2_oh
+            y2_oh_true=y2_oh,
         ),
         #  "AllCategorySizes" gets multiple values for keyword argument "y1"
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore

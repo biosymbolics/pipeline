@@ -61,6 +61,9 @@ def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
 
     - normalizes/extracts intervention names
     - normalizes status etc.
+
+    good check:
+    - select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
     # intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
@@ -206,8 +209,8 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-              Usage: python3 -m scripts.ctgov.copy_ctgov
-              Copies ctgov to patents
+            Usage: python3 -m scripts.ctgov.copy_ctgov
+            Copies ctgov to patents
         """
         )
         sys.exit()
