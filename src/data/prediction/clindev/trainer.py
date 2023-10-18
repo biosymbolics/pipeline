@@ -77,11 +77,12 @@ class ModelTrainer:
             embedding_dim=embedding_dim,
             multi_select_input=math.prod(training_input_dict.multi_select.shape[2:]),
             quantitative_input=training_input_dict.quantitative.size(-1),
+            # 3 x 1
             single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
             text_input=training_input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
             stage1_output=math.prod(training_input_dict.y1_true.shape[2:]),
-            stage2_output=10,  # math.prod(training_input_dict.y2_true.shape[2:]),
+            stage2_output=10,  # math.prod(training_input_dict.y2_true.shape[2:]), # TODO: fix
         )
         logger.info("Model sizes: %s", sizes)
 
@@ -168,15 +169,24 @@ class ModelTrainer:
         return loss
 
     @staticmethod
-    def __get_batch(i: int, input_dict: ModelInputAndOutput) -> ModelInputAndOutput:
+    def __get_batch(
+        i: int, input_dict: ModelInputAndOutput
+    ) -> ModelInputAndOutput | None:
         """
         Get input_dict for batch i
         """
+        if not all([len(v) > i or len(v) == 0 for v in input_dict._asdict().values()]):
+            logger.error(
+                "Batch %s is empty (%s)",
+                i,
+                [(k1, len(v1)) for k1, v1 in input_dict._asdict().items()],
+            )
+            return None
+
         batch = ModelInputAndOutput(
             **{
-                f: v[i] if len(v) > i else torch.Tensor()
+                f: v[i] if len(v) > 0 else torch.Tensor()
                 for f, v in input_dict._asdict().items()
-                if v is not None
             }
         )
         return batch
@@ -192,10 +202,13 @@ class ModelTrainer:
         """
         batch = ModelTrainer.__get_batch(i, input_dict)
 
+        if batch is None:
+            return
+
         # place before any loss calculation
         self.model.optimizer.zero_grad()
 
-        y1_probs, y1_corr_probs, y2_preds = self.model(
+        y1_probs, y1_corr_probs, y2_preds, _ = self.model(
             torch.split(batch.multi_select, 1, dim=1),
             torch.split(batch.single_select, 1, dim=1),
             batch.text,
@@ -237,8 +250,12 @@ class ModelTrainer:
             if epoch % SAVE_FREQUENCY == 0:
                 self.log_metrics("Training")
                 num_eval_batches = self.test_input_dict.multi_select.size(0)
-                for te in range(0, num_eval_batches):
+                for te in range(0, num_eval_batches - 1):
                     batch = ModelTrainer.__get_batch(te, self.test_input_dict)
+
+                    if batch is None:
+                        continue
+
                     self.evaluate(batch, self.y1_category_sizes)
                 self.log_metrics("Evaluation")
                 self.model.save(epoch)
@@ -303,7 +320,7 @@ class ModelTrainer:
         """
         Evaluate model on eval/test set
         """
-        y1_probs, _, y2_preds = self.model(
+        y1_probs, _, y2_preds, _ = self.model(
             torch.split(input_dict.multi_select, 1, dim=1),
             torch.split(input_dict.single_select, 1, dim=1),
             input_dict.text,

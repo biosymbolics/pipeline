@@ -170,7 +170,13 @@ class InputModel(SaveableModel):
 
             self.to(self.device)
 
-    def forward(self, multi_select, single_select, text, quantitative):
+    def forward(
+        self,
+        multi_select: list[torch.Tensor],
+        single_select: list[torch.Tensor],
+        text: torch.Tensor,
+        quantitative: torch.Tensor,
+    ):
         all_inputs = []
         if len(text) > 0:
             all_inputs.append(self.text(text))

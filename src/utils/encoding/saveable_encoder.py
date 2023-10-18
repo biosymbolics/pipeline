@@ -1,10 +1,10 @@
 import logging
-from typing import cast
 from pydash import flatten
 import polars as pl
 from sklearn.calibration import LabelEncoder
 import polars as pl
 from joblib import dump, load
+import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -41,7 +41,11 @@ class Encoder:
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
-    def _encode(self, field: str, df: pl.DataFrame) -> list[list[int]]:
+    def _encode_df(self, field, df: pl.DataFrame) -> list:
+        values = df.select(pl.col(field)).to_series().to_list()
+        return self._encode(field, values)  # .reshape(-1, 1))
+
+    def _encode(self, field: str, values: list | npt.NDArray) -> list:
         """
         Encode a categorical field from a dataframe
 
@@ -49,24 +53,19 @@ class Encoder:
             field (str): Field to encode
             df (pl.DataFrame): Dataframe to encode from
         """
-        values = df.select(pl.col(field)).to_series().to_list()
+        is_nested = isinstance(values[0], list)
+
         logger.info(
-            "Encoding field %s (e.g. %s) length: %s", field, values[0:5], len(values)
+            "Encoding field %s (vals %s) len: %s", field, values[0:5], len(values)
         )
         self._encoder.fit(flatten(values))
-        encoded_values = [
-            self._encoder.transform([v] if isinstance(v, str) else v) for v in values
-        ]
 
-        if df.shape[0] != len(encoded_values):
-            raise ValueError(
-                "Encoded values length does not match dataframe length: %s != %s",
-                len(encoded_values),
-                df.shape[0],
-            )
+        _values = values if is_nested else [values]
+        encoded_values = [self._encoder.transform(v) for v in _values]
 
         logger.info("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
-        return cast(list[list[int]], encoded_values)
+
+        return encoded_values[0] if not is_nested else encoded_values
 
     def fit(self):
         """
@@ -74,11 +73,15 @@ class Encoder:
         """
         raise NotImplementedError()
 
-    def fit_transform(self, df: pl.DataFrame) -> list[list[int]]:
+    def fit_transform(self, data: pl.DataFrame | list | npt.NDArray) -> list:
         """
         Fit and transform a dataframe
         """
-        encoded_values = self._encode(self._field, df)
+        if isinstance(data, pl.DataFrame):
+            encoded_values = self._encode_df(self._field, data)
+        else:
+            encoded_values = self._encode(self._field, data)
+
         self.save()
         return encoded_values
 
@@ -86,3 +89,27 @@ class Encoder:
 class LabelCategoryEncoder(Encoder):
     def __init__(self, *args, **kargs):
         super().__init__(LabelEncoder, *args, **kargs)
+
+
+class QuantitativeEncoder(Encoder):
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
+
+    def _encode(self, field: str, values: npt.NDArray) -> list:
+        """
+        Encode a categorical field from a dataframe
+
+        Args:
+            field (str): Field to encode
+            values (npt.NDArray): Values to encode
+        """
+        logger.info(
+            "Encoding field %s (e.g. %s) length: %s", field, values[0:5], len(values)
+        )
+
+        self._encoder.fit(values)
+        encoded_values = self._encoder.transform(values)
+
+        logger.info("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
+
+        return encoded_values.tolist()

@@ -8,16 +8,39 @@ from kneed import KneeLocator
 import polars as pl
 
 
-from .saveable_encoder import Encoder
+from .saveable_encoder import QuantitativeEncoder
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+KbinsStrategy = Literal["uniform", "quantile", "kmeans"]
 
-class BinEncoder(Encoder):
-    def __init__(self, field: str, directory: str, n_bins: int, *args, **kwargs):
-        super().__init__(KBinsDiscretizer, field, directory, n_bins, *args, **kwargs)
+
+class BinEncoder(QuantitativeEncoder):
+    def __init__(
+        self,
+        field: str,
+        directory: str,
+        n_bins: Optional[int] = None,
+        strategy: KbinsStrategy = "kmeans",
+        encode: Literal["ordinal", "onehot", "onehot-dense"] = "ordinal",
+        *args,
+        **kwargs
+    ):
+        self.field = field
+        self.strategy: KbinsStrategy = strategy
+        self.n_bins = n_bins
+        super().__init__(
+            KBinsDiscretizer,
+            field,
+            directory,
+            encode=encode,
+            strategy=strategy,
+            subsample=None,
+            *args,
+            **kwargs
+        )
 
     @staticmethod
     def estimate_n_bins(
@@ -81,13 +104,9 @@ class BinEncoder(Encoder):
 
         return winner
 
-    @staticmethod
     def bin(
+        self,
         values: Sequence[float | int] | pl.Series,
-        field: str,
-        directory: str,
-        n_bins: int | None = 5,
-        kbins_strategy: Literal["uniform", "quantile", "kmeans"] = "kmeans",
     ) -> Sequence[list[int]]:
         """
         Bins quantiative values, turning them into categorical
@@ -97,35 +116,23 @@ class BinEncoder(Encoder):
 
         Args:
             values (Sequence[float | int]): List of values
-            field (str): Field name (used for logging)
-            n_bins (int): Number of bins
-            kbins_strategy (str): Strategy to use for KBinsDiscretizer
-
         Returns:
             Sequence[list[int]]: List of lists of binned values (e.g. [[0.0], [2.0], [5.0], [0.0], [0.0]])
                 (a list of lists because that matches our other categorical vars)
         """
-        if n_bins is None:
-            n_bins = BinEncoder.estimate_n_bins(
-                list(values), kbins_strategy=kbins_strategy
+        if self.n_bins is None:
+            self.n_bins = self.estimate_n_bins(
+                list(values), kbins_strategy=self.strategy
             )
             logger.info(
-                "Using estimated optimal n_bins value of %s for field %s", n_bins, field
+                "Using estimated optimal n_bins value of %s for field %s",
+                self.n_bins,
+                self.field,
             )
 
-        binner = Encoder(
-            KBinsDiscretizer,
-            field,
-            directory,
-            n_bins=n_bins,
-            encode="ordinal",
-            strategy=kbins_strategy,
-            subsample=None,
-        )
-
-        X = np.array(values).reshape(-1, 1)
-        Xt = binner.fit_transform(pl.DataFrame(X, schema=[field]))
+        X = np.array(values).reshape(-1, 1)  # .tolist()
+        Xt = super().fit_transform(X)
         return Xt
 
-    def fit_transform(self, values, field, directory, n_bins, *args, **kwargs):
-        return self.bin(values, field, directory, n_bins, *args, **kwargs)
+    def fit_transform(self, values, *args, **kwargs):
+        return self.bin(values, *args, **kwargs)

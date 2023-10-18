@@ -1,5 +1,5 @@
 from datetime import date
-from typing import NamedTuple, Sequence, TypeGuard, cast
+from typing import Any, NamedTuple, Sequence, TypeGuard, cast
 import logging
 from collections import namedtuple
 import polars as pl
@@ -95,7 +95,12 @@ def batch_and_pad(
 
     batches = [F.pad(b, get_batch_pad(b)) for b in batches]
 
-    logging.info("Batches: %s (%s ...)", len(batches), [b.size() for b in batches[0:5]])
+    logging.info(
+        "Batches: %s (%s) (%s ...)",
+        len(batches),
+        batch_size,
+        [b.size() for b in batches[0:5]],
+    )
 
     return torch.stack(batches)
 
@@ -120,6 +125,10 @@ def resize_and_batch(
     return batch_and_pad(padded_emb, batch_size)
 
 
+def is_list(obj: Any) -> bool:
+    return hasattr(obj, "__len__") or isinstance(obj, list)
+
+
 def encode_categories(
     records: Sequence[InputRecord],
     categorical_fields: list[str],
@@ -137,6 +146,7 @@ def encode_categories(
     FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
     df = pl.from_dicts(dicts, infer_schema_length=1000)
 
+    # total records by field
     size_map = dict(
         [
             (field, df.select(pl.col(field).flatten()).n_unique())
@@ -151,9 +161,20 @@ def encode_categories(
     ]
     encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
 
+    print(
+        "SIZE ENDICS",
+        df,
+        len(encodings_list),
+        len(encodings_list[0]),
+        categorical_fields,
+    )
+
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
-        [dict[field][0:max_items_per_cat] for field in categorical_fields]
+        [
+            dict[field][0:max_items_per_cat] if is_list(dict[field]) else [dict[field]]
+            for field in categorical_fields
+        ]
         for dict in encoded_dicts
     ]
 
@@ -218,7 +239,7 @@ def encode_quantitative_fields(
         df = df.with_columns(
             [
                 pl.col(field).map_batches(
-                    lambda v: pl.Series(BinEncoder.bin(v, field, directory))
+                    lambda v: pl.Series(BinEncoder(field, directory).bin(v))
                 )
             ]
         )
@@ -308,15 +329,13 @@ def encode_and_batch_features(
         records, field_lists, directory, max_items_per_cat, device=device
     )
 
-    feature_dict = dict(
+    batched = dict(
         (f, resize_and_batch(t, batch_size)) for f, t in feats._asdict().items()
     )
 
-    inputs = ModelInput(**feature_dict)
-
     logger.info(
         "Feature Sizes: %s",
-        [(f, t.shape if t is not None else None) for f, t in inputs._asdict().items()],
+        [(f, t.shape if t is not None else None) for f, t in batched.items()],
     )
 
-    return inputs, sizes
+    return ModelInput(**batched), sizes

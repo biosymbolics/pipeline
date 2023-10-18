@@ -69,19 +69,25 @@ def split_train_and_test(
         input_dict (ModelInputAndOutput): Input data
         training_proportion (float): Proportion of data to use for training
     """
-    total_records = input_dict.y1_true.size(0)
-    split_idx = round(total_records * training_proportion)
-    training_input_dict = ModelInputAndOutput(
-        **{k: torch.split(v, split_idx)[0] for k, v in input_dict._asdict().items()}
-    )
-    test_input_dict = ModelInputAndOutput(
-        **{
-            k: torch.split(v, split_idx)[1] if len(v) == total_records else v
-            for k, v in input_dict._asdict().items()
-        }
-    )
+    record_cnt = input_dict.y1_true.size(0)
+    split_idx = round(record_cnt * training_proportion)
 
-    return training_input_dict, test_input_dict
+    # len(v) == 0 if empty input
+    split_input = {
+        k: torch.split(v, split_idx) if len(v) > 0 else (torch.Tensor(), torch.Tensor())
+        for k, v in input_dict._asdict().items()
+    }
+
+    for i in range(2):
+        logger.warning(
+            "Split discrepancy: %s",
+            [(k, len(v[i])) for k, v in split_input.items()],
+        )
+
+    train_input_dict = ModelInputAndOutput(**{k: v[0] for k, v in split_input.items()})
+    test_input_dict = ModelInputAndOutput(**{k: v[1] for k, v in split_input.items()})
+
+    return train_input_dict, test_input_dict
 
 
 def prepare_input_data(
@@ -129,7 +135,12 @@ def prepare_data(
     )
 
     # (batches) x (seq length) x (num cats) x (items per cat)
-    y1_size_map, vectorized_y1 = vectorize_single_select(trials, field_lists.y1_categorical, device=device)  # type: ignore
+    y1_size_map, vectorized_y1 = vectorize_single_select(
+        records,
+        field_lists.y1_categorical,
+        directory=BASE_ENCODER_DIRECTORY,
+        device=device,
+    )
     y1 = resize_and_batch(vectorized_y1, batch_size)
     y1_categories = resize_and_batch(vectorized_y1, batch_size)
     all_y2 = (
@@ -138,8 +149,11 @@ def prepare_data(
         .to(device)
     )
     y2 = resize_and_batch(all_y2, batch_size).squeeze()
+
+    # TODO: 10 (y2 output dim)
     y2_oh = resize_and_batch(
-        torch.zeros(all_y2.size(0), 10).to(device).scatter_(1, all_y2, 1), batch_size
+        torch.zeros(all_y2.size(0), 10).to(device).scatter_(1, all_y2, 1),
+        min(batch_size, all_y2.size(0)),
     )
 
     # (batches) x (seq length) x 1
@@ -159,6 +173,7 @@ def prepare_data(
             y2_true=y2,
             y2_oh_true=y2_oh
         ),
+        #  "AllCategorySizes" gets multiple values for keyword argument "y1"
         AllCategorySizes(*sizes, y1=y1_size_map),  # type: ignore
         round(len(batched_feats.multi_select) / batch_size),
     )
