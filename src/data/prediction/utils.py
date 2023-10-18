@@ -95,7 +95,7 @@ def batch_and_pad(
 
     batches = [F.pad(b, get_batch_pad(b)) for b in batches]
 
-    logging.info(
+    logging.debug(
         "Batches: %s (%s) (%s ...)",
         len(batches),
         batch_size,
@@ -255,8 +255,6 @@ def encode_features(
         device (str): Device to use
     """
 
-    logger.info("Getting feature embeddings")
-
     single_select = encode_single_select_categories(
         records, field_lists.single_select, directory=directory, device=device
     )
@@ -293,8 +291,6 @@ def encode_features(
         else torch.Tensor()
     )
 
-    logger.info("Finished with feature encodings")
-
     return ModelInput(
         multi_select=multi_select.encodings,
         quantitative=quantitative,
@@ -325,7 +321,7 @@ def encode_and_batch_features(
         (f, resize_and_batch(t, batch_size)) for f, t in feats._asdict().items()
     )
 
-    logger.info(
+    logger.debug(
         "Feature Sizes: %s",
         [(f, t.shape if t is not None else None) for f, t in batched.items()],
     )

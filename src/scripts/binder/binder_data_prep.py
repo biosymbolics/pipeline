@@ -221,13 +221,6 @@ def create_binder_data():
     return format_into_binder(df, tokenizer)
 
 
-def main():
-    """
-    Create training data for binder model
-    """
-    create_binder_data()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
@@ -238,4 +231,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    create_binder_data()

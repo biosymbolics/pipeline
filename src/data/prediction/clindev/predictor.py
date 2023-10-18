@@ -35,7 +35,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 5,
+        checkpoint_epoch: int = 100,
         device: str = DEVICE,
     ):
         """
@@ -113,7 +113,8 @@ if __name__ == "__main__":
             """
             Usage: python3 -m data.prediction.clindev.predictor --field: value
 
-            Example: python3 -m data.prediction.clindev.predictor --interventions hydroxychloroquine --conditions covid-19 --mesh_conditions covid-19
+            Example:
+            python3 -m data.prediction.clindev.predictor --interventions hydroxychloroquine --conditions covid-19 --mesh_conditions covid-19
             """
         )
         sys.exit()

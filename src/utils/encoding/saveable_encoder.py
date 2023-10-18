@@ -14,8 +14,9 @@ class Encoder:
     def __init__(self, impl, field: str, directory: str, *args, **kwargs):
         self._directory = directory
         self._field = field
-        self._file = f"{self._directory}/{self._field}.joblib"
         self._impl = impl
+        self.encoder_type = impl.__name__
+        self._file = f"{self._directory}/{self._field}-{self.encoder_type}.joblib"
         self._encoder = self.load(*args, **kwargs)
 
     def load(self, *args, **kwargs):
@@ -26,12 +27,18 @@ class Encoder:
             encoder = load(self._file)
             if not isinstance(encoder, self._impl):
                 raise ValueError(
-                    f"Encoder for field {self._field} is not of type {self._impl}"
+                    f"Encoder for field {self._field} is not of type {self.encoder_type}"
                 )
-            logger.warn("Using existing encoder for %s", self._field)
+            logger.info(
+                "Using EXISTING encoder for %s (%s)", self._field, self.encoder_type
+            )
             return encoder
         except:
-            logging.info("Creating instance of encoder for %s", self._field)
+            logging.info(
+                "Creating NEW instance of encoder for %s (%s)",
+                self._field,
+                self.encoder_type,
+            )
             return self._impl(*args, **kwargs)
 
     def save(self):
@@ -63,7 +70,7 @@ class Encoder:
         _values = values if is_nested else [values]
         encoded_values = [self._encoder.transform(v) for v in _values]
 
-        logger.info("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
+        logger.debug("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
 
         return encoded_values[0] if not is_nested else encoded_values
 
@@ -109,7 +116,5 @@ class QuantitativeEncoder(Encoder):
 
         self._encoder.fit(values)
         encoded_values = self._encoder.transform(values)
-
-        logger.info("Finished encoding field %s (e.g. %s)", field, encoded_values[0:5])
 
         return encoded_values.tolist()
