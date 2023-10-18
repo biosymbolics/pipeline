@@ -251,12 +251,15 @@ def main(bootstrap: bool = False):
     -- analyze applications;
     -- reindex database patents;
         " >> patents.psql
-    # pg_restore --clean -d patents -h 172.31.55.68 -p 5432 --username postgres --password patents.psql
+    echo $PASSWORD
     dropdb patents --force  -h 172.31.55.68 -p 5432 --username postgres
     createdb patents -h 172.31.55.68 -p 5432 --username postgres
     psql -d patents -h 172.31.55.68 -p 5432 --username postgres --password -f patents.psql
     rm patents.psql*
     ```
+
+    if new bastion:
+    - yum install postgresql15
     """
     if bootstrap:
         # bigquery
@@ -282,6 +285,7 @@ def main(bootstrap: bool = False):
     copy_ctgov()
 
     # post
+    # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
     # update annotations set term=regexp_replace(term, ' gene$', '', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
     # update annotations set term=regexp_replace(term, '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
     # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';

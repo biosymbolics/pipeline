@@ -67,6 +67,8 @@ class NerTagger:
         """
         Named-entity recognition using spacy
 
+        NOTE: if using binder, requires binder model class be in PYTHONPATH. (TODO: fix this)
+
         Args:
             use_llm (Optional[bool], optional): Use LLM model. Defaults to False. If true, no rules or anything are used.
             llm_config (Optional[str], optional): LLM config file. Defaults to "configs/patents/config.cfg".

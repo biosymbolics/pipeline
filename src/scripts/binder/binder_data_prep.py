@@ -47,13 +47,16 @@ def get_annotations():
         where b_anns.publication_number = apps.publication_number
         AND s.publication_number = apps.publication_number
         AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
+        AND not array_to_string(ipc_codes, ',') ~ '.*C01.*'
         and 'mechanisms' = any(s.domains)
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
         and domain in ('compounds', 'diseases', 'mechanisms')
-        order by apps.publication_number
+        order by RANDOM()
+        limit 600000
     """
     records = client.select(query)
+    logger.info("Got % s annotations", len(records))
     df = pl.DataFrame(records).explode("text", "publication_number")
     return df
 

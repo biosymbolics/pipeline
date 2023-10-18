@@ -5,14 +5,14 @@ import sys
 import logging
 
 from system import initialize
-from utils.list import dedup
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from core.ner.ner import NerTagger
+from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
 from typings.trials import dict_to_trial_summary
+from utils.list import dedup
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -63,16 +63,18 @@ def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
     - normalizes status etc.
     """
 
-    intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
-    logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
-    normalized_interventions = tagger.extract_strings(
-        [dedup(i_set) for i_set in intervention_sets]
-    )
+    # intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
+    # logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
+    # normalized_interventions = tagger.extract_strings(
+    #     [dedup(i_set) for i_set in intervention_sets]
+    # )
 
-    return [
-        {**dict_to_trial_summary({**rec, "interventions": interventions})}
-        for rec, interventions in zip(ctgov_records, normalized_interventions)
-    ]
+    # return [
+    #     {**dict_to_trial_summary({**rec, "interventions": interventions})}
+    #     for rec, interventions in zip(ctgov_records, normalized_interventions)
+    # ]
+
+    return [dict_to_trial_summary(rec) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -114,7 +116,7 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]), link=False)
+    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]), link=True)
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -162,6 +164,9 @@ def ingest_trials():
 def create_patent_to_trial():
     """
     Create table that maps patent applications to trials
+
+    NOTE: we're currently doing some post-hoc term adjustments on annotations,
+    and this must be run before.
     """
     client = PsqlDatabaseClient()
     att_query = """
@@ -197,10 +202,6 @@ def copy_ctgov():
     create_patent_to_trial()
 
 
-def main():
-    copy_ctgov()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
@@ -211,4 +212,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    copy_ctgov()
