@@ -38,6 +38,10 @@ class Encoder:
         if directory is not None and not os.path.exists(directory):
             os.makedirs(directory)
 
+    def __getattr__(self, name):
+        # Delegate attribute access to the underlying Encoder instance
+        return getattr(self._encoder, name)
+
     def load(self, *args, **kwargs):
         """
         Load encoder from file for a field
@@ -137,5 +141,16 @@ class Encoder:
 
 
 class LabelCategoryEncoder(Encoder):
+    """
+    Encoder for categorical fields
+
+    Usage (examining saved encoder):
+    ```
+    from utils.encoding.saveable_encoder import LabelCategoryEncoder
+    encoder = LabelCategoryEncoder("design", "clindev_model_checkpoints/encoders")
+    print(encoder.classes_)
+    ```
+    """
+
     def __init__(self, *args, **kargs):
         super().__init__(LabelEncoder, *args, **kargs)
