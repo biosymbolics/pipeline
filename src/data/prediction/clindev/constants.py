@@ -88,14 +88,19 @@ def _get_type(field_type: str) -> type | UnionType:
         return str
     if field_type == "quantitative":
         return int | float
+    # TODO: hard-coded
+    if field_type == "y1_categorical":
+        return str
+    if field_type == "y2":
+        return int | float
     raise ValueError(f"Invalid field_type: {field_type}")
 
 
 def get_fields_to_types(
     _field_lists: AnyFieldLists,
 ) -> tuple[tuple[str, type | UnionType], ...]:
-    vals = [(k, fvs) for k, fvs in _field_lists.__dict__.items()]
-    return tuple([(k, _get_type(fv)) for k, fv in vals])
+    vals = _field_lists.__dict__.items()
+    return tuple([(fv, _get_type(k)) for k, fvs in vals for fv in fvs])
 
 
 # sigh https://github.com/python/mypy/issues/848

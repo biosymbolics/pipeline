@@ -8,19 +8,20 @@ import system
 
 system.initialize()
 
-from data.prediction.utils import ModelInput
+from data.prediction.utils import ModelInput, decode_output
 
 from .constants import (
+    BASE_ENCODER_DIRECTORY,
     BATCH_SIZE,
     DEVICE,
     InputRecord,
     input_field_lists,
+    output_field_lists,
 )
 from .model import ClindevPredictionModel
 from .utils import (
     prepare_input_data,
     preprocess_inputs,
-    split_input_categories as split_categories,
 )
 
 
@@ -90,8 +91,12 @@ class ModelPredictor:
                 batch.text,
                 batch.quantitative,
             )
-            y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
-            return [torch.argmax(y1).item() for y1 in y1_probs_list], y2_pred
+            return decode_output(
+                y1_probs_list,
+                y2_preds,
+                output_field_lists,
+                directory=BASE_ENCODER_DIRECTORY,
+            )
 
         predictions = [predict_batch(i) for i in range(len(inputs.multi_select))]
         return predictions

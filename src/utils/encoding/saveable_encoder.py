@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import TypeVar
 from pydash import flatten
 import polars as pl
 from sklearn.calibration import LabelEncoder
@@ -10,6 +11,8 @@ import numpy.typing as npt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+OV = TypeVar("OV", bound=list | npt.NDArray | int)
+
 
 class Encoder:
     def __init__(self, impl, field: str, directory: str, *args, **kwargs):
@@ -17,7 +20,8 @@ class Encoder:
         self._field = field
         self._impl = impl
         self.encoder_type = impl.__name__
-        self._file = f"{self._directory}/{self._field}-{self.encoder_type}.joblib"
+        self._name = f"{self._field}-{self.encoder_type}"
+        self._file = f"{self._directory}/{self._name}.joblib"
         self._encoder = self.load(*args, **kwargs)
 
         if not os.path.exists(directory):
@@ -29,16 +33,10 @@ class Encoder:
         """
         try:
             encoder = load(self._file)
-            logger.info(
-                "Using EXISTING encoder for %s (%s)", self._field, self.encoder_type
-            )
+            logger.info("Using EXISTING encoder for %s", self._name)
             return encoder
         except:
-            logging.info(
-                "Creating NEW instance of encoder for %s (%s)",
-                self._field,
-                self.encoder_type,
-            )
+            logging.info("Creating NEW instance of encoder for %s", self._name)
             return self._impl(*args, **kwargs)
 
     def save(self):
@@ -98,11 +96,11 @@ class Encoder:
         self.save()
         return encoded_values
 
-    def inverse_transform(self, values: list | npt.NDArray) -> list:
+    def inverse_transform(self, val: OV) -> OV:
         """
-        Inverse transform a list of encoded values
+        Inverse transform a list of encoded value(s)
         """
-        return self._encoder.inverse_transform(values)
+        return self._encoder.inverse_transform(val)
 
 
 class LabelCategoryEncoder(Encoder):

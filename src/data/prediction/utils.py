@@ -23,7 +23,7 @@ from data.prediction.types import (
     ModelInput,
     ModelInputAndOutput,
     ModelOutput,
-    OuptputCategorySizes,
+    OutputCategorySizes,
 )
 from typings.core import Primitive
 from utils.encoding.quant_encoder import BinEncoder
@@ -252,7 +252,7 @@ def encode_outputs(
         torch.zeros(y2_encoding.size(0), y2_size).to(device).scatter_(1, y2_encoding, 1)
     )
 
-    sizes = OuptputCategorySizes(
+    sizes = OutputCategorySizes(
         y1=y1.category_size_map,
         y2=y2_size,
     )
@@ -373,13 +373,29 @@ def _encode_and_batch_features(
     return batched, sizes.__dict__
 
 
-# y1_categorical: list[str] y2: str
 def decode_output(
-    y1_probs_list, y2_preds, field_lists: OutputFieldLists, *args, **kwargs
-):
+    y1_probs_list: list[torch.Tensor],
+    y2_preds: torch.Tensor,
+    field_lists: OutputFieldLists,
+    directory: str,
+) -> dict[str, Any]:
+    """
+    Decode outputs
+
+    TODO: generalize or move
+    """
     y1_values = [torch.argmax(y1).item() for y1 in y1_probs_list]
     y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
-    return y1_values, y2_pred
+
+    # TODO: SaveableEncoder should throw exception on inverse_transform if no saved encoder
+    y1_decoded = {
+        f: LabelCategoryEncoder(f, directory).inverse_transform([v])
+        for f, v in zip(field_lists.y1_categorical, y1_values)
+    }
+    y2_decoded = LabelCategoryEncoder(field_lists.y2, directory).inverse_transform(
+        [y2_pred]
+    )
+    return {**y1_decoded, field_lists.y2: y2_decoded}
 
 
 def encode_and_batch_input(

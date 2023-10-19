@@ -125,12 +125,14 @@ class BinEncoder(Encoder):
 
         if self._encoder.n_bins_ != self.n_bins:
             logger.error(
-                "Actual bins != n_bins: %s != %s", self._encoder.n_bins_, self.n_bins
+                "Actual bins != n_bins: %s vs %s", self._encoder.n_bins_, self.n_bins
             )
 
         logger.info(
             "Finished encoding field %s (%s bins)", self._field, self._encoder.n_bins_
         )
+
+        self.save()
 
         return encoded_values.tolist()
 

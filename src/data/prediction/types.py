@@ -10,13 +10,13 @@ class InputCategorySizes:
 
 
 @dataclass(frozen=True)
-class OuptputCategorySizes:
+class OutputCategorySizes:
     y1: dict[str, int]
     y2: int
 
 
 @dataclass(frozen=True)
-class AllCategorySizes(InputCategorySizes, OuptputCategorySizes):
+class AllCategorySizes(InputCategorySizes, OutputCategorySizes):
     pass
 
 
