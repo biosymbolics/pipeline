@@ -1,13 +1,13 @@
 """
 Trial characteristic and duration prediction model
 """
-import os
-from typing import Literal, Optional, Type, TypeVar, cast
+from typing import Literal, Optional
 import torch
 import torch.nn as nn
 import logging
 
 from data.prediction.clindev.utils import embed_cat_inputs
+from data.prediction.model import SaveableModel
 
 from .constants import (
     CHECKPOINT_PATH,
@@ -20,53 +20,6 @@ from .types import StageSizes, ClinDevModelSizes, ClinDevModelInputSizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-T = TypeVar("T", bound="SaveableModel")
-
-
-class SaveableModel(nn.Module):
-    key: str | None = None
-    device = DEVICE  # TODO can this be overwritten?
-
-    def __init__(self):
-        super().__init__()
-
-    @classmethod
-    def get_checkpoint_name(cls, epoch: int):
-        return f"{cls.key}-checkpoint_{epoch}.pt"
-
-    @classmethod
-    def get_checkpoint_path(cls, epoch: int):
-        return os.path.join(CHECKPOINT_PATH, cls.get_checkpoint_name(epoch))
-
-    def save(self, epoch: int):
-        """
-        Save model checkpoint
-
-        Args:
-            epoch (int): Epoch number
-        """
-        checkpoint_name = f"{self.key}-checkpoint_{epoch}.pt"
-
-        try:
-            torch.save(self, self.get_checkpoint_path(epoch))
-            logger.info("Saved checkpoint %s", checkpoint_name)
-        except Exception as e:
-            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
-            raise e
-
-    @classmethod
-    def load(cls: Type[T], epoch: int) -> T:
-        model = cast(
-            T,
-            torch.load(
-                cls.get_checkpoint_path(epoch),
-                map_location=torch.device(cls.device),
-            ),
-        )
-        model.eval()
-        return model
 
 
 class OutputCorrelation(nn.Module):
@@ -94,6 +47,7 @@ class OutputCorrelation(nn.Module):
 class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
     key = "correlation_decoders"
     device = DEVICE
+    checkpoint_path = CHECKPOINT_PATH
 
     def __init__(self, output_map: Optional[dict[str, int]] = None):
         super().__init__()
@@ -114,6 +68,7 @@ class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
 class Stage1Output(SaveableModel, nn.ModuleDict):
     key = "stage1_output"
     device = DEVICE
+    checkpoint_path = CHECKPOINT_PATH
 
     def __init__(
         self,
@@ -135,6 +90,7 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
 class InputModel(SaveableModel):
     key = "input"
     device = DEVICE
+    checkpoint_path = CHECKPOINT_PATH
 
     def __init__(self, sizes: Optional[ClinDevModelInputSizes] = None):
         super().__init__()
@@ -211,6 +167,7 @@ class InputModel(SaveableModel):
 class Stage1Model(SaveableModel):
     key = "stage1"
     device = DEVICE
+    checkpoint_path = CHECKPOINT_PATH
 
     def __init__(self, sizes: Optional[StageSizes] = None):
         super().__init__()
@@ -246,6 +203,7 @@ class Stage1Model(SaveableModel):
 class Stage2Model(SaveableModel):
     key = "stage2"
     device = DEVICE
+    checkpoint_path = CHECKPOINT_PATH
 
     def __init__(self, sizes: Optional[StageSizes] = None):
         super().__init__()
