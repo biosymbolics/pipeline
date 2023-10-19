@@ -58,7 +58,6 @@ class Encoder:
             field (str): Field to encode
             df (pl.DataFrame): Dataframe to encode from
         """
-        is_nested = isinstance(values[0], list)
 
         logger.info(
             "Encoding field %s (e.g. %s) len: %s", self._field, values[0:5], len(values)
@@ -66,26 +65,30 @@ class Encoder:
 
         # fit if not already fit
         if not self._is_fit:
-            self._encoder.fit(flatten(values))
+            self.fit(values)
 
-        _values = values if is_nested else [values]
-        encoded_values = [self._encoder.transform(v) for v in _values]
-        encoded_values = encoded_values[0] if not is_nested else encoded_values
+        # if nested (list o' lists), encode each list separately
+        if isinstance(values[0], list):
+            return [self._encoder.transform(v) for v in values]
 
-        logger.info(
-            "Finished encoding field %s (classes: %s, e.g. %s)",
-            self._field,
-            self._encoder.classes_,
-            encoded_values[0:5],
-        )
+        return self._encoder.transform(values)
 
-        return encoded_values
-
-    def fit(self):
+    def fit(self, values: list | npt.NDArray):
         """
         Fit an encoder
         """
-        raise NotImplementedError()
+        if self._is_fit:
+            logger.warning("Encoder already fit, skipping")
+            return
+
+        self._encoder.fit(flatten(values))
+        self.save()
+
+        logger.info(
+            "Finished fitting field %s (classes: %s)",
+            self._field,
+            self._encoder.classes_,
+        )
 
     def fit_transform(self, data: pl.DataFrame | list | npt.NDArray) -> list:
         """
@@ -96,7 +99,6 @@ class Encoder:
         else:
             encoded_values = self._encode(data)
 
-        self.save()
         return encoded_values
 
     def inverse_transform(self, val: OV) -> OV:

@@ -122,19 +122,7 @@ class BinEncoder(Encoder):
 
         # fit if not already fit
         if not self._is_fit:
-            if self.n_bins is None:
-                self.n_bins = self.estimate_n_bins(
-                    list(values), kbins_strategy=self.strategy
-                )
-                logger.info(
-                    "Using estimated optimal n_bins value of %s for field %s",
-                    self.n_bins,
-                    self.field,
-                )
-                logger.error(
-                    "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
-                )
-            self._encoder.fit(values)
+            self.fit(values)
 
         encoded_values = self._encoder.transform(values)
 
@@ -143,16 +131,36 @@ class BinEncoder(Encoder):
                 "Actual bins != n_bins: %s vs %s", self._encoder.n_bins_, self.n_bins
             )
 
-        logger.info(
-            "Finished encoding field %s (nbins: %s, ex values: %s)",
-            self._field,
-            self._encoder.n_bins_,
-            encoded_values[0:5],
-        )
+        return encoded_values.tolist()
 
+    def fit(self, values: npt.NDArray):
+        """
+        Fit an encoder
+        """
+        if self._is_fit:
+            logger.warning("Encoder already fit, skipping")
+            return
+
+        if self.n_bins is None:
+            self.n_bins = self.estimate_n_bins(
+                list(values), kbins_strategy=self.strategy
+            )
+            logger.info(
+                "Using estimated optimal n_bins value of %s for field %s",
+                self.n_bins,
+                self.field,
+            )
+            logger.error(
+                "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
+            )
+        self._encoder.fit(values)
         self.save()
 
-        return encoded_values.tolist()
+        logger.info(
+            "Finished fitting field %s (nbins: %s)",
+            self._field,
+            self._encoder.n_bins_,
+        )
 
     def fit_transform(self, values: Sequence[float | int] | pl.Series):
         """
