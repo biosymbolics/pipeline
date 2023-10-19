@@ -15,16 +15,27 @@ OV = TypeVar("OV", bound=list | npt.NDArray | int)
 
 
 class Encoder:
-    def __init__(self, impl, field: str, directory: str, *args, **kwargs):
+    def __init__(
+        self,
+        impl,
+        field: str | None = None,
+        directory: str | None = None,
+        *args,
+        **kwargs,
+    ):
         self._directory = directory
         self._field = field
         self._impl = impl
         self.encoder_type = impl.__name__
-        self._name = f"{self._field}-{self.encoder_type}"
-        self._file = f"{self._directory}/{self._name}.joblib"
+
+        self.is_saveable = field is not None and directory is not None
+
+        if self.is_saveable:
+            self._name = f"{self._field}-{self.encoder_type}"
+            self._file = f"{self._directory}/{self._name}.joblib"
         self._encoder, self._is_fit = self.load(*args, **kwargs)
 
-        if not os.path.exists(directory):
+        if directory is not None and not os.path.exists(directory):
             os.makedirs(directory)
 
     def load(self, *args, **kwargs):
@@ -43,10 +54,16 @@ class Encoder:
         """
         Save encoder to file for a field
         """
+        if not self.is_saveable:
+            logger.warning("Cannot save encoder without field and directory")
+            return
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
     def _encode_df(self, df: pl.DataFrame) -> list:
+        if not self._field:
+            raise ValueError("Cannot encode dataframe without field")
+
         values = df.select(pl.col(self._field)).to_series().to_list()
         return self._encode(values)  # .reshape(-1, 1))
 
@@ -82,6 +99,7 @@ class Encoder:
             return
 
         self._encoder.fit(flatten(values))
+
         self.save()
 
         logger.info(

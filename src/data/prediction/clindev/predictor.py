@@ -36,7 +36,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 30,
+        checkpoint_epoch: int = 230,
         device: str = DEVICE,
     ):
         """
@@ -74,8 +74,7 @@ class ModelPredictor:
         batch_size: int = BATCH_SIZE,
         device: str = DEVICE,
     ):
-        inputs, category_sizes = prepare_input_data(
-            # no duration, since this is inference
+        inputs, _ = prepare_input_data(
             preprocess_inputs(records, ["enrollment"]),
             field_lists=input_field_lists,
             batch_size=batch_size,
@@ -119,7 +118,7 @@ if __name__ == "__main__":
             Usage: python3 -m data.prediction.clindev.predictor --field: value
 
             Example:
-            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --conditions Clinically Significant Portal Hypertension --mesh_conditions Hypertension
+            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --conditions 'Clinically Significant Portal Hypertension' --mesh_conditions Hypertension
             """
         )
         sys.exit()

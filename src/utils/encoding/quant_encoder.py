@@ -21,8 +21,8 @@ KbinsStrategy = Literal["uniform", "quantile", "kmeans"]
 class BinEncoder(Encoder):
     def __init__(
         self,
-        field: str,
-        directory: str,
+        field: str | None = None,
+        directory: str | None = None,
         # if None, will estimate (TODO: must adjust size of stage2 output accordingly!)
         n_bins: Optional[int] = 5,
         strategy: KbinsStrategy = "kmeans",
@@ -46,8 +46,7 @@ class BinEncoder(Encoder):
 
     @staticmethod
     def estimate_n_bins(
-        data: list[str] | list[int] | list[float],
-        kbins_strategy: Literal["uniform", "quantile", "kmeans"],
+        values: npt.NDArray,
         bins_to_test=range(3, 20),
     ):
         """
@@ -59,7 +58,6 @@ class BinEncoder(Encoder):
         Args:
             data (list[str] | list[int] | list[float]): List of values
             bins_to_test (range): Range of bins to test
-            kbins_strategy (str): Strategy to use for KBinsDiscretizer
         """
 
         def elbow(
@@ -95,11 +93,8 @@ class BinEncoder(Encoder):
             return gini_before - gini_after
 
         def score_bin(n_bins):
-            est = KBinsDiscretizer(
-                n_bins=n_bins, encode="ordinal", strategy=kbins_strategy, subsample=None
-            )
-            bin_data = est.fit_transform(np.array(data).reshape(-1, 1))
-            return gini_impurity(data, bin_data)
+            bin_data = BinEncoder(nbins=n_bins).fit_transform(values)
+            return gini_impurity(values, bin_data)
 
         scores = [score_bin(n_bins) for n_bins in bins_to_test]
         winner = elbow(scores, bins_to_test)
@@ -126,11 +121,6 @@ class BinEncoder(Encoder):
 
         encoded_values = self._encoder.transform(values)
 
-        if self._encoder.n_bins_ != self.n_bins:
-            logger.error(
-                "Actual bins != n_bins: %s vs %s", self._encoder.n_bins_, self.n_bins
-            )
-
         return encoded_values.tolist()
 
     def fit(self, values: npt.NDArray):
@@ -142,9 +132,7 @@ class BinEncoder(Encoder):
             return
 
         if self.n_bins is None:
-            self.n_bins = self.estimate_n_bins(
-                list(values), kbins_strategy=self.strategy
-            )
+            self.n_bins = self.estimate_n_bins(values)
             logger.info(
                 "Using estimated optimal n_bins value of %s for field %s",
                 self.n_bins,
@@ -154,6 +142,12 @@ class BinEncoder(Encoder):
                 "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
             )
         self._encoder.fit(values)
+
+        if self._encoder.n_bins_ != self.n_bins:
+            logger.error(
+                "Actual bins != n_bins: %s vs %s", self._encoder.n_bins_, self.n_bins
+            )
+
         self.save()
 
         logger.info(
@@ -162,7 +156,7 @@ class BinEncoder(Encoder):
             self._encoder.n_bins_,
         )
 
-    def fit_transform(self, values: Sequence[float | int] | pl.Series):
+    def fit_transform(self, values: Sequence[float | int] | pl.Series | npt.NDArray):
         """
         Bins quantiative values, turning them into categorical
         @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html
