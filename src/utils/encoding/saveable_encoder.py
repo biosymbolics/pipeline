@@ -11,7 +11,7 @@ import numpy.typing as npt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-OV = TypeVar("OV", bound=list | npt.NDArray | int)
+OV = TypeVar("OV", bound=list | npt.NDArray | int | float)
 
 
 class Encoder:
@@ -122,6 +122,9 @@ class Encoder:
     def inverse_transform(self, val: OV) -> OV:
         """
         Inverse transform a list of encoded value(s)
+
+        Will return the mean between the two edges of the bin
+        (see https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.KBinsDiscretizer.html#sklearn.preprocessing.KBinsDiscretizer.inverse_transform)
         """
         if not self._is_fit:
             raise ValueError("Cannot inverse transform before fitting")

@@ -3,6 +3,7 @@ from functools import partial
 from typing import Any, NamedTuple, Sequence, TypeGuard, TypeVar, cast
 import logging
 from collections import namedtuple
+import numpy as np
 import polars as pl
 import torch
 import torch.nn.functional as F
@@ -367,7 +368,10 @@ def decode_output(
     y2_decoded = LabelCategoryEncoder(field_lists.y2, directory).inverse_transform(
         [y2_pred]
     )
-    return {**y1_decoded, field_lists.y2: y2_decoded}
+    y2_quant_decoded = BinEncoder(field_lists.y2, directory).inverse_transform(
+        [y2_decoded]
+    )
+    return {**y1_decoded, field_lists.y2: round(y2_quant_decoded[0][0])}
 
 
 def _encode_and_batch_features(
