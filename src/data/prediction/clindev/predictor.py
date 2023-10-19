@@ -35,7 +35,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 100,
+        checkpoint_epoch: int = 25,
         device: str = DEVICE,
     ):
         """
@@ -76,7 +76,7 @@ class ModelPredictor:
         inputs, category_sizes = prepare_input_data(
             # no duration, since this is inference
             preprocess_inputs(records, ["enrollment"]),
-            input_field_lists=input_field_lists,
+            field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
         )

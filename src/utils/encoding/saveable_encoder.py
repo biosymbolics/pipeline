@@ -98,6 +98,12 @@ class Encoder:
         self.save()
         return encoded_values
 
+    def inverse_transform(self, values: list | npt.NDArray) -> list:
+        """
+        Inverse transform a list of encoded values
+        """
+        return self._encoder.inverse_transform(values)
+
 
 class LabelCategoryEncoder(Encoder):
     def __init__(self, *args, **kargs):

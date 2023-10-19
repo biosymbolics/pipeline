@@ -2,34 +2,30 @@
 Utils for patent eNPV model
 """
 
-from functools import reduce
+from functools import partial, reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence, TypeVar, cast
+from typing import Callable, Sequence, TypeVar
 import logging
 from pydash import uniq
 import torch
 import torch.nn as nn
 
 from data.prediction.utils import (
-    ModelInput,
     ModelInputAndOutput,
     encode_and_batch_all,
     encode_and_batch_input,
     encode_quantitative_fields,
 )
-from data.types import FieldLists, InputFieldLists
 from typings.trials import TrialSummary
 
 from .constants import (
     BASE_ENCODER_DIRECTORY,
-    DEVICE,
     MAX_ITEMS_PER_CAT,
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     InputRecord,
 )
 
-from ..types import AllCategorySizes, InputCategorySizes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -92,54 +88,19 @@ def split_train_and_test(
     return train_input_dict, test_input_dict
 
 
-def prepare_input_data(
-    records: Sequence[InputRecord],
-    input_field_lists: InputFieldLists,
-    batch_size: int,
-    device: str,
-) -> tuple[ModelInput, InputCategorySizes]:
-    """
-    Prepare input data
-    """
-    inputs, category_sizes = encode_and_batch_input(
-        records,
-        field_lists=input_field_lists,
-        batch_size=batch_size,
-        directory=BASE_ENCODER_DIRECTORY,
-        max_items_per_cat=MAX_ITEMS_PER_CAT,
-        device=device,
-    )
+# wrapper around encode_and_batch_input for inputs
+prepare_input_data = partial(
+    encode_and_batch_input,
+    directory=BASE_ENCODER_DIRECTORY,
+    max_items_per_cat=MAX_ITEMS_PER_CAT,
+)
 
-    return inputs, category_sizes
-
-
-def prepare_data(
-    trials: Sequence[TrialSummary],
-    field_lists: FieldLists,
-    batch_size: int,
-    device: str = DEVICE,
-) -> tuple[ModelInputAndOutput, AllCategorySizes, int]:
-    """
-    Prepare data for model
-    """
-    logger.info("Preparing inputs for model")
-
-    records = cast(Sequence[InputRecord], trials)
-
-    batched_feats, sizes = encode_and_batch_all(
-        records,
-        field_lists=field_lists,
-        batch_size=batch_size,
-        directory=BASE_ENCODER_DIRECTORY,
-        max_items_per_cat=MAX_ITEMS_PER_CAT,
-        device=device,
-    )
-
-    return (
-        batched_feats,
-        sizes,
-        round(len(batched_feats.multi_select) / batch_size),
-    )
+# wrapper around encode_and_batch_all for inputs & outputs
+prepare_data = partial(
+    encode_and_batch_all,
+    directory=BASE_ENCODER_DIRECTORY,
+    max_items_per_cat=MAX_ITEMS_PER_CAT,
+)
 
 
 def split_input_categories(

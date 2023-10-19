@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import sys
-from typing import Any, Callable, NamedTuple, Optional, Sequence
+from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
@@ -351,8 +351,8 @@ class ModelTrainer:
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
 
-        input_dict, category_sizes, _ = prepare_data(
-            trials, field_lists, batch_size, DEVICE
+        input_dict, category_sizes = prepare_data(
+            cast(Sequence[InputRecord], trials), field_lists, batch_size, DEVICE
         )
 
         training_input_dict, test_input_dict = split_train_and_test(input_dict)
@@ -366,7 +366,7 @@ class ModelTrainer:
     ):
         batched_feats = prepare_input_data(
             records,
-            input_field_lists=input_field_lists,
+            field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
         )
