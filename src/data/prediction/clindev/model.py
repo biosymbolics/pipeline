@@ -268,7 +268,6 @@ class Stage2Model(SaveableModel):
 
             self.layer3 = nn.Sequential(
                 nn.Linear(round(sizes.hidden / 2), sizes.output),
-                nn.Softmax(),
             )
 
             self.to(self.device)
@@ -302,7 +301,7 @@ class TwoStageModel(nn.Module):
         self.device = device
 
         if mode == "train" and sizes is not None:
-            self.__initialize_model(sizes, device)
+            self.__initialize_model(sizes)
         elif mode == "predict" and checkpoint_epoch is not None:
             return self.load(checkpoint_epoch)
         elif mode == "none":
@@ -332,7 +331,7 @@ class TwoStageModel(nn.Module):
         self.correlation_decoders = OutputCorrelationDecoders.load(epoch)
         self.stage2_model = Stage2Model.load(epoch)
 
-    def __initialize_model(self, sizes: TwoStageModelSizes, device: str):
+    def __initialize_model(self, sizes: TwoStageModelSizes):
         self.input_model = InputModel(sizes)
 
         self.stage1_model = Stage1Model(

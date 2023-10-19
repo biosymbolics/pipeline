@@ -129,7 +129,7 @@ class BinEncoder(Encoder):
             )
 
         logger.info(
-            "Finished encoding field %s (%s)", self._field, self._encoder.n_bins_
+            "Finished encoding field %s (%s bins)", self._field, self._encoder.n_bins_
         )
 
         return encoded_values.tolist()

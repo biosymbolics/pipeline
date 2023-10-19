@@ -69,12 +69,16 @@ class Encoder:
 
         _values = values if is_nested else [values]
         encoded_values = [self._encoder.transform(v) for v in _values]
+        encoded_values = encoded_values[0] if not is_nested else encoded_values
 
         logger.info(
-            "Finished encoding field %s (%s)", self._field, self._encoder.classes_
+            "Finished encoding field %s (classes: %s, e.g. %s)",
+            self._field,
+            self._encoder.classes_,
+            encoded_values[0:5],
         )
 
-        return encoded_values[0] if not is_nested else encoded_values
+        return encoded_values
 
     def fit(self):
         """

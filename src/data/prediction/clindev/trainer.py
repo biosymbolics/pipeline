@@ -5,7 +5,7 @@ import sys
 from typing import Any, Callable, NamedTuple, Optional, Sequence
 import torch
 import torch.nn as nn
-from ignite.metrics import Accuracy, ClassificationReport, MeanAbsoluteError
+from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
 
 import system
 
@@ -85,7 +85,7 @@ class ModelTrainer:
             single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
             text_input=training_input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]),
+            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]) * 20,
             stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
@@ -101,8 +101,15 @@ class ModelTrainer:
         }
 
         self.stage2_metrics = {
-            # "cp": MetricWrapper(metric=ClassificationReport(), transform=None),
-            "accuracy": MetricWrapper(metric=Accuracy(), transform=None),
+            "accuracy": MetricWrapper(
+                metric=Accuracy(), transform=lambda x: (x > 0.49).float()
+            ),
+            "precision": MetricWrapper(
+                metric=Precision(), transform=lambda x: (x > 0.49).float()
+            ),
+            "recall": MetricWrapper(
+                metric=Recall(), transform=lambda x: (x > 0.49).float()
+            ),
             "mae": MetricWrapper(
                 metric=MeanAbsoluteError(),
                 transform=lambda x: torch.argmax(x, dim=1),
@@ -149,15 +156,17 @@ class ModelTrainer:
 
         # STAGE 2
         stage2_ce_loss = self.stage2_ce_criterion(y2_preds, batch.y2_oh_true)
+
+        # using softmax to get a more precise error than CEL between one-hot vectors
         stage2_mse_loss = torch.mul(
-            self.stage2_mse_criterion(torch.softmax(y2_preds, dim=1), batch.y2_true),
+            self.stage2_mse_criterion(torch.softmax(y2_preds, dim=1), batch.y2_oh_true),
             STAGE2_MSE_WEIGHT,
         )
 
         # TOTAL
         loss = stage1_loss + stage1_corr_loss + stage2_ce_loss + stage2_mse_loss
 
-        logger.info(
+        logger.debug(
             "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s (%s))",
             i,
             loss.detach().item(),
@@ -167,7 +176,6 @@ class ModelTrainer:
             stage2_mse_loss.detach().item(),
         )
 
-        # STAGE2 LOSS torch.Size([32, 5]) torch.Size([32, 5]) torch.Size([32, 1])
         self.calculate_metrics(
             y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
@@ -271,7 +279,7 @@ class ModelTrainer:
         y1_preds_by_field: Sequence[torch.Tensor],
         y1_true_by_field: Sequence[torch.Tensor],
         y2_preds: torch.Tensor,
-        y2_true: torch.Tensor,
+        y2_oh_true: torch.Tensor,
     ):
         """
         Calculate discrete metrics for a batch
@@ -288,14 +296,13 @@ class ModelTrainer:
             for metric in self.stage1_metrics.values():
                 metric[k].update((cpu_y1_preds, cpu_y1_true))
 
-        cpu_y2_preds = (torch.softmax(y2_preds.detach().to("cpu"), dim=1) > 0.5).float()
-        # print(y2_preds[0:5])
-        cpu_y2_true = y2_true.detach().to("cpu")
+        cpu_y2_preds = torch.softmax(y2_preds.detach().to("cpu"), dim=1)
+        cpu_y2_oh_true = y2_oh_true.detach().to("cpu")
         for metric, transform in self.stage2_metrics.values():
             if transform:
-                metric.update((transform(cpu_y2_preds), transform(cpu_y2_true)))
+                metric.update((transform(cpu_y2_preds), transform(cpu_y2_oh_true)))
             else:
-                metric.update((cpu_y2_preds, cpu_y2_true))
+                metric.update((cpu_y2_preds, cpu_y2_oh_true))
 
     def log_metrics(self, stage: str = "Training"):
         """
@@ -304,24 +311,21 @@ class ModelTrainer:
         try:
             for k in self.y1_category_sizes.keys():
                 for name, metric in self.stage1_metrics.items():
-                    logger.info(
-                        "%s Stage1 %s %s: %s",
-                        stage,
-                        k,
-                        name,
-                        metric[k].compute().__round__(2),  # type: ignore
-                    )
+                    value = metric[k].compute().__round__(2)
+                    logger.info("%s Stage1 %s %s: %s", stage, k, name, value)
                     metric[k].reset()
 
             for name in self.stage2_metrics.keys():
                 metric, _ = self.stage2_metrics[name]
-                logger.info(
-                    "%s Stage2 %s: %s", stage, name, metric.compute().__round__(2)  # type: ignore
-                )
+                value = metric.compute()  # type: ignore
+                if isinstance(value, torch.Tensor):
+                    value = value.item()
+                logger.info("%s Stage2 %s: %s", stage, name, value.__round__(2))
                 metric.reset()  # type: ignore
 
         except Exception as e:
             logger.warning("Failed to evaluate: %s", e)
+            raise e
 
     def evaluate(self, input_dict: ModelInputAndOutput, category_sizes: dict[str, int]):
         """

@@ -90,7 +90,7 @@ class ModelPredictor:
                 batch.text,
                 batch.quantitative,
             )
-            y2_pred = torch.argmax(y2_preds).item()
+            y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
             return [torch.argmax(y1).item() for y1 in y1_probs_list], y2_pred
 
         predictions = [predict_batch(i) for i in range(len(inputs.multi_select))]
