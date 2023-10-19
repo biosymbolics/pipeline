@@ -116,11 +116,14 @@ AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
 
 
 def is_output_record(record: AnyRecord) -> TypeGuard[OutputRecord]:
-    output_fields = flatten(output_field_lists.__dict__.values())
-    return all([k in record.__dict__.keys() for k in output_fields])
+    record_keys = (record.__dict__ if not isinstance(record, dict) else record).keys()
+    output_fields = set(flatten(output_field_lists.__dict__.values()))
+    return output_fields.issubset(record_keys)
 
 
 def is_output_records(
     records: Sequence[AnyRecord],
 ) -> TypeGuard[Sequence[OutputRecord]]:
-    return all(is_output_record(record) for record in records)
+    return len(records) > 0 and all(
+        is_output_record(record) for record in records[0:10]
+    )
