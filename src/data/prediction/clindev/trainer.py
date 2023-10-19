@@ -360,18 +360,6 @@ class ModelTrainer:
         model = ModelTrainer(training_input_dict, test_input_dict, category_sizes)
         model.train()
 
-    @staticmethod
-    def predict(
-        records: list[InputRecord], batch_size: int = BATCH_SIZE, device: str = DEVICE
-    ):
-        batched_feats = prepare_input_data(
-            records,
-            field_lists=input_field_lists,
-            batch_size=batch_size,
-            device=device,
-        )
-        return batched_feats
-
 
 def main():
     ModelTrainer.train_from_trials()

@@ -1,6 +1,6 @@
 from datetime import date
 from functools import partial
-from typing import Any, NamedTuple, Sequence, TypeGuard, cast
+from typing import Any, NamedTuple, Sequence, TypeGuard, TypeVar, cast
 import logging
 from collections import namedtuple
 import polars as pl
@@ -8,7 +8,13 @@ import torch
 import torch.nn.functional as F
 import polars as pl
 
-from data.prediction.clindev.constants import InputRecord
+from data.prediction.clindev.constants import (
+    AnyRecord,
+    InputAndOutputRecord,
+    InputRecord,
+    OutputRecord,
+    is_output_records,
+)
 from data.prediction.constants import DEFAULT_TEXT_FEATURES
 from data.prediction.types import (
     AllCategorySizes,
@@ -16,8 +22,9 @@ from data.prediction.types import (
     InputCategorySizes,
     ModelInput,
     ModelInputAndOutput,
+    ModelOutput,
+    OuptputCategorySizes,
 )
-from data.types import FieldLists, InputFieldLists, is_all_fields_list
 from typings.core import Primitive
 from utils.encoding.quant_encoder import BinEncoder
 from utils.encoding.saveable_encoder import LabelCategoryEncoder
@@ -25,11 +32,15 @@ from utils.encoding.text_encoder import get_text_embeddings
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
 
+from .types import FieldLists, InputFieldLists, OutputFieldLists, is_all_fields_list
+
 
 DEFAULT_MAX_ITEMS_PER_CAT = 20
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+T = TypeVar("T", bound=AnyRecord)
 
 
 class EncodedCategories(NamedTuple):
@@ -113,7 +124,7 @@ def is_list(obj: Any) -> bool:
 
 
 def encode_categories(
-    records: Sequence[InputRecord],
+    records: Sequence[T],
     categorical_fields: list[str],
     max_items_per_cat: int,
     directory: str,
@@ -162,7 +173,7 @@ def encode_categories(
 
 
 def encode_single_select_categories(
-    records: Sequence[InputRecord],
+    records: Sequence[T],
     categorical_fields: list[str],
     directory: str,
     device: str = "cpu",
@@ -177,7 +188,7 @@ def encode_single_select_categories(
 
 
 def encode_multi_select_categories(
-    records: Sequence[InputRecord],
+    records: Sequence[T],
     categorical_fields: list[str],
     max_items_per_cat: int,
     directory: str,
@@ -221,8 +232,40 @@ def encode_quantitative_fields(
     return df.to_dicts()
 
 
+def encode_outputs(
+    records: Sequence[OutputRecord],
+    field_lists: OutputFieldLists,
+    directory: str,
+    device: str = "cpu",
+):
+    """
+    Encode outputs (for use in loss calculation)
+    """
+    encode_single = partial(
+        encode_single_select_categories, directory=directory, device=device
+    )
+    y1 = encode_single(records, field_lists.y1_categorical)
+    y2 = encode_single(records, [field_lists.y2])
+    y2_encoding = y2.encodings.squeeze(1)
+    y2_size = y2.category_size_map[field_lists.y2]
+    y2_oh = (
+        torch.zeros(y2_encoding.size(0), y2_size).to(device).scatter_(1, y2_encoding, 1)
+    )
+
+    sizes = OuptputCategorySizes(
+        y1=y1.category_size_map,
+        y2=y2_size,
+    )
+    encodings = ModelOutput(
+        y1_true=y1.encodings,
+        y2_true=y2_encoding,
+        y2_oh_true=y2_oh,
+    )
+    return encodings, sizes
+
+
 def encode_features(
-    records: Sequence[InputRecord],
+    records: Sequence[T],
     field_lists: FieldLists | InputFieldLists,
     directory: str,
     max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
@@ -250,11 +293,7 @@ def encode_features(
     )
 
     single_select = encode_single(records, field_lists.single_select)
-
-    multi_select = encode_multi(
-        records,
-        field_lists.multi_select,
-    )
+    multi_select = encode_multi(records, field_lists.multi_select)
 
     text = (
         get_text_embeddings(
@@ -292,29 +331,17 @@ def encode_features(
         text=text,
     )
 
-    if is_all_fields_list(field_lists):
-        y1 = encode_single(records, field_lists.y1_categorical)
-        y2 = encode_single(records, [field_lists.y2])
-        y2_encoding = y2.encodings.squeeze(1)
-        y2_size = y2.category_size_map[field_lists.y2]
-        y2_oh = (
-            torch.zeros(y2_encoding.size(0), y2_size)
-            .to(device)
-            .scatter_(1, y2_encoding, 1)
+    if is_all_fields_list(field_lists) and is_output_records(records):
+        o_encodings, o_sizes = encode_outputs(
+            records,
+            cast(OutputFieldLists, field_lists),
+            directory=directory,
+            device=device,
         )
-
-        sizes = AllCategorySizes(
-            **sizes.__dict__,
-            y1=y1.category_size_map,
-            y2=y2_size,
-        )
-        encodings = ModelInputAndOutput(
-            **encodings.__dict__,
-            y1_true=y1.encodings,
-            y2_true=y2_encoding,
-            y2_oh_true=y2_oh,
-        )
-        return encodings, sizes
+        # TODO: Ugly
+        return ModelInputAndOutput(
+            **encodings.__dict__, **o_encodings.__dict__
+        ), AllCategorySizes(**sizes.__dict__, **o_sizes.__dict__)
 
     return encodings, sizes
 
@@ -344,6 +371,15 @@ def _encode_and_batch_features(
     )
 
     return batched, sizes.__dict__
+
+
+# y1_categorical: list[str] y2: str
+def decode_output(
+    y1_probs_list, y2_preds, field_lists: OutputFieldLists, *args, **kwargs
+):
+    y1_values = [torch.argmax(y1).item() for y1 in y1_probs_list]
+    y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
+    return y1_values, y2_pred
 
 
 def encode_and_batch_input(

@@ -1,12 +1,13 @@
 from types import UnionType
-from typing import NamedTuple, Type
+from typing import NamedTuple, Sequence, Type, TypeGuard
 
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
     DEFAULT_TRUE_THRESHOLD,
 )
-from data.types import FieldLists, InputFieldLists
+
+from ..types import AnyFieldLists, FieldLists, InputFieldLists, OutputFieldLists
 
 CHECKPOINT_PATH = "clindev_model_checkpoints"
 BASE_ENCODER_DIRECTORY = "clindev_model_checkpoints/encoders"
@@ -72,8 +73,13 @@ input_field_lists = InputFieldLists(
     quantitative=QUANTITATIVE_FIELDS,
 )
 
+output_field_lists = OutputFieldLists(
+    y1_categorical=Y1_CATEGORICAL_FIELDS,
+    y2=Y2_FIELD,
+)
 
-def get_input_type(field_type: str) -> Type | UnionType:
+
+def _get_type(field_type: str) -> type | UnionType:
     if field_type == "single_select":
         return str | int | float
     if field_type == "multi_select":
@@ -85,23 +91,28 @@ def get_input_type(field_type: str) -> Type | UnionType:
     raise ValueError(f"Invalid field_type: {field_type}")
 
 
-fields_to_types: list[tuple[str, Type | UnionType]] = [
-    (fv, get_input_type(t))
-    for t, fvs in input_field_lists.__dict__.items()
-    for fv in fvs
-]
-InputRecord = NamedTuple("InputRecord", fields_to_types)  # type: ignore
+def get_fields_to_types(
+    _field_lists: AnyFieldLists,
+) -> tuple[tuple[str, type | UnionType], ...]:
+    vals = [(k, fvs) for k, fvs in _field_lists.__dict__.items()]
+    return tuple([(k, _get_type(fv)) for k, fv in vals])
 
-# with 5 buckets
-# INFO:__main__:Training Stage1 design accuracy: 0.79
-# INFO:__main__:Training Stage1 masking accuracy: 0.63
-# INFO:__main__:Training Stage1 randomization accuracy: 0.81
-# INFO:__main__:Training Stage1 comparison_type accuracy: 0.62
-# INFO:__main__:Training Stage2 accuracy: 0.79
-# INFO:__main__:Training Stage2 mae: 0.3
-# INFO:__main__:Evaluation Stage1 design accuracy: 0.64
-# INFO:__main__:Evaluation Stage1 masking accuracy: 0.5
-# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.69
-# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.43
-# INFO:__main__:Evaluation Stage2 accuracy: 0.72
-# INFO:__main__:Evaluation Stage2 mae: 0.37
+
+# sigh https://github.com/python/mypy/issues/848
+InputRecord = NamedTuple("InputRecord", get_fields_to_types(input_field_lists))  # type: ignore
+InputAndOutputRecord = NamedTuple(  # type: ignore
+    "InputAndOutputRecord", get_fields_to_types(field_lists)  # type: ignore
+)
+OutputRecord = NamedTuple("OutputRecord", get_fields_to_types(output_field_lists))  # type: ignore
+
+AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
+
+
+def is_output_record(record: AnyRecord) -> TypeGuard[OutputRecord]:
+    return isinstance(record, OutputRecord)
+
+
+def is_output_records(
+    records: Sequence[AnyRecord],
+) -> TypeGuard[Sequence[OutputRecord]]:
+    return all(is_output_record(record) for record in records)

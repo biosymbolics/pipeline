@@ -1,4 +1,4 @@
-from typing import Sequence, cast
+from typing import Sequence, TypeVar, cast
 import logging
 from pydash import flatten
 import numpy as np
@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from sklearn.decomposition import PCA
 
 from core.ner.spacy import Spacy
-from data.prediction.clindev.constants import InputRecord
+from data.prediction.clindev.constants import AnyRecord, InputRecord
 from utils.tensor import array_to_tensor
 
 
@@ -26,8 +26,11 @@ def get_string_values(item: dict, field: str) -> list:
     return [val[0:DEFAULT_MAX_STRING_LEN]]
 
 
+T = TypeVar("T", bound=AnyRecord)
+
+
 def get_text_embeddings(
-    records: Sequence[InputRecord],
+    records: Sequence[T],
     text_fields: list[str],
     n_text_features: int,
     device: str = "cpu",
