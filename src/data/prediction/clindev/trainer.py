@@ -19,9 +19,8 @@ from .constants import (
     DEVICE,
     EMBEDDING_DIM,
     SAVE_FREQUENCY,
-    InputRecord,
+    InputAndOutputRecord,
     field_lists,
-    input_field_lists,
 )
 from .model import ClindevTrainingModel
 from .types import TwoStageModelSizes
@@ -352,7 +351,10 @@ class ModelTrainer:
         trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
 
         input_dict, category_sizes = prepare_data(
-            cast(Sequence[InputRecord], trials), field_lists, batch_size, DEVICE
+            cast(Sequence[InputAndOutputRecord], trials),
+            field_lists,
+            batch_size=batch_size,
+            device=DEVICE,
         )
 
         training_input_dict, test_input_dict = split_train_and_test(input_dict)

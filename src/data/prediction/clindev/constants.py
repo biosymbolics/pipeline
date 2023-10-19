@@ -1,6 +1,8 @@
 from types import UnionType
 from typing import NamedTuple, Sequence, Type, TypeGuard
 
+from pydash import flatten
+
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
@@ -114,7 +116,8 @@ AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
 
 
 def is_output_record(record: AnyRecord) -> TypeGuard[OutputRecord]:
-    return isinstance(record, OutputRecord)
+    output_fields = flatten(output_field_lists.__dict__.values())
+    return all([k in record.__dict__.keys() for k in output_fields])
 
 
 def is_output_records(

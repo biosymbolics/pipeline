@@ -346,33 +346,6 @@ def encode_features(
     return encodings, sizes
 
 
-def _encode_and_batch_features(
-    records: Sequence[InputRecord],
-    field_lists: FieldLists | InputFieldLists,
-    batch_size: int,
-    directory: str,
-    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
-    device: str = "cpu",
-) -> tuple[dict, dict]:
-    """
-    Vectorizes and batches input features
-    """
-    feats, sizes = encode_features(
-        records, field_lists, directory, max_items_per_cat, device=device
-    )
-
-    batched = dict(
-        (f, resize_and_batch(t, batch_size)) for f, t in feats.__dict__.items()
-    )
-
-    logger.debug(
-        "Feature Sizes: %s",
-        [(f, t.shape if t is not None else None) for f, t in batched.items()],
-    )
-
-    return batched, sizes.__dict__
-
-
 def decode_output(
     y1_probs_list: list[torch.Tensor],
     y2_preds: torch.Tensor,
@@ -398,15 +371,43 @@ def decode_output(
     return {**y1_decoded, field_lists.y2: y2_decoded}
 
 
+def _encode_and_batch_features(
+    records: Sequence[AnyRecord],
+    field_lists: FieldLists | InputFieldLists,
+    batch_size: int,
+    directory: str,
+    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
+    device: str = "cpu",
+) -> tuple[dict, dict]:
+    """
+    Vectorizes and batches input features
+    """
+    feats, sizes = encode_features(
+        records, field_lists, directory, max_items_per_cat, device=device
+    )
+
+    batched = dict(
+        (f, resize_and_batch(t, batch_size)) for f, t in feats.__dict__.items()
+    )
+
+    logger.debug(
+        "Feature Sizes: %s",
+        [(f, t.shape if t is not None else None) for f, t in batched.items()],
+    )
+
+    return batched, sizes.__dict__
+
+
 def encode_and_batch_input(
-    records: Sequence[InputRecord], field_lists: InputFieldLists, *args, **kwargs
+    records: Sequence[InputRecord], field_lists: InputFieldLists, **kwargs
 ) -> tuple[ModelInput, InputCategorySizes]:
-    batched, sizes = _encode_and_batch_features(records, field_lists, *args, **kwargs)
+    batched, sizes = _encode_and_batch_features(records, field_lists, **kwargs)
     return ModelInput(**batched), InputCategorySizes(**sizes)
 
 
 def encode_and_batch_all(
-    records: Sequence[InputRecord], field_lists: FieldLists, *args, **kwargs
+    records: Sequence[InputAndOutputRecord], field_lists: FieldLists, **kwargs
 ) -> tuple[ModelInputAndOutput, AllCategorySizes]:
-    batched, sizes = _encode_and_batch_features(records, field_lists, *args, **kwargs)
+    batched, sizes = _encode_and_batch_features(records, field_lists, **kwargs)
+    print(batched.keys())
     return ModelInputAndOutput(**batched), AllCategorySizes(**sizes)
