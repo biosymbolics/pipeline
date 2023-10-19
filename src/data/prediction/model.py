@@ -1,8 +1,8 @@
 """
-Trial characteristic and duration prediction model
+General saveable torch model
 """
 import os
-from typing import Literal, Optional, Type, TypeVar, cast
+from typing import Type, TypeVar, cast
 import torch
 import torch.nn as nn
 import logging
