@@ -272,7 +272,8 @@ class Stage2Model(SaveableModel):
 
             self.to(self.device)
 
-    def forward(self, input):
+    def forward(self, y1, x):
+        input = torch.cat([y1, x], dim=1)
         x = self.layer1(input)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -383,7 +384,7 @@ class ClinDevModel(nn.Module):
         # outputs guessed based on the other outputs (to learn relationships)
         y1_corr_probs = self.correlation_decoders(y1_probs_list)
 
-        y2_pred = self.stage2_model(y1_pred).to(self.device)
+        y2_pred = self.stage2_model(y1_pred, x).to(self.device)
 
         return (y1_probs, y1_corr_probs, y2_pred, y1_probs_list)
 

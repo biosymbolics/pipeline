@@ -27,7 +27,6 @@ from .types import ClinDevModelSizes
 from .utils import (
     calc_categories_loss,
     prepare_data,
-    prepare_input_data,
     preprocess_inputs,
     split_categories,
     split_train_and_test,
@@ -84,7 +83,7 @@ class ModelTrainer:
             single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
             text_input=training_input_dict.text.size(-1),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]) * 20,
+            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]) * 10,
             stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
@@ -349,7 +348,6 @@ class ModelTrainer:
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
-        print(trials[0:2])
 
         input_dict, category_sizes = prepare_data(
             cast(Sequence[InputAndOutputRecord], trials),

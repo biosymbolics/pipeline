@@ -56,7 +56,7 @@ class ClinDevModelSizes(ClinDevModelInputSizes):
 
     @property
     def stage2_input(self):
-        return self.stage1_output
+        return self.stage1_output + self.stage1_input
 
     @property
     def stage2_hidden(self):
