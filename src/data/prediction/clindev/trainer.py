@@ -23,7 +23,7 @@ from .constants import (
     field_lists,
 )
 from .model import ClindevTrainingModel
-from .types import TwoStageModelSizes
+from .types import ClinDevModelSizes
 from .utils import (
     calc_categories_loss,
     prepare_data,
@@ -75,7 +75,7 @@ class ModelTrainer:
         self.training_input_dict = training_input_dict
         self.test_input_dict = test_input_dict
 
-        sizes = TwoStageModelSizes(
+        sizes = ClinDevModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
             multi_select_input=math.prod(training_input_dict.multi_select.shape[2:]),

@@ -5,7 +5,7 @@ from data.prediction.types import AllCategorySizes
 
 
 @dataclass(frozen=True)
-class TwoStageModelInputSizes:
+class ClinDevModelInputSizes:
     multi_select_input: int
     quantitative_input: int
     single_select_input: int
@@ -32,7 +32,7 @@ class TwoStageModelInputSizes:
 
 
 @dataclass(frozen=True)
-class TwoStageModelSizes(TwoStageModelInputSizes):
+class ClinDevModelSizes(ClinDevModelInputSizes):
     """
     Sizes of inputs and outputs for two-stage model
     """

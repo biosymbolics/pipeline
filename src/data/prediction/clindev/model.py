@@ -15,7 +15,7 @@ from .constants import (
     LR,
     OPTIMIZER_CLASS,
 )
-from .types import StageSizes, TwoStageModelSizes, TwoStageModelInputSizes
+from .types import StageSizes, ClinDevModelSizes, ClinDevModelInputSizes
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,7 @@ class InputModel(SaveableModel):
     key = "input"
     device = DEVICE
 
-    def __init__(self, sizes: Optional[TwoStageModelInputSizes] = None):
+    def __init__(self, sizes: Optional[ClinDevModelInputSizes] = None):
         super().__init__()
 
         if sizes is not None:
@@ -279,7 +279,7 @@ class Stage2Model(SaveableModel):
         return x
 
 
-class TwoStageModel(nn.Module):
+class ClinDevModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
 
@@ -292,7 +292,7 @@ class TwoStageModel(nn.Module):
     def __init__(
         self,
         mode: Literal["train", "predict", "none"] = "train",
-        sizes: Optional[TwoStageModelSizes] = None,  # required if mode == "train"
+        sizes: Optional[ClinDevModelSizes] = None,  # required if mode == "train"
         checkpoint_epoch: Optional[int] = None,  # required if mode == "predict"
         device: str = DEVICE,
     ):
@@ -331,7 +331,7 @@ class TwoStageModel(nn.Module):
         self.correlation_decoders = OutputCorrelationDecoders.load(epoch)
         self.stage2_model = Stage2Model.load(epoch)
 
-    def __initialize_model(self, sizes: TwoStageModelSizes):
+    def __initialize_model(self, sizes: ClinDevModelSizes):
         self.input_model = InputModel(sizes)
 
         self.stage1_model = Stage1Model(
@@ -388,11 +388,11 @@ class TwoStageModel(nn.Module):
         return (y1_probs, y1_corr_probs, y2_pred, y1_probs_list)
 
 
-class ClindevPredictionModel(TwoStageModel):
+class ClindevPredictionModel(ClinDevModel):
     def __init__(self, checkpoint_epoch: int, device: str = DEVICE):
         super().__init__("predict", None, checkpoint_epoch, device=device)
 
 
-class ClindevTrainingModel(TwoStageModel):
-    def __init__(self, sizes: TwoStageModelSizes, device: str = DEVICE):
+class ClindevTrainingModel(ClinDevModel):
+    def __init__(self, sizes: ClinDevModelSizes, device: str = DEVICE):
         super().__init__("train", sizes, device=device)

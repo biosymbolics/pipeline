@@ -43,7 +43,7 @@ class ModelPredictor:
         Initialize model
 
         Args:
-            sizes (TwoStageModelSizes): Model sizes
+            sizes (ClinDevModelSizes): Model sizes
         """
         torch.device(device)
         self.device = device
