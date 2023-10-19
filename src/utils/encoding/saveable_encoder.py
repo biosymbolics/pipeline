@@ -22,7 +22,7 @@ class Encoder:
         self.encoder_type = impl.__name__
         self._name = f"{self._field}-{self.encoder_type}"
         self._file = f"{self._directory}/{self._name}.joblib"
-        self._encoder = self.load(*args, **kwargs)
+        self._encoder, self._is_fit = self.load(*args, **kwargs)
 
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -34,10 +34,10 @@ class Encoder:
         try:
             encoder = load(self._file)
             logger.info("Using EXISTING encoder for %s", self._name)
-            return encoder
+            return encoder, True
         except:
             logging.info("Creating NEW instance of encoder for %s", self._name)
-            return self._impl(*args, **kwargs)
+            return self._impl(*args, **kwargs), False
 
     def save(self):
         """
@@ -63,7 +63,10 @@ class Encoder:
         logger.info(
             "Encoding field %s (e.g. %s) len: %s", self._field, values[0:5], len(values)
         )
-        self._encoder.fit(flatten(values))
+
+        # fit if not already fit
+        if not self._is_fit:
+            self._encoder.fit(flatten(values))
 
         _values = values if is_nested else [values]
         encoded_values = [self._encoder.transform(v) for v in _values]
@@ -100,7 +103,14 @@ class Encoder:
         """
         Inverse transform a list of encoded value(s)
         """
-        return self._encoder.inverse_transform(val)
+        if not self._is_fit:
+            raise ValueError("Cannot inverse transform before fitting")
+
+        try:
+            return self._encoder.inverse_transform(val)
+        except ValueError as e:
+            logger.error("Could not inverse transform %s (%s)", val, e)
+            return val
 
 
 class LabelCategoryEncoder(Encoder):

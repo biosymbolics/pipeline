@@ -225,7 +225,7 @@ def encode_quantitative_fields(
         df = df.with_columns(
             [
                 pl.col(field).map_batches(
-                    lambda v: pl.Series(BinEncoder(field, directory).bin(v))
+                    lambda v: pl.Series(BinEncoder(field, directory).fit_transform(v))
                 )
             ]
         )
@@ -360,7 +360,6 @@ def decode_output(
     y1_values = [torch.argmax(y1).item() for y1 in y1_probs_list]
     y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
 
-    # TODO: SaveableEncoder should throw exception on inverse_transform if no saved encoder
     y1_decoded = {
         f: LabelCategoryEncoder(f, directory).inverse_transform([v])
         for f, v in zip(field_lists.y1_categorical, y1_values)

@@ -120,7 +120,22 @@ class BinEncoder(Encoder):
             len(values),
         )
 
-        self._encoder.fit(values)
+        # fit if not already fit
+        if not self._is_fit:
+            if self.n_bins is None:
+                self.n_bins = self.estimate_n_bins(
+                    list(values), kbins_strategy=self.strategy
+                )
+                logger.info(
+                    "Using estimated optimal n_bins value of %s for field %s",
+                    self.n_bins,
+                    self.field,
+                )
+                logger.error(
+                    "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
+                )
+            self._encoder.fit(values)
+
         encoded_values = self._encoder.transform(values)
 
         if self._encoder.n_bins_ != self.n_bins:
@@ -129,17 +144,17 @@ class BinEncoder(Encoder):
             )
 
         logger.info(
-            "Finished encoding field %s (%s bins)", self._field, self._encoder.n_bins_
+            "Finished encoding field %s (nbins: %s, ex values: %s)",
+            self._field,
+            self._encoder.n_bins_,
+            encoded_values[0:5],
         )
 
         self.save()
 
         return encoded_values.tolist()
 
-    def bin(
-        self,
-        values: Sequence[float | int] | pl.Series,
-    ) -> Sequence[list[int]]:
+    def fit_transform(self, values: Sequence[float | int] | pl.Series):
         """
         Bins quantiative values, turning them into categorical
         @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html
@@ -151,22 +166,6 @@ class BinEncoder(Encoder):
             Sequence[list[int]]: List of lists of binned values (e.g. [[0.0], [2.0], [5.0], [0.0], [0.0]])
                 (a list of lists because that matches our other categorical vars)
         """
-        if self.n_bins is None:
-            self.n_bins = self.estimate_n_bins(
-                list(values), kbins_strategy=self.strategy
-            )
-            logger.info(
-                "Using estimated optimal n_bins value of %s for field %s",
-                self.n_bins,
-                self.field,
-            )
-            logger.error(
-                "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
-            )
-
         X = np.array(values).reshape(-1, 1)
         Xt = self._encode(X)
         return Xt
-
-    def fit_transform(self, values, *args, **kwargs):
-        return self.bin(values, *args, **kwargs)
