@@ -4,6 +4,7 @@ To run after NER is complete
 from functools import reduce
 import re
 import logging
+from typing import Sequence
 from spacy.tokens import Doc
 
 from system import initialize
@@ -27,8 +28,8 @@ logger.setLevel(logging.INFO)
 
 
 def remove_trailing_leading(
-    terms: list[str], removal_terms: dict[str, WordPlace]
-) -> list[str]:
+    terms: Sequence[str], removal_terms: dict[str, WordPlace]
+) -> Sequence[str]:
     logger.info("Removing trailing/leading words")
 
     def get_leading_trailing_re(place: str) -> re.Pattern | None:

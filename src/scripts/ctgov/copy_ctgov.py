@@ -13,6 +13,10 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
+from data.common.biomedical import (
+    remove_trailing_leading,
+    REMOVAL_WORDS_POST as REMOVAL_WORDS,
+)
 from typings.trials import TrialSummary, dict_to_trial_summary
 from utils.list import dedup
 
@@ -129,7 +133,13 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]), link=True)
+    tagger = NerTagger(
+        entity_types=frozenset(["compounds", "mechanisms"]),
+        link=True,
+        additional_cleaners=[
+            lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+        ],
+    )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 

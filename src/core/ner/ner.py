@@ -6,7 +6,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 from functools import reduce
 from itertools import groupby
 import time
-from typing import Any, Literal, Optional, Sequence, TypeVar, cast
+from typing import Any, Callable, Literal, Optional, Sequence, TypeVar, cast
 from pydash import flatten
 import logging
 import warnings
@@ -61,6 +61,7 @@ class NerTagger:
                 MECHANISM_SPACY_PATTERNS,
             ]
         ),
+        additional_cleaners: list[Callable[[Sequence[str]], Sequence[str]]] = [],
         link: bool = True,
     ):
         """
@@ -82,6 +83,7 @@ class NerTagger:
         self.use_llm = use_llm
         self.llm_config = llm_config
         self.rule_sets = rule_sets
+        self.additional_cleaners = additional_cleaners
         self.entity_types = entity_types
         self.normalizer = TermNormalizer(link=link)
         start_time = time.time()
@@ -143,6 +145,7 @@ class NerTagger:
             lambda c: flatten(chunk_list(c, CHUNK_SIZE)) if self.use_llm else c,
             lambda _content: [html.unescape(c) for c in _content],
             remove_extra_spaces,  # important; model gets confused by weird spacing
+            *self.additional_cleaners,
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
