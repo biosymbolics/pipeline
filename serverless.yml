@@ -121,19 +121,6 @@ functions:
     handler: src.handlers.patents.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  ask-sec:
-    ## requirements updates requires rebuild/push of image! ##
-    vpc: ~ # no need to be in VPC; needs OB access
-    # image:
-    #   name: chat_torch_container
-    events:
-      - http:
-          path: sec/ask
-          method: get
-          cors: true
-    handler: src.handlers.sec.ask
-    layers:
-      - Ref: PythonRequirementsLambdaLayer
   predict-clindev:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
