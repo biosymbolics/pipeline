@@ -6,7 +6,7 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 from functools import reduce
 from itertools import groupby
 import time
-from typing import Any, Literal, Optional, TypeVar
+from typing import Any, Literal, Optional, Sequence, TypeVar, cast
 from pydash import flatten
 import logging
 import warnings
@@ -33,7 +33,6 @@ from .utils import spans_to_doc_entities
 
 T = TypeVar("T", bound=Span | str)
 
-ST = TypeVar("ST", bound=list[str] | list[list[str]])
 ContentType = Literal["text", "html"]
 CHUNK_SIZE = 10000
 
@@ -136,7 +135,7 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __prep_for_extract(self, content: ST) -> ST:
+    def __prep_for_extract(self, content: Sequence[str]) -> Sequence[str]:
         """
         Prepares a list of content for NER
         """
@@ -146,11 +145,7 @@ class NerTagger:
             remove_extra_spaces,  # important; model gets confused by weird spacing
         ]
 
-        if is_string_list_list(content):
-            return [self.__prep_for_extract(c) for c in content]  # type: ignore
-        elif is_string_list(content):
-            return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
-        raise Exception("Bad content type")
+        return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
 
     @staticmethod
     def __combine_ents(doc1: Doc, doc2: Doc) -> DocEntities:
@@ -174,9 +169,7 @@ class NerTagger:
         entity_set = spans_to_doc_entities(sorted(deduped, key=lambda e: e.start_char))
         return entity_set
 
-    def __dual_model_extract(
-        self, content: list[str] | list[list[str]]
-    ) -> list[DocEntities]:
+    def __dual_model_extract(self, content: Sequence[str]) -> list[DocEntities]:
         """
         Run both NLP pipelines (rule_nlp and binder)
 
@@ -184,7 +177,7 @@ class NerTagger:
         """
 
         if is_string_list_list(content):
-            ents = flatten([self.__dual_model_extract(c) for c in content])  # type: ignore
+            ents = flatten([self.__dual_model_extract(c) for c in content])
             return ents
         elif is_string_list(content):
             binder_docs = self.nlp.pipe(content)
@@ -220,7 +213,7 @@ class NerTagger:
             )
 
         # filter by entity types (if provided) and remove empty chars
-        entities = [
+        norm_entity_sets = [
             [
                 get_doc_entity(e)
                 for e in es
@@ -230,12 +223,12 @@ class NerTagger:
             for es in entity_sets
         ]
 
-        return entities
+        return norm_entity_sets
 
     def extract(
         self,
-        content: list[str] | list[list[str]],
-    ) -> list[DocEntities]:
+        content: Sequence[str],
+    ) -> Sequence[DocEntities]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -254,7 +247,7 @@ class NerTagger:
             >>> tagger.extract(["commercialize biosimilar BAT1806, a anti-interleukin-6 (IL-6) receptor monoclonal antibody"])
             >>> tagger.extract(["mannose-1-phosphate guanylyltransferase (GDP) activity"])
 
-        NOTE: As of 08/14/2023, start_chars and end_chars are not to be trusted in context with double+ spaces and/or html-encoded chars
+        NOTE: As of 08/14/2023, start_chars and end_chars are not to be trusted in context with 2+ spaces or html-encoded chars
         """
 
         start_time = time.time()
@@ -267,45 +260,39 @@ class NerTagger:
 
         prepped_content = self.__prep_for_extract(content)
         entity_sets = self.__dual_model_extract(prepped_content)
-        normalized_entity_sets = self.__normalize(entity_sets)
+        norm_entity_sets = self.__normalize(entity_sets)
+
+        if len(norm_entity_sets) != len(entity_sets):
+            raise ValueError("Normalization changed number of entities")
 
         logger.info(
             "Full entity extraction took %s seconds for %s docs, yielded %s",
             round(time.time() - start_time, 2),
             len(content),
-            normalized_entity_sets,
+            norm_entity_sets,
         )
-        return normalized_entity_sets
+        return norm_entity_sets
 
-    @staticmethod
-    def __get_string_entities(entities: DocEntities) -> list[str]:
+    def extract_string_map(self, content: list[str], **kwargs) -> dict[str, list[str]]:
         """
-        Get the string representation of a list of entities
+        Extract named entities from a list of content, returning a list of strings
         """
 
-        def __get_string_entity(entity: DocEntity) -> str:
+        def as_string(entity: DocEntity) -> str:
             """
             Get the string representation of an entity
-            (linked name otherwise normalized term otherwise term)
             """
             if entity.linked_entity:
                 return entity.linked_entity.name
             return entity.normalized_term or entity.term
 
-        strings = [__get_string_entity(entity) for entity in entities]
-        return sorted(dedup(strings))
+        def as_strings(entities: DocEntities) -> list[str]:
+            return [as_string(e) for e in entities]
 
-    def extract_strings(self, content: ST, **kwargs) -> ST:
-        """
-        Extract named entities from a list of content, returning a list of strings
-        """
         ents_by_doc = self.extract(content, **kwargs)
-        strings = [self.__get_string_entities(e) for e in ents_by_doc]
+        map = {orig: as_strings(v) for orig, v in zip(content, ents_by_doc)}
 
-        if is_string_list(content):
-            return flatten(strings)  # type: ignore
-
-        return strings  # type: ignore
+        return map
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return self.extract(*args, **kwds)

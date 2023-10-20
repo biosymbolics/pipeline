@@ -257,7 +257,7 @@ class TestNerUtils(unittest.TestCase):
             text = condition["text"]
             expected_output = condition["expected_output"]
 
-            result = self.tagger.extract_strings([text])
+            result = self.tagger.extract_string_map([text])[text]
 
             if result != expected_output:
                 print("Actual", result, "expected", expected_output)

@@ -2,13 +2,13 @@
 Low-level Postgres client
 """
 import time
-from typing import Any, Callable, Mapping, Sequence, TypeVar
+from typing import Any, Callable, Sequence
 import logging
 import psycopg
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
-from clients.low_level.database import DatabaseClient, ExecuteResult
+from clients.low_level.database import DatabaseClient, ExecuteResult, M
 from constants.core import BASE_DATABASE_URL, DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides, nonoverride
@@ -22,7 +22,6 @@ from .types import (
 )
 from .utils import get_schema_from_cursor
 
-T = TypeVar("T", bound=Mapping)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -193,7 +192,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 return self.handle_error(conn, e, ignore_error=ignore_error)
 
     @overrides(DatabaseClient)
-    def _insert(self, table_name: str, records: list[T]) -> ExecuteResult:
+    def _insert(self, table_name: str, records: list[M]) -> ExecuteResult:
         columns = [c for c in list(records[0].keys())]
         insert_cols = ", ".join([f'"{c}"' for c in columns])
         query = f"INSERT INTO {table_name} ({insert_cols}) VALUES ({(', ').join(['%s' for _ in range(len(columns)) ])})"
@@ -281,7 +280,7 @@ class PsqlDatabaseClient(DatabaseClient):
         dest_db: str,
         dest_table_name: str,
         truncate_if_exists: bool = True,
-        transform: Callable[[list[dict]], list[dict]] | None = None,
+        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
         transform_schema: Callable[[dict], dict] | None = None,
     ):
         """
@@ -314,5 +313,5 @@ class PsqlDatabaseClient(DatabaseClient):
             dest_table_name,
             schema,
             truncate_if_exists=truncate_if_exists,
-            transform=transform,
+            transform=transform,  # type: ignore
         )

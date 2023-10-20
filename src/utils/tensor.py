@@ -47,7 +47,7 @@ def pad_or_truncate_to_size(tensor: torch.Tensor, size: tuple[int, ...]):
 
 def batch_as_tensors(
     items: list[Primitive], batch_size: int = BATCH_SIZE
-) -> list[torch.Tensor]:
+) -> Sequence[torch.Tensor]:
     """
     Turns a list into a list of tensors of size `batch_size`
 

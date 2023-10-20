@@ -3,6 +3,8 @@ Utils for copying approvals data
 """
 import sys
 import logging
+from typing import Sequence
+from pydash import flatten
 
 from system import initialize
 
@@ -11,7 +13,7 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
-from typings.trials import dict_to_trial_summary
+from typings.trials import TrialSummary, dict_to_trial_summary
 from utils.list import dedup
 
 logger = logging.getLogger(__name__)
@@ -54,7 +56,9 @@ MULI_FIELDS_SQL = [
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
+def transform_ct_records(
+    ctgov_records: Sequence[dict], tagger: NerTagger
+) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
     Slow due to intervention mapping!!
@@ -63,21 +67,27 @@ def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
     - normalizes status etc.
 
     good check:
-    - select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
+    select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    # intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
-    # logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
-    # normalized_interventions = tagger.extract_strings(
-    #     [dedup(i_set) for i_set in intervention_sets]
-    # )
+    intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
+    uniq_interventions = dedup(flatten(intervention_sets))
+    logger.info(
+        "Extracting intervention names for %s strings (e.g. %s)",
+        len(uniq_interventions),
+        uniq_interventions[0:10],
+    )
+    norm_map = tagger.extract_string_map(uniq_interventions)
 
-    # return [
-    #     {**dict_to_trial_summary({**rec, "interventions": interventions})}
-    #     for rec, interventions in zip(ctgov_records, normalized_interventions)
-    # ]
+    def normalize_interventions(interventions: list[str]):
+        return flatten([norm_map.get(i, i) for i in interventions])
 
-    return [dict_to_trial_summary(rec) for rec in ctgov_records]
+    return [
+        dict_to_trial_summary(
+            {**rec, "interventions": normalize_interventions(rec["interventions"])}
+        )
+        for rec in ctgov_records
+    ]
 
 
 def ingest_trials():
@@ -128,7 +138,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),
+        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
     )
     # TODO: alter table trials alter column interventions set data type text[];
 

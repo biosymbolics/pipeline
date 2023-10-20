@@ -50,8 +50,8 @@ class EncodedCategories(NamedTuple):
 
 
 def is_tensor_list(
-    embeddings: list[torch.Tensor] | list[Primitive],
-) -> TypeGuard[list[torch.Tensor]]:
+    embeddings: Sequence[torch.Tensor] | Sequence[Primitive],
+) -> TypeGuard[Sequence[torch.Tensor]]:
     return len(embeddings) > 0 and isinstance(embeddings[0], torch.Tensor)
 
 
@@ -62,7 +62,7 @@ def to_float(value: int | float | date) -> float:
 
 
 def batch_and_pad(
-    tensors: list[torch.Tensor] | list[Primitive], batch_size: int
+    tensors: Sequence[torch.Tensor] | Sequence[Primitive], batch_size: int
 ) -> torch.Tensor:
     """
     Batch a list of tensors or primitives
@@ -81,7 +81,7 @@ def batch_and_pad(
     else:
         num_dims = len(tensors[0].size()) + 1
         batches = batch(tensors, batch_size)
-        batches = [torch.stack(b) for b in batches]
+        batches = [torch.stack(list(b)) for b in batches]
 
     def get_batch_pad(b: torch.Tensor):
         zeros = ([0, 0] * (num_dims - 1)) + [0]

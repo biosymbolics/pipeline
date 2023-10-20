@@ -3,7 +3,7 @@ Utils for lists/arrays
 """
 
 
-from typing import Mapping, TypeVar, cast
+from typing import Mapping, Sequence, TypeVar, cast
 from pydash import compact
 
 T = TypeVar("T")
@@ -44,7 +44,7 @@ def has_intersection(list_a: list[T], list_b: list[T]) -> bool:
     return len(set(list_a).intersection(set(list_b))) > 0
 
 
-def batch(items: list[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
+def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> Sequence[Sequence[T]]:
     """
     Turns a list into a list of lists of size `batch_size`
 
@@ -60,7 +60,7 @@ def batch(items: list[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
 BT = TypeVar("BT", bound=Mapping)
 
 
-def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> list[BT]:
+def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> Sequence[BT]:
     """
     Turns a dict of lists into a list of dicts of lists of size `batch_size`
 
