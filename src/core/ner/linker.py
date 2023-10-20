@@ -3,7 +3,7 @@ Term Normalizer
 """
 import logging
 import time
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple, Sequence, Union
 import torch
 
 from .types import KbLinker, CanonicalEntity
@@ -73,19 +73,19 @@ class TermLinker:
 
         return None
 
-    def generate_map(self, terms: list[str]) -> LinkedEntityMap:
+    def generate_map(self, terms: Sequence[str]) -> LinkedEntityMap:
         """
         Generate a map of terms to normalized/canonical entities (containing name and id)
 
         Args:
-            terms (list[str]): list of terms to normalize
+            terms (Sequence[str]): list of terms to normalize
 
         Returns:
             LinkedEntityMap: mapping of terms to canonical entities
         """
         logging.info("Starting candidate generation")
         start_time = time.time()
-        candidates = self.candidate_generator(terms, 1)
+        candidates = self.candidate_generator(list(terms), 1)
         logging.info(
             "Finished generating candidates (took %s)", time.time() - start_time
         )
@@ -97,12 +97,14 @@ class TermLinker:
             if value is not None and len(value) > 1 and len(key) > 1
         }
 
-    def link(self, terms: list[str]) -> list[tuple[str, CanonicalEntity | None]]:
+    def link(
+        self, terms: Sequence[str]
+    ) -> Sequence[tuple[str, CanonicalEntity | None]]:
         """
         Link term to canonical entity or synonym
 
         Args:
-            terms (list[str]): list of terms to normalize
+            terms (Sequence[str]): list of terms to normalize
         """
         if len(terms) == 0:
             logging.warning("No terms to link")
@@ -118,5 +120,7 @@ class TermLinker:
 
         return list(zip(terms, linked_entities))
 
-    def __call__(self, terms: list[str]) -> list[tuple[str, CanonicalEntity | None]]:
+    def __call__(
+        self, terms: Sequence[str]
+    ) -> Sequence[tuple[str, CanonicalEntity | None]]:
         return self.link(terms)

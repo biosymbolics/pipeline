@@ -13,6 +13,7 @@ import warnings
 import html
 import spacy
 from spacy.tokens import Span, Doc
+from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
 from typings.core import is_string_list, is_string_list_list
 
@@ -61,7 +62,7 @@ class NerTagger:
                 MECHANISM_SPACY_PATTERNS,
             ]
         ),
-        additional_cleaners: list[Callable[[Sequence[str]], Sequence[str]]] = [],
+        additional_cleaners: list[CleanFunction] = [],
         link: bool = True,
     ):
         """
@@ -74,7 +75,8 @@ class NerTagger:
             llm_config (Optional[str], optional): LLM config file. Defaults to "configs/patents/config.cfg".
             model (str, optional): torch NER model. Defaults to "binder.pt".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
-            parallelize (bool, optional): Parallelize. Defaults to True. Even if true, will only parallelize for sufficiently large batches.
+            additional_cleaners (list[Callable[[Sequence[str]], Sequence[str]]], optional): Additional cleaners funs. Defaults to [].
+            link (bool, optional): Whether to link entities. Defaults to True.
         """
         # prefer_gpu()
         # set_gpu_allocator("pytorch")
@@ -85,7 +87,7 @@ class NerTagger:
         self.rule_sets = rule_sets
         self.additional_cleaners = additional_cleaners
         self.entity_types = entity_types
-        self.normalizer = TermNormalizer(link=link)
+        self.normalizer = TermNormalizer(link, additional_cleaners)
         start_time = time.time()
 
         if entity_types is not None and not isinstance(entity_types, frozenset):
@@ -145,7 +147,6 @@ class NerTagger:
             lambda c: flatten(chunk_list(c, CHUNK_SIZE)) if self.use_llm else c,
             lambda _content: [html.unescape(c) for c in _content],
             remove_extra_spaces,  # important; model gets confused by weird spacing
-            *self.additional_cleaners,
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore

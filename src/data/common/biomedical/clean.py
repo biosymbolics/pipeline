@@ -30,6 +30,10 @@ logger.setLevel(logging.INFO)
 def remove_trailing_leading(
     terms: Sequence[str], removal_terms: dict[str, WordPlace]
 ) -> Sequence[str]:
+    """
+    Remove trailing/leading words from terms
+    (A hack that will hopefully go away, mostly, in the future)
+    """
     logger.info("Removing trailing/leading words")
 
     def get_leading_trailing_re(place: str) -> re.Pattern | None:

@@ -1,4 +1,5 @@
-from core.ner.cleaning import EntityCleaner
+from typing import Callable, Sequence
+from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker import TermLinker
 from core.ner.types import CanonicalEntity
 
@@ -30,7 +31,11 @@ class TermNormalizer:
         [(t[0], t[1].name) for t in terms]
     """
 
-    def __init__(self, link: bool = True):
+    def __init__(
+        self,
+        link: bool = True,
+        additional_cleaners: Sequence[CleanFunction] = [],
+    ):
         """
         Initialize term normalizer using existing model
         """
@@ -38,7 +43,9 @@ class TermNormalizer:
             self.term_linker: TermLinker | None = TermLinker()
         else:
             self.term_linker = None
-        self.cleaner: EntityCleaner = EntityCleaner()
+        self.cleaner: EntityCleaner = EntityCleaner(
+            additional_cleaners=additional_cleaners,
+        )
 
     def normalize(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
         """
