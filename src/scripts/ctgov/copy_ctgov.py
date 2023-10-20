@@ -70,7 +70,7 @@ def transform_ct_records(
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
+    intervention_sets = [rec["interventions"] for rec in ctgov_records]
     uniq_interventions = dedup(flatten(intervention_sets))
     logger.info(
         "Extracting intervention names for %s strings (e.g. %s)",
@@ -80,7 +80,7 @@ def transform_ct_records(
     norm_map = tagger.extract_string_map(uniq_interventions)
 
     def normalize_interventions(interventions: list[str]):
-        return flatten([norm_map.get(i, i) for i in interventions])
+        return flatten([norm_map.get(i) or i for i in interventions])
 
     return [
         dict_to_trial_summary(
