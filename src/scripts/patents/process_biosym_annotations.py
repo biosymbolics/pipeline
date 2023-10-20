@@ -219,16 +219,16 @@ def clean_up_junk():
     logger.info("Removing junk")
 
     queries = [
-        # removes evertyhing after a newline
+        # removes everything after a newline (add to EntityCleaner?)
         rf"update {WORKING_TABLE} set original_term= regexp_replace(original_term, '\.?\s*\n.*', '') where  original_term ~ '.*\n.*'",
-        # unwrap
+        # unwrap (done in EntityCleaner too)
         f"update {WORKING_TABLE} "
         + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         # orphaned closing parens
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) "
         + "where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
-        # leading/trailing whitespace
+        # leading/trailing whitespace (done in EntityCleaner too)
         rf"update {WORKING_TABLE} set original_term=trim(original_term) where trim(original_term) <> original_term",
     ]
     client = DatabaseClient()
