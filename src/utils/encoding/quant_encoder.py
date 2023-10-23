@@ -27,6 +27,7 @@ class BinEncoder(Encoder):
         n_bins: Optional[int] = 5,
         strategy: KbinsStrategy = "kmeans",
         encode: Literal["ordinal", "onehot", "onehot-dense"] = "ordinal",
+        device: str = "cpu",
         *args,
         **kwargs
     ):
@@ -156,7 +157,9 @@ class BinEncoder(Encoder):
             self._encoder.n_bins_,
         )
 
-    def fit_transform(self, values: Sequence[float | int] | pl.Series | npt.NDArray):
+    def fit_transform(
+        self, values: Sequence[float | int] | pl.Series | npt.NDArray
+    ) -> list:
         """
         Bins quantiative values, turning them into categorical
         @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html

@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import TypeVar
+from typing import Sequence, TypeVar
 from pydash import flatten
 import polars as pl
 from sklearn.calibration import LabelEncoder
@@ -64,14 +64,14 @@ class Encoder:
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
-    def _encode_df(self, df: pl.DataFrame) -> list:
+    def _encode_df(self, df: pl.DataFrame) -> Sequence:
         if not self._field:
             raise ValueError("Cannot encode dataframe without field")
 
         values = df.select(pl.col(self._field)).to_series().to_list()
         return self._encode(values)  # .reshape(-1, 1))
 
-    def _encode(self, values: list | npt.NDArray) -> list:
+    def _encode(self, values: Sequence | npt.NDArray) -> Sequence:
         """
         Encode a categorical field from a dataframe
 
@@ -89,12 +89,12 @@ class Encoder:
             self.fit(values)
 
         # if nested (list o' lists), encode each list separately
-        if isinstance(values[0], list):
+        if isinstance(values[0], Sequence) and not isinstance(values[0], str):
             return [self._encoder.transform(v) for v in values]
 
         return self._encoder.transform(values)
 
-    def fit(self, values: list | npt.NDArray):
+    def fit(self, values: Sequence | npt.NDArray):
         """
         Fit an encoder
         """
@@ -112,7 +112,7 @@ class Encoder:
             self._encoder.classes_,
         )
 
-    def fit_transform(self, data: pl.DataFrame | list | npt.NDArray) -> list:
+    def fit_transform(self, data: pl.DataFrame | Sequence | npt.NDArray) -> Sequence:
         """
         Fit and transform a dataframe
         """

@@ -83,14 +83,14 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
         and len(data) > 0
         and all(map(lambda d: isinstance(d, torch.Tensor), data))
     ):
-        stacked = torch.stack(data)  # type: ignore
+        stacked = torch.stack([pad_or_truncate_to_size(d, shape[1:]) for d in data])
         return pad_or_truncate_to_size(stacked, shape)
     if is_array_like(data) and len(data) > 0 and is_array_like(data[0]):
         tensors = [array_to_tensor(d, shape[1:]) for d in data]
         return torch.stack(tensors)
     if is_array_like(data):
         return pad_or_truncate_to_size(torch.tensor(data), shape)
-    return data  # type: ignore
+    return torch.tensor(data)
 
 
 def reverse_embedding(

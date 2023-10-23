@@ -1,13 +1,12 @@
-from typing import Sequence, TypeVar, cast
+from typing import Sequence
 import logging
-from pydash import flatten
+from pydash import compact
 import numpy as np
 import torch
-import torch.nn.functional as F
-from sklearn.decomposition import PCA
+import numpy.typing as npt
+import polars as pl
 
 from core.ner.spacy import Spacy
-from data.prediction.clindev.constants import AnyRecord, InputRecord
 from utils.tensor import array_to_tensor
 
 
@@ -17,70 +16,63 @@ logger.setLevel(logging.INFO)
 DEFAULT_MAX_STRING_LEN = 200
 
 
-def get_string_values(item: dict, field: str) -> list:
-    val = item.get(field)
-    if isinstance(val, list):
-        return [v[0:DEFAULT_MAX_STRING_LEN] for v in val]
-    if val is None:
-        return [None]
-    return [val[0:DEFAULT_MAX_STRING_LEN]]
+class TextEncoder:
+    def __init__(
+        self,
+        field: str | None = None,
+        n_features: int = 5,
+        device: str = "cpu",
+    ):
+        self.n_features = n_features
+        self.field = field
+        self.nlp = Spacy.get_instance(disable=["ner"])
+        self.device = device
 
+    def _encode_df(self, df: pl.DataFrame) -> torch.Tensor:
+        if not self.field:
+            raise ValueError("Cannot encode dataframe without field")
 
-T = TypeVar("T", bound=AnyRecord)
+        values = df.select(pl.col(self.field)).to_series().to_list()
+        return self._encode(values)
 
+    def _encode(
+        self,
+        values: Sequence[str] | npt.NDArray,
+    ) -> torch.Tensor:
+        """
+        Get text embeddings given a list of dict
 
-def get_text_embeddings(
-    records: Sequence[T],
-    text_fields: list[str],
-    n_text_features: int,
-    device: str = "cpu",
-) -> torch.Tensor:
-    """
-    Get text embeddings given a list of dicts
-    """
-    nlp = Spacy.get_instance(disable=["ner"])
-    pca = PCA(n_components=n_text_features)
-    text_vectors = [
-        np.concatenate(
-            [
-                tv
-                for tv in [
-                    np.array(
-                        [
-                            token.vector
-                            for value in get_string_values(record._asdict(), field)
-                            for token in nlp(value)
-                        ]
-                    )
-                    for field in text_fields
-                ]
-                if len(tv.shape) > 1
+        @see https://pytorch.org/docs/stable/generated/torch.pca_lowrank.html
+        """
+
+        def vectorize(value: str | list[str]) -> torch.Tensor:
+            val = value if isinstance(value, str) else (", ").join(compact(value))
+            vectors = [
+                token.vector for token in self.nlp(val[0:DEFAULT_MAX_STRING_LEN])
             ]
-        )
-        for record in records
-    ]
+            if len(vectors) == 0:
+                return torch.Tensor()
+            return torch.Tensor(np.concatenate(vectors))
 
-    pca_model = pca.fit(np.concatenate(text_vectors, axis=0))
-    text_feats = [
-        torch.flatten(torch.tensor(pca_model.transform(text_vector)))
-        for text_vector in text_vectors
-    ]
-    max_len = max(f.size(0) for f in flatten(text_feats))
-    text_feats = [F.pad(f, (0, max_len - f.size(0))) for f in text_feats]
+        text_vectors = list(map(vectorize, values))
+        max_size = max([f.size(0) for f in text_vectors])
 
-    tensor = array_to_tensor(
-        text_feats,
-        (
-            len(text_feats),
-            len(text_feats[0]),
-            *text_feats[0][0].shape,
-        ),
-    )
+        # A=Udiag(S)V^T
+        # use cpu for this op: "The operator 'aten::linalg_qr.out' is not currently implemented for the MPS device."
+        A = array_to_tensor(text_vectors, (len(text_vectors), max_size))
+        U, S, V = torch.pca_lowrank(A)
 
-    return tensor.to(device)
+        return torch.matmul(A, V[:, : self.n_features]).to(self.device)
 
+    def fit_transform(
+        self, data: pl.DataFrame | Sequence | npt.NDArray
+    ) -> torch.Tensor:
+        """
+        Fit and transform a dataframe
+        """
+        if isinstance(data, pl.DataFrame):
+            encoded_values = self._encode_df(data)
+        else:
+            encoded_values = self._encode(data)
 
-# TODO
-# class TextEncoder(Encoder):
-#     def __init__(self, *args, **kargs):
-#         super().__init__(LabelEncoder, *args, **kargs)
+        return encoded_values
