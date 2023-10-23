@@ -16,6 +16,9 @@ class ClinDevModelInputSizes:
 
     @property
     def multi_select_output(self):
+        if self.categories_by_field.multi_select is None:
+            return 0
+
         return round(
             (self.multi_select_input / 5)  # shrink multis, many of which are zero
             * self.embedding_dim
@@ -24,6 +27,9 @@ class ClinDevModelInputSizes:
 
     @property
     def single_select_output(self):
+        if self.categories_by_field.single_select is None:
+            return 0
+
         return round(
             self.single_select_input
             * self.embedding_dim

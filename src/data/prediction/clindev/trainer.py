@@ -12,13 +12,14 @@ import system
 system.initialize()
 
 from clients.trials import fetch_trials
-from data.prediction.utils import ModelInputAndOutput
+from data.prediction.utils import ModelInputAndOutput, split_train_and_test
 
 from .constants import (
     BATCH_SIZE,
     DEVICE,
     EMBEDDING_DIM,
     SAVE_FREQUENCY,
+    TRAINING_PROPORTION,
     InputAndOutputRecord,
     field_lists,
 )
@@ -29,10 +30,9 @@ from .utils import (
     prepare_data,
     preprocess_inputs,
     split_categories,
-    split_train_and_test,
 )
 
-from ..types import AllCategorySizes
+from ..types import AllCategorySizes, ModelInput
 
 
 class MetricWrapper(NamedTuple):
@@ -45,6 +45,11 @@ logger.setLevel(logging.INFO)
 
 STAGE2_MSE_WEIGHT = 5
 
+TRAIN_TRANSFORMATIONS = {
+    "multi_select": lambda x: torch.split(x, 1, dim=1),
+    "single_select": lambda x: torch.split(x, 1, dim=1),
+}
+
 
 class ModelTrainer:
     """
@@ -53,8 +58,8 @@ class ModelTrainer:
 
     def __init__(
         self,
-        training_input_dict: ModelInputAndOutput,
-        test_input_dict: ModelInputAndOutput,
+        training_input: ModelInputAndOutput,
+        test_input: ModelInputAndOutput,
         category_sizes: AllCategorySizes,
         embedding_dim: int = EMBEDDING_DIM,
     ):
@@ -70,20 +75,19 @@ class ModelTrainer:
         self.device = DEVICE
 
         self.y1_category_sizes = category_sizes.y1
-
-        self.training_input_dict = training_input_dict
-        self.test_input_dict = test_input_dict
+        self.training_input = training_input
+        self.test_input = test_input
 
         sizes = ClinDevModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
-            multi_select_input=math.prod(training_input_dict.multi_select.shape[2:]),
-            quantitative_input=training_input_dict.quantitative.size(-1),
+            multi_select_input=math.prod(training_input.multi_select.shape[2:]),
+            quantitative_input=training_input.quantitative.size(-1),
             # 3 x 1
-            single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
-            text_input=training_input_dict.text.size(-1),
+            single_select_input=math.prod(training_input.single_select.shape[2:]),
+            text_input=training_input.text.size(-1),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]) * 10,
+            stage1_output=math.prod(training_input.y1_true.shape[2:]) * 10,
             stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
@@ -182,37 +186,41 @@ class ModelTrainer:
 
     @staticmethod
     def __get_batch(
-        i: int, input_dict: ModelInputAndOutput
+        i: int,
+        input: ModelInputAndOutput,
+        transformations: dict[str, Callable] = TRAIN_TRANSFORMATIONS,
     ) -> ModelInputAndOutput | None:
         """
-        Get input_dict for batch i
+        Get input for batch i
+
+        Args:
+            i (int): Batch index
+            input (ModelInputAndOutput): Input dict
+            transformations (dict[str, Callable], optional): Transformations to apply to each field. Defaults to TRAIN_TRANSFORMATIONS
         """
-        if not all([len(v) > i or len(v) == 0 for v in input_dict.__dict__.values()]):
-            logger.error(
-                "Batch %s is empty (%s)",
-                i,
-                [(k1, len(v1)) for k1, v1 in input_dict.__dict__.items()],
-            )
+        if not all([len(v) > i or len(v) == 0 for v in input.__dict__.values()]):
+            logger.error("Batch %s is empty", i)
             return None
 
+        def transform_batch(f: str, v: torch.Tensor, i: int):
+            transform = transformations.get(f) or (lambda x: x)
+            return transform(v[i]) if len(v) > 0 else torch.Tensor()
+
         batch = ModelInputAndOutput(
-            **{
-                f: v[i] if len(v) > 0 else torch.Tensor()
-                for f, v in input_dict.__dict__.items()
-            }
+            **{f: transform_batch(f, v, i) for f, v in input.__dict__.items()}
         )
         return batch
 
-    def __train_batch(self, i: int, input_dict: ModelInputAndOutput):
+    def __train_batch(self, i: int, input: ModelInputAndOutput):
         """
         Train model on a single batch
 
         Args:
             i (int): Batch index
             num_batches (int): Number of batches
-            input_dict (ModelInputAndOutput): Input dict
+            input (ModelInputAndOutput): Input dict
         """
-        batch = ModelTrainer.__get_batch(i, input_dict)
+        batch = ModelTrainer.__get_batch(i, input)
 
         if batch is None:
             return
@@ -221,10 +229,7 @@ class ModelTrainer:
         self.model.optimizer.zero_grad()
 
         y1_probs, y1_corr_probs, y2_preds, _ = self.model(
-            torch.split(batch.multi_select, 1, dim=1),
-            torch.split(batch.single_select, 1, dim=1),
-            batch.text,
-            batch.quantitative,
+            **ModelInput.get_instance(**batch.__dict__).__dict__
         )
 
         # TOTAL
@@ -245,14 +250,14 @@ class ModelTrainer:
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
-        num_batches = self.training_input_dict.multi_select.size(0)
+        num_batches = self.training_input.single_select.size(0)
 
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
             _input_dict = ModelInputAndOutput(
                 **{
                     k: v.detach().clone()
-                    for k, v in self.training_input_dict.__dict__.items()
+                    for k, v in self.training_input.__dict__.items()
                 },
             )
             for i in range(num_batches):
@@ -261,9 +266,10 @@ class ModelTrainer:
 
             if epoch % SAVE_FREQUENCY == 0:
                 self.log_metrics("Training")
-                num_eval_batches = self.test_input_dict.multi_select.size(0)
+                # TODO: unreliable
+                num_eval_batches = self.test_input.single_select.size(0)
                 for te in range(0, num_eval_batches - 1):
-                    batch = ModelTrainer.__get_batch(te, self.test_input_dict)
+                    batch = ModelTrainer.__get_batch(te, self.test_input)
 
                     if batch is None:
                         continue
@@ -323,26 +329,22 @@ class ModelTrainer:
 
         except Exception as e:
             logger.warning("Failed to evaluate: %s", e)
-            raise e
 
-    def evaluate(self, input_dict: ModelInputAndOutput, category_sizes: dict[str, int]):
+    def evaluate(self, batch: ModelInputAndOutput, category_sizes: dict[str, int]):
         """
         Evaluate model on eval/test set
         """
 
         y1_probs, _, y2_preds, _ = self.model(
-            torch.split(input_dict.multi_select, 1, dim=1),
-            torch.split(input_dict.single_select, 1, dim=1),
-            input_dict.text,
-            input_dict.quantitative,
+            **ModelInput.get_instance(**batch.__dict__).__dict__
         )
 
         y1_probs_by_field, y1_true_by_field = split_categories(
-            y1_probs, input_dict.y1_true, category_sizes
+            y1_probs, batch.y1_true, category_sizes
         )
 
         self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, input_dict.y2_oh_true
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
 
     @staticmethod
@@ -356,9 +358,11 @@ class ModelTrainer:
             device=DEVICE,
         )
 
-        training_input_dict, test_input_dict = split_train_and_test(input_dict)
+        training_input, test_input = split_train_and_test(
+            input_dict, TRAINING_PROPORTION
+        )
 
-        model = ModelTrainer(training_input_dict, test_input_dict, category_sizes)
+        model = ModelTrainer(training_input, test_input, category_sizes)
         model.train()
 
 

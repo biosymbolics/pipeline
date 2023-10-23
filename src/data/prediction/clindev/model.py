@@ -97,22 +97,31 @@ class InputModel(SaveableModel):
 
         if sizes is not None:
             logger.info("Initializing input model with sizes %s", sizes)
-            self.multi_select_embeddings = nn.ModuleDict(
-                {
-                    f: nn.Embedding(s, sizes.embedding_dim)
-                    for f, s in sizes.categories_by_field.multi_select.items()
-                }
+
+            self.multi_select_embeddings = (
+                nn.ModuleDict(
+                    {
+                        f: nn.Embedding(s, sizes.embedding_dim)
+                        for f, s in sizes.categories_by_field.multi_select.items()
+                    }
+                )
+                if sizes.categories_by_field.multi_select is not None
+                else None
             )
             self.multi_select = nn.Linear(
                 sizes.multi_select_input * sizes.embedding_dim,
                 sizes.multi_select_output,
             )
 
-            self.single_select_embeddings = nn.ModuleDict(
-                {
-                    f: nn.Embedding(s, sizes.embedding_dim)
-                    for f, s in sizes.categories_by_field.single_select.items()
-                }
+            self.single_select_embeddings = (
+                nn.ModuleDict(
+                    {
+                        f: nn.Embedding(s, sizes.embedding_dim)
+                        for f, s in sizes.categories_by_field.single_select.items()
+                    }
+                )
+                if sizes.categories_by_field.single_select is not None
+                else None
             )
             self.single_select = nn.Linear(
                 sizes.single_select_input * sizes.embedding_dim,
@@ -140,13 +149,13 @@ class InputModel(SaveableModel):
         if len(quantitative) > 0:
             all_inputs.append(self.quantitative(quantitative))
 
-        if len(multi_select) > 0:
+        if len(multi_select) > 0 and self.multi_select_embeddings is not None:
             inputs = embed_cat_inputs(
                 multi_select, self.multi_select_embeddings, self.device
             )
             all_inputs.append(self.multi_select(inputs))
 
-        if len(single_select) > 0:
+        if len(single_select) > 0 and self.single_select_embeddings is not None:
             inputs = embed_cat_inputs(
                 single_select, self.single_select_embeddings, self.device
             )
@@ -158,8 +167,8 @@ class InputModel(SaveableModel):
     def eval(self):
         super().eval()
         for emb in [
-            *self.multi_select_embeddings.values(),
-            *self.single_select_embeddings.values(),
+            *(self.multi_select_embeddings or {}).values(),
+            *(self.single_select_embeddings or {}).values(),
         ]:
             emb.eval()
 

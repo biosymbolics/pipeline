@@ -3,8 +3,8 @@ from functools import partial
 from typing import Any, NamedTuple, Sequence, TypeGuard, TypeVar, cast
 import logging
 from collections import namedtuple
-import numpy as np
 import polars as pl
+from pydash import uniq
 import torch
 import torch.nn.functional as F
 import polars as pl
@@ -29,7 +29,7 @@ from data.prediction.types import (
 from typings.core import Primitive
 from utils.encoding.quant_encoder import BinEncoder
 from utils.encoding.saveable_encoder import LabelCategoryEncoder
-from utils.encoding.text_encoder import get_text_embeddings
+from utils.encoding.text_encoder import TextEncoder
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
 
@@ -173,7 +173,7 @@ def encode_categories(
     return EncodedCategories(category_size_map=size_map, encodings=encodings)
 
 
-def encode_single_select_categories(
+def encode_single_select(
     records: Sequence[T],
     categorical_fields: list[str],
     directory: str,
@@ -188,7 +188,7 @@ def encode_single_select_categories(
     )
 
 
-def encode_multi_select_categories(
+def encode_multi_select(
     records: Sequence[T],
     categorical_fields: list[str],
     max_items_per_cat: int,
@@ -242,9 +242,7 @@ def encode_outputs(
     """
     Encode outputs (for use in loss calculation)
     """
-    encode_single = partial(
-        encode_single_select_categories, directory=directory, device=device
-    )
+    encode_single = partial(encode_single_select, directory=directory, device=device)
     y1 = encode_single(records, field_lists.y1_categorical)
     y2 = encode_single(records, [field_lists.y2])
     y2_encoding = y2.encodings.squeeze(1)
@@ -265,6 +263,16 @@ def encode_outputs(
     return encodings, sizes
 
 
+def encode_quantitative(
+    records: Sequence[dict],
+    fields: list[str],
+    device: str = "cpu",
+) -> torch.Tensor:
+    return F.normalize(
+        torch.Tensor([[to_float(r[field]) for field in fields] for r in records]),
+    ).to(device)
+
+
 def encode_features(
     records: Sequence[T],
     field_lists: FieldLists | InputFieldLists,
@@ -283,53 +291,41 @@ def encode_features(
         device (str): Device to use
     """
 
-    encode_single = partial(
-        encode_single_select_categories, directory=directory, device=device
-    )
-    encode_multi = partial(
-        encode_multi_select_categories,
-        max_items_per_cat=max_items_per_cat,
-        directory=directory,
-        device=device,
-    )
+    args = {"directory": directory, "device": device}
 
-    single_select = encode_single(records, field_lists.single_select)
-    multi_select = encode_multi(records, field_lists.multi_select)
+    field_types = {
+        "multi_select": partial(
+            encode_multi_select, max_items_per_cat=max_items_per_cat, **args
+        ),
+        "quantitative": partial(encode_quantitative, device=device),
+        "single_select": partial(encode_single_select, **args),
+        "text": partial(
+            lambda records, f: TextEncoder(
+                f, n_features=DEFAULT_TEXT_FEATURES, device=device
+            ).fit_transform(pl.DataFrame(records, infer_schema_length=1000))
+        ),
+    }
 
-    text = (
-        get_text_embeddings(
-            records,
-            field_lists.text,
-            n_text_features=DEFAULT_TEXT_FEATURES,
-            device=device,
-        )
-        if len(field_lists.text) > 1
+    encoded = {
+        t: enc_fun(records, getattr(field_lists, t))
+        if len(getattr(field_lists, t)) > 0
         else torch.Tensor()
-    )
-
-    quantitative = (
-        F.normalize(
-            torch.Tensor(
-                [
-                    [to_float(r[field]) for field in field_lists.quantitative]  # type: ignore
-                    for r in records
-                ]
-            ).to(device),
-        )
-        if len(field_lists.quantitative) > 0
-        else torch.Tensor()
-    )
+        for t, enc_fun in field_types.items()
+    }
 
     sizes = InputCategorySizes(
-        multi_select=multi_select.category_size_map,
-        single_select=single_select.category_size_map,
+        **{
+            t: v.category_size_map
+            for t, v in encoded.items()
+            if isinstance(v, EncodedCategories)
+        }
     )
 
-    encodings = ModelInput(
-        multi_select=multi_select.encodings,
-        quantitative=quantitative,
-        single_select=single_select.encodings,
-        text=text,
+    input_enc = ModelInput.get_instance(
+        **{
+            t: (v.encodings if isinstance(v, EncodedCategories) else v)
+            for t, v in encoded.items()
+        }
     )
 
     if is_all_fields_list(field_lists) and is_output_records(records):
@@ -340,11 +336,11 @@ def encode_features(
             device=device,
         )
         # TODO: Ugly
-        return ModelInputAndOutput(
-            **encodings.__dict__, **o_encodings.__dict__
+        return ModelInputAndOutput.get_instance(
+            **input_enc.__dict__, **o_encodings.__dict__
         ), AllCategorySizes(**sizes.__dict__, **o_sizes.__dict__)
 
-    return encodings, sizes
+    return input_enc, sizes
 
 
 def decode_output(
@@ -412,5 +408,37 @@ def encode_and_batch_all(
     records: Sequence[InputAndOutputRecord], field_lists: FieldLists, **kwargs
 ) -> tuple[ModelInputAndOutput, AllCategorySizes]:
     batched, sizes = _encode_and_batch_features(records, field_lists, **kwargs)
-    print(batched.keys())
     return ModelInputAndOutput(**batched), AllCategorySizes(**sizes)
+
+
+def split_train_and_test(
+    input_dict: ModelInputAndOutput,
+    training_proportion: float,
+) -> tuple[ModelInputAndOutput, ModelInputAndOutput]:
+    """
+    Split out training and test data
+
+    Args:
+        input_dict (ModelInputAndOutput): Input data
+        training_proportion (float): Proportion of data to use for training
+    """
+    record_cnt = input_dict.y1_true.size(0)
+    split_idx = round(record_cnt * training_proportion)
+
+    # len(v) == 0 if empty input
+    split_input = {
+        k: torch.split(v, split_idx) if len(v) > 0 else (torch.Tensor(), torch.Tensor())
+        for k, v in input_dict.__dict__.items()
+    }
+
+    for i in range(2):
+        sizes = uniq([len(v[i]) for v in split_input.values() if len(v[i]) > 0])
+        if len(sizes) > 1:
+            raise ValueError(
+                f"Split discrepancy: {[(k, len(v[i])) for k, v in split_input.items()]}"
+            )
+
+    train_input_dict = ModelInputAndOutput(**{k: v[0] for k, v in split_input.items()})
+    test_input = ModelInputAndOutput(**{k: v[1] for k, v in split_input.items()})
+
+    return train_input_dict, test_input

@@ -22,6 +22,8 @@ OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
+TRAINING_PROPORTION = 0.8
+
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
@@ -29,12 +31,12 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "facilities", ??
     # "countries" ??
 ]
-MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    "conditions",  # typically only the specific condition
+MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
+TEXT_FIELDS: list[str] = [
+    # "conditions",  # typically only the specific condition
     "mesh_conditions",  # normalized; includes ancestors
     "interventions",
 ]
-TEXT_FIELDS: list[str] = []
 
 
 QUANTITATIVE_FIELDS: list[str] = [

@@ -7,7 +7,6 @@ from itertools import accumulate
 import random
 from typing import Callable, Sequence, TypeVar
 import logging
-from pydash import uniq
 import torch
 import torch.nn as nn
 
@@ -29,8 +28,6 @@ from .constants import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-TRAINING_PROPORTION = 0.8
 
 
 T = TypeVar("T", bound=Sequence[InputRecord | TrialSummary])
@@ -54,38 +51,6 @@ def preprocess_inputs(
     output = reduce(lambda x, f: f(x), transformations, records)
 
     return output
-
-
-def split_train_and_test(
-    input_dict: ModelInputAndOutput, training_proportion: float = TRAINING_PROPORTION
-) -> tuple[ModelInputAndOutput, ModelInputAndOutput]:
-    """
-    Split out training and test data
-
-    Args:
-        input_dict (ModelInputAndOutput): Input data
-        training_proportion (float): Proportion of data to use for training
-    """
-    record_cnt = input_dict.y1_true.size(0)
-    split_idx = round(record_cnt * training_proportion)
-
-    # len(v) == 0 if empty input
-    split_input = {
-        k: torch.split(v, split_idx) if len(v) > 0 else (torch.Tensor(), torch.Tensor())
-        for k, v in input_dict.__dict__.items()
-    }
-
-    for i in range(2):
-        sizes = uniq([len(v[i]) for v in split_input.values() if len(v[i]) > 0])
-        if len(sizes) > 1:
-            raise ValueError(
-                f"Split discrepancy: {[(k, len(v[i])) for k, v in split_input.items()]}"
-            )
-
-    train_input_dict = ModelInputAndOutput(**{k: v[0] for k, v in split_input.items()})
-    test_input_dict = ModelInputAndOutput(**{k: v[1] for k, v in split_input.items()})
-
-    return train_input_dict, test_input_dict
 
 
 # wrapper around encode_and_batch_input for inputs

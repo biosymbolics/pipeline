@@ -1,12 +1,16 @@
 from dataclasses import dataclass
-from typing import TypeGuard
+from typing import Optional, TypeGuard
 import torch
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 @dataclass(frozen=True)
 class InputCategorySizes:
-    multi_select: dict[str, int]
-    single_select: dict[str, int]
+    multi_select: Optional[dict[str, int]] = None
+    single_select: Optional[dict[str, int]] = None
 
 
 @dataclass(frozen=True)
@@ -23,8 +27,28 @@ class AllCategorySizes(InputCategorySizes, OutputCategorySizes):
 CategorySizes = AllCategorySizes | InputCategorySizes
 
 
+class TolerantDataclass:
+    """
+    A dataclass that can be instantiated with unknown kwargs (which are ignored)
+    """
+
+    @classmethod
+    def _get_valid_args(cls, **kwargs):
+        cls_attrs = cls.__dict__["__dataclass_fields__"].keys()
+        _kwargs = {k: v for k, v in kwargs.items() if k in cls_attrs}
+        if len(_kwargs) < len(kwargs):
+            logger.debug(
+                f"Instantiating {cls.__name__} with unknown kwargs: {kwargs.keys() - _kwargs.keys()}"
+            )
+        return _kwargs
+
+    @classmethod
+    def get_instance(cls, **kwargs):
+        return cls(**cls._get_valid_args(**kwargs))
+
+
 @dataclass(frozen=True)
-class ModelInput:
+class ModelInput(TolerantDataclass):
     multi_select: torch.Tensor
     quantitative: torch.Tensor
     single_select: torch.Tensor
@@ -32,7 +56,7 @@ class ModelInput:
 
 
 @dataclass(frozen=True)
-class ModelOutput:
+class ModelOutput(TolerantDataclass):
     y1_true: torch.Tensor  # embedded y1_true
     y2_true: torch.Tensor
     y2_oh_true: torch.Tensor
