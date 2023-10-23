@@ -8,6 +8,7 @@ import logging
 
 from data.prediction.clindev.utils import embed_cat_inputs
 from data.prediction.model import SaveableModel
+from data.prediction.types import SplitModelInput
 
 from .constants import (
     CHECKPOINT_PATH,
@@ -131,33 +132,30 @@ class InputModel(SaveableModel):
             self.quantitative = nn.Linear(
                 sizes.quantitative_input, sizes.quantitative_input
             )
-            self.text = nn.Linear(sizes.text_input, sizes.text_input)
+            self.text = nn.Linear(sizes.text_input, sizes.text_output)
 
             self.to(self.device)
 
     def forward(
         self,
-        multi_select: list[torch.Tensor],
-        single_select: list[torch.Tensor],
-        text: torch.Tensor,
-        quantitative: torch.Tensor,
+        input: SplitModelInput,
     ):
         all_inputs = []
-        if len(text) > 0:
-            all_inputs.append(self.text(text))
+        if len(input.text) > 0:
+            all_inputs.append(self.text(input.text))
 
-        if len(quantitative) > 0:
-            all_inputs.append(self.quantitative(quantitative))
+        if len(input.quantitative) > 0:
+            all_inputs.append(self.quantitative(input.quantitative))
 
-        if len(multi_select) > 0 and self.multi_select_embeddings is not None:
+        if len(input.multi_select) > 0 and self.multi_select_embeddings is not None:
             inputs = embed_cat_inputs(
-                multi_select, self.multi_select_embeddings, self.device
+                input.multi_select, self.multi_select_embeddings, self.device
             )
             all_inputs.append(self.multi_select(inputs))
 
-        if len(single_select) > 0 and self.single_select_embeddings is not None:
+        if len(input.single_select) > 0 and self.single_select_embeddings is not None:
             inputs = embed_cat_inputs(
-                single_select, self.single_select_embeddings, self.device
+                input.single_select, self.single_select_embeddings, self.device
             )
             all_inputs.append(self.single_select(inputs))
 
@@ -331,11 +329,7 @@ class ClinDevModel(nn.Module):
         )
 
     def forward(
-        self,
-        multi_select: list[torch.Tensor],
-        single_select: list[torch.Tensor],
-        text: torch.Tensor,
-        quantitative: torch.Tensor,
+        self, input: SplitModelInput
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Note to self: if not training, first check if weights are updating
@@ -344,14 +338,14 @@ class ClinDevModel(nn.Module):
         print(list(self.multi_select_embeddings.values())[0].weight[0:10])
 
         """
-        x = self.input_model(multi_select, single_select, text, quantitative)
-        y1_pred = self.stage1_model(x).to(self.device)
+        x = self.input_model(input)
+        y1_pred = self.stage1_model(x)
         y1_probs, y1_probs_list = self.stage1_output_model(y1_pred)
 
         # outputs guessed based on the other outputs (to learn relationships)
         y1_corr_probs = self.correlation_decoders(y1_probs_list)
 
-        y2_pred = self.stage2_model(y1_pred, x).to(self.device)
+        y2_pred = self.stage2_model(y1_pred, x)
 
         return (y1_probs, y1_corr_probs, y2_pred, y1_probs_list)
 

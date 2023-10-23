@@ -27,6 +27,7 @@ from .model import ClindevTrainingModel
 from .types import ClinDevModelSizes
 from .utils import (
     calc_categories_loss,
+    get_batch,
     prepare_data,
     preprocess_inputs,
     split_categories,
@@ -44,11 +45,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 STAGE2_MSE_WEIGHT = 5
-
-TRAIN_TRANSFORMATIONS = {
-    "multi_select": lambda x: torch.split(x, 1, dim=1),
-    "single_select": lambda x: torch.split(x, 1, dim=1),
-}
 
 
 class ModelTrainer:
@@ -83,9 +79,8 @@ class ModelTrainer:
             embedding_dim=embedding_dim,
             multi_select_input=math.prod(training_input.multi_select.shape[2:]),
             quantitative_input=training_input.quantitative.size(-1),
-            # 3 x 1
             single_select_input=math.prod(training_input.single_select.shape[2:]),
-            text_input=training_input.text.size(-1),
+            text_input=math.prod(training_input.text.shape[2:]),
             stage1_output_map=category_sizes.y1,
             stage1_output=math.prod(training_input.y1_true.shape[2:]) * 10,
             stage2_output=category_sizes.y2,
@@ -184,33 +179,6 @@ class ModelTrainer:
 
         return loss
 
-    @staticmethod
-    def __get_batch(
-        i: int,
-        input: ModelInputAndOutput,
-        transformations: dict[str, Callable] = TRAIN_TRANSFORMATIONS,
-    ) -> ModelInputAndOutput | None:
-        """
-        Get input for batch i
-
-        Args:
-            i (int): Batch index
-            input (ModelInputAndOutput): Input dict
-            transformations (dict[str, Callable], optional): Transformations to apply to each field. Defaults to TRAIN_TRANSFORMATIONS
-        """
-        if not all([len(v) > i or len(v) == 0 for v in input.__dict__.values()]):
-            logger.error("Batch %s is empty", i)
-            return None
-
-        def transform_batch(f: str, v: torch.Tensor, i: int):
-            transform = transformations.get(f) or (lambda x: x)
-            return transform(v[i]) if len(v) > 0 else torch.Tensor()
-
-        batch = ModelInputAndOutput(
-            **{f: transform_batch(f, v, i) for f, v in input.__dict__.items()}
-        )
-        return batch
-
     def __train_batch(self, i: int, input: ModelInputAndOutput):
         """
         Train model on a single batch
@@ -220,7 +188,7 @@ class ModelTrainer:
             num_batches (int): Number of batches
             input (ModelInputAndOutput): Input dict
         """
-        batch = ModelTrainer.__get_batch(i, input)
+        batch = get_batch(i, input)
 
         if batch is None:
             return
@@ -229,7 +197,7 @@ class ModelTrainer:
         self.model.optimizer.zero_grad()
 
         y1_probs, y1_corr_probs, y2_preds, _ = self.model(
-            **ModelInput.get_instance(**batch.__dict__).__dict__
+            ModelInput.get_instance(**batch.__dict__)
         )
 
         # TOTAL
@@ -269,7 +237,7 @@ class ModelTrainer:
                 # TODO: unreliable
                 num_eval_batches = self.test_input.single_select.size(0)
                 for te in range(0, num_eval_batches - 1):
-                    batch = ModelTrainer.__get_batch(te, self.test_input)
+                    batch = get_batch(te, self.test_input)
 
                     if batch is None:
                         continue
@@ -335,9 +303,7 @@ class ModelTrainer:
         Evaluate model on eval/test set
         """
 
-        y1_probs, _, y2_preds, _ = self.model(
-            **ModelInput.get_instance(**batch.__dict__).__dict__
-        )
+        y1_probs, _, y2_preds, _ = self.model(ModelInput.get_instance(**batch.__dict__))
 
         y1_probs_by_field, y1_true_by_field = split_categories(
             y1_probs, batch.y1_true, category_sizes
@@ -366,10 +332,6 @@ class ModelTrainer:
         model.train()
 
 
-def main():
-    ModelTrainer.train_from_trials()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
@@ -379,4 +341,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    ModelTrainer.train_from_trials()

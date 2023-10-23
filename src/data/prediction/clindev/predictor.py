@@ -20,6 +20,7 @@ from .constants import (
 )
 from .model import ClindevPredictionModel
 from .utils import (
+    get_batch,
     prepare_input_data,
     preprocess_inputs,
 )
@@ -36,7 +37,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 80,
+        checkpoint_epoch: int = 15,
         device: str = DEVICE,
     ):
         """
@@ -56,14 +57,14 @@ class ModelPredictor:
         self.predict(*args, **kwargs)
 
     @staticmethod
-    def __get_batch(i: int, input_dict: ModelInput) -> ModelInput:
+    def __get_batch(i: int, input: ModelInput) -> ModelInput:
         """
         Get input_dict for batch i
         """
         return ModelInput(
             **{
                 f: v[i] if len(v) > i else torch.Tensor()
-                for f, v in input_dict.__dict__.items()
+                for f, v in input.items()
                 if v is not None
             }
         )
@@ -82,13 +83,10 @@ class ModelPredictor:
         )
 
         def predict_batch(i: int):
-            batch = ModelPredictor.__get_batch(i, inputs)
+            batch = get_batch(i, inputs)
 
             _, _, y2_preds, y1_probs_list = self.model(
-                torch.split(batch.multi_select, 1, dim=1),
-                torch.split(batch.single_select, 1, dim=1),
-                batch.text,
-                batch.quantitative,
+                ModelInput.get_instance(**batch.__dict__)
             )
             return decode_output(
                 y1_probs_list,
@@ -97,7 +95,8 @@ class ModelPredictor:
                 directory=BASE_ENCODER_DIRECTORY,
             )
 
-        predictions = [predict_batch(i) for i in range(len(inputs.multi_select))]
+        # TODO: brittle batch len
+        predictions = [predict_batch(i) for i in range(len(records))]
         return predictions
 
 
@@ -118,7 +117,11 @@ if __name__ == "__main__":
             Usage: python3 -m data.prediction.clindev.predictor --field: value
 
             Example:
-            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --conditions 'Clinically Significant Portal Hypertension' --mesh_conditions Hypertension
+            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --mesh_conditions Hypertension
+            --conditions 'Clinically Significant Portal Hypertension'
+
+            python3 -m data.prediction.clindev.predictor --interventions lianhuaqingwen --mesh_conditions 'Coronavirus Infections'
+            python3 -m data.prediction.clindev.predictor --interventions 'apatinib mesylate' --mesh_conditions Neoplasms
             """
         )
         sys.exit()
@@ -137,6 +140,6 @@ if __name__ == "__main__":
     for field in flatten(input_field_lists.__dict__.values()):
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
-    record = InputRecord(*parser.parse_args().__dict__.values())
+    record = InputRecord(**parser.parse_args().__dict__)
     res = predict_single(record)
     print("RESULT:", res)

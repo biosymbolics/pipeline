@@ -5,6 +5,7 @@ Utils for lists/arrays
 
 from typing import Mapping, Sequence, TypeVar, cast
 from pydash import compact
+import polars as pl
 
 T = TypeVar("T")
 BATCH_SIZE = 1000
@@ -74,4 +75,16 @@ def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> Sequence[BT]:
             {k: v[i : i + batch_size] for k, v in data_dict.items()}
             for i in range(0, len(next(iter(data_dict.values()))), batch_size)
         ],
+    )
+
+
+def is_sequence(obj: object) -> bool:
+    """
+    Returns True if obj is a sequence (list, tuple, etc.)
+
+    Args:
+        obj (object): object to check
+    """
+    return not isinstance(obj, str) and isinstance(
+        obj, (Sequence, list, tuple, pl.Series)
     )

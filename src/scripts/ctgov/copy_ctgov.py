@@ -137,7 +137,7 @@ def ingest_trials():
         entity_types=frozenset(["compounds", "mechanisms"]),
         link=True,
         additional_cleaners=[
-            lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+            lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
         ],
     )
     trial_db = f"{BASE_DATABASE_URL}/aact"

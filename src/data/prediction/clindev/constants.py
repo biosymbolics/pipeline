@@ -1,5 +1,5 @@
 from types import UnionType
-from typing import NamedTuple, Sequence, Type, TypeGuard
+from typing import NamedTuple, Sequence, TypeGuard
 
 from pydash import flatten
 
@@ -31,7 +31,11 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "facilities", ??
     # "countries" ??
 ]
-MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
+MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
+    # "conditions",  # typically only the specific condition
+    # "mesh_conditions",  # normalized; includes ancestors
+    # "interventions",
+]
 TEXT_FIELDS: list[str] = [
     # "conditions",  # typically only the specific condition
     "mesh_conditions",  # normalized; includes ancestors
@@ -87,9 +91,9 @@ def _get_type(field_type: str) -> type | UnionType:
     if field_type == "single_select":
         return str | int | float
     if field_type == "multi_select":
-        return list[str | int | float]
+        return list[str] | list[int] | list[float]
     if field_type == "text":
-        return str
+        return str | list[str]
     if field_type == "quantitative":
         return int | float
     # TODO: hard-coded
@@ -129,3 +133,41 @@ def is_output_records(
     return len(records) > 0 and all(
         is_output_record(record) for record in records[0:10]
     )
+
+
+# Epoch 50
+# INFO:__main__:Training Stage1 design accuracy: 0.74
+# INFO:__main__:Training Stage1 masking accuracy: 0.62
+# INFO:__main__:Training Stage1 randomization accuracy: 0.83
+# INFO:__main__:Training Stage1 comparison_type accuracy: 0.67
+# INFO:__main__:Training Stage2 accuracy: 0.83
+# INFO:__main__:Training Stage2 precision: 0.69
+# INFO:__main__:Training Stage2 recall: 0.31
+# INFO:__main__:Training Stage2 mae: 0.69
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.64
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.53
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.76
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.55
+# INFO:__main__:Evaluation Stage2 accuracy: 0.81
+# INFO:__main__:Evaluation Stage2 precision: 0.55
+# INFO:__main__:Evaluation Stage2 recall: 0.23
+# INFO:__main__:Evaluation Stage2 mae: 0.86
+
+
+# INFO:__main__:Starting epoch 20
+# INFO:__main__:Training Stage1 design accuracy: 0.99
+# INFO:__main__:Training Stage1 masking accuracy: 0.98
+# INFO:__main__:Training Stage1 randomization accuracy: 0.99
+# INFO:__main__:Training Stage1 comparison_type accuracy: 0.99
+# INFO:__main__:Training Stage2 accuracy: 1.0
+# INFO:__main__:Training Stage2 precision: 0.99
+# INFO:__main__:Training Stage2 recall: 0.99
+# INFO:__main__:Training Stage2 mae: 0.01
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.69
+# INFO:__main__:Evaluation Stage1 masking accuracy: 0.48
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.76
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.56
+# INFO:__main__:Evaluation Stage2 accuracy: 0.77
+# INFO:__main__:Evaluation Stage2 precision: 0.41
+# INFO:__main__:Evaluation Stage2 recall: 0.36
+# INFO:__main__:Evaluation Stage2 mae: 0.94

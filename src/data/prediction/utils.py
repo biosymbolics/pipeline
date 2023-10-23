@@ -1,10 +1,10 @@
 from datetime import date
 from functools import partial
-from typing import Any, NamedTuple, Sequence, TypeGuard, TypeVar, cast
+from typing import Any, Callable, NamedTuple, Sequence, TypeGuard, TypeVar, cast
 import logging
 from collections import namedtuple
 import polars as pl
-from pydash import uniq
+from pydash import is_list, uniq
 import torch
 import torch.nn.functional as F
 import polars as pl
@@ -16,7 +16,6 @@ from data.prediction.clindev.constants import (
     OutputRecord,
     is_output_records,
 )
-from data.prediction.constants import DEFAULT_TEXT_FEATURES
 from data.prediction.types import (
     AllCategorySizes,
     CategorySizes,
@@ -29,14 +28,14 @@ from data.prediction.types import (
 from typings.core import Primitive
 from utils.encoding.quant_encoder import BinEncoder
 from utils.encoding.saveable_encoder import LabelCategoryEncoder
-from utils.encoding.text_encoder import TextEncoder
+from utils.encoding.text_encoder import WORD_VECTOR_LENGTH, TextEncoder
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
 
 from .types import FieldLists, InputFieldLists, OutputFieldLists, is_all_fields_list
 
 
-DEFAULT_MAX_ITEMS_PER_CAT = 20
+DEFAULT_MAX_ITEMS_PER_CAT = 3
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -120,57 +119,73 @@ def resize_and_batch(
     return batch_and_pad(padded_emb, batch_size)
 
 
-def is_list(obj: Any) -> bool:
-    return hasattr(obj, "__len__") or isinstance(obj, list)
-
-
 def encode_categories(
     records: Sequence[T],
-    categorical_fields: list[str],
+    fields: list[str],
     max_items_per_cat: int,
     directory: str,
+    get_encoder: Callable = lambda field, directory, max_items_per_cat: LabelCategoryEncoder(
+        field, directory
+    ),
     device: str = "cpu",
 ) -> EncodedCategories:
     """
     Get category **encodings** given a list of dicts
     """
+
     dicts = [
         record._asdict() if not isinstance(record, dict) else record
         for record in records
     ]
-    FeatureTuple = namedtuple("FeatureTuple", categorical_fields)  # type: ignore
     df = pl.from_dicts(dicts, infer_schema_length=1000)
 
     # total records by field
     size_map = dict(
-        [
-            (field, df.select(pl.col(field).flatten()).n_unique())
-            for field in categorical_fields
-        ]
+        [(field, df.select(pl.col(field).flatten()).n_unique()) for field in fields]
     )
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]
     encodings_list = [
-        LabelCategoryEncoder(field, directory).fit_transform(df)
-        for field in categorical_fields
-    ]
-    encoded_dicts = [FeatureTuple(*fv)._asdict() for fv in zip(*encodings_list)]
-
-    # e.g. [[[413], [2]], [[436, 440], [2]]]
-    encoded_records = [
-        [
-            dict[field][0:max_items_per_cat] if is_list(dict[field]) else [dict[field]]
-            for field in categorical_fields
-        ]
-        for dict in encoded_dicts
+        get_encoder(field, directory, max_items_per_cat).fit_transform(df)
+        for field in fields
     ]
 
     encodings = array_to_tensor(
-        encoded_records,
-        (len(records), len(categorical_fields), max_items_per_cat),
+        encodings_list,
+        (len(records), len(fields), max_items_per_cat),
     ).to(device)
 
     return EncodedCategories(category_size_map=size_map, encodings=encodings)
+
+
+def encode_categories_as_text(
+    records: Sequence[T],
+    fields: list[str],
+    max_items_per_cat: int,
+    directory: str,
+    get_encoder: Callable = (lambda f, dir, max_in_cat: TextEncoder(f, max_in_cat)),
+    device: str = "cpu",
+) -> torch.Tensor:
+    """
+    Get vectorized text
+    """
+
+    dicts = [
+        record._asdict() if not isinstance(record, dict) else record
+        for record in records
+    ]
+    df = pl.from_dicts(dicts, infer_schema_length=1000)
+
+    encodings_list = [
+        get_encoder(field, directory, max_items_per_cat).fit_transform(df)
+        for field in fields
+    ]
+    encodings = array_to_tensor(
+        encodings_list,
+        (len(records), len(fields), max_items_per_cat, 5, WORD_VECTOR_LENGTH),
+    ).to(device)
+
+    return encodings.view(*encodings.shape[0:1], -1)
 
 
 def encode_single_select(
@@ -217,11 +232,12 @@ def encode_quantitative_fields(
     Args:
         records (Sequence[dict]): List of dicts
         fields (list[str]): List of fields to encode
+        directory (str): Directory to save encoder
 
     Returns:
         Sequence[dict]: List of dicts with encoded fields
     """
-    df = pl.from_dicts(records, infer_schema_length=1000)  # type: ignore
+    df = pl.from_dicts(records, infer_schema_length=None)
     for field in fields:
         df = df.with_columns(
             [
@@ -300,17 +316,17 @@ def encode_features(
         "quantitative": partial(encode_quantitative, device=device),
         "single_select": partial(encode_single_select, **args),
         "text": partial(
-            lambda records, f: TextEncoder(
-                f, n_features=DEFAULT_TEXT_FEATURES, device=device
-            ).fit_transform(pl.DataFrame(records, infer_schema_length=1000))
+            encode_categories_as_text,
+            **args,
+            max_items_per_cat=max_items_per_cat,
         ),
     }
 
     encoded = {
-        t: enc_fun(records, getattr(field_lists, t))
+        t: Encode(records, getattr(field_lists, t))
         if len(getattr(field_lists, t)) > 0
         else torch.Tensor()
-        for t, enc_fun in field_types.items()
+        for t, Encode in field_types.items()
     }
 
     sizes = InputCategorySizes(
@@ -328,6 +344,7 @@ def encode_features(
         }
     )
 
+    # return encoded outputs too, if appropriate
     if is_all_fields_list(field_lists) and is_output_records(records):
         o_encodings, o_sizes = encode_outputs(
             records,
@@ -385,9 +402,7 @@ def _encode_and_batch_features(
         records, field_lists, directory, max_items_per_cat, device=device
     )
 
-    batched = dict(
-        (f, resize_and_batch(t, batch_size)) for f, t in feats.__dict__.items()
-    )
+    batched = dict((f, resize_and_batch(t, batch_size)) for f, t in feats.items())
 
     logger.debug(
         "Feature Sizes: %s",

@@ -1,7 +1,5 @@
-from typing import Sequence
+from typing import Sequence, TypeAlias
 import logging
-from pydash import compact
-import numpy as np
 import torch
 import numpy.typing as npt
 import polars as pl
@@ -13,66 +11,51 @@ from utils.tensor import array_to_tensor
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-DEFAULT_MAX_STRING_LEN = 200
+DEFAULT_MAX_STRING_LEN = 100
+WORD_VECTOR_LENGTH = 300
+
+TextEncoderData: TypeAlias = pl.DataFrame | Sequence | npt.NDArray
 
 
 class TextEncoder:
-    def __init__(
-        self,
-        field: str | None = None,
-        n_features: int = 5,
-        device: str = "cpu",
-    ):
-        self.n_features = n_features
-        self.field = field
+    def __init__(self, field, max_items_per_cat: int):
         self.nlp = Spacy.get_instance(disable=["ner"])
-        self.device = device
+        self.max_items_per_cat = max_items_per_cat
+        self.field = field
 
-    def _encode_df(self, df: pl.DataFrame) -> torch.Tensor:
-        if not self.field:
-            raise ValueError("Cannot encode dataframe without field")
+    def _vectorize_values(self, values: Sequence[str]) -> tuple[int, torch.Tensor]:
+        def get_tokens(val: str):
+            # max_tokens x word_vector_length
+            return torch.Tensor(
+                [token.vector for token in self.nlp(val[0:DEFAULT_MAX_STRING_LEN])]
+            )
 
-        values = df.select(pl.col(self.field)).to_series().to_list()
-        return self._encode(values)
+        # max_items_per_cat x max_tokens x word_vector_length
+        vectors = [get_tokens(v) for v in values][0 : self.max_items_per_cat]
+        max_tokens = max(map(len, vectors))
+        return max_tokens, array_to_tensor(
+            vectors,
+            (self.max_items_per_cat, max_tokens, WORD_VECTOR_LENGTH),
+        )
 
-    def _encode(
-        self,
-        values: Sequence[str] | npt.NDArray,
-    ) -> torch.Tensor:
-        """
-        Get text embeddings given a list of dict
+    def vectorize(self, values: TextEncoderData) -> torch.Tensor:
+        if isinstance(values, pl.DataFrame):
+            values = values.select(pl.col(self.field)).to_series().to_list()
 
-        @see https://pytorch.org/docs/stable/generated/torch.pca_lowrank.html
-        """
+        vectored = list(map(self._vectorize_values, values))
+        vectors = [v[1] for v in vectored]
+        max_tokens = max([v[0] for v in vectored])
 
-        def vectorize(value: str | list[str]) -> torch.Tensor:
-            val = value if isinstance(value, str) else (", ").join(compact(value))
-            vectors = [
-                token.vector for token in self.nlp(val[0:DEFAULT_MAX_STRING_LEN])
-            ]
-            if len(vectors) == 0:
-                return torch.Tensor()
-            return torch.Tensor(np.concatenate(vectors))
+        return array_to_tensor(
+            vectors,
+            (len(values), self.max_items_per_cat, max_tokens, WORD_VECTOR_LENGTH),
+        )
 
-        text_vectors = list(map(vectorize, values))
-        max_size = max([f.size(0) for f in text_vectors])
+    def fit(self, values: torch.Tensor):
+        # NO-OP
+        logger.warning("FIT is a no-op for TextEncoder")
+        return
 
-        # A=Udiag(S)V^T
-        # use cpu for this op: "The operator 'aten::linalg_qr.out' is not currently implemented for the MPS device."
-        A = array_to_tensor(text_vectors, (len(text_vectors), max_size))
-        U, S, V = torch.pca_lowrank(A)
-
-        return torch.matmul(A, V[:, : self.n_features]).to(self.device)
-
-    def fit_transform(
-        self, data: pl.DataFrame | Sequence | npt.NDArray
-    ) -> torch.Tensor:
-        """
-        Fit and transform a dataframe
-        """
-        if isinstance(data, pl.DataFrame):
-            encoded_values = self._encode_df(data)
-        else:
-            encoded_values = self._encode(data)
-
-        return encoded_values
+    def fit_transform(self, values: TextEncoderData) -> torch.Tensor:
+        text_vectors = self.vectorize(values)
+        return text_vectors

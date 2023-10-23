@@ -527,7 +527,7 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
     )
 
 
-def is_trial_summary_list(trials: list[dict]) -> TypeGuard[list[TrialSummary]]:
+def is_trial_summary_list(trials: Sequence[dict]) -> TypeGuard[Sequence[TrialSummary]]:
     """
     Check if list of trial records
     """

@@ -11,6 +11,7 @@ logger.setLevel(logging.INFO)
 class InputCategorySizes:
     multi_select: Optional[dict[str, int]] = None
     single_select: Optional[dict[str, int]] = None
+    text: Optional[dict[str, int]] = None
 
 
 @dataclass(frozen=True)
@@ -46,12 +47,24 @@ class TolerantDataclass:
     def get_instance(cls, **kwargs):
         return cls(**cls._get_valid_args(**kwargs))
 
+    # allow this to act like a dict
+    def __getattr__(self, name):
+        return getattr(self.__dict__, name)
+
 
 @dataclass(frozen=True)
 class ModelInput(TolerantDataclass):
     multi_select: torch.Tensor
     quantitative: torch.Tensor
     single_select: torch.Tensor
+    text: torch.Tensor
+
+
+@dataclass(frozen=True)
+class SplitModelInput(TolerantDataclass):
+    multi_select: list[torch.Tensor]
+    quantitative: torch.Tensor
+    single_select: list[torch.Tensor]
     text: torch.Tensor
 
 
@@ -67,11 +80,38 @@ class ModelInputAndOutput(ModelInput, ModelOutput):
     pass
 
 
+@dataclass(frozen=True)
+class SplitModelInputAndOutput(SplitModelInput, ModelOutput):
+    pass
+
+
+def is_model_input(
+    model_params: ModelInput | ModelOutput | ModelInputAndOutput,
+) -> TypeGuard[ModelInput]:
+    if is_model_input_output(model_params):
+        return False
+    fields = model_params.keys()
+    input_fields = ModelInput.__dataclass_fields__.keys()
+    return set(input_fields).issubset(fields)
+
+
 def is_model_output(
     model_params: ModelInput | ModelOutput | ModelInputAndOutput,
 ) -> TypeGuard[ModelOutput]:
-    fields = model_params.__dict__.keys()
-    return "y1_true" in fields and "y2_true" in fields and "y2_oh_true" in fields
+    if is_model_input_output(model_params):
+        return False
+    fields = model_params.keys()
+    output_fields = ModelOutput.__dataclass_fields__.keys()
+    return set(output_fields).issubset(fields)
+
+
+def is_model_input_output(
+    model_params: ModelInput | ModelOutput | ModelInputAndOutput,
+) -> TypeGuard[ModelInputAndOutput]:
+    fields = model_params.keys()
+    input_fields = ModelInput.__dataclass_fields__.keys()
+    output_fields = ModelOutput.__dataclass_fields__.keys()
+    return set(input_fields).issubset(fields) and set(output_fields).issubset(fields)
 
 
 @dataclass(frozen=True)

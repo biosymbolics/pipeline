@@ -5,13 +5,18 @@ Utils for patent eNPV model
 from functools import partial, reduce
 from itertools import accumulate
 import random
-from typing import Callable, Sequence, TypeVar
+from typing import Callable, Sequence, TypeVar, cast
 import logging
 import torch
 import torch.nn as nn
+from data.prediction.types import (
+    ModelInput,
+    ModelInputAndOutput,
+    is_model_input,
+    is_model_input_output,
+)
 
 from data.prediction.utils import (
-    ModelInputAndOutput,
     encode_and_batch_all,
     encode_and_batch_input,
     encode_quantitative_fields,
@@ -145,3 +150,45 @@ def embed_cat_inputs(
     ).to(device)
     cats_input = cats_input.view(*cats_input.shape[0:1], -1)
     return cats_input
+
+
+BATCH_TRANSFORMATIONS = {
+    "multi_select": lambda x: torch.split(x, 1, dim=1),
+    "single_select": lambda x: torch.split(x, 1, dim=1),
+}
+
+
+IT = TypeVar("IT", bound=ModelInputAndOutput | ModelInput)
+
+
+def get_batch(
+    i: int,
+    input: IT,
+    transformations: dict[str, Callable] = BATCH_TRANSFORMATIONS,
+) -> IT | None:
+    """
+    Get input for batch i
+
+    Args:
+        i (int): Batch index
+        input (ModelInputAndOutput): Input dict
+        transformations (dict[str, Callable], optional): Transformations to apply to each field. Defaults to BATCH_TRANSFORMATIONS
+    """
+    if not all([len(v) > i or len(v) == 0 for v in input.values()]):
+        logger.error("Batch %s is empty", i)
+        return None
+
+    def transform_batch(f: str, v: torch.Tensor, i: int):
+        transform = transformations.get(f) or (lambda x: x)
+        return transform(v[i]) if len(v) > 0 else torch.Tensor()
+
+    batch = {f: transform_batch(f, v, i) for f, v in input.items()}
+
+    if is_model_input(input):
+        batch = ModelInput(**batch)
+    elif is_model_input_output(input):
+        batch = ModelInputAndOutput(**batch)
+    else:
+        raise ValueError(f"Unknown input type {type(input)}")
+
+    return cast(IT, batch)
