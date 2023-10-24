@@ -62,6 +62,10 @@ class TestTrialUtils(unittest.TestCase):
                 "time_frame_desc": "At Day 1, 999, 15, 29, 43, 57, 71, 85, 99, 127 and 169",
                 "expected": 999,
             },
+            # {
+            #     "time_frame_desc": "One year after the last patient is randomized",
+            #     "expected": 365,
+            # },
         ]
 
         for test in test_cases:

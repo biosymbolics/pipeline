@@ -31,13 +31,28 @@ time_in_days: dict = {
     "year": YEAR,
 }
 
+digit_map: dict = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+}
+
 
 def extract_timeframe(timeframe_desc: str) -> int | None:
     """
     Extract outcome durations in days
     """
     unit_re = get_or_re(flatten(time_units.values()))
-    digit_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve))"
+    digit_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|{get_or_re(list(digit_map.keys()))})"
     digit_units_re = rf"{digit_re}+[ -]?{unit_re}"
     time_joiners = "(?:[-, ]+| to | and )"
     units_digit_re = rf"\b{unit_re}[ -]?{digit_re}+(?:{time_joiners}+{digit_re}+)*"
@@ -61,14 +76,24 @@ def extract_timeframe(timeframe_desc: str) -> int | None:
 
         return units[0]
 
+    def get_number(d: str) -> int | None:
+        if d in digit_map:
+            return digit_map[d]
+
+        try:
+            return int(d)
+        except ValueError:
+            return None
+
     def calc_time(time_desc: str) -> int | None:
-        digits = re.findall(digit_re, time_desc)
+        num_strings = re.findall(digit_re, time_desc)
         unit = get_unit(time_desc)
 
         if unit is None:
             return None
 
-        v = [int(d) * time_in_days[unit] for d in digits if is_number(int(d))]
+        numbers = compact([get_number(n_str) for n_str in num_strings])
+        v = [int(n) * time_in_days[unit] for n in numbers]
         if len(v) == 0:
             return None
         return round(max(v))
