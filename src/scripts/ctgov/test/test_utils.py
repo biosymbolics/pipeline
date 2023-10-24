@@ -46,10 +46,10 @@ class TestTrialUtils(unittest.TestCase):
                 "time_frame_desc": "Cycle 1 Day -3: Predose, 1, 2, 4, 6, 8, 10, 24, 48 and 72 hours (hr) postdose; Cycle 1 Day 28: Predose, 1, 2, 4, 6, 8, 10 and 24 hr postdose (Cycle 1 = 32 days)",
                 "expected": 32,  # TODO?
             },
-            # {
-            #     "time_frame_desc": "At Day 15, 29, 43, 57, 71, 85, 99, 127 and 169",
-            #     "expected": 169,
-            # },
+            {
+                "time_frame_desc": "At Day 15, 29, 43, 57, 71, 85, 99, 127 and 169",
+                "expected": 169,
+            },
         ]
 
         for test in test_cases:

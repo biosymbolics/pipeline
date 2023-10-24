@@ -40,7 +40,8 @@ def extract_timeframe(timeframe_desc: str) -> int:
     unit_re = get_or_re(flatten(time_units.values()))
     digit_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve))"
     digit_units_re = rf"{digit_re}+[ -]?{unit_re}"
-    units_digit_re = rf"\b{unit_re}[ -]?{digit_re}+(?:-{digit_re}+)?"
+    time_joiners = "(?:[-, ]+| to | and )"
+    units_digit_re = rf"\b{unit_re}[ -]?{digit_re}+(?:{time_joiners}+{digit_re}+)*"
 
     timeframe_re = rf"(?:{digit_units_re}|{units_digit_re}|{digit_re})"
 
