@@ -83,6 +83,9 @@ def extract_max_timeframe(timeframe_descs: list[str]) -> int | None:
     Returns the largest timeframe in days
     """
     times = compact(
-        [extract_timeframe(timeframe_desc) for timeframe_desc in timeframe_descs]
+        [
+            extract_timeframe(timeframe_desc)
+            for timeframe_desc in compact(timeframe_descs)
+        ]
     )
     return max(times) if len(times) > 0 else None

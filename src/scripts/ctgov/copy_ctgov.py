@@ -50,6 +50,7 @@ MULTI_FIELDS = {
     "design_groups.group_type": "arm_types",
     "interventions.name": "interventions",
     "outcomes.title": "primary_outcomes",
+    "outcomes.time_frame": "time_frames",
 }
 
 SINGLE_FIELDS_SQL = [f"max({f}) as {new_f}" for f, new_f in SINGLE_FIELDS.items()]
@@ -61,7 +62,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
 def transform_ct_records(
-    ctgov_records: Sequence[dict], tagger: NerTagger
+    ctgov_records: Sequence[dict],  # , tagger: NerTagger
 ) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
@@ -74,24 +75,26 @@ def transform_ct_records(
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    intervention_sets = [rec["interventions"] for rec in ctgov_records]
-    uniq_interventions = dedup(flatten(intervention_sets))
-    logger.info(
-        "Extracting intervention names for %s strings (e.g. %s)",
-        len(uniq_interventions),
-        uniq_interventions[0:10],
-    )
-    norm_map = tagger.extract_string_map(uniq_interventions)
+    # intervention_sets = [rec["interventions"] for rec in ctgov_records]
+    # uniq_interventions = dedup(flatten(intervention_sets))
+    # logger.info(
+    #     "Extracting intervention names for %s strings (e.g. %s)",
+    #     len(uniq_interventions),
+    #     uniq_interventions[0:10],
+    # )
+    # norm_map = tagger.extract_string_map(uniq_interventions)
 
-    def normalize_interventions(interventions: list[str]):
-        return flatten([norm_map.get(i) or i for i in interventions])
+    # def normalize_interventions(interventions: list[str]):
+    #     return flatten([norm_map.get(i) or i for i in interventions])
 
-    return [
-        dict_to_trial_summary(
-            {**rec, "interventions": normalize_interventions(rec["interventions"])}
-        )
-        for rec in ctgov_records
-    ]
+    # return [
+    #     dict_to_trial_summary(
+    #         {**rec, "interventions": normalize_interventions(rec["interventions"])}
+    #     )
+    #     for rec in ctgov_records
+    # ]
+
+    return [dict_to_trial_summary(rec) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -134,13 +137,13 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    tagger = NerTagger(
-        entity_types=frozenset(["compounds", "mechanisms"]),
-        link=True,
-        additional_cleaners=[
-            lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
-        ],
-    )
+    # tagger = NerTagger(
+    #     entity_types=frozenset(["compounds", "mechanisms"]),
+    #     link=True,
+    #     additional_cleaners=[
+    #         lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
+    #     ],
+    # )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -149,7 +152,9 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
+        transform=lambda records: transform_ct_records(
+            records  # type: ignore
+        ),  # tagger
     )
     # TODO: alter table trials alter column interventions set data type text[];
 

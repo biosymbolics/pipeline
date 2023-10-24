@@ -456,6 +456,7 @@ class BaseTrial(TypedDict):
     primary_outcomes: list[str]
     sponsor: str
     start_date: date
+    time_frames: list[str]
     title: str
 
 
@@ -566,7 +567,7 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
             "comparison_type": ComparisonType.find(trial["arm_types"], design),
             "design": design,
             "duration": __calc_duration(trial["start_date"], trial["end_date"]),
-            "max_timeframe": extract_max_timeframe(trial["primary_outcomes"]),
+            "max_timeframe": extract_max_timeframe(trial["time_frames"]),
             "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "masking": TrialMasking(trial["masking"]),
             "phase": TrialPhase(trial["phase"]),
