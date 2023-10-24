@@ -16,7 +16,7 @@ BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
 LR = 1e-4
-MAX_ITEMS_PER_CAT = 8  # DEFAULT_MAX_ITEMS_PER_CAT
+MAX_ITEMS_PER_CAT = 5  # DEFAULT_MAX_ITEMS_PER_CAT
 MAX_TOKENS_PER_ITEM = 8
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
@@ -133,41 +133,3 @@ def is_output_records(
     return len(records) > 0 and all(
         is_output_record(record) for record in records[0:10]
     )
-
-
-# Epoch 50
-# INFO:__main__:Training Stage1 design accuracy: 0.74
-# INFO:__main__:Training Stage1 masking accuracy: 0.62
-# INFO:__main__:Training Stage1 randomization accuracy: 0.83
-# INFO:__main__:Training Stage1 comparison_type accuracy: 0.67
-# INFO:__main__:Training Stage2 accuracy: 0.83
-# INFO:__main__:Training Stage2 precision: 0.69
-# INFO:__main__:Training Stage2 recall: 0.31
-# INFO:__main__:Training Stage2 mae: 0.69
-# INFO:__main__:Evaluation Stage1 design accuracy: 0.64
-# INFO:__main__:Evaluation Stage1 masking accuracy: 0.53
-# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.76
-# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.55
-# INFO:__main__:Evaluation Stage2 accuracy: 0.81
-# INFO:__main__:Evaluation Stage2 precision: 0.55
-# INFO:__main__:Evaluation Stage2 recall: 0.23
-# INFO:__main__:Evaluation Stage2 mae: 0.86
-
-
-# INFO:__main__:Starting epoch 20
-# INFO:__main__:Training Stage1 design accuracy: 0.99
-# INFO:__main__:Training Stage1 masking accuracy: 0.98
-# INFO:__main__:Training Stage1 randomization accuracy: 0.99
-# INFO:__main__:Training Stage1 comparison_type accuracy: 0.99
-# INFO:__main__:Training Stage2 accuracy: 1.0
-# INFO:__main__:Training Stage2 precision: 0.99
-# INFO:__main__:Training Stage2 recall: 0.99
-# INFO:__main__:Training Stage2 mae: 0.01
-# INFO:__main__:Evaluation Stage1 design accuracy: 0.69
-# INFO:__main__:Evaluation Stage1 masking accuracy: 0.48
-# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.76
-# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.56
-# INFO:__main__:Evaluation Stage2 accuracy: 0.77
-# INFO:__main__:Evaluation Stage2 precision: 0.41
-# INFO:__main__:Evaluation Stage2 recall: 0.36
-# INFO:__main__:Evaluation Stage2 mae: 0.94
