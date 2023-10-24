@@ -402,22 +402,22 @@ class ComparisonType(ByDefinitionOrderEnum):
     @classmethod
     def find(cls, value, design: TrialDesign | None = None):
         if isinstance(value, Sequence):
+            if design == TrialDesign.SINGLE_GROUP:
+                return cls.NA
             if len(value) == 0:
                 return cls.UNKNOWN
             if "Active Comparator" in value:
                 if "Experimental" in value:
                     return cls.ACTIVE
-                if (
-                    len(value) == 1 or "Other" in value
-                ) and design != TrialDesign.SINGLE_GROUP:
+                if all("Active Comparator" in v for v in value):
+                    return cls.ACTIVE
+                if len(value) == 1 or "Other" in value:
                     return cls.PLACEBO  # just guessing
             if "Placebo Comparator" in value or "Sham Comparator" in value:
                 return cls.PLACEBO
             if "No Intervention" in value:
                 return cls.NO_INTERVENTION
             if "Experimental" in value:
-                if design == TrialDesign.SINGLE_GROUP:
-                    return cls.NA
                 if design in [
                     TrialDesign.PARALLEL,
                     TrialDesign.CROSSOVER,
@@ -427,8 +427,6 @@ class ComparisonType(ByDefinitionOrderEnum):
                     return cls.ACTIVE
                 return cls.UNKNOWN
             if "Other" in value:
-                if design == TrialDesign.SINGLE_GROUP:
-                    return cls.NA
                 return cls.OTHER
             if "No Intervention" in value:
                 return cls.NA
@@ -544,6 +542,13 @@ def __calc_duration(start_date: date | None, end_date: date | None) -> int:
         return (datetime.today().date() - start_date).days
 
     return (end_date - start_date).days
+
+
+def __extract_timeframe(timeframe_desc: str) -> int:
+    """
+    Calculate outcome durations in days
+    """
+    return 0
 
 
 def dict_to_trial_summary(trial: dict) -> TrialSummary:
