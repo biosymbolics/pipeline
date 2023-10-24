@@ -85,8 +85,11 @@ class ModelPredictor:
         def predict_batch(i: int):
             batch = get_batch(i, inputs)
 
+            if batch is None:
+                return []
+
             _, _, y2_preds, y1_probs_list = self.model(
-                ModelInput.get_instance(**batch.__dict__)
+                ModelInput.get_instance(*batch.items())
             )
             return decode_output(
                 y1_probs_list,

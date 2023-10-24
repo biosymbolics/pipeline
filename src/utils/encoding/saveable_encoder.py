@@ -94,20 +94,20 @@ class Encoder:
             values (EncodeableData): Values to encode
         """
 
-        logger.info(
-            "Encoding field %s (e.g. %s) len: %s", self._field, values[0:5], len(values)
-        )
-
         # fit if not already fit
         if not self._is_fit:
             self.fit(values)
 
         # if nested (list o' lists, at least one len > 1), encode each list separately
         if all([is_sequence(v) for v in values]) and any([len(v) > 1 for v in values]):
-            logger.info("Treating %s as list o lists", self._field)
-            return [self._encoder.transform(v).tolist() for v in values]
+            encoded = [self._encoder.transform(v).tolist() for v in values]
+        else:
+            encoded = self._encoder.transform(values).tolist()
 
-        return self._encoder.transform(values).tolist()
+        logger.info(
+            "Encoded field %s (e.g. %s vs %s)", self._field, encoded[0:5], values[0:5]
+        )
+        return encoded
 
     def fit(self, values: EncoderData):
         """
@@ -137,9 +137,6 @@ class Encoder:
     def inverse_transform(self, val: V) -> V:
         """
         Inverse transform a list of encoded value(s)
-
-        Will return the mean between the two edges of the bin
-        (see https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.KBinsDiscretizer.html#sklearn.preprocessing.KBinsDiscretizer.inverse_transform)
         """
         if not self._is_fit:
             raise ValueError("Cannot inverse transform before fitting")
@@ -147,7 +144,9 @@ class Encoder:
         try:
             return self._encoder.inverse_transform(val)
         except ValueError as e:
-            logger.error("Could not inverse transform %s (%s)", val, e)
+            logger.error(
+                "Could not inverse transform %s, impl %s: %s", val, self._name, e
+            )
             return val
 
 

@@ -12,9 +12,14 @@ import system
 system.initialize()
 
 from clients.trials import fetch_trials
-from data.prediction.utils import ModelInputAndOutput, split_train_and_test
+from data.prediction.utils import (
+    ModelInputAndOutput,
+    decode_output,
+    split_train_and_test,
+)
 
 from .constants import (
+    BASE_ENCODER_DIRECTORY,
     BATCH_SIZE,
     DEVICE,
     EMBEDDING_DIM,
@@ -22,6 +27,7 @@ from .constants import (
     TRAINING_PROPORTION,
     InputAndOutputRecord,
     field_lists,
+    output_field_lists,
 )
 from .model import ClindevTrainingModel
 from .types import ClinDevModelSizes
@@ -33,7 +39,7 @@ from .utils import (
     split_categories,
 )
 
-from ..types import AllCategorySizes, ModelInput
+from ..types import AllCategorySizes, ModelInput, OutputFieldLists
 
 
 class MetricWrapper(NamedTuple):
@@ -243,8 +249,31 @@ class ModelTrainer:
                         continue
 
                     self.evaluate(batch, self.y1_category_sizes)
+
                 self.log_metrics("Evaluation")
                 self.model.save(epoch)
+
+    def log_metrics(self, stage: str = "Training"):
+        """
+        Log metrics
+        """
+        try:
+            for k in self.y1_category_sizes.keys():
+                for name, metric in self.stage1_metrics.items():
+                    value = metric[k].compute().__round__(2)
+                    logger.info("%s Stage1 %s %s: %s", stage, k, name, value)
+                    metric[k].reset()
+
+            for name in self.stage2_metrics.keys():
+                metric, _ = self.stage2_metrics[name]
+                value = metric.compute()  # type: ignore
+                if isinstance(value, torch.Tensor):
+                    value = value.item()
+                logger.info("%s Stage2 %s: %s", stage, name, value.__round__(2))
+                metric.reset()  # type: ignore
+
+        except Exception as e:
+            logger.warning("Failed to evaluate: %s", e)
 
     def calculate_metrics(
         self,
@@ -276,28 +305,6 @@ class ModelTrainer:
             else:
                 metric.update((cpu_y2_preds, cpu_y2_oh_true))
 
-    def log_metrics(self, stage: str = "Training"):
-        """
-        Log metrics
-        """
-        try:
-            for k in self.y1_category_sizes.keys():
-                for name, metric in self.stage1_metrics.items():
-                    value = metric[k].compute().__round__(2)
-                    logger.info("%s Stage1 %s %s: %s", stage, k, name, value)
-                    metric[k].reset()
-
-            for name in self.stage2_metrics.keys():
-                metric, _ = self.stage2_metrics[name]
-                value = metric.compute()  # type: ignore
-                if isinstance(value, torch.Tensor):
-                    value = value.item()
-                logger.info("%s Stage2 %s: %s", stage, name, value.__round__(2))
-                metric.reset()  # type: ignore
-
-        except Exception as e:
-            logger.warning("Failed to evaluate: %s", e)
-
     def evaluate(self, batch: ModelInputAndOutput, category_sizes: dict[str, int]):
         """
         Evaluate model on eval/test set
@@ -312,6 +319,18 @@ class ModelTrainer:
         self.calculate_metrics(
             y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
+
+        try:
+            print(
+                decode_output(
+                    [y1.detach().to("cpu") for y1 in y1_probs_by_field],
+                    y2_preds.detach().to("cpu"),
+                    output_field_lists,
+                    directory=BASE_ENCODER_DIRECTORY,
+                )
+            )
+        except Exception as e:
+            logger.warning("Failed to decode: %s", e)
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):

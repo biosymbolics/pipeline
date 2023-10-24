@@ -117,7 +117,7 @@ def calc_categories_loss(
     """
     loss = torch.stack(
         [
-            criterion(y1_by_field.float(), y1_true_set)
+            criterion(y1_by_field, y1_true_set)
             for y1_by_field, y1_true_set in zip(
                 y1_probs_by_field,
                 y1_true_by_field,

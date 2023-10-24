@@ -19,7 +19,7 @@ EMBEDDING_DIM = 16
 LR = 1e-4
 MAX_ITEMS_PER_CAT = 8  # DEFAULT_MAX_ITEMS_PER_CAT
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
-SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
+SAVE_FREQUENCY = 5  # DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 TRAINING_PROPORTION = 0.8
@@ -32,7 +32,7 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    # "conditions",  # typically only the specific condition
+    "conditions",  # typically only the specific condition
     "mesh_conditions",  # normalized; includes ancestors
     "interventions",
 ]

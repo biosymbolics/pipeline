@@ -154,13 +154,13 @@ def encode_categories(
     # e.g. [[[413], [2]], [[436, 440], [2]]]
     encoded_records = [
         [
-            dict[field][0:max_items_per_cat] if is_list(dict[field]) else dict[field]
+            # TODO: not ideal to force list of scalar value
+            dict[field][0:max_items_per_cat] if is_list(dict[field]) else [dict[field]]
             for field in fields
         ]
         for dict in encoded_dicts
     ]
 
-    # .view(*encodings.shape[0:1], -1)
     encodings = array_to_tensor(
         encoded_records,
         (len(records), len(fields), max_items_per_cat),
@@ -384,20 +384,20 @@ def decode_output(
 
     TODO: generalize or move
     """
-    y1_values = [torch.argmax(y1).item() for y1 in y1_probs_list]
-    y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1)).item()
+    y1_values = [torch.argmax(y1, dim=1) for y1 in y1_probs_list]
+    y2_pred = torch.argmax(torch.softmax(y2_preds, dim=1), dim=1)
 
     y1_decoded = {
-        f: LabelCategoryEncoder(f, directory).inverse_transform([v])
+        f: LabelCategoryEncoder(f, directory).inverse_transform(v.numpy())
         for f, v in zip(field_lists.y1_categorical, y1_values)
     }
     y2_decoded = LabelCategoryEncoder(field_lists.y2, directory).inverse_transform(
-        [y2_pred]
+        y2_pred.numpy()
     )
     y2_quant_decoded = BinEncoder(field_lists.y2, directory).inverse_transform(
-        [y2_decoded]
+        y2_decoded.reshape(-1, 1)
     )
-    return {**y1_decoded, field_lists.y2: round(y2_quant_decoded[0][0])}
+    return {**y1_decoded, field_lists.y2: y2_quant_decoded[0]}
 
 
 def _encode_and_batch_features(
