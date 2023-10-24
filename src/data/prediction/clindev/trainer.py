@@ -2,6 +2,7 @@ import json
 import logging
 import math
 import os
+import random
 import sys
 from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
 from pydash import flatten
@@ -350,7 +351,10 @@ class ModelTrainer:
             for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
         ]
         logger.info(
-            "Comparisons: %s", json.dumps(comparison[0:10], indent=4, sort_keys=True)
+            "Comparisons: %s",
+            json.dumps(
+                sorted(comparison, key=lambda x: random.random())[0:5], indent=2
+            ),
         )
 
     @staticmethod
