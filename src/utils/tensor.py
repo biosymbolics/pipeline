@@ -2,7 +2,7 @@
 Tensor utilities
 """
 import logging
-from typing import Sequence
+from typing import Sequence, TypeVar, cast
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -11,7 +11,10 @@ from utils.list import BATCH_SIZE, batch, is_sequence
 from typings.core import Primitive
 
 
-def pad_or_truncate_to_size(_tensor: torch.Tensor, shape: tuple[int, ...]):
+T = TypeVar("T", bound=torch.Tensor)
+
+
+def pad_or_truncate_to_size(tensor: T, shape: tuple[int, ...]) -> T:
     """
     Pad or truncate a tensor to a given size
 
@@ -19,13 +22,11 @@ def pad_or_truncate_to_size(_tensor: torch.Tensor, shape: tuple[int, ...]):
         tensor (torch.Tensor): Tensor to pad or truncate
         size (tuple[int, ...]): Size to pad or truncate to
     """
-    tensor = _tensor.clone()  # perf?
-
     if tensor.size() == shape:
         return tensor
 
     if len(tensor.size()) == 0:
-        return torch.zeros(shape)
+        return cast(T, torch.zeros(shape))
 
     dim_delta = len(shape) - len(tensor.size())
 
@@ -36,7 +37,7 @@ def pad_or_truncate_to_size(_tensor: torch.Tensor, shape: tuple[int, ...]):
     # or larger, remove dimensions
     if dim_delta < 0:
         for _ in range(abs(dim_delta)):
-            tensor = tensor.squeeze(0)
+            tensor = tensor.squeeze()
 
     # Confirm the size is correct
     if len(tensor.size()) != len(shape):
@@ -53,12 +54,12 @@ def pad_or_truncate_to_size(_tensor: torch.Tensor, shape: tuple[int, ...]):
             # Create a padding configuration with padding for this dimension only
             padding = [0] * len(shape) * 2
             padding[-(dim * 2 + 2)] = padding_needed
-            tensor = F.pad(tensor, padding)
+            tensor = F.pad(tensor, padding)  # type: ignore
         # If this dimension of the tensor is larger than required, truncate it
         elif tensor.size(dim) > shape[dim]:
             index = [slice(None)] * len(shape)  # Start with all dimensions
             index[dim] = slice(0, shape[dim])  # Set the slice for this dimension
-            tensor = tensor[tuple(index)]
+            tensor = tensor[tuple(index)]  # type: ignore
 
     return tensor
 
@@ -70,7 +71,13 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
     Args:
         data (list): list (of lists (of lists))
         shape (tuple[int, ...]): Shape of the desired output tensor (TODO: automatically infer)
+
+    Notes:
+    - this is pretty brittle because it is so general
+    - passing in [torch.Tensor(), torch.LongTensor()] will yield a FloatTensor
     """
+    if len(shape) == 0 or shape[0] == 0:
+        raise ValueError("shape must have at least 1 dimension")
     if not is_sequence(data):
         raise ValueError("data must be a sequence")
     if isinstance(data, torch.Tensor):
@@ -79,14 +86,23 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
         return torch.zeros(shape)
 
     # array of tensors
-    if all(map(lambda d: isinstance(d, torch.Tensor), data)):
-        stacked = torch.stack([pad_or_truncate_to_size(d, shape[1:]) for d in data])
-        return pad_or_truncate_to_size(stacked, shape)
+    is_all_scalars = all(map(lambda d: is_scalar(d), data))
 
-    # 2d+ array
-    if is_sequence(data[0]) and len(shape[1:]) > 0:
-        tensor = torch.stack([array_to_tensor(d, shape[1:]) for d in data])
-        return pad_or_truncate_to_size(tensor, shape)
+    if not is_all_scalars and len(shape) > 1:
+        if all(map(lambda d: isinstance(d, torch.Tensor), data)):
+            stacked = torch.stack(
+                [
+                    pad_or_truncate_to_size(torch.Tensor(d), shape[1:])
+                    for d in data
+                    if not is_scalar(d)
+                ]
+            )
+            return pad_or_truncate_to_size(stacked, shape)
+
+        # 2d+ array
+        if is_sequence(data[0]):
+            tensor = torch.stack([array_to_tensor(d, shape[1:]) for d in data])
+            return pad_or_truncate_to_size(tensor, shape)
 
     # 1d
     if isinstance(data, np.ndarray):
@@ -147,3 +163,12 @@ def reverse_embedding(
     outputs = [get_encoding_idx_by_field(i) for i in range(len(weights))]
     output = torch.stack(outputs, dim=1)
     return output
+
+
+def is_scalar(d):
+    """
+    Returns True if d is a scalar (int, float, etc.)
+    """
+    is_tensor = isinstance(d, torch.Tensor) and (len(d.shape) == 0 or d.shape[0] == 0)
+    is_numpy_scalar = isinstance(d, np.number)
+    return is_tensor or is_numpy_scalar or isinstance(d, (int, float))

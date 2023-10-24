@@ -74,27 +74,36 @@ class TestUtils(unittest.TestCase):
             },
             {
                 "name": "test10",
-                "data": [[244, 389, 977]],
+                "data": [244, 389, 977],
                 "shape": (4,),
-                "expected": torch.Tensor(
-                    [0, 244, 389, 977],
-                ),  # TODO
+                # TODO
+                "expected": torch.LongTensor([0, 244, 389, 977]),
+            },
+            {
+                "name": "Test 11 - Zero sized child tensors",
+                "data": [torch.LongTensor([1, 2, 3]), torch.LongTensor()],
+                "shape": (1, 3),
+                "expected": torch.LongTensor([1, 2, 3]),
             },
         ]
 
         for test in test_conditions:
+            print("Starting test: ", test["name"])
             result = array_to_tensor(test["data"], test["shape"])
             is_equal = torch.all(torch.eq(test["expected"], result))
             if not is_equal:
-                print("Expected:", test["expected"], "Actual:", result)
+                print(
+                    "Expected for",
+                    test["expected"],
+                    "Actual:",
+                    result,
+                )
             self.assertTrue(is_equal)
 
             type_consistent = test["expected"].type() == result.type()
             if not type_consistent:
                 print(
-                    "Expected type for",
-                    test["name"],
-                    ":",
+                    "Expected type:",
                     test["expected"].type(),
                     "Actual type:",
                     result.type(),

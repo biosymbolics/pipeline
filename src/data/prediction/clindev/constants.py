@@ -32,14 +32,14 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    "conditions",  # typically only the specific condition
-    "mesh_conditions",  # normalized; includes ancestors
-    "interventions",
-]
-TEXT_FIELDS: list[str] = [
     # "conditions",  # typically only the specific condition
     # "mesh_conditions",  # normalized; includes ancestors
     # "interventions",
+]
+TEXT_FIELDS: list[str] = [
+    # "conditions",  # typically only the specific condition
+    "mesh_conditions",  # normalized; includes ancestors
+    "interventions",
 ]
 
 
