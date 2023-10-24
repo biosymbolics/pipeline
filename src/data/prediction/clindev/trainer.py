@@ -330,10 +330,6 @@ class ModelTrainer:
             y1_probs, batch.y1_true, category_sizes
         )
 
-        self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
-        )
-
         # decode outputs and verify a few
         outputs = decode_output(
             [y1.detach().to("cpu") for y1 in y1_probs_by_field],
@@ -354,6 +350,10 @@ class ModelTrainer:
             json.dumps(
                 sorted(comparison, key=lambda x: random.random())[0:1], indent=2
             ),
+        )
+
+        self.calculate_metrics(
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
 
     @staticmethod

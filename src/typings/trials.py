@@ -548,7 +548,19 @@ def __extract_timeframe(timeframe_desc: str) -> int:
     """
     Calculate outcome durations in days
     """
+    # choose the last
+    unit_re = "(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?"
+    digit_re = rf"(?:[0-9\.,]+|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve))"
+    digit_units_re = rf"\d+[ -]?{unit_re}"
+    units_digit_re = rf"\b{unit_re}[ -]?\d+(?:-\d+)?"  # weeks 1-12
     return 0
+
+
+"""
+select
+substring(time_frame, '(?i)(?:(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?[ -]?\d+|\d+[ -]?(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?)'),
+time_frame, actual_duration from outcomes, calculated_values cv where cv.nct_id=outcomes.nct_id limit 1000;
+"""
 
 
 def dict_to_trial_summary(trial: dict) -> TrialSummary:
