@@ -294,6 +294,7 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
     # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
     # update annotations set term=regexp_replace(term, ', human', '', 'i') where term ~* ', human$';
+    #####
     # update annotations set term=regexp_replace(term, 'modulat(?:ed?|ing|ion)$', 'modulator') where term ~* '\ymodulat(?:ed?|ing|ion)$';
     # update annotations set term=regexp_replace(term, 'activat(?:ed?|ing|ion)$', 'activator') where term ~* '\yactivat(?:ed?|ing|ion)$'; -- 0 recs
     # update annotations set term=regexp_replace(term, 'stimulat(?:ed?|ing|ion)$', 'stimulator') where term ~* '\ystimulat(?:ed?|ing|ion)$';
@@ -313,7 +314,18 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
     # update annotations set term=regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
     # update annotations set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
+    # update annotations set term=regexp_replace(term, '\s{1,}$', '', 'g') where term ~* '\s{1,}$';
     # leading "inhibiting" -> trailing "inhibitor"
+
+    # UPDATE trials
+    # SET interventions = sub.new_interventions
+    # FROM (
+    #   SELECT nct_id, array_agg(
+    #     regexp_replace(i, '\s{1,}$', '', 'g')
+    #   ) AS new_interventions
+    #   FROM trials, unnest(interventions) i group by nct_id
+    # ) sub
+    # where sub.nct_id=trials.nct_id
 
 
 if __name__ == "__main__":
