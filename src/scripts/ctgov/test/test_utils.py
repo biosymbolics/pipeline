@@ -4,7 +4,7 @@ from scripts.ctgov.utils import extract_timeframe
 
 
 class TestTrialUtils(unittest.TestCase):
-    def test_extract_timefraome(self):
+    def test_extract_timeframe(self):
         test_cases = [
             {
                 "time_frame_desc": "From Day 0 up to Year 2",

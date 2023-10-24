@@ -4,6 +4,7 @@ import logging
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
+from scripts.ctgov.utils import extract_max_timeframe
 from utils.classes import ByDefinitionOrderEnum
 
 logger = logging.getLogger(__name__)
@@ -477,6 +478,7 @@ class TrialSummary(BaseTrial):
     duration: int  # in days
     hypothesis_type: HypothesisType
     masking: TrialMasking
+    max_timeframe: int | None  # in days
     phase: TrialPhase
     purpose: TrialPurpose
     randomization: TrialRandomization
@@ -518,6 +520,7 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
         and "design" in trial
         and "hypothesis_type" in trial
         and "masking" in trial
+        and "max_timeframe" in trial
         and "purpose" in trial
         and "randomization" in trial
         and "termination_reason" in trial
@@ -544,25 +547,6 @@ def __calc_duration(start_date: date | None, end_date: date | None) -> int:
     return (end_date - start_date).days
 
 
-def __extract_timeframe(timeframe_desc: str) -> int:
-    """
-    Calculate outcome durations in days
-    """
-    # choose the last
-    unit_re = "(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?"
-    digit_re = rf"(?:[0-9\.,]+|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve))"
-    digit_units_re = rf"\d+[ -]?{unit_re}"
-    units_digit_re = rf"\b{unit_re}[ -]?\d+(?:-\d+)?"  # weeks 1-12
-    return 0
-
-
-"""
-select
-substring(time_frame, '(?i)(?:(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?[ -]?\d+|\d+[ -]?(?:second|s|hour|hr|day|d|week|wk|w|month|m|mon|year|yr)s?)'),
-time_frame, actual_duration from outcomes, calculated_values cv where cv.nct_id=outcomes.nct_id limit 1000;
-"""
-
-
 def dict_to_trial_summary(trial: dict) -> TrialSummary:
     """
     Get trial summary from db record
@@ -582,6 +566,7 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
             "comparison_type": ComparisonType.find(trial["arm_types"], design),
             "design": design,
             "duration": __calc_duration(trial["start_date"], trial["end_date"]),
+            "max_timeframe": extract_max_timeframe(trial["primary_outcomes"]),
             "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "masking": TrialMasking(trial["masking"]),
             "phase": TrialPhase(trial["phase"]),

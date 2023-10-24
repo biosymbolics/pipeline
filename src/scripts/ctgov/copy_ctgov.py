@@ -107,6 +107,7 @@ def ingest_trials():
         0 as duration,
         '' as comparison_type,
         '' as hypothesis_type,
+        '' as max_timeframe,
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason

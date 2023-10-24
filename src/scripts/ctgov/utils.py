@@ -32,9 +32,9 @@ time_in_days: dict = {
 }
 
 
-def extract_timeframe(timeframe_desc: str) -> int:
+def extract_timeframe(timeframe_desc: str) -> int | None:
     """
-    Calculate outcome durations in days
+    Extract outcome durations in days
     """
     unit_re = get_or_re(flatten(time_units.values()))
     digit_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve))"
@@ -73,8 +73,16 @@ def extract_timeframe(timeframe_desc: str) -> int:
             return None
         return round(max(v))
 
-    times = [calc_time(candidate) for candidate in timeframe_candidates]
+    times = compact([calc_time(candidate) for candidate in timeframe_candidates])
 
-    if len(compact(times)) == 0:
-        return 0
-    return max(compact(times))
+    return max(times) if len(times) > 0 else None
+
+
+def extract_max_timeframe(timeframe_descs: list[str]) -> int | None:
+    """
+    Returns the largest timeframe in days
+    """
+    times = compact(
+        [extract_timeframe(timeframe_desc) for timeframe_desc in timeframe_descs]
+    )
+    return max(times) if len(times) > 0 else None
