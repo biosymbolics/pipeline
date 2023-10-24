@@ -42,6 +42,10 @@ class TestTrialUtils(unittest.TestCase):
                 "time_frame_desc": "Duration of hospital stay (average 3.4 days)",
                 "expected": 4,
             },
+            # {
+            #     "time_frame_desc": "Entire duration, 1,200 days",
+            #     "expected": 1200,
+            # },
             {
                 "time_frame_desc": "Cycle 1 Day -3: Predose, 1, 2, 4, 6, 8, 10, 24, 48 and 72 hours (hr) postdose; Cycle 1 Day 28: Predose, 1, 2, 4, 6, 8, 10 and 24 hr postdose (Cycle 1 = 32 days)",
                 "expected": 32,  # TODO?
@@ -49,6 +53,14 @@ class TestTrialUtils(unittest.TestCase):
             {
                 "time_frame_desc": "At Day 15, 29, 43, 57, 71, 85, 99, 127 and 169",
                 "expected": 169,
+            },
+            {
+                "time_frame_desc": "At Day 10000, 15, 29, 43, 57, 71, 85, 99, 127 and 169",
+                "expected": 10000,
+            },
+            {
+                "time_frame_desc": "At Day 1, 999, 15, 29, 43, 57, 71, 85, 99, 127 and 169",
+                "expected": 999,
             },
         ]
 
