@@ -85,6 +85,12 @@ class TestUtils(unittest.TestCase):
                 "shape": (1, 3),
                 "expected": torch.LongTensor([1, 2, 3]),
             },
+            {
+                "name": "Test 12 - empty",
+                "data": [torch.Tensor()],
+                "shape": (1, 3),
+                "expected": torch.Tensor([0, 0, 0]),
+            },
         ]
 
         for test in test_conditions:

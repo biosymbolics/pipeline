@@ -82,14 +82,16 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
         raise ValueError("data must be a sequence")
     if isinstance(data, torch.Tensor):
         return data
-    if len(data) == 0:
+
+    is_all_scalars = all(map(lambda d: is_scalar(d), data))
+    is_all_tensors = all(map(lambda d: isinstance(d, torch.Tensor), data))
+
+    # if all tensors but also "scalars", it means they're empty (TODO: fix)
+    if len(data) == 0 or (is_all_tensors and is_all_scalars):
         return torch.zeros(shape)
 
-    # array of tensors
-    is_all_scalars = all(map(lambda d: is_scalar(d), data))
-
     if not is_all_scalars and len(shape) > 1:
-        if all(map(lambda d: isinstance(d, torch.Tensor), data)):
+        if is_all_tensors:
             stacked = torch.stack(
                 [
                     pad_or_truncate_to_size(torch.Tensor(d), shape[1:])
@@ -111,7 +113,11 @@ def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
         if all(map(lambda d: isinstance(d, int), data)):
             tensor = torch.LongTensor(data)
         else:
-            tensor = torch.Tensor(data)
+            try:
+                tensor = torch.Tensor(data)
+            except Exception as e:
+                logging.error("Error converting %s to tensor", data)
+                raise e
     else:
         raise ValueError(f"Unknown data type {type(data)}")
 
