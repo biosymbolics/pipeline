@@ -6,12 +6,12 @@ from typing import Sequence
 import torch
 import torch.nn.functional as F
 import numpy as np
-from utils.list import BATCH_SIZE, batch
+from utils.list import BATCH_SIZE, batch, is_sequence
 
 from typings.core import Primitive
 
 
-def pad_or_truncate_to_size(tensor: torch.Tensor, shape: tuple[int, ...]):
+def pad_or_truncate_to_size(_tensor: torch.Tensor, shape: tuple[int, ...]):
     """
     Pad or truncate a tensor to a given size
 
@@ -19,16 +19,30 @@ def pad_or_truncate_to_size(tensor: torch.Tensor, shape: tuple[int, ...]):
         tensor (torch.Tensor): Tensor to pad or truncate
         size (tuple[int, ...]): Size to pad or truncate to
     """
-    if len(tensor) == 0:
+    tensor = _tensor.clone()  # perf?
+
+    if tensor.size() == shape:
+        return tensor
+
+    if len(tensor.size()) == 0:
         return torch.zeros(shape)
-    # Make sure the size is correct
+
+    dim_delta = len(shape) - len(tensor.size())
+
+    # If the tensor is smaller than the required size, add dimensions
+    for _ in range(dim_delta):
+        tensor = tensor.unsqueeze(0)
+
+    # or larger, remove dimensions
+    if dim_delta < 0:
+        for _ in range(abs(dim_delta)):
+            tensor = tensor.squeeze(0)
+
+    # Confirm the size is correct
     if len(tensor.size()) != len(shape):
         logging.error(
-            "N dims must match (expected %s vs actual %s)",
-            shape,
-            tensor.size(),
+            "N dims must match (expected %s vs actual %s)", shape, tensor.size()
         )
-        print("Actual", tensor)
         raise ValueError("N dims must match")
 
     # For each dimension
@@ -45,7 +59,47 @@ def pad_or_truncate_to_size(tensor: torch.Tensor, shape: tuple[int, ...]):
             index = [slice(None)] * len(shape)  # Start with all dimensions
             index[dim] = slice(0, shape[dim])  # Set the slice for this dimension
             tensor = tensor[tuple(index)]
+
     return tensor
+
+
+def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
+    """
+    Turn a list (of lists (of lists)) into a tensor
+
+    Args:
+        data (list): list (of lists (of lists))
+        shape (tuple[int, ...]): Shape of the desired output tensor (TODO: automatically infer)
+    """
+    if not is_sequence(data):
+        raise ValueError("data must be a sequence")
+    if isinstance(data, torch.Tensor):
+        return data
+    if len(data) == 0:
+        return torch.zeros(shape)
+
+    # array of tensors
+    if all(map(lambda d: isinstance(d, torch.Tensor), data)):
+        stacked = torch.stack([pad_or_truncate_to_size(d, shape[1:]) for d in data])
+        return pad_or_truncate_to_size(stacked, shape)
+
+    # 2d+ array
+    if is_sequence(data[0]) and len(shape[1:]) > 0:
+        tensor = torch.stack([array_to_tensor(d, shape[1:]) for d in data])
+        return pad_or_truncate_to_size(tensor, shape)
+
+    # 1d
+    if isinstance(data, np.ndarray):
+        tensor = torch.from_numpy(data)
+    elif isinstance(data, list):
+        if all(map(lambda d: isinstance(d, int), data)):
+            tensor = torch.LongTensor(data)
+        else:
+            tensor = torch.Tensor(data)
+    else:
+        raise ValueError(f"Unknown data type {type(data)}")
+
+    return pad_or_truncate_to_size(tensor, shape)  # slow if np.array
 
 
 def batch_as_tensors(
@@ -59,41 +113,7 @@ def batch_as_tensors(
         batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
     """
     batches = batch(items, batch_size)
-    return [torch.tensor(batch) for batch in batches]
-
-
-def is_array_like(data: object) -> bool:
-    """
-    Check if data is array-like
-    """
-    if isinstance(data, Sequence):
-        return True
-    if type(data) == np.ndarray:
-        return True
-    return False
-
-
-def array_to_tensor(data: Sequence, shape: tuple[int, ...]) -> torch.Tensor:
-    """
-    Turn a list (of lists (of lists)) into a tensor
-
-    Args:
-        data (list): list (of lists (of lists))
-        shape (tuple[int, ...]): Shape of the desired output tensor (TODO: automatically infer)
-    """
-    if not is_array_like(data):
-        return torch.tensor(data)  # ??
-    if len(data) <= 0:
-        return torch.zeros(shape)
-
-    # all tensors
-    if all(map(lambda d: isinstance(d, torch.Tensor), data)):
-        stacked = torch.stack([pad_or_truncate_to_size(d, shape[1:]) for d in data])
-        return pad_or_truncate_to_size(stacked, shape)
-    if is_array_like(data[0]):
-        tensors = [array_to_tensor(d, shape[1:]) for d in data]
-        return torch.stack(tensors)
-    return pad_or_truncate_to_size(torch.tensor(data), shape)
+    return [torch.Tensor(batch) for batch in batches]
 
 
 def reverse_embedding(
@@ -122,7 +142,7 @@ def reverse_embedding(
             return encoding_idx
 
         distances = [get_encoding_idx(i) for i in range(field_select_slice.shape[0])]
-        return torch.tensor(distances).reshape(field_slice.size(0), field_slice.size(1))
+        return torch.Tensor(distances).reshape(field_slice.size(0), field_slice.size(1))
 
     outputs = [get_encoding_idx_by_field(i) for i in range(len(weights))]
     output = torch.stack(outputs, dim=1)

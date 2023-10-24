@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Sequence, TypeAlias, TypeVar
+from typing import Sequence, TypeAlias, TypeVar, cast
 from pydash import flatten
 import polars as pl
 from sklearn.calibration import LabelEncoder
@@ -14,9 +14,13 @@ from utils.list import is_sequence
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-OV = TypeVar("OV", bound=Sequence | npt.NDArray | int | float)
+# for decoding
+V = TypeVar("V", bound=Sequence | npt.NDArray | int | float)
+
 EncodeableData: TypeAlias = pl.Series | Sequence | npt.NDArray
 EncoderData: TypeAlias = pl.DataFrame | EncodeableData
+
+EncodedData = int | float | list[int | float]
 
 
 class Encoder:
@@ -69,7 +73,7 @@ class Encoder:
         logging.info("Saving encoder for %s to %s", self._field, self._file)
         dump(self._encoder, self._file)
 
-    def _df_to_values(self, df: pl.DataFrame) -> Sequence:
+    def _df_to_values(self, df: pl.DataFrame) -> list[EncodedData]:
         """
         Convert a dataframe to a list of values
         """
@@ -79,16 +83,15 @@ class Encoder:
         values = df.select(pl.col(self._field)).to_series().to_list()
         return values
 
-    def _encode_df(self, df: pl.DataFrame) -> Sequence:
-        return self._encode(self._df_to_values(df))  # .reshape(-1, 1))
+    def _encode_df(self, df: pl.DataFrame) -> list[EncodedData]:
+        return self._encode(self._df_to_values(df))
 
-    def _encode(self, values: EncodeableData) -> Sequence:
+    def _encode(self, values: EncodeableData) -> list[EncodedData]:
         """
-        Encode a categorical field from a dataframe
+        Encode values
 
         Args:
-            field (str): Field to encode
-            df (pl.DataFrame): Dataframe to encode from
+            values (EncodeableData): Values to encode
         """
 
         logger.info(
@@ -102,9 +105,9 @@ class Encoder:
         # if nested (list o' lists, at least one len > 1), encode each list separately
         if all([is_sequence(v) for v in values]) and any([len(v) > 1 for v in values]):
             logger.info("Treating %s as list o lists", self._field)
-            return [self._encoder.transform(v) for v in values]
+            return [self._encoder.transform(v).tolist() for v in values]
 
-        return self._encoder.transform(values)
+        return self._encoder.transform(values).tolist()
 
     def fit(self, values: EncoderData):
         """
@@ -120,7 +123,7 @@ class Encoder:
         self._encoder.fit(flatten(values))
         self.save()
 
-    def fit_transform(self, data: EncoderData) -> Sequence:
+    def fit_transform(self, data: EncoderData) -> list[EncodedData]:
         """
         Fit and transform a dataframe
         """
@@ -131,7 +134,7 @@ class Encoder:
 
         return encoded_values
 
-    def inverse_transform(self, val: OV) -> OV:
+    def inverse_transform(self, val: V) -> V:
         """
         Inverse transform a list of encoded value(s)
 

@@ -35,8 +35,6 @@ from utils.tensor import batch_as_tensors, array_to_tensor
 from .types import FieldLists, InputFieldLists, OutputFieldLists, is_all_fields_list
 
 
-DEFAULT_MAX_ITEMS_PER_CAT = 3
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -149,9 +147,22 @@ def encode_categories(
         get_encoder(field, directory, max_items_per_cat).fit_transform(df)
         for field in fields
     ]
+    encoded_dicts = [
+        namedtuple("FeatureTuple", fields)(*fv)._asdict() for fv in zip(*encodings_list)  # type: ignore
+    ]
 
+    # e.g. [[[413], [2]], [[436, 440], [2]]]
+    encoded_records = [
+        [
+            dict[field][0:max_items_per_cat] if is_list(dict[field]) else dict[field]
+            for field in fields
+        ]
+        for dict in encoded_dicts
+    ]
+
+    # .view(*encodings.shape[0:1], -1)
     encodings = array_to_tensor(
-        encodings_list,
+        encoded_records,
         (len(records), len(fields), max_items_per_cat),
     ).to(device)
 
@@ -241,9 +252,11 @@ def encode_quantitative_fields(
     for field in fields:
         df = df.with_columns(
             [
-                pl.col(field).map_batches(
+                pl.col(field)
+                .map_batches(
                     lambda v: pl.Series(BinEncoder(field, directory).fit_transform(v))
                 )
+                .alias(field)
             ]
         )
     return df.to_dicts()
@@ -293,7 +306,7 @@ def encode_features(
     records: Sequence[T],
     field_lists: FieldLists | InputFieldLists,
     directory: str,
-    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int,
     device: str = "cpu",
 ) -> tuple[ModelInput, CategorySizes | AllCategorySizes]:
     """
@@ -392,7 +405,7 @@ def _encode_and_batch_features(
     field_lists: FieldLists | InputFieldLists,
     batch_size: int,
     directory: str,
-    max_items_per_cat: int = DEFAULT_MAX_ITEMS_PER_CAT,
+    max_items_per_cat: int,
     device: str = "cpu",
 ) -> tuple[dict, dict]:
     """

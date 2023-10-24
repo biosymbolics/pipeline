@@ -17,7 +17,7 @@ BATCH_SIZE = 32  # DEFAULT_BATCH_SIZE
 DEVICE = "mps"
 EMBEDDING_DIM = 16
 LR = 1e-4
-MAX_ITEMS_PER_CAT = 10  # DEFAULT_MAX_ITEMS_PER_CAT
+MAX_ITEMS_PER_CAT = 8  # DEFAULT_MAX_ITEMS_PER_CAT
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
 SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
@@ -33,13 +33,13 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "conditions",  # typically only the specific condition
-    # "mesh_conditions",  # normalized; includes ancestors
-    # "interventions",
+    "mesh_conditions",  # normalized; includes ancestors
+    "interventions",
 ]
 TEXT_FIELDS: list[str] = [
     # "conditions",  # typically only the specific condition
-    "mesh_conditions",  # normalized; includes ancestors
-    "interventions",
+    # "mesh_conditions",  # normalized; includes ancestors
+    # "interventions",
 ]
 
 

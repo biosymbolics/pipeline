@@ -16,7 +16,7 @@ class ClinDevModelInputSizes:
 
     @property
     def text_output(self):
-        return round(self.text_input / 10)
+        return round(self.text_input / 40)
 
     @property
     def multi_select_output(self):
@@ -62,7 +62,7 @@ class ClinDevModelSizes(ClinDevModelInputSizes):
 
     @property
     def stage1_hidden(self):
-        return round(self.stage1_input * 0.3)
+        return round(self.stage1_input * 1.5)
 
     @property
     def stage2_input(self):
@@ -70,7 +70,7 @@ class ClinDevModelSizes(ClinDevModelInputSizes):
 
     @property
     def stage2_hidden(self):
-        return round(self.stage2_input * 0.1)
+        return round(self.stage2_input * 1.5)
 
     def __str__(self):
         return (

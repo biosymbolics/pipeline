@@ -102,7 +102,7 @@ class BinEncoder(Encoder):
 
         return winner
 
-    def _encode(self, values: npt.NDArray) -> list:
+    def _encode(self, values: npt.NDArray) -> npt.NDArray:
         """
         Encode a quant field
 
@@ -122,7 +122,7 @@ class BinEncoder(Encoder):
 
         encoded_values = self._encoder.transform(values)
 
-        return encoded_values.tolist()
+        return encoded_values
 
     def fit(self, values: npt.NDArray):
         """
@@ -159,7 +159,7 @@ class BinEncoder(Encoder):
 
     def fit_transform(
         self, values: Sequence[float | int] | pl.Series | npt.NDArray
-    ) -> list:
+    ) -> npt.NDArray:
         """
         Bins quantiative values, turning them into categorical
         @see https://scikit-learn.org/stable/auto_examples/preprocessing/plot_discretization_strategies.html

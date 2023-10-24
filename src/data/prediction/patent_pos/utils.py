@@ -89,7 +89,7 @@ def prepare_inputs(
         # TODO: enirch with pathways, targets, disease pathways
         embeddings, _ = encode_features(patents, gnn_categorical_fields)  # type: ignore
         x2 = resize_and_batch(embeddings, batch_size)
-        edge_index = [torch.tensor([i, i]) for i in range(len(patents))]
+        edge_index = [torch.Tensor([i, i]) for i in range(len(patents))]
         ei = batch_and_pad(edge_index, batch_size)
         # logging.info("X2: %s, EI %s", x2.size(), ei.size())
 

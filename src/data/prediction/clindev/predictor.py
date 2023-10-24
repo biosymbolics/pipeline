@@ -37,7 +37,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 15,
+        checkpoint_epoch: int = 20,
         device: str = DEVICE,
     ):
         """
@@ -95,7 +95,6 @@ class ModelPredictor:
                 directory=BASE_ENCODER_DIRECTORY,
             )
 
-        # TODO: brittle batch len
         predictions = [predict_batch(i) for i in range(len(records))]
         return predictions
 
@@ -132,7 +131,7 @@ if __name__ == "__main__":
         # "interventions": ["hydroxychloroquine"],
         "sponsor_type": "INDUSTRY",
         "phase": "PHASE_3",
-        "enrollment": 10000,
+        "enrollment": 1000,
         "start_date": 2024,
     }
 

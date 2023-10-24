@@ -3,7 +3,8 @@ Utils for lists/arrays
 """
 
 
-from typing import Mapping, Sequence, TypeVar, cast
+from typing import Mapping, Sequence, Type, TypeVar, cast
+import numpy as np
 from pydash import compact
 import polars as pl
 
@@ -86,5 +87,5 @@ def is_sequence(obj: object) -> bool:
         obj (object): object to check
     """
     return not isinstance(obj, str) and isinstance(
-        obj, (Sequence, list, tuple, pl.Series)
+        obj, (Sequence, list, tuple, pl.Series, np.ndarray)
     )

@@ -1,5 +1,6 @@
 from typing import Sequence, TypeAlias
 import logging
+import numpy as np
 import torch
 import numpy.typing as npt
 import polars as pl
@@ -19,7 +20,7 @@ TextEncoderData: TypeAlias = pl.DataFrame | Sequence | npt.NDArray
 
 class TextEncoder:
     def __init__(self, field, max_items_per_cat: int):
-        self.nlp = Spacy.get_instance(disable=["ner"])
+        self.nlp = Spacy.get_instance(disable=["ner"])  # TODO: use BioBert?
         self.max_items_per_cat = max_items_per_cat
         self.field = field
 
@@ -27,12 +28,14 @@ class TextEncoder:
         def get_tokens(val: str):
             # max_tokens x word_vector_length
             return torch.Tensor(
-                [token.vector for token in self.nlp(val[0:DEFAULT_MAX_STRING_LEN])]
+                np.array(
+                    [token.vector for token in self.nlp(val[0:DEFAULT_MAX_STRING_LEN])]
+                )
             )
 
         # max_items_per_cat x max_tokens x word_vector_length
         vectors = [get_tokens(v) for v in values][0 : self.max_items_per_cat]
-        max_tokens = max(map(len, vectors))
+        max_tokens = max([*map(len, vectors), 1])
         return max_tokens, array_to_tensor(
             vectors,
             (self.max_items_per_cat, max_tokens, WORD_VECTOR_LENGTH),
