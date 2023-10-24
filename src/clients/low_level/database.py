@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import logging
 import time
-from typing import Any, Callable, Mapping, TypeVar, TypedDict
+from typing import Any, Callable, Mapping, Sequence, TypeVar, TypedDict
 import logging
 
 from utils.list import batch
@@ -9,9 +9,9 @@ from utils.list import batch
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-T = TypeVar("T", bound=Mapping)
+M = TypeVar("M", bound=Mapping)
 ExecuteResult = TypedDict(
-    "ExecuteResult", {"columns": dict[str, str], "data": list[dict]}
+    "ExecuteResult", {"columns": dict[str, str], "data": Sequence[dict]}
 )
 
 
@@ -25,7 +25,7 @@ class DatabaseClient:
         raise NotImplementedError
 
     @abstractmethod
-    def execute_query(self, query: str, values: list = []) -> ExecuteResult:
+    def execute_query(self, query: str, values: Sequence = []) -> ExecuteResult:
         raise NotImplementedError
 
     @abstractmethod
@@ -33,14 +33,14 @@ class DatabaseClient:
         raise NotImplementedError
 
     @abstractmethod
-    def _insert(self, table_name: str, records: list[T]):
+    def _insert(self, table_name: str, records: Sequence[M]):
         raise NotImplementedError
 
     @abstractmethod
     def _create(
         self,
         table_name: str,
-        columns: list[str] | dict[str, str],
+        columns: Sequence[str] | Mapping[str, str],
     ):
         raise NotImplementedError
 
@@ -61,7 +61,7 @@ class DatabaseClient:
         """
         self.execute_query(create_table_query)
 
-    def select(self, query: str, values: list = []) -> list[dict]:
+    def select(self, query: str, values: Sequence = []) -> Sequence[dict]:
         """
         Execute a query and return the results as a list of dicts
         (must include provide fully qualified table name in query)
@@ -90,18 +90,18 @@ class DatabaseClient:
 
     def create_and_insert(
         self,
-        records: list[T],
+        records: Sequence[M],
         table_name: str,
-        columns: list[str] | dict[str, str] | None = None,
+        columns: Sequence[str] | Mapping[str, str] | None = None,
         truncate_if_exists: bool = True,
-        transform: Callable[[list[T]], list[T]] | None = None,
+        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
         batch_size: int = 1000,
     ):
         """
         Create a table and insert rows into it
 
         Args:
-            records (list[dict]): list of records to insert
+            records (Sequence[dict]): list of records to insert
             table_name (str): name of the table
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
@@ -113,17 +113,18 @@ class DatabaseClient:
 
     def insert_into_table(
         self,
-        records: list[T],
+        records: Sequence[M],
         table_name: str,
-        transform: Callable[[list[T]], list[T]] | None = None,
+        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
         batch_size: int = 1000,
     ):
         """
         Insert rows into a table from a list of records
 
         Args:
-            records (list[dict]): list of records to insert
+            records (Sequence[dict]): list of records to insert
             table_name (str): name of the table
+            transform (Callable[[Sequence[M]], Sequence[M]], optional): function to transform records before inserting. Defaults to None.
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
         batched = batch(records, batch_size)
@@ -138,7 +139,7 @@ class DatabaseClient:
     def create_table(
         self,
         table_name: str,
-        schema: list[str] | dict[str, str],
+        schema: Sequence[str] | Mapping[str, str],
         exists_ok: bool = True,
         truncate_if_exists: bool = False,
     ):

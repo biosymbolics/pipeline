@@ -1,15 +1,14 @@
 """
 To run after NER is complete
 """
-from functools import reduce
-import re
 import sys
 import logging
 from typing_extensions import NotRequired
-from typing import Literal, TypedDict
+from typing import Literal, Sequence, TypedDict
 from pydash import compact
 import polars as pl
 from spacy.tokens import Doc
+
 
 from system import initialize
 
@@ -27,11 +26,21 @@ from constants.patterns.intervention import (
 )
 from core.ner.cleaning import EntityCleaner
 from core.ner.spacy import Spacy
+from data.common.biomedical import (
+    expand_term,
+    expand_parens_term,
+    remove_trailing_leading as _remove_trailing_leading,
+    EXPAND_CONNECTING_RE,
+    POTENTIAL_EXPANSION_MAX_TOKENS,
+    TARGET_PARENS,
+    REMOVAL_WORDS_PRE,
+    REMOVAL_WORDS_POST,
+)
+from data.common.biomedical.types import WordPlace
 from utils.list import batch
 from utils.re import get_or_re
 
-from .constants import DELETION_TERMS, REMOVAL_WORDS_POST, REMOVAL_WORDS_PRE
-from .types import WordPlace
+from .constants import DELETION_TERMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -76,23 +85,6 @@ def remove_substrings():
     client.delete_table(temp_table)
 
 
-# e.g. '(sstr4) agonists', which NER has a prob with
-TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
-
-# no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
-EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
-# when expanding annotations, we don't want to make it too long
-EXPANSION_NUM_CUTOFF_TOKENS = 7
-# leave longer terms alone
-POTENTIAL_EXPANSION_MAX_TOKENS = 4
-
-EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
-EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
-
-# overrides POS, eg "inhibiting the expression of XYZ"
-EXPANSION_POS_OVERRIDE_TERMS = ["expression"]
-
-
 TermMap = TypedDict(
     "TermMap",
     {"original_term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
@@ -130,78 +122,7 @@ def expand_annotations(
     return _expand_annotations(batched)
 
 
-def _extract_parens_term(text: str, original_term: str) -> str | None:
-    """
-    Returns expanded term in cases like agonists -> (sstr4) agonists
-    TODO: typically is more like 'somatostatin receptor subtype 4 (sstr4) agonists'
-    """
-    possible_parens_term = re.findall(
-        f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
-    )
-
-    if len(possible_parens_term) == 0:
-        return None
-
-    return possible_parens_term[0]
-
-
-def _extract_expansion_term(original_term: str, text: str, text_doc: Doc) -> str | None:
-    """
-    Returns expanded term
-    Looks until it finds the next dobj or other suitable ending dep.
-    @see https://downloads.cs.stanford.edu/nlp/software/dependencies_manual.pdf
-
-    TODO:
-    -  CCONJ - this is sometimes valuable, e.g. inhibitor of X and Y
-    -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
-    """
-    s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
-
-    # shouldn't happen
-    if s is None:
-        logger.error("No term text in expansion: %s, %s", original_term, text)
-        return None
-
-    char_to_token_idx = {t.idx: t.i for t in text_doc}
-
-    # starting index of the string (we're only looking forward)
-    start_idx = char_to_token_idx.get(s.start())
-    end_idx = char_to_token_idx[s.end() - 1]
-
-    # check -1 in case of hyphenated term in text
-    # TODO: [number average molecular weight]×[content mass ratio] (content)
-    if start_idx is None:
-        start_idx = char_to_token_idx.get(s.start() - 1)
-
-    if start_idx is None:
-        logger.error("start_idx none for %s\n%s", original_term, text)
-        return None
-    doc = text_doc[start_idx:]
-
-    # syntactic subtree around the term
-    subtree = list([d for d in doc[0].subtree if d.i >= start_idx])
-    deps = [t.dep_ for t in subtree]
-
-    ending_idxs = [
-        deps.index(dep)
-        for dep in EXPANSION_ENDING_DEPS
-        # to avoid PRON (pronoun)
-        if dep in deps and subtree[deps.index(dep)].pos_ in EXPANSION_ENDING_POS
-        # don't consider if expansion contains "OR" or "AND" (tho in future we will)
-        and "cc" not in deps[end_idx : deps.index(dep)]  # TODO: use of end_idx untested
-        # eg "inhibiting the expression of XYZ"
-        and subtree[deps.index(dep)].text.lower() not in EXPANSION_POS_OVERRIDE_TERMS
-    ]
-    next_ending_idx = min(ending_idxs) if len(ending_idxs) > 0 else -1
-    if next_ending_idx > 0 and next_ending_idx <= EXPANSION_NUM_CUTOFF_TOKENS:
-        expanded = subtree[0 : next_ending_idx + 1]
-        expanded_term = "".join([t.text_with_ws for t in expanded]).strip()
-        return expanded_term
-
-    return None
-
-
-def _expand_annotations(batched_records: list[list[dict]]):
+def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
@@ -216,10 +137,10 @@ def _expand_annotations(batched_records: list[list[dict]]):
         text_doc = doc_map[publication_number]
 
         # check for hyphenated term edge-case
-        fixed_term = _extract_parens_term(record["text"], record["original_term"])
+        fixed_term = expand_parens_term(record["text"], record["original_term"])
 
         if not fixed_term:
-            fixed_term = _extract_expansion_term(original_term, text, text_doc)
+            fixed_term = expand_term(original_term, text, text_doc)
 
         if (
             fixed_term is not None
@@ -277,50 +198,7 @@ def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
         f"SELECT distinct original_term FROM {WORKING_TABLE} where length(original_term) > 1"
     )
     terms: list[str] = [r["original_term"] for r in records]
-    return _remove_trailing_leading(terms, removal_terms)
-
-
-def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlace]):
-    logger.info("Removing trailing/leading words")
-
-    def get_leading_trailing_re(place: str) -> re.Pattern | None:
-        WB = "(?:^|$|[;,.: ])"  # no dash wb
-        all_words = [t[0] + "s?[ ]*" for t in removal_terms.items() if t[1] == place]
-
-        if len(all_words) == 0:
-            return None
-
-        or_re = get_or_re(all_words, "+")
-        if place == "trailing":
-            final_re = rf"{WB}{or_re}$"
-        elif place == "conditional_trailing":
-            # e.g. to avoid "bio-affecting substances" -> "bio-affecting"
-            lbs = ["(?<!(?:the|ing|ed|ion))", r"(?<!\ba)", r"(?<!\ban)"]
-            lb = get_or_re(lbs)
-            final_re = rf"{lb}{WB}{or_re}$"
-        elif place == "leading":
-            final_re = rf"^{or_re}{WB}"
-        elif place == "conditional_all":
-            final_re = rf"(?<!(?:the|ing)){WB}{or_re}{WB}"
-        else:
-            final_re = rf"{WB}{or_re}{WB}"
-
-        return re.compile(final_re, re.IGNORECASE | re.MULTILINE)
-
-    # without p=p, lambda will use the last value of p
-    steps = [
-        lambda s, p=p, r=r: re.sub(get_leading_trailing_re(p), r, s)  # type: ignore
-        for p, r in {
-            "trailing": "",
-            "conditional_trailing": "",
-            "leading": "",
-            "all": " ",
-            "conditional_all": " ",
-        }.items()
-        if get_leading_trailing_re(p) is not None
-    ]
-
-    clean_terms = [reduce(lambda s, f: f(s), steps, term) for term in terms]
+    cleaned_term = _remove_trailing_leading(terms, removal_terms)
 
     _update_annotation_values(
         [
@@ -328,7 +206,7 @@ def _remove_trailing_leading(terms: list[str], removal_terms: dict[str, WordPlac
                 "original_term": original_term,
                 "cleaned_term": cleaned_term,
             }
-            for original_term, cleaned_term in zip(terms, clean_terms)
+            for original_term, cleaned_term in zip(terms, cleaned_term)
             if cleaned_term != original_term
         ]
     )
@@ -341,16 +219,16 @@ def clean_up_junk():
     logger.info("Removing junk")
 
     queries = [
-        # removes evertyhing after a newline
+        # removes everything after a newline (add to EntityCleaner?)
         rf"update {WORKING_TABLE} set original_term= regexp_replace(original_term, '\.?\s*\n.*', '') where  original_term ~ '.*\n.*'",
-        # unwrap
+        # unwrap (done in EntityCleaner too)
         f"update {WORKING_TABLE} "
         + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
         rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
         # orphaned closing parens
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) "
         + "where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
-        # leading/trailing whitespace
+        # leading/trailing whitespace (done in EntityCleaner too)
         rf"update {WORKING_TABLE} set original_term=trim(original_term) where trim(original_term) <> original_term",
     ]
     client = DatabaseClient()
@@ -443,7 +321,9 @@ def normalize_domains():
         f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
         f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
         f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
+        f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
+
     for sql in queries:
         client.execute_query(sql)
 
@@ -535,42 +415,31 @@ if __name__ == "__main__":
     """
     Checks:
 
+    select original_term, count(*) from biosym_annotations group by original_term order by count(*) desc limit 2000;
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930 -> 1,037,828)
+    (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 777,772)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138)
+    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138 -> 4,866,248)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690)
+    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690 -> 5,445,856)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'';
-    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403)
+    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403 -> 6,749,193)
     select domain, count(*) from biosym_annotations group by domain;
-    attributes | 3032462
-    compounds  | 1474950
-    diseases   |  829121
-    mechanisms | 1444346
-    --
     attributes | 3721861
     compounds  | 2572389
     diseases   |  845771
     mechanisms | 4225243
+    ------------+---------
+    attributes | 3721861
+    compounds  | 2332852
+    diseases   |  810242
+    mechanisms | 3606099
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493)
+    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493 -> 21,758)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696)
+    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696 -> 55,104)
     select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443)
-
-
-    alter table terms ADD COLUMN id SERIAL PRIMARY KEY;
-    DELETE FROM terms
-    WHERE id IN
-        (SELECT id
-        FROM#
-            (SELECT id,
-            ROW_NUMBER() OVER( PARTITION BY original_term, domain, character_offset_start, character_offset_end, publication_number
-            ORDER BY id ) AS row_num
-            FROM terms ) t
-            WHERE t.row_num > 1 );
+    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443 -> 119,331)
     """
     if "-h" in sys.argv:
         print(

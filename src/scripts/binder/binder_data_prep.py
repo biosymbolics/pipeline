@@ -32,8 +32,13 @@ def get_annotations():
     client = PsqlDatabaseClient()
     query = """
         SELECT
-        ARRAY[concat(title, '\n', abstract), concat(abstract, '\n', title)] as text, -- both title + abs and abs + title to improve generalizability
-        ARRAY[concat(s.publication_number, '-1'), concat(s.publication_number, '-2')] as publication_number, original_term as term, domain
+        (
+            CASE WHEN RANDOM() > 0.49
+            THEN concat(title, '\n', abstract)
+            ELSE concat(abstract, '\n', title)
+            END
+        ) as text, -- switch title + abs and abs + title to improve generalizability
+        s.publication_number as publication_number, original_term as term, domain
         FROM
         (
             select publication_number, array_agg(distinct domain) as domains
@@ -47,13 +52,16 @@ def get_annotations():
         where b_anns.publication_number = apps.publication_number
         AND s.publication_number = apps.publication_number
         AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
+        AND not array_to_string(ipc_codes, ',') ~ '.*C01.*'
         and 'mechanisms' = any(s.domains)
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
-        order by apps.publication_number
+        and domain in ('compounds', 'diseases', 'mechanisms')
+        order by RANDOM()
     """
     records = client.select(query)
-    df = pl.DataFrame(records).explode("text", "publication_number")
+    logger.info("Got % s annotations", len(records))
+    df = pl.DataFrame(records)  # .explode("text", "publication_number")
     return df
 
 
@@ -213,13 +221,6 @@ def create_binder_data():
     return format_into_binder(df, tokenizer)
 
 
-def main():
-    """
-    Create training data for binder model
-    """
-    create_binder_data()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
@@ -230,4 +231,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    create_binder_data()

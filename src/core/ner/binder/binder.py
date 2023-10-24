@@ -34,8 +34,7 @@ class BinderNlp:
         device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info("Loading torch model from: %s", model_file)
-        self.model = torch.load(model_file)
-        self.model.to(device)
+        self.model = torch.load(model_file).to(device)
         self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
         self.nlp = Spacy.get_instance()
 

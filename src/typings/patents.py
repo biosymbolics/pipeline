@@ -19,7 +19,6 @@ class PatentBasicInfo(TypedDict):
     ipc_codes: list[str]
     patent_years: int
     priority_date: date
-    # publication_date: date
     publication_number: str
     score: float
     title: str
@@ -34,10 +33,6 @@ class PatentApplication(PatentBasicInfo):
     compounds: list[str]
     country: str
     diseases: list[str]
-    genes: list[str]  # remove?
-    embeddings: list[float]
-    # grant_date: date
-    # filing_date: date
     inventors: list[str]
     last_trial_status: str
     last_trial_update: date
@@ -45,7 +40,6 @@ class PatentApplication(PatentBasicInfo):
     mechanisms: list[str]
     nct_ids: list[str]
     similar_patents: list[str]
-    top_terms: list[str]  # from GPR table
 
 
 class ApprovedPatentApplication(PatentApplication):

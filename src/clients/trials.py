@@ -1,5 +1,6 @@
 import time
 import logging
+from typing import Sequence
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from typings.trials import TrialSummary, is_trial_summary_list
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
+def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
     """
     Fetch all trial summaries by status
 
@@ -25,6 +26,8 @@ def fetch_trials(status: str, limit: int = 2000) -> list[TrialSummary]:
         AND duration > 0
         AND purpose = 'TREATMENT'
         AND array_length(conditions, 1) > 0
+        AND array_length(mesh_conditions, 1) > 0
+        AND mesh_conditions[1] is not null
         AND array_length(interventions, 1) > 0
         AND design not in ('UNKNOWN', 'FACTORIAL', 'SEQUENTIAL') -- rare (TODO: remove)
         AND randomization not in ('UNKNOWN') -- rare

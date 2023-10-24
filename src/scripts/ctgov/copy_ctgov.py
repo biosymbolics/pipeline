@@ -3,15 +3,22 @@ Utils for copying approvals data
 """
 import sys
 import logging
+from typing import Sequence
+from pydash import flatten
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from core.ner.ner import NerTagger
+from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
-from typings.trials import get_trial_summary
+from data.common.biomedical import (
+    remove_trailing_leading,
+    REMOVAL_WORDS_POST as REMOVAL_WORDS,
+)
+from typings.trials import TrialSummary, dict_to_trial_summary
+from utils.list import dedup
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -53,19 +60,38 @@ MULI_FIELDS_SQL = [
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
-def transform_ct_records(ctgov_records: list[dict], tagger: NerTagger):
+def transform_ct_records(
+    ctgov_records: Sequence[dict], tagger: NerTagger
+) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
     Slow due to intervention mapping!!
 
     - normalizes/extracts intervention names
     - normalizes status etc.
+
+    good check:
+    select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    # intervention_sets: list[list[str]] = [rec["interventions"] for rec in ctgov_records]
-    # logger.info("Extracting intervention names for %s (...)", intervention_sets[0:10])
-    # normalized = tagger.extract_strings([dedup(i_set) for i_set in intervention_sets])
-    return [{**get_trial_summary(rec)} for rec in ctgov_records]
+    intervention_sets = [rec["interventions"] for rec in ctgov_records]
+    uniq_interventions = dedup(flatten(intervention_sets))
+    logger.info(
+        "Extracting intervention names for %s strings (e.g. %s)",
+        len(uniq_interventions),
+        uniq_interventions[0:10],
+    )
+    norm_map = tagger.extract_string_map(uniq_interventions)
+
+    def normalize_interventions(interventions: list[str]):
+        return flatten([norm_map.get(i) or i for i in interventions])
+
+    return [
+        dict_to_trial_summary(
+            {**rec, "interventions": normalize_interventions(rec["interventions"])}
+        )
+        for rec in ctgov_records
+    ]
 
 
 def ingest_trials():
@@ -107,7 +133,13 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    tagger = NerTagger(entity_types=frozenset(["compounds", "mechanisms"]), link=False)
+    tagger = NerTagger(
+        entity_types=frozenset(["compounds", "mechanisms"]),
+        link=True,
+        additional_cleaners=[
+            lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
+        ],
+    )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -116,7 +148,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),
+        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
     )
     # TODO: alter table trials alter column interventions set data type text[];
 
@@ -155,6 +187,9 @@ def ingest_trials():
 def create_patent_to_trial():
     """
     Create table that maps patent applications to trials
+
+    NOTE: we're currently doing some post-hoc term adjustments on annotations,
+    and this must be run before.
     """
     client = PsqlDatabaseClient()
     att_query = """
@@ -162,8 +197,7 @@ def create_patent_to_trial():
         from trials t,
         aggregated_annotations a,
         applications p
-        where a.publication_number=a.publication_number
-        AND p.publication_number=a.publication_number
+        where p.publication_number=a.publication_number
         AND t.normalized_sponsor = any(a.terms) -- sponsor match
         AND t.interventions::text[] && a.terms -- intervention match
         AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
@@ -191,18 +225,14 @@ def copy_ctgov():
     create_patent_to_trial()
 
 
-def main():
-    copy_ctgov()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-              Usage: python3 -m scripts.ctgov.copy_ctgov
-              Copies ctgov to patents
+            Usage: python3 -m scripts.ctgov.copy_ctgov
+            Copies ctgov to patents
         """
         )
         sys.exit()
 
-    main()
+    copy_ctgov()

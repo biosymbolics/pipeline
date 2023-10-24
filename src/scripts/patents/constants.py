@@ -1,199 +1,19 @@
 from constants.patterns.device import DEVICE_RES
-from constants.patterns.intervention import (
-    COMPOUND_BASE_TERMS_GENERIC,
-    INTERVENTION_PREFIXES_GENERIC,
-)
 
-from .types import WordPlace
-
-REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
-    **{k: "leading" for k in INTERVENTION_PREFIXES_GENERIC},
-    "such": "all",
-    "method": "all",
-    "obtainable": "all",
-    "different": "all",
-    "-+": "leading",
-    "stable": "all",
-    "various": "all",
-    "the": "leading",
-    "example": "all",
-    "unwanted": "leading",
-    "comprised?": "all",
-    "contagious": "leading",
-    "recognition": "trailing",
-    "binding": "trailing",
-    "prevention": "leading",
-    "that": "trailing",
-    "discreet": "all",
-    "properties": "trailing",
-    "administration(?: of)?": "all",
-    "treatment(?: of)?": "all",
-    "derived": "all",
-    "library": "all",
-    "more": "leading",
-    "technique": "trailing",
-    "classic": "all",
-    "present": "leading",
-    "invention": "all",
-    "various": "leading",
-    "construct": "trailing",
-    "particular": "all",
-    "uses(?: thereof| of)": "all",
-    "designer": "all",
-    "obvious": "leading",
-    "thereof": "all",
-    "specific": "all",
-    "in": "leading",
-    "more": "leading",
-    "a": "leading",
-    "non[ -]?toxic": "leading",
-    "(?:non )?selective": "leading",
-    "adequate": "leading",
-    "improv(?:ed|ing)": "all",
-    r"\b[(]?e[.]?g[.]?,?": "all",
-    "-targeted": "all",
-    "long[ -]?acting": "leading",
-    "other": "leading",
-    "more": "leading",
-    "of": "trailing",
-    "symptom": "trailing",
-    "condition": "trailing",
-    "be": "trailing",
-    "use": "trailing",
-    "efficacy": "all",
-    "pharmaceutical compositions?(?: comprising)?": "all",
-    "therapeutic procedure": "all",
-    "therefor": "all",
-    "(?:co[ -]?)?therapy": "trailing",
-    "(?:pharmaceutical |chemical )?composition": "trailing",
-    "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
-    "treating": "all",
-    "contact": "trailing",
-    "portion": "trailing",
-    "intermediate": "all",
-    "suitable": "all",
-    "and uses thereof": "all",
-    "procedure": "all",  # TODO
-    "relevant": "all",
-    "patient": "all",
-    "thereto": "all",
-    "against": "trailing",
-    "other": "leading",
-    "use of": "leading",
-    "certain": "all",
-    "working": "leading",
-    "on": "trailing",
-    "in(?: a)?": "trailing",
-    "(?: ,)?and": "trailing",
-    "and ": "leading",
-    "the": "trailing",
-    "with": "trailing",
-    "of": "trailing",
-    "for": "trailing",
-    "=": "trailing",
-    "unit(?:[(]s[)])?": "trailing",
-    "measur(?:ement|ing)": "all",
-    # "system": "trailing", # CNS?
-    "[.]": "trailing",
-    "analysis": "all",
-    "management": "all",
-    "accelerated": "all",
-    "below": "trailing",
-    "diagnosis": "all",
-    "fixed": "leading",
-    "pharmacological": "all",
-    "acquisition": "all",
-    "production": "all",
-    "level": "trailing",
-    "processing(?: of)?": "all",
-    "lead candidate": "all",
-    "control": "trailing",
-    "variant": "trailing",
-    "variet(?:y|ie)": "trailing",
-    "famil(?:y|ie)": "trailing",
-    "(?:pharmaceutically|physiologically) (?:acceptable |active )?": "leading",
-    "based": "trailing",
-    "an?": "leading",
-    "active": "all",
-    "wherein": "all",
-    "additional": "all",
-    "additive": "all",
-    "advantageous": "all",
-    "aforementioned": "all",
-    "aforesaid": "all",
-    "efficient": "all",
-    "first": "all",
-    "second": "all",
-    "(?:ab)?normal": "all",
-    "inappropriate": "all",
-    "compounds as": "all",
-    "formula [(][ivxab]{1,3}[)]": "trailing",
-    "is": "leading",
-    "engineered": "leading",
-    "engineered": "trailing",
-    "medicament": "all",
-    "medicinal": "all",
-    "sufficient": "all",
-    "due": "trailing",
-    "locate": "all",
-    "specification": "all",
-    "detect": "all",
-    "similar": "all",
-    "contemplated": "all",
-    "predictable": "all",
-    "dos(?:e|ing|age)": "leading",
-    "conventional": "leading",
-    "contemplated": "all",
-    "is indicative of": "all",
-    "via": "leading",
-    "effect": "trailing",
-    "level": "trailing",
-    "disclosed": "all",
-    "wild type": "all",  # TODO
-    "(?:high|low)[ -]?dos(?:e|ing|age)": "all",
-    "effects of": "all",
-    "soluble": "leading",
-    "competitive": "leading",
-    "activatable": "all",
-    # "type": "leading", # type II diabetes
-    # model/source
-    "murine": "all",
-    "monkey": "all",
-    "non[ -]?human": "all",
-    "primate": "all",
-    "mouse": "all",
-    "mice": "all",
-    "human": "all",  # ??
-    "rat": "all",
-    "rodent": "all",
-    "rabbit": "all",
-    "porcine": "all",
-    "bovine": "all",
-    "equine": "all",
-    "mammal(?:ian)?": "all",
-}
-
-REMOVAL_WORDS_POST: dict[str, WordPlace] = {
-    **dict(
-        [
-            (t, "conditional_trailing")
-            for t in [
-                *COMPOUND_BASE_TERMS_GENERIC,
-                "activity",
-                "agent",
-                "effect",
-                "pro[ -]?drug",
-            ]
-        ]
-    ),
-    **REMOVAL_WORDS_PRE,
-}
 
 DELETION_TERMS = [
     *DEVICE_RES,
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "acid addition salt",
+    "potentially useful",
+    "above protein",
+    "operating same",
+    "device capable",
+    "compounds for the",
+    "pre[ -]?treatment",
+    "enhancing the",
     "non-overlapping double-stranded regions separated",  # ??
     "(?:.* )? capable",  # material capable, etc
     "salt as an",
@@ -206,7 +26,7 @@ DELETION_TERMS = [
     "light[ -]?receiving",
     "resultant",
     "optionally other",
-    "above[ -]?mentioned",
+    "above[ -]?(?: mentioned)?",
     ".* of",
     ".* comprising",
     ".* tubular",
@@ -237,8 +57,11 @@ DELETION_TERMS = [
     "embodiment",
     "least partial",
     "reform",
-    "conformat",
+    "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "oxide",
+    "agricultural",
+    "system",
     "receptor",
     "product .*",
     "pathogen(?:ic)?",
@@ -252,7 +75,7 @@ DELETION_TERMS = [
     "medical purpose",
     "cell membrane",
     "(?:.* )?part",
-    "(?:product|reaction) mixture",  # single dose
+    "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system|medium)",
     "(?:.* )?activit",
     "(?:.* )?member",
     "module",
@@ -261,6 +84,7 @@ DELETION_TERMS = [
     "operator",
     "field of .*",
     # thing (unwanted because wrong type of thing)
+    "(?:.* )?food",
     "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
@@ -303,7 +127,8 @@ DELETION_TERMS = [
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
     "(?:.* )?reaction",
-    "(?:.* )?cosmetic",
+    "(?:.* )?cosmetic.*",  # may re-enable in the future
+    "(?:.* )?hair condition",  # may re-enable in the future
     "(?:.* )?fragrance",
     "silica",
     "perfum",
@@ -312,7 +137,7 @@ DELETION_TERMS = [
     "(?:.* )?location",
     "(?:.* )?mode",
     "(?:.* )?region",
-    "(?:tumou?r|eukaryotic|live|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?) cell",
+    "(?:tumou?r|eukaryotic|liv(?:e|ing)|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?|plant|cultur(?:ing|ed?)|individual) cell",
     "virus",  # generic
     "titanium dioxide",
     "microorganism",
@@ -323,32 +148,26 @@ DELETION_TERMS = [
     "(?:.* )?layer",
     "(?:.* )?surface",  # device?
     # effect
-    "deactivat",
+    "cell growth",
+    "clean",  # cleaning
     "friction",
     "compressive force",
     "correcting dysfunction",
     # "bleaching",
     "vibrat",
-    "moisturi[zs]",
     "induc(?:es?d?|ing) differentiation",
     "cool",
     "connect",
     "deterioration",
     "detrimental",
-    "(?:.* )?absorb",
     "(?:.* )?disengage",
     "adjustment",
-    "lubricat",
-    "chain transfer",
     "(?:.* )?abrasive",
     "(?:.* )?retardancy",  # e.g. flame retardant
     "film[ -]?form",
     "heat transfer",
-    # "nucleating",
     "cell death",
     "deformable",
-    "(?:.* )?growth",  # TODO: disease?
-    "(?:.* )?resistance",
     "(?:.* )?addition",
     "ameliorat",
     "transformant",
@@ -371,6 +190,8 @@ DELETION_TERMS = [
     "(?:.* )?appendage",
     "(?:.* )?ventricle",
     "(?:.* )?aorta",
+    "(?:.* )?nostril",
+    "(?:.* )?nose",
     "(?:.* )?intervertebral disc",
     "(?:.* )?mucosa",
     "(?:.* )?retina",
@@ -386,7 +207,6 @@ DELETION_TERMS = [
     "(?:.* )?obturator",
     "(?:.* )?atrium",
     "tibial?",
-    "transdermal",
     "(?:.* )?femur",
     "(?:.* )?core",  # device
     "(?:.* )?vesicle",
@@ -445,6 +265,8 @@ DELETION_TERMS = [
     "venous",
     "lymph(?:atic)?(?: node| vessel)?",
     # category errors
+    "formability",
+    "(?:fe)?male",
     "(?:.*)?dimensional",
     "pathological",
     "consideration",
@@ -482,6 +304,18 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "(?:.* )?period",  # never used for menstruation
+    "integrated system",
+    "renewable resource",
+    "pillar",
+    "conditioned medium",
+    "potential difference",
+    "addition salt",
+    "layered product",
+    "indicia",
+    "addition salt",
+    "salt of the compound",  # TODO: possible noun exception
+    "starting material",
     "multi[- ]?component",
     "discret",  # discrete
     "problem",
@@ -504,8 +338,7 @@ DELETION_TERMS = [
     "piece",
     "attribute",
     "preform",
-    "DNA sequence",
-    "(?:medical|treatment|operation) (?:fluid|zone|container|section|technology)",
+    "(?:medical|treatment|operation|reaction) (?:fluid|zone|container|section|technology)",
     "object",
     "(?:drug )?target",
     "biologically active",
@@ -530,6 +363,11 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
+    "hydrophobic",
+    "serum-free",
+    "moldability",
+    "cellulosic",
+    "transgenic",
     "utility",
     "detachabl",
     "proximal",
@@ -561,6 +399,8 @@ DELETION_TERMS = [
     "substantially free",
     "therapeutically active",
     # characteristics / descriptors
+    "minimally invasive",
+    "adhesiveness",
     "helical",
     "ingestibl",
     "humaniz",  # humanized
@@ -571,7 +411,7 @@ DELETION_TERMS = [
     "solubilit",
     "(?:.* )?refractive index",
     "uniform(?:it)?",
-    "(?:non[ -]?)?conductive",
+    "(?:.* )?conductive",
     "granular",
     "luminescent",
     "(?:.* )?bound",
@@ -615,38 +455,16 @@ DELETION_TERMS = [
     "optionally substitut",
     "non[ -]?invasive",
     "reinforc",
-    "(?:.* )?chain",
     "aqueous",
-    "(?:.* )?bond",
     "concentration",
-    "(?:.* )?conductive",
-    "(?:.* )?recombinant",
-    "(?:.* )?genetic",
     "(?:.* )?acidic",
     "(?:.* )?unsubstituted",
-    "(?:.* )?gaseous",
-    "(?:.* )?aromatic",
-    "(?:.* )?conjugated",
-    "(?:.* )?polymeric",
-    "(?:.* )?polymerizable",
-    "(?:.* )?oligomeric",
     "(?:.* )?synergistic",
-    "(?:.* )?immunogenic",
-    "(?:.* )?amphiphilic",
-    "(?:.* )?macrocyclic",
-    "(?:.* )?elastic",
-    "(?:.* )?catalytic",
     "(?:.* )?hydrophilic",
-    "(?:.* )?ophthalmic",
-    "(?:.* )?heterocyclic",
-    "(?:.* )?hydrophobic",
-    "(?:.* )?enzymatic",
-    "(?:.* )?lipophilic",
     "(?:.* )?biodegradabilit",
     "(?:.* )?affinity",
     "(?:.* )?residual",
     "(?:.* )?rigid",
-    "(?:.* )?cyclic",
     "(?:.* )?adverse",
     # physical process
     "elut",  # elution
@@ -680,7 +498,7 @@ DELETION_TERMS = [
     "(?:.* )?strength",
     "(?:.* )?population",
     "(?:.* )?end",
-    "(?:.*[ -])?temperatures?(?: range|high(?:er)?)?",
+    "(?:.*[ -])?temperatures?(?: range|high(?:er)?|low(?:er)?)?",
     "(?:.* )?ratio",
     "(?:.* )?deliver",
     "(?:.* )?step",
@@ -696,6 +514,13 @@ DELETION_TERMS = [
     "intravenous",
     "subcutaneous",
     "topical",
+    "(?:trans|intra)dermal",
+    "oral",
+    "rectal",
+    "vaginal",
+    "intrathecal",
+    "intraocular",
+    "intraperitoneal",
     # intangible thing
     "(?:.* )?concept",
     "(?:.* )?data",
@@ -708,25 +533,37 @@ DELETION_TERMS = [
     "(?:.* )?longitudinal",
     "(?:.* )?equivalent",
     "(?:.* )?subset",
-    "time period",
     "(?:.* )?memory",
-    # material
+    # food
+    "(?:.* )?fermentation",
+    # material or materials
     "(?:.* )?metal",
+    "cobalt",
+    "block copolymer",
+    "chromium",
+    "polymerizable",
+    "(?:.* )?metal oxide",
+    "(?:.* )?graphite",
+    "(?:.* )?graphene(?: oxide)?",
+    "(?:.* )?metal",  # temporary?
     # non-medical procedure or process"
     "session",
     "wash",
     "solid-liquid separation",
     "mix",
-    # "pattern form",  # pattern forming
+    "pattern form",  # pattern forming
     "crystallizat",
     "quantitat",
     "(?:administrative )?procedure",
     "support (?:.*)",  # ??
     "(?:.* )?communicat",
     "(?:.* )?sequenc",
-    # "thermoset",  # thermosetting
     "(?:.* )?(?:micro)?process",
     # procedure
+    "(?:.* )?procedure",
+    "(?:.* )?technique",
+    "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",
+    "root canal",
     "punctur",  # puncture
     "transplant(?:at)",  # transplantation
     "(?:.* )?electrolysis",
@@ -746,38 +583,51 @@ DELETION_TERMS = [
     "sealant",
     "microelectronic",
     # agtech
+    "feed(?: material|substance)?",
     "pest control",
     "(?:.* )?feedstock",
     "(?:.* )?biomass",
     "(?:.* )?agrochemical",
-    "(?:.* )?herbicid(?:e|al)(?: activity)?",
-    "(?:.* )?insecticid(?:e|al)(?: activity)?",
-    "(?:.* )?biocid(?:e|al)(?: activity)?",
-    "(?:.* )?fungicid(?:e|al)(?: activity)?",
-    "(?:.* )?pesticid(?:e|al)(?: activity)?",
-    "(?:.* )?plant",
+    "(?:.* )?herbicid(?:e|al)(?: .*)?",
+    "(?:.* )?insecticid(?:e|al)(?: .*)?",
+    # "(?:.* )?biocid(?:e|al)(?: .*)?", # could be biomedical
+    # "(?:.* )?fungicid(?:e|al)(?: .*)?",  # could be biomedical
+    "(?:.* )?pesticid(?:e|al)(?: .*)?",
+    "(?:.* )?plant(?: cell)?",
     "drought tolerance",
     "biofuel",
     "biodiesel",
     "plant growth regulator",
     # end agtech
     # start industrial
+    "coating composition",
+    "carboxylic acid",  # maybe keep?
+    "heat resistance",
+    "methanol",
+    "methane",
+    "phosphate",
+    "thermoset",  # thermosetting
+    "solvent system",
+    "biodegradable polymer",
     "corros",  # corrosion
     "asphalt",
     "heat exchang",
     "carbon black",
     "(?:.* )?composite",
     "(?:.* )?manufactur",
-    "(?:.* )?graphite",
-    "(?:.* )?metal",  # temporary?
-    "palladium",
-    "cobalt",
     "propane",
     "(?:.* )?energy",
-    "electric(?:al) .*",
+    "electric(?:al)(?:ly)?.*",
     "formaldehyde",  # ??
+    "metal catalyst",
+    "styrene",
+    "curing agent",
+    "carbon dioxide",
+    "isocyanate",
+    "hydrogen",  # industrial
     "aromatic ring",  # industrial
     "polymer matrix",  # industrial
+    "(?:quaternary )?ammonium",
     "polyolefin",  # industrial
     "polyisocyanate",  # industrial
     "alkaline",  # industrial
@@ -798,6 +648,7 @@ DELETION_TERMS = [
     "(?:.* )?contrast",
     "(?:.* )?screen",
     "(?:.* )?media",
+    "imaging agent",
     "(?:.* )?culture",
     "(?:.* )?polymerase chain reaction",
     "(?:.* )?test(?:ing)?",
@@ -805,10 +656,186 @@ DELETION_TERMS = [
     "(?:.* )?diagnostic",
     "(?:.* )?diagnosis",
     "(?:.* )?analyt",  # analyte
-    "reaction (?:vessel|mixture)",
     "(?:.* )?assay",
     "(?:.* )?microarray",
     "prognosticat",
     "(?:.* )?scopy" "(?:.* )?reagent",
     # end diagnostic
 ]
+
+TEXT_FIELDS = frozenset(["title", "abstract"])
+APPLICATIONS_TABLE = "applications"
+ANNOTATIONS_TABLE = "annotations"
+GPR_ANNOTATIONS_TABLE = "gpr_annotations"
+GPR_PUBLICATIONS_TABLE = "gpr_publications"
+
+
+ADHD = "Attention Deficit Hyperactivity Disorder"
+ARTICULATION_DISORDER = "Articulation Disorder"
+AMNESTIC_DISORDER = "Amnestic Disorder"
+ANAESTHESIA = "Anaesthesia"
+ANEMIA = "Anemia"
+ANXIETY = "Anxiety"
+ASPERGERS = "Aspergers"
+AUTISM = "Autism"
+BDI = "Bipolar I Disorder"
+BDII = "Bipolar II Disorder"
+BIPOLAR = "Bipolar Disorder"
+BODY_DYSMORPHIA = "Body Dysmorphic Disorder"
+BPD = "Borderline Personality Disorder"
+BRIEF_PSYCHOTIC_DISORDER = "Brief Psychotic Disorder"
+CELIAC = "Celiac Disease"
+CYCLOTHYMIA = "Cyclothymia"
+DEPRESSION = "Mental Depression"  # mental depression due to UMLS
+DEVELOPMENTAL_DISORDER = "Developmental Disorder"
+DELUSION = "Delusion"
+DIARRHEA = "Diarrhea"
+DYSTHYMIA = "Dysthymia"
+EATING_DISORDER = "Eating Disorder"
+GERD = "Gastroesophageal Reflux Disease"
+GENERALIZED_ANXIETY_DISORDER = "Generalized Anxiety Disorder"
+HEMATOLOGICAL_DISORDER = "Hematological Disorder"
+HYPERSENSITIVITY = "Hypersensitivity"
+INTERMITTENT_EXPLOSIVE_DISORDER = "Intermittent Explosive Disorder"
+ISCHEMIA = "Ischemia"
+MENTAL_DISORDER = "Mental Disorder"
+MIGRAINE = "Migraine"
+MOTOR_NEURON_DISEASE = "Motor Neuron Disease"
+MOOD_DISRDER = "Mood Disorder"
+NEURODEVELOPMENTAL_DISORDER = "Neurodevelopmental Disorder"
+NPD = "Narcissistic Personality Disorder"
+DISSASOCIATIVE_IDENTITY_DISORDER = "Dissociative identity disorder"
+NEUROSIS = "Neurosis"
+OCD = "Obsessive-Compulsive Disorder"
+OPPOSITIONAL_DEFIANT_DISORDER = "Oppositional Defiant Disorder"
+PAIN_DISORDER = "Pain Disorder"
+PANIC = "Panic Disorder"
+PATHOGENIC_PAIN = "Pathogenic Pain"
+PDD = "Premenstrual Dysphoric Disorder"
+PERSONALITY_DISORDER = "Personality Disorder"
+PHOBIA = "Phobia"
+PHOTOSENSITIVITY = "Photosensitivity"
+PSYCHIATRIC_DISORDER = "Psychiatric Disorder"
+PSYCHOTIC_DISORDER = "Psychotic Disorder"
+PTSD = "Post-Traumatic Stress Disorder"
+REPRODUCTIVE_DISORDER = "Reproductive Disorder"
+SAD = "Seasonal Affective Disorder"
+SCHIZOPHRENIA = "Schizophrenia"
+SCHIZOPHRENIFORM_DISORDER = "Schizophreniform Disorder"
+SCHIZOAFFECTIVE_DISORDER = "Schizoaffective Disorder"
+SEXUAL_DISORDER = "Sexual Disorder"
+SLEEP_APNEA = "Sleep Apnea"
+SLEEP_DISORDER = "Sleep Disorder"
+SOCIOPATHY = "Antisocial Personality Disorder"
+STRESS_DISORDER = "Stress Disorder"
+SUBSTANCE_ABUSE = "Substance Abuse"
+SUBSTANCE_PSYCHOSIS = "Substance-Induced Psychotic Disorder"
+TIC_DISORDER = "Tic Disorder"
+
+SYNONYM_MAP = {
+    "acute stress disease": STRESS_DISORDER,
+    "alcohol use disease": SUBSTANCE_ABUSE,
+    "amnestic disease": AMNESTIC_DISORDER,
+    "anaemia of chronic disease": ANEMIA,
+    "anaesthetic": ANAESTHESIA,
+    "anaesthesia": ANAESTHESIA,
+    "antisocial personality disease": SOCIOPATHY,
+    "articulation disease": ARTICULATION_DISORDER,
+    "autism spectrum disease": AUTISM,
+    "autism disease": AUTISM,
+    "autistic disease": AUTISM,
+    "aspergers disease": ASPERGERS,
+    "asperger syndrome": ASPERGERS,
+    "aspergers syndrome": ASPERGERS,
+    "asperger\\'s disease": ASPERGERS,
+    "attention deficit hyperactivity disease": ADHD,
+    "attention deficit/hyperactivity disease": ADHD,
+    "attention deficit disorder with hyperactivity": ADHD,
+    "anxiety": ANXIETY,
+    "anxiety disease": GENERALIZED_ANXIETY_DISORDER,
+    "bipolar disease": BIPOLAR,
+    "bipolar i disease": BDI,
+    "bipolar ii disease": BDII,
+    "body dysmorphic disease": BODY_DYSMORPHIA,
+    "borderline personality disease": BPD,
+    "celiac disease": CELIAC,
+    "coeliac disease": CELIAC,
+    "combat disease": PTSD,  # ??
+    "communication disease": "communication disorder",
+    "cyclothymic disease": CYCLOTHYMIA,
+    "generalised anxiety disease": GENERALIZED_ANXIETY_DISORDER,
+    "generalized anxiety disease": GENERALIZED_ANXIETY_DISORDER,
+    "delusional disease": DELUSION,
+    "depressive disease": DEPRESSION,
+    "depressed mood": DEPRESSION,
+    "depressive symptom": DEPRESSION,
+    "depressive": DEPRESSION,
+    "dependence": SUBSTANCE_ABUSE,
+    "diarrhoea": DIARRHEA,
+    "dysthymic disease": DYSTHYMIA,
+    "dissociative identity disease": DISSASOCIATIVE_IDENTITY_DISORDER,
+    "dissociative disease": DISSASOCIATIVE_IDENTITY_DISORDER,
+    "drug dependence": SUBSTANCE_ABUSE,
+    "eating disease": EATING_DISORDER,
+    "effect on cardiovascular disease": "Cardiovascular disease",
+    "female reproductive system disease": REPRODUCTIVE_DISORDER,
+    "gastrooesophageal reflux disease": GERD,
+    "haemorrhagic disease": "Hemorrhagic disease",
+    "haematological disease": HEMATOLOGICAL_DISORDER,
+    "haemochromatosis": "Hemochromatosis",
+    "hypersensitivity reaction disease": HYPERSENSITIVITY,
+    "hypomania": BDII,
+    "intermittent explosive disease": INTERMITTENT_EXPLOSIVE_DISORDER,
+    "ischaemic disease": ISCHEMIA,
+    "ischaemia": ISCHEMIA,
+    "manic and bipolar mood disorders and disturbance": BIPOLAR,
+    "major depression": DEPRESSION,
+    "major depressive disease": DEPRESSION,
+    "mental disease": MENTAL_DISORDER,
+    "mood disease": MOOD_DISRDER,
+    "middle ear disease": "Middle ear disorder",
+    "migraine disorders": MIGRAINE,
+    "motor neurone disease": MOTOR_NEURON_DISEASE,
+    "multiple personality disease": DISSASOCIATIVE_IDENTITY_DISORDER,
+    "movement disease": "movement disorder",
+    "narcissistic personality disease": NPD,
+    "neurotic disease": NEUROSIS,
+    "neurotic disorder": NEUROSIS,
+    "neurodevelopmental disease": NEURODEVELOPMENTAL_DISORDER,
+    "obsessive-compulsive disease": OCD,
+    "pain disease": PAIN_DISORDER,
+    "panic disease": PANIC,
+    "panic attacks and disease": PANIC,
+    "pathogenic pain disease": PATHOGENIC_PAIN,
+    "penicillins": "penicillin",
+    "pervasive developmental disease": DEVELOPMENTAL_DISORDER,
+    "personality disease": PERSONALITY_DISORDER,
+    "photosensitivity disease": PHOTOSENSITIVITY,
+    "phobic disease": PHOBIA,
+    "post-traumatic stress disease": PTSD,
+    "premenstrual dysphoric disease": PDD,
+    "psychosexual disease": SEXUAL_DISORDER,
+    "psychotic disease": PSYCHOTIC_DISORDER,
+    "psychiatric disease": PSYCHIATRIC_DISORDER,
+    "oppositional defiant disease": OPPOSITIONAL_DEFIANT_DISORDER,
+    "reading disease": "Reading disorder",
+    "schizoaffective disease": SCHIZOAFFECTIVE_DISORDER,
+    "schizophreniform disease": SCHIZOPHRENIFORM_DISORDER,
+    "brief psychotic disease": BRIEF_PSYCHOTIC_DISORDER,
+    "schizophrenia and other psychotic disease": PSYCHOTIC_DISORDER,
+    "seasonal affective disease": SAD,
+    "sexual arousal disease": SEXUAL_DISORDER,
+    "sexual desire disease": SEXUAL_DISORDER,
+    "sleep disease": SLEEP_DISORDER,
+    "shared psychotic disease": PSYCHOTIC_DISORDER,
+    "sleep apnea syndrome": SLEEP_APNEA,
+    "sleep apnoea syndrome": SLEEP_APNEA,
+    "somatoform disease": "Somatoform disorder",
+    "specific developmental disease": DEVELOPMENTAL_DISORDER,
+    "stress disease": STRESS_DISORDER,
+    "substance related disease": SUBSTANCE_ABUSE,
+    "substance-related disease": SUBSTANCE_ABUSE,
+    "substance-induced psychotic disease": SUBSTANCE_PSYCHOSIS,
+    "tic disease": TIC_DISORDER,
+    "transient tic disease": TIC_DISORDER,
+}

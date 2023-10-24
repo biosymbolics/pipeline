@@ -17,10 +17,10 @@ from core.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .biosym_annotations import populate_working_biosym_annotations
+from .process_biosym_annotations import populate_working_biosym_annotations
 
-from .._constants import SYNONYM_MAP
-from ..utils import clean_owners
+from .constants import SYNONYM_MAP
+from .utils import clean_owners
 
 TERMS_FILE = "terms.json"
 TERMS_TABLE = "terms"
@@ -363,7 +363,7 @@ def create_patent_terms():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 -m scripts.patents.psql.terms")
+        print("Usage: python3 -m scripts.patents.terms")
         sys.exit()
 
     create_patent_terms()

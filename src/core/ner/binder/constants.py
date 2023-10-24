@@ -57,7 +57,7 @@ PHRASE_MAP = {
     "associated illness": "associated disease",
     "biologic(?:al)? response modifiers?": "immunomodulator",
     "chimeric[ -]?(?:antigen|antibody)[ -]?receptor": "chimeric antigen receptor",
-    "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell ) receptor": "chimeric antigen receptor t-cell",
+    "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell )receptor": "chimeric antigen receptor t-cell",
     "car[ -]t": "chimeric antigen receptor t-cell",
     "conditions and disease": "diseases",
     "disease factors": "diseases",

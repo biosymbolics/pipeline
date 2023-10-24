@@ -1,43 +1,51 @@
+import json
 import logging
 import math
 import os
+import random
 import sys
-from typing import Any, Callable, NamedTuple, Optional, Sequence
+from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
+from pydash import flatten
 import torch
 import torch.nn as nn
-from ignite.metrics import Accuracy, ClassificationReport, MeanAbsoluteError
+from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
+import polars as pl
 
 import system
+from typings.trials import TrialSummary
+from utils.list import batch
 
 system.initialize()
 
 from clients.trials import fetch_trials
-from data.prediction.utils import ModelInput
-from data.types import FieldLists
+from data.prediction.utils import (
+    ModelInputAndOutput,
+    decode_output,
+    split_train_and_test,
+)
 
 from .constants import (
+    BASE_ENCODER_DIRECTORY,
     BATCH_SIZE,
-    CHECKPOINT_PATH,
     DEVICE,
     EMBEDDING_DIM,
-    MULTI_SELECT_CATEGORICAL_FIELDS,
-    SINGLE_SELECT_CATEGORICAL_FIELDS,
-    QUANTITATIVE_FIELDS,
-    QUANTITATIVE_TO_CATEGORY_FIELDS,
     SAVE_FREQUENCY,
-    TEXT_FIELDS,
-    Y1_CATEGORICAL_FIELDS,
-    Y2_FIELD,
+    TRAINING_PROPORTION,
+    InputAndOutputRecord,
+    field_lists,
+    output_field_lists,
 )
-from .model import TwoStageModel
-from .types import AllCategorySizes, TwoStageModelSizes
+from .model import ClindevTrainingModel
+from .types import ClinDevModelSizes
 from .utils import (
     calc_categories_loss,
+    get_batch,
     prepare_data,
     preprocess_inputs,
     split_categories,
-    split_train_and_test,
 )
+
+from ..types import AllCategorySizes, ModelInput
 
 
 class MetricWrapper(NamedTuple):
@@ -48,6 +56,8 @@ class MetricWrapper(NamedTuple):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+STAGE2_MSE_WEIGHT = 5
+
 
 class ModelTrainer:
     """
@@ -56,41 +66,44 @@ class ModelTrainer:
 
     def __init__(
         self,
-        training_input_dict: ModelInput,
-        test_input_dict: ModelInput,
+        training_input: ModelInputAndOutput,
+        test_input: ModelInputAndOutput,
         category_sizes: AllCategorySizes,
+        test_trials: Sequence[Sequence[TrialSummary]],
         embedding_dim: int = EMBEDDING_DIM,
     ):
         """
         Initialize model
 
         Args:
-            input_dict (ModelInput): Input dict
+            inputs (ModelInputAndOutput): Input dict
             category_sizes (AllCategorySizes): Sizes of categorical fields
+            trials (Sequence[TrialSummary]): Trials (for output decoding)
             embedding_dim (int, optional): Embedding dimension. Defaults to 16.
         """
         torch.device(DEVICE)
         self.device = DEVICE
 
+        self.test_trials = test_trials  # used for decoding
+
         self.y1_category_sizes = category_sizes.y1
+        self.training_input = training_input
+        self.test_input = test_input
 
-        self.training_input_dict = training_input_dict
-        self.test_input_dict = test_input_dict
-
-        sizes = TwoStageModelSizes(
+        sizes = ClinDevModelSizes(
             categories_by_field=category_sizes,
             embedding_dim=embedding_dim,
-            multi_select_input=math.prod(training_input_dict.multi_select.shape[2:]),
-            quantitative_input=training_input_dict.quantitative.size(-1),
-            single_select_input=math.prod(training_input_dict.single_select.shape[2:]),
-            text_input=training_input_dict.text.size(-1),
+            multi_select_input=math.prod(training_input.multi_select.shape[2:]),
+            quantitative_input=training_input.quantitative.size(-1),
+            single_select_input=math.prod(training_input.single_select.shape[2:]),
+            text_input=math.prod(training_input.text.shape[2:]),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(training_input_dict.y1_true.shape[2:]),
-            stage2_output=10,  # math.prod(training_input_dict.y2_true.shape[2:]),
+            stage1_output=math.prod(training_input.y1_true.shape[2:]) * 10,
+            stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
 
-        self.model = TwoStageModel(sizes)
+        self.model = ClindevTrainingModel(sizes)
         self.stage1_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
         self.stage2_ce_criterion = nn.CrossEntropyLoss(label_smoothing=0.005)
         self.stage2_mse_criterion = nn.MSELoss()
@@ -101,8 +114,15 @@ class ModelTrainer:
         }
 
         self.stage2_metrics = {
-            # "cp": MetricWrapper(metric=ClassificationReport(), transform=None),
-            "accuracy": MetricWrapper(metric=Accuracy(), transform=None),
+            "accuracy": MetricWrapper(
+                metric=Accuracy(), transform=lambda x: (x > 0.49).float()
+            ),
+            "precision": MetricWrapper(
+                metric=Precision(), transform=lambda x: (x > 0.49).float()
+            ),
+            "recall": MetricWrapper(
+                metric=Recall(), transform=lambda x: (x > 0.49).float()
+            ),
             "mae": MetricWrapper(
                 metric=MeanAbsoluteError(),
                 transform=lambda x: torch.argmax(x, dim=1),
@@ -115,33 +135,10 @@ class ModelTrainer:
         """
         self.train(*args, **kwargs)
 
-    def save_checkpoint(self, epoch: int):
-        """
-        Save model checkpoint
-
-        Args:
-            model (CombinedModel): Model to save
-            optimizer (torch.optim.Optimizer): Optimizer to save
-            epoch (int): Epoch number
-        """
-        checkpoint = {
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.model.optimizer.state_dict(),
-            "epoch": epoch,
-        }
-        checkpoint_name = f"checkpoint_{epoch}.pt"
-
-        try:
-            torch.save(checkpoint, os.path.join(CHECKPOINT_PATH, checkpoint_name))
-            logger.info("Saved checkpoint %s", checkpoint_name)
-        except Exception as e:
-            logger.error("Failed to save checkpoint %s: %s", checkpoint_name, e)
-            raise e
-
     def calc_loss(
         self,
         i: int,
-        batch: ModelInput,
+        batch: ModelInputAndOutput,
         y1_probs: torch.Tensor,
         y1_corr_probs: torch.Tensor,
         y2_preds: torch.Tensor,
@@ -171,9 +168,12 @@ class ModelTrainer:
         )
 
         # STAGE 2
-        stage2_ce_loss = self.stage2_ce_criterion(y2_preds, batch.y2_true)
+        stage2_ce_loss = self.stage2_ce_criterion(y2_preds, batch.y2_oh_true)
+
+        # using softmax to get a more precise error than CEL between one-hot vectors
         stage2_mse_loss = torch.mul(
-            self.stage2_mse_criterion(y2_preds, batch.y2_oh_true), 10
+            self.stage2_mse_criterion(torch.softmax(y2_preds, dim=1), batch.y2_oh_true),
+            STAGE2_MSE_WEIGHT,
         )
 
         # TOTAL
@@ -190,44 +190,30 @@ class ModelTrainer:
         )
 
         self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_true
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
 
         return loss
 
-    @staticmethod
-    def __get_batch(i: int, input_dict: ModelInput) -> ModelInput:
-        """
-        Get input_dict for batch i
-        """
-        batch = ModelInput(
-            **{
-                f: v[i] if len(v) > i else torch.Tensor()
-                for f, v in input_dict._asdict().items()
-                if v is not None
-            }
-        )
-        return batch
-
-    def __train_batch(self, i: int, input_dict: ModelInput):
+    def __train_batch(self, i: int, input: ModelInputAndOutput):
         """
         Train model on a single batch
 
         Args:
             i (int): Batch index
             num_batches (int): Number of batches
-            input_dict (ModelInput): Input dict
+            input (ModelInputAndOutput): Input dict
         """
-        batch = ModelTrainer.__get_batch(i, input_dict)
+        batch = get_batch(i, input)
+
+        if batch is None:
+            return
 
         # place before any loss calculation
         self.model.optimizer.zero_grad()
 
-        y1_probs, y1_corr_probs, y2_preds = self.model(
-            torch.split(batch.multi_select, 1, dim=1),
-            torch.split(batch.single_select, 1, dim=1),
-            batch.text,
-            batch.quantitative,
+        y1_probs, y1_corr_probs, y2_preds, _ = self.model(
+            ModelInput.get_instance(**batch.__dict__)
         )
 
         # TOTAL
@@ -248,14 +234,14 @@ class ModelTrainer:
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
         """
-        num_batches = self.training_input_dict.multi_select.size(0)
+        num_batches = self.training_input.single_select.size(0)
 
         for epoch in range(start_epoch, num_epochs):
             logger.info("Starting epoch %s", epoch)
-            _input_dict = ModelInput(
+            _input_dict = ModelInputAndOutput(
                 **{
                     k: v.detach().clone()
-                    for k, v in self.training_input_dict._asdict().items()
+                    for k, v in self.training_input.__dict__.items()
                 },
             )
             for i in range(num_batches):
@@ -264,19 +250,47 @@ class ModelTrainer:
 
             if epoch % SAVE_FREQUENCY == 0:
                 self.log_metrics("Training")
-                num_eval_batches = self.test_input_dict.multi_select.size(0)
-                for te in range(0, num_eval_batches):
-                    batch = ModelTrainer.__get_batch(te, self.test_input_dict)
-                    self.evaluate(batch, self.y1_category_sizes)
+                # TODO: unreliable
+                num_eval_batches = self.test_input.single_select.size(0)
+                for te in range(0, num_eval_batches - 1):
+                    batch = get_batch(te, self.test_input)
+
+                    if batch is None:
+                        continue
+
+                    self.evaluate(batch, self.test_trials[te], self.y1_category_sizes)
+
                 self.log_metrics("Evaluation")
-                self.save_checkpoint(epoch)
+                self.model.save(epoch)
+
+    def log_metrics(self, stage: str = "Training"):
+        """
+        Log metrics
+        """
+        try:
+            for k in self.y1_category_sizes.keys():
+                for name, metric in self.stage1_metrics.items():
+                    value = metric[k].compute().__round__(2)
+                    logger.info("%s Stage1 %s %s: %s", stage, k, name, value)
+                    metric[k].reset()
+
+            for name in self.stage2_metrics.keys():
+                metric, _ = self.stage2_metrics[name]
+                value = metric.compute()  # type: ignore
+                if isinstance(value, torch.Tensor):
+                    value = value.item()
+                logger.info("%s Stage2 %s: %s", stage, name, value.__round__(2))
+                metric.reset()  # type: ignore
+
+        except Exception as e:
+            logger.warning("Failed to evaluate: %s", e)
 
     def calculate_metrics(
         self,
         y1_preds_by_field: Sequence[torch.Tensor],
         y1_true_by_field: Sequence[torch.Tensor],
         y2_preds: torch.Tensor,
-        y2_true: torch.Tensor,
+        y2_oh_true: torch.Tensor,
     ):
         """
         Calculate discrete metrics for a batch
@@ -293,86 +307,74 @@ class ModelTrainer:
             for metric in self.stage1_metrics.values():
                 metric[k].update((cpu_y1_preds, cpu_y1_true))
 
-        cpu_y2_preds = y2_preds.detach().to("cpu")
-        cpu_y2_true = y2_true.detach().to("cpu")
+        cpu_y2_preds = torch.softmax(y2_preds.detach().to("cpu"), dim=1)
+        cpu_y2_oh_true = y2_oh_true.detach().to("cpu")
         for metric, transform in self.stage2_metrics.values():
             if transform:
-                metric.update((transform(cpu_y2_preds), cpu_y2_true))
+                metric.update((transform(cpu_y2_preds), transform(cpu_y2_oh_true)))
             else:
-                metric.update((cpu_y2_preds, cpu_y2_true))
+                metric.update((cpu_y2_preds, cpu_y2_oh_true))
 
-    def log_metrics(self, stage: str = "Training"):
-        """
-        Log metrics
-        """
-        try:
-            for k in self.y1_category_sizes.keys():
-                for name, metric in self.stage1_metrics.items():
-                    logger.info(
-                        "%s Stage1 %s %s: %s",
-                        stage,
-                        k,
-                        name,
-                        metric[k].compute().__round__(2),  # type: ignore
-                    )
-                    metric[k].reset()
-
-            for name in self.stage2_metrics.keys():
-                metric, _ = self.stage2_metrics[name]
-                logger.info(
-                    "%s Stage2 %s: %s", stage, name, metric.compute().__round__(2)  # type: ignore
-                )
-                metric.reset()  # type: ignore
-
-        except Exception as e:
-            logger.warning("Failed to evaluate: %s", e)
-
-    def evaluate(self, input_dict: ModelInput, category_sizes: dict[str, int]):
+    def evaluate(
+        self,
+        batch: ModelInputAndOutput,
+        records: Sequence[TrialSummary],
+        category_sizes: dict[str, int],
+    ):
         """
         Evaluate model on eval/test set
         """
-        y1_probs, _, y2_preds = self.model(
-            torch.split(input_dict.multi_select, 1, dim=1),
-            torch.split(input_dict.single_select, 1, dim=1),
-            input_dict.text,
-            input_dict.quantitative,
-        )
+
+        y1_probs, _, y2_preds, _ = self.model(ModelInput.get_instance(**batch.__dict__))
 
         y1_probs_by_field, y1_true_by_field = split_categories(
-            y1_probs, input_dict.y1_true, category_sizes
+            y1_probs, batch.y1_true, category_sizes
         )
 
         self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, input_dict.y2_true
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
+        )
+
+        # decode outputs and verify a few
+        outputs = decode_output(
+            [y1.detach().to("cpu") for y1 in y1_probs_by_field],
+            y2_preds.detach().to("cpu"),
+            output_field_lists,
+            directory=BASE_ENCODER_DIRECTORY,
+        )
+        comparison = [
+            {
+                k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
+                for k, v in true.items()
+                if k == "nct_id" or k in flatten(output_field_lists.__dict__.values())
+            }
+            for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
+        ]
+        logger.info(
+            "Comparisons: %s",
+            json.dumps(
+                sorted(comparison, key=lambda x: random.random())[0:5], indent=2
+            ),
         )
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(
-            fetch_trials("COMPLETED", limit=50000), QUANTITATIVE_TO_CATEGORY_FIELDS
+        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
+
+        inputs, category_sizes = prepare_data(
+            cast(Sequence[InputAndOutputRecord], trials),
+            field_lists,
+            batch_size=batch_size,
+            device=DEVICE,
+        )
+        batched_trials = batch(trials, batch_size)
+
+        training_input, test_input, _, test_records = split_train_and_test(
+            inputs, batched_trials, TRAINING_PROPORTION
         )
 
-        field_lists = FieldLists(
-            single_select=SINGLE_SELECT_CATEGORICAL_FIELDS,
-            multi_select=MULTI_SELECT_CATEGORICAL_FIELDS,
-            text=TEXT_FIELDS,
-            quantitative=QUANTITATIVE_FIELDS,
-            y1_categorical=Y1_CATEGORICAL_FIELDS,
-            y2=Y2_FIELD,
-        )
-
-        input_dict, category_sizes, _ = prepare_data(
-            trials, field_lists, batch_size, DEVICE
-        )
-
-        training_input_dict, test_input_dict = split_train_and_test(input_dict)
-
-        model = ModelTrainer(training_input_dict, test_input_dict, category_sizes)
+        model = ModelTrainer(training_input, test_input, category_sizes, test_records)
         model.train()
-
-
-def main():
-    ModelTrainer.train_from_trials()
 
 
 if __name__ == "__main__":
@@ -384,4 +386,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    main()
+    ModelTrainer.train_from_trials()

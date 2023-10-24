@@ -16,17 +16,17 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
-from scripts.patents.psql.copy_approvals import copy_approvals
-from scripts.patents.bq.copy_tables import copy_patent_tables
-from scripts.patents.bq_to_psql import copy_bq_to_psql
-from scripts.patents.psql.terms import create_patent_terms
 
-from ._constants import (
+from .constants import (
     APPLICATIONS_TABLE,
     ANNOTATIONS_TABLE,
     GPR_ANNOTATIONS_TABLE,
     TEXT_FIELDS,
 )
+from .copy_approvals import copy_approvals
+from .prep_bq_patents import copy_patent_tables
+from .import_bq_patents import copy_bq_to_psql
+from .terms import create_patent_terms
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -251,12 +251,15 @@ def main(bootstrap: bool = False):
     -- analyze applications;
     -- reindex database patents;
         " >> patents.psql
-    # pg_restore --clean -d patents -h 172.31.55.68 -p 5432 --username postgres --password patents.psql
+    echo $PASSWORD
     dropdb patents --force  -h 172.31.55.68 -p 5432 --username postgres
     createdb patents -h 172.31.55.68 -p 5432 --username postgres
     psql -d patents -h 172.31.55.68 -p 5432 --username postgres --password -f patents.psql
     rm patents.psql*
     ```
+
+    if new bastion:
+    - yum install postgresql15
     """
     if bootstrap:
         # bigquery
@@ -282,6 +285,7 @@ def main(bootstrap: bool = False):
     copy_ctgov()
 
     # post
+    # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
     # update annotations set term=regexp_replace(term, ' gene$', '', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
     # update annotations set term=regexp_replace(term, '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
     # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';

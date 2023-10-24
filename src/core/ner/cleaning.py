@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Iterable, TypeVar, Union, cast
+from typing import Iterable, Sequence, TypeVar, Union, cast
 import regex as re
 from functools import partial, reduce
 import logging
@@ -25,7 +25,7 @@ T = TypeVar("T", bound=Union[DocEntity, str])
 
 class CleanFunction(Protocol):
     @abstractmethod
-    def __call__(self, terms: list[str], n_process: int) -> list[str]:
+    def __call__(self, terms: Sequence[str], n_process: int) -> Sequence[str]:
         pass
 
 
@@ -67,11 +67,13 @@ class EntityCleaner:
         self,
         additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
         char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+        additional_cleaners: Sequence[CleanFunction] = [],
         parallelize: bool = True,
     ):
         self.additional_common_words = additional_common_words
         self.char_suppressions = char_suppressions
         self.parallelize = parallelize
+        self.additional_cleaners = additional_cleaners
         self.__common_words = None
         self.nlp = Spacy.get_instance(disable=["ner"])._nlp
 
@@ -102,16 +104,16 @@ class EntityCleaner:
 
     def filter_common_terms(
         self,
-        terms: list[str],
+        terms: Sequence[str],
         n_process: int = 1,
-        exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
-    ) -> list[str]:
+        exception_list: Sequence[str] = DEFAULT_EXCEPTION_LIST,
+    ) -> Sequence[str]:
         """
         Filter out common terms from a list of terms, e.g. "vaccine candidates"
 
         Args:
-            terms (list[str]): list of terms
-            exception_list (list[str]): list of exceptions to the common terms
+            terms (Sequence[str]): list of terms
+            exception_list (Sequence[str]): list of exceptions to the common terms
         """
         # doing in bulk for perf
         token_sets = self.nlp.pipe(terms, n_process=n_process)
@@ -141,7 +143,9 @@ class EntityCleaner:
         new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_lemmas])
         return new_list
 
-    def normalize_terms(self, terms: list[str], n_process: int = 1) -> list[str]:
+    def normalize_terms(
+        self, terms: Sequence[str], n_process: int = 1
+    ) -> Sequence[str]:
         """
         Normalize terms
         - remove certain characters
@@ -256,12 +260,12 @@ class EntityCleaner:
         )
         return normalized
 
-    def __suppress(self, terms: list[str]) -> list[str]:
+    def __suppress(self, terms: Sequence[str]) -> Sequence[str]:
         """
         Filter out irrelevant terms
 
         Args:
-            terms (list[str]): terms
+            terms (Sequence[str]): terms
         """
 
         def should_keep(term) -> bool:
@@ -276,8 +280,10 @@ class EntityCleaner:
 
     @staticmethod
     def __return_to_type(
-        modified_texts: list[str], orig_ents: list[T], remove_suppressed: bool = False
-    ) -> list[T]:
+        modified_texts: Sequence[str],
+        orig_ents: Sequence[T],
+        remove_suppressed: bool = False,
+    ) -> Sequence[T]:
         if len(modified_texts) != len(orig_ents):
             logging.info(
                 "Modified text: %s, original entities: %s", modified_texts, orig_ents
@@ -302,10 +308,10 @@ class EntityCleaner:
 
     def clean(
         self,
-        entities: list[T],
+        entities: Sequence[T],
         common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
         remove_suppressed: bool = False,
-    ) -> list[T]:
+    ) -> Sequence[T]:
         """
         Sanitize entity list
         - filters out (some) excessively general entities
@@ -333,7 +339,7 @@ class EntityCleaner:
             self.filter_common_terms,
         ]
 
-        terms = [self.__get_text(ent) for ent in entities]
+        terms: Sequence = [self.__get_text(ent) for ent in entities]
         cleaned = reduce(
             lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
         )

@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+from typing import Sequence
 from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
@@ -13,18 +14,43 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
+from typings.core import is_dict_list
 
-from ._constants import (
+from .constants import (
     APPLICATIONS_TABLE,
     GPR_ANNOTATIONS_TABLE,
     GPR_PUBLICATIONS_TABLE,
 )
+from .utils import determine_bq_data_type
+
 
 storage_client = storage.Client()
 db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+PATENT_APPLICATION_FIELDS = [
+    # ** FROM gpr_publications **
+    "gpr_pubs.publication_number as publication_number",
+    "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
+    "abstract",
+    "all_publication_numbers",  # all the country-specific patents
+    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
+    "application_number",
+    "country",
+    "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s) as similar_patents",
+    "title",
+    "url",
+    # **FROM PUBLICATIONS **
+    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
+    "claims_localized as claims",
+    "family_id",
+    "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
+    "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
+    "priority_date",
+]
 
 EXPORT_TABLES = {
     "biosym_annotations_source": {
@@ -51,51 +77,18 @@ GCS_BUCKET = "biosym-patents"
 # adjust this based on how large you want each shard to be
 
 
-INITIAL_COPY_FIELDS = [
-    # gpr_publications
-    "gpr_pubs.publication_number as publication_number",
-    "regexp_replace(gpr_pubs.publication_number, '-[^-]*$', '') as base_publication_number",  # for matching against approvals
-    "abstract",
-    "all_publication_numbers",
-    "ARRAY(select regexp_replace(pn, '-[^-]*$', '') from UNNEST(all_publication_numbers) as pn) as all_base_publication_numbers",
-    "application_number",
-    "cited_by",
-    "country",
-    "embedding_v1 as embeddings",
-    "ARRAY(SELECT s.publication_number FROM UNNEST(similar) as s) as similar_patents",
-    "title",
-    "top_terms",
-    "url",
-    # publications
-    "application_kind",
-    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
-    "citation",
-    "claims_localized as claims",
-    "ARRAY(SELECT cpc.code FROM UNNEST(pubs.cpc) as cpc) as cpc_codes",
-    "family_id",
-    "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
-    "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",
-    "kind_code",
-    "pct_number",
-    "priority_claim",
-    "priority_date",
-    "spif_application_number",
-    "spif_publication_number",
-]
-
-
 def create_patent_applications_table():
     """
     Create a table of patent applications in BigQuery
-    (then exported and pulled into psql)
+    (which is then exported and imported into psql)
     """
-    logging.info("Create a table of patent applications for use in app queries")
+    logging.info("Create a table of patent applications on BigQuery for sharding")
 
     client = BQDatabaseClient()
     client.delete_table(APPLICATIONS_TABLE)
 
     applications = f"""
-        SELECT {','.join(INITIAL_COPY_FIELDS)}
+        SELECT {','.join(PATENT_APPLICATION_FIELDS)}
         FROM `{BQ_DATASET_ID}.publications` pubs,
         `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
         WHERE pubs.publication_number = gpr_pubs.publication_number
@@ -104,13 +97,16 @@ def create_patent_applications_table():
 
 
 def shared_and_export(shard_query: str, shared_table_name: str, table: str, value: str):
+    """
+    Create a shared table, export to GCS and delete
+    """
     db_client.create_from_select(shard_query, shared_table_name)
     destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
     db_client.export_table_to_storage(shared_table_name, destination_uri)
     db_client.delete_table(shared_table_name)
 
 
-def export_bq_tables(today):
+def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
@@ -145,36 +141,6 @@ def export_bq_tables(today):
                 shared_and_export(shard_query, shared_table_name, table, current_shard)
 
 
-# alter table applications alter column priority_date type date USING priority_date::date;
-TYPE_OVERRIDES = {
-    "character_offset_start": "INTEGER",
-    "character_offset_end": "INTEGER",
-    "publication_date": "DATE",
-    "filing_date": "DATE",
-    "grant_date": "DATE",
-    "priority_date": "DATE",
-}
-
-
-def determine_data_type(value, field: str | None = None):
-    if field and field in TYPE_OVERRIDES:
-        return TYPE_OVERRIDES[field]
-
-    if isinstance(value, int):
-        return "INTEGER"
-    elif isinstance(value, float):
-        return "FLOAT"
-    elif isinstance(value, bool):
-        return "BOOLEAN"
-    elif isinstance(value, list):
-        if len(value) > 0:
-            dt = determine_data_type(value[0])
-            return f"{dt}[]"
-        return "TEXT[]"
-    else:  # default to TEXT for strings or other data types
-        return "TEXT"
-
-
 def import_into_psql(today: str):
     """
     Load data from a JSON file into a psql table
@@ -186,39 +152,31 @@ def import_into_psql(today: str):
     for table in EXPORT_TABLES.keys():
         client.truncate_table(table)
 
-    def transform(s, c: str):
-        if c.endswith("_date") and s == 0:
-            logger.info("RETURNING NONE for %s %s", c, s)
+    def transform(value: str | dict | int | float | Sequence | pl.Series, col: str):
+        if col.endswith("_date") and isinstance(value, int) and value == 0:
+            # return none for zero-valued dates
             return None
-        if isinstance(s, dict):
+        if isinstance(value, dict):
             # TODO: this is a hack, only works because the first value is currently always the one we want
-            return compact(s.values())[0]
-        elif isinstance(s, list) or isinstance(s, pl.Series) and len(s) > 0:
-            if isinstance(s[0], dict):
-                return [compact(s1.values())[0] for s1 in s if len(s1) > 0]
-        return s
+            return compact(value.values())[0]
+        elif (isinstance(value, list) or isinstance(value, pl.Series)) and len(
+            value
+        ) > 0:
+            if is_dict_list(value):
+                return [compact(v.values())[0] for v in value if len(value) > 0]
+        return value
 
     def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
-        # figure out transformation before re-enabling.
-        nono_columns = [
-            "cited_by",
-            "citation",
-            "publication_date",
-        ]
         df = df.select(
-            *[
-                pl.col(c).map_elements(lambda s: transform(s, c))
-                for c in df.columns
-                if c not in nono_columns
-            ]
+            *[pl.col(c).map_elements(lambda s: transform(s, c)) for c in df.columns]
         )
 
         first_record = records[0]
         columns = dict(
-            [(f'"{k}"', determine_data_type(v, k)) for k, v in first_record.items()]
+            [(f'"{k}"', determine_bq_data_type(v, k)) for k, v in first_record.items()]
         )
         client.create_table(table_name, columns, exists_ok=True)
         client.insert_into_table(df.to_dicts(), table_name)
@@ -241,8 +199,11 @@ def import_into_psql(today: str):
 
 
 def copy_bq_to_psql():
+    """
+    Copy data from BigQuery to psql + create index
+    """
     today = datetime.now().strftime("%Y%m%d")
-    export_bq_tables(today)
+    export_bq_tables()
     import_into_psql(today)
 
     client = PsqlDatabaseClient()
@@ -284,7 +245,7 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y%m%d")
 
     if "-export" in sys.argv:
-        export_bq_tables(today)
+        export_bq_tables()
 
     if "-import" in sys.argv:
         import_into_psql(today)
