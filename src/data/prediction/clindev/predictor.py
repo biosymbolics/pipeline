@@ -89,7 +89,7 @@ class ModelPredictor:
                 return []
 
             _, _, y2_preds, y1_probs_list = self.model(
-                ModelInput.get_instance(*batch.items())
+                ModelInput.get_instance(**batch.__dict__)
             )
             return decode_output(
                 y1_probs_list,

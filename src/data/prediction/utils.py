@@ -1,6 +1,15 @@
 from datetime import date
 from functools import partial
-from typing import Any, Callable, NamedTuple, Sequence, TypeGuard, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Mapping,
+    NamedTuple,
+    Sequence,
+    TypeGuard,
+    TypeVar,
+    cast,
+)
 import logging
 from collections import namedtuple
 import polars as pl
@@ -397,7 +406,7 @@ def decode_output(
     y2_quant_decoded = BinEncoder(field_lists.y2, directory).inverse_transform(
         y2_decoded.reshape(-1, 1)
     )
-    return {**y1_decoded, field_lists.y2: y2_quant_decoded[0]}
+    return {**y1_decoded, field_lists.y2: y2_decoded}  # y2_quant_decoded}
 
 
 def _encode_and_batch_features(
@@ -439,34 +448,41 @@ def encode_and_batch_all(
     return ModelInputAndOutput(**batched), AllCategorySizes(**sizes)
 
 
+R = TypeVar("R", bound=Mapping)
+
+
 def split_train_and_test(
-    input_dict: ModelInputAndOutput,
+    batched_inputs: ModelInputAndOutput,
+    batched_records: Sequence[Sequence[R]],
     training_proportion: float,
-) -> tuple[ModelInputAndOutput, ModelInputAndOutput]:
+) -> tuple[
+    ModelInputAndOutput,
+    ModelInputAndOutput,
+    Sequence[Sequence[R]],
+    Sequence[Sequence[R]],
+]:
     """
     Split out training and test data
 
     Args:
-        input_dict (ModelInputAndOutput): Input data
+        batched_inputs (ModelInputAndOutput): Batched input data
         training_proportion (float): Proportion of data to use for training
     """
-    record_cnt = input_dict.y1_true.size(0)
+    record_cnt = batched_inputs.y1_true.size(0)
     split_idx = round(record_cnt * training_proportion)
 
     # len(v) == 0 if empty input
     split_input = {
         k: torch.split(v, split_idx) if len(v) > 0 else (torch.Tensor(), torch.Tensor())
-        for k, v in input_dict.__dict__.items()
+        for k, v in batched_inputs.items()
     }
-
-    for i in range(2):
-        sizes = uniq([len(v[i]) for v in split_input.values() if len(v[i]) > 0])
-        if len(sizes) > 1:
-            raise ValueError(
-                f"Split discrepancy: {[(k, len(v[i])) for k, v in split_input.items()]}"
-            )
 
     train_input_dict = ModelInputAndOutput(**{k: v[0] for k, v in split_input.items()})
     test_input = ModelInputAndOutput(**{k: v[1] for k, v in split_input.items()})
 
-    return train_input_dict, test_input
+    return (
+        train_input_dict,
+        test_input,
+        batched_records[0:split_idx],
+        batched_records[split_idx:],
+    )

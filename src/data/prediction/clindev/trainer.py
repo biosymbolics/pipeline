@@ -1,13 +1,18 @@
+import json
 import logging
 import math
 import os
 import sys
 from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
+from pydash import flatten
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
+import polars as pl
 
 import system
+from typings.trials import TrialSummary
+from utils.list import batch
 
 system.initialize()
 
@@ -39,7 +44,7 @@ from .utils import (
     split_categories,
 )
 
-from ..types import AllCategorySizes, ModelInput, OutputFieldLists
+from ..types import AllCategorySizes, ModelInput
 
 
 class MetricWrapper(NamedTuple):
@@ -63,18 +68,22 @@ class ModelTrainer:
         training_input: ModelInputAndOutput,
         test_input: ModelInputAndOutput,
         category_sizes: AllCategorySizes,
+        test_trials: Sequence[Sequence[TrialSummary]],
         embedding_dim: int = EMBEDDING_DIM,
     ):
         """
         Initialize model
 
         Args:
-            input_dict (ModelInputAndOutput): Input dict
+            inputs (ModelInputAndOutput): Input dict
             category_sizes (AllCategorySizes): Sizes of categorical fields
+            trials (Sequence[TrialSummary]): Trials (for output decoding)
             embedding_dim (int, optional): Embedding dimension. Defaults to 16.
         """
         torch.device(DEVICE)
         self.device = DEVICE
+
+        self.test_trials = test_trials  # used for decoding
 
         self.y1_category_sizes = category_sizes.y1
         self.training_input = training_input
@@ -248,7 +257,7 @@ class ModelTrainer:
                     if batch is None:
                         continue
 
-                    self.evaluate(batch, self.y1_category_sizes)
+                    self.evaluate(batch, self.test_trials[te], self.y1_category_sizes)
 
                 self.log_metrics("Evaluation")
                 self.model.save(epoch)
@@ -305,7 +314,12 @@ class ModelTrainer:
             else:
                 metric.update((cpu_y2_preds, cpu_y2_oh_true))
 
-    def evaluate(self, batch: ModelInputAndOutput, category_sizes: dict[str, int]):
+    def evaluate(
+        self,
+        batch: ModelInputAndOutput,
+        records: Sequence[TrialSummary],
+        category_sizes: dict[str, int],
+    ):
         """
         Evaluate model on eval/test set
         """
@@ -320,34 +334,42 @@ class ModelTrainer:
             y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
         )
 
-        try:
-            print(
-                decode_output(
-                    [y1.detach().to("cpu") for y1 in y1_probs_by_field],
-                    y2_preds.detach().to("cpu"),
-                    output_field_lists,
-                    directory=BASE_ENCODER_DIRECTORY,
-                )
-            )
-        except Exception as e:
-            logger.warning("Failed to decode: %s", e)
+        # decode outputs and verify a few
+        outputs = decode_output(
+            [y1.detach().to("cpu") for y1 in y1_probs_by_field],
+            y2_preds.detach().to("cpu"),
+            output_field_lists,
+            directory=BASE_ENCODER_DIRECTORY,
+        )
+        comparison = [
+            {
+                k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
+                for k, v in true.items()
+                if k == "nct_id" or k in flatten(output_field_lists.__dict__.values())
+            }
+            for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
+        ]
+        logger.info(
+            "Comparisons: %s", json.dumps(comparison[0:10], indent=4, sort_keys=True)
+        )
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
         trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
 
-        input_dict, category_sizes = prepare_data(
+        inputs, category_sizes = prepare_data(
             cast(Sequence[InputAndOutputRecord], trials),
             field_lists,
             batch_size=batch_size,
             device=DEVICE,
         )
+        batched_trials = batch(trials, batch_size)
 
-        training_input, test_input = split_train_and_test(
-            input_dict, TRAINING_PROPORTION
+        training_input, test_input, _, test_records = split_train_and_test(
+            inputs, batched_trials, TRAINING_PROPORTION
         )
 
-        model = ModelTrainer(training_input, test_input, category_sizes)
+        model = ModelTrainer(training_input, test_input, category_sizes, test_records)
         model.train()
 
 
