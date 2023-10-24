@@ -38,10 +38,10 @@ class TestTrialUtils(unittest.TestCase):
                 "time_frame_desc": "Efficacy Expansion: Baseline up to Day 1072",
                 "expected": 1072,
             },
-            # {
-            #     "time_frame_desc": "Duration of hospital stay (average 3.4 days)",
-            #     "expected": 3,
-            # },
+            {
+                "time_frame_desc": "Duration of hospital stay (average 3.4 days)",
+                "expected": 3,
+            },
             # {
             #     "time_frame_desc": "Cycle 1 Day -3: Predose, 1, 2, 4, 6, 8, 10, 24, 48 and 72 hours (hr) postdose; Cycle 1 Day 28: Predose, 1, 2, 4, 6, 8, 10 and 24 hr postdose (Cycle 1 = 32 days)",
             #     "expected": 28,  # TODO?
