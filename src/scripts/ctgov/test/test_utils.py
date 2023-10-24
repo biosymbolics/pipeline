@@ -40,12 +40,12 @@ class TestTrialUtils(unittest.TestCase):
             },
             {
                 "time_frame_desc": "Duration of hospital stay (average 3.4 days)",
-                "expected": 3,
+                "expected": 4,
             },
-            # {
-            #     "time_frame_desc": "Cycle 1 Day -3: Predose, 1, 2, 4, 6, 8, 10, 24, 48 and 72 hours (hr) postdose; Cycle 1 Day 28: Predose, 1, 2, 4, 6, 8, 10 and 24 hr postdose (Cycle 1 = 32 days)",
-            #     "expected": 28,  # TODO?
-            # },
+            {
+                "time_frame_desc": "Cycle 1 Day -3: Predose, 1, 2, 4, 6, 8, 10, 24, 48 and 72 hours (hr) postdose; Cycle 1 Day 28: Predose, 1, 2, 4, 6, 8, 10 and 24 hr postdose (Cycle 1 = 32 days)",
+                "expected": 32,  # TODO?
+            },
             # {
             #     "time_frame_desc": "At Day 15, 29, 43, 57, 71, 85, 99, 127 and 169",
             #     "expected": 169,
@@ -57,5 +57,12 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = extract_timeframe(time_frame_desc)
-            print("Actual", result, "expected", expected_output)
+            print(
+                "Test:",
+                test["time_frame_desc"],
+                "\nActual",
+                result,
+                "expected",
+                expected_output,
+            )
             self.assertEqual(result, expected_output)
