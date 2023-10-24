@@ -24,10 +24,9 @@ class BinEncoder(Encoder):
         field: str | None = None,
         directory: str | None = None,
         # if None, will estimate (TODO: must adjust size of stage2 output accordingly!)
-        n_bins: Optional[int] = 5,
+        n_bins: Optional[int] = None,
         strategy: KbinsStrategy = "kmeans",
         encode: Literal["ordinal", "onehot", "onehot-dense"] = "ordinal",
-        device: str = "cpu",
         *args,
         **kwargs
     ):
@@ -39,6 +38,7 @@ class BinEncoder(Encoder):
             field,
             directory,
             encode=encode,
+            # n_bins=n_bins,
             strategy=strategy,
             subsample=None,
             *args,
@@ -94,7 +94,7 @@ class BinEncoder(Encoder):
             return gini_before - gini_after
 
         def score_bin(n_bins):
-            bin_data = BinEncoder(nbins=n_bins).fit_transform(values)
+            bin_data = BinEncoder(n_bins=n_bins).fit_transform(values)
             return gini_impurity(values, bin_data)
 
         scores = [score_bin(n_bins) for n_bins in bins_to_test]
@@ -112,7 +112,7 @@ class BinEncoder(Encoder):
         logger.info(
             "Encoding field %s (e.g. %s) length: %s",
             self._field,
-            values[0:5],
+            values[0:6],
             len(values),
         )
 
@@ -139,15 +139,15 @@ class BinEncoder(Encoder):
                 self.n_bins,
                 self.field,
             )
-            logger.error(
-                "THIS WILL PROBABLY BREAK YOUR MODEL unless stage2 output size (etc) are sized properly."
-            )
+
+        self._encoder.n_bins = self.n_bins
         self._encoder.fit(values)
 
         if self._encoder.n_bins_ != self.n_bins:
             logger.error(
                 "Actual bins != n_bins: %s vs %s", self._encoder.n_bins_, self.n_bins
             )
+            raise ValueError("Actual bins != n_bins")
 
         self.save()
 

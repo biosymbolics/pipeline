@@ -13,7 +13,7 @@ from typing import (
 import logging
 from collections import namedtuple
 import polars as pl
-from pydash import is_list, uniq
+from pydash import is_list
 import torch
 import torch.nn.functional as F
 import polars as pl
@@ -100,7 +100,7 @@ def batch_and_pad(
         "Batches: %s (%s) (%s ...)",
         len(batches),
         batch_size,
-        [b.size() for b in batches[0:5]],
+        [b.size() for b in batches[0:6]],
     )
 
     return torch.stack(batches)
@@ -182,6 +182,7 @@ def encode_categories_as_text(
     records: Sequence[T],
     fields: list[str],
     max_items_per_cat: int,
+    max_tokens_per_item: int,
     directory: str,
     get_encoder: Callable = (lambda f, dir, max_in_cat: TextEncoder(f, max_in_cat)),
     device: str = "cpu",
@@ -202,7 +203,13 @@ def encode_categories_as_text(
     ]
     encodings = array_to_tensor(
         encodings_list,
-        (len(records), len(fields), max_items_per_cat, 5, WORD_VECTOR_LENGTH),
+        (
+            len(records),
+            len(fields),
+            max_items_per_cat,
+            max_tokens_per_item,
+            WORD_VECTOR_LENGTH,
+        ),
     ).to(device)
 
     return encodings.view(*encodings.shape[0:1], -1)
@@ -316,6 +323,7 @@ def encode_features(
     field_lists: FieldLists | InputFieldLists,
     directory: str,
     max_items_per_cat: int,
+    max_tokens_per_item: int,
     device: str = "cpu",
 ) -> tuple[ModelInput, CategorySizes | AllCategorySizes]:
     """
@@ -341,6 +349,7 @@ def encode_features(
             encode_categories_as_text,
             **args,
             max_items_per_cat=max_items_per_cat,
+            max_tokens_per_item=max_tokens_per_item,
         ),
     }
 
@@ -415,13 +424,19 @@ def _encode_and_batch_features(
     batch_size: int,
     directory: str,
     max_items_per_cat: int,
+    max_tokens_per_item: int,
     device: str = "cpu",
 ) -> tuple[dict, dict]:
     """
     Vectorizes and batches input features
     """
     feats, sizes = encode_features(
-        records, field_lists, directory, max_items_per_cat, device=device
+        records,
+        field_lists,
+        directory,
+        max_items_per_cat,
+        max_tokens_per_item,
+        device=device,
     )
 
     batched = dict((f, resize_and_batch(t, batch_size)) for f, t in feats.items())

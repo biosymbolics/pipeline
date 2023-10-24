@@ -1,6 +1,5 @@
 from types import UnionType
 from typing import NamedTuple, Sequence, TypeGuard
-
 from pydash import flatten
 
 from data.prediction.constants import (
@@ -18,8 +17,9 @@ DEVICE = "mps"
 EMBEDDING_DIM = 16
 LR = 1e-4
 MAX_ITEMS_PER_CAT = 8  # DEFAULT_MAX_ITEMS_PER_CAT
+MAX_TOKENS_PER_ITEM = 8
 OPTIMIZER_CLASS = DEFAULT_OPTIMIZER_CLASS
-SAVE_FREQUENCY = 5  # DEFAULT_SAVE_FREQUENCY
+SAVE_FREQUENCY = DEFAULT_SAVE_FREQUENCY
 TRUE_THRESHOLD = DEFAULT_TRUE_THRESHOLD
 
 TRAINING_PROPORTION = 0.8

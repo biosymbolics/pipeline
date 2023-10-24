@@ -9,13 +9,14 @@ from typing import Callable, Sequence, TypeVar, cast
 import logging
 import torch
 import torch.nn as nn
+
+
 from data.prediction.types import (
     ModelInput,
     ModelInputAndOutput,
     is_model_input,
     is_model_input_output,
 )
-
 from data.prediction.utils import (
     encode_and_batch_all,
     encode_and_batch_input,
@@ -26,6 +27,7 @@ from typings.trials import TrialSummary
 from .constants import (
     BASE_ENCODER_DIRECTORY,
     MAX_ITEMS_PER_CAT,
+    MAX_TOKENS_PER_ITEM,
     QUANTITATIVE_TO_CATEGORY_FIELDS,
     InputRecord,
 )
@@ -63,6 +65,7 @@ prepare_input_data = partial(
     encode_and_batch_input,
     directory=BASE_ENCODER_DIRECTORY,
     max_items_per_cat=MAX_ITEMS_PER_CAT,
+    max_tokens_per_item=MAX_TOKENS_PER_ITEM,
 )
 
 # wrapper around encode_and_batch_all for inputs & outputs
@@ -70,6 +73,7 @@ prepare_data = partial(
     encode_and_batch_all,
     directory=BASE_ENCODER_DIRECTORY,
     max_items_per_cat=MAX_ITEMS_PER_CAT,
+    max_tokens_per_item=MAX_TOKENS_PER_ITEM,
 )
 
 

@@ -236,6 +236,7 @@ def main(bootstrap: bool = False):
         aws configure sso
         aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
         unzip patents.psql.zip
+        y
         export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
         echo "
     CREATE ROLE readaccess;

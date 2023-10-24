@@ -12,8 +12,6 @@ from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
 import polars as pl
 
 import system
-from typings.trials import TrialSummary
-from utils.list import batch
 
 system.initialize()
 
@@ -23,6 +21,8 @@ from data.prediction.utils import (
     decode_output,
     split_train_and_test,
 )
+from typings.trials import TrialSummary
+from utils.list import batch
 
 from .constants import (
     BASE_ENCODER_DIRECTORY,
@@ -56,7 +56,8 @@ class MetricWrapper(NamedTuple):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-STAGE2_MSE_WEIGHT = 5
+STAGE2_MSE_WEIGHT = 6
+STAGE1_CORR_WEIGHT = 0.2
 
 
 class ModelTrainer:
@@ -143,8 +144,7 @@ class ModelTrainer:
         y1_corr_probs: torch.Tensor,
         y2_preds: torch.Tensor,
     ) -> torch.Tensor:
-        # STAGE 1
-        # main stage 1 categorical loss
+        # STAGE 1 - categorical loss
         y1_probs_by_field, y1_true_by_field = split_categories(
             y1_probs, batch.y1_true, self.y1_category_sizes
         )
@@ -154,7 +154,7 @@ class ModelTrainer:
             self.stage1_criterion,
         )
 
-        # corr stage 1 categorical loss (guessing vals based on peer outputs)
+        # STAGE 1 - correlational loss (guessing vals based on peer outputs)
         y1_corr_probs_by_field, _ = split_categories(
             y1_corr_probs, batch.y1_true, self.y1_category_sizes
         )
@@ -164,7 +164,7 @@ class ModelTrainer:
                 y1_true_by_field,
                 self.stage1_criterion,
             ),
-            0.2,
+            STAGE1_CORR_WEIGHT,
         )
 
         # STAGE 2
@@ -176,7 +176,7 @@ class ModelTrainer:
             STAGE2_MSE_WEIGHT,
         )
 
-        # TOTAL
+        # TOTAL loss
         loss = stage1_loss + stage1_corr_loss + stage2_ce_loss + stage2_mse_loss
 
         logger.debug(
@@ -216,7 +216,6 @@ class ModelTrainer:
             ModelInput.get_instance(**batch.__dict__)
         )
 
-        # TOTAL
         loss = self.calc_loss(i, batch, y1_probs, y1_corr_probs, y2_preds)
 
         loss.backward()
@@ -353,7 +352,7 @@ class ModelTrainer:
         logger.info(
             "Comparisons: %s",
             json.dumps(
-                sorted(comparison, key=lambda x: random.random())[0:5], indent=2
+                sorted(comparison, key=lambda x: random.random())[0:1], indent=2
             ),
         )
 

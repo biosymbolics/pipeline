@@ -57,7 +57,7 @@ class Encoder:
         """
         try:
             encoder = load(self._file)
-            logger.info("Using EXISTING encoder for %s", self._name)
+            logger.debug("Using EXISTING encoder for %s", self._name)
             return encoder, True
         except:
             logging.info("Creating NEW instance of encoder for %s", self._name)
@@ -105,7 +105,7 @@ class Encoder:
             encoded = self._encoder.transform(values).tolist()
 
         logger.info(
-            "Encoded field %s (e.g. %s vs %s)", self._field, encoded[0:5], values[0:5]
+            "Encoded field %s (e.g. %s vs %s)", self._field, encoded[0:6], values[0:6]
         )
         return encoded
 
