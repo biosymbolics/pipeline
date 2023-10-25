@@ -68,12 +68,13 @@ class TestTrialUtils(unittest.TestCase):
             },
             # {
             #     "time_frame_desc": "415±32 days",
-            #     "expected": 415,
+            #     "expected": 415, # TODO: 32
             # },
             {
                 "time_frame_desc": "One year after the last patient is randomized",
                 "expected": 365,
             },
+            # 21 Days/course for up to 12 courses
         ]
 
         for test in test_cases:

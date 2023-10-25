@@ -32,7 +32,9 @@ time_in_days: dict = {
 }
 
 digit_map: dict = {
+    "first": 1,
     "one": 1,
+    "second": 2,
     "two": 2,
     "three": 3,
     "four": 4,
