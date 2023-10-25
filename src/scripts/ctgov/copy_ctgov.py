@@ -25,22 +25,22 @@ logger.setLevel(logging.INFO)
 
 SINGLE_FIELDS = {
     "studies.nct_id": "nct_id",
+    "studies.acronym": "acronym",
+    "studies.brief_title": "title",
+    "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
+    "studies.last_update_posted_date": "last_updated_date",
+    "studies.overall_status": "status",  # vs last_known_status
+    "studies.phase": "phase",
+    "studies.primary_completion_date": "end_date",  # Actual or est.
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
-    "studies.brief_title": "title",
-    "studies.primary_completion_date": "end_date",  # Actual or est.
-    "studies.last_update_posted_date": "last_updated_date",
     "studies.why_stopped": "why_stopped",
-    "studies.phase": "phase",
-    "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
-    "studies.overall_status": "status",  # vs last_known_status
-    "studies.acronym": "acronym",
+    "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
     "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
     "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
     "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
-    "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
-    "drop_withdrawals.reasons": "dropout_reasons",
     "drop_withdrawals.dropout_count": "dropout_count",
+    "drop_withdrawals.reasons": "dropout_reasons",
     "outcome_analyses.non_inferiority_types": "hypothesis_types",
 }
 
@@ -50,18 +50,20 @@ MULTI_FIELDS = {
     "design_groups.group_type": "arm_types",
     "interventions.name": "interventions",
     "outcomes.title": "primary_outcomes",
+    "outcomes.time_frame": "time_frames",
 }
 
 SINGLE_FIELDS_SQL = [f"max({f}) as {new_f}" for f, new_f in SINGLE_FIELDS.items()]
 MULI_FIELDS_SQL = [
-    f"array_agg(distinct {f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()
+    f"array_remove(array_agg(distinct {f}), NULL) as {new_f}"
+    for f, new_f in MULTI_FIELDS.items()
 ]
 
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
 def transform_ct_records(
-    ctgov_records: Sequence[dict], tagger: NerTagger
+    ctgov_records: Sequence[dict],  # , tagger: NerTagger
 ) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
@@ -74,24 +76,26 @@ def transform_ct_records(
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    intervention_sets = [rec["interventions"] for rec in ctgov_records]
-    uniq_interventions = dedup(flatten(intervention_sets))
-    logger.info(
-        "Extracting intervention names for %s strings (e.g. %s)",
-        len(uniq_interventions),
-        uniq_interventions[0:10],
-    )
-    norm_map = tagger.extract_string_map(uniq_interventions)
+    # intervention_sets = [rec["interventions"] for rec in ctgov_records]
+    # uniq_interventions = dedup(flatten(intervention_sets))
+    # logger.info(
+    #     "Extracting intervention names for %s strings (e.g. %s)",
+    #     len(uniq_interventions),
+    #     uniq_interventions[0:10],
+    # )
+    # norm_map = tagger.extract_string_map(uniq_interventions)
 
-    def normalize_interventions(interventions: list[str]):
-        return flatten([norm_map.get(i) or i for i in interventions])
+    # def normalize_interventions(interventions: list[str]):
+    #     return flatten([norm_map.get(i) or i for i in interventions])
 
-    return [
-        dict_to_trial_summary(
-            {**rec, "interventions": normalize_interventions(rec["interventions"])}
-        )
-        for rec in ctgov_records
-    ]
+    # return [
+    #     dict_to_trial_summary(
+    #         {**rec, "interventions": normalize_interventions(rec["interventions"])}
+    #     )
+    #     for rec in ctgov_records
+    # ]
+
+    return [dict_to_trial_summary(rec) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -107,6 +111,7 @@ def ingest_trials():
         0 as duration,
         '' as comparison_type,
         '' as hypothesis_type,
+        null as max_timeframe,
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason
@@ -133,13 +138,13 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    tagger = NerTagger(
-        entity_types=frozenset(["compounds", "mechanisms"]),
-        link=True,
-        additional_cleaners=[
-            lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
-        ],
-    )
+    # tagger = NerTagger(
+    #     entity_types=frozenset(["compounds", "mechanisms"]),
+    #     link=True,
+    #     additional_cleaners=[
+    #         lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
+    #     ],
+    # )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -148,7 +153,9 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
+        transform=lambda records: transform_ct_records(
+            records  # type: ignore
+        ),  # tagger
     )
     # TODO: alter table trials alter column interventions set data type text[];
 

@@ -2,8 +2,11 @@ from datetime import date, datetime
 from typing import Sequence, TypeGuard, TypedDict, cast
 import logging
 
+from pydash import uniq
+
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
+from scripts.ctgov.utils import extract_timeframe, extract_max_timeframe
 from utils.classes import ByDefinitionOrderEnum
 
 logger = logging.getLogger(__name__)
@@ -395,6 +398,7 @@ class ComparisonType(ByDefinitionOrderEnum):
     ACTIVE = "ACTIVE"
     PLACEBO = "PLACEBO"
     NO_INTERVENTION = "NO_INTERVENTION"
+    NO_COMPARISON = "NO_COMPARISON"
     UNKNOWN = "UNKNOWN"
     NA = "NA"
     OTHER = "OTHER"
@@ -402,22 +406,22 @@ class ComparisonType(ByDefinitionOrderEnum):
     @classmethod
     def find(cls, value, design: TrialDesign | None = None):
         if isinstance(value, Sequence):
+            if design == TrialDesign.SINGLE_GROUP:
+                return cls.NO_COMPARISON
             if len(value) == 0:
                 return cls.UNKNOWN
             if "Active Comparator" in value:
                 if "Experimental" in value:
                     return cls.ACTIVE
-                if (
-                    len(value) == 1 or "Other" in value
-                ) and design != TrialDesign.SINGLE_GROUP:
+                if all("Active Comparator" in v for v in value):
+                    return cls.ACTIVE
+                if len(value) == 1 or "Other" in value:
                     return cls.PLACEBO  # just guessing
             if "Placebo Comparator" in value or "Sham Comparator" in value:
                 return cls.PLACEBO
             if "No Intervention" in value:
                 return cls.NO_INTERVENTION
             if "Experimental" in value:
-                if design == TrialDesign.SINGLE_GROUP:
-                    return cls.NA
                 if design in [
                     TrialDesign.PARALLEL,
                     TrialDesign.CROSSOVER,
@@ -425,13 +429,14 @@ class ComparisonType(ByDefinitionOrderEnum):
                 ]:
                     # assume only experimental given parallel/xover or factorial, assume that means active comp
                     return cls.ACTIVE
+                if design == TrialDesign.SEQUENTIAL and uniq(value) == 1:
+                    # if sequential and only experimental, assume no comparison
+                    return cls.NO_COMPARISON
                 return cls.UNKNOWN
-            if "Other" in value:
-                if design == TrialDesign.SINGLE_GROUP:
-                    return cls.NA
-                return cls.OTHER
             if "No Intervention" in value:
-                return cls.NA
+                return cls.NO_INTERVENTION
+            if "Other" in value:
+                return cls.OTHER
             return cls.UNKNOWN
         else:
             logger.warning("Comparison type is not a sequence: %s", value)
@@ -457,6 +462,8 @@ class BaseTrial(TypedDict):
     primary_outcomes: list[str]
     sponsor: str
     start_date: date
+    termination_reason: TerminationReason
+    time_frames: list[str]
     title: str
 
 
@@ -479,15 +486,15 @@ class TrialSummary(BaseTrial):
     duration: int  # in days
     hypothesis_type: HypothesisType
     masking: TrialMasking
+    max_timeframe: int | None  # in days
     phase: TrialPhase
     purpose: TrialPurpose
     randomization: TrialRandomization
     sponsor_type: SponsorType
     status: TrialStatus
-    termination_reason: TerminationReason
 
 
-def is_trial_record(trial: dict) -> TypeGuard[TrialSummary]:
+def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
     """
     Check if dict is a trial record
     """
@@ -520,6 +527,7 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
         and "design" in trial
         and "hypothesis_type" in trial
         and "masking" in trial
+        and "max_timeframe" in trial
         and "purpose" in trial
         and "randomization" in trial
         and "termination_reason" in trial
@@ -565,6 +573,7 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
             "comparison_type": ComparisonType.find(trial["arm_types"], design),
             "design": design,
             "duration": __calc_duration(trial["start_date"], trial["end_date"]),
+            "max_timeframe": extract_max_timeframe(trial["time_frames"]),
             "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "masking": TrialMasking(trial["masking"]),
             "phase": TrialPhase(trial["phase"]),

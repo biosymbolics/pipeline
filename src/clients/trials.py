@@ -29,7 +29,8 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND array_length(mesh_conditions, 1) > 0
         AND mesh_conditions[1] is not null
         AND array_length(interventions, 1) > 0
-        AND design not in ('UNKNOWN', 'FACTORIAL', 'SEQUENTIAL') -- rare (TODO: remove)
+        AND comparison_type not in ('UNKNOWN', 'OTHER')
+        AND design not in ('UNKNOWN', 'FACTORIAL') -- rare (TODO: remove)
         AND randomization not in ('UNKNOWN') -- rare
         AND masking not in ('UNKNOWN')
         AND sponsor_type in ('INDUSTRY', 'INDUSTRY_LARGE', 'OTHER')
