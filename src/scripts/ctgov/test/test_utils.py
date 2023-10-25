@@ -66,6 +66,10 @@ class TestTrialUtils(unittest.TestCase):
                 "time_frame_desc": "415days",
                 "expected": 415,
             },
+            {
+                "time_frame_desc": "3 Years",
+                "expected": 3 * 365,
+            },
             # {
             #     "time_frame_desc": "415±32 days",
             #     "expected": 415, # TODO: 32

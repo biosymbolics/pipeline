@@ -105,7 +105,8 @@ def extract_timeframe(timeframe_desc: str | None) -> int | None:
 
     times = compact([calc_time(candidate) for candidate in timeframe_candidates])
 
-    return max(times) if len(times) > 0 else None
+    max_timeframe = max(times) if len(times) > 0 else None
+    return max_timeframe
 
 
 def extract_max_timeframe(timeframe_descs: list[str]) -> int | None:

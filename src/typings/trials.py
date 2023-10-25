@@ -474,7 +474,6 @@ class TrialRecord(BaseTrial):
     purpose: str
     randomization: str
     status: str
-    target_duration: str | None
 
 
 class TrialSummary(BaseTrial):
@@ -493,7 +492,6 @@ class TrialSummary(BaseTrial):
     randomization: TrialRandomization
     sponsor_type: SponsorType
     status: TrialStatus
-    target_duration: int | None  # in days
 
 
 def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
@@ -507,7 +505,6 @@ def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
         and "start_date" in trial
         and "last_updated_date" in trial
         and "status" in trial
-        and "target_duration" in trial
         and "title" in trial
         and "phase" in trial
         and "conditions" in trial
@@ -584,7 +581,6 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
             "randomization": TrialRandomization(trial["randomization"]),
             "sponsor_type": SponsorType(trial["sponsor"]),
             "status": TrialStatus(trial["status"]),
-            "target_duration": extract_timeframe(trial["target_duration"]),
             "termination_reason": TerminationReason(trial["termination_reason"]),
         },
     )

@@ -34,7 +34,6 @@ SINGLE_FIELDS = {
     "studies.primary_completion_date": "end_date",  # Actual or est.
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
-    "studies.target_duration": "target_duration",
     "studies.why_stopped": "why_stopped",
     "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
     "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
