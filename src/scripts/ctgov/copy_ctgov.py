@@ -25,22 +25,23 @@ logger.setLevel(logging.INFO)
 
 SINGLE_FIELDS = {
     "studies.nct_id": "nct_id",
+    "studies.acronym": "acronym",
+    "studies.brief_title": "title",
+    "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
+    "studies.last_update_posted_date": "last_updated_date",
+    "studies.overall_status": "status",  # vs last_known_status
+    "studies.phase": "phase",
+    "studies.primary_completion_date": "end_date",  # Actual or est.
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
-    "studies.brief_title": "title",
-    "studies.primary_completion_date": "end_date",  # Actual or est.
-    "studies.last_update_posted_date": "last_updated_date",
+    "studies.target_duration": "target_duration",
     "studies.why_stopped": "why_stopped",
-    "studies.phase": "phase",
-    "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
-    "studies.overall_status": "status",  # vs last_known_status
-    "studies.acronym": "acronym",
+    "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
     "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
     "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
     "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
-    "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
-    "drop_withdrawals.reasons": "dropout_reasons",
     "drop_withdrawals.dropout_count": "dropout_count",
+    "drop_withdrawals.reasons": "dropout_reasons",
     "outcome_analyses.non_inferiority_types": "hypothesis_types",
 }
 
@@ -55,7 +56,8 @@ MULTI_FIELDS = {
 
 SINGLE_FIELDS_SQL = [f"max({f}) as {new_f}" for f, new_f in SINGLE_FIELDS.items()]
 MULI_FIELDS_SQL = [
-    f"array_agg(distinct {f}) as {new_f}" for f, new_f in MULTI_FIELDS.items()
+    f"array_remove(array_agg(distinct {f}), NULL) as {new_f}"
+    for f, new_f in MULTI_FIELDS.items()
 ]
 
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL

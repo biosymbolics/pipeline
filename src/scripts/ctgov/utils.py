@@ -49,7 +49,7 @@ digit_map: dict = {
 }
 
 
-def extract_timeframe(timeframe_desc: str) -> int | None:
+def extract_timeframe(timeframe_desc: str | None) -> int | None:
     """
     Extract outcome durations in days
     """
@@ -59,6 +59,9 @@ def extract_timeframe(timeframe_desc: str) -> int | None:
     time_joiners = "(?:[-, ±]+| to | and )"
     units_digit_re = rf"\b{unit_re}[ -]?{number_re}+(?:{time_joiners}+{number_re}+)*"
     timeframe_re = rf"(?:{number_units_re}|{units_digit_re}|{number_re})"
+
+    if timeframe_desc is None:
+        return None
 
     timeframe_candidates = re.findall(
         timeframe_re, timeframe_desc, re.IGNORECASE | re.MULTILINE
