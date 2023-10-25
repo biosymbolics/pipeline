@@ -52,11 +52,11 @@ def extract_timeframe(timeframe_desc: str) -> int | None:
     Extract outcome durations in days
     """
     unit_re = get_or_re(flatten(time_units.values()))
-    digit_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|{get_or_re(list(digit_map.keys()))})"
-    digit_units_re = rf"{digit_re}+[ -]?{unit_re}"
-    time_joiners = "(?:[-, ]+| to | and )"
-    units_digit_re = rf"\b{unit_re}[ -]?{digit_re}+(?:{time_joiners}+{digit_re}+)*"
-    timeframe_re = rf"(?:{digit_units_re}|{units_digit_re}|{digit_re})"
+    number_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|{get_or_re(list(digit_map.keys()))})"
+    number_units_re = rf"{number_re}+[ -]?{unit_re}"
+    time_joiners = "(?:[-, ±]+| to | and )"
+    units_digit_re = rf"\b{unit_re}[ -]?{number_re}+(?:{time_joiners}+{number_re}+)*"
+    timeframe_re = rf"(?:{number_units_re}|{units_digit_re}|{number_re})"
 
     timeframe_candidates = re.findall(
         timeframe_re, timeframe_desc, re.IGNORECASE | re.MULTILINE
@@ -86,13 +86,13 @@ def extract_timeframe(timeframe_desc: str) -> int | None:
             return None
 
     def calc_time(time_desc: str) -> int | None:
-        num_strings = re.findall(digit_re, time_desc)
-        unit = get_unit(time_desc)
+        number_strs = re.findall(number_re, time_desc, re.IGNORECASE)
+        unit = get_unit(re.sub(get_or_re(number_strs), "", time_desc))
 
         if unit is None:
             return None
 
-        numbers = compact([get_number(n_str) for n_str in num_strings])
+        numbers = compact([get_number(num_str.lower()) for num_str in number_strs])
         v = [int(n) * time_in_days[unit] for n in numbers]
         if len(v) == 0:
             return None
