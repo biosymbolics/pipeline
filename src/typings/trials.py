@@ -432,7 +432,7 @@ class ComparisonType(ByDefinitionOrderEnum):
     OTHER = "OTHER"
 
     @classmethod
-    def is_intervention_match(cls, comp_type: str, i_types) -> bool:
+    def is_intervention_match(cls, comp_type: "str | ComparisonType", i_types) -> bool:
         ACTIVE_RE = r"(?:active comparator|standard of care|\bSOC\b)"
         PLACEBO_RE = r"(?:placebo|sham|comparator|control\b)"
 
