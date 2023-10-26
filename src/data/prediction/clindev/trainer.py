@@ -99,7 +99,7 @@ class ModelTrainer:
             single_select_input=math.prod(training_input.single_select.shape[2:]),
             text_input=math.prod(training_input.text.shape[2:]),
             stage1_output_map=category_sizes.y1,
-            stage1_output=math.prod(training_input.y1_true.shape[2:]) * 10,
+            stage1_output=math.prod(training_input.y1_true.shape[2:]) * 20,
             stage2_output=category_sizes.y2,
         )
         logger.info("Model sizes: %s", sizes)
@@ -330,6 +330,10 @@ class ModelTrainer:
             y1_probs, batch.y1_true, category_sizes
         )
 
+        self.calculate_metrics(
+            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
+        )
+
         # decode outputs and verify a few
         outputs = decode_output(
             [y1.detach().to("cpu") for y1 in y1_probs_by_field],
@@ -341,7 +345,8 @@ class ModelTrainer:
             {
                 k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
                 for k, v in true.items()
-                if k == "nct_id" or k in flatten(output_field_lists.__dict__.values())
+                if k in ["nct_id", "mesh_conditions"]
+                or k in flatten(output_field_lists.__dict__.values())
             }
             for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
         ]
@@ -352,13 +357,9 @@ class ModelTrainer:
             ),
         )
 
-        self.calculate_metrics(
-            y1_probs_by_field, y1_true_by_field, y2_preds, batch.y2_oh_true
-        )
-
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=50000))
+        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
 
         inputs, category_sizes = prepare_data(
             cast(Sequence[InputAndOutputRecord], trials),

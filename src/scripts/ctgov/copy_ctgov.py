@@ -111,15 +111,19 @@ def ingest_trials():
         0 as duration,
         '' as comparison_type,
         '' as hypothesis_type,
-        null as max_timeframe,
+        -1 as max_timeframe,
         '' as normalized_sponsor,
         '' as sponsor_type,
         '' as termination_reason
         from designs, studies
         JOIN conditions on conditions.nct_id = studies.nct_id
-        JOIN interventions on interventions.nct_id = studies.nct_id AND intervention_type = 'Drug'
+        JOIN interventions on interventions.nct_id = studies.nct_id
+            AND intervention_type in (
+                'Biological', 'Combination Product', 'Drug',
+                'Dietary Supplement', 'Genetic', 'Other', 'Procedure'
+            )
         LEFT JOIN design_groups on design_groups.nct_id = studies.nct_id
-        LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
+        LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id AND mesh_type='mesh-list'
         LEFT JOIN outcomes on outcomes.nct_id = studies.nct_id AND outcomes.outcome_type = 'Primary'
         LEFT JOIN (
             select nct_id, sum(count) as dropout_count, array_agg(distinct reason) as reasons
