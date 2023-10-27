@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Iterable, Optional, Sequence, TypeVar, Union, cast
+from typing import Iterable, Sequence, TypeVar, Union, cast
 import regex as re
 from functools import partial, reduce
 import logging
@@ -31,7 +31,7 @@ class CleanFunction(Protocol):
         pass
 
 
-WORD_AND_CHAR_SUPPRESSIONS = {
+SUBSTITUTIONS = {
     r"\n": " ",
     "/": " ",
     r"[.,:;'\"]+$": "",  # trailing punct
@@ -68,12 +68,12 @@ class EntityCleaner:
     def __init__(
         self,
         additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
-        char_suppressions: dict[str, str] = WORD_AND_CHAR_SUPPRESSIONS,
+        substitutions: dict[str, str] = SUBSTITUTIONS,
         additional_cleaners: Sequence[CleanFunction] = [],
         parallelize: bool = True,
     ):
         self.additional_common_words = additional_common_words
-        self.char_suppressions = char_suppressions
+        self.substitutions = substitutions
         self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
         self.__common_words = None
@@ -158,16 +158,15 @@ class EntityCleaner:
         """
         start = time.time()
 
-        def remove_chars(_terms: list[str]) -> Iterable[str]:
-            def __remove_chars(term):
-                for pattern, replacement in self.char_suppressions.items():
+        def make_substitutions(_terms: list[str]) -> Iterable[str]:
+            def __substitute_strings(term):
+                for pattern, replacement in self.substitutions.items():
                     term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
-                    print(pattern, replacement, term)
 
                 return term
 
             for term in _terms:
-                yield __remove_chars(term)
+                yield __substitute_strings(term)
 
         def decode_html(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
@@ -236,7 +235,7 @@ class EntityCleaner:
             remove_after_newline,  # order matters (this before unwrap etc)
             unwrap,
             format_parentheticals,  # order matters (run after unwrap)
-            remove_chars,  # order matters (after unwrap/format_parentheticals)
+            make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
             rearrange_terms,
             depluralize_tails,
@@ -307,7 +306,6 @@ class EntityCleaner:
     def clean(
         self,
         entities: Sequence[T],
-        common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
         remove_suppressed: bool = False,
     ) -> Sequence[T]:
         """
