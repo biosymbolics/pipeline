@@ -122,6 +122,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?toothbrush",
     "(?:.* )?sutur",
     "(?:.* )?stent",
+    "(?:.* )?(?:bike|bicycle)",
 ]
 # for use in patents; might need adjustment to be more generally applicable.
 DEVICE_RES = [

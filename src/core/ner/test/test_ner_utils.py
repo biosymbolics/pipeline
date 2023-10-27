@@ -2,6 +2,10 @@ import unittest
 
 from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
+from data.common.biomedical import (
+    remove_trailing_leading,
+    REMOVAL_WORDS_POST as REMOVAL_WORDS,
+)
 
 
 class TestNerUtils(unittest.TestCase):
@@ -11,7 +15,11 @@ class TestNerUtils(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cleaner = EntityCleaner()
+        self.cleaner = EntityCleaner(
+            additional_cleaners=[
+                lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+            ],
+        )
 
     def test_filter_common_terms(self):
         test_conditions = [
@@ -80,7 +88,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "OPSUMITB®, other product",
-                "expected": "opsumitb, other product",
+                "expected": "opsumitb, other",
             },
             {
                 "input": "/OPSUMITC ®",
@@ -92,7 +100,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
-                "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivative",
+                "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione",
             },
             {
                 "input": "(meth)acrylic acid polymer",
@@ -221,7 +229,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "chimeric antibody-T cell receptor",
-                "expected": "chimeric antibody t-cell receptor",
+                "expected": "chimeric antigen receptor t-cell",
             },
             {
                 "input": "β1-adrenoreceptor gene",
@@ -262,6 +270,10 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "ingredient tumor cytotoxic factor-II (TCF-II)",
                 "expected": "ingredient tumor cytotoxic factor ii",
+            },
+            {
+                "input": "FOLFIRINOX treatment",
+                "expected": "folfirinox",
             },
         ]
 

@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Iterable, Sequence, TypeVar, Union, cast
+from typing import Iterable, Optional, Sequence, TypeVar, Union, cast
 import regex as re
 from functools import partial, reduce
 import logging
@@ -13,7 +13,7 @@ from typing_extensions import Protocol
 from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
-from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
+from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .spacy import Spacy
@@ -22,14 +22,16 @@ from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
+RE_FLAGS = RE_STANDARD_FLAGS
+
 
 class CleanFunction(Protocol):
     @abstractmethod
-    def __call__(self, terms: Sequence[str], n_process: int) -> Sequence[str]:
+    def __call__(self, terms: Sequence[str]) -> Sequence[str]:
         pass
 
 
-CHAR_SUPPRESSIONS = {
+WORD_AND_CHAR_SUPPRESSIONS = {
     r"\n": " ",
     "/": " ",
     r"[.,:;'\"]+$": "",  # trailing punct
@@ -66,7 +68,7 @@ class EntityCleaner:
     def __init__(
         self,
         additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
-        char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+        char_suppressions: dict[str, str] = WORD_AND_CHAR_SUPPRESSIONS,
         additional_cleaners: Sequence[CleanFunction] = [],
         parallelize: bool = True,
     ):
@@ -143,9 +145,7 @@ class EntityCleaner:
         new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_lemmas])
         return new_list
 
-    def normalize_terms(
-        self, terms: Sequence[str], n_process: int = 1
-    ) -> Sequence[str]:
+    def normalize_terms(self, terms: Sequence[str]) -> Sequence[str]:
         """
         Normalize terms
         - remove certain characters
@@ -161,7 +161,9 @@ class EntityCleaner:
         def remove_chars(_terms: list[str]) -> Iterable[str]:
             def __remove_chars(term):
                 for pattern, replacement in self.char_suppressions.items():
-                    term = re.sub(pattern, replacement, term, flags=re.DOTALL)
+                    term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
+                    print(pattern, replacement, term)
+
                 return term
 
             for term in _terms:
@@ -177,7 +179,7 @@ class EntityCleaner:
             e.g. "asthma\n is a disease" -> "asthma"
             """
             for term in _terms:
-                yield re.sub(r"\n.*", "", term, flags=re.DOTALL)
+                yield re.sub(r"\n.*", "", term, flags=RE_FLAGS)
 
         def lower(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
@@ -202,22 +204,20 @@ class EntityCleaner:
                     r"(?<=[ ,])(\([a-z-0-9 ]+\))(?=(?: |,|$))",
                     "",
                     term,
-                    flags=re.DOTALL | re.IGNORECASE,
+                    flags=RE_FLAGS,
                 )
                 # `poly(isoprene)` -> `polyisoprene``
                 no_parens = re.sub(
                     r"\(([a-z-0-9]+)\)",
                     r"\1",
                     no_parenth,
-                    flags=re.DOTALL | re.IGNORECASE,
+                    flags=RE_FLAGS,
                 )
                 yield no_parens
 
         def normalize_phrases(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
-                return re.sub(
-                    rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
-                )
+                return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
@@ -238,13 +238,11 @@ class EntityCleaner:
             format_parentheticals,  # order matters (run after unwrap)
             remove_chars,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
-            partial(rearrange_terms, n_process=n_process),
-            partial(
-                depluralize_tails,
-                n_process=n_process,
-            ),
-            partial(normalize_by_pos, n_process=n_process),
+            rearrange_terms,
+            depluralize_tails,
+            normalize_by_pos,
             normalize_phrases,  # order matters (after rearrange)
+            *self.additional_cleaners,
             remove_extra_spaces,
             lower,
         ]
@@ -334,15 +332,13 @@ class EntityCleaner:
             )
 
         cleaning_steps: list[CleanFunction] = [
-            lambda terms, n_process: self.__suppress(terms),
+            self.__suppress,
             self.normalize_terms,
             self.filter_common_terms,
         ]
 
         terms: Sequence = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(
-            lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
-        )
+        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
 
         logging.info(
             "Cleaned %s entities in %s seconds",

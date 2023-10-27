@@ -85,6 +85,7 @@ DELETION_TERMS = [
     "field of .*",
     # thing (unwanted because wrong type of thing)
     "(?:.* )?food",
+    "(?:.* )?diet",
     "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
@@ -264,7 +265,12 @@ DELETION_TERMS = [
     "arterial",
     "venous",
     "lymph(?:atic)?(?: node| vessel)?",
+    # control
+    "(?:.* )?placebos?(?: .*)?",
+    "standard treatment",
+    "standard of care",
     # category errors
+    "individual",
     "formability",
     "(?:fe)?male",
     "(?:.*)?dimensional",
@@ -474,6 +480,7 @@ DELETION_TERMS = [
     "evaporat",
     "agglomerat",
     # measurable thing
+    "(?:.* )?measurement",
     "(?:.* )?curvature",
     "(?:.* )?degree",
     "spatial resolution",
@@ -559,7 +566,15 @@ DELETION_TERMS = [
     "(?:.* )?communicat",
     "(?:.* )?sequenc",
     "(?:.* )?(?:micro)?process",
+    # behavioral
+    "(?:.* )?program",
+    "(?:.* )?counsel",
+    "(?:.* )?rehabilitation",
+    "(?:.* )?physical therapy",
+    "(?:.* )?behavioral therapy",
+    "(?:.* )?visit",
     # procedure
+    "(?:.* )?monitor",
     "(?:.* )?procedure",
     "(?:.* )?technique",
     "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",

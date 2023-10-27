@@ -31,6 +31,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "treatment(?: of)?": "all",
     "library": "all",
     "more": "leading",
+    "% ": "leading",
+    "active control": "all",
     "classic": "all",
     "present": "leading",
     "invention": "all",
@@ -55,6 +57,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "other": "leading",
     "more": "leading",
     "of": "trailing",
+    "combined": "trailing",
     "symptom": "trailing",
     "condition": "trailing",
     "be": "trailing",
@@ -142,6 +145,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
+    "application": "trailing",
     # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",
