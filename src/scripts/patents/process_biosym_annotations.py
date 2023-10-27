@@ -276,11 +276,10 @@ def remove_common_terms():
     ]
 
     common_terms_re = get_or_re(common_terms)
-    del_term_res = [
-        # .? - to capture things like "gripping" from "grip"
-        f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$",
-    ]
-    del_term_re = "(?i)" + get_or_re(del_term_res)
+    del_term_re = (
+        "(?i)"
+        + f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$"
+    )
     result = client.select(f"select distinct original_term from {WORKING_TABLE}")
     terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
 
