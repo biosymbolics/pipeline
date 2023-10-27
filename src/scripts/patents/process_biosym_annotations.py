@@ -33,14 +33,15 @@ from data.common.biomedical import (
     EXPAND_CONNECTING_RE,
     POTENTIAL_EXPANSION_MAX_TOKENS,
     TARGET_PARENS,
+    DELETION_TERMS,
     REMOVAL_WORDS_PRE,
     REMOVAL_WORDS_POST,
 )
+
 from data.common.biomedical.types import WordPlace
 from utils.list import batch
 from utils.re import get_or_re
 
-from .constants import DELETION_TERMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -271,7 +272,7 @@ def remove_common_terms():
     common_terms = [
         *DELETION_TERMS,
         *INTERVENTION_BASE_TERMS,
-        *EntityCleaner().common_words,
+        *EntityCleaner().removal_words,
     ]
 
     common_terms_re = get_or_re(common_terms)

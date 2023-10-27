@@ -27,10 +27,10 @@ class TestNerUtils(unittest.TestCase):
                 "terms": [
                     "vaccine candidates",
                     "PF-06863135",
-                    "therapeutic options",
+                    "therapeutics",
                     "COVID-19 mRNA vaccine",
-                    "exception term",
-                    "common term",
+                    "exception",
+                    "common",
                 ],
                 "exception_list": ["exception"],
                 "expected_output": [
@@ -38,29 +38,8 @@ class TestNerUtils(unittest.TestCase):
                     "PF-06863135",
                     "",
                     "COVID-19 mRNA vaccine",
-                    "exception term",
-                    "common term",
-                ],
-            },
-            {
-                "terms": [
-                    "vaccine candidate",
-                    "vaccine candidates",
-                    "therapeutic options",
-                    "therapeutic option",
-                    "therapeutics option",
-                    "COVID-19 mRNA vaccine",
-                    "common term",
-                ],
-                "exception_list": [],
-                "expected_output": [
-                    "vaccine candidate",
-                    "vaccine candidates",
+                    "exception",
                     "",
-                    "",
-                    "",
-                    "COVID-19 mRNA vaccine",
-                    "common term",
                 ],
             },
         ]
@@ -70,9 +49,7 @@ class TestNerUtils(unittest.TestCase):
             exception_list = condition["exception_list"]
             expected_output = condition["expected_output"]
 
-            result = self.cleaner.filter_common_terms(
-                terms, exception_list=exception_list
-            )
+            result = self.cleaner.remove_terms(terms, exception_list=exception_list)
             print("Actual", result, "expected", expected_output)
             self.assertEqual(result, expected_output)
 
@@ -281,7 +258,7 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = self.cleaner.clean([input], [], True)
+            result = self.cleaner.clean([input], True)
             print("Actual", result, "expected", [expected])
             self.assertEqual(result, [expected])
 

@@ -5,6 +5,9 @@ import sys
 import logging
 from typing import Sequence
 from pydash import flatten
+from constants.patterns.intervention import INTERVENTION_BASE_TERMS
+from core.ner.cleaning import EntityCleaner
+from data.common.biomedical.constants import DELETION_TERMS
 
 from system import initialize
 
@@ -78,6 +81,7 @@ def transform_ct_records(
     """
 
     intervention_sets = [rec["interventions"] for rec in ctgov_records]
+
     uniq_interventions = dedup(flatten(intervention_sets))
     logger.info(
         "Extracting intervention names for %s strings (e.g. %s)",
@@ -149,6 +153,10 @@ def ingest_trials():
         link=True,
         additional_cleaners=[
             lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+        ],
+        additional_removal_terms=[
+            *DELETION_TERMS,
+            *INTERVENTION_BASE_TERMS,
         ],
     )
     trial_db = f"{BASE_DATABASE_URL}/aact"

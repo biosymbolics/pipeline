@@ -62,6 +62,7 @@ class NerTagger:
             ]
         ),
         additional_cleaners: list[CleanFunction] = [],
+        additional_removal_terms: list[str] = [],
         link: bool = True,
     ):
         """

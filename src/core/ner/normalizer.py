@@ -35,6 +35,7 @@ class TermNormalizer:
         self,
         link: bool = True,
         additional_cleaners: Sequence[CleanFunction] = [],
+        additional_removal_terms: Sequence[str] = [],
     ):
         """
         Initialize term normalizer using existing model
@@ -44,6 +45,7 @@ class TermNormalizer:
         else:
             self.term_linker = None
         self.cleaner: EntityCleaner = EntityCleaner(
+            additional_removal_words=additional_removal_terms,
             additional_cleaners=additional_cleaners,
         )
 
