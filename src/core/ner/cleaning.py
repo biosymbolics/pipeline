@@ -4,7 +4,6 @@ Utils for the NER pipeline
 from abc import abstractmethod
 import time
 from typing import Iterable, Mapping, Sequence, TypeVar, Union, cast
-from pydash import flatten
 import regex as re
 from functools import partial, reduce
 import logging
@@ -14,7 +13,7 @@ from typing_extensions import Protocol
 from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
-from utils.re import expand_res, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
+from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .spacy import Spacy
@@ -48,8 +47,6 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "second",
 ]
 
-MAX_N_PROCESS = 4
-
 
 class EntityCleaner:
     """
@@ -75,20 +72,6 @@ class EntityCleaner:
         self.additional_cleaners = additional_cleaners
         self.__removal_words: list[str] | None = None
         self.nlp = Spacy.get_instance(disable=["ner"])._nlp
-
-    def get_n_process(self, num_entries: int) -> int:
-        """
-        Get the number of processes to use for parallelization in nlp pipeline
-
-        only parallelize if
-            1) parallelize is set to true and
-            2) there are more than 10000 entities (otherwise the overhead probably exceeds the benefits)
-
-        TODO: it might never make sense to parallelize.
-        Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
-        """
-        parallelize = self.parallelize and num_entries > 100000000
-        return MAX_N_PROCESS if parallelize else 1
 
     @property
     def removal_words(self) -> list[str]:
@@ -265,13 +248,6 @@ class EntityCleaner:
         start = time.time()
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
-
-        num_processes = self.get_n_process(len(entities))
-
-        if num_processes > 1:
-            logging.info(
-                "Using %s processes for count %s", num_processes, len(entities)
-            )
 
         cleaning_steps: list[CleanFunction] = [self.normalize_terms]
 
