@@ -15,9 +15,7 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
-from constants.patterns.intervention import INTERVENTION_BASE_TERMS
 from core.ner.cleaning import RE_FLAGS
-from data.common.biomedical.constants import DELETION_TERMS
 from data.common.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
@@ -176,10 +174,6 @@ def ingest_trials():
         link=True,
         additional_cleaners=[
             lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
-        ],
-        additional_removal_terms=[
-            *DELETION_TERMS,
-            *INTERVENTION_BASE_TERMS,
         ],
     )
     trial_db = f"{BASE_DATABASE_URL}/aact"
