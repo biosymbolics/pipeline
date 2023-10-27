@@ -1,9 +1,11 @@
 """
 Utils for copying approvals data
 """
+from functools import reduce
+import re
 import sys
 import logging
-from typing import Sequence
+from typing import Callable, Sequence
 from pydash import flatten
 from constants.patterns.intervention import INTERVENTION_BASE_TERMS
 from core.ner.cleaning import EntityCleaner
@@ -66,6 +68,20 @@ MULI_FIELDS_SQL = [
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
+def is_control(intervention_str: str) -> bool:
+    return (
+        re.match(
+            r".*\b(?:placebo|standard (?:of )?care|sham|standard treatment)s?\b.*",
+            intervention_str,
+        )
+        is None
+    )
+
+
+def is_intervention(intervention_str: str) -> bool:
+    return not is_control(intervention_str)
+
+
 def transform_ct_records(
     ctgov_records: Sequence[dict], tagger: NerTagger
 ) -> Sequence[TrialSummary]:
@@ -82,13 +98,19 @@ def transform_ct_records(
 
     intervention_sets = [rec["interventions"] for rec in ctgov_records]
 
-    uniq_interventions = dedup(flatten(intervention_sets))
+    cleaners: list[Callable[[list[str]], list[str]]] = [
+        lambda interventions: dedup(interventions),
+        lambda interventions: list(filter(is_intervention, interventions)),
+    ]
+    interventions = reduce(
+        lambda x, cleaner: cleaner(x), cleaners, flatten(intervention_sets)
+    )
     logger.info(
         "Extracting intervention names for %s strings (e.g. %s)",
-        len(uniq_interventions),
-        uniq_interventions[0:10],
+        len(interventions),
+        interventions[0:10],
     )
-    norm_map = tagger.extract_string_map(uniq_interventions)
+    norm_map = tagger.extract_string_map(interventions)
 
     def normalize_interventions(interventions: list[str]):
         return flatten([norm_map.get(i) or i for i in interventions])
