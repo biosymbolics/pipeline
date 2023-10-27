@@ -276,7 +276,6 @@ DELETION_TERMS = [
     r"agent\(s\)",
     "medical purpose",
     "cell membrane",
-    "(?:.* )?part",
     "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system|medium)",
     "(?:.* )?activit",
     "(?:.* )?member",

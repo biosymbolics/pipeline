@@ -1,4 +1,7 @@
-from typing import Callable, Sequence
+"""
+Linking/cleaning of terms
+"""
+from typing import Sequence
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker import TermLinker
 from core.ner.types import CanonicalEntity
@@ -45,7 +48,7 @@ class TermNormalizer:
         else:
             self.term_linker = None
         self.cleaner: EntityCleaner = EntityCleaner(
-            additional_removal_words=additional_removal_terms,
+            additional_removal_terms=additional_removal_terms,
             additional_cleaners=additional_cleaners,
         )
 

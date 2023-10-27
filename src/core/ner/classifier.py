@@ -4,7 +4,7 @@ Text classifiers
 from enum import Enum
 import regex as re
 from pydash import compact, flatten
-from typing import Mapping, TypeVar, Union
+from typing import Mapping, TypeVar
 import logging
 
 from core.ner.utils import lemmatize_all

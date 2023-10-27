@@ -5,7 +5,6 @@ TODO: combine with biologics.py / moa.py / etc.
 from utils.re import get_or_re
 
 
-# period
 PRIMARY_BASE_TERMS: dict[str, str] = {
     "activat(?:or|ion|ing|e)?": "activator",
     "(?:super[ -]?)?agoni[sz](?:t|ing|er?|m)?": "agonist",

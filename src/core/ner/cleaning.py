@@ -3,7 +3,8 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Iterable, Sequence, TypeVar, Union, cast
+from typing import Iterable, Mapping, Sequence, TypeVar, Union, cast
+from pydash import flatten
 import regex as re
 from functools import partial, reduce
 import logging
@@ -13,7 +14,7 @@ from typing_extensions import Protocol
 from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
-from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
+from utils.re import expand_res, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .spacy import Spacy
@@ -39,8 +40,6 @@ SUBSTITUTIONS = {
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
-INCLUSION_SUPPRESSIONS = ["phase", "trial"]
-DEFAULT_EXCEPTION_LIST: list[str] = []
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(i)",  # so common in patents, e.g. "general formula (I)"
@@ -67,16 +66,14 @@ class EntityCleaner:
 
     def __init__(
         self,
-        additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
-        substitutions: dict[str, str] = SUBSTITUTIONS,
+        substitutions: Mapping[str, str] = SUBSTITUTIONS,
         additional_cleaners: Sequence[CleanFunction] = [],
         parallelize: bool = True,
     ):
-        self.additional_common_words = additional_common_words
         self.substitutions = substitutions
         self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
-        self.__common_words = None
+        self.__removal_words: list[str] | None = None
         self.nlp = Spacy.get_instance(disable=["ner"])._nlp
 
     def get_n_process(self, num_entries: int) -> int:
@@ -94,56 +91,18 @@ class EntityCleaner:
         return MAX_N_PROCESS if parallelize else 1
 
     @property
-    def common_words(self) -> list[str]:
+    def removal_words(self) -> list[str]:
         """
         Get common words from a file + additional common words
+
+        LEGACY
         """
-        if self.__common_words is None:
+        if self.__removal_words is None:
             with open("10000words.txt", "r") as file:
                 vocab_words = file.read().splitlines()
-            return [*vocab_words, *self.additional_common_words]
-        return self.__common_words
+                self.__removal_words = vocab_words
 
-    def filter_common_terms(
-        self,
-        terms: Sequence[str],
-        n_process: int = 1,
-        exception_list: Sequence[str] = DEFAULT_EXCEPTION_LIST,
-    ) -> Sequence[str]:
-        """
-        Filter out common terms from a list of terms, e.g. "vaccine candidates"
-
-        Args:
-            terms (Sequence[str]): list of terms
-            exception_list (Sequence[str]): list of exceptions to the common terms
-        """
-        # doing in bulk for perf
-        token_sets = self.nlp.pipe(terms, n_process=n_process)
-        term_lemmas = [
-            (term, set([t.lemma_ for t in tokens]))
-            for term, tokens in zip(terms, token_sets)
-        ]
-
-        def __is_common(term: str, lemmas: set[str]) -> bool:
-            # check if all words are in the vocab
-            is_common = lemmas.issubset(self.common_words)
-
-            # check if any words are in the exception list
-            is_excepted = bool(set(exception_list) & set(lemmas))
-
-            is_common_not_excepted = is_common and not is_excepted
-
-            if is_common_not_excepted:
-                logging.debug(f"Removing common term: {term}")
-            elif is_excepted:
-                logging.debug(f"Keeping exception term: {term}")
-            return is_common_not_excepted
-
-        def __is_uncommon(term: str, lemmas: set[str]) -> bool:
-            return not __is_common(term, lemmas)
-
-        new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_lemmas])
-        return new_list
+        return self.__removal_words
 
     def normalize_terms(self, terms: Sequence[str]) -> Sequence[str]:
         """
@@ -257,20 +216,6 @@ class EntityCleaner:
         )
         return normalized
 
-    def __suppress(self, terms: Sequence[str]) -> Sequence[str]:
-        """
-        Filter out irrelevant terms
-
-        Args:
-            terms (Sequence[str]): terms
-        """
-
-        def should_keep(term) -> bool:
-            is_suppressed = any([sup in term.lower() for sup in INCLUSION_SUPPRESSIONS])
-            return not is_suppressed
-
-        return [(term if should_keep(term) else "") for term in terms]
-
     @staticmethod
     def __get_text(entity) -> str:
         return entity[0] if isinstance(entity, tuple) else entity
@@ -315,7 +260,6 @@ class EntityCleaner:
 
         Args:
             entities (list[T]): entities
-            common_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
             remove_suppressed (bool, optional): remove empties? Defaults to False (leaves empty spaces in, to maintain order)
         """
         start = time.time()
@@ -329,11 +273,7 @@ class EntityCleaner:
                 "Using %s processes for count %s", num_processes, len(entities)
             )
 
-        cleaning_steps: list[CleanFunction] = [
-            self.__suppress,
-            self.normalize_terms,
-            self.filter_common_terms,
-        ]
+        cleaning_steps: list[CleanFunction] = [self.normalize_terms]
 
         terms: Sequence = [self.__get_text(ent) for ent in entities]
         cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)

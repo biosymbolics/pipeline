@@ -4,6 +4,7 @@ from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
 from data.common.biomedical import (
     remove_trailing_leading,
+    DELETION_TERMS,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 
@@ -20,38 +21,6 @@ class TestNerUtils(unittest.TestCase):
                 lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
             ],
         )
-
-    def test_filter_common_terms(self):
-        test_conditions = [
-            {
-                "terms": [
-                    "vaccine candidates",
-                    "PF-06863135",
-                    "therapeutics",
-                    "COVID-19 mRNA vaccine",
-                    "exception",
-                    "common",
-                ],
-                "exception_list": ["exception"],
-                "expected_output": [
-                    "vaccine candidates",
-                    "PF-06863135",
-                    "",
-                    "COVID-19 mRNA vaccine",
-                    "exception",
-                    "",
-                ],
-            },
-        ]
-
-        for condition in test_conditions:
-            terms = condition["terms"]
-            exception_list = condition["exception_list"]
-            expected_output = condition["expected_output"]
-
-            result = self.cleaner.remove_terms(terms, exception_list=exception_list)
-            print("Actual", result, "expected", expected_output)
-            self.assertEqual(result, expected_output)
 
     def test_clean_entities(self):
         test_conditions = [

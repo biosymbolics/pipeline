@@ -1,4 +1,4 @@
-from pydash import compact, flatten, is_number
+from pydash import compact, flatten
 import regex as re
 
 from utils.re import get_or_re

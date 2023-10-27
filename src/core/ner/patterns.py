@@ -3,6 +3,7 @@ NER Patterns (SpaCy)
 """
 
 from typing import cast
+
 from constants.patterns import (
     MOA_INFIXES,
     MOA_PREFIXES,
@@ -16,8 +17,8 @@ from constants.patterns import (
     SMALL_MOLECULE_SUFFIXES,
 )
 from constants.patterns.intervention import ALL_COMPOUND_BASE_TERMS_RE
-
 from utils.re import get_or_re, wrap, ALPHA_CHARS
+
 from .types import SpacyPatterns
 from .utils import get_entity_re, get_infix_entity_re, get_suffix_entitiy_re, EOE_RE
 

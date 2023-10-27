@@ -4,11 +4,10 @@ Utils for the NER pipeline
 from functools import partial, reduce
 import logging
 import regex as re
-import time
 from typing import Iterable
 from spacy.tokens import Doc, Span
-from constants.patterns.iupac import is_iupac
 
+from constants.patterns.iupac import is_iupac
 from utils.re import (
     RE_STANDARD_FLAGS,
     get_or_re,
