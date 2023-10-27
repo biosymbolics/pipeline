@@ -7,9 +7,6 @@ import sys
 import logging
 from typing import Callable, Sequence
 from pydash import flatten
-from constants.patterns.intervention import INTERVENTION_BASE_TERMS
-from core.ner.cleaning import EntityCleaner
-from data.common.biomedical.constants import DELETION_TERMS
 
 from system import initialize
 
@@ -18,6 +15,9 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
+from constants.patterns.intervention import INTERVENTION_BASE_TERMS
+from core.ner.cleaning import RE_FLAGS
+from data.common.biomedical.constants import DELETION_TERMS
 from data.common.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
@@ -73,6 +73,7 @@ def is_control(intervention_str: str) -> bool:
         re.match(
             r".*\b(?:placebo|standard (?:of )?care|sham|standard treatment)s?\b.*",
             intervention_str,
+            flags=RE_FLAGS,
         )
         is None
     )
