@@ -73,7 +73,7 @@ def is_control(intervention_str: str) -> bool:
             intervention_str,
             flags=RE_FLAGS,
         )
-        is None
+        is not None
     )
 
 
@@ -186,7 +186,6 @@ def ingest_trials():
         "trials",
         transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
     )
-    # TODO: alter table trials alter column interventions set data type text[];
 
     client = PsqlDatabaseClient()
 
