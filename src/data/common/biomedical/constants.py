@@ -279,14 +279,11 @@ DELETION_TERMS = [
     "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system|medium)",
     "(?:.* )?activit",
     "(?:.* )?member",
-    "module",
     "group",
     "product stream",
     "operator",
     "field of(?:.* )",
     # thing (unwanted because wrong type of thing)
-    "(?:.* )?food",
-    "(?:.* )?diet",
     "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
@@ -298,7 +295,6 @@ DELETION_TERMS = [
     "distract",  # distraction
     "(?:.* )?configuration",
     "considerat",  # consideration
-    "strateg(?:y|ie)",
     "(?:.* )?arrangement",
     "(?:.* )?position",
     "(?:.* )?frame",
@@ -310,7 +306,6 @@ DELETION_TERMS = [
     "gene transfer",
     "mother milk",
     "drug development",
-    "(?:.* )?administration",
     "(?:.* )?patient",
     "(?:.* )?pest",
     "(?:.* )?examinee",
@@ -328,7 +323,6 @@ DELETION_TERMS = [
     "(?:.* )?animal",
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
-    "(?:.* )?reaction",
     "(?:.* )?cosmetic.*",  # may re-enable in the future
     "(?:.* )?hair condition",  # may re-enable in the future
     "(?:.* )?fragrance",
@@ -673,6 +667,7 @@ DELETION_TERMS = [
     "(?:.* )?rigid",
     "(?:.* )?adverse",
     # physical process
+    "(?:.* )?reaction",
     "elut",  # elution
     "drug release",
     "sustained[ -]?release",
@@ -754,49 +749,13 @@ DELETION_TERMS = [
     "(?:.* )?graphene(?: oxide)?",
     "(?:.* )?metal",  # temporary?
     # non-medical procedure or process"
-    "session",
-    "wash",
     "solid-liquid separation",
     "mix",
     "pattern form",  # pattern forming
     "crystallizat",
     "quantitat",
-    "(?:administrative )?procedure",
-    "support (?:.*)",  # ??
     "(?:.* )?communicat",
-    "(?:.* )?sequenc",
     "(?:.* )?(?:micro)?process",
-    # behavioral
-    "(?:.* )?program",
-    "(?:.* )?counsel",
-    "(?:.* )?rehabilitation",
-    "(?:.* )?physical therapy",
-    "(?:.* )?behavioral therapy",
-    "(?:.* )?visit",
-    # procedure
-    "(?:.* )?monitor",
-    "(?:.* )?procedure",
-    "(?:.* )?technique",
-    "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",
-    "root canal",
-    "punctur",  # puncture
-    "transplant(?:at)",  # transplantation
-    "(?:.* )?electrolysis",
-    "(?:.* )?incision",
-    "(?:.* )?graft",
-    "(?:.* )?ablation",
-    "(?:.* )?technique",
-    "(?:.* )?retract",
-    "(?:.* )?care",
-    "(?:.* )?amplification",
-    "(?:.* )?ablation",
-    "(?:.* )?surger(?:y|ie)",
-    "(?:.* )?operat",
-    "(?:.* )?extraction",
-    "brachytherapy",
-    "radiotherapy",
-    "sealant",
-    "microelectronic",
     # agtech
     "feed(?: material|substance)?",
     "pest control",
@@ -859,22 +818,4 @@ DELETION_TERMS = [
     # start military
     "explosive",
     # end military
-    # diagnostic or lab
-    "(?:.* )?contrast",
-    "(?:.* )?screen",
-    "(?:.* )?media",
-    "imaging agent",
-    "(?:.* )?culture",
-    "(?:.* )?polymerase chain reaction",
-    "(?:.* )?test(?:ing)?",
-    "(?:.* )?detect",
-    "(?:.* )?diagnostic",
-    "(?:.* )?diagnosis",
-    "(?:.* )?analyt",  # analyte
-    "(?:.* )?assay",
-    "(?:.* )?microarray",
-    "prognosticat",
-    "(?:.* )?scopy",
-    "(?:.* )?reagent",
-    # end diagnostic
 ]

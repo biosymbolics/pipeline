@@ -24,8 +24,19 @@ TM_SYM = "\u2122"  # ™
 
 LEGAL_SYMBOLS = [COPYRIGHT_SYM, REGISTERED_SYM, TM_SYM]
 
+HACKY_STEMMING_RE = (
+    ".?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?"
+)
 
 ReCount = Union[Literal["*", "+", "?"], int]
+
+
+def get_hacky_stem_re(terms: list[str], **kwargs) -> str:
+    """
+    Get re that matches terms with hacky stemming
+    (requires that terms be stemmed; this adds the "s", "ing", "ed", etc suffixes)
+    """
+    return "(?i)" + f"^{get_or_re(terms, **kwargs)}{HACKY_STEMMING_RE}$"
 
 
 def get_or_re(
@@ -34,6 +45,7 @@ def get_or_re(
     upper: Optional[int] = None,
     permit_trailing_space: bool = False,
     enforce_word_boundaries: bool = False,
+    permit_plural: bool = True,
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -46,6 +58,9 @@ def get_or_re(
         enforce_word_boundaries (bool): whether to enforce word boundaries (defaults to False)
     """
     re_strs = [*_re_strs]
+    if permit_plural:
+        re_strs = [re_str + r"s?" for re_str in re_strs]
+
     if enforce_word_boundaries:
         re_strs = [rf"\b{re_str}\b" for re_str in re_strs]
 

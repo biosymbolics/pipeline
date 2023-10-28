@@ -69,7 +69,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def is_control(intervention_str: str) -> bool:
     return (
         re.match(
-            r".*\b(?:placebo|standard (?:of )?care|sham|standard treatment)s?\b.*",
+            r".*\b(?:placebo|sham|best supportive care|standard|comparator|no treatment|saline solution|conventional)s?\b.*",
             intervention_str,
             flags=RE_FLAGS,
         )

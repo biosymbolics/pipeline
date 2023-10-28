@@ -8,6 +8,7 @@ from typing import Literal, Sequence, TypedDict
 from pydash import compact
 import polars as pl
 from spacy.tokens import Doc
+from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 
 
 from system import initialize
@@ -20,9 +21,15 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
 from constants.patterns.intervention import (
+    BEHAVIOR_RES,
+    DIAGNOSTIC_RES,
+    FORM_RES,
     MECHANISM_BASE_TERMS,
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
+    PROCEDURE_RES,
+    RESEARCH_TOOLS_RES,
+    ROA_RES,
 )
 from core.ner.cleaning import EntityCleaner
 from core.ner.spacy import Spacy
@@ -40,7 +47,7 @@ from data.common.biomedical import (
 
 from data.common.biomedical.types import WordPlace
 from utils.list import batch
-from utils.re import get_or_re
+from utils.re import get_or_re, get_hacky_stem_re
 
 
 logger = logging.getLogger(__name__)
@@ -275,11 +282,7 @@ def remove_common_terms():
         *EntityCleaner().removal_words,
     ]
 
-    common_terms_re = get_or_re(common_terms)
-    del_term_re = (
-        "(?i)"
-        + f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$"
-    )
+    del_term_re = get_hacky_stem_re(common_terms)
     result = client.select(f"select distinct original_term from {WORKING_TABLE}")
     terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
 
@@ -307,20 +310,25 @@ def normalize_domains():
     """
     client = DatabaseClient()
 
-    mechanism_terms = [f"{t}s?" for t in MECHANISM_BASE_TERMS]
-    mechanism_re = get_or_re(mechanism_terms)
+    mechanism_re = get_or_re(MECHANISM_BASE_TERMS)
+    device_re = get_or_re(HIGH_LIKELIHOOD_DEVICES)
+    procedure_re = get_or_re(PROCEDURE_RES)
+    diagnostic_re = get_or_re(DIAGNOSTIC_RES)
+    roa_re = get_or_re(ROA_RES)
+    form_re = get_or_re(FORM_RES)
+    research_re = get_or_re(RESEARCH_TOOLS_RES)
+    behavioral_re = get_or_re(BEHAVIOR_RES)
 
     queries = [
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term in ('abrasive', 'dyeing', 'dialyzer', 'colorant', 'herbicidal', 'fungicidal', 'deodorant', 'chemotherapeutic',  'photodynamic', 'anticancer', 'anti-cancer', 'tumor infiltrating lymphocytes', 'electroporation', 'vibration', 'disinfecting', 'disinfection', 'gene editing', 'ultrafiltration', 'cytotoxic', 'amphiphilic', 'transfection', 'chemotherapy')",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term in ('adrenoleukodystrophy', 'stents') or original_term ~ '.* diseases?$'",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term in ('ethanol', 'isocyanates')",
-        f"update {WORKING_TABLE} set domain='compounds' where original_term ~* '(?:^| |,)(?:molecules?|molecules? bindings?|reagents?|derivatives?|compositions?|compounds?|formulations?|stereoisomers?|analogs?|analogues?|homologues?|drugs?|regimens?|clones?|particles?|nanoparticles?|microparticles?)$' and not original_term ~* '(anti|receptor|degrade|disease|syndrome|condition)' and domain<>'compounds'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*receptor$' and domain='compounds'",
         f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.*gene$' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|autism|associated|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|retardation|arthritis|tosis|motor|seizure|bald|leukemia|huntington|osteo|atop|melanoma|schizophrenia|susceptibility|toma)'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* '.* factor$' and not original_term ~* '.*(?:risk|disease).*' and domain='diseases'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where original_term ~* 'receptors?$' and domain='diseases'",
+        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$",
+        f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$",
+        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$",
+        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{roa_re}$",
+        f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$",
+        f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$",
+        f"update {WORKING_TABLE} set domain='formulations' where domain<>'formulations' AND original_term ~* '^{form_re}$",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 
@@ -402,7 +410,6 @@ def populate_working_biosym_annotations():
     )
 
     remove_common_terms()  # remove one-off generic terms
-
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations
