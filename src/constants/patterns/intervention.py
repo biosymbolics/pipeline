@@ -568,12 +568,12 @@ RESEARCH_TOOLS_RES = [
     ".*western blot.*",
 ]
 
-ROA_PREFIX = "(?:intra[ -]?|trans[ -]?|sub[ -]?)?"
+ROA_PREFIX = "(?:epi[ -]?|intra[ -]?|trans[ -]?|sub[ -]?)?"
 ROA_VERB = (
     r"(?:solution|administration|route|preparation|application|suspension|composition)?"
 )
 ROA_RES = [
-    f"(?:{ROA_VERB} of )?{ROA_PREFIX}{roa}\b{ROA_VERB}"
+    f"(?:{ROA_VERB} of )?{ROA_PREFIX}{roa}(?:ly )?\b{ROA_VERB}"
     for roa in [
         "arterial",
         "articular",
@@ -583,11 +583,10 @@ ROA_RES = [
         "cerebroventricular",
         "cutaneous",
         "dermal",
-        "epicutaneous",
         "enteric",
         "enteral",
         "gastrointestinal",
-        "inhalation",
+        "(?:inhalation|inhaled)",
         "insufflation",
         "IV",
         "intraosseous",

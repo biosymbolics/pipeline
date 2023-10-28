@@ -451,7 +451,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.patents.psql.biosym_annotations
+            Usage: python3 -m scripts.patents.process_biosym_annotations
             Imports/cleans biosym_annotations (followed by a subsequent stage)
             """
         )
