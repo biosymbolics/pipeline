@@ -33,14 +33,15 @@ from data.common.biomedical import (
     EXPAND_CONNECTING_RE,
     POTENTIAL_EXPANSION_MAX_TOKENS,
     TARGET_PARENS,
+    DELETION_TERMS,
     REMOVAL_WORDS_PRE,
     REMOVAL_WORDS_POST,
 )
+
 from data.common.biomedical.types import WordPlace
 from utils.list import batch
 from utils.re import get_or_re
 
-from .constants import DELETION_TERMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -271,15 +272,14 @@ def remove_common_terms():
     common_terms = [
         *DELETION_TERMS,
         *INTERVENTION_BASE_TERMS,
-        *EntityCleaner().common_words,
+        *EntityCleaner().removal_words,
     ]
 
     common_terms_re = get_or_re(common_terms)
-    del_term_res = [
-        # .? - to capture things like "gripping" from "grip"
-        f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$",
-    ]
-    del_term_re = "(?i)" + get_or_re(del_term_res)
+    del_term_re = (
+        "(?i)"
+        + f"^{common_terms_re}.?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?$"
+    )
     result = client.select(f"select distinct original_term from {WORKING_TABLE}")
     terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
 

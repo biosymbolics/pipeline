@@ -14,8 +14,11 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
     """
     Fetch all trial summaries by status
 
+    Currently specific to the ClinDev model
+
     Args:
         status (str): Trial status
+        limit (int, optional): Number of trials to fetch. Defaults to 2000.
     """
     start = time.time()
 
@@ -30,6 +33,7 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND mesh_conditions[1] is not null
         AND array_length(interventions, 1) > 0
         AND comparison_type not in ('UNKNOWN', 'OTHER')
+        AND intervention_type='PHARMACOLOGICAL'
         AND design not in ('UNKNOWN', 'FACTORIAL', 'SEQUENTIAL')
         AND randomization not in ('UNKNOWN') -- rare
         AND masking not in ('UNKNOWN')

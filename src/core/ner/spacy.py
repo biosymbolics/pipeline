@@ -4,7 +4,6 @@ SpaCy client
 
 import logging
 from typing import Any
-
 import spacy
 from spacy.language import Language
 

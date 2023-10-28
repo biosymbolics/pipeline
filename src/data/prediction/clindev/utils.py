@@ -11,16 +11,14 @@ import torch
 import torch.nn as nn
 
 
-from data.prediction.types import (
+from data.prediction import (
     ModelInput,
     ModelInputAndOutput,
-    is_model_input,
-    is_model_input_output,
-)
-from data.prediction.utils import (
     encode_and_batch_all,
     encode_and_batch_input,
     encode_quantitative_fields,
+    is_model_input,
+    is_model_input_output,
 )
 from typings.trials import TrialSummary
 

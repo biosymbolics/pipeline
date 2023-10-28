@@ -9,6 +9,8 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE | re.DOTALL
+
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
     return (

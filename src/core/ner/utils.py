@@ -4,12 +4,12 @@ Utils for the NER pipeline
 from functools import partial, reduce
 import logging
 import regex as re
-import time
 from typing import Iterable
 from spacy.tokens import Doc, Span
-from constants.patterns.iupac import is_iupac
 
+from constants.patterns.iupac import is_iupac
 from utils.re import (
+    RE_STANDARD_FLAGS,
     get_or_re,
     ReCount,
     ALPHA_CHARS,
@@ -218,7 +218,9 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     }
 
     def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
-        normalized = [re.sub(adp_ext, adp_term, t, flags=re.DOTALL) for t in _terms]
+        normalized = [
+            re.sub(adp_ext, adp_term, t, flags=RE_STANDARD_FLAGS) for t in _terms
+        ]
         final = __rearrange_adp(normalized, adp_term=adp_term, n_process=n_process)
         return final
 
@@ -411,7 +413,7 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
     # avoid spacy keeping terms with - as a single token
     def sep_dash(term: str) -> str:
         return (
-            re.sub(DASHES_RE, rf" {DASH} ", term, flags=re.DOTALL)
+            re.sub(DASHES_RE, rf" {DASH} ", term, flags=re.IGNORECASE)
             if not is_iupac(term)
             else term
         )

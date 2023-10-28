@@ -5,7 +5,6 @@ TODO: combine with biologics.py / moa.py / etc.
 from utils.re import get_or_re
 
 
-# period
 PRIMARY_BASE_TERMS: dict[str, str] = {
     "activat(?:or|ion|ing|e)?": "activator",
     "(?:super[ -]?)?agoni[sz](?:t|ing|er?|m)?": "agonist",
@@ -295,6 +294,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "ring",
     "salt",
     "slurr(?:y|ie)",
+    "softgel",
     "solution",
     "spray",
     "strain",  # ??
@@ -307,7 +307,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "(?:nutritional )?supplement",
     "support",
     "suppositor(?:y|ie)",
-    "tablet",
+    "(?:oral )?tablet",
     "(?:mono[ -]?)?therap(?:y|ies)",
     "therapeutical",
     "treatment",
@@ -433,7 +433,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "suitable",
     "target(?:ing|ed)?",
     "(?:chemo[ -]?)?therapeutic(?:ally)?",
-    "topical",
+    "(?:% )?topical",
     "usable",
     "useful",
     "value",

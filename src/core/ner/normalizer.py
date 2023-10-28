@@ -1,4 +1,7 @@
-from typing import Callable, Sequence
+"""
+Linking/cleaning of terms
+"""
+from typing import Sequence
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker import TermLinker
 from core.ner.types import CanonicalEntity

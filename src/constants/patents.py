@@ -1,4 +1,5 @@
 from pydash import flatten
+
 from constants.company import COMPANY_STRINGS
 from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS

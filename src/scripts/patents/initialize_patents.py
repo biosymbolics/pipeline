@@ -287,10 +287,11 @@ def main(bootstrap: bool = False):
 
     # post
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
-    # update annotations set term=regexp_replace(term, ' gene$', '', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
+    # update annotations set term=regexp_replace(term, '^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
     # update annotations set term=regexp_replace(term, '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
     # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
-    # update annotations set term=regexp_replace(term, ' protein$', '', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
+    # update annotations set term=regexp_replace(term, '^([a-z0-9-]{3,}) protein$', '\1', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
+    #####
     # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:(?:super)?family )?protein$';
     # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
     # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
@@ -322,7 +323,7 @@ def main(bootstrap: bool = False):
     # SET interventions = sub.new_interventions
     # FROM (
     #   SELECT nct_id, array_agg(
-    #     regexp_replace(i, '\s{1,}$', '', 'g')
+    #       regexp_replace(i, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1')
     #   ) AS new_interventions
     #   FROM trials, unnest(interventions) i group by nct_id
     # ) sub

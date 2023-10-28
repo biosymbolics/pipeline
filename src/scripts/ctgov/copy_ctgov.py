@@ -1,9 +1,11 @@
 """
 Utils for copying approvals data
 """
+from functools import reduce
+import re
 import sys
 import logging
-from typing import Sequence
+from typing import Callable, Sequence
 from pydash import flatten
 
 from system import initialize
@@ -13,6 +15,7 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
+from core.ner.cleaning import RE_FLAGS
 from data.common.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
@@ -49,6 +52,7 @@ MULTI_FIELDS = {
     "mesh_conditions.mesh_term": "mesh_conditions",
     "design_groups.group_type": "arm_types",
     "interventions.name": "interventions",
+    "interventions.intervention_type": "intervention_types",
     "outcomes.title": "primary_outcomes",
     "outcomes.time_frame": "time_frames",
 }
@@ -62,8 +66,23 @@ MULI_FIELDS_SQL = [
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 
 
+def is_control(intervention_str: str) -> bool:
+    return (
+        re.match(
+            r".*\b(?:placebo|standard (?:of )?care|sham|standard treatment)s?\b.*",
+            intervention_str,
+            flags=RE_FLAGS,
+        )
+        is not None
+    )
+
+
+def is_intervention(intervention_str: str) -> bool:
+    return not is_control(intervention_str)
+
+
 def transform_ct_records(
-    ctgov_records: Sequence[dict],  # , tagger: NerTagger
+    ctgov_records: Sequence[dict], tagger: NerTagger
 ) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
@@ -76,26 +95,33 @@ def transform_ct_records(
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
     """
 
-    # intervention_sets = [rec["interventions"] for rec in ctgov_records]
-    # uniq_interventions = dedup(flatten(intervention_sets))
-    # logger.info(
-    #     "Extracting intervention names for %s strings (e.g. %s)",
-    #     len(uniq_interventions),
-    #     uniq_interventions[0:10],
-    # )
-    # norm_map = tagger.extract_string_map(uniq_interventions)
+    intervention_sets = [rec["interventions"] for rec in ctgov_records]
 
-    # def normalize_interventions(interventions: list[str]):
-    #     return flatten([norm_map.get(i) or i for i in interventions])
+    cleaners: list[Callable[[list[str]], list[str]]] = [
+        lambda interventions: dedup(interventions),
+        lambda interventions: list(filter(is_intervention, interventions)),
+    ]
+    interventions = reduce(
+        lambda x, cleaner: cleaner(x), cleaners, flatten(intervention_sets)
+    )
+    logger.info(
+        "Extracting intervention names for %s strings (e.g. %s)",
+        len(interventions),
+        interventions[0:10],
+    )
+    norm_map = tagger.extract_string_map(interventions)
 
-    # return [
-    #     dict_to_trial_summary(
-    #         {**rec, "interventions": normalize_interventions(rec["interventions"])}
-    #     )
-    #     for rec in ctgov_records
-    # ]
+    def normalize_interventions(interventions: list[str]):
+        return flatten([norm_map.get(i) or i for i in interventions])
 
-    return [dict_to_trial_summary(rec) for rec in ctgov_records]
+    return [
+        dict_to_trial_summary(
+            {**rec, "interventions": normalize_interventions(rec["interventions"])}
+        )
+        for rec in ctgov_records
+    ]
+
+    # return [dict_to_trial_summary(rec) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -111,6 +137,7 @@ def ingest_trials():
         0 as duration,
         '' as comparison_type,
         '' as hypothesis_type,
+        '' as intervention_type,
         -1 as max_timeframe,
         '' as normalized_sponsor,
         '' as sponsor_type,
@@ -142,13 +169,13 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    # tagger = NerTagger(
-    #     entity_types=frozenset(["compounds", "mechanisms"]),
-    #     link=True,
-    #     additional_cleaners=[
-    #         lambda terms, n_process: remove_trailing_leading(terms, REMOVAL_WORDS)
-    #     ],
-    # )
+    tagger = NerTagger(
+        entity_types=frozenset(["compounds", "mechanisms"]),
+        link=True,
+        additional_cleaners=[
+            lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+        ],
+    )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -157,11 +184,8 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(
-            records  # type: ignore
-        ),  # tagger
+        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
     )
-    # TODO: alter table trials alter column interventions set data type text[];
 
     client = PsqlDatabaseClient()
 

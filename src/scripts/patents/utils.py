@@ -9,7 +9,9 @@ from constants.patents import (
     OWNER_TERM_MAP,
 )
 from core.ner.utils import cluster_terms
-from utils.re import get_or_re, remove_extra_spaces
+from utils.re import get_or_re, remove_extra_spaces, RE_STANDARD_FLAGS
+
+RE_FLAGS = RE_STANDARD_FLAGS
 
 
 def clean_owners(owners: list[str]) -> list[str]:
@@ -41,9 +43,7 @@ def clean_owners(owners: list[str]) -> list[str]:
         suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$)|\(.+\))"
 
         for term in terms:
-            yield re.sub(suppress_re, "", term, flags=re.DOTALL | re.IGNORECASE).rstrip(
-                "&[ .,]*"
-            )
+            yield re.sub(suppress_re, "", term, flags=RE_FLAGS).rstrip("&[ .,]*")
 
     def normalize_terms(assignees: list[str]) -> Iterable[str]:
         """
@@ -60,7 +60,7 @@ def clean_owners(owners: list[str]) -> list[str]:
                         rf"\b{term}\b",
                         f" {OWNER_TERM_MAP[term.lower()]} ",
                         cleaned,
-                        flags=re.IGNORECASE | re.DOTALL,
+                        flags=RE_FLAGS,
                     ).strip()
                 return _assignee
 
@@ -77,10 +77,7 @@ def clean_owners(owners: list[str]) -> list[str]:
         """
         to_check = [clean_assignee, og_assignee]
         has_mapping = any(
-            [
-                re.findall(rf"\b{key}\b", check, flags=re.IGNORECASE)
-                for check in to_check
-            ]
+            [re.findall(rf"\b{key}\b", check, flags=RE_FLAGS) for check in to_check]
         )
         if has_mapping:
             return key

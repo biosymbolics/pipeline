@@ -20,7 +20,7 @@ TextEncoderData: TypeAlias = pl.DataFrame | Sequence | npt.NDArray
 
 class TextEncoder:
     def __init__(self, field, max_items_per_cat: int):
-        self.nlp = Spacy.get_instance(disable=["ner"])  # TODO: use BioBert?
+        self.nlp = Spacy.get_instance(model="en_core_sci_lg", disable=["ner"])
         self.max_items_per_cat = max_items_per_cat
         self.field = field
 

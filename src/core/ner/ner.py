@@ -6,20 +6,19 @@ No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#is
 from functools import reduce
 from itertools import groupby
 import time
-from typing import Any, Callable, Literal, Optional, Sequence, TypeVar, cast
+from typing import Any, Literal, Optional, Sequence, TypeVar
 from pydash import flatten
 import logging
 import warnings
 import html
 import spacy
 from spacy.tokens import Span, Doc
+
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
 from typings.core import is_string_list, is_string_list_list
-
 from utils.args import make_hashable
 from utils.model import get_model_path
-from utils.list import dedup
 from utils.re import remove_extra_spaces
 from utils.string import chunk_list
 

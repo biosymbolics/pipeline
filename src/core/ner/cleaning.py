@@ -3,7 +3,7 @@ Utils for the NER pipeline
 """
 from abc import abstractmethod
 import time
-from typing import Iterable, Sequence, TypeVar, Union, cast
+from typing import Iterable, Mapping, Sequence, TypeVar, Union, cast
 import regex as re
 from functools import partial, reduce
 import logging
@@ -13,7 +13,7 @@ from typing_extensions import Protocol
 from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
 from constants.patterns.iupac import is_iupac
 from core.ner.binder.constants import PHRASE_MAP
-from utils.re import remove_extra_spaces, LEGAL_SYMBOLS
+from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .spacy import Spacy
@@ -22,14 +22,16 @@ from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
+RE_FLAGS = RE_STANDARD_FLAGS
+
 
 class CleanFunction(Protocol):
     @abstractmethod
-    def __call__(self, terms: Sequence[str], n_process: int) -> Sequence[str]:
+    def __call__(self, terms: Sequence[str]) -> Sequence[str]:
         pass
 
 
-CHAR_SUPPRESSIONS = {
+SUBSTITUTIONS = {
     r"\n": " ",
     "/": " ",
     r"[.,:;'\"]+$": "",  # trailing punct
@@ -37,8 +39,6 @@ CHAR_SUPPRESSIONS = {
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
-INCLUSION_SUPPRESSIONS = ["phase", "trial"]
-DEFAULT_EXCEPTION_LIST: list[str] = []
 
 DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "(i)",  # so common in patents, e.g. "general formula (I)"
@@ -46,8 +46,6 @@ DEFAULT_ADDITIONAL_COMMON_WORDS = [
     "sec",
     "second",
 ]
-
-MAX_N_PROCESS = 4
 
 
 class EntityCleaner:
@@ -65,87 +63,31 @@ class EntityCleaner:
 
     def __init__(
         self,
-        additional_common_words: list[str] = DEFAULT_ADDITIONAL_COMMON_WORDS,
-        char_suppressions: dict[str, str] = CHAR_SUPPRESSIONS,
+        substitutions: Mapping[str, str] = SUBSTITUTIONS,
         additional_cleaners: Sequence[CleanFunction] = [],
         parallelize: bool = True,
     ):
-        self.additional_common_words = additional_common_words
-        self.char_suppressions = char_suppressions
+        self.substitutions = substitutions
         self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
-        self.__common_words = None
+        self.__removal_words: list[str] | None = None
         self.nlp = Spacy.get_instance(disable=["ner"])._nlp
 
-    def get_n_process(self, num_entries: int) -> int:
-        """
-        Get the number of processes to use for parallelization in nlp pipeline
-
-        only parallelize if
-            1) parallelize is set to true and
-            2) there are more than 10000 entities (otherwise the overhead probably exceeds the benefits)
-
-        TODO: it might never make sense to parallelize.
-        Just ran into a situation where a process took 200s with 2000 entities, but **3s** with no parallelize
-        """
-        parallelize = self.parallelize and num_entries > 100000000
-        return MAX_N_PROCESS if parallelize else 1
-
     @property
-    def common_words(self) -> list[str]:
+    def removal_words(self) -> list[str]:
         """
         Get common words from a file + additional common words
+
+        LEGACY
         """
-        if self.__common_words is None:
+        if self.__removal_words is None:
             with open("10000words.txt", "r") as file:
                 vocab_words = file.read().splitlines()
-            return [*vocab_words, *self.additional_common_words]
-        return self.__common_words
+                self.__removal_words = vocab_words
 
-    def filter_common_terms(
-        self,
-        terms: Sequence[str],
-        n_process: int = 1,
-        exception_list: Sequence[str] = DEFAULT_EXCEPTION_LIST,
-    ) -> Sequence[str]:
-        """
-        Filter out common terms from a list of terms, e.g. "vaccine candidates"
+        return self.__removal_words
 
-        Args:
-            terms (Sequence[str]): list of terms
-            exception_list (Sequence[str]): list of exceptions to the common terms
-        """
-        # doing in bulk for perf
-        token_sets = self.nlp.pipe(terms, n_process=n_process)
-        term_lemmas = [
-            (term, set([t.lemma_ for t in tokens]))
-            for term, tokens in zip(terms, token_sets)
-        ]
-
-        def __is_common(term: str, lemmas: set[str]) -> bool:
-            # check if all words are in the vocab
-            is_common = lemmas.issubset(self.common_words)
-
-            # check if any words are in the exception list
-            is_excepted = bool(set(exception_list) & set(lemmas))
-
-            is_common_not_excepted = is_common and not is_excepted
-
-            if is_common_not_excepted:
-                logging.debug(f"Removing common term: {term}")
-            elif is_excepted:
-                logging.debug(f"Keeping exception term: {term}")
-            return is_common_not_excepted
-
-        def __is_uncommon(term: str, lemmas: set[str]) -> bool:
-            return not __is_common(term, lemmas)
-
-        new_list = list([(tw[0] if __is_uncommon(*tw) else "") for tw in term_lemmas])
-        return new_list
-
-    def normalize_terms(
-        self, terms: Sequence[str], n_process: int = 1
-    ) -> Sequence[str]:
+    def normalize_terms(self, terms: Sequence[str]) -> Sequence[str]:
         """
         Normalize terms
         - remove certain characters
@@ -158,14 +100,15 @@ class EntityCleaner:
         """
         start = time.time()
 
-        def remove_chars(_terms: list[str]) -> Iterable[str]:
-            def __remove_chars(term):
-                for pattern, replacement in self.char_suppressions.items():
-                    term = re.sub(pattern, replacement, term, flags=re.DOTALL)
+        def make_substitutions(_terms: list[str]) -> Iterable[str]:
+            def __substitute_strings(term):
+                for pattern, replacement in self.substitutions.items():
+                    term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
+
                 return term
 
             for term in _terms:
-                yield __remove_chars(term)
+                yield __substitute_strings(term)
 
         def decode_html(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
@@ -177,7 +120,7 @@ class EntityCleaner:
             e.g. "asthma\n is a disease" -> "asthma"
             """
             for term in _terms:
-                yield re.sub(r"\n.*", "", term, flags=re.DOTALL)
+                yield re.sub(r"\n.*", "", term, flags=RE_FLAGS)
 
         def lower(_terms: list[str]) -> Iterable[str]:
             for term in _terms:
@@ -202,22 +145,20 @@ class EntityCleaner:
                     r"(?<=[ ,])(\([a-z-0-9 ]+\))(?=(?: |,|$))",
                     "",
                     term,
-                    flags=re.DOTALL | re.IGNORECASE,
+                    flags=RE_FLAGS,
                 )
                 # `poly(isoprene)` -> `polyisoprene``
                 no_parens = re.sub(
                     r"\(([a-z-0-9]+)\)",
                     r"\1",
                     no_parenth,
-                    flags=re.DOTALL | re.IGNORECASE,
+                    flags=RE_FLAGS,
                 )
                 yield no_parens
 
         def normalize_phrases(_terms: list[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
-                return re.sub(
-                    rf"\b{syn}s?\b", canonical, s, flags=re.DOTALL | re.IGNORECASE
-                )
+                return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
@@ -236,15 +177,13 @@ class EntityCleaner:
             remove_after_newline,  # order matters (this before unwrap etc)
             unwrap,
             format_parentheticals,  # order matters (run after unwrap)
-            remove_chars,  # order matters (after unwrap/format_parentheticals)
+            make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
-            partial(rearrange_terms, n_process=n_process),
-            partial(
-                depluralize_tails,
-                n_process=n_process,
-            ),
-            partial(normalize_by_pos, n_process=n_process),
+            rearrange_terms,
+            depluralize_tails,
+            normalize_by_pos,
             normalize_phrases,  # order matters (after rearrange)
+            *self.additional_cleaners,
             remove_extra_spaces,
             lower,
         ]
@@ -259,20 +198,6 @@ class EntityCleaner:
             round(time.time() - start, 2),
         )
         return normalized
-
-    def __suppress(self, terms: Sequence[str]) -> Sequence[str]:
-        """
-        Filter out irrelevant terms
-
-        Args:
-            terms (Sequence[str]): terms
-        """
-
-        def should_keep(term) -> bool:
-            is_suppressed = any([sup in term.lower() for sup in INCLUSION_SUPPRESSIONS])
-            return not is_suppressed
-
-        return [(term if should_keep(term) else "") for term in terms]
 
     @staticmethod
     def __get_text(entity) -> str:
@@ -309,7 +234,6 @@ class EntityCleaner:
     def clean(
         self,
         entities: Sequence[T],
-        common_exception_list: list[str] = DEFAULT_EXCEPTION_LIST,
         remove_suppressed: bool = False,
     ) -> Sequence[T]:
         """
@@ -319,30 +243,16 @@ class EntityCleaner:
 
         Args:
             entities (list[T]): entities
-            common_exception_list (list[str], optional): list of exceptions to the common terms. Defaults to DEFAULT_EXCEPTION_LIST.
             remove_suppressed (bool, optional): remove empties? Defaults to False (leaves empty spaces in, to maintain order)
         """
         start = time.time()
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
-        num_processes = self.get_n_process(len(entities))
-
-        if num_processes > 1:
-            logging.info(
-                "Using %s processes for count %s", num_processes, len(entities)
-            )
-
-        cleaning_steps: list[CleanFunction] = [
-            lambda terms, n_process: self.__suppress(terms),
-            self.normalize_terms,
-            self.filter_common_terms,
-        ]
+        cleaning_steps: list[CleanFunction] = [self.normalize_terms]
 
         terms: Sequence = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(
-            lambda x, func: func(x, n_process=num_processes), cleaning_steps, terms
-        )
+        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
 
         logging.info(
             "Cleaned %s entities in %s seconds",

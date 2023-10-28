@@ -9,6 +9,7 @@ from .constants import (
     EXPAND_CONNECTING_RE,
     POTENTIAL_EXPANSION_MAX_TOKENS,
     TARGET_PARENS,
+    DELETION_TERMS,
 )
 from .types import WordPlace
 
@@ -26,4 +27,5 @@ __all__ = [
     "TARGET_PARENS",
     "REMOVAL_WORDS_POST",
     "REMOVAL_WORDS_PRE",
+    "DELETION_TERMS",
 ]
