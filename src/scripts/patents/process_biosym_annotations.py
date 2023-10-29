@@ -8,7 +8,6 @@ from typing import Literal, Sequence, TypedDict
 from pydash import compact
 import polars as pl
 from spacy.tokens import Doc
-from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 
 
 from system import initialize
@@ -20,16 +19,19 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
+from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 from constants.patterns.intervention import (
     BEHAVIOR_RES,
+    BIOLOGIC_BASE_TERMS,
+    COMPOUND_BASE_TERMS,
     DIAGNOSTIC_RES,
-    FORM_RES,
+    DOSAGE_FORM_RE,
     MECHANISM_BASE_TERMS,
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
     PROCEDURE_RES,
     RESEARCH_TOOLS_RES,
-    ROA_RES,
+    ROA_RE,
 )
 from core.ner.cleaning import EntityCleaner
 from core.ner.spacy import Spacy
@@ -41,8 +43,6 @@ from data.common.biomedical import (
     POTENTIAL_EXPANSION_MAX_TOKENS,
     TARGET_PARENS,
     DELETION_TERMS,
-    REMOVAL_WORDS_PRE,
-    REMOVAL_WORDS_POST,
 )
 
 from data.common.biomedical.types import WordPlace
@@ -108,7 +108,7 @@ def expand_annotations(
     """
     client = DatabaseClient()
     prefix_re = get_or_re([p + " " for p in prefix_terms], "*")
-    terms_re = get_or_re([f"{t}s?" for t in base_terms_to_expand])
+    terms_re = get_or_re(base_terms_to_expand)
     records = client.select(
         rf"""
         SELECT original_term, concat(title, '. ', abstract) as text, app.publication_number
@@ -310,25 +310,29 @@ def normalize_domains():
     """
     client = DatabaseClient()
 
-    mechanism_re = get_or_re(MECHANISM_BASE_TERMS)
+    compounds_re = f".*{get_or_re(COMPOUND_BASE_TERMS)}.*"
+    biologics_re = f".*{get_or_re(BIOLOGIC_BASE_TERMS)}.*"  # TODO: break into intervention vs general biological thing
+    mechanism_re = f".*{get_or_re(MECHANISM_BASE_TERMS)}.*"
     device_re = get_or_re(HIGH_LIKELIHOOD_DEVICES)
     procedure_re = get_or_re(PROCEDURE_RES)
     diagnostic_re = get_or_re(DIAGNOSTIC_RES)
-    roa_re = get_or_re(ROA_RES)
-    form_re = get_or_re(FORM_RES)
+    roa_re = get_or_re(ROA_RE)
+    dosage_form_re = get_or_re(DOSAGE_FORM_RE)
     research_re = get_or_re(RESEARCH_TOOLS_RES)
     behavioral_re = get_or_re(BEHAVIOR_RES)
 
     queries = [
+        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
+        f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$'",
+        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
+        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{roa_re}$'",
+        f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$'",
+        f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$'",
+        f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND original_term ~* '^{dosage_form_re}$'",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update {WORKING_TABLE} set domain='compounds' where domain<>'compounds' AND original_term ~* '.*{compounds_re}$'",
+        f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND original_term ~* '.*{biologics_re}$'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer|disease|disorder|syndrome|autism|condition|psoriasis|carcinoma|obesity|hypertension|neurofibromatosis|tumor|tumour|glaucoma|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$",
-        f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$",
-        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$",
-        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{roa_re}$",
-        f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$",
-        f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$",
-        f"update {WORKING_TABLE} set domain='formulations' where domain<>'formulations' AND original_term ~* '^{form_re}$",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 

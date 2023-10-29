@@ -22,6 +22,5 @@ def get_namespace_id(namespace_key: NamespaceKey) -> str:
     Args:
         namespace_key (NamespaceKey): key of namespace (order matters)
     """
-    print(namespace_key._asdict())
     parts = [f"{k}-{get_id(v)}" for k, v in namespace_key._asdict().items()]
     return "-".join(parts)

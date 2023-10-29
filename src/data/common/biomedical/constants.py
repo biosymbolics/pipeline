@@ -1,4 +1,3 @@
-from constants.patterns.device import DEVICE_RES
 from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
     INTERVENTION_PREFIXES_GENERIC,
@@ -28,11 +27,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "discreet": "all",
     "subject": "leading",
     "properties": "trailing",
-    "administration(?: of)?": "all",
+    "(?:co[- ]?)?administration(?: of)?": "all",
     "treatment(?: of)?": "all",
     "library": "all",
     "more": "leading",
-    "% ": "leading",
     "active control": "all",
     "classic": "all",
     "present": "leading",
@@ -204,10 +202,10 @@ EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding", "coding"]
 
 
 DELETION_TERMS = [
-    *DEVICE_RES,
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "having formula",
     "acid addition salt",
     "potentially useful",
     "above protein",
@@ -222,7 +220,7 @@ DELETION_TERMS = [
     "further",
     "individual suffering",
     ".{1,5}-",  # tri-
-    "(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
+    ".*(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
     "optionally other modification",
     "co[- ]?operate",
     "light[ -]?receiving",
@@ -261,6 +259,8 @@ DELETION_TERMS = [
     "reform",
     "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "backing material",
+    "operation part",
     "oxide",
     "agricultural",
     "system",
@@ -334,7 +334,6 @@ DELETION_TERMS = [
     "(?:.* )?mode",
     "(?:.* )?region",
     "(?:tumou?r|eukaryotic|liv(?:e|ing)|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?|plant|cultur(?:ing|ed?)|individual) cell",
-    "virus",  # generic
     "titanium dioxide",
     "microorganism",
     "(?:.* )?area",
@@ -382,6 +381,9 @@ DELETION_TERMS = [
     "disorder",
     "dysfunction",
     # part or characteristic of body, or fluid
+    "rib",
+    "back",
+    "cardiovascular",
     "(?:.* )?urine",
     "(?:.* )?appendage",
     "(?:.* )?ventricle",
@@ -428,6 +430,7 @@ DELETION_TERMS = [
     "jaw",
     "liver",
     "heart",
+    "ankle",
     "intraocular len",
     "femoral",
     "respiratory(?: tract)?",
@@ -465,6 +468,8 @@ DELETION_TERMS = [
     "standard treatment",
     "standard of care",
     # category errors
+    "buttress",
+    "wastewater",
     "individual",
     "formability",
     "(?:fe)?male",
@@ -505,6 +510,8 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "compositions of matter",
+    "compounds of the formula",
     "(?:.* )?period",  # never used for menstruation
     "integrated system",
     "renewable resource",
@@ -564,6 +571,9 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
+    "sanitary",
+    "instant",
+    "purity",
     "hydrophobic",
     "serum-free",
     "moldability",
@@ -706,23 +716,6 @@ DELETION_TERMS = [
     "(?:.* )?step",
     "(?:.* )?value",
     "(?:.* )?time",
-    # roa
-    "aerosol",
-    "parenteral",
-    "inhalation",
-    "insufflation",
-    "intranasal",
-    "intramuscular",
-    "intravenous",
-    "subcutaneous",
-    "topical",
-    "(?:trans|intra)dermal",
-    "oral",
-    "rectal",
-    "vaginal",
-    "intrathecal",
-    "intraocular",
-    "intraperitoneal",
     # intangible thing
     "(?:.* )?concept",
     "(?:.* )?data",

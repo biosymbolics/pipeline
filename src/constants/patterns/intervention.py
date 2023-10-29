@@ -2,6 +2,7 @@
 Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
+from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
 from utils.re import get_or_re
 
 
@@ -76,6 +77,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "disinfectant",
     "dye",
     "effect",
+    "electroluminescent",
     "emitter",
     "emollient",
     "encoder",
@@ -87,8 +89,10 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "lubricant",
     "metabolite",
     "(?:(?:neo|peri)[ -]?)?adjuvant",
+    "NSAID",
     "phototherap(?:y|ie)",
     "pigment",
+    "plasticizer",
     "polymorph",
     "precursor",
     "primer",
@@ -105,6 +109,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "transfection",
     "transfer",
     "toxin",
+    "vitamin",
     "vaccine(?: adjuvant)?",
 ]
 
@@ -112,66 +117,7 @@ MECHANISM_BASE_TERMS = [
     *list(PRIMARY_BASE_TERMS.keys()),
     *SECONDARY_MECHANISM_BASE_TERMS,
 ]
-BIOLOGIC_BASE_TERMS: list[str] = [
-    "(?:(?:glyco|fusion)[ -]?)?proteins?(?: binding)?",
-    "(?:poly)peptides?(?: binding)?",
-    "(?:poly|di|tri)?nucleo[ts]ides?(?: binding)?",
-    "(?:receptor |protein )?ligands?(?: binding| that bind)?",
-    "(?:dna |nucleic acid |antibody )?(?:fragments?|sequences?)(?: binding| that bind)?",
-    "aggregate",
-    "(?:amino |fatty |(?:poly|di|tri)nucleic )acid",
-    "(?:neo)?antigen",
-    "antigen[ -]binding fragment",
-    "antigen presenting cell",
-    "aptamer",
-    "anion",
-    "(?:auto)?antibod(?:ie|y)",
-    "adc",
-    "antibody[ -]?drug[ -]conjugate",
-    "bcma(?: nke)?",
-    "car[- ]?(?:t|nk)",
-    "chimeric antigen receptor",
-    "chemotherap(?:y|ie)",  # not necessary biologic, more class/descriptive
-    "(?:adoptive )?cell(?: tranfer)?(?: therap(?:y|ie))?",
-    "clone",
-    "conjugate",
-    "(?:cell )?culture",
-    "cytokine",
-    "decomposition",
-    "(?:recombinant )?dna",
-    "epitope",
-    "exosome",
-    "enzyme",
-    "fab(?: region)?",
-    "factor [ivx]{1,3}",
-    "fc(?:[- ]fusion )?(?: protein)?",
-    "fus(?:ed|ion)",
-    "(?:hairpin|micro|messenger|sh|si|ds|m|hp|recombinant|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?rna(?: molecule| sequence)?",
-    "(?:trans)?gene",
-    "interferon",
-    "isoform",
-    "(?:phospho[ -]?|sphingo[ -]?)?lipid",
-    "kinase",
-    "(?:co[ -]?)?(?:di|mono|poly|oligo)mer",
-    "(?:natural killer|nkt|nkc)(?: cells)?",
-    "lignin",
-    "liposome",
-    "mutein",
-    "nuclease",
-    "(?:oligo[ -])?nucleotides?(?: sequence)?",
-    "(?:poly[ -]?)?peptides?(?: sequence)?",
-    "plasmid",
-    "protease",
-    "protein",
-    "recognizer",
-    "scaffold",
-    "scfv",  # single-chain variable fragment
-    "sequence",
-    "(?:expression )?vector",
-    "stem cell",
-    "(?:tumor[- ]?infiltrating )?lymphocyte",
-    "(?:(?:immuno|gene)[ -]?)?therap(?:y|ie)",
-]
+
 COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     # incomplete is an understatement.
     "acetone",
@@ -179,6 +125,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "(?:poly)?amide",
     "(?:poly)?amine",
     "ammonia",  # not biomedical?
+    "antimony",
     "benzene",  # not biomedical?
     "cellulose",
     "(?:immuno[ -]?)?conjugat(?:ion|ing|e)",
@@ -196,6 +143,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "indole",
     "(?:stereo)?isomer",
     "ketone",  # not biomedical?
+    "nitrile",
     "phenol",
     "(?:co[ -]?|pre[ -]?|bio[ -]?)?polymer",
     "propylene",
@@ -293,38 +241,6 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "vehicle",
 ]
 
-FORM_RES = [
-    "aerosol",
-    "bolus",
-    "(?:micro[ -]?|nano[ -]?)?capsule",
-    "cream",
-    "drop(?:let)",
-    "foam",
-    "gas",
-    "(?:soft|aero|hydro)?[- ]?gel",
-    "granule",
-    "infusion",
-    "inhalant",
-    "(?:(?:pressurized )?metered[ -]?dose |p?MDI |dry[ -]powder |DPI )?inhal(?:er|ation|ant)",
-    "(?:auto[- ]?)?inject(?:ion|or)",
-    "liquid",
-    "lotion",
-    "lozenge",
-    "microsphere",
-    "nebuliz(?:er|ation|ant)",
-    "ointment",
-    "oil",
-    "patch",
-    "pellet",
-    "pill",
-    "powder",
-    "slurr(?:y|ie)",
-    "spray",
-    "suppositor(?:y|ie)",
-    "tablet",
-    "vapor(?:izer)?",
-]
-
 
 COMPOUND_BASE_TERMS = [
     *COMPOUND_BASE_TERMS_SPECIFIC,
@@ -343,17 +259,12 @@ INTERVENTION_BASE_TERMS = [
 
 
 ALL_COMPOUND_BASE_TERMS = COMPOUND_BASE_TERMS
-ALL_COMPOUND_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_COMPOUND_BASE_TERMS], "+")
+ALL_COMPOUND_BASE_TERMS_RE = get_or_re(ALL_COMPOUND_BASE_TERMS, "+")
 ALL_BIOLOGIC_BASE_TERMS = BIOLOGIC_BASE_TERMS
 ALL_MECHANISM_BASE_TERMS = MECHANISM_BASE_TERMS
 
-ALL_BIOLOGIC_BASE_TERMS_RE = get_or_re([f"{t}s?" for t in ALL_BIOLOGIC_BASE_TERMS], "+")
-
-
-ALL_MECHANISM_BASE_TERMS_RE = get_or_re(
-    [f"{t}s?" for t in ALL_MECHANISM_BASE_TERMS], "+"
-)
-
+ALL_BIOLOGIC_BASE_TERMS_RE = get_or_re(ALL_BIOLOGIC_BASE_TERMS, "+")
+ALL_MECHANISM_BASE_TERMS_RE = get_or_re(ALL_MECHANISM_BASE_TERMS, "+")
 ALL_INTERVENTION_BASE_TERMS = [
     *ALL_COMPOUND_BASE_TERMS,
     *ALL_BIOLOGIC_BASE_TERMS,
@@ -437,7 +348,7 @@ INTERVENTION_PREFIXES_GENERIC = [
     "suitable",
     "target(?:ing|ed)?",
     "(?:chemo[ -]?)?therapeutic(?:ally)?",
-    "(?:% )?topical",
+    "topical",
     "usable",
     "useful",
     "value",
@@ -551,7 +462,7 @@ DIAGNOSTIC_RES = [
     ".*biomarker.*",
     "(?:.* )?contrast",
     "(?:.* )?detection",
-    "(?:.* )?diagnos(?:tic|is)",
+    "(?:.* )?diagnos(?:tic|is).*",
     ".*examination",
     ".*imaging agent",
     "(?:.* )?screen",
@@ -570,49 +481,90 @@ RESEARCH_TOOLS_RES = [
     ".*rna[- ]?seq.*",
     "(?:.* )?sequencing.*",
     ".*western blot.*",
+    ".*centrifug.*",
 ]
 
 ROA_PREFIX = "(?:epi[ -]?|intra[ -]?|trans[ -]?|sub[ -]?)?"
 ROA_VERB = (
     r"(?:solution|administration|route|preparation|application|suspension|composition)?"
 )
-ROA_RES = [
-    f"(?:{ROA_VERB} of )?{ROA_PREFIX}{roa}(?:ly )?\b{ROA_VERB}"
-    for roa in [
-        "arterial",
-        "articular",
-        "buccal",
-        "cardiac",
-        "cavernous",
-        "cerebroventricular",
-        "cutaneous",
-        "dermal",
-        "enteric",
-        "enteral",
-        "gastrointestinal",
-        "(?:inhalation|inhaled)",
-        "insufflation",
-        "IV",
-        "intraosseous",
-        "lesion(?:al)?",
-        "lingual",
-        "labial",
-        "muscular",
-        "mucosal",
-        "nasal",
-        "ocular",
-        "ophthalmic",
-        "oral",
-        "parenteral",
-        "peritoneal",
-        "rectal",
-        "SQ",
-        "SUB[-]?Q",
-        "thecal",
-        "topical",
-        "vaginal",
-        "venous",  # intravenous
-        "vesical",
-        "vitreal",
-    ]
+ROAS = [
+    "arterial",
+    "articular",
+    "buccal",
+    "cardiac",
+    "cavernous",
+    "cerebroventricular",
+    "cutaneous",
+    "dermal",
+    "enteric",
+    "enteral",
+    "gastrointestinal",
+    "(?:inhalation|inhaled)",
+    "insufflation",
+    "IV",
+    "lesion(?:al)?",
+    "lingual",
+    "labial",
+    "muscular",
+    "mucosal",
+    "nasal",
+    "ocular",
+    "ophthalmic",
+    "oral",
+    "osseous",
+    "parenteral",
+    "peritoneal",
+    "rectal",
+    "SQ",
+    "SUB[-]?Q",
+    "thecal",
+    "topical",
+    "vaginal",
+    "venous",  # intravenous
+    "vesical",
+    "vitreal",
 ]
+
+ROA_RE = f"(?:{ROA_VERB} of )?{ROA_PREFIX}{get_or_re(ROAS)}(?:ly )?\b{ROA_VERB}"
+
+DOSAGE_FORM_RES = [
+    "aerosol(?:ized)?",
+    "balm",
+    "bolus",
+    "(?:micro[ -]?|nano[ -]?|soft )?capsule",
+    "cream",
+    "(?:eye |nasal )?drop(?:let)",
+    "emulsion",
+    "foam",
+    "gas(?:eous)?",
+    "(?:soft|aero|hydro)?[- ]?gel",
+    "granule",
+    "infusion",
+    "inhal(?:ation|ant)",
+    "(?:(?:pressurized )?metered[ -]?dose |p?MDI |dry[ -]powder |DPI )?inhal(?:er|ation|ant)",
+    "(?:auto[- ]?)?inject(?:ion|or)",
+    "liquid",
+    "lotion",
+    "lozenge",
+    "microsphere",
+    "nebuliz(?:er|ation|ant)",
+    "ointment",
+    "oil",
+    "patch",
+    "pellet",
+    "pill",
+    "powder",
+    "ring",
+    "shapmoo",
+    "slurr(?:y|ie)",
+    "spray",
+    "syrup",
+    "suppositor(?:y|ie)",
+    "tablet",
+    "tincture",
+    "toothpaste",
+    "vapor(?:izer)?",
+]
+
+DOSAGE_FORM_RE = f"(?:{ROA_RE} )?{get_or_re(DOSAGE_FORM_RES, '+')}"
