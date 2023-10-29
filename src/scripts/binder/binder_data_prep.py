@@ -43,7 +43,7 @@ def get_annotations():
         (
             select publication_number, array_agg(distinct domain) as domains
             FROM biosym_annotations
-            WHERE domain in ('compounds', 'diseases', 'mechanisms')
+            WHERE domain not in ('assignees', 'attributes')
             AND publication_number ~ '.*A1' -- limit total count, effective reduce dups
             group by publication_number
         ) s,
@@ -56,12 +56,12 @@ def get_annotations():
         and 'mechanisms' = any(s.domains)
         and 'compounds' = any(s.domains)
         and 'diseases' = any(s.domains)
-        and domain in ('compounds', 'diseases', 'mechanisms')
+        and domain not in ('assignees', 'attributes')
         order by RANDOM()
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))
-    df = pl.DataFrame(records)  # .explode("text", "publication_number")
+    df = pl.DataFrame(records)
     return df
 
 

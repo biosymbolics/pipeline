@@ -82,7 +82,6 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "emollient",
     "encoder",
     "expression",  # TODO: also a disease term
-    "(?:growth )?factor",
     "interference",
     "interaction",
     "interface",
@@ -108,7 +107,6 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "transcription(?: factor)?",
     "transfection",
     "transfer",
-    "toxin",
     "vitamin",
     "vaccine(?: adjuvant)?",
 ]
@@ -132,18 +130,21 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "(?:small |antibody |dna |rna )?molecules?(?: binding)?",
     "carbonyl",
     "carbene",
+    "carbohydrate",
     "diamine",
     "elastomer",
     "emulsion",
     "ester",
     "gelatin",
     "glycerin",
+    "heterocyclic",
     "hydrogel",
     "hydrocarbon",  # not biomedical?
     "indole",
     "(?:stereo)?isomer",
     "ketone",  # not biomedical?
     "nitrile",
+    "nitrate",
     "phenol",
     "(?:co[ -]?|pre[ -]?|bio[ -]?)?polymer",
     "propylene",
@@ -152,6 +153,8 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "silicone",
     "starch",
     "sulfur",
+    "triazole",
+    "triazine",
     "taxane",  # not biomedical?
     "volatile organic",  # not biomedical?
 ]
@@ -168,7 +171,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "blend",
     "by[ -]?product",  # ??
     "(?:di|nano)?bod(?:y|ie)",  # ??
-    "(?:bio)?material",
+    "biomaterial",
     "(?:lead )?candidate",
     "(?:electro|bio)?[ -]?chemical",
     "(?:re[ -]?)?combination",
@@ -199,7 +202,7 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "laminate",
     "leading",
     "librar(?:y|ies)",
-    "(?:producing )?material",
+    "producing material",
     "medicament",
     "medication",
     "medium",
@@ -370,7 +373,7 @@ INTERVENTION_PREFIXES_SPECIFIC = [
     "aromatic",
     "chimeric",
     "chiral",
-    "deuterat",  # deuterated
+    "deuterated",
     "(?:non-?|mono|spiro|ali|bi|endo|tri|hetero|poly|macro)?cyclic",
     "(?:ion )?channel",
     "fused",
@@ -405,6 +408,7 @@ PROCEDURE_RES = [
     "(?:.* )?blow",
     "brachytherapy",
     "(?:.* )?care",
+    ".*dialysis.*",
     ".*dissection",
     ".*enema",
     ".*electrical stimulation",
@@ -420,7 +424,7 @@ PROCEDURE_RES = [
     ".*implantat(?:ion|ing).*",
     "(?:.* )?irrigation",
     "(?:.* )?monitor(?:ing)?",
-    "(?:.* )?operation",
+    "(?:.* )?operations?(?: .*)?",
     ".*placement",
     ".*plasty",
     "(?:.* )?procedure",
@@ -428,6 +432,7 @@ PROCEDURE_RES = [
     "(?:.* )?radiation",
     ".*radiotherapy",
     "root canal",
+    "(?:.* )?extraction",
     ".*scopy",
     "(?:.* )?surger(?:y|ies).*",
     "(?:.* )?technique",
@@ -473,11 +478,11 @@ RESEARCH_TOOLS_RES = [
     "(?:.* )?analyte",
     "(?:.* )?assay",
     "(?:.* )?culture",
-    "(?:.* )?polymerase chain reaction",
+    "(?:.* )?polymerase chain reaction.*",
     "(?:.* )?media",
     "(?:.* )?microarray",
-    "(?:.* )?reagent",
-    "(?:.* )?reactant",
+    "(?:.* )?reagents?(?: .*)?",
+    "(?:.* )?reactants?(?: .*)?",
     ".*rna[- ]?seq.*",
     "(?:.* )?sequencing.*",
     ".*western blot.*",
@@ -526,14 +531,16 @@ ROAS = [
     "vitreal",
 ]
 
-ROA_RE = f"(?:{ROA_VERB} of )?{ROA_PREFIX}{get_or_re(ROAS)}(?:ly )?\b{ROA_VERB}"
+ROA_RE = rf"(?:{ROA_VERB} of )?{ROA_PREFIX}{get_or_re(ROAS)}(?:ly)?[ ]?{ROA_VERB}"
 
 DOSAGE_FORM_RES = [
     "aerosol(?:ized)?",
+    "bag",
     "balm",
     "bolus",
     "(?:micro[ -]?|nano[ -]?|soft )?capsule",
     "cream",
+    "drip",
     "(?:eye |nasal )?drop(?:let)",
     "emulsion",
     "foam",
@@ -554,7 +561,7 @@ DOSAGE_FORM_RES = [
     "patch",
     "pellet",
     "pill",
-    "powder",
+    "(?:dry )?powder",
     "ring",
     "shapmoo",
     "slurr(?:y|ie)",
@@ -568,3 +575,18 @@ DOSAGE_FORM_RES = [
 ]
 
 DOSAGE_FORM_RE = f"(?:{ROA_RE} )?{get_or_re(DOSAGE_FORM_RES, '+')}"
+
+
+DOSAGE_UOMS = [
+    "mg",
+    "milligram",
+    "g",
+    "gram",
+    "mcg",
+    "μg",
+    "microgram",
+    "ml",
+    "milliliter",
+    "nanogram",
+    "ng",
+]

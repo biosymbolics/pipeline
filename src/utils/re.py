@@ -6,6 +6,8 @@ import regex as re
 from typing import Iterable, Literal, Optional, Sequence, Union
 import logging
 
+from utils.list import is_sequence
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -57,6 +59,9 @@ def get_or_re(
         permit_trailing_space (bool): whether to permit trailing space between each re (defaults to False)
         enforce_word_boundaries (bool): whether to enforce word boundaries (defaults to False)
     """
+    if not is_sequence(_re_strs):
+        raise Exception("re_strs must be a sequence")
+
     re_strs = [*_re_strs]
     if permit_plural:
         re_strs = [re_str + r"s?" for re_str in re_strs]

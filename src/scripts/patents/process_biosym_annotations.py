@@ -20,7 +20,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
-from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
+from constants.patterns.device import DEVICE_RES
 from constants.patterns.intervention import (
     BEHAVIOR_RES,
     BIOLOGIC_BASE_TERMS,
@@ -108,7 +108,7 @@ def expand_annotations(
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
     client = DatabaseClient()
-    prefix_re = get_or_re([p + " " for p in prefix_terms], "*")
+    prefix_re = get_or_re(prefix_terms, "*", enforce_word_boundaries=True)
     terms_re = get_or_re(base_terms_to_expand)
     records = client.select(
         rf"""
@@ -311,29 +311,27 @@ def normalize_domains():
     """
     client = DatabaseClient()
 
-    compounds_re = f".*{get_or_re(COMPOUND_BASE_TERMS)}.*"
-    biologics_re = f".*{get_or_re(BIOLOGIC_BASE_TERMS)}.*"  # TODO: break into intervention vs general biological thing
-    mechanism_re = f".*{get_or_re(MECHANISM_BASE_TERMS)}.*"
-    device_re = get_or_re(HIGH_LIKELIHOOD_DEVICES)
+    compounds_re = rf".*\y{get_or_re(COMPOUND_BASE_TERMS)}.*"
+    biologics_re = rf".*\y{get_or_re(BIOLOGIC_BASE_TERMS)}.*"  # TODO: break into intervention vs general biological thing
+    mechanism_re = rf".*\y{get_or_re(MECHANISM_BASE_TERMS)}.*"
+    device_re = get_or_re(DEVICE_RES)
     procedure_re = get_or_re(PROCEDURE_RES)
     diagnostic_re = get_or_re(DIAGNOSTIC_RES)
-    roa_re = get_or_re(ROA_RE)
-    dosage_form_re = get_or_re(DOSAGE_FORM_RE)
     research_re = get_or_re(RESEARCH_TOOLS_RES)
     behavioral_re = get_or_re(BEHAVIOR_RES)
 
     queries = [
-        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update {WORKING_TABLE} set domain='compounds' where domain<>'compounds' AND original_term ~* '{compounds_re}$'",
+        f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND original_term ~* '{biologics_re}$'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '{mechanism_re}$'",
         f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$'",
-        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
-        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{roa_re}$'",
         f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$'",
         f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$'",
-        f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND original_term ~* '^{dosage_form_re}$'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='compounds' where domain<>'compounds' AND original_term ~* '.*{compounds_re}$'",
-        f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND original_term ~* '.*{biologics_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '.*{mechanism_re}$'",
+        f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND original_term ~* '^{DOSAGE_FORM_RE}$'",
+        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{ROA_RE}$'",
+        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
+        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 
@@ -371,50 +369,50 @@ def populate_working_biosym_annotations():
     - Performs various cleanups and deletions
     """
     client = DatabaseClient()
-    logger.info(
-        "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
-    )
-    client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-        WORKING_TABLE,
-    )
+    # logger.info(
+    #     "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
+    # )
+    # client.create_from_select(
+    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+    #     WORKING_TABLE,
+    # )
 
-    # add indices after initial load
-    client.create_indices(
-        [
-            {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
-            {"table": WORKING_TABLE, "column": "domain"},
-        ]
-    )
+    # # add indices after initial load
+    # client.create_indices(
+    #     [
+    #         {"table": WORKING_TABLE, "column": "publication_number"},
+    #         {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+    #         {"table": WORKING_TABLE, "column": "domain"},
+    #     ]
+    # )
 
-    fix_unmatched()
-    clean_up_junk()
+    # fix_unmatched()
+    # clean_up_junk()
 
-    # # round 1 (leaves in stuff used by for/of)
-    remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # # # round 1 (leaves in stuff used by for/of)
+    # remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
+    # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
     # after remove_substrings to avoid expanding substrings into something (potentially) mangled
-    expand_annotations()
+    # expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
-    remove_trailing_leading(REMOVAL_WORDS_POST)
+    # remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
-    clean_up_junk()
+    # clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    client.execute_query(
-        """
-        drop index trgm_index_biosym_annotations_original_term;
-        drop index index_biosym_annotations_domain;
-        """,
-        ignore_error=True,
-    )
+    # client.execute_query(
+    #     """
+    #     drop index trgm_index_biosym_annotations_original_term;
+    #     drop index index_biosym_annotations_domain;
+    #     """,
+    #     ignore_error=True,
+    # )
 
-    remove_common_terms()  # remove one-off generic terms
+    # remove_common_terms()  # remove one-off generic terms
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations

@@ -259,6 +259,11 @@ DELETION_TERMS = [
     "reform",
     "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "compositions comprising the compounds",
+    "support arm",
+    "information system",
+    "support structure",
+    "support system",
     "backing material",
     "operation part",
     "oxide",
@@ -510,6 +515,8 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "mechanical",
+    "compound of general",
     "compositions of matter",
     "compounds of the formula",
     "(?:.* )?period",  # never used for menstruation
@@ -800,6 +807,7 @@ DELETION_TERMS = [
     "alkaline",  # industrial
     "trifluoromethyl",  # industrial
     "thermoplastic(?: .*)?",  # industrial
+    "plastic material",
     "(?:.* )?resin",
     "(?:.* )?epoxy",
     "(?:.* )?polyurethane",
