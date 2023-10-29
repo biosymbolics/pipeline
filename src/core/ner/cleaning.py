@@ -40,13 +40,6 @@ SUBSTITUTIONS = {
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
 
-DEFAULT_ADDITIONAL_COMMON_WORDS = [
-    "(i)",  # so common in patents, e.g. "general formula (I)"
-    "(1)",
-    "sec",
-    "second",
-]
-
 
 class EntityCleaner:
     """

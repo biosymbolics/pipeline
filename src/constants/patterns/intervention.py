@@ -82,6 +82,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "emollient",
     "encoder",
     "expression",  # TODO: also a disease term
+    "function",
     "interference",
     "interaction",
     "interface",

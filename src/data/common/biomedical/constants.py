@@ -198,7 +198,7 @@ EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
 # overrides POS, eg "inhibiting the expression of XYZ"
-EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding", "coding"]
+EXPANSION_POS_OVERRIDE_TERMS = ["directed", "expression", "encoding", "coding"]
 
 
 DELETION_TERMS = [

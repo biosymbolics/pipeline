@@ -1,30 +1,30 @@
 LARGE_PHARMA_KEYWORDS = [
-    "Abbott",
-    "ABBVIE",  # ABBVIE INC
-    "AMGEN",  # AMGEN INC
-    "Allergan",
-    "ASTRAZENECA",  # ASTRAZENECA AB
-    "BAYER",  # BAYER AG, Bayer Pharma AG
-    "BIOGEN",  # BIOGEN IDEC INC
-    "BOEHRINGER INGELHEIM",  # BOEHRINGER INGELHEIM INT, BOEHRINGER INGELHEIM PHARMA
-    "BRISTOL[ -]?MYERS SQUIBB",  # BRISTOL MYERS SQUIBB CO
-    "ELI LILLY",  # LILLY CO ELI
-    "LILLY",
-    "GENENTECH",  # GENENTECH INC
-    "GILEAD",  # GILEAD SCIENCES INC
-    "GLAXO",  # GLAXO GROUP LTD
-    "GLAXOSMITHKLINE",  # GLAXOSMITHKLINE IP DEV LTD
-    "GSK",
-    "JANSSEN",  # JANSSEN PHARMACEUTICA NV
-    "MERCK",  # MERCK SHARP & DOHME
-    "MITSUBISHI",  # MITSUBISHI TANABE PHARMA CORP
-    "NOVARTIS",  # NOVARTIS AG
-    "NOVO NORDISK",
-    "PFIZER",
-    "REGENERON",  # REGENERON PHARMACEUTICALS
-    "ROCHE",  # HOFFMANN LA ROCHE
+    "abbott",
+    "abbvie",  # ABBVIE INC
+    "amgen",  # AMGEN INC
+    "allergan",
+    "astrazenca",  # ASTRAZENECA AB
+    "bayer",  # BAYER AG, Bayer Pharma AG
+    "biogen",  # BIOGEN IDEC INC
+    "boehringer ingelheim",  # BOEHRINGER INGELHEIM INT, BOEHRINGER INGELHEIM PHARMA
+    "bristol[ -]?myers squibb",  # BRISTOL MYERS SQUIBB CO
+    "eli lilly",  # LILLY CO ELI
+    "lilly",
+    "genentech",  # GENENTECH INC
+    "gilead",  # GILEAD SCIENCES INC
+    "glaxo",  # GLAXO GROUP LTD
+    "glaxo[- ]?smith[- ]?kline",  # GLAXOSMITHKLINE IP DEV LTD
+    "gsk",
+    "janssen",  # JANSSEN PHARMACEUTICA NV
+    "merck",  # MERCK SHARP & DOHME
+    "mitsubishi",  # MITSUBISHI TANABE PHARMA CORP
+    "novartis",  # NOVARTIS AG
+    "novo nordisk",
+    "pfizer",
+    "regeneron",  # REGENERON PHARMACEUTICALS
+    "roche",  # HOFFMANN LA ROCHE
     "sanofi",  # SANOFI AVENTIS DEUTSCHLAND
-    "TAKEDA",  # TAKEDA PHARMACEUTICAL
+    "takeda",  # TAKEDA PHARMACEUTICAL
 ]
 
 COMPANY_STRINGS = [

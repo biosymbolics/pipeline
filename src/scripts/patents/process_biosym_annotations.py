@@ -369,50 +369,50 @@ def populate_working_biosym_annotations():
     - Performs various cleanups and deletions
     """
     client = DatabaseClient()
-    # logger.info(
-    #     "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
-    # )
-    # client.create_from_select(
-    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-    #     WORKING_TABLE,
-    # )
+    logger.info(
+        "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
+    )
+    client.create_from_select(
+        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+        WORKING_TABLE,
+    )
 
-    # # add indices after initial load
-    # client.create_indices(
-    #     [
-    #         {"table": WORKING_TABLE, "column": "publication_number"},
-    #         {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
-    #         {"table": WORKING_TABLE, "column": "domain"},
-    #     ]
-    # )
+    # add indices after initial load
+    client.create_indices(
+        [
+            {"table": WORKING_TABLE, "column": "publication_number"},
+            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+            {"table": WORKING_TABLE, "column": "domain"},
+        ]
+    )
 
-    # fix_unmatched()
-    # clean_up_junk()
+    fix_unmatched()
+    clean_up_junk()
 
-    # # # round 1 (leaves in stuff used by for/of)
-    # remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # round 1 (leaves in stuff used by for/of)
+    remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    # remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
+    remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
     # after remove_substrings to avoid expanding substrings into something (potentially) mangled
-    # expand_annotations()
+    expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
-    # remove_trailing_leading(REMOVAL_WORDS_POST)
+    remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
-    # clean_up_junk()
+    clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    # client.execute_query(
-    #     """
-    #     drop index trgm_index_biosym_annotations_original_term;
-    #     drop index index_biosym_annotations_domain;
-    #     """,
-    #     ignore_error=True,
-    # )
+    client.execute_query(
+        """
+        drop index trgm_index_biosym_annotations_original_term;
+        drop index index_biosym_annotations_domain;
+        """,
+        ignore_error=True,
+    )
 
-    # remove_common_terms()  # remove one-off generic terms
+    remove_common_terms()  # remove one-off generic terms
     normalize_domains()
 
     # do this last to minimize mucking with attribute annotations

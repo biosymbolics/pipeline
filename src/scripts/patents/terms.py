@@ -356,7 +356,7 @@ def create_patent_terms():
 
     $ jq '.[] | select(.name == "therapeutically")' terms.json
     """
-    populate_working_biosym_annotations()
+    # populate_working_biosym_annotations()
 
     TermAssembler.run()
 
