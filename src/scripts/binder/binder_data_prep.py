@@ -54,10 +54,11 @@ def get_annotations():
         AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
         AND not array_to_string(ipc_codes, ',') ~ '.*C01.*'
         and 'mechanisms' = any(s.domains)
-        and 'compounds' = any(s.domains)
+        and ('compounds' = any(s.domains) or 'biologics' = any(s.domains))
         and 'diseases' = any(s.domains)
         and domain not in ('assignees', 'attributes')
         order by RANDOM()
+        limit 500000 -- 829,812
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))
