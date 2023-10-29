@@ -39,7 +39,7 @@ def aggregate(
     ```
     import system; system.initialize();
     from clients import patents as patent_client
-    patents = patent_client.search(["asthma"])
+    patents = patent_client.search(["asthma"], skip_cache=True)
     from clients.patents.constants import DOMAINS_OF_INTEREST
     from clients.patents.reports import aggregate
     summaries = aggregate(patents, DOMAINS_OF_INTEREST)
@@ -51,10 +51,12 @@ def aggregate(
         df: pl.DataFrame, x_dim: str, y_dim: str, LIMIT: int = 100
     ) -> list[PatentsReportRecord]:
         if len(y_dim) > 0:
+            # explode y_dim if list
+            if df.select(pl.col(y_dim)).dtypes == pl.List:
+                df = df.explode(y_dim)
             col_df = (
                 # apply y_transform; keep y around
-                df.explode(y_dim)
-                .with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
+                df.with_columns(pl.col(y_dim).apply(y_transform).alias("y"))
                 .select(
                     pl.col(x_dim).apply(x_transform, skip_nulls=False).alias("x"),
                     pl.col("y"),

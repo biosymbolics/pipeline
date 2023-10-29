@@ -5,7 +5,6 @@ from functools import partial
 import logging
 import time
 from typing import Sequence, TypedDict, cast
-from pydash import compact
 
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.low_level.postgres import PsqlDatabaseClient
