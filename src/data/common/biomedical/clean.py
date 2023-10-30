@@ -7,10 +7,6 @@ import logging
 from typing import Sequence
 from spacy.tokens import Doc
 
-from system import initialize
-
-initialize()
-
 
 from utils.re import get_or_re
 

@@ -1,4 +1,5 @@
 import unittest
+from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
@@ -288,6 +289,10 @@ class TestNerUtils(unittest.TestCase):
                 "input": "inhibitors of the interaction between mdm2 and XYZ",
                 "expected": "interaction inhibitors",  # TODO
             },
+            # {
+            #     "input": "inhibiting thrombin",
+            #     "expected": "thrombin inhibiting",
+            # },
             {
                 "input": "middle-of-the night insomnia",
                 "expected": "-the night insomnia middle-",  # TODO eek should be "middle of the night insomnia",
@@ -298,12 +303,36 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",
-                "expected": "inhibitors for use in blood-borne cancer the treatment",  # TODO: "blood-borne cancer treatment inhibitors",
+                "expected": "blood-borne cancer treatment inhibitors",  # TODO: "blood-borne cancer inhibitors",
             },
             {
                 "input": "antibody against urokinase receptor",
                 "expected": "urokinase receptor antibody",
             },
+            {
+                "input": "antagonist to tumor angiogenesis",
+                "expected": "tumor angiogenesis antagonist",
+            },
+            {
+                "input": "antagonist for use in the diabetes",
+                "expected": "diabetes antagonist",
+            },
+            {
+                "input": "antagonist for the cb1 receptor",
+                "expected": "cb1 receptor antagonist",
+            },
+            {
+                "input": "antagonist for the cb1 receptor",
+                "expected": "cb1 receptor antagonist",
+            },
+            {
+                "input": "modulator tmem230",
+                "expected": "tmem230 modulator",
+            },
+            {
+                "input": "inhibitor 5a reductase enzyme",
+                "expected": "inhibitor 5a reductase enzyme",  # TODO
+            }
             # {
             #     "input": "useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
             #     "expected": "disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
@@ -314,7 +343,9 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = list(rearrange_terms([input]))[0]
+            result = list(
+                rearrange_terms([input], list(PRIMARY_MECHANISM_BASE_TERMS.keys()))
+            )[0]
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 

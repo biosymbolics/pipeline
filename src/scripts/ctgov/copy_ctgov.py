@@ -69,7 +69,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def is_control(intervention_str: str) -> bool:
     return (
         re.match(
-            r".*\b(?:placebo|sham|best supportive care|standard|comparator|no treatment|saline solution|conventional)s?\b.*",
+            r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Therapeutic procedure|Questionnaire Administration|Dosage)s?\b.*",
             intervention_str,
             flags=RE_FLAGS,
         )
@@ -170,8 +170,10 @@ def ingest_trials():
     """
 
     tagger = NerTagger(
-        entity_types=frozenset(["compounds", "mechanisms"]),
-        link=True,
+        entity_types=frozenset(
+            ["compounds", "mechanisms"]
+        ),  # TODO: biologics, devices, maybe dosage_forms
+        link=False,
         additional_cleaners=[
             lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
         ],

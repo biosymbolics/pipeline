@@ -105,7 +105,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "car[- ]?(?:t|nk)",
     "chimeric antigen receptor",
     "chemotherap(?:y|ie)",  # not necessary biologic, more class/descriptive
-    "(?:adoptive )?cell(?: tranfer)?(?: therap(?:y|ie))?",
+    "(?:adoptive )?cell(?: tranfer)?(?: therap(?:y|ie))?",  # cell disease
     "clone",
     "conjugate",
     "(?:cell )?culture",
@@ -134,6 +134,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "lignin",
     "liposome",
     "mutein",
+    "mutation",
     "nuclease",
     "(?:oligo[ -])?nucleotides?(?: sequence)?",
     "(?:poly[ -]?)?peptides?(?: sequence)?",

@@ -17,9 +17,8 @@ from core.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .process_biosym_annotations import populate_working_biosym_annotations
-
 from .constants import SYNONYM_MAP
+from .process_biosym_annotations import populate_working_biosym_annotations
 from .utils import clean_owners
 
 TERMS_FILE = "terms.json"

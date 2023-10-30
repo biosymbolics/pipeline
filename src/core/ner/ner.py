@@ -179,20 +179,13 @@ class NerTagger:
         To avoid reconstructing the SpaCy doc, just return DocEntities
         """
 
-        if is_string_list_list(content):
-            ents = flatten([self.__dual_model_extract(c) for c in content])
-            return ents
-        elif is_string_list(content):
-            binder_docs = self.nlp.pipe(content)
-            if self.rule_nlp:
-                rule_docs = self.rule_nlp.pipe(content)
-                return [
-                    self.__combine_ents(d1, d2)
-                    for d1, d2 in zip(binder_docs, rule_docs)
-                ]
-            return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
-        else:
-            raise Exception("Bad content type")
+        binder_docs = self.nlp.pipe(content)
+        if self.rule_nlp:
+            rule_docs = self.rule_nlp.pipe(content)
+            return [
+                self.__combine_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
+            ]
+        return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
     def __normalize(
         self,

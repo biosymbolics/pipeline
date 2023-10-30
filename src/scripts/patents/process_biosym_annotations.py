@@ -8,7 +8,6 @@ from typing import Literal, Sequence, TypedDict
 from pydash import compact
 import polars as pl
 from spacy.tokens import Doc
-from data.common.biomedical.constants import REMOVAL_WORDS_POST, REMOVAL_WORDS_PRE
 
 
 from system import initialize
@@ -31,6 +30,7 @@ from constants.patterns.intervention import (
     INTERVENTION_BASE_TERMS,
     INTERVENTION_PREFIXES,
     PROCEDURE_RES,
+    PROCESS_RES,
     RESEARCH_TOOLS_RES,
     ROA_RE,
 )
@@ -43,10 +43,11 @@ from data.common.biomedical import (
     EXPAND_CONNECTING_RE,
     POTENTIAL_EXPANSION_MAX_TOKENS,
     TARGET_PARENS,
+    REMOVAL_WORDS_POST,
+    REMOVAL_WORDS_PRE,
     DELETION_TERMS,
+    WordPlace,
 )
-
-from data.common.biomedical.types import WordPlace
 from utils.list import batch
 from utils.re import get_or_re, get_hacky_stem_re
 
@@ -319,6 +320,7 @@ def normalize_domains():
     diagnostic_re = get_or_re(DIAGNOSTIC_RES)
     research_re = get_or_re(RESEARCH_TOOLS_RES)
     behavioral_re = get_or_re(BEHAVIOR_RES)
+    process_re = get_or_re(PROCESS_RES)
 
     queries = [
         f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
@@ -326,12 +328,14 @@ def normalize_domains():
         f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND original_term ~* '{biologics_re}$'",
         f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '{mechanism_re}$'",
         f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$'",
+        f"update {WORKING_TABLE} set domain='processes' where domain<>'processes' AND original_term ~* '^{process_re}$'",
         f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$'",
         f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$'",
         f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND original_term ~* '^{DOSAGE_FORM_RE}$'",
         f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{ROA_RE}$'",
         f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
         f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term ilike '% disease' and domain<>'diseases' and not original_term ~* '(?:compounds?|compositions?|anti|agent|immuni[zs]ing|drug for|imag)'",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 
@@ -414,11 +418,6 @@ def populate_working_biosym_annotations():
 
     remove_common_terms()  # remove one-off generic terms
     normalize_domains()
-
-    # do this last to minimize mucking with attribute annotations
-    client.select_insert_into_table(
-        f"SELECT * from {SOURCE_TABLE} where domain='attributes'", WORKING_TABLE
-    )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """
 Binder NER model
 """
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Iterator
 from pydash import compact
 import torch
 from transformers import AutoTokenizer
@@ -66,14 +66,14 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def get_doc(self, doc: Union[str, Doc], annotations: list[Annotation]) -> Doc:
+    def get_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
         In the case of overlapping entity spans, takes the largest.
 
         Args:
-            doc (Union[str, Doc]): text or SpaCy Doc
+            doc (str | Doc): text or SpaCy Doc
             annotations (list[Annotation]): list of annotations
         """
         # TODO: have this use tokenization identical to the model (biobert)
@@ -114,7 +114,7 @@ class BinderNlp:
 
     def tokenize(
         self,
-        text: Union[str, list[str]],
+        text: str | list[str],
         tokenize_args: dict = {
             "return_overflowing_tokens": True,
             "return_offsets_mapping": True,
@@ -129,12 +129,12 @@ class BinderNlp:
         all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
         return self.__tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
-    def extract(self, doc: Union[str, Doc]) -> Doc:
+    def extract(self, doc: str | Doc) -> Doc:
         """
         Extracts entity annotations for a given text.
 
         Args:
-            doc (Union[str, Doc]): The Spacy Docs (or strings) to annotate.
+            doc (str | Doc): The Spacy Docs (or strings) to annotate.
 
         ```
         import system; system.initialize()
@@ -142,7 +142,7 @@ class BinderNlp:
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
             "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-            for i in range(100)
+            for i in range(2)
         ]) + " and some melanoma."
         b.extract(text).ents
         ```
@@ -164,14 +164,14 @@ class BinderNlp:
 
     def pipe(
         self,
-        texts: Iterable[Union[str, Doc]],
+        texts: Iterable[str | Doc],
     ) -> Iterator[Doc]:
         """
         Apply the pipeline to a batch of texts.
         Single threaded because GPU handles parallelism.
 
         Args:
-            texts (Iterable[Union[str, Doc]]): The texts to annotate.
+            texts (Iterable[str | Doc]): The texts to annotate.
         """
         logger.debug("Starting binder NER extraction")
 

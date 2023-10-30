@@ -6,42 +6,42 @@ from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
 from utils.re import get_or_re
 
 
-PRIMARY_BASE_TERMS: dict[str, str] = {
-    "activat(?:or|ion|ing|e)?": "activator",
-    "(?:super[ -]?)?agoni[sz](?:t|ing|er?|m)?": "agonist",
-    "antagoni[sz](?:t|ing|er?|m)?": "antagonist",
-    "amplif(?:ier|ication|ying|y)": "amplifier",
+PRIMARY_MECHANISM_BASE_TERMS: dict[str, str] = {
+    "activat(?:or|ion|ing|ed?)?": "activator",
+    "(?:super[ -]?)?agoni[sz](?:t|ing|er?|m|ed)?": "agonist",
+    "antagoni[sz](?:t|ing|er?|m|ed)?": "antagonist",
+    "amplif(?:ier|ication|ying|y|ied)": "amplifier",
     "bind(?:er|ing)?": "binder",
-    "block(?:er|ing|ade)?": "blocker",
+    "block(?:er|ing|ade|ed)?": "blocker",
     "chaperone": "chaperone",
-    "(?:co[ -]?|bio[ -]?)?cataly(?:st|ze|zing|zer)(?: system)": "catalyst",
-    "degrad(?:er|ation|ing|e)?": "degrader",
-    "desensitiz(?:ation|ing|e|er)": "desensitizer",
-    "disrupt(?:or|ion|ing)?": "disruptor",
-    "disintegrat(?:or|ion|ing|e)?": "disintegrator",
-    "desicca(?:tion|nt|te|ted|ting)": "desiccant",
+    "(?:co[ -]?|bio[ -]?)?cataly(?:st|zed?|zing|zer)(?: system)": "catalyst",
+    "degrad(?:er|ation|ing|ed?)?": "degrader",
+    "desensitiz(?:ation|ing|ed?|er)": "desensitizer",
+    "disrupt(?:or|ion|ing|ed)?": "disruptor",
+    "disintegrat(?:or|ion|ing|ed?)?": "disintegrator",
+    "desicca(?:tion|nt|te|ting)": "desiccant",
     "enhanc(?:er|ing|e)": "enhancer",
-    "emulsif(?:y|ying|ier)?": "emulsifier",
+    "emulsif(?:y|ying|ier|ied)?": "emulsifier",
     "immunosuppress(?:ion|or|ant)": "immunosuppressant",
     "inactivat(?:or|ion|ing|e)?": "inactivator",
     "induc(?:er|ing|ion|e)?": "inducer",
-    "inhibit(?:ion|ing|or)?": "inhibitor",
-    "initiat(?:er?|ion|ing|or)?": "initiator",
-    "introduc(?:er?|ing|tion)": "introducer",
+    "inhibit(?:ion|ing|or|ed)?": "inhibitor",
+    "initiat(?:er?|ion|ing|or|ed)?": "initiator",
+    "introduc(?:er?|ing|tion|ed)": "introducer",
     "mimetic": "mimetic",
-    "modulat(?:or|ion|ing|e)?": "modulator",
-    "modif(?:ier?|ying|ication|y)": "modifier",
-    "oxidi[sz](?:er|ing|ation|e)?": "oxidizer",
-    "promot(?:or|ion|ing|ant|e)?": "promoter",
-    "potentiat(?:or|ion|ing|e)?": "potentiator",
-    "regenerat(?:e|ion|ing|ion|or)": "regenerator",
-    "suppress(?:or|ion|ing|ant)?": "suppressor",
-    "stimulat(?:or|ion|ing|ant|e)?": "stimulator",
-    "sensiti[sz](?:ation|ing|e|er)": "sensitizer",
+    "modulat(?:or|ion|ing|ed?)?": "modulator",
+    "modif(?:ier|ied|ying|ication|y)": "modifier",
+    "oxidi[sz](?:er|ed|ing|ation|e)?": "oxidizer",
+    "promot(?:or|ion|ing|ant|ed?)?": "promoter",
+    "potentiat(?:or|ion|ing|ed?)?": "potentiator",
+    "regenerat(?:ed?|ion|ing|ion|or)": "regenerator",
+    "suppress(?:or|ion|ing|ant|ed)?": "suppressor",
+    "stimulat(?:or|ion|ing|ant|ed?)?": "stimulator",
+    "sensiti[sz](?:ation|ing|ed?|er)": "sensitizer",
     "strip(?:per|ping|ped|ping)": "stripper",
-    "stabili[sz](?:er|ing|e|ion)": "stabilizer",
+    "stabili[sz](?:er|ing|ed?|ion)": "stabilizer",
     "thicken(?:er|ing|ed)": "thickener",
-    "transport(?:er|ing|ation)?": "transporter",
+    "transport(?:er|ing|ation|ed)?": "transporter",
 }
 
 SECONDARY_MECHANISM_BASE_TERMS = [
@@ -113,7 +113,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
 ]
 
 MECHANISM_BASE_TERMS = [
-    *list(PRIMARY_BASE_TERMS.keys()),
+    *list(PRIMARY_MECHANISM_BASE_TERMS.keys()),
     *SECONDARY_MECHANISM_BASE_TERMS,
 ]
 
@@ -428,7 +428,7 @@ PROCEDURE_RES = [
     "(?:.* )?operations?(?: .*)?",
     ".*placement",
     ".*plasty",
-    "(?:.* )?procedure",
+    "(?:.* )?procedures?(?: .*)?",
     ".*puncture",  # puncture
     "(?:.* )?radiation",
     ".*radiotherapy",
@@ -488,6 +488,10 @@ RESEARCH_TOOLS_RES = [
     "(?:.* )?sequencing.*",
     ".*western blot.*",
     ".*centrifug.*",
+]
+
+PROCESS_RES = [
+    "^.+process(?:es)?",
 ]
 
 ROA_PREFIX = "(?:epi[ -]?|intra[ -]?|trans[ -]?|sub[ -]?)?"

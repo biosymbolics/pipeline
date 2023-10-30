@@ -37,33 +37,28 @@ def get_annotations():
             THEN concat(title, '\n', substring(abstract from 0 for 2000))
             ELSE concat(substring(abstract from 0 for 2000), '\n', title)
             END
-        ) as text, -- switch title + abs and abs + title to improve generalizability
+        ) as text, -- switching title + abs and abs + title to improve generalizability
         s.publication_number as publication_number, original_term as term, domain
         FROM
         (
             select ba.publication_number, array_agg(distinct domain) as domains
-            FROM biosym_annotations ba,
-            aggregated_annotations as aa -- for term count
-            WHERE aa.publication_number = ba.publication_number
-            AND domain not in ('assignees', 'attributes')
+            FROM biosym_annotations ba
+            WHERE domain not in ('assignees', 'attributes')
             AND ba.publication_number ~ '.*A1' -- limit total count, effective reduce dups
-            AND array_length(aa.terms, 1) < 400
             group by ba.publication_number
         ) s,
         biosym_annotations b_anns,
-        applications apps,
-        aggregated_annotations as aa
-        where aa.publication_number = apps.publication_number
-        AND b_anns.publication_number = apps.publication_number
+        applications apps
+        where b_anns.publication_number = apps.publication_number
         AND s.publication_number = apps.publication_number
         AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
         AND not array_to_string(ipc_codes, ',') ~ '.*C01.*'
         and 'mechanisms' = any(s.domains)
-        and ('compounds' = any(s.domains) or 'biologics' = any(s.domains))
+        and ARRAY['compounds', 'biologics'] && s.domains
         and 'diseases' = any(s.domains)
         and domain not in ('assignees', 'attributes')
         order by RANDOM()
-        limit 400000 -- 829,812
+        limit 300000 -- 829,812
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))

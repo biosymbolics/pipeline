@@ -10,9 +10,12 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
+from constants.patterns.intervention import (
+    INTERVENTION_PREFIXES_GENERIC_RE,
+    PRIMARY_MECHANISM_BASE_TERMS,
+)
 from constants.patterns.iupac import is_iupac
-from core.ner.binder.constants import PHRASE_MAP
+from data.common.biomedical.constants import PHRASE_REWRITES
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
@@ -155,7 +158,7 @@ class EntityCleaner:
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
-                for syn, canonical in PHRASE_MAP.items()
+                for syn, canonical in PHRASE_REWRITES.items()
             ]
 
             for term in _terms:
@@ -172,7 +175,9 @@ class EntityCleaner:
             format_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
-            rearrange_terms,
+            partial(
+                rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
+            ),
             depluralize_tails,
             normalize_by_pos,
             normalize_phrases,  # order matters (after rearrange)
