@@ -8,7 +8,7 @@ from typing import Sequence
 from spacy.tokens import Doc
 
 
-from utils.re import get_or_re
+from utils.re import get_or_re, RE_STANDARD_FLAGS
 
 from .constants import (
     EXPANSION_ENDING_DEPS,
@@ -107,7 +107,12 @@ def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
         text (str): Text to search / full text
         text_doc (Doc): Spacy doc (passed in for perf reasons)
     """
-    s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
+    # using partial word boundaries instead of \b to handle cases where original_term starts with a wb char like (
+    s = re.search(
+        rf"(?:^| ){re.escape(original_term)}(?:$| )",
+        text_doc.text,
+        flags=RE_STANDARD_FLAGS,
+    )
 
     # shouldn't happen
     if s is None:

@@ -48,6 +48,7 @@ def get_or_re(
     permit_trailing_space: bool = False,
     enforce_word_boundaries: bool = False,
     permit_plural: bool = True,
+    word_boundary_char: str = rf"\b",  # \y for postgres
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -66,8 +67,9 @@ def get_or_re(
     if permit_plural:
         re_strs = [re_str + r"s?" for re_str in re_strs]
 
+    wbc = word_boundary_char
     if enforce_word_boundaries:
-        re_strs = [rf"\b{re_str}\b" for re_str in re_strs]
+        re_strs = [rf"{wbc}{re_str}{wbc}" for re_str in re_strs]
 
     if permit_trailing_space:
         re_strs = [re_str + r"\s*" for re_str in re_strs]
