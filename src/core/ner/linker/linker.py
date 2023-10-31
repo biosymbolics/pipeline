@@ -3,18 +3,19 @@ Term Normalizer
 """
 import logging
 import time
-from typing import List, NamedTuple, Sequence, Union
-import torch
+from typing import List, NamedTuple, Sequence
 
-from .types import KbLinker, CanonicalEntity
+
+from ..types import KbLinker, CanonicalEntity
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-LinkedEntityMap = dict[str, CanonicalEntity]
 
 MIN_SIMILARITY = 0.85
 ONTOLOGY = "umls"
+
+LinkedEntityMap = dict[str, CanonicalEntity]
 
 
 # copy from scispacy to avoid the import
@@ -34,44 +35,52 @@ class TermLinker:
 
     Example:
         >>> linker = TermLinker()
-        >>> linker(["APP", "haemorrage", "MEGFII", "anaemia"])
+        >>> linker(["DNMT1", "DNMT1 inhibitor"])
     """
 
-    def __init__(self):
+    def __init__(self, min_similarity: float = MIN_SIMILARITY):
         """
         Initialize term normalizer using existing model
         """
-        torch.device("mps")  # does this work?
-
         # lazy (Umls is big)
-        logger.info("Loading scispacy")
-        from scispacy.candidate_generation import (
-            CandidateGenerator,
-            UmlsKnowledgeBase,
+        logger.info("Loading CompositeCandidateGenerator")
+        from core.ner.linker.candidate_generator import (
+            CompositeCandidateGenerator as CandidateGenerator,
         )
 
-        self.candidate_generator = CandidateGenerator()
+        self.candidate_generator = CandidateGenerator(min_similarity=min_similarity)
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
 
     def __get_canonical_entity(
-        self, candidates: list[MentionCandidate]
-    ) -> Union[CanonicalEntity, None]:
+        self, candidates: Sequence[MentionCandidate]
+    ) -> CanonicalEntity | None:
         """
         Get canonical candidate if suggestions exceed min similarity
 
         Args:
-            candidates (list[MentionCandidate]): candidates
+            candidates (Sequence[MentionCandidate]): candidates
         """
-        if len(candidates) > 0 and candidates[0].similarities[0] > MIN_SIMILARITY:
-            entity = self.kb.cui_to_entity[candidates[0].concept_id]
-            linked_entity = CanonicalEntity(
-                entity.concept_id,
-                entity.canonical_name,
-                entity.aliases,
-            )
-            return linked_entity
+        top_candidate = candidates[0] if len(candidates) > 0 else None
 
-        return None
+        if top_candidate is not None and top_candidate.similarities[0] < MIN_SIMILARITY:
+            return None
+
+        # go to kb to get canonical name
+        entity = self.kb.cui_to_entity.get(candidates[0].concept_id)
+
+        # if no entity, which will happen if we got a composite candidate:
+        if entity is None:
+            return CanonicalEntity(
+                candidates[0].concept_id,
+                candidates[0].aliases[0],
+                candidates[0].aliases,
+            )
+
+        return CanonicalEntity(
+            entity.concept_id if entity else candidates[0].concept_id,
+            entity.canonical_name if entity else candidates[0].aliases[0],
+            entity.aliases if entity else candidates[0].aliases,
+        )
 
     def generate_map(self, terms: Sequence[str]) -> LinkedEntityMap:
         """
@@ -94,7 +103,7 @@ class TermLinker:
         return {
             key: value
             for key, value in entity_map.items()
-            if value is not None and len(value) > 1 and len(key) > 1
+            if value is not None and len(key) > 1
         }
 
     def link(
