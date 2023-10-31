@@ -251,14 +251,11 @@ COMPOUND_BASE_TERMS = [
     *COMPOUND_BASE_TERMS_GENERIC,
 ]
 
-OTHER_INTERVENTION_BASE_TERMS = ["sweetener"]
-
 
 INTERVENTION_BASE_TERMS = [
     *BIOLOGIC_BASE_TERMS,
     *MECHANISM_BASE_TERMS,
     *COMPOUND_BASE_TERMS,
-    *OTHER_INTERVENTION_BASE_TERMS,
 ]
 
 
@@ -280,7 +277,7 @@ ALL_INTERVENTION_BASE_TERMS_RE = get_or_re(ALL_INTERVENTION_BASE_TERMS)
 INTERVENTION_PREFIXES_GENERIC = [
     "(?:(?:bi|tri|dual|triple)[- ]?)?functional",
     "(?:bi|tri|dual|triple|inverse|reverse)(?:[- ]?acting)?",
-    "activ(?:ity|ated|atable)",
+    "activ(?:ated|atable)",  # not activity
     "advanced",
     "adjunct",
     "asymmetric",  # TODO: move to specific?
@@ -529,6 +526,7 @@ ROAS = [
     "SQ",
     "SUB[-]?Q",
     "thecal",
+    "tumor(?:al)?",
     "topical",
     "vaginal",
     "venous",  # intravenous

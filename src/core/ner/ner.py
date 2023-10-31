@@ -84,7 +84,6 @@ class NerTagger:
         self.use_llm = use_llm
         self.llm_config = llm_config
         self.rule_sets = rule_sets
-        self.additional_cleaners = additional_cleaners
         self.entity_types = entity_types
         self.normalizer = TermNormalizer(link, additional_cleaners)
         start_time = time.time()
@@ -208,7 +207,7 @@ class NerTagger:
                 linked_entity=linked_entity,
             )
 
-        # filter by entity types (if provided) and remove empty chars
+        # filter by entity types (if provided) and remove empty names
         norm_entity_sets = [
             [
                 get_doc_entity(e)

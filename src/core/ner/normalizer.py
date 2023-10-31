@@ -46,7 +46,8 @@ class TermNormalizer:
             self.term_linker: TermLinker | None = TermLinker()
         else:
             self.term_linker = None
-        self.cleaner: EntityCleaner = EntityCleaner(
+
+        self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
 
@@ -60,7 +61,6 @@ class TermNormalizer:
         Note:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
-            - will return fewer terms than input, if term meets conditions for suppression
         """
         # removed_suppressed must be false to properly index against original terms
         normalized = self.cleaner.clean(terms, remove_suppressed=False)

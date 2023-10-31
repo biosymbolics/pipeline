@@ -247,10 +247,7 @@ class EntityCleaner:
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
-        cleaning_steps: list[CleanFunction] = [self.normalize_terms]
-
-        terms: Sequence = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
+        cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
 
         logging.info(
             "Cleaned %s entities in %s seconds",

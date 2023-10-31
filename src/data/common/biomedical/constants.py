@@ -66,7 +66,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "efficacy": "all",
     "therapeutic procedure": "all",
     "therefor": "all",
-    "(?:co[ -]?)?therapy": "trailing",
     "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
     "treating": "all",
     "contact": "trailing",
@@ -126,7 +125,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "is": "leading",
     "engineered": "leading",
     "engineered": "trailing",
-    "medicinal": "all",
     "sufficient": "all",
     "due": "trailing",
     "locate": "all",
@@ -138,7 +136,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "contemplated": "all",
     "is indicative of": "all",
     "via": "leading",
-    "effect": "trailing",
     "level": "trailing",
     "disclosed": "all",
     "wild type": "all",  # TODO
@@ -146,7 +143,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "application": "trailing",
     # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",

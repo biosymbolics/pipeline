@@ -256,7 +256,6 @@ def main(bootstrap: bool = False):
 
         Followed by:
         ```
-        pg_dump --no-owner patents -t attributes > attributes.psql
         # from local machine
         pg_dump --no-owner patents \
             -t aggregated_annotations \
@@ -366,16 +365,6 @@ def main(bootstrap: bool = False):
     #       regexp_replace(i, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i')
     #   ) AS new_interventions
     #   FROM trials, unnest(interventions) i group by nct_id
-    # ) sub
-    # where sub.nct_id=trials.nct_id
-
-    # UPDATE trials
-    # SET interventions = sub.new_interventions
-    # FROM (
-    #   SELECT nct_id, array_agg(i) AS new_interventions
-    #   FROM trials, unnest(interventions) i where
-    #   not i ~* '(?i).*\y(?:placebos?|shams?|best supportive care|standard|comparators?|no treatment|saline solution|conventional|usual care|Oral Tablets?|Drug vehicles?|pharmacological study|aspirin|controls?|Tablet Dosage Form|Laboratory Biomarker Analysis|Therapeutic procedure|Questionnaire Administration|Dosage)\y.*'
-    #     group by nct_id
     # ) sub
     # where sub.nct_id=trials.nct_id
 

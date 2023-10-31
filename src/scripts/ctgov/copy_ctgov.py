@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from typing import Callable, Sequence
-from pydash import flatten
+from pydash import compact, flatten
 
 from system import initialize
 
@@ -69,7 +69,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def is_control(intervention_str: str) -> bool:
     return (
         re.match(
-            r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Therapeutic procedure|Questionnaire Administration|Dosage)s?\b.*",
+            r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Normal saline|Therapeutic procedure|Quality-of-Life Assessment|Questionnaire Administration|Dosage)s?\b.*",
             intervention_str,
             flags=RE_FLAGS,
         )
@@ -111,8 +111,9 @@ def transform_ct_records(
     )
     norm_map = tagger.extract_string_map(interventions)
 
+    # normalize interventions, dropping those without a normalized mapping
     def normalize_interventions(interventions: list[str]):
-        return flatten([norm_map.get(i) or i for i in interventions])
+        return compact(flatten([norm_map.get(i) for i in interventions]))
 
     return [
         dict_to_trial_summary(
@@ -170,10 +171,9 @@ def ingest_trials():
     """
 
     tagger = NerTagger(
-        entity_types=frozenset(
-            ["compounds", "mechanisms"]
-        ),  # TODO: biologics, devices, maybe dosage_forms
-        link=False,
+        # TODO: biologics, devices, maybe dosage_forms
+        entity_types=frozenset(["compounds", "mechanisms"]),
+        link=True,
         additional_cleaners=[
             lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
         ],
