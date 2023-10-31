@@ -51,12 +51,12 @@ class TermNormalizer:
             additional_cleaners=additional_cleaners,
         )
 
-    def normalize(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
+    def normalize(self, terms: Sequence[str]) -> list[tuple[str, CanonicalEntity]]:
         """
         Normalize and link terms to canonical entities
 
         Args:
-            terms (list[str]): list of terms to normalize
+            terms (Sequence[str]): list of terms to normalize
 
         Note:
             - canonical linking is based on normalized term

@@ -3,7 +3,7 @@ Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
-from constants.patterns.iupac import IUPAC_RE
+from constants.patterns.iupac import IUPAC_RE, IUPAC_STRINGS
 from utils.re import get_or_re
 
 
@@ -96,6 +96,7 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "pro[ -]?drug",
     "pathway",
     "receiver",
+    "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
     "reinforce",  # ??
     "reinforcement",  # ??
     "solvent",
@@ -114,7 +115,7 @@ MECHANISM_BASE_TERMS = [
 ]
 
 COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
-    *IUPAC_RE,
+    *IUPAC_STRINGS,
     # incomplete is an understatement.
     "acetone",
     "acid",
@@ -470,6 +471,7 @@ DIAGNOSTIC_RES = [
 RESEARCH_TOOLS_RES = [
     "(?:.* )?analyte",
     "(?:.* )?assay",
+    ".*centrifug.*",
     "(?:.* )?culture",
     "(?:.* )?polymerase chain reaction.*",
     "(?:.* )?media",
@@ -478,8 +480,8 @@ RESEARCH_TOOLS_RES = [
     "(?:.* )?reactants?(?: .*)?",
     ".*rna[- ]?seq.*",
     "(?:.* )?sequencing.*",
+    "(?:.* )?study",
     ".*western blot.*",
-    ".*centrifug.*",
 ]
 
 PROCESS_RES = [

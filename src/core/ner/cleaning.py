@@ -9,6 +9,7 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
+from spacy.tokens import Doc, Span
 
 from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC_RE,
@@ -96,7 +97,7 @@ class EntityCleaner:
         """
         start = time.time()
 
-        def make_substitutions(_terms: list[str]) -> Iterable[str]:
+        def make_substitutions(_terms: Sequence[str]) -> Iterable[str]:
             def __substitute_strings(term):
                 for pattern, replacement in self.substitutions.items():
                     term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
@@ -106,11 +107,11 @@ class EntityCleaner:
             for term in _terms:
                 yield __substitute_strings(term)
 
-        def decode_html(_terms: list[str]) -> Iterable[str]:
+        def decode_html(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 yield html.unescape(term)
 
-        def remove_after_newline(_terms: list[str]) -> Iterable[str]:
+        def remove_after_newline(_terms: Sequence[str]) -> Iterable[str]:
             """
             Remove everything after a newline
             e.g. "asthma\n is a disease" -> "asthma"
@@ -118,18 +119,18 @@ class EntityCleaner:
             for term in _terms:
                 yield re.sub(r"\n.*", "", term, flags=RE_FLAGS)
 
-        def lower(_terms: list[str]) -> Iterable[str]:
+        def lower(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 yield term.lower()
 
-        def unwrap(_terms: list[str]) -> Iterable[str]:
+        def unwrap(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 if term.startswith("(") and term.endswith(")"):
                     yield term.strip("()")
                     continue
                 yield term
 
-        def format_parentheticals(_terms: list[str]) -> Iterable[str]:
+        def format_parentheticals(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 # if iupac term, don't mess with its parens
                 if is_iupac(term):
@@ -152,7 +153,7 @@ class EntityCleaner:
                 )
                 yield no_parens
 
-        def normalize_phrases(_terms: list[str]) -> Iterable[str]:
+        def normalize_phrases(_terms: Sequence[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
 

@@ -117,12 +117,12 @@ def expand_annotations(
         FROM biosym_annotations ann, applications app
         where ann.publication_number = app.publication_number
         AND length(original_term) > 1
-        AND original_term  ~* '^(?:{prefix_re})*{terms_re}[ ]?$'
+        AND original_term  ~* '{prefix_re}{terms_re}'
         AND array_length(string_to_array(original_term, ' '), 1) <= {POTENTIAL_EXPANSION_MAX_TOKENS}
         AND (
-            concat(title, '. ', abstract) ~* concat('.*', original_term, ' {EXPAND_CONNECTING_RE}.*')
+            concat(title, '. ', abstract) ~* concat('.*', escape_regex_chars(original_term), ' {EXPAND_CONNECTING_RE}.*')
             OR
-            concat(title, '. ', abstract) ~* concat('.*{TARGET_PARENS} ', original_term, '.*') -- e.g. '(sstr4) agonists', which NER has a prob with
+            concat(title, '. ', abstract) ~* concat('.*{TARGET_PARENS} ', escape_regex_chars(original_term), '.*') -- e.g. '(sstr4) agonists', which NER has a prob with
         )
         AND domain not in ('attributes', 'assignees')
         """
@@ -239,7 +239,7 @@ def clean_up_junk():
         f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) "
         + "where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
         # leading/trailing whitespace (done in EntityCleaner too)
-        rf"update {WORKING_TABLE} set original_term=trim(original_term) where trim(original_term) <> original_term",
+        rf"update {WORKING_TABLE} set original_term=trim(BOTH from original_term) where trim(original_term) <> original_term",
     ]
     client = DatabaseClient()
     for sql in queries:

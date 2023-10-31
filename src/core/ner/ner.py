@@ -16,7 +16,7 @@ from spacy.tokens import Span, Doc
 
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
-from typings.core import is_string_list, is_string_list_list
+from core.ner.spacy import Spacy
 from utils.args import make_hashable
 from utils.model import get_model_path
 from utils.re import remove_extra_spaces
@@ -44,6 +44,8 @@ logger.setLevel(logging.INFO)
 class NerTagger:
     """
     Named-entity recognition using spacy and other means
+
+    TODO: add abbr resolution
     """
 
     _instances: dict[str, Any] = {}
@@ -116,13 +118,17 @@ class NerTagger:
             if len(self.rule_sets) > 0:
                 logger.info("Adding rule sets to NER pipeline")
                 # rules catch a few things the binder model misses
-                rule_nlp = spacy.load("en_core_sci_lg")
-                rule_nlp.add_pipe("merge_entities", after="ner")
-                ruler = rule_nlp.add_pipe(
-                    "entity_ruler",
-                    config={"validate": True, "overwrite_ents": True},
-                    after="merge_entities",
+                rule_nlp = Spacy.get_instance(
+                    model="en_core_sci_lg",
+                    additional_pipelines={
+                        "merge_entities": {"after": "ner"},
+                        "entity_ruler": {
+                            "config": {"validate": True, "overwrite_ents": True},
+                            "after": "merge_entities",
+                        },
+                    },
                 )
+
                 for rules in self.rule_sets:
                     ruler.add_patterns(rules)  # type: ignore
 

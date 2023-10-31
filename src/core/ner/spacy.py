@@ -27,8 +27,26 @@ class Spacy:
     def __init__(
         self,
         model: str = DEFAULT_MODEL,
+        additional_pipelines: dict[str, dict] = {},
         **kwargs: Any,
     ):
+        """
+        Initialize Spacy instance
+
+        TODO: add disables!
+
+        Using additions:
+        rule_nlp = Spacy.get_instance(
+            model="en_core_sci_lg",
+            additional_pipelines={
+                "merge_entities": {"after": "ner"},
+                "entity_ruler": {
+                    "config": {"validate": True, "overwrite_ents": True},
+                    "after": "merge_entities",
+                },
+            },
+        )
+        """
         # acceleration via https://github.com/explosion/thinc-apple-ops
         # not using GPU/M1 right now, tho...
         # is_gpu_avail = prefer_gpu()
@@ -37,6 +55,8 @@ class Spacy:
 
         self.model = model
         self._nlp: Language = spacy.load(self.model, **kwargs)
+        for name, args in additional_pipelines.items():
+            self._nlp.add_pipe(name, **args)
 
     def __getattr__(self, name):
         # Delegate attribute access to the underlying Language instance

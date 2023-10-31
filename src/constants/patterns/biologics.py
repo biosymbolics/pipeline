@@ -154,7 +154,6 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "protease",
     "protein",
     "recombinant",
-    "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
     "receptor",  # ??
     "recognizer",
     "(?:recombinant|attenuated|antibod(?:y|ies)|inhibit|anti|chimeric|synthetic).*virus",

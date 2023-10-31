@@ -17,7 +17,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "-+": "leading",
     "stable": "all",
     "various": "all",
+    "responsible": "trailing",
     "the": "leading",
+    "associated": "leading",
+    "prepared": "leading",
     "example": "all",
     "unwanted": "leading",
     "comprised?": "all",
@@ -187,11 +190,22 @@ TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
 
 # no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
 # with, as in "with efficacy against"
-EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|encoding|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
+EXPAND_CONNECTING_RES = [
+    "of",
+    "the",
+    "that",
+    "to",
+    "(?:the )?expression",
+    "encoding",
+    "comprising",
+    "with",
+    "(?:directed |effective |with efficacy )?against",
+]
+EXPAND_CONNECTING_RE = get_or_re(EXPAND_CONNECTING_RES)
 # when expanding annotations, we don't want to make it too long
 EXPANSION_NUM_CUTOFF_TOKENS = 7
 # leave longer terms alone
-POTENTIAL_EXPANSION_MAX_TOKENS = 4
+POTENTIAL_EXPANSION_MAX_TOKENS = 6
 
 EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
@@ -275,6 +289,7 @@ PHRASE_REWRITES = {
     "peptide (?:conjugate|sequence|complex(?:es)?)": "peptide",
     "(?:poly)?peptide chain": "polypeptide",
     "polypeptide sequence": "polypeptide",
+    "risk of (?:disorder|disease)s?": "diseases",
     "responsive protein": "protein",
     "re[ -]?uptake": "reuptake",
     "(?:therapy|therapeutic) agent": "therapy",

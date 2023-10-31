@@ -83,7 +83,7 @@ def expand_parens_term(text: str, original_term: str) -> str | None:
         original_term (str): Original term
     """
     possible_parens_term = re.findall(
-        f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
+        f"{TARGET_PARENS} {re.escape(original_term)}", text, re.IGNORECASE
     )
 
     if len(possible_parens_term) == 0:
