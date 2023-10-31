@@ -20,9 +20,9 @@ MAX_PATENT_LIFE = 20
 DOMAINS_OF_INTEREST = [
     "assignees",
     ATTRIBUTE_FIELD,
-    # "biologics",
+    "biologics",
     "compounds",
-    # "devices",
+    "devices",
     "diseases",
     "inventors",
     "mechanisms",

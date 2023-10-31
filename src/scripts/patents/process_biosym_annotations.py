@@ -335,7 +335,7 @@ def normalize_domains():
         f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{ROA_RE}$'",
         f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
         f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ilike '% disease' and domain<>'diseases' and not original_term ~* '(?:compounds?|compositions?|anti|agent|immuni[zs]ing|drug for|imag)'",
+        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '.* (?:disease|disorder|syndrome|dysfunction|degenerat(?:ion|ive))s?$' and domain<>'diseases' and not original_term ~* '(?:compounds?|compositions?|reagent|anti|agent|immuni[zs]ing|drug for|imag|treat)'",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 

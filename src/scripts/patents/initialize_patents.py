@@ -361,14 +361,13 @@ def main(bootstrap: bool = False):
     # UPDATE trials
     # SET interventions = sub.new_interventions
     # FROM (
-    #   SELECT nct_id, array_agg(
-    #       regexp_replace(i, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i')
+    #   SELECT nct_id, array_agg(i), array_agg(
+    #       regexp_replace(i, '\y[0-9]{1,}\.?[0-9]*[ ]?(?:mg|mcg|ug|µg|ml|gm?)(?:[ /](?:kgs?|lbs?|m2|m^2|day|mg))*\y', '', 'ig')
     #   ) AS new_interventions
-    #   FROM trials, unnest(interventions) i group by nct_id
+    #   FROM trials, unnest(interventions) i
+    #   group by nct_id
     # ) sub
     # where sub.nct_id=trials.nct_id
-
-    # remove \d+[ ]?mg|ml|g|kg|mg/kg|mg/ml|mg/m2
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?equipment",
     "(?:.* )?generator",
     "(?:.* )?cartridge",
-    "(?:.* )?(?:micro)?channel",
+    # "(?:.* )?(?:micro)?channel", # icon channel
     "(?:impression|packaging|building) material",
     "(?:.* )?light[ -]?emitt(?:er|ing)s?.*",
     "(?:.* )?cathode.*",
@@ -120,7 +120,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     ".*(?: |^|-)instrument",
     "(?:.* )?vessel",  # ??
     ".*(?: |^|-)devices?.*",
-    "(?:.* )?motor.*",
+    "(?:.* )?motor",  # motor disorders
     ".*(?: |^|-)electrode.*",
     "(?:.* )?camera.*",
     ".*(?: |^|-)mouthpiece.*",
@@ -139,7 +139,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?plunger.*",
     "(?:.* )?piston.*",
     "(?:.* )?balloon.*",
-    "(?:.* )?linkage",  # ??
+    # "(?:.* )?linkage",  # ?? bio
     "(?:.* )?(?:bio)?reactor",
     ".*piezoelectric.*",
     ".*ultrasonic.*",

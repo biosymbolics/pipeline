@@ -5,7 +5,6 @@ from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
 from data.common.biomedical import (
     remove_trailing_leading,
-    DELETION_TERMS,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 

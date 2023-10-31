@@ -146,6 +146,7 @@ COMPANY_MAP = {
     "bristol[- ]?myers squibb": "Bristol-Myers Squibb",
     "Celgene": "Bristol-Myers Squibb",
     "Samsung": "Samsung",
+    "ucb": "UCB",
 }
 
 OWNER_TERM_MAP = {

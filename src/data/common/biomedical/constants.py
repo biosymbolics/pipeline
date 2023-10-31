@@ -22,6 +22,7 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "unwanted": "leading",
     "comprised?": "all",
     "contagious": "leading",
+    "compositions that include a": "leading",
     "recognition": "trailing",
     "binding": "trailing",
     "prevention": "leading",
@@ -362,6 +363,7 @@ DELETION_TERMS = [
     "reform",
     "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "material",
     "compositions comprising the compounds",
     "support arm",
     "information system",
@@ -795,6 +797,7 @@ DELETION_TERMS = [
     "evaporat",
     "agglomerat",
     # measurable thing
+    "(?:.* )?movement",
     "(?:.* )?measurement",
     "(?:.* )?curvature",
     "(?:.* )?degree",

@@ -91,8 +91,9 @@ def transform_ct_records(
     - normalizes/extracts intervention names
     - normalizes status etc.
 
-    good check:
+    good checks:
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
+    select intervention, count(*) from trials, unnest(interventions) intervention, patent_to_trial ptt where ptt.nct_id=trials.nct_id group by intervention order by count(*) desc;
     """
 
     intervention_sets = [rec["interventions"] for rec in ctgov_records]

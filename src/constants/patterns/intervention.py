@@ -3,6 +3,7 @@ Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
+from constants.patterns.iupac import IUPAC_RE
 from utils.re import get_or_re
 
 
@@ -20,6 +21,7 @@ PRIMARY_MECHANISM_BASE_TERMS: dict[str, str] = {
     "disrupt(?:or|ion|ing|ed)?": "disruptor",
     "disintegrat(?:or|ion|ing|ed?)?": "disintegrator",
     "desicca(?:tion|nt|te|ting)": "desiccant",
+    "engag(?:er|ing|e|ment)": "engager",
     "enhanc(?:er|ing|e)": "enhancer",
     "emulsif(?:y|ying|ier|ied)?": "emulsifier",
     "immunosuppress(?:ion|or|ant)": "immunosuppressant",
@@ -45,10 +47,6 @@ PRIMARY_MECHANISM_BASE_TERMS: dict[str, str] = {
 }
 
 SECONDARY_MECHANISM_BASE_TERMS = [
-    "immun[io][zs](?:ation|ing|e|logical|therapy|genic)",
-    "(?:(?:down|up)[ -]?)?regulat(?:or|ion|ing)",
-    "(?:(?:neuro|immuno)[- ]?)?modulat(?:or|ion|ing|e)s?(?: binding)?",
-    "(?:(?:t[ -]cell )?engag(?:er|ing|e|ment)(?: receptor)?|tce(?:r))",
     "absorb[ae]nt",
     "activity",
     "action",
@@ -81,7 +79,6 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "emitter",
     "emollient",
     "encoder",
-    "expression",  # TODO: also a disease term
     "function",
     "interference",
     "interaction",
@@ -105,7 +102,6 @@ SECONDARY_MECHANISM_BASE_TERMS = [
     "sunscreen",
     "surfactant",
     "target",  # ??
-    "transcription(?: factor)?",
     "transfection",
     "transfer",
     "vitamin",
@@ -118,6 +114,7 @@ MECHANISM_BASE_TERMS = [
 ]
 
 COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
+    *IUPAC_RE,
     # incomplete is an understatement.
     "acetone",
     "acid",
@@ -128,7 +125,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "benzene",  # not biomedical?
     "cellulose",
     "(?:immuno[ -]?)?conjugat(?:ion|ing|e)",
-    "(?:small |antibody |dna |rna )?molecules?(?: binding)?",
+    "(?:small )?molecules?(?: binding)?",
     "carbonyl",
     "carbene",
     "carbohydrate",
@@ -142,6 +139,7 @@ COMPOUND_BASE_TERMS_SPECIFIC: list[str] = [
     "hydrogel",
     "hydrocarbon",  # not biomedical?
     "indole",
+    "imidazole",
     "(?:stereo)?isomer",
     "ketone",  # not biomedical?
     "nitrile",
@@ -172,9 +170,8 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "blend",
     "by[ -]?product",  # ??
     "(?:di|nano)?bod(?:y|ie)",  # ??
-    "biomaterial",
     "(?:lead )?candidate",
-    "(?:electro|bio)?[ -]?chemical",
+    "(?:electro)?[ -]?chemical",
     "(?:re[ -]?)?combination",
     "complex(?:es)?",
     "(?:pharmaceutical |chemical )?composition",
@@ -209,10 +206,9 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "medium",
     "member",
     "(?:micro|nano)?[ -]?particle",
-    "(?:small|macro|bio)?[ -]?molecule",
+    "(?:small)?[ -]?molecule",
     "modalit(?:y|ie)",
     "moiet(?:y|ie)",  # ??
-    "motif",  # ??
     "nutrient",
     "nutraceutical",
     "ortholog(?:ue)?",
@@ -228,7 +224,6 @@ COMPOUND_BASE_TERMS_GENERIC: list[str] = [
     "salt",
     "solution",
     "strain",  # ??
-    "strand",
     "substance",
     "substitute",
     "substituent",
@@ -537,12 +532,13 @@ ROAS = [
 ROA_RE = rf"(?:{ROA_VERB} of )?{ROA_PREFIX}{get_or_re(ROAS)}(?:ly)?[ ]?{ROA_VERB}"
 
 DOSAGE_FORM_RES = [
-    "aerosol(?:ized)?",
+    "aerosol(?:ized|ization)?",
     "bag",
     "balm",
     "bolus",
     "(?:micro[ -]?|nano[ -]?|soft )?capsule",
     "cream",
+    "(?:dose|dosage)",
     "drip",
     "(?:eye |nasal )?drop(?:let)",
     "emulsion",
