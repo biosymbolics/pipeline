@@ -63,7 +63,7 @@ class TermLinker:
         """
         top_candidate = candidates[0] if len(candidates) > 0 else None
 
-        if top_candidate is not None and top_candidate.similarities[0] < MIN_SIMILARITY:
+        if top_candidate is None or top_candidate.similarities[0] < MIN_SIMILARITY:
             return None
 
         # go to kb to get canonical name
@@ -133,12 +133,3 @@ class TermLinker:
         self, terms: Sequence[str]
     ) -> Sequence[tuple[str, CanonicalEntity | None]]:
         return self.link(terms)
-
-
-# select * from mrhier where cui='C1414121';
-# select * from mrhier where aui='A7608627';
-
-# select * from mrrel where cui1='C1414121';
-# select count(*) from mrconso where lat='ENG' and ts='P'; # preferred term
-
-# select * from mrconso where lat='ENG' and ts='P' and cui='C1334751'

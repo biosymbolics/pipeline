@@ -265,7 +265,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions characterized by up-regulation of IL-10",
-                "expected": "il-10 up-regulation conditions",
+                "expected": "il-10 up-regulation conditions",  # up-regulation of IL-10 conditions
             },
             {"input": "alleviation of tumors", "expected": "tumor alleviation"},
             {

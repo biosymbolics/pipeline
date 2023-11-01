@@ -180,7 +180,6 @@ class EntityCleaner:
                 logger.info(
                     "Executing function %s took %s", func, round(time.time() - start, 2)
                 )
-                print("TIME", func, round(time.time() - start, 2))
                 return res
             return func(x)
 
@@ -260,8 +259,7 @@ class EntityCleaner:
 
         cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
 
-        # INFO:root:Cleaned 2268406 entities in 2749.49 seconds
-        # INFO:core.ner.cleaning:Cleaned 2268406 entities in 2672.56 seconds
+        # INFO:core.ner.cleaning:Cleaned 2268406 entities in 1957.85 seconds
         logger.info(
             "Cleaned %s entities in %s seconds",
             len(entities),

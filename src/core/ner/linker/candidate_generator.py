@@ -8,6 +8,8 @@ from spacy.lang.en.stop_words import STOP_WORDS
 class CompositeCandidateGenerator(CandidateGenerator, object):
     """
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
+
+    TODO: look up in UMLS here and use 'type' for standard ordering on composite candidate names (e.g. gene first)
     """
 
     def __init__(self, *args, min_similarity: float, **kwargs):
@@ -44,11 +46,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             for word, candidate in zip(matchless_words, matchless_candidates)
         }
         composite_matches = {
-            mention_text: [
-                CompositeCandidateGenerator._generate_composite(
-                    mention_text, word_candidate_map
-                )
-            ]
+            mention_text: CompositeCandidateGenerator._generate_composite(
+                mention_text, word_candidate_map
+            )
             for mention_text in matchless_mention_texts
         }
         return composite_matches
@@ -57,7 +57,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     def _generate_composite(
         mention_text: str,
         word_candidate_map: dict[str, MentionCandidate],
-    ) -> MentionCandidate:
+    ) -> Sequence[MentionCandidate]:
         """
         Generate a composite candidate from a mention text
 
@@ -65,6 +65,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             mention_text (str): Mention text
             word_candidate_map (dict[str, MentionCandidate]): word-to-candidate map
         """
+        if mention_text.strip() == "":
+            return []
+
         candidates = [
             word_candidate_map.get(word)
             # fake candidate, just to make assembly easier
@@ -81,14 +84,16 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             [c.similarities[0] for c in candidates if c.similarities[0] > 0]
         )
 
-        return MentionCandidate(
-            concept_id="|".join(
-                [c.concept_id for c in candidates if c.similarities[0] > 0]
-            ),
-            # TODO: all permutations
-            aliases=[" ".join([c.aliases[0] for c in candidates])],
-            similarities=[similarity],
-        )
+        return [
+            MentionCandidate(
+                concept_id="|".join(
+                    [c.concept_id for c in candidates if c.similarities[0] > 0]
+                ),
+                # TODO: all permutations
+                aliases=[" ".join([c.aliases[0] for c in candidates])],
+                similarities=[similarity],
+            )
+        ]
 
     def __call__(
         self, mention_texts: Sequence[str], k: int
@@ -123,7 +128,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 min_similarity=self.min_similarity,
             ),
         }
-        print(all_matches)
 
         # ensure order
         return [all_matches[mention_text] for mention_text in mention_texts]
