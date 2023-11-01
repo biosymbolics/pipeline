@@ -485,7 +485,7 @@ RESEARCH_TOOLS_RES = [
 ]
 
 PROCESS_RES = [
-    "^.+process(?:es)?",
+    "^.+process(?:es|ing|ability)?(?: stream)?",
 ]
 
 ROA_PREFIX = "(?:epi[ -]?|intra[ -]?|trans[ -]?|sub[ -]?)?"

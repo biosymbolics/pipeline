@@ -5,7 +5,7 @@ from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 from spacy.lang.en.stop_words import STOP_WORDS
 
 
-class CompositeCandidateGenerator(CandidateGenerator):
+class CompositeCandidateGenerator(CandidateGenerator, object):
     """
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
     """
@@ -14,9 +14,8 @@ class CompositeCandidateGenerator(CandidateGenerator):
         super().__init__(*args, **kwargs)
         self.min_similarity = min_similarity
 
-    @staticmethod
     def find_composite_matches(
-        matchless_mention_texts: Sequence[str], min_similarity: float
+        self, matchless_mention_texts: Sequence[str], min_similarity: float
     ):
         """
         For a list of mention text without a sufficiently similar direct match,
@@ -34,9 +33,7 @@ class CompositeCandidateGenerator(CandidateGenerator):
                 if len(word) > 2 and word not in STOP_WORDS
             ]
         )
-        matchless_candidates: list[list[MentionCandidate]] = super.__call__(
-            matchless_words, 1
-        )
+        matchless_candidates = super().__call__(matchless_words, 1)
         word_candidate_map = {
             # k = 1 so each should have only 1 entry anyway
             word: candidate[0]
@@ -45,9 +42,11 @@ class CompositeCandidateGenerator(CandidateGenerator):
             for word, candidate in zip(matchless_words, matchless_candidates)
         }
         composite_matches = {
-            mention_text: CompositeCandidateGenerator._generate_composite(
-                mention_text, word_candidate_map
-            )
+            mention_text: [
+                CompositeCandidateGenerator._generate_composite(
+                    mention_text, word_candidate_map
+                )
+            ]
             for mention_text in matchless_mention_texts
         }
         return composite_matches
@@ -62,7 +61,7 @@ class CompositeCandidateGenerator(CandidateGenerator):
 
         Args:
             mention_text (str): Mention text
-            word_candidate_map (dict[str, MentionCandidate]): Map of word to candidate
+            word_candidate_map (dict[str, MentionCandidate]): word-to-candidate map
         """
         candidates = [
             word_candidate_map.get(word)
@@ -97,7 +96,7 @@ class CompositeCandidateGenerator(CandidateGenerator):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = super.__call__(list(mention_texts), k)
+        candidates = super().__call__(list(mention_texts), k)
 
         matches = {
             mention_text: candidate
@@ -113,7 +112,7 @@ class CompositeCandidateGenerator(CandidateGenerator):
         # combine composite matches such that they override the original matches
         all_matches = {
             **matches,
-            **CompositeCandidateGenerator.find_composite_matches(
+            **self.find_composite_matches(
                 [
                     mention_text
                     for mention_text in mention_texts
@@ -122,6 +121,7 @@ class CompositeCandidateGenerator(CandidateGenerator):
                 min_similarity=self.min_similarity,
             ),
         }
+        print(all_matches)
 
         # ensure order
-        return [[all_matches[mention_text]] for mention_text in mention_texts]
+        return [all_matches[mention_text] for mention_text in mention_texts]

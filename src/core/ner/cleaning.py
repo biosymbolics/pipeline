@@ -9,7 +9,6 @@ from functools import partial, reduce
 import logging
 import html
 from typing_extensions import Protocol
-from spacy.tokens import Doc, Span
 
 from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC_RE,
@@ -20,7 +19,6 @@ from data.common.biomedical.constants import PHRASE_REWRITES
 from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
-from .spacy import Spacy
 from .types import DocEntity, is_entity_doc_list
 from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 
@@ -68,7 +66,6 @@ class EntityCleaner:
         self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
         self.__removal_words: list[str] | None = None
-        self.nlp = Spacy.get_instance(disable=["ner"])._nlp
 
     @property
     def removal_words(self) -> list[str]:
@@ -93,7 +90,6 @@ class EntityCleaner:
 
         Args:
             terms (list[str]): terms
-            n_process (int): number of processes to use for parallelization
         """
         start = time.time()
 

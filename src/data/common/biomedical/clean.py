@@ -107,9 +107,12 @@ def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
         text (str): Text to search / full text
         text_doc (Doc): Spacy doc (passed in for perf reasons)
     """
-    # using partial word boundaries instead of \b to handle cases where original_term starts with a wb char like (
+    # owb/cwb in case original_term starts with (, which confuses the \b match
+    wb_chars = ["(", ")"]
+    owb = "" if original_term[0] in wb_chars else r"\b"
+    cwb = "" if original_term[-1] in wb_chars else r"\b"
     s = re.search(
-        rf"(?:^| ){re.escape(original_term)}(?:$| )",
+        f"{owb}{re.escape(original_term)}{cwb}",
         text_doc.text,
         flags=RE_STANDARD_FLAGS,
     )

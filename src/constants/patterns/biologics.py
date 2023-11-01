@@ -125,7 +125,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "fc(?:[- ]fusion )?(?: protein)?",
     "fus(?:ed|ion)",
     "gene",
-    "(?:growth )?factor",  # biologi
+    "(?:growth )?factor",
     "(?:hairpin|micro|messenger|sh|si|i|ds|m|hp|recombinant|double[- ]?stranded|small[- ]?interfering|guide)?[ -]?(?:rna|ribonucleic acid)(?: molecule| sequence)?",
     "(?:trans)?gene",
     "hormone",
@@ -136,8 +136,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "isoform",
     "(?:phospho[ -]?|sphingo[ -]?)?lipid",
     "keratin",
-    "kinase",
-    ".*nase",  # enzyme
+    "(?:dehydratase|esterase|hydrolase|ligase|mutase|oxidase|protease|synthase|transferase|transcriptase|reductase|kinase|nuclease)",  # some enzymes
     "(?:co[ -]?)?(?:di|mono|poly|oligo)mer",
     "(?:natural killer|nkt|nkc)(?: cells?)?",
     "lignin",
@@ -147,11 +146,9 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "motif",
     "mutein",
     "mutation",
-    "nuclease",
     "(?:oligo[ -])?nucleotides?(?: sequence)?",
     "(?:poly[ -]?)?peptides?(?: sequence)?",
     "plasmid",
-    "protease",
     "protein",
     "recombinant",
     "receptor",  # ??

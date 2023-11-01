@@ -47,6 +47,7 @@ class TermLinker:
         from core.ner.linker.candidate_generator import (
             CompositeCandidateGenerator as CandidateGenerator,
         )
+        from scispacy.candidate_generation import UmlsKnowledgeBase
 
         self.candidate_generator = CandidateGenerator(min_similarity=min_similarity)
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
@@ -96,7 +97,7 @@ class TermLinker:
         start_time = time.time()
         candidates = self.candidate_generator(list(terms), 1)
         logging.info(
-            "Finished generating candidates (took %s)", time.time() - start_time
+            "Finished candidate generation (took %s)", time.time() - start_time
         )
         canonical_entities = [self.__get_canonical_entity(c) for c in candidates]  # type: ignore
         entity_map = dict(zip(terms, canonical_entities))

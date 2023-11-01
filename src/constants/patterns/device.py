@@ -184,6 +184,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?tampon(?: |-|$).*",
     "(?:.* )?(?:top)?sheet",
     "(?:.*[ -])?scale",
+    ".*microprocessor.*",
 ]
 # for use in patents; might need adjustment to be more generally applicable.
 DEVICE_RES = [
