@@ -53,29 +53,6 @@ CREATE TABLE MRCUI (
 );
 \copy MRCUI from 'META/MRCUI.RRF' with delimiter as '|' null as '';
 
-
-DROP TABLE MRCXT;
-CREATE TABLE MRCXT (
-	CUI	char(9),
-	SUI	char(9),
-	AUI	varchar(9),
-	SAB	varchar(20),
-	CODE	varchar(50),
-	CXN	int,
-	CXL	char(3),
-	RANK	int,
-	CXS	text,
-	CUI2	char(8),
-	AUI2	varchar(9),
-	HCD	varchar(50),
-	RELA	varchar(100),
-	XC	varchar(1),
-	CVF	int
-
-);
-\copy MRCXT from 'META/MRCXT.RRF' with delimiter as '|' null as '';
-
-
 DROP TABLE MRDEF;
 CREATE TABLE MRDEF (
 	CUI	char(9) NOT NULL,
