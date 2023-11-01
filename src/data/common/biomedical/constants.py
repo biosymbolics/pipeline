@@ -218,19 +218,19 @@ EXPANSION_POS_OVERRIDE_TERMS = ["directed", "expression", "encoding", "coding"]
 MOA_COMPOUND_PREFIX = (
     "(?:compound|composition)s?[ ]?(?:that (?:are|have(?: a)?)|for|of|as|which)?"
 )
-LOW_INFO_MOA_PREFIX = f"(?:(?:{MOA_COMPOUND_PREFIX}|symmetric|axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
+LOW_INFO_MOA_PREFIX = f"(?:(?:{MOA_COMPOUND_PREFIX}|activity|symmetric|axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
 GENERIC_COMPOUND_TERM = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
 
 # e.g. "production enhancer" -> "enhancer"
 # e.g. "blahblah derivative" -> "blahblah"
 MOA_PATTERNS = {
-    f"{LOW_INFO_MOA_PREFIX}?{pattern}(?:[ ]{GENERIC_COMPOUND_TERM})?": f" {canonical} "  # extra space removed later
+    f"{LOW_INFO_MOA_PREFIX}?{pattern}(?: {GENERIC_COMPOUND_TERM})?": f" {canonical} "  # extra space removed later
     for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
 }
 
 # inhibitory activity -> inhibitor
 ACTIVITY_MOA_PATTERNS = {
-    f"{pattern}(?:[ ]activity|action|function)": f" {canonical} "
+    f"{pattern} (?:activity|action|function)": f" {canonical} "
     for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
 }
 
@@ -239,7 +239,6 @@ PHRASE_REWRITES = {
     **MOA_PATTERNS,
     **ACTIVITY_MOA_PATTERNS,
     "analogue": "analog",
-    "activating": "activator",
     "antibody conjugate": "antibody",
     "antibody immunoconjugate": "antibody",
     "antibodies?": "antibody",
@@ -273,7 +272,7 @@ PHRASE_REWRITES = {
     "family member": "family",
     "family protein": "protein",
     "formulae": "formula",
-    # "disease states mediated by": "associated disease", # disease states mediated by CCR5 (rearrange)
+    # "disease states mediated by": "associated disease",  # disease states mediated by CCR5 (rearrange)
     "diarrhoea": "diarrhea",
     "faecal": "fecal",
     "g[ -]?protein[ -]?(?:coupled|linked)[ -]?receptor": "gpcr",
@@ -300,11 +299,11 @@ PHRASE_REWRITES = {
     "transporter inhibitor": "transport inhibitor",
     "t cell": "t-cell",
     "b cell": "b-cell",
-    "interleukin[- ]?([0-9]+)": r"IL\1",
-    "il ([0-9]+)": r"IL\1",
-    "immunoglobulin ([a-z][0-9]*)": r"IG\1",
+    "interleukin[- ]?([0-9]{1,3})": r"IL\1",
+    "il ([0-9]{1,3})": r"IL\1",
+    "immunoglobulin ([a-z][0-9]{0,3})": r"IG\1",
     "peginterferon": "pegylated interferon",
-    "([a-z]{1,3}) ([0-9]+)": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
+    "([a-z]{1,3}) ([0-9]{1,4})": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
     "PEG": "pegylated",
     "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:(?:superfamily )?type )?([0-9]|v?i{1,3}))?": r"tgfβ\1",
     # superfamily type ii
@@ -314,9 +313,9 @@ PHRASE_REWRITES = {
     "(?:tnf|tumor necrosis factor)[ -]?(?:g|γ)(?:amma)?(?:[ -]?([0-9]))?": r"tnfγ\1",
     "(?:tnfr|tumor necrosis factor receptors?)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfrα\1",
     "(?:egf|epidermal growth factor)": r"egf",
-    "(?:egfr|epidermal growth factor receptor)(?:[ ]?([v?i{1,3}|[0-9]))": r"egfr\1",
-    # vascular endothelial growth factor (VEGF), VEGFR1
-    # fibroblast growth factor (FGF), fibroblast growth factor receptor 2
+    "(?:egfr|epidermal growth factor receptor)(?:[ ]?(v?i{1,3}|[0-9]))?": r"egfr \1",
+    # # vascular endothelial growth factor (VEGF), VEGFR1
+    # # fibroblast growth factor (FGF), fibroblast growth factor receptor 2
 }
 
 

@@ -2,11 +2,11 @@
 Utils for the NER pipeline
 """
 from functools import partial, reduce
-from itertools import chain
 import logging
+import time
 import regex as re
 from typing import Iterable, Sequence
-from spacy.tokens import Doc, Span
+from spacy.tokens import Doc, Span, Token
 import polars as pl
 
 from constants.patterns.iupac import is_iupac
@@ -20,6 +20,9 @@ from utils.re import (
 from .spacy import Spacy
 from .types import DocEntities, DocEntity, SynonymRecord
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # end-of-entity regex
 EOE_RE = "\\b" + ".*"
@@ -98,8 +101,7 @@ def get_suffix_entitiy_re(
 
 
 def lemmatize_tail(
-    term: str | Doc,
-    exception_pattern: str | None = None,
+    term: str | Doc | Span,
     lemma_tags: Sequence[str] | None = None,
 ) -> str:
     """
@@ -112,21 +114,17 @@ def lemmatize_tail(
 
     Args:
         term (str): term to lemmatize
-        exception_pattern (str): regex pattern to match against the term. If matched, returns the term as-is
         lemma_tags (Sequence[str]): list of spacy tags to lemmatize (default: None)
     """
     if isinstance(term, str):
-        nlp = Spacy.get_instance()
+        nlp = Spacy.get_instance(disable=["ner"])
         doc = nlp(term)  # turn into spacy doc (has lemma info)
-    elif isinstance(term, Doc):
+    elif isinstance(term, Doc) or isinstance(term, Span):
         doc = term
     else:
         raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
-    if exception_pattern is not None and re.match(exception_pattern, doc.text):
-        return doc.text
-
-    def maybe_lemmatize(token, i):
+    def maybe_lemmatize(token: Token, i: int) -> str:
         is_last = i == len(doc) - 1
 
         if not is_last:
@@ -145,16 +143,21 @@ def lemmatize_tail(
 
 
 def lemmatize_tails(
-    terms: Sequence[str], n_process: int = 1, exception_pattern: str | None = None
+    terms: Sequence[str],
+    n_process: int = 1,
 ) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
+
+    e.g.
+    "heart attacks" -> "heart attack"
+
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
-        yield lemmatize_tail(doc, exception_pattern)
+        yield lemmatize_tail(doc)
 
 
 def depluralize_tails(
@@ -163,8 +166,14 @@ def depluralize_tails(
 ) -> Iterable[str]:
     """
     Singularize last terms
+
+    e.g. "heart attacks" -> "heart attack"
+
+    Args:
+        terms (Sequence[str]): terms to normalize
+        n_process (int): number of processes to use for parallelization
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     plural_pos_tags = ["NNS", "NNPS"]
@@ -178,7 +187,7 @@ def lemmatize_all(term: str | Doc) -> str:
     Lemmatizes all words in a string
     """
     if isinstance(term, str):
-        nlp = Spacy.get_instance()
+        nlp = Spacy.get_instance(disable=["ner"])
         doc = nlp(term)  # turn into spacy doc (has lemma info)
     elif isinstance(term, Doc):
         doc = term
@@ -207,9 +216,12 @@ def rearrange_terms(
         base_patterns (Sequence[str]): patterns to match against for base rearrangement
         n_process (int): number of processes to use for parallelization
     """
-    by_base = list(rearrange_terms_by_base(terms, base_patterns))
-    adp_iter = rearrange_adp_terms(by_base, n_process=n_process)
-    return adp_iter
+    steps = [
+        lambda _terms: rearrange_terms_by_base(_terms, base_patterns),
+        lambda _terms: rearrange_adp_terms(_terms, n_process=n_process),
+    ]
+
+    return reduce(lambda x, func: func(x), steps, terms)
 
 
 def rearrange_terms_by_base(
@@ -225,14 +237,13 @@ def rearrange_terms_by_base(
     """
     base_re = get_or_re(base_re_patterns)
 
-    def rearrange_term_by_base(term: str):
+    def rearrange_term_by_base(term: str) -> str:
         # base pattern followed by any non-space text
         # e.g. "inhibitor XYZ" -> "XYZ inhibitor" but not "inhibitor of XYZ antibody" -> "XYZ inhibitor"
         # (the latter is handled by rearrange_adp_terms)
-        res = re.sub(
-            f"^({base_re})[ ]([^ ]+)$", r"\2 \1", term, flags=RE_STANDARD_FLAGS
-        )
-        return res
+        if len(term.split(" ")) != 2:
+            return term
+        return re.sub(f"^({base_re}) (.+)$", r"\2 \1", term, flags=RE_STANDARD_FLAGS)
 
     for term in terms:
         yield rearrange_term_by_base(term)
@@ -249,7 +260,7 @@ def rearrange_adp_terms(terms: Sequence[str], n_process: int = 1) -> Iterable[st
     adp_map = {
         "of": get_or_re(
             [
-                r"(?:of|to|for)(?: use in)?(?:[ ](?:the|a|an))?\b",
+                r"(?:of|to|for)(?: use in)?(?: (?:the|a|an))?\b",
                 r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed by(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
                 r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
                 r"targeting\b",
@@ -259,8 +270,7 @@ def rearrange_adp_terms(terms: Sequence[str], n_process: int = 1) -> Iterable[st
             ]
         ),
         "with": r"associated with\b",
-        "against": r"against\b",
-        # antibody to
+        "against": r"against\b",  # ADP??
     }
 
     def _rearrange(_terms: Sequence[str], adp_term: str, adp_ext: str) -> Iterable[str]:
@@ -290,10 +300,10 @@ def __rearrange_adp(
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)
 
-    def __rearrange(doc: Doc) -> str:
+    def __rearrange(doc: Doc | Span) -> str:
         # get indices of all ADPs, to use those as stopping points
         # refusing to consider the first ADP (if any) because it's likely to be a preposition
         all_adp_indices = [t.i for i, t in enumerate(doc) if t.pos_ == "ADP" and i > 0]
@@ -307,17 +317,8 @@ def __rearrange_adp(
 
         if len(specific_adp_indices) > 1:
             # recursively process doc
-            head_doc = __rearrange(
-                nlp(
-                    "".join(
-                        [t.text_with_ws for t in doc[specific_adp_indices[0] + 1 :]]
-                    )
-                )
-            )
-
-            tail_doc = __rearrange(
-                nlp("".join([t.text_with_ws for t in doc[0 : specific_adp_indices[0]]]))
-            )
+            head_doc = __rearrange(doc[specific_adp_indices[0] + 1 :].as_doc())
+            tail_doc = __rearrange(doc[0 : specific_adp_indices[0]].as_doc())
 
             return f"{head_doc} {tail_doc}".strip()
 
@@ -336,9 +337,7 @@ def __rearrange_adp(
             before_start_idx = (
                 max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
             )
-
-            before_tokens = doc[before_start_idx:adp_index]
-            before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
+            before_phrase = doc[before_start_idx:adp_index].text.strip()
 
             # all ADPs after
             after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
@@ -346,35 +345,28 @@ def __rearrange_adp(
             after_start_idx = (
                 min(after_adp_indices) if len(after_adp_indices) > 0 else len(doc)
             )
-            after_tokens = doc[adp_index + 1 : after_start_idx]
-            after_phrase = lemmatize_tail(
-                "".join([t.text_with_ws for t in after_tokens])
-            )
+            after_phrase = lemmatize_tail(doc[adp_index + 1 : after_start_idx])
 
             # if we cut off stuff from the beginning, put back
             # e.g. (diseases associated with) expression of GU Protein
-            other_stuff = (
-                "".join([t.text_with_ws for t in doc[0:before_start_idx]])
-                if before_start_idx > 0
-                else ""
-            )
+            other_stuff = doc[0:before_start_idx].text if before_start_idx > 0 else ""
 
-            return f"{other_stuff}{after_phrase} {before_phrase}".strip()
+            return f"{other_stuff} {after_phrase} {before_phrase}".strip()
         except Exception as e:
-            logging.error("Error in rearrange_adp, returning orig text: %s", e)
+            logger.error("Error in rearrange_adp, returning orig text: %s", e)
             return doc.text
 
     for doc in docs:
         yield __rearrange(doc)
 
 
-def __normalize_by_pos(doc: Doc):
+def __normalize_by_pos(doc: Doc) -> str:
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logger.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
-    def clean_by_pos(t, prev_t, next_t):
+    def clean_by_pos(t: Token, prev_t: Token | None, next_t: Token | None) -> str:
         # spacy only marks a token as SPACE if it is hanging out in a weird place
         if t.pos_ == "SPACE":
             return ""
@@ -385,8 +377,10 @@ def __normalize_by_pos(doc: Doc):
             if t.pos_ == "ADJ":
                 return " "
             if t.pos_ in ["PUNCT", "SYM"]:
+                if prev_t is None:
+                    return " "
                 if prev_t.pos_ == "PUNCT":
-                    # "(-)-ditoluoyltartaric acid" unchnaged
+                    # "(-)-ditoluoyltartaric acid" unchanged
                     return DASH
                 if (
                     next_t is not None
@@ -454,7 +448,7 @@ def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
-    nlp = Spacy.get_instance()
+    nlp = Spacy.get_instance(disable=["ner"])
 
     # avoid spacy keeping terms with - as a single token
     def sep_dash(term: str) -> str:

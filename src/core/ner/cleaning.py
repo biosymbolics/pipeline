@@ -16,7 +16,7 @@ from constants.patterns.intervention import (
 )
 from constants.patterns.iupac import is_iupac
 from data.common.biomedical.constants import PHRASE_REWRITES
-from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
+from utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .types import DocEntity, is_entity_doc_list
@@ -25,6 +25,9 @@ from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 T = TypeVar("T", bound=Union[DocEntity, str])
 
 RE_FLAGS = RE_STANDARD_FLAGS
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class CleanFunction(Protocol):
@@ -91,7 +94,6 @@ class EntityCleaner:
         Args:
             terms (list[str]): terms
         """
-        start = time.time()
 
         def make_substitutions(_terms: Sequence[str]) -> Iterable[str]:
             def __substitute_strings(term):
@@ -158,11 +160,28 @@ class EntityCleaner:
                 for syn, canonical in PHRASE_REWRITES.items()
             ]
 
-            for term in _terms:
-                yield reduce(lambda x, func: func(x), steps, term)
+            pharse_to_norm_re = get_or_re(
+                list(PHRASE_REWRITES.keys()), enforce_word_boundaries=True
+            )
 
-        def exec_func(func, x):
-            logging.debug("Executing function: %s", func)
+            for term in _terms:
+                if (
+                    re.search(f".*{pharse_to_norm_re}.*", term, flags=RE_FLAGS)
+                    is not None
+                ):
+                    yield reduce(lambda x, func: func(x), steps, term)
+                else:
+                    yield term
+
+        def exec_func(func, x, debug: bool = True):
+            if debug:
+                start = time.time()
+                res = list(func(x))
+                logger.info(
+                    "Executing function %s took %s", func, round(time.time() - start, 2)
+                )
+                print("TIME", func, round(time.time() - start, 2))
+                return res
             return func(x)
 
         cleaning_steps = [
@@ -187,11 +206,6 @@ class EntityCleaner:
             reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
         )
 
-        logging.debug(
-            "Normalized %s terms in %s seconds",
-            len(terms),
-            round(time.time() - start, 2),
-        )
         return normalized
 
     @staticmethod
@@ -205,7 +219,7 @@ class EntityCleaner:
         remove_suppressed: bool = False,
     ) -> Sequence[T]:
         if len(modified_texts) != len(orig_ents):
-            logging.info(
+            logger.info(
                 "Modified text: %s, original entities: %s", modified_texts, orig_ents
             )
             raise ValueError("Modified text must be same length as original entities")
@@ -246,7 +260,9 @@ class EntityCleaner:
 
         cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
 
-        logging.info(
+        # INFO:root:Cleaned 2268406 entities in 2749.49 seconds
+        # INFO:core.ner.cleaning:Cleaned 2268406 entities in 2672.56 seconds
+        logger.info(
             "Cleaned %s entities in %s seconds",
             len(entities),
             round(time.time() - start, 2),

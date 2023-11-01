@@ -11,7 +11,7 @@ from utils.list import is_sequence
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE | re.DOTALL
+RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE
 
 
 def WORD_CHAR_RE(additional_chars: list[str] = []):
@@ -48,7 +48,7 @@ def get_or_re(
     permit_trailing_space: bool = False,
     enforce_word_boundaries: bool = False,
     permit_plural: bool = True,
-    word_boundary_char: str = rf"\b",  # \y for postgres
+    word_boundary_char: str = "\\b",  # \y for postgres
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -69,7 +69,7 @@ def get_or_re(
 
     wbc = word_boundary_char
     if enforce_word_boundaries:
-        re_strs = [rf"{wbc}{re_str}{wbc}" for re_str in re_strs]
+        re_strs = [f"{wbc}{re_str}{wbc}" for re_str in re_strs]
 
     if permit_trailing_space:
         re_strs = [re_str + r"\s*" for re_str in re_strs]

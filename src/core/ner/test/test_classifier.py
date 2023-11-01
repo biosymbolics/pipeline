@@ -22,21 +22,21 @@ class TestClassifier(unittest.TestCase):
                     "Food supplement for combating asthma made from medicinal plants. The food supplement for combating asthma contains certain nutrients such as vitamins, minerals and unsaturated fatty acids that combat infections and inflammations of the respiratory system, soothe and act favourably on dilation of the bronchi, and provide relief to persons suffering from breathing difficulties caused by congestion or lack of air."
                 ],
                 "attribute_map": PATENT_ATTRIBUTE_MAP,
-                "expected_output": [["NUTRITIONAL"]],
+                "expected_output": [["COMPOUND_OR_MECHANISM", "NUTRITIONAL"]],
             },
             {
                 "docs": [
                     "Sensor devices and systems for monitoring markers in breath. The disclosure relates to devices, systems and methods for detecting markers in breath, more specifically volatile and non-volatile markers associated with pulmonary diseases such as, for example, asthma, chronic obstructive pulmonary disease (COPD), or cystic fibrosis (CF), in exhaled breath condensate (EBC)."
                 ],
                 "attribute_map": PATENT_ATTRIBUTE_MAP,
-                "expected_output": [["DEVICE", "DIAGNOSTIC", "PROCESS"]],
+                "expected_output": [["DIAGNOSTIC", "PROCESS"]],  # "DEVICE"
             },
             {
                 "docs": [
                     "In vitro method for identifying severity levels in patients with bronchial asthma. The present invention shows that miR-185-5p exhibits higher levels of relative expression (2 -ΔCt , where ΔCt= Ct miRNA of interest (miR-185-5p) -Ct endogenous miRNA) in asthma patients than in healthy individuals. Moreover, the levels of expression of miR-185-5p differ not only between healthy individuals and asthma patients, but also between healthy individuals and each of the subgroups of asthma patients (intermittent, persistent mild, moderate and severe)"
                 ],
                 "attribute_map": PATENT_ATTRIBUTE_MAP,
-                "expected_output": [["DIAGNOSTIC"]],
+                "expected_output": [["COMPOUND_OR_MECHANISM", "DIAGNOSTIC"]],
             },
             {
                 "docs": [

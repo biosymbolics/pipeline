@@ -52,7 +52,7 @@ class TermLinker:
         self.candidate_generator = CandidateGenerator(min_similarity=min_similarity)
         self.kb: KbLinker = UmlsKnowledgeBase()  # type: ignore
 
-    def __get_canonical_entity(
+    def _get_canonical(
         self, candidates: Sequence[MentionCandidate]
     ) -> CanonicalEntity | None:
         """
@@ -72,15 +72,17 @@ class TermLinker:
         # if no entity, which will happen if we got a composite candidate:
         if entity is None:
             return CanonicalEntity(
-                candidates[0].concept_id,
-                candidates[0].aliases[0],
-                candidates[0].aliases,
+                id=candidates[0].concept_id,
+                name=candidates[0].aliases[0],
+                aliases=candidates[0].aliases,
             )
 
         return CanonicalEntity(
-            entity.concept_id if entity else candidates[0].concept_id,
-            entity.canonical_name if entity else candidates[0].aliases[0],
-            entity.aliases if entity else candidates[0].aliases,
+            id=entity.concept_id,
+            name=entity.canonical_name,
+            aliases=entity.aliases,
+            description=entity.definition,
+            types=entity.types,
         )
 
     def generate_map(self, terms: Sequence[str]) -> LinkedEntityMap:
@@ -99,7 +101,7 @@ class TermLinker:
         logging.info(
             "Finished candidate generation (took %s)", time.time() - start_time
         )
-        canonical_entities = [self.__get_canonical_entity(c) for c in candidates]  # type: ignore
+        canonical_entities = [self._get_canonical(c) for c in candidates]  # type: ignore
         entity_map = dict(zip(terms, canonical_entities))
         return {
             key: value
@@ -121,16 +123,22 @@ class TermLinker:
             return []
 
         canonical_map = self.generate_map(terms)
+        linked_entities = [(t, canonical_map.get(t)) for t in terms]
 
-        linked_entities = [canonical_map.get(t) for t in terms]
         logging.info("Completed linking batch of %s terms", len(terms))
 
-        # should always be the same length ("" for omitted terms)
-        assert len(terms) == len(linked_entities)
-
-        return list(zip(terms, linked_entities))
+        return linked_entities
 
     def __call__(
         self, terms: Sequence[str]
     ) -> Sequence[tuple[str, CanonicalEntity | None]]:
         return self.link(terms)
+
+
+# select * from mrhier where cui='C1414121';
+# select * from mrhier where aui='A7608627';
+
+# select * from mrrel where cui1='C1414121';
+# select count(*) from mrconso where lat='ENG' and ts='P'; # preferred term
+
+# select * from mrconso where lat='ENG' and ts='P' and cui='C1334751'

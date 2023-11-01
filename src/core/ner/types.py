@@ -25,7 +25,9 @@ NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group":
 class CanonicalEntity(NamedTuple):
     id: str
     name: str
-    aliases: Optional[List[str]] = []
+    description: Optional[str] = None
+    aliases: list[str] = []
+    types: list[str] = []
 
 
 class DocEntity(

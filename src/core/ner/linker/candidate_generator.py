@@ -37,7 +37,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         word_candidate_map = {
             # k = 1 so each should have only 1 entry anyway
             word: candidate[0]
-            if candidate[0].similarities[0] > min_similarity
+            if len(candidate) > 0
+            and len(candidate[0].similarities) > 0
+            and candidate[0].similarities[0] > min_similarity
             else MentionCandidate("na", [word], [1])
             for word, candidate in zip(matchless_words, matchless_candidates)
         }
@@ -76,12 +78,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         # similarity score as mean of all words
         similarity = mean(
-            [c.similarities[0] for c in candidates if c.similarities[0] > -1]
+            [c.similarities[0] for c in candidates if c.similarities[0] > 0]
         )
 
         return MentionCandidate(
             concept_id="|".join(
-                [c.concept_id for c in candidates if c.similarities[0] > -1]
+                [c.concept_id for c in candidates if c.similarities[0] > 0]
             ),
             # TODO: all permutations
             aliases=[" ".join([c.aliases[0] for c in candidates])],
