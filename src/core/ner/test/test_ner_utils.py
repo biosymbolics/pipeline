@@ -91,63 +91,63 @@ class TestNerUtils(unittest.TestCase):
             # tgf beta r1 inhibitor
             {
                 "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgfβ1 accessory receptor",
+                "expected": "tgfb1 accessory receptor",
             },
             {
                 "input": "inhibitor of tgfβ1 activity",
-                "expected": "tgfβ1 inhibitor",
+                "expected": "tgfb1 inhibitor",
             },
             {
                 "input": "tgf beta antisense oligonucleotide",
-                "expected": "tgfβ antisense oligonucleotide",
+                "expected": "tgfb antisense oligonucleotide",
             },
             {
                 "input": "tgfβ receptor 1",
-                "expected": "tgfβ receptor 1",  # TODO
+                "expected": "tgfb receptor 1",  # TODO
             },
             {
                 "input": "transforming growth factor β (tgfβ) antagonist",
-                "expected": "tgfβ (tgfβ) antagonist",
+                "expected": "tgfb (tgfb) antagonist",
             },
             {
                 "input": "transforming growth factor beta3",
-                "expected": "tgfβ3",
+                "expected": "tgfb3",
             },
             {
                 "input": "tgfβ1 inhibitor",
-                "expected": "tgfβ1 inhibitor",
+                "expected": "tgfb1 inhibitor",
             },
             {
                 "input": "tgf β superfamily type ii receptor",
-                "expected": "tgfβii receptor",  # TODO
+                "expected": "tgfbii receptor",  # TODO
             },
             {
                 "input": "tgf-beta superfamily proteins",
-                "expected": "tgfβ superfamily protein",
+                "expected": "tgfb superfamily protein",
             },
             {
                 "input": "anti tgf β 1 antibody",
-                "expected": "anti tgfβ1 antibody",
+                "expected": "anti tgfb1 antibody",
             },
             {
                 "input": "tgfβ",
-                "expected": "tgfβ",
+                "expected": "tgfb",
             },
             {
                 "input": "TGF-β type I receptor",
-                "expected": "tgfβi receptor",  # TGFβRI
+                "expected": "tgfbi receptor",  # TGFβRI
             },
             {
                 "input": "tgfb inhibitor",
-                "expected": "tgfβ inhibitor",
+                "expected": "tgfb inhibitor",
             },
             {
                 "input": "tgfb1",
-                "expected": "tgfβ1",
+                "expected": "tgfb1",
             },
             {
-                "input": "(tumor necrosis factor)-α inhibitor tgf",
-                "expected": "(tumor necrosis factor)-α inhibitor tgf",  # TODO
+                "input": "(tumor necrosis factor)-alpha inhibitor tgf",
+                "expected": "(tumor necrosis factor)-alpha inhibitor tgf",  # TODO
             },
             {
                 "input": "EGFR vIII mRNA",
@@ -155,15 +155,15 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-β1",
-                "expected": "tgfβ1",
+                "expected": "tgfb1",
             },
             {
                 "input": "anti-TGF-β siRNA",
-                "expected": "anti tgfβ sirna",
+                "expected": "anti tgfb sirna",
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "tgfβ (tgfβ) overexpression disorder",  # TODO
+                "expected": "tgfb (tgfb) overexpression disorder",  # TODO
             },
             {
                 "input": "angiotensin-ii",
@@ -220,6 +220,38 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "FOLFIRINOX treatment",
                 "expected": "folfirinox",
+            },
+            {
+                "input": "TGF-β inhibitor",
+                "expected": "tgfb inhibitor",
+            },
+            {
+                "input": "NF-kB",
+                "expected": "nfkb",
+            },
+            {
+                "input": "NF-kB",
+                "expected": "nfkb",
+            },
+            {
+                "input": "DIURETICS CONTAINING η-TOCOTRIENOL",
+                "expected": "diuretics containing eta tocotrienol",
+            },
+            {
+                "input": "FcηRII bridging agent",
+                "expected": "fc eta rii bridging agent",  # TODO
+            },
+            {
+                "input": "β-methyl-β-hydroxy-η-butyrolactone",
+                "expected": "beta methyl beta hydroxy eta butyrolactone",
+            },
+            {
+                "input": "α,ω-dihalogen substituted alkane",
+                "expected": "α, omega dihalogen substituted alkane",  # TODO
+            },
+            {
+                "input": "aβ42",
+                "expected": "abeta42",
             },
         ]
 

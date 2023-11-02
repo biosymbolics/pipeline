@@ -6,8 +6,15 @@ from spacy.lang.en.stop_words import STOP_WORDS
 
 from utils.string import generate_ngram_phrases
 
-MIN_WORD_LENGTH = 3
+MIN_WORD_LENGTH = 1
 NGRAMS_N = 2
+
+CUI_SUPPRESSIONS = {
+    "C0432616": "Blood group antibody A",  # matches "anti", sigh
+    "C1413336": "CEL gene",  # matches "cell"; TODO fix so this gene can match
+    "C1413568": "COIL gene",  # matches "coil"
+    "C0439095": "greek letter alpha",
+}
 
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
@@ -20,12 +27,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
       - Antibodies too grabby, e.g. "antibody against c5"
       - Antibodies, Anti-Idiotypic -> anti- αβ42 antibody, anti-tnfalpha antibody
       - Antagonist muscle action -> ανβ3 receptor antagonists etc
-      - "anti-cancer therapeutics" -> Anti A Cancer
+
     - Wrong
       - C1413336 / CEL gene - matches cell!!
       - Emitter COIL - COIL gene
       - FLAME gene
-      - https://uts.nlm.nih.gov/uts/umls/concept/C0870814 - "like"
     - not first alias (https://uts.nlm.nih.gov/uts/umls/concept/C0127400)
     - dedup same ids, e.g. Keratin fiber / Keratin fibre both C0010803|C0225326 - combine
     - potentially suppress some types
@@ -144,11 +150,13 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             min_similarity (float): minimum similarity to consider a match
         """
 
-        def has_acceptable_candidate(candidates: Sequence[MentionCandidate]) -> bool:
+        def is_acceptable_candidate(candidates: Sequence[MentionCandidate]) -> bool:
+            # k = 1 so each should have only 1 entry anyway
             return (
                 len(candidates) > 0
                 and len(candidates[0].similarities) > 0
                 and candidates[0].similarities[0] > min_similarity
+                and candidates[0].concept_id not in CUI_SUPPRESSIONS
             )
 
         # 1grams and 2grams
@@ -164,10 +172,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         matchless_candidates = super().__call__(matchless_ngrams, 1)
         ngram_candidate_map = {
-            # k = 1 so each should have only 1 entry anyway
             ngram: candidate[0]
             for ngram, candidate in zip(matchless_ngrams, matchless_candidates)
-            if has_acceptable_candidate(candidate)
+            if is_acceptable_candidate(candidate)
         }
         composite_matches = {
             mention_text: self._generate_composite(mention_text, ngram_candidate_map)

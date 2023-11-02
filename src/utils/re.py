@@ -14,10 +14,18 @@ logger.setLevel(logging.INFO)
 RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE
 
 
+# (includes greek chars)
 def WORD_CHAR_RE(additional_chars: list[str] = []):
-    return (
-        "[\\w\u0370-\u03FF" + "".join(additional_chars) + "]"
-    )  # (includes greek chars)
+    """
+    Returns a regex for a single word char
+
+    Args:
+        additional_chars (list[str]): additional chars to include (as string literals)
+    """
+    return "[\\w\u0370-\u03FF" + "".join(additional_chars) + "]"
+
+
+WORD_DIGIT_RE = rf"(?:{WORD_CHAR_RE()}|\d)"
 
 
 COPYRIGHT_SYM = "\u00A9"  # ©

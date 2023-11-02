@@ -3,7 +3,7 @@ from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC,
     PRIMARY_MECHANISM_BASE_TERMS,
 )
-from utils.re import get_or_re
+from utils.re import WORD_CHAR_RE, WORD_DIGIT_RE, ALPHA_CHARS, get_or_re
 
 
 from .types import WordPlace
@@ -234,10 +234,26 @@ ACTIVITY_MOA_PATTERNS = {
     for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
 }
 
-
 PHRASE_REWRITES = {
     **MOA_PATTERNS,
     **ACTIVITY_MOA_PATTERNS,
+    r"κB": "kappa-b",
+    r"nf-κ[BβΒ]": "nfkb",
+    r"(?:α|a|amyloid)[ ]?(?:β|b|beta)[ ]?([-0-9]{1,5})": r"abeta\1",  # scispacy does better with this
+    f"({ALPHA_CHARS('*')})[ ]?[Αα][ ]?({ALPHA_CHARS(2)})": r"\1 alpha \2",
+    f"({ALPHA_CHARS('*')})[ ]?[βΒ][ ]?({ALPHA_CHARS(2)})": r"\1 beta \2",
+    f"({ALPHA_CHARS('*')})[ ]?[γΓ][ ]?({ALPHA_CHARS(2)})": r"\1 gamma \2",
+    f"({ALPHA_CHARS('*')})[ ]?[δΔ][ ]?({ALPHA_CHARS(2)})": r"\1 delta \2",
+    f"({ALPHA_CHARS('*')})[ ]?[ωΩ][ ]?({ALPHA_CHARS(2)})": r"\1 omega \2",
+    f"({ALPHA_CHARS('*')})[ ]?[ηΗ][ ]?({ALPHA_CHARS(2)})": r"\1 eta \2",
+    rf"({ALPHA_CHARS('*')})[ ]?[κ][ ]?({ALPHA_CHARS(2)})": r"\1 kappa \2",
+    f"({ALPHA_CHARS('*')})Αα(-?(?:[0-9]+|[a-z]))": r"\1 alpha \2",
+    f"({ALPHA_CHARS('*')})βΒ(-?(?:[0-9]+|[a-z]))": r"\1 beta\2",
+    f"({ALPHA_CHARS('*')})γΓ(-?(?:[0-9]+|[a-z]))": r"\1 gamma\2",
+    f"({ALPHA_CHARS('*')})δΔ(-?(?:[0-9]+|[a-z]))": r"\1 delta\2",
+    f"({ALPHA_CHARS('*')})ωΩ(-?(?:[0-9]+|[a-z]))": r"\1 omega\2",
+    f"({ALPHA_CHARS('*')})ηΗ(-?(?:[0-9]+|[a-z]))": r"\1 eta\2",
+    f"({ALPHA_CHARS('*')})κ(-?(?:[0-9]+|[a-z]))": r"\1 kappa\2",
     "analogue": "analog",
     "antibody conjugate": "antibody",
     "antibody immunoconjugate": "antibody",
@@ -305,13 +321,11 @@ PHRASE_REWRITES = {
     "peginterferon": "pegylated interferon",
     "([a-z]{1,3}) ([0-9]{1,4})": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
     "PEG": "pegylated",
-    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:(?:superfamily )?type )?([0-9]|v?i{1,3}))?": r"tgfβ\1",
+    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:(?:superfamily )?type )?([0-9]|v?i{1,3}))?": r"tgfb\1",
     # superfamily type ii
-    "(?:tgf|transforming growth factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfα\1",
-    "(?:tnf|tumor necrosis factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfα\1",
-    "(?:tnf|tumor necrosis factor)[ -]?(?:b|β)(?:beta)?(?:[ -]?([0-9]))?": r"tnfβ\1",
-    "(?:tnf|tumor necrosis factor)[ -]?(?:g|γ)(?:amma)?(?:[ -]?([0-9]))?": r"tnfγ\1",
-    "(?:tnfr|tumor necrosis factor receptors?)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfrα\1",
+    "(?:tgfr?|transforming growth factor(?: receptors?))[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfa\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfa\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:b|β)(?:beta)?(?:[ -]?([0-9]))?": r"tnfb\1",
     "(?:egf|epidermal growth factor)": r"egf",
     "(?:egfr|epidermal growth factor receptor)(?:[ ]?(v?i{1,3}|[0-9]))?": r"egfr \1",
     # # vascular endothelial growth factor (VEGF), VEGFR1
