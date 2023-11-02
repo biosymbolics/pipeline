@@ -5,7 +5,7 @@ String utilities
 
 from datetime import date
 import regex as re
-from typing import Any, Mapping, TypeGuard, Union
+from typing import Any, Mapping, Sequence, TypeGuard, Union
 
 
 _Idable = str | list[str] | int | date
@@ -130,3 +130,33 @@ def byte_dict_to_string_dict(
     raise ValueError(
         f"Expected a dictionary of bytes or strings, got {type(maybe_byte_dict)}"
     )
+
+
+def generate_ngrams(tokens: Sequence[str], n: int) -> list[tuple[str, str]]:
+    """
+    Generate n-grams from a list of tokens
+
+    Args:
+        tokens (Sequence[str]): list of tokens
+        n (int): n-gram size
+
+    Example:
+        >>> generate_ngrams(["a", "b", "c", "d"], 2)
+        [('a', 'b'), ('b', 'c'), ('c', 'd')]
+    """
+    return list(*zip(*[tokens[i:] for i in range(n)]))
+
+
+def generate_ngram_phrases(tokens: Sequence[str], n: int) -> list[str]:
+    """
+    Generate n-grams from a list of tokens
+
+    Args:
+        tokens (Sequence[str]): list of tokens
+        n (int): n-gram size
+
+    Example:
+        >>> generate_ngram_phrases(["a", "b", "c", "d"], 2)
+        ['a b', 'b c', 'c d']
+    """
+    return [" ".join(ng) for ng in generate_ngrams(tokens, n)]

@@ -98,8 +98,11 @@ class TermLinker:
         logging.info("Starting candidate generation")
         start_time = time.time()
         candidates = self.candidate_generator(list(terms), 1)
+
+        # INFO:root:Finished candidate generation (took 1703)
         logging.info(
-            "Finished candidate generation (took %s)", time.time() - start_time
+            "Finished candidate generation (took %s seconds)",
+            round(time.time() - start_time),
         )
         canonical_entities = [self._get_canonical(c) for c in candidates]  # type: ignore
         entity_map = dict(zip(terms, canonical_entities))
