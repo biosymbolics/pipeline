@@ -6,7 +6,8 @@ from spacy.lang.en.stop_words import STOP_WORDS
 
 from utils.string import generate_ngram_phrases
 
-MIN_WORD_LENGTH = 2
+MIN_WORD_LENGTH = 3
+NGRAMS_N = 2
 
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
@@ -27,7 +28,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
       - https://uts.nlm.nih.gov/uts/umls/concept/C0870814 - "like"
     - not first alias (https://uts.nlm.nih.gov/uts/umls/concept/C0127400)
     - dedup same ids, e.g. Keratin fiber / Keratin fibre both C0010803|C0225326 - combine
-    - bigrams
     - potentially suppress some types
         - T077 residue, means, cure
         - T090 (occupation) Technology, engineering, Magnetic <?>
@@ -39,11 +39,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         - T169 functional - includes ROAs and endogenous/exogenous, but still probably okay to remove
         - T041 mental process - may have a few false positives
 
-        - remove short text? (e.g., food Content
-        - leave term if only umls match
-
-
-
     - look at microglia
     """
 
@@ -52,72 +47,75 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         self.min_similarity = min_similarity
 
     @classmethod
-    def get_ngrams(cls, texts: Sequence[str], n: int = 1) -> list[str]:
-        def _ngram(text: str, n: int) -> list[str]:
-            words = tuple(
-                [
-                    word
-                    for word in text.split()
-                    if len(word) > MIN_WORD_LENGTH and word not in STOP_WORDS
-                ]
-            )
+    def get_words(cls, text: str) -> tuple[str, ...]:
+        return tuple(
+            [
+                word
+                for word in text.split()
+                if len(word) >= MIN_WORD_LENGTH and word not in STOP_WORDS
+            ]
+        )
 
-            # if fewer words than n, just return words
-            # (this is expedient but probably confusing)
-            if n == 1 or len(words) < n:
-                return list(words)
+    @classmethod
+    def get_ngrams(cls, text: str, n: int) -> list[str]:
+        words = cls.get_words(text)
 
-            ngrams = generate_ngram_phrases(words, n)
-            return ngrams
+        # if fewer words than n, just return words
+        # (this is expedient but probably confusing)
+        if n == 1 or len(words) < n:
+            return list(words)
 
-        matchless_ngrams = uniq(flatten([_ngram(text, n) for text in texts]))
-        return matchless_ngrams
+        ngrams = generate_ngram_phrases(words, n)
+        return ngrams
 
     @classmethod
     def _generate_composite(
         cls,
         mention_text: str,
-        word_candidate_map: dict[str, MentionCandidate],
+        ngram_candidate_map: dict[str, MentionCandidate],
     ) -> list[MentionCandidate]:
         """
         Generate a composite candidate from a mention text
 
         Args:
             mention_text (str): Mention text
-            word_candidate_map (dict[str, MentionCandidate]): word-to-candidate map
+            ngram_candidate_map (dict[str, MentionCandidate]): word-to-candidate map
         """
         if mention_text.strip() == "":
             return []
 
-        ngrams = cls.get_ngrams([mention_text], 2)
-
-        def get_ngram_candidate(ngram: str, is_last: bool) -> list[MentionCandidate]:
+        def get_candidates(words: tuple[str, ...]) -> list[MentionCandidate]:
             """
-            Return candidate for a ngram
-            (if no ngram candidate, return a candidate for each word in the ngram)
+            Recursive function to see if the first ngram has a match, then the first n-1, etc.
             """
-            if ngram in word_candidate_map:
-                return [word_candidate_map[ngram]]
+            if len(words) == 0:
+                return []
 
-            single_words = ngram.split(" ")[-1 if is_last else 0]
+            if len(words) >= NGRAMS_N:
+                ngram = " ".join(words[0:NGRAMS_N])
+                if ngram in ngram_candidate_map:
+                    remaining_words = tuple(words[NGRAMS_N:])
+                    return [
+                        ngram_candidate_map[ngram],
+                        *get_candidates(remaining_words),
+                    ]
+
+            # otherwise, let's map only the first word
+            remaining_words = tuple(words[1:])
+            if words[0] in ngram_candidate_map:
+                return [ngram_candidate_map[words[0]], *get_candidates(remaining_words)]
 
             return [
-                word_candidate_map[word]
-                if word in word_candidate_map
-                else MentionCandidate(
+                MentionCandidate(
                     concept_id="na",
-                    aliases=[word],
+                    aliases=[words[0]],
                     similarities=[-1],
-                )
-                for word in single_words
+                ),
+                *get_candidates(remaining_words),
             ]
 
-        candidates = flatten(
-            [
-                get_ngram_candidate(ngram, is_last=(i == len(ngrams) - 1))
-                for i, ngram in enumerate(ngrams)
-            ]
-        )
+        all_words = cls.get_words(mention_text)
+        candidates = get_candidates(all_words)
 
         # similarity score as mean of all words
         similarities = [c.similarities[0] for c in candidates if c.similarities[0] > 0]
@@ -154,20 +152,25 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             )
 
         # 1grams and 2grams
-        matchless_ngrams = flatten(
-            [self.get_ngrams(matchless_mention_texts, i) for i in range(1, 2)]
+        matchless_ngrams = uniq(
+            flatten(
+                [
+                    self.get_ngrams(text, i + 1)
+                    for text in matchless_mention_texts
+                    for i in range(NGRAMS_N)
+                ]
+            )
         )
 
         matchless_candidates = super().__call__(matchless_ngrams, 1)
-        word_candidate_map = {
+        ngram_candidate_map = {
             # k = 1 so each should have only 1 entry anyway
-            word: candidate[0]
+            ngram: candidate[0]
+            for ngram, candidate in zip(matchless_ngrams, matchless_candidates)
             if has_acceptable_candidate(candidate)
-            else MentionCandidate("na", [word], [1])
-            for word, candidate in zip(matchless_ngrams, matchless_candidates)
         }
         composite_matches = {
-            mention_text: self._generate_composite(mention_text, word_candidate_map)
+            mention_text: self._generate_composite(mention_text, ngram_candidate_map)
             for mention_text in matchless_mention_texts
         }
         return composite_matches
