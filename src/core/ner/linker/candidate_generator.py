@@ -54,16 +54,18 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     @classmethod
     def get_ngrams(cls, texts: Sequence[str], n: int = 1) -> list[str]:
         def _ngram(text: str, n: int) -> list[str]:
-            words = [
-                word
-                for word in text.split()
-                if len(word) > MIN_WORD_LENGTH and word not in STOP_WORDS
-            ]
+            words = tuple(
+                [
+                    word
+                    for word in text.split()
+                    if len(word) > MIN_WORD_LENGTH and word not in STOP_WORDS
+                ]
+            )
 
             # if fewer words than n, just return words
             # (this is expedient but probably confusing)
             if n == 1 or len(words) < n:
-                return words
+                return list(words)
 
             ngrams = generate_ngram_phrases(words, n)
             return ngrams

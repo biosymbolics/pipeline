@@ -10,6 +10,7 @@ import logging
 from core.ner.utils import lemmatize_all
 from utils.list import dedup
 from utils.re import expand_res
+from utils.string import generate_ngrams
 
 T = TypeVar("T", bound=Enum | str)
 
@@ -50,10 +51,6 @@ def create_lookup_map(keyword_map: Mapping[T, list[str]]) -> Mapping[str, T]:
     return lookup_map
 
 
-def generate_ngrams(input_list: list[str], n: int):
-    return zip(*[input_list[i:] for i in range(n)])
-
-
 def classify_string(
     string: str, lookup_map: Mapping[str, T], nx_name: T | None = None
 ) -> list[T]:
@@ -72,7 +69,7 @@ def classify_string(
 
     def __extract_ngrams():
         lemmatized = lemmatize_all(string.lower())
-        tokens = lemmatized.split(" ")
+        tokens = tuple(lemmatized.split(" "))
         bigrams = generate_ngrams(tokens, 3)
         trigrams = generate_ngrams(tokens, 2)
         ngrams = [

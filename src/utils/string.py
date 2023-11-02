@@ -132,7 +132,7 @@ def byte_dict_to_string_dict(
     )
 
 
-def generate_ngrams(tokens: tuple[str], n: int) -> list[tuple[str, str]]:
+def generate_ngrams(tokens: tuple[str, ...], n: int) -> list[tuple[str, str]]:
     """
     Generate n-grams from a list of tokens
 
@@ -147,7 +147,7 @@ def generate_ngrams(tokens: tuple[str], n: int) -> list[tuple[str, str]]:
     return list(zip(*[tokens[i:] for i in range(n)]))  # type: ignore
 
 
-def generate_ngram_phrases(tokens: tuple[str], n: int) -> list[str]:
+def generate_ngram_phrases(tokens: tuple[str, ...], n: int) -> list[str]:
     """
     Generate n-grams from a list of tokens
 
