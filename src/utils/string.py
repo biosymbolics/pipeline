@@ -132,27 +132,27 @@ def byte_dict_to_string_dict(
     )
 
 
-def generate_ngrams(tokens: Sequence[str], n: int) -> list[tuple[str, str]]:
+def generate_ngrams(tokens: tuple[str], n: int) -> list[tuple[str, str]]:
     """
     Generate n-grams from a list of tokens
 
     Args:
-        tokens (Sequence[str]): list of tokens
+        tokens (tuple[str]): list of tokens
         n (int): n-gram size
 
     Example:
         >>> generate_ngrams(["a", "b", "c", "d"], 2)
         [('a', 'b'), ('b', 'c'), ('c', 'd')]
     """
-    return list(*zip(*[tokens[i:] for i in range(n)]))
+    return list(zip(*[tokens[i:] for i in range(n)]))  # type: ignore
 
 
-def generate_ngram_phrases(tokens: Sequence[str], n: int) -> list[str]:
+def generate_ngram_phrases(tokens: tuple[str], n: int) -> list[str]:
     """
     Generate n-grams from a list of tokens
 
     Args:
-        tokens (Sequence[str]): list of tokens
+        tokens (tuple[str]): list of tokens
         n (int): n-gram size
 
     Example:
