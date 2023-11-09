@@ -56,10 +56,11 @@ def transform_umls_relationships(
         ancestors = (hier.split(".") if hier is not None else [])[::-1]
 
         return {
-            **record.__dict__,
+            **record,  # type: ignore
             **{f"l{i}_ancestor": None for i in range(MAX_DENORMALIZED_ANCESTORS)},
             **{
-                f"l{i}_ancestor": aui_lookup.get(ancestors[i])
+                # TODO strip shouldn't be necessary
+                f"l{i}_ancestor": aui_lookup.get(ancestors[i], "").strip()
                 if i < len(ancestors)
                 else None
                 for i in range(MAX_DENORMALIZED_ANCESTORS)
@@ -69,9 +70,9 @@ def transform_umls_relationships(
     return [parse_ancestor_ids(r) for r in records]
 
 
-def ingest_umls():
+def create_umls_lookup():
     """
-    Ingest UMLS
+    Create UMLS lookup table
 
     - Creates a table of UMLS entities: id, name, ancestor ids
     """
@@ -87,7 +88,8 @@ def ingest_umls():
             max(ancestors.ptr) as hierarchy,
             -- {", ".join(ANCESTOR_FIELDS)},
             max(semantic_types.tui) as type_id,
-            max(semantic_types.sty) as type_name
+            max(semantic_types.sty) as type_name,
+            count(*)
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
@@ -102,12 +104,7 @@ def ingest_umls():
     umls_db = f"{BASE_DATABASE_URL}/umls"
     aui_lookup = {
         r["aui"]: r["cui"]
-        for r in PsqlDatabaseClient(umls_db).select(
-            """
-            select cui, aui, str as name from mrconso
-            where ts='P' and ispref='Y' and lat='ENG'
-            """
-        )
+        for r in PsqlDatabaseClient(umls_db).select("select aui, cui from mrconso")
     }
 
     PsqlDatabaseClient(umls_db).truncate_table(new_table_name)
@@ -181,8 +178,8 @@ def copy_umls():
     """
     Copy data from umls to patents
     """
-    ingest_umls()
-    copy_relationships()
+    create_umls_lookup()
+    # copy_relationships()
 
 
 if __name__ == "__main__":

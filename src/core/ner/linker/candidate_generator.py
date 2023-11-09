@@ -1,10 +1,8 @@
 from typing import Mapping, Sequence
 from pydash import flatten, omit_by, uniq
 from spacy.lang.en.stop_words import STOP_WORDS
-from scispacy.candidate_generation import (
-    CandidateGenerator,
-    MentionCandidate,
-)
+from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
+from scispacy.linking_utils import Entity as ScispacyEntity
 
 from core.ner.types import CanonicalEntity
 from utils.string import generate_ngram_phrases
@@ -32,6 +30,32 @@ CANONICAL_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
 }
 
+# a bit too strong - protein will be preferred even if text is "XYZ gene"
+PREFFERED_TYPES = {
+    "T200": "Clinical Drug",
+    "T121": "Pharmacologic Substance",
+    "T116": "Amino Acid, Peptide, or Protein",
+    "T123": "Biologically Active Substance",
+    "T129": "Immunologic Factor",
+    "T085": "Molecular Sequence",
+    "T126": "Enzyme",
+    "T103": "Chemical",
+    "T120": "Chemical Viewed Functionally",
+    "T104": "Chemical Viewed Structurally",
+    "T088": "Carbohydrate Sequence",
+    "T047": "Disease or Syndrome",
+    "T048": "Mental or Behavioral Dysfunction",
+    "T049": "Cell or Molecular Dysfunction",
+    "T046": "Pathologic Function",
+    "T109": "Organic Chemical",
+    "T127": "Vitamin",
+    "T167": "Substance",
+    "T192": "Receptor",
+    # "T028": "Gene or Genome", # prefer protein over gene
+    # "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
+    # "T086": "Nucleotide Sequence",
+}
+
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
     """
@@ -41,7 +65,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(canonical_id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
 
     - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
-    - dedup same ids, e.g. Keratin fiber / Keratin fibre both C0010803|C0225326 - combine
     - potentially suppress some types as means to "this is not substantive"
         - T077 residue, means, cure
         - T090 (occupation) Technology, engineering, Magnetic <?>
@@ -86,9 +109,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         ngrams = generate_ngram_phrases(words, n)
         return ngrams
 
-    @classmethod
     def get_best_candidate(
-        cls, candidates: Sequence[MentionCandidate], min_similarity: float
+        self, candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
         Finds the best candidate
@@ -96,14 +118,24 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         - Sufficient similarity
         - Not suppressed
         """
+
+        def sorter(c: MentionCandidate):
+            types = set(self.kb.cui_to_entity[c.concept_id].types)
+
+            # sort non-preferred-types to the bottom
+            if not types.intersection(PREFFERED_TYPES.keys()):
+                return self.min_similarity
+
+            return c.similarities[0]
+
         ok_candidates = sorted(
             [
                 c
                 for c in candidates
-                if c.similarities[0] >= min_similarity
+                if c.similarities[0] >= self.min_similarity
                 and c.concept_id not in CUI_SUPPRESSIONS
             ],
-            key=lambda c: c.similarities[0],
+            key=sorter,
             reverse=True,
         )
 
@@ -112,7 +144,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     def _create_composite_name(self, candidates: Sequence[MentionCandidate]) -> str:
         """
         Create a composite name from a list of candidates
-        (all canonical names, concatted)
+
+        TODO: use tfidf index
         """
 
         def get_name(c):
@@ -120,7 +153,24 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 return CANONICAL_NAME_OVERRIDES[c.concept_id]
 
             if c.concept_id in self.kb.cui_to_entity:
-                return self.kb.cui_to_entity[c.concept_id].canonical_name
+                ce = self.kb.cui_to_entity[c.concept_id]
+
+                def name_sorter(a: str) -> int:
+                    # prefer shorter aliases that start with the same word/letter as the canonical name
+                    # e.g. TNFSF11 for "TNFSF11 protein, human"
+                    ent_words = ce.canonical_name.split(" ")
+                    return (
+                        len(a)
+                        + (5 if a.split(" ")[0] != ent_words[0] else 0)
+                        + (20 if a[0] != ce.canonical_name[0] else 0)
+                    )
+
+                # if 1-2 words or no aliases, prefer canonical name
+                if len(ce.canonical_name.split(" ")) <= 2 or len(c.aliases) == 0:
+                    return ce.canonical_name
+
+                aliases = sorted(ce.aliases, key=name_sorter)
+                return aliases[0]
 
             return c.aliases[0]
 
@@ -212,7 +262,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         # create a map of ngrams to (acceptable) candidates
         ngram_candidate_map: dict[str, MentionCandidate] = omit_by(
             {
-                ngram: self.get_best_candidate(candidate_set, self.min_similarity)
+                ngram: self.get_best_candidate(candidate_set)
                 for ngram, candidate_set in zip(matchless_ngrams, matchless_candidates)
             },
             lambda v: v is None,
@@ -235,13 +285,13 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         Args:
             candidates (Sequence[MentionCandidate]): candidates
         """
-        top_candidate = self.get_best_candidate(candidates, self.min_similarity)
+        top_candidate = self.get_best_candidate(candidates)
 
         if top_candidate is None:
             return None
 
         # go to kb to get canonical name
-        entity = self.kb.cui_to_entity[candidates[0].concept_id]
+        entity = self.kb.cui_to_entity[top_candidate.concept_id]
 
         return CanonicalEntity(
             id=entity.concept_id,
