@@ -23,6 +23,7 @@ CUI_SUPPRESSIONS = {
     "C0439097": "greek letter delta",
     "C1552644": "greek letter gamma",
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
+    "C0332281": "Associated with",
 }
 
 # TODO: maybe choose NCI as canonical name

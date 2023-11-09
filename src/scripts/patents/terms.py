@@ -140,7 +140,7 @@ class TermAssembler:
         """
         # depends upon canonical_id always being in the same order
         grouped_terms = group_by(
-            [{**t.__dict__, "key": t["canonical_id"] or t["term"]} for t in terms],
+            [{**t, "key": t["canonical_id"] or t["term"]} for t in terms],  # type: ignore
             "key",
         )
 
@@ -155,7 +155,7 @@ class TermAssembler:
                 "synonyms": dedup([row["original_term"] for row in group]),
             }
 
-        agg_terms = [__get_term_record(group) for _, group in grouped_terms]
+        agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
         return agg_terms
 
     def generate_owner_terms(self) -> list[AggregatedTermRecord]:
@@ -286,13 +286,11 @@ class TermAssembler:
         save_json_as_file(terms, TERMS_FILE)
         return terms
 
-    def persist_terms(
-        self, existing_terms: Optional[list[AggregatedTermRecord]] = None
-    ):
+    def persist_terms(self):
         """
-        Persists terms to a table
+        Persists terms (TERMS_FILE) to a table
         """
-        terms = existing_terms or load_json_from_file(TERMS_FILE)
+        terms = load_json_from_file(TERMS_FILE)
 
         schema = {
             "term": "TEXT",
