@@ -24,6 +24,7 @@ CUI_SUPPRESSIONS = {
     "C1552644": "greek letter gamma",
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
     "C0332281": "Associated with",
+    "C0205263": "Induce (action)",
 }
 
 # TODO: maybe choose NCI as canonical name
@@ -113,14 +114,17 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         Create a composite name from a list of candidates
         (all canonical names, concatted)
         """
-        return " ".join(
-            [
-                self.kb.cui_to_entity[c.concept_id].canonical_name
-                if c.concept_id in self.kb.cui_to_entity
-                else c.aliases[0]
-                for c in candidates
-            ]
-        )
+
+        def get_name(c):
+            if c.concept_id in CANONICAL_NAME_OVERRIDES:
+                return CANONICAL_NAME_OVERRIDES[c.concept_id]
+
+            if c.concept_id in self.kb.cui_to_entity:
+                return self.kb.cui_to_entity[c.concept_id].canonical_name
+
+            return c.aliases[0]
+
+        return " ".join([get_name(c) for c in candidates])
 
     def _generate_composite(
         self,
