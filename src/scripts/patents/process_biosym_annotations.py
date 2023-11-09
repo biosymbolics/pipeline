@@ -255,6 +255,8 @@ def fix_unmatched():
 
     logger.info("Fixing unmatched parens")
 
+    # bis(thio-hydrazide amides"
+
     def get_query(field, char_set):
         sql = f"""
             UPDATE {WORKING_TABLE} ab
