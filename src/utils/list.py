@@ -3,9 +3,9 @@ Utils for lists/arrays
 """
 
 
-from typing import Mapping, Sequence, Type, TypeVar, cast
+from typing import Callable, Mapping, Sequence, Type, TypeVar, cast
 import numpy as np
-from pydash import compact
+from pydash import compact, group_by
 import polars as pl
 
 T = TypeVar("T")

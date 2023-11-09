@@ -1,11 +1,10 @@
 """
 Functions to initialize the terms and synonym tables
 """
-from itertools import groupby
 import sys
 from typing import Optional, TypedDict
 import logging
-from pydash import flatten
+from pydash import flatten, group_by
 
 import system
 
@@ -29,18 +28,17 @@ class BaseTermRecord(TypedDict):
     term: str
     count: int
     canonical_id: Optional[str]
+    canonical_ids: Optional[list[str]]
 
 
 class TermRecord(BaseTermRecord):
     domain: str
-    original_id: Optional[str]
     original_term: Optional[str]
 
 
 class AggregatedTermRecord(BaseTermRecord):
     domains: list[str]
     synonyms: list[str]
-    synonym_ids: list[str]
 
 
 SYNONYM_TABLE_NAME = "synonym_map"
@@ -140,9 +138,11 @@ class TermAssembler:
         """
         Aggregates terms by term and canonical id
         """
-        # sort required for groupby
-        sorted_terms = sorted(terms, key=lambda row: row["term"])
-        grouped_terms = groupby(sorted_terms, key=lambda row: row["term"])
+        # depends upon canonical_id always being in the same order
+        grouped_terms = group_by(
+            [{**t.__dict__, "key": t["canonical_id"] or t["term"]} for t in terms],
+            "key",
+        )
 
         def __get_term_record(_group) -> AggregatedTermRecord:
             group = list(_group)
@@ -150,9 +150,9 @@ class TermAssembler:
                 "term": group[0]["term"],
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
+                "canonical_ids": group[0].get("canonical_ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
                 "synonyms": dedup([row["original_term"] for row in group]),
-                "synonym_ids": dedup([row.get("original_id") for row in group]),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms]
@@ -212,8 +212,8 @@ class TermAssembler:
                 "count": row["count"] or 0,
                 "domain": row["domain"],
                 "canonical_id": None,
+                "canonical_ids": [],
                 "original_term": row["name"],
-                "original_id": None,
             }
             for row, owner in zip(rows, owners)
             if len(owner) > 0
@@ -257,9 +257,11 @@ class TermAssembler:
                 "canonical_id": getattr(
                     normalization_map.get(row["term"]) or (), "id", None
                 ),
+                "canonical_ids": getattr(
+                    normalization_map.get(row["term"]) or (), "ids", None
+                ),
                 "domain": row["domain"],
                 "original_term": row["term"],
-                "original_id": None,
             }
             for row in rows
         ]
@@ -295,10 +297,10 @@ class TermAssembler:
         schema = {
             "term": "TEXT",
             "canonical_id": "TEXT",
+            "canonical_ids": "TEXT[]",
             "count": "INTEGER",
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
-            "synonym_ids": "TEXT[]",
             "text_search": "tsvector",
         }
         self.client.create_and_insert(
