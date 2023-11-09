@@ -247,7 +247,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "α,ω-dihalogen substituted alkane",
-                "expected": "α, omega dihalogen substituted alkane",  # TODO
+                "expected": "alpha, omega dihalogen substituted alkane",  # TODO ?
             },
             {
                 "input": "aβ42",

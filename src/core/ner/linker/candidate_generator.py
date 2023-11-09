@@ -23,15 +23,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
     Look up in UMLS here and use 'type' for standard ordering on composite candidate names (e.g. gene first)
     select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(canonical_id, '\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
-    - Grabby
-      - Antibodies too grabby, e.g. "antibody against c5"
-      - Antibodies, Anti-Idiotypic -> anti- αβ42 antibody, anti-tnfalpha antibody
-      - Antagonist muscle action -> ανβ3 receptor antagonists etc
 
-    - Wrong
-      - C1413336 / CEL gene - matches cell!!
-      - Emitter COIL - COIL gene
-      - FLAME gene
+    - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
     - not first alias (https://uts.nlm.nih.gov/uts/umls/concept/C0127400)
     - dedup same ids, e.g. Keratin fiber / Keratin fibre both C0010803|C0225326 - combine
     - potentially suppress some types
@@ -73,6 +66,18 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         ngrams = generate_ngram_phrases(words, n)
         return ngrams
+
+    @classmethod
+    def is_ok_candidate(
+        cls, candidates: Sequence[MentionCandidate], min_similarity: float
+    ) -> bool:
+        # k = 1 so each should have only 1 entry anyway
+        return (
+            len(candidates) > 0
+            and len(candidates[0].similarities) > 0
+            and candidates[0].similarities[0] > min_similarity
+            and candidates[0].concept_id not in CUI_SUPPRESSIONS
+        )
 
     @classmethod
     def _generate_composite(
@@ -150,15 +155,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             min_similarity (float): minimum similarity to consider a match
         """
 
-        def is_acceptable_candidate(candidates: Sequence[MentionCandidate]) -> bool:
-            # k = 1 so each should have only 1 entry anyway
-            return (
-                len(candidates) > 0
-                and len(candidates[0].similarities) > 0
-                and candidates[0].similarities[0] > min_similarity
-                and candidates[0].concept_id not in CUI_SUPPRESSIONS
-            )
-
         # 1grams and 2grams
         matchless_ngrams = uniq(
             flatten(
@@ -174,7 +170,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         ngram_candidate_map = {
             ngram: candidate[0]
             for ngram, candidate in zip(matchless_ngrams, matchless_candidates)
-            if is_acceptable_candidate(candidate)
+            if self.is_ok_candidate(candidate, min_similarity)
         }
         composite_matches = {
             mention_text: self._generate_composite(mention_text, ngram_candidate_map)
@@ -197,12 +193,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             for mention_text, candidate in zip(mention_texts, candidates)
         }
 
-        def has_match(candidates: Sequence[MentionCandidate]) -> bool:
-            return (
-                len(candidates) > 0
-                and candidates[0].similarities[0] > self.min_similarity
-            )
-
         # combine composite matches such that they override the original matches
         all_matches = {
             **matches,
@@ -210,7 +200,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 [
                     mention_text
                     for mention_text in mention_texts
-                    if not has_match(matches[mention_text])
+                    if not self.is_ok_candidate(
+                        matches[mention_text], self.min_similarity
+                    )
                 ],
                 min_similarity=self.min_similarity,
             ),
