@@ -28,7 +28,7 @@ class TermLinker:
     Example:
         >>> linker = TermLinker()
         >>> linker(["DNMT1", "DNMT1 inhibitor"])
-        linker(["DNMT1 protein synthase inhibitor"])
+        >>> linker(["DNMT1 protein synthase inhibitor"])
     """
 
     def __init__(self, min_similarity: float = MIN_SIMILARITY):

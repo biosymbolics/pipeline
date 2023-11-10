@@ -51,7 +51,9 @@ def __create_annotations_table():
                     'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
-                    1 as character_offset_end
+                    1 as character_offset_end,
+                    '' as instance_ancestor,
+                    '' as category_ancestor
                 FROM applications a,
                 unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
@@ -65,7 +67,9 @@ def __create_annotations_table():
                     'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
-                    1 as character_offset_end
+                    1 as character_offset_end,
+                    '' as instance_ancestor,
+                    '' as category_ancestor
                 FROM applications a,
                 unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -79,7 +83,9 @@ def __create_annotations_table():
                     domain,
                     source,
                     character_offset_start,
-                    character_offset_end
+                    character_offset_end,
+                    '' as instance_ancestor,
+                    '' as category_ancestor
                     FROM (
                         SELECT
                             *,
@@ -104,8 +110,8 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     character_offset_end,
-                    instance_term, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
-                    category_term, -- min category term (i.e. the closest ancestor considered to be a category)
+                    t.instance_ancestor as instance_ancestor,
+                    t.category_ancestor as category_ancestor,
                     FROM (
                         SELECT
                             *,
@@ -119,7 +125,6 @@ def __create_annotations_table():
                         FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
                         LEFT JOIN terms t on map.term = t.term
-                        LEFT JOIN umls_lookup umls on umls.id = ANY(t.ids)
                         WHERE length(ba.term) > 0
                     ) s
                     WHERE rn = 1
@@ -130,7 +135,9 @@ def __create_annotations_table():
             domain,
             source,
             character_offset_start,
-            character_offset_end
+            character_offset_end,
+            instance_ancestor, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
+            category_ancestor -- min category term (i.e. the closest ancestor considered to be a category)
         FROM terms
         ORDER BY character_offset_start
     """
@@ -145,7 +152,9 @@ def __create_annotations_table():
                 domain,
                 source,
                 character_offset_start,
-                character_offset_end
+                character_offset_end,
+                '' as instance_ancestor,
+                '' as category_ancestor
             from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
             where domain='attributes'
         """,

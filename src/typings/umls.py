@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import re
 from typing import TypedDict
 
@@ -35,7 +36,11 @@ INSTANCE_TYPE_IDS = {
 }
 
 
-class UmlsRecord(TypedDict):
+@dataclass(frozen=True)
+class UmlsRecord:
+    def __getitem__(self, item):
+        return getattr(self, item)
+
     id: str
     canonical_name: str
     num_descendants: int
@@ -110,3 +115,10 @@ class OntologyLevel(ByDefinitionOrderEnum):
             return cls.INSTANCE
 
         return cls.CATEGORY
+
+
+@dataclass(frozen=True)
+class UmlsLookupRecord(UmlsRecord):
+    level: OntologyLevel
+    instance_ancestor: str | None
+    category_ancestor: str | None

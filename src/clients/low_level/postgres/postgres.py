@@ -8,7 +8,12 @@ import psycopg
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 
-from clients.low_level.database import DatabaseClient, ExecuteResult, M
+from clients.low_level.database import (
+    DatabaseClient,
+    ExecuteResult,
+    M,
+    TransformFunction,
+)
 from constants.core import BASE_DATABASE_URL, DATABASE_URL
 from typings.core import is_string_list
 from utils.classes import overrides, nonoverride
@@ -280,7 +285,7 @@ class PsqlDatabaseClient(DatabaseClient):
         dest_db: str,
         dest_table_name: str,
         truncate_if_exists: bool = True,
-        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
+        transform: TransformFunction | None = None,
         transform_schema: Callable[[dict], dict] | None = None,
     ):
         """
@@ -313,5 +318,5 @@ class PsqlDatabaseClient(DatabaseClient):
             dest_table_name,
             schema,
             truncate_if_exists=truncate_if_exists,
-            transform=transform,  # type: ignore
+            transform=transform,
         )

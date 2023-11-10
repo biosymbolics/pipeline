@@ -187,7 +187,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
+        transform=lambda batch, _: transform_ct_records(batch, tagger),
     )
 
     client = PsqlDatabaseClient()

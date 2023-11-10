@@ -157,7 +157,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 for c in candidates
                 if c.similarities[0] >= self.min_similarity
                 and c.concept_id not in CANDIDATE_CUI_SUPPRESSIONS
-                and has_intersection(
+                and not has_intersection(
                     CANDIDATE_NAME_SUPPRESSIONS,
                     self.kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
                 )

@@ -2,10 +2,9 @@
 Functions to initialize the terms and synonym tables
 """
 import sys
-from typing import Optional, Sequence, TypedDict
+from typing import Sequence
 import logging
-from pydash import compact, flatten, group_by
-from core.ner.utils import lemmatize_tails
+from pydash import flatten, group_by
 
 import system
 
@@ -14,113 +13,18 @@ system.initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
 from core.ner import TermNormalizer
+from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .constants import SYNONYM_MAP
+from .constants import SYNONYM_MAP, TERMS_FILE, TERMS_TABLE
 from .process_biosym_annotations import populate_working_biosym_annotations
+from .synonyms import SynonymMapper
+from .types import AggregatedTermRecord, Ancestors, TermRecord
 from .utils import clean_owners
 
-TERMS_FILE = "terms.json"
-TERMS_TABLE = "terms"
+
 MIN_CANONICAL_NAME_COUNT = 5
-
-
-class BaseTermRecord(TypedDict):
-    term: str
-    count: int
-    id: Optional[str]
-    ids: Optional[list[str]]
-
-
-class TermRecord(BaseTermRecord):
-    domain: str
-    original_term: Optional[str]
-
-
-class AggregatedTermRecord(BaseTermRecord):
-    domains: list[str]
-    synonyms: list[str]
-
-
-SYNONYM_TABLE_NAME = "synonym_map"
-
-
-class SynonymMapper:
-    """
-    Static class for synonym mapping functions
-    """
-
-    def __init__(self, synonym_map: dict[str, str]):
-        """
-        Create a table of synonyms
-
-        Args:
-            synonym_map: a map of synonyms to canonical names
-        """
-        self.client = PsqlDatabaseClient()
-
-        logging.info("Creating synonym map (truncating if exists)")
-        self.client.create_table(
-            SYNONYM_TABLE_NAME,
-            {"synonym": "TEXT", "term": "TEXT"},
-            exists_ok=True,
-            truncate_if_exists=True,
-        )
-
-        logging.info("Adding default/hard-coded synonym map entries")
-        self.add_map(synonym_map)
-
-    def add_synonyms(
-        self,
-        existing_terms: Optional[list[AggregatedTermRecord]] = None,
-    ):
-        """
-        Add synonym records based on terms, i.e. records with { term: "foo", synonyms: ["bar", "baz"] }
-
-        Args:
-            existing_terms: a list of terms to use as the basis for synonyms.
-                If not provided, terms will be loaded from file (TERMS_FILE/terms.json)
-        """
-        terms = existing_terms or load_json_from_file(TERMS_FILE)
-
-        # Persist term -> synonyms as synonyms
-        synonym_map = {
-            og_term: row["term"]
-            for row in terms
-            for og_term in row["synonyms"]
-            if len(row["term"]) > 1
-        }
-
-        logging.info("Adding %s terms to synonym map", len(synonym_map))
-
-        self.add_map(synonym_map)
-
-    def add_map(self, synonym_map: dict[str, str]):
-        """
-        Add common entity names to the synonym map, taking in a map of form {synonym: term}
-
-        Args:
-            synonym_map: a map of synonyms to canonical names
-        """
-        records = [
-            {
-                "synonym": entry[0].lower(),
-                "term": entry[1].lower(),
-            }
-            for entry in synonym_map.items()
-            if len(entry[0]) > 0 and entry[0] != entry[1]
-        ]
-
-        self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
-        logging.info(
-            "Inserted %s rows into synonym_map (%s)",
-            len(records),
-            len(list(synonym_map.keys())),
-        )
-
-    def index(self):
-        self.client.create_index({"table": "synonym_map", "column": "synonym"})
 
 
 class TermAssembler:
@@ -134,6 +38,16 @@ class TermAssembler:
 
     def __init__(self):
         self.client = PsqlDatabaseClient()
+        self.canonical_map = self.load_canonical()
+
+    def load_canonical(self) -> dict:
+        """
+        Load some UMLs data for canonical names
+        """
+        canonical_records = self.client.select(
+            "select id, canonical_name, instance_ancestor, category_ancestor from umls_lookup"
+        )
+        return {row["id"]: row for row in canonical_records}
 
     @staticmethod
     def _get_canonical_name(term_records: Sequence[TermRecord]) -> str:
@@ -166,9 +80,10 @@ class TermAssembler:
         )
 
         def __get_term_record(group: Sequence[TermRecord]) -> AggregatedTermRecord:
-            canonical_term = TermAssembler._get_canonical_name(group)
+            canonical_name = TermAssembler._get_canonical_name(group)
+            print(canonical_name, group[0].get("id"), group[0].get("ids"))
             return {
-                "term": canonical_term,
+                "term": canonical_name,
                 "count": sum(row["count"] for row in group),
                 "id": group[0].get("id") or "",
                 "ids": group[0].get("ids") or [],
@@ -259,19 +174,20 @@ class TermAssembler:
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
                 where length(original_term) > 0
                 group by lower(original_term), domain
+                limit 1000
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
 
         logging.info("Normalizing/linking %s terms", len(rows))
         normalizer = TermNormalizer()
-        normalization_map = dict(normalizer.normalize(terms))
+        norm_map = dict(normalizer.normalize(terms))
         logging.info("Finished creating normalization_map")
 
         def __normalize(term: str, domain: str) -> str:
             if domain == "attributes":
                 return term  # leave attributes alone
-            entry = normalization_map.get(term)
+            entry = norm_map.get(term)
             if not entry:
                 return SYNONYM_MAP.get(term) or term
             return entry.name
@@ -280,8 +196,8 @@ class TermAssembler:
             {
                 "term": __normalize(row["term"], row["domain"]),
                 "count": row["count"] or 0,
-                "id": getattr(normalization_map.get(row["term"]) or (), "id", None),
-                "ids": getattr(normalization_map.get(row["term"]) or (), "ids", None),
+                "id": getattr(norm_map.get(row["term"]) or (), "id", None),
+                "ids": getattr(norm_map.get(row["term"]) or (), "ids", None),
                 "domain": row["domain"],
                 "original_term": row["term"],
             }
@@ -309,6 +225,34 @@ class TermAssembler:
         save_json_as_file(terms, TERMS_FILE)
         return terms
 
+    def get_ancestors(self, record: AggregatedTermRecord) -> Ancestors | dict:
+        """
+        Get ancestor names for record (used for aggregation)
+        """
+        if record["ids"] is None or len(record["ids"]) < 1:
+            return {}
+
+        def get_ancestor_name(ids: Sequence[str], type_name: str) -> str | None:
+            ancestor_ids = [
+                self.canonical_map.get(i, {}).get(f"{type_name}_ancestor") for i in ids
+            ]
+            names = [self.canonical_map[ai]["canonical_name"] for ai in ancestor_ids]
+            if len(names) > 0:
+                return names[0]
+            return None
+
+        print(
+            "GOT SOME ANCESTORS?",
+            {
+                "instance_ancestor": get_ancestor_name(record["ids"], "instance"),
+                "category_ancestor": get_ancestor_name(record["ids"], "category"),
+            },
+        )
+        return {
+            "instance_ancestor": get_ancestor_name(record["ids"], "instance"),
+            "category_ancestor": get_ancestor_name(record["ids"], "category"),
+        }
+
     def persist_terms(self):
         """
         Persists terms (TERMS_FILE) to a table
@@ -323,9 +267,15 @@ class TermAssembler:
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
             "text_search": "tsvector",
+            "instance_ancestor": "TEXT",
+            "category_ancestor": "TEXT",
         }
         self.client.create_and_insert(
-            terms, TERMS_TABLE, schema, truncate_if_exists=True
+            terms,
+            TERMS_TABLE,
+            schema,
+            truncate_if_exists=True,
+            transform=lambda batch, _: [{**r, **self.get_ancestors(r)} for r in batch],
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
 
