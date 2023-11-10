@@ -72,23 +72,40 @@ class OntologyLevel(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def find(cls, record: UmlsRecord, ancestor_ids: list[str]):
+    def find_by_record(cls, record: UmlsRecord, ancestor_ids: list[str]):
+        return cls.find(
+            record["canonical_name"],
+            record["type_id"],
+            record["type_name"],
+            record["num_descendants"],
+            ancestor_ids,
+        )
+
+    @classmethod
+    def find(
+        cls,
+        canonical_name: str,
+        type_id: str,
+        type_name: str,
+        num_descendants: int,
+        ancestor_ids: list[str],
+    ):
         """
         Simple heuristic to find approximate semantic level of UMLS record
         TODO: make this a model
         """
         if (
-            record["type_id"] in GENERAL_CATEGORY_TYPE_IDS.keys()
-            or re.search(GENERAL_CATEGORY_RE, record["canonical_name"]) is not None
-            or is_name_semantic_type(record["canonical_name"], record["type_name"])
-            or record["num_descendants"] >= THRESHOLD_COUNT_FOR_CATEGORY
+            type_id in GENERAL_CATEGORY_TYPE_IDS.keys()
+            or re.search(GENERAL_CATEGORY_RE, canonical_name) is not None
+            or is_name_semantic_type(canonical_name, type_name)
+            or num_descendants >= THRESHOLD_COUNT_FOR_CATEGORY
         ):
             return cls.GENERAL_CATEGORY
 
         if (
             len(ancestor_ids) == 0
-            or record["num_descendants"] <= THRESHOLD_COUNT_FOR_INSTANCE
-            or record["type_id"] in INSTANCE_TYPE_IDS.keys()
+            or num_descendants <= THRESHOLD_COUNT_FOR_INSTANCE
+            or type_id in INSTANCE_TYPE_IDS.keys()
         ):
             return cls.INSTANCE
 
