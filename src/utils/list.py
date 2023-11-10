@@ -3,7 +3,7 @@ Utils for lists/arrays
 """
 
 
-from typing import Mapping, Sequence, TypeVar, cast
+from typing import Iterable, Mapping, Sequence, TypeVar, cast
 import numpy as np
 from pydash import compact
 import polars as pl
@@ -25,7 +25,7 @@ def diff_lists(list_one: Sequence[T], list_two: Sequence[T]) -> list[T]:
     return dropped
 
 
-def dedup(a_list: Sequence[T]) -> list[T]:
+def dedup(a_list: Sequence[T] | Iterable[T]) -> list[T]:
     """
     Returns a list with duplicate (and falsey) values removed
 

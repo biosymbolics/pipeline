@@ -4,7 +4,8 @@ Functions to initialize the terms and synonym tables
 import sys
 from typing import Optional, Sequence, TypedDict
 import logging
-from pydash import flatten, group_by
+from pydash import compact, flatten, group_by
+from core.ner.utils import lemmatize_tails
 
 import system
 
@@ -154,9 +155,9 @@ class TermAssembler:
         )
 
     @staticmethod
-    def __aggregate(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
+    def __group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
         """
-        Dedups/aggregates terms by canonical_id and term
+        Dedups/groups terms by canonical_id and term
         """
         # depends upon canonical_id always being in the same order (enforced elsewhere)
         grouped_terms: dict[str, Sequence[TermRecord]] = group_by(
@@ -172,7 +173,13 @@ class TermAssembler:
                 "canonical_id": group[0].get("canonical_id") or "",
                 "canonical_ids": group[0].get("canonical_ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
-                "synonyms": dedup([row["original_term"] or "" for row in group]),
+                # lemmatize tails for less duplication. todo: lemmatize all?
+                # 2x duplication for perf
+                "synonyms": dedup(
+                    lemmatize_tails(
+                        dedup([row["original_term"] or "" for row in group])
+                    )
+                ),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
@@ -239,7 +246,7 @@ class TermAssembler:
             if len(owner) > 0
         ]
 
-        terms = TermAssembler.__aggregate(normalized)
+        terms = TermAssembler.__group_terms(normalized)
         return terms
 
     def generate_entity_terms(self) -> list[AggregatedTermRecord]:
@@ -259,7 +266,6 @@ class TermAssembler:
         logging.info("Normalizing/linking %s terms", len(rows))
         normalizer = TermNormalizer()
         normalization_map = dict(normalizer.normalize(terms))
-
         logging.info("Finished creating normalization_map")
 
         def __normalize(term: str, domain: str) -> str:
@@ -286,7 +292,7 @@ class TermAssembler:
             for row in rows
         ]
 
-        return TermAssembler.__aggregate(term_records)
+        return TermAssembler.__group_terms(term_records)
 
     def generate_terms(self) -> list[AggregatedTermRecord]:
         """
@@ -303,6 +309,7 @@ class TermAssembler:
 
         terms = assignee_terms + entity_terms
 
+        # persisting to json (easy to replay if it borks on db ingest)
         save_json_as_file(terms, TERMS_FILE)
         return terms
 
@@ -337,13 +344,25 @@ class TermAssembler:
             """
         )
 
-        self.client.create_index(
-            {
-                "table": TERMS_TABLE,
-                "column": "text_search",
-                "is_gin": True,
-                "is_lower": False,
-            },
+        self.client.create_indices(
+            [
+                {
+                    "table": TERMS_TABLE,
+                    "column": "canonical_id",
+                },
+                {
+                    "table": TERMS_TABLE,
+                    "column": "canonical_ids",
+                    "is_gin": True,
+                    "is_lower": False,
+                },
+                {
+                    "table": TERMS_TABLE,
+                    "column": "text_search",
+                    "is_gin": True,
+                    "is_lower": False,
+                },
+            ]
         )
 
     def generate_and_persist_terms(self):
