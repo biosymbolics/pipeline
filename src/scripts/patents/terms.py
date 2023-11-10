@@ -2,7 +2,7 @@
 Functions to initialize the terms and synonym tables
 """
 import sys
-from typing import Optional, TypedDict
+from typing import Optional, Sequence, TypedDict
 import logging
 from pydash import flatten, group_by
 
@@ -22,6 +22,7 @@ from .utils import clean_owners
 
 TERMS_FILE = "terms.json"
 TERMS_TABLE = "terms"
+MIN_CANONICAL_NAME_COUNT = 5
 
 
 class BaseTermRecord(TypedDict):
@@ -134,25 +135,44 @@ class TermAssembler:
         self.client = PsqlDatabaseClient()
 
     @staticmethod
+    def _get_canonical_name(term_records: Sequence[TermRecord]) -> str:
+        """
+        Get canonical name from a list of term records
+
+        Uses the most common "original_term" if used with sufficiently high frequency,
+        and otherwise uses the "canonical_term" (which is often a mangled composite of UMLS terms)
+        """
+        synonyms = sorted(
+            group_by(term_records, "original_term").items(),
+            key=lambda x: len(x[1]),
+            reverse=True,
+        )
+        return (
+            synonyms[0][0]
+            if len(synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT
+            else term_records[0]["term"]
+        )
+
+    @staticmethod
     def __aggregate(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
         """
-        Aggregates terms by term and canonical id
+        Dedups/aggregates terms by canonical_id and term
         """
-        # depends upon canonical_id always being in the same order
-        grouped_terms = group_by(
+        # depends upon canonical_id always being in the same order (enforced elsewhere)
+        grouped_terms: dict[str, Sequence[TermRecord]] = group_by(
             [{**t, "key": t["canonical_id"] or t["term"]} for t in terms],  # type: ignore
             "key",
         )
 
-        def __get_term_record(_group) -> AggregatedTermRecord:
-            group = list(_group)
+        def __get_term_record(group: Sequence[TermRecord]) -> AggregatedTermRecord:
+            canonical_term = TermAssembler._get_canonical_name(group)
             return {
-                "term": group[0]["term"],
+                "term": canonical_term,
                 "count": sum(row["count"] for row in group),
                 "canonical_id": group[0].get("canonical_id") or "",
                 "canonical_ids": group[0].get("canonical_ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
-                "synonyms": dedup([row["original_term"] for row in group]),
+                "synonyms": dedup([row["original_term"] or "" for row in group]),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]

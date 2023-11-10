@@ -4,6 +4,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
+from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
 
 
@@ -145,7 +146,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             types = set(self.kb.cui_to_entity[c.concept_id].types)
 
             # sort non-preferred-types to the bottom
-            if not types.intersection(PREFFERED_TYPES.keys()):
+            if not has_intersection(types, list(PREFFERED_TYPES.keys())):
                 return self.min_similarity
 
             return c.similarities[0]
@@ -156,8 +157,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 for c in candidates
                 if c.similarities[0] >= self.min_similarity
                 and c.concept_id not in CANDIDATE_CUI_SUPPRESSIONS
-                and not CANDIDATE_NAME_SUPPRESSIONS.intersection(
-                    self.kb.cui_to_entity[c.concept_id].canonical_name.split(" ")
+                and has_intersection(
+                    CANDIDATE_NAME_SUPPRESSIONS,
+                    self.kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
                 )
             ],
             key=sorter,
