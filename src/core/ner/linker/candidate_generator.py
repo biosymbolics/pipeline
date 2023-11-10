@@ -144,8 +144,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     def _create_composite_name(self, candidates: Sequence[MentionCandidate]) -> str:
         """
         Create a composite name from a list of candidates
-
-        TODO: use tfidf index
         """
 
         def get_name(c):
@@ -158,6 +156,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 def name_sorter(a: str) -> int:
                     # prefer shorter aliases that start with the same word/letter as the canonical name
                     # e.g. TNFSF11 for "TNFSF11 protein, human"
+                    # todo: use something like tfidf
                     ent_words = ce.canonical_name.split(" ")
                     return (
                         len(a)
@@ -166,7 +165,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     )
 
                 # if 1-2 words or no aliases, prefer canonical name
-                if len(ce.canonical_name.split(" ")) <= 2 or len(c.aliases) == 0:
+                if len(ce.canonical_name.split(" ")) <= 2 or len(ce.aliases) == 0:
                     return ce.canonical_name
 
                 aliases = sorted(ce.aliases, key=name_sorter)

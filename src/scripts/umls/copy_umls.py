@@ -3,7 +3,7 @@ Utils for ETLing UMLs data
 """
 import sys
 import logging
-from typing import Sequence, TypeGuard, TypedDict
+from typing import Any, Sequence, TypeGuard
 
 from system import initialize
 
@@ -11,18 +11,13 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from typings.umls import OntologyLevel, UmlsRecord
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
 MAX_DENORMALIZED_ANCESTORS = 10
-
-
-class UmlsRecord(TypedDict):
-    id: str
-    canonical_name: str
-    hierarchy: str | None
 
 
 def is_umls_record_list(
@@ -38,31 +33,35 @@ def is_umls_record_list(
         and "id" in records[0]
         and "canonical_name" in records[0]
         and "hierarchy" in records[0]
+        and "type_id" in records[0]
+        and "type_name" in records[0]
+        and "level" in records[0]
     )
 
 
 def transform_umls_relationships(
     records: Sequence[dict], aui_lookup: dict[str, str]
-) -> list[dict[str, str | None]]:
+) -> list[dict[str, Any]]:
     """
     Transform umls relationship
     """
     if not is_umls_record_list(records):
         raise ValueError(f"Records are not UmlsRecords: {records[:10]}")
 
-    def parse_ancestor_ids(record: UmlsRecord) -> dict[str, str | None]:
+    def parse_ancestor_ids(record: UmlsRecord) -> dict[str, Any]:
         hier = record["hierarchy"]
         # reverse to get nearest ancestor first
         ancestors = (hier.split(".") if hier is not None else [])[::-1]
 
+        # TODO strip shouldn't be necessary
+        ancestor_cuis = [aui_lookup.get(aui, "").strip() for aui in ancestors]
+
         return {
             **record,  # type: ignore
+            "level": OntologyLevel.find(record, ancestor_cuis),
             **{f"l{i}_ancestor": None for i in range(MAX_DENORMALIZED_ANCESTORS)},
             **{
-                # TODO strip shouldn't be necessary
-                f"l{i}_ancestor": aui_lookup.get(ancestors[i], "").strip()
-                if i < len(ancestors)
-                else None
+                f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestors) else None
                 for i in range(MAX_DENORMALIZED_ANCESTORS)
             },
         }
@@ -89,9 +88,11 @@ def create_umls_lookup():
             -- {", ".join(ANCESTOR_FIELDS)},
             max(semantic_types.tui) as type_id,
             max(semantic_types.sty) as type_name,
-            count(*)
+            '' as level,
+            array_length(array_agg(descendants.cui), 1) as num_descendants
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
+        LEFT JOIN mrhier as descendants on descendants.cui = entities.cui
         JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
         where entities.lat='ENG' -- english
         AND entities.ts='P' -- preferred terms
