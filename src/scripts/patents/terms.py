@@ -29,8 +29,8 @@ MIN_CANONICAL_NAME_COUNT = 5
 class BaseTermRecord(TypedDict):
     term: str
     count: int
-    canonical_id: Optional[str]
-    canonical_ids: Optional[list[str]]
+    id: Optional[str]
+    ids: Optional[list[str]]
 
 
 class TermRecord(BaseTermRecord):
@@ -157,11 +157,11 @@ class TermAssembler:
     @staticmethod
     def __group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
         """
-        Dedups/groups terms by canonical_id and term
+        Dedups/groups terms by id and term
         """
-        # depends upon canonical_id always being in the same order (enforced elsewhere)
+        # depends upon id always being in the same order (enforced elsewhere)
         grouped_terms: dict[str, Sequence[TermRecord]] = group_by(
-            [{**t, "key": t["canonical_id"] or t["term"]} for t in terms],  # type: ignore
+            [{**t, "key": t["id"] or t["term"]} for t in terms],  # type: ignore
             "key",
         )
 
@@ -170,8 +170,8 @@ class TermAssembler:
             return {
                 "term": canonical_term,
                 "count": sum(row["count"] for row in group),
-                "canonical_id": group[0].get("canonical_id") or "",
-                "canonical_ids": group[0].get("canonical_ids") or [],
+                "id": group[0].get("id") or "",
+                "ids": group[0].get("ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
                 # lemmatize tails for less duplication. todo: lemmatize all?
                 # 2x duplication for perf
@@ -238,8 +238,8 @@ class TermAssembler:
                 "term": owner,
                 "count": row["count"] or 0,
                 "domain": row["domain"],
-                "canonical_id": None,
-                "canonical_ids": [],
+                "id": None,
+                "ids": [],
                 "original_term": row["name"],
             }
             for row, owner in zip(rows, owners)
@@ -280,12 +280,8 @@ class TermAssembler:
             {
                 "term": __normalize(row["term"], row["domain"]),
                 "count": row["count"] or 0,
-                "canonical_id": getattr(
-                    normalization_map.get(row["term"]) or (), "id", None
-                ),
-                "canonical_ids": getattr(
-                    normalization_map.get(row["term"]) or (), "ids", None
-                ),
+                "id": getattr(normalization_map.get(row["term"]) or (), "id", None),
+                "ids": getattr(normalization_map.get(row["term"]) or (), "ids", None),
                 "domain": row["domain"],
                 "original_term": row["term"],
             }
@@ -321,8 +317,8 @@ class TermAssembler:
 
         schema = {
             "term": "TEXT",
-            "canonical_id": "TEXT",
-            "canonical_ids": "TEXT[]",
+            "id": "TEXT",
+            "ids": "TEXT[]",
             "count": "INTEGER",
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
@@ -348,11 +344,11 @@ class TermAssembler:
             [
                 {
                     "table": TERMS_TABLE,
-                    "column": "canonical_id",
+                    "column": "id",
                 },
                 {
                     "table": TERMS_TABLE,
-                    "column": "canonical_ids",
+                    "column": "ids",
                     "is_gin": True,
                     "is_lower": False,
                 },

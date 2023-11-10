@@ -82,7 +82,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
 
     Look up in UMLS here and use 'type' for standard ordering on composite candidate names (e.g. gene first)
-    select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(canonical_id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
+    select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
 
     - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
     - potentially suppress some types as means to "this is not substantive"
