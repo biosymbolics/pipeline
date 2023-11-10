@@ -2,7 +2,6 @@ from typing import Mapping, Sequence
 from pydash import flatten, omit_by, uniq
 from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
-from scispacy.linking_utils import Entity as ScispacyEntity
 
 from core.ner.types import CanonicalEntity
 from utils.string import generate_ngram_phrases
@@ -12,7 +11,7 @@ MIN_WORD_LENGTH = 1
 NGRAMS_N = 2
 DEFAULT_K = 3  # mostly wanting to avoid suppressions. increase if adding a lot more suppressions.
 
-CUI_SUPPRESSIONS = {
+CANDIDATE_CUI_SUPPRESSIONS = {
     "C0432616": "Blood group antibody A",  # matches "anti", sigh
     "C1413336": "CEL gene",  # matches "cell"; TODO fix so this gene can match
     "C1413568": "COIL gene",  # matches "coil"
@@ -24,12 +23,22 @@ CUI_SUPPRESSIONS = {
     "C0332281": "Associated with",
     "C0205263": "Induce (action)",
     "C1709060": "Modulator device",
+    "C0179302": "Binder device",
 }
+
+# assumes closest matching alias would match the suppressed name (sketchy)
+CANDIDATE_NAME_SUPPRESSIONS = set(
+    [
+        ", rat",
+        ", mouse",
+    ]
+)
 
 # TODO: maybe choose NCI as canonical name
 CANONICAL_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
+    "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
 }
 
 # a bit too strong - protein will be preferred even if text is "XYZ gene"
@@ -62,6 +71,8 @@ PREFFERED_TYPES = {
 COMPOSITE_WORD_OVERRIDES = {
     "modulator": "C0005525",
     "modulators": "C0005525",
+    "binder": "C1145667",
+    "binders": "C1145667",
 }
 
 
@@ -118,7 +129,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         return ngrams
 
     def get_best_candidate(
-        self, candidates: Sequence[MentionCandidate], term: str | None = None
+        self, candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
         Finds the best candidate
@@ -128,16 +139,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         Args:
             candidates (Sequence[MentionCandidate]): candidates
-            term (str, Optional): term to override; to look for overrides
         """
-
-        # If term is provided AND has an override, use the override
-        if term is not None and term.lower() in COMPOSITE_WORD_OVERRIDES:
-            return MentionCandidate(
-                concept_id=COMPOSITE_WORD_OVERRIDES[term.lower()],
-                aliases=[term],
-                similarities=[1],
-            )
 
         def sorter(c: MentionCandidate):
             types = set(self.kb.cui_to_entity[c.concept_id].types)
@@ -153,13 +155,36 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 c
                 for c in candidates
                 if c.similarities[0] >= self.min_similarity
-                and c.concept_id not in CUI_SUPPRESSIONS
+                and c.concept_id not in CANDIDATE_CUI_SUPPRESSIONS
+                and not CANDIDATE_NAME_SUPPRESSIONS.intersection(
+                    self.kb.cui_to_entity[c.concept_id].canonical_name.split(" ")
+                )
             ],
             key=sorter,
             reverse=True,
         )
 
         return ok_candidates[0] if len(ok_candidates) > 0 else None
+
+    def _get_matches(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
+        """
+        Wrapper around super().__call__ that handles overrides
+        """
+        # look for any overrides (terms -> candidate)
+        override_indices = [
+            i for i, t in enumerate(texts) if t.lower() in COMPOSITE_WORD_OVERRIDES
+        ]
+        candidates = super().__call__(list(texts), k=DEFAULT_K)
+
+        for i in override_indices:
+            candidates[i] = [
+                MentionCandidate(
+                    concept_id=COMPOSITE_WORD_OVERRIDES[texts[i].lower()],
+                    aliases=[texts[i]],
+                    similarities=[1],
+                )
+            ]
+        return candidates
 
     def _create_composite_name(self, candidates: Sequence[MentionCandidate]) -> str:
         """
@@ -276,12 +301,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         )
 
         # get candidates from superclass
-        matchless_candidates = super().__call__(matchless_ngrams, k=DEFAULT_K)
+        matchless_candidates = self._get_matches(matchless_ngrams)
 
         # create a map of ngrams to (acceptable) candidates
         ngram_candidate_map: dict[str, MentionCandidate] = omit_by(
             {
-                ngram: self.get_best_candidate(candidate_set, ngram)
+                ngram: self.get_best_candidate(candidate_set)
                 for ngram, candidate_set in zip(matchless_ngrams, matchless_candidates)
             },
             lambda v: v is None,
@@ -327,7 +352,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = super().__call__(list(mention_texts), k=DEFAULT_K)
+        candidates = self._get_matches(mention_texts)
 
         matches = {
             mention_text: self._get_canonical(candidate_set)
