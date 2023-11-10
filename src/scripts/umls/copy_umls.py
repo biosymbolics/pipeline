@@ -85,14 +85,20 @@ def create_umls_lookup():
             entities.cui as id,
             max(entities.str) as canonical_name,
             max(ancestors.ptr) as hierarchy,
-            -- {", ".join(ANCESTOR_FIELDS)},
+            {", ".join(ANCESTOR_FIELDS)},
             max(semantic_types.tui) as type_id,
             max(semantic_types.sty) as type_name,
             '' as level,
-            array_length(array_agg(descendants.cui), 1) as num_descendants
+            max(descendants.count) as num_descendants
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
-        LEFT JOIN mrhier as descendants on descendants.cui = entities.cui
+        JOIN (
+            select cui1 as parent_cui, count(*) as count
+            from mrrel
+            where rel = 'RN' -- narrower
+            and rela is null -- no specified relationship
+            group by parent_cui
+        ) descendants ON descendants.parent_cui = entities.cui
         JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
         where entities.lat='ENG' -- english
         AND entities.ts='P' -- preferred terms

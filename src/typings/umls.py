@@ -38,7 +38,7 @@ INSTANCE_TYPE_IDS = {
 class UmlsRecord(TypedDict):
     id: str
     canonical_name: str
-    num_children: int
+    num_descendants: int
     hierarchy: str | None
     type_id: str
     type_name: str
@@ -81,13 +81,13 @@ class OntologyLevel(ByDefinitionOrderEnum):
             record["type_id"] in GENERAL_CATEGORY_TYPE_IDS.keys()
             or re.search(GENERAL_CATEGORY_RE, record["canonical_name"]) is not None
             or is_name_semantic_type(record["canonical_name"], record["type_name"])
-            or record["num_children"] >= THRESHOLD_COUNT_FOR_CATEGORY
+            or record["num_descendants"] >= THRESHOLD_COUNT_FOR_CATEGORY
         ):
             return cls.GENERAL_CATEGORY
 
         if (
             len(ancestor_ids) == 0
-            or record["num_children"] <= THRESHOLD_COUNT_FOR_INSTANCE
+            or record["num_descendants"] <= THRESHOLD_COUNT_FOR_INSTANCE
             or record["type_id"] in INSTANCE_TYPE_IDS.keys()
         ):
             return cls.INSTANCE
