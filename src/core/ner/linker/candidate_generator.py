@@ -23,11 +23,13 @@ CUI_SUPPRESSIONS = {
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
     "C0332281": "Associated with",
     "C0205263": "Induce (action)",
+    "C1709060": "Modulator device",
 }
 
 # TODO: maybe choose NCI as canonical name
 CANONICAL_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
+    "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
 }
 
 # a bit too strong - protein will be preferred even if text is "XYZ gene"
@@ -54,6 +56,12 @@ PREFFERED_TYPES = {
     # "T028": "Gene or Genome", # prefer protein over gene
     # "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
     # "T086": "Nucleotide Sequence",
+}
+
+# map term to specified cui
+COMPOSITE_WORD_OVERRIDES = {
+    "modulator": "C0005525",
+    "modulators": "C0005525",
 }
 
 
@@ -110,14 +118,26 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         return ngrams
 
     def get_best_candidate(
-        self, candidates: Sequence[MentionCandidate]
+        self, candidates: Sequence[MentionCandidate], term: str | None = None
     ) -> MentionCandidate | None:
         """
         Finds the best candidate
 
         - Sufficient similarity
         - Not suppressed
+
+        Args:
+            candidates (Sequence[MentionCandidate]): candidates
+            term (str, Optional): term to override; to look for overrides
         """
+
+        # If term is provided AND has an override, use the override
+        if term is not None and term.lower() in COMPOSITE_WORD_OVERRIDES:
+            return MentionCandidate(
+                concept_id=COMPOSITE_WORD_OVERRIDES[term.lower()],
+                aliases=[term],
+                similarities=[1],
+            )
 
         def sorter(c: MentionCandidate):
             types = set(self.kb.cui_to_entity[c.concept_id].types)
@@ -160,8 +180,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     ent_words = ce.canonical_name.split(" ")
                     return (
                         len(a)
-                        + (5 if a.split(" ")[0] != ent_words[0] else 0)
-                        + (20 if a[0] != ce.canonical_name[0] else 0)
+                        + (5 if a.split(" ")[0].lower() != ent_words[0].lower() else 0)
+                        + (20 if a[0].lower() != ce.canonical_name[0].lower() else 0)
                     )
 
                 # if 1-2 words or no aliases, prefer canonical name
@@ -261,7 +281,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         # create a map of ngrams to (acceptable) candidates
         ngram_candidate_map: dict[str, MentionCandidate] = omit_by(
             {
-                ngram: self.get_best_candidate(candidate_set)
+                ngram: self.get_best_candidate(candidate_set, ngram)
                 for ngram, candidate_set in zip(matchless_ngrams, matchless_candidates)
             },
             lambda v: v is None,

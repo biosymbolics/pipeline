@@ -261,7 +261,7 @@ PHRASE_REWRITES = {
     "antibody(?: construct| drug)": "antibody",
     "associated protein": "protein",
     "associated illness": "associated disease",
-    "biologic(?:al)? response modifiers?": "immunomodulator",
+    "biologic(?:al)? response modifiers?": "modulator",
     "chimeric[ -]?(?:antigen|antibody)[ -]?receptor": "chimeric antigen receptor",
     "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell )receptor": "chimeric antigen receptor t-cell",
     "car[ -]t": "chimeric antigen receptor t-cell",

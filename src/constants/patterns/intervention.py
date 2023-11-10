@@ -31,7 +31,7 @@ PRIMARY_MECHANISM_BASE_TERMS: dict[str, str] = {
     "initiat(?:er?|ion|ing|or|ed)": "initiator",
     "introduc(?:er?|ing|tion|ed)": "introducer",
     "mimetic": "mimetic",
-    "modulat(?:or|ion|ing|ed?)": "modulator",
+    "(?:bio[ -]?)?modulat(?:or|ion|ing|ed?)": "modulator",
     "modif(?:ier|ied|ying|ication|y)": "modifier",
     "oxidi[sz](?:er|ed|ing|ation|e)": "oxidizer",
     "promot(?:or|ion|ing|ant|ed?)": "promoter",
