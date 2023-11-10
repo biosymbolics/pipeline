@@ -3,16 +3,16 @@ Utils for lists/arrays
 """
 
 
-from typing import Callable, Mapping, Sequence, Type, TypeVar, cast
+from typing import Mapping, Sequence, TypeVar, cast
 import numpy as np
-from pydash import compact, group_by
+from pydash import compact
 import polars as pl
 
 T = TypeVar("T")
 BATCH_SIZE = 1000
 
 
-def diff_lists(list_one: list[T], list_two: list[T]) -> list[T]:
+def diff_lists(list_one: Sequence[T], list_two: Sequence[T]) -> list[T]:
     """
     Returns the items present in list_one but missing in list_two
 
@@ -25,17 +25,17 @@ def diff_lists(list_one: list[T], list_two: list[T]) -> list[T]:
     return dropped
 
 
-def dedup(a_list: list[T]) -> list[T]:
+def dedup(a_list: Sequence[T]) -> list[T]:
     """
-    Returns a list with duplicates removed
+    Returns a list with duplicate (and falsey) values removed
 
     Args:
-        a_list (list): list to deduplicate
+        a_list (Sequence): list to deduplicate
     """
     return compact(list(set(a_list)))
 
 
-def has_intersection(list_a: list[T], list_b: list[T]) -> bool:
+def has_intersection(list_a: Sequence[T] | set[T], list_b: Sequence[T]) -> bool:
     """
     Returns True if list_a and list_b have at least one element in common
 
@@ -62,7 +62,7 @@ def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> Sequence[Sequence
 BT = TypeVar("BT", bound=Mapping)
 
 
-def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> Sequence[BT]:
+def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> list[BT]:
     """
     Turns a dict of lists into a list of dicts of lists of size `batch_size`
 
