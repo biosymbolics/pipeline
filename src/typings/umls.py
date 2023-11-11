@@ -37,12 +37,15 @@ class OntologyLevel(ByDefinitionOrderEnum):
             # assume it isn't in the map due to too low degree
             return cls.INSTANCE
 
-        if betweenness_map[id] > 0.05:
+        if betweenness_map[id] > 0.005:
+            # 163 as of 11/23
             return cls.GENERAL_CATEGORY
 
-        if betweenness_map[id] > 0.005:
+        if betweenness_map[id] > 0.0001:
+            # 6418 as of 11/23
             return cls.CATEGORY
 
+        # 49837 as of 11/23
         return cls.INSTANCE
 
 

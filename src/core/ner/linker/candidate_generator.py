@@ -4,9 +4,8 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
-from utils.list import has_intersection
+from data.common.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.string import generate_ngram_phrases
-
 
 MIN_WORD_LENGTH = 1
 NGRAMS_N = 2
@@ -16,79 +15,13 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0432616": "Blood group antibody A",  # matches "anti", sigh
     "C1413336": "CEL gene",  # matches "cell"; TODO fix so this gene can match
     "C1413568": "COIL gene",  # matches "coil"
-    "C0439095": "greek letter alpha",
-    "C0439096": "greek letter beta",
-    "C0439097": "greek letter delta",
-    "C1552644": "greek letter gamma",
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
-    "C0332281": "Associated with",
     "C0205263": "Induce (action)",
     "C1709060": "Modulator device",
     "C0179302": "Binder device",
-    "C0280041": "Substituted Urea",
+    "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
 }
 
-# assumes closest matching alias would match the suppressed name (sketchy)
-CANDIDATE_NAME_SUPPRESSIONS = set(
-    [
-        ", rat",
-        ", mouse",
-    ]
-)
-
-# TODO: maybe choose NCI as canonical name
-CANONICAL_NAME_OVERRIDES = {
-    "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
-    "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
-    "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
-}
-
-# a bit too strong - protein will be preferred even if text is "XYZ gene"
-PREFFERED_TYPES = {
-    # "T023": "ACCEPTED",  # Body Part, Organ, or Organ Component
-    # "T028": "ACCEPTED",  # "Gene or Genome", # prefer protein over gene
-    # "T033": "ACCEPTED",  # Finding
-    # "T037": "ACCEPTED",  # Injury or Poisoning
-    "T047": "PREFERRED",  # "Disease or Syndrome",
-    "T048": "PREFERRED",  # "Mental or Behavioral Dysfunction",
-    "T049": "PREFERRED",  # "Cell or Molecular Dysfunction",
-    "T046": "PREFERRED",  # "Pathologic Function",
-    # "T061": "ACCEPTED",  # "Therapeutic or Preventive Procedure",
-    "T085": "PREFERRED",  # "Molecular Sequence",
-    # "T086": "ACCEPTED",  # "Nucleotide Sequence",
-    "T088": "PREFERRED",  # "Carbohydrate Sequence",
-    "T103": "PREFERRED",  # "Chemical",
-    "T104": "PREFERRED",  # "Chemical Viewed Structurally",
-    "T109": "PREFERRED",  # "Organic Chemical",
-    # "T114": "ACCEPTED",  # "Nucleic Acid, Nucleoside, or Nucleotide",
-    "T116": "PREFERRED",  # "Amino Acid, Peptide, or Protein",
-    "T120": "PREFERRED",  # "Chemical Viewed Functionally",
-    "T121": "PREFERRED",  # "Pharmacologic Substance",
-    "T123": "PREFERRED",  # "Biologically Active Substance",
-    "T125": "PREFERRED",  # "Hormone",
-    "T129": "PREFERRED",  # "Immunologic Factor",
-    "T126": "PREFERRED",  # "Enzyme",
-    "T127": "PREFERRED",  # "Vitamin",
-    "T131": "PREFERRED",  # "Hazardous or Poisonous Substance",
-    "T167": "PREFERRED",  # "Substance",
-    "T191": "PREFERRED",  # "Neoplastic Process",
-    "T196": "PREFERRED",  # "Element, Ion, or Isotope"
-    # "T192": "ACCEPTED",  # "Receptor",
-    "T200": "PREFERRED",  # "Clinical Drug"
-    # "T201": "ACCEPTED",  # Clinical Attribute
-}
-
-SUPPRESSED_TYPES = [
-    "T041",  # mental process - e.g. "like" (as in, "I like X")
-    "T077",  # Conceptual Entity
-    "T078",  # (idea or concept) INFORMATION, bias, group
-    "T079",  # (Temporal Concept) date, future
-    "T080",  # (Qualitative Concept) includes solid, biomass
-    "T081",  # (Quantitative Concept) includes Bioavailability, bacterial
-    "T082",  # spatial - includes bodily locations like 'Prostatic', terms like Occlusion, Polycyclic, lateral
-    "T090",  # (occupation) Technology, engineering, Magnetic <?>
-    "T169",  # functional - includes ROAs and endogenous/exogenous, but still probably okay to remove
-]
 
 # map term to specified cui
 COMPOSITE_WORD_OVERRIDES = {
@@ -146,49 +79,18 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     ) -> MentionCandidate | None:
         """
         Finds the best candidate
-
-        - Sufficient similarity
-        - Not suppressed
-
-        Args:
-            candidates (Sequence[MentionCandidate]): candidates
         """
 
-        def sorter(c: MentionCandidate):
-            types = set(self.kb.cui_to_entity[c.concept_id].types)
-
-            # sort non-preferred-types to the bottom
-            if not has_intersection(types, list(PREFFERED_TYPES.keys())):
-                return self.min_similarity
-
-            return c.similarities[0]
-
-        ok_candidates = sorted(
-            [
-                c
-                for c in candidates
-                if c.similarities[0] >= self.min_similarity
-                and c.concept_id not in CANDIDATE_CUI_SUPPRESSIONS
-                and not all(
-                    [
-                        t in SUPPRESSED_TYPES
-                        for t in self.kb.cui_to_entity[c.concept_id].types
-                    ]
-                )
-                and not has_intersection(
-                    CANDIDATE_NAME_SUPPRESSIONS,
-                    self.kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
-                )
-            ],
-            key=sorter,
-            reverse=True,
+        return get_best_umls_candidate(
+            candidates,
+            self.min_similarity,
+            self.kb,
+            list(CANDIDATE_CUI_SUPPRESSIONS.keys()),
         )
-
-        return ok_candidates[0] if len(ok_candidates) > 0 else None
 
     def _get_matches(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
         """
-        Wrapper around super().__call__ that handles overrides
+        Wrapper around super().__call__ that handles word overrides
         """
         # look for any overrides (terms -> candidate)
         override_indices = [
@@ -212,33 +114,10 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         """
 
         def get_name(c):
-            if c.concept_id in CANONICAL_NAME_OVERRIDES:
-                return CANONICAL_NAME_OVERRIDES[c.concept_id]
-
             if c.concept_id in self.kb.cui_to_entity:
                 ce = self.kb.cui_to_entity[c.concept_id]
 
-                def name_sorter(a: str) -> int:
-                    # prefer shorter aliases that start with the same word/letter as the canonical name
-                    # e.g. TNFSF11 for "TNFSF11 protein, human"
-                    # todo: use something like tfidf
-                    ent_words = ce.canonical_name.split(" ")
-                    return (
-                        len(a)
-                        # prefer same first word
-                        + (5 if a.split(" ")[0].lower() != ent_words[0].lower() else 0)
-                        # prefer same first letter
-                        + (20 if a[0].lower() != ce.canonical_name[0].lower() else 0)
-                        # prefer non-comma
-                        + (5 if "," in a else 0)
-                    )
-
-                # if 1-2 words or no aliases, prefer canonical name
-                if len(ce.canonical_name.split(" ")) <= 2 or len(ce.aliases) == 0:
-                    return ce.canonical_name
-
-                aliases = sorted(ce.aliases, key=name_sorter)
-                return aliases[0]
+                return clean_umls_name(ce.concept_id, ce.canonical_name, ce.aliases)
 
             return c.aliases[0]
 

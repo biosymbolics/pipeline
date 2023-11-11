@@ -16,6 +16,7 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
+from scripts.umls.copy_umls import copy_umls
 
 from .constants import (
     APPLICATIONS_TABLE,
@@ -330,6 +331,8 @@ def main(bootstrap: bool = False):
         copy_approvals()
         # adds column & index for application search
         add_application_search()
+        # UMLS records (slow due to betweenness centrality calc)
+        copy_umls()
 
     # create patent terms (psql)
     create_patent_terms()

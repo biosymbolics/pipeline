@@ -69,7 +69,7 @@ class UmlsTransformer:
                 f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestor_cuis) else None
                 for i in range(MAX_DENORMALIZED_ANCESTORS)
             },
-            "level": OntologyLevel.find(record.id, self.betweenness_map),
+            "level": OntologyLevel.find(record["id"], self.betweenness_map),
         }
 
     def find_level_ancestor(

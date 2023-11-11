@@ -1,11 +1,14 @@
-from multiprocessing import Pool
 import time
+from typing import Sequence
 import networkx as nx
 import logging
-from pydash import is_list
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from data.common.biomedical.constants import (
+    BIOMEDICAL_UMLS_TYPES,
+    UMLS_NAME_SUPPRESSIONS,
+)
 from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
 
@@ -14,66 +17,6 @@ logger.setLevel(logging.INFO)
 
 HUB_DEGREE_THRESHOLD = 300
 BETWEENNESS_FILE = "umls_betweenness.json"
-
-# could include things like virus, bacteria, etc.
-BIOMEDICAL_TYPES = tuple(
-    [
-        # "T023"  # Body Part, Organ, or Organ Component
-        "T020",  # acquired abnormality
-        "T019",  # congenital abnormality
-        # "T025",  # cell
-        # "T026",  # cell component
-        "T043",  # cell function
-        "T028",  # "Gene or Genome",
-        # "T033", # Finding
-        # "T034",  # laboratory or test result
-        "T037",  # Injury or Poisoning
-        "T044",  # molecular function
-        "T046",  # Pathologic Function
-        "T047",  # "Disease or Syndrome",
-        "T048",  # "Mental or Behavioral Dysfunction",
-        "T049",  # "Cell or Molecular Dysfunction",
-        "T046",  # "Pathologic Function",
-        "T059",  # laboratory procedure
-        "T060",  # diagnostic procedure
-        "T061",  # "Therapeutic or Preventive Procedure",
-        "T063",  # research activity
-        "T074",  # medical device
-        "T075",  # research device
-        "T085",  # "Molecular Sequence",
-        "T086",  # "Nucleotide Sequence",
-        "T087",  # "Amino Acid Sequence",
-        "T088",  # "Carbohydrate Sequence",
-        "T103",  # "Chemical",
-        "T104",  # "Chemical Viewed Structurally",
-        "T109",  # "Organic Chemical",
-        "T114",  # "Nucleic Acid, Nucleoside, or Nucleotide",
-        "T116",  # "Amino Acid, Peptide, or Protein",
-        "T120",  # "Chemical Viewed Functionally",
-        "T121",  # "Pharmacologic Substance",
-        "T122",  # biomedical or dental material
-        "T123",  # "Biologically Active Substance",
-        "T125",  # "Hormone",
-        "T129",  # "Immunologic Factor",
-        "T126",  # "Enzyme",
-        "T127",  # "Vitamin",
-        "T129",  # "Immunologic Factor",
-        "T130",  # "Indicator, Reagent, or Diagnostic Aid",
-        "T131",  # "Hazardous or Poisonous Substance",
-        "T167",  # "Substance",
-        "T168",  # food
-        "T184",  # sign or symptom
-        "T190",  # Anotomic abnormality
-        "T191",  # "Neoplastic Process",
-        "T192",  # "Receptor",
-        "T195",  # antibiotic
-        "T196",  # "Element, Ion, or Isotope"
-        "T197",  # "Inorganic Chemical"
-        "T200",  # "Clinical Drug"
-        "T203",  # drug delivery device
-        # "T201",  # Clinical Attribute
-    ]
-)
 
 
 class UmlsGraph:
@@ -95,25 +38,51 @@ class UmlsGraph:
         self.G = self.load_graph()
         self.betweenness_map = self.load_betweenness()
 
-    def load_graph(self) -> nx.Graph:
+    @staticmethod
+    def _format_name_sql(table: str, suppressions: Sequence[str] | set[str]) -> str:
+        name_filter = (
+            " ".join([f"and not {table}.str ~ '^.*{s}'" for s in suppressions])
+            if len(suppressions) > 0
+            else ""
+        )
+        lang_filter = f"""
+            and {table}.lat='ENG' -- english
+            and {table}.ts='P' -- preferred terms
+            and {table}.ispref='Y' -- preferred term
+        """
+        return name_filter + lang_filter
+
+    def load_graph(
+        self, suppressions: Sequence[str] | set[str] = UMLS_NAME_SUPPRESSIONS
+    ) -> nx.Graph:
         """
         Load UMLS graph from database
 
         Restricted to ancestoral relationships between biomedical entities
+
+        NOTE: assumes suppressions are "ends-with" strings and proper casing, for perf.
         """
         start = time.monotonic()
         logger.info("Loading UMLS into graph")
         G = nx.Graph()
+
+        head_name_sql = UmlsGraph._format_name_sql("head_entities", suppressions)
+        tail_name_sql = UmlsGraph._format_name_sql("tail_entities", suppressions)
+
         ancestory_edges = self.db.select(
             f"""
             SELECT cui1 as head, cui2 as tail
-            FROM mrrel, mrhier, mrsty
+            FROM mrrel, mrhier, mrsty, mrconso head_entities, mrconso tail_entities
             where mrhier.cui = mrrel.cui1
             and mrrel.cui1 = mrsty.cui
+            and head_entities.cui = cui1
+            and tail_entities.cui = cui2
             and mrhier.ptr is not null -- only including entities that have a parent
             and mrrel.rel in ('RN', 'CHD') -- narrower, child
             and (mrrel.rela is null or mrrel.rela = 'isa') -- no specified relationship, or 'is a'
-            and mrsty.tui in {BIOMEDICAL_TYPES}
+            and mrsty.tui in {BIOMEDICAL_UMLS_TYPES}
+            {head_name_sql}
+            {tail_name_sql}
             group by cui1, cui2
             """
         )
