@@ -21,3 +21,4 @@ terms.json
 formatted_data.json
 binder_training_data.json
 mps/**
+umls_betweenness.json

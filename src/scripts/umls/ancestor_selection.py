@@ -161,6 +161,8 @@ class UmlsGraph:
             k: number of nodes to include in the map (for performance reasons)
             hub_degree_threshold: nodes with degree above this threshold will be excluded
             file_name: if provided, will load from file instead of computing (or save to file after computing)
+
+        11/23 - INFO:scripts.umls.ancestor_selection:Loaded bc map in 3236 seconds (50k nodes)
         """
         if file_name is not None:
             try:
