@@ -24,7 +24,7 @@ from .types import AggregatedTermRecord, Ancestors, TermRecord
 from .utils import clean_owners
 
 
-MIN_CANONICAL_NAME_COUNT = 5
+MIN_CANONICAL_NAME_COUNT = 2
 
 
 class TermAssembler:
@@ -45,7 +45,7 @@ class TermAssembler:
         Load some UMLs data for canonical names
         """
         canonical_records = self.client.select(
-            "select id, canonical_name, instance_ancestor, category_ancestor from umls_lookup"
+            "select id, canonical_name, instance_rollup, category_rollup from umls_lookup"
         )
         return {row["id"]: row for row in canonical_records}
 
@@ -69,7 +69,7 @@ class TermAssembler:
         )
 
     @staticmethod
-    def __group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
+    def _group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
         """
         Dedups/groups terms by id and term
         """
@@ -81,7 +81,6 @@ class TermAssembler:
 
         def __get_term_record(group: Sequence[TermRecord]) -> AggregatedTermRecord:
             canonical_name = TermAssembler._get_canonical_name(group)
-            print(canonical_name, group[0].get("id"), group[0].get("ids"))
             return {
                 "term": canonical_name,
                 "count": sum(row["count"] for row in group),
@@ -161,7 +160,7 @@ class TermAssembler:
             if len(owner) > 0
         ]
 
-        terms = TermAssembler.__group_terms(normalized)
+        terms = TermAssembler._group_terms(normalized)
         return terms
 
     def generate_entity_terms(self) -> list[AggregatedTermRecord]:
@@ -174,7 +173,6 @@ class TermAssembler:
                 FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
                 where length(original_term) > 0
                 group by lower(original_term), domain
-                limit 1000
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -204,7 +202,7 @@ class TermAssembler:
             for row in rows
         ]
 
-        return TermAssembler.__group_terms(term_records)
+        return TermAssembler._group_terms(term_records)
 
     def generate_terms(self) -> list[AggregatedTermRecord]:
         """
@@ -228,29 +226,31 @@ class TermAssembler:
     def get_ancestors(self, record: AggregatedTermRecord) -> Ancestors | dict:
         """
         Get ancestor names for record (used for aggregation)
-        """
-        if record["ids"] is None or len(record["ids"]) < 1:
-            return {}
 
-        def get_ancestor_name(ids: Sequence[str], type_name: str) -> str | None:
+        If no instance or category ancestor is found, it will return the term itself
+        (to simplify the use of these fields as rollups)
+        """
+
+        def get_ancestor(ids: Sequence[str], type_name: str) -> str | None:
             ancestor_ids = [
-                self.canonical_map.get(i, {}).get(f"{type_name}_ancestor") for i in ids
+                self.canonical_map.get(i, {}).get(f"{type_name}_rollup") for i in ids
             ]
-            names = [self.canonical_map[ai]["canonical_name"] for ai in ancestor_ids]
+            names = [
+                self.canonical_map[ai]["canonical_name"]
+                for ai in ancestor_ids
+                if ai in self.canonical_map and ai != record["id"]
+            ]
             if len(names) > 0:
                 return names[0]
             return None
 
-        print(
-            "GOT SOME ANCESTORS?",
-            {
-                "instance_ancestor": get_ancestor_name(record["ids"], "instance"),
-                "category_ancestor": get_ancestor_name(record["ids"], "category"),
-            },
-        )
+        ids = record["ids"] or []
+        instance_rollup = get_ancestor(ids, "instance") or record["term"]
+        category_rollup = get_ancestor(ids, "category") or instance_rollup
+
         return {
-            "instance_ancestor": get_ancestor_name(record["ids"], "instance"),
-            "category_ancestor": get_ancestor_name(record["ids"], "category"),
+            "instance_rollup": instance_rollup,
+            "category_rollup": category_rollup,
         }
 
     def persist_terms(self):
@@ -267,8 +267,8 @@ class TermAssembler:
             "domains": "TEXT[]",
             "synonyms": "TEXT[]",
             "text_search": "tsvector",
-            "instance_ancestor": "TEXT",
-            "category_ancestor": "TEXT",
+            "instance_rollup": "TEXT",
+            "category_rollup": "TEXT",
         }
         self.client.create_and_insert(
             terms,

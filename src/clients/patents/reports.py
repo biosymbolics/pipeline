@@ -7,6 +7,7 @@ import polars as pl
 import logging
 
 from typings.patents import PatentApplication
+from typings.umls import RollupLevel
 
 from .types import (
     PatentsReport,
@@ -23,6 +24,7 @@ def aggregate(
     y_dimensions: list[str] | None = None,
     x_transform: Callable[[Any], Any] = lambda x: x,
     y_transform: Callable[[Any], Any] = lambda y: y,
+    rollup_level: RollupLevel | None = None,
 ) -> Sequence[PatentsReport]:
     """
     Aggregate summary stats
@@ -32,6 +34,9 @@ def aggregate(
         patents (pl.Sequence[PatentApplication]): list of patent applications
         x_dimensions (list[str]): list of x dimensions to aggregate
         y_dimensions ((list[str], optional): y dimensions to aggregate. Defaults to None.
+        x_transform (Callable[[Any], Any], optional): transform x dimension. Defaults to lambda x: x.
+        y_transform (Callable[[Any], Any], optional): transform y dimension. Defaults to lambda y: y.
+        rollup_level (RollupLevel, optional): rollup level. Defaults to None.
 
     TODO: SQL for agg?
 

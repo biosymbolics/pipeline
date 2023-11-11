@@ -20,5 +20,5 @@ class AggregatedTermRecord(BaseTermRecord):
 
 Ancestors = TypedDict(
     "Ancestors",
-    {"instance_ancestor": Optional[str], "category_ancestor": Optional[str]},
+    {"instance_rollup": Optional[str], "category_rollup": Optional[str]},
 )

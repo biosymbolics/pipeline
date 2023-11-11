@@ -51,16 +51,13 @@ class UmlsTransformer:
         logger.info("Initializing UMLS lookup dict with %s records", len(all_records))
         lookup_records = [self.create_lookup_record(r) for r in all_records]
         self.lookup_dict = {r["id"]: r for r in lookup_records}
-        print(lookup_records[0:10])
-        logger.info("Initializedg UMLS lookup dict")
+        logger.info("Initializing UMLS lookup dict")
 
     def create_lookup_record(self, record: UmlsRecord) -> UmlsLookupRecord:
         hier = record["hierarchy"]
         # reverse to get nearest ancestor first
         ancestors = (hier.split(".") if hier is not None else [])[::-1]
-
-        # TODO strip shouldn't be necessary
-        ancestor_cuis = [self.aui_lookup.get(aui, "").strip() for aui in ancestors]
+        ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
 
         return {
             **record,  # type: ignore
@@ -86,6 +83,10 @@ class UmlsTransformer:
         """
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")
+
+        # use self as rollup if at the right level
+        if record["level"] == level:
+            return record["id"]
 
         for i in range(MAX_DENORMALIZED_ANCESTORS):
             acui = record[f"l{i}_ancestor"]
@@ -124,10 +125,10 @@ class UmlsTransformer:
                 UmlsLookupRecord,
                 {
                     **r,  # type: ignore
-                    "instance_ancestor": self.find_level_ancestor(
+                    "instance_rollup": self.find_level_ancestor(
                         r, OntologyLevel.INSTANCE
                     ),
-                    "category_ancestor": self.find_level_ancestor(
+                    "category_rollup": self.find_level_ancestor(
                         r, OntologyLevel.CATEGORY
                     ),
                 },
@@ -154,8 +155,8 @@ def create_umls_lookup():
             TRIM(max(ancestors.ptr)) as hierarchy,
             {", ".join(ANCESTOR_FIELDS)},
             '' as level,
-            '' as instance_ancestor,
-            '' as category_ancestor,
+            '' as instance_rollup,
+            '' as category_rollup,
             TRIM(max(semantic_types.tui)) as type_id,
             TRIM(max(semantic_types.sty)) as type_name,
             COALESCE(max(descendants.count), 0) as num_descendants
@@ -164,8 +165,8 @@ def create_umls_lookup():
         LEFT JOIN (
             select cui1 as parent_cui, count(*) as count
             from mrrel
-            where rel = 'RN' -- narrower
-            and rela is null -- no specified relationship
+            where rel in ('RN', 'CHD') -- narrower, child
+            and (rela is null or rela = 'isa') -- no specified relationship, or 'is a' rel
             group by parent_cui
         ) descendants ON descendants.parent_cui = entities.cui
         LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui

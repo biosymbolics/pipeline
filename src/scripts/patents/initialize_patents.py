@@ -52,8 +52,8 @@ def __create_annotations_table():
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_ancestor,
-                    '' as category_ancestor
+                    '' as instance_rollup,
+                    '' as category_rollup
                 FROM applications a,
                 unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
@@ -68,8 +68,8 @@ def __create_annotations_table():
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_ancestor,
-                    '' as category_ancestor
+                    '' as instance_rollup,
+                    '' as category_rollup
                 FROM applications a,
                 unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -84,8 +84,8 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     character_offset_end,
-                    '' as instance_ancestor,
-                    '' as category_ancestor
+                    '' as instance_rollup,
+                    '' as category_rollup
                     FROM (
                         SELECT
                             *,
@@ -110,8 +110,8 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     character_offset_end,
-                    t.instance_ancestor as instance_ancestor,
-                    t.category_ancestor as category_ancestor,
+                    t.instance_rollup as instance_rollup,
+                    t.category_rollup as category_rollup
                     FROM (
                         SELECT
                             *,
@@ -124,9 +124,9 @@ def __create_annotations_table():
                             ) AS rn
                         FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
-                        LEFT JOIN terms t on map.term = t.term
                         WHERE length(ba.term) > 0
                     ) s
+                    LEFT JOIN terms t on s.norm_term = lower(t.term)
                     WHERE rn = 1
         )
         SELECT
@@ -136,8 +136,8 @@ def __create_annotations_table():
             source,
             character_offset_start,
             character_offset_end,
-            instance_ancestor, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
-            category_ancestor -- min category term (i.e. the closest ancestor considered to be a category)
+            COALESCE(instance_rollup, term) as instance_rollup, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
+            COALESCE(category_rollup, term) as category_rollup -- min category term (i.e. the closest ancestor considered to be a category)
         FROM terms
         ORDER BY character_offset_start
     """
@@ -153,8 +153,8 @@ def __create_annotations_table():
                 source,
                 character_offset_start,
                 character_offset_end,
-                '' as instance_ancestor,
-                '' as category_ancestor
+                original_term as instance_rollup,
+                original_term as category_rollup
             from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
             where domain='attributes'
         """,
@@ -179,9 +179,12 @@ def __create_annotations_table():
         CREATE MATERIALIZED VIEW {AGGREGATED_ANNOTATIONS_TABLE} AS
         SELECT
             publication_number,
-            ARRAY_AGG(term) AS terms,
-            ARRAY_AGG(domain) AS domains
-        FROM {ANNOTATIONS_TABLE}
+            ARRAY_AGG(a.term) AS terms,
+            ARRAY_AGG(domain) AS domains,
+            ARRAY_AGG(t.instance_rollup) as rollup_terms,
+            ARRAY_AGG(t.category_rollup) as rollup_categories
+        FROM {ANNOTATIONS_TABLE} a
+        LEFT JOIN terms t on t.term = a.term
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)

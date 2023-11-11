@@ -25,6 +25,7 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0205263": "Induce (action)",
     "C1709060": "Modulator device",
     "C0179302": "Binder device",
+    "C0280041": "Substituted Urea",
 }
 
 # assumes closest matching alias would match the suppressed name (sketchy)
@@ -44,29 +45,51 @@ CANONICAL_NAME_OVERRIDES = {
 
 # a bit too strong - protein will be preferred even if text is "XYZ gene"
 PREFFERED_TYPES = {
-    "T200": "Clinical Drug",
-    "T121": "Pharmacologic Substance",
-    "T116": "Amino Acid, Peptide, or Protein",
-    "T123": "Biologically Active Substance",
-    "T129": "Immunologic Factor",
-    "T085": "Molecular Sequence",
-    "T126": "Enzyme",
-    "T103": "Chemical",
-    "T120": "Chemical Viewed Functionally",
-    "T104": "Chemical Viewed Structurally",
-    "T088": "Carbohydrate Sequence",
-    "T047": "Disease or Syndrome",
-    "T048": "Mental or Behavioral Dysfunction",
-    "T049": "Cell or Molecular Dysfunction",
-    "T046": "Pathologic Function",
-    "T109": "Organic Chemical",
-    "T127": "Vitamin",
-    "T167": "Substance",
-    "T192": "Receptor",
-    # "T028": "Gene or Genome", # prefer protein over gene
-    # "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
-    # "T086": "Nucleotide Sequence",
+    # "T004": "ACCEPTED",  # Fungus
+    # "T023": "ACCEPTED",  # Body Part, Organ, or Organ Component
+    # "T028": "ACCEPTED",  # "Gene or Genome", # prefer protein over gene
+    # "T033": "ACCEPTED",  # Finding
+    # "T037": "ACCEPTED",  # Injury or Poisoning
+    "T047": "PREFERRED",  # "Disease or Syndrome",
+    "T048": "PREFERRED",  # "Mental or Behavioral Dysfunction",
+    "T049": "PREFERRED",  # "Cell or Molecular Dysfunction",
+    "T046": "PREFERRED",  # "Pathologic Function",
+    # "T061": "ACCEPTED",  # "Therapeutic or Preventive Procedure",
+    "T085": "PREFERRED",  # "Molecular Sequence",
+    # "T086": "ACCEPTED",  # "Nucleotide Sequence",
+    "T088": "PREFERRED",  # "Carbohydrate Sequence",
+    "T103": "PREFERRED",  # "Chemical",
+    "T104": "PREFERRED",  # "Chemical Viewed Structurally",
+    "T109": "PREFERRED",  # "Organic Chemical",
+    # "T114": "ACCEPTED",  # "Nucleic Acid, Nucleoside, or Nucleotide",
+    "T116": "PREFERRED",  # "Amino Acid, Peptide, or Protein",
+    "T120": "PREFERRED",  # "Chemical Viewed Functionally",
+    "T121": "PREFERRED",  # "Pharmacologic Substance",
+    "T123": "PREFERRED",  # "Biologically Active Substance",
+    "T125": "PREFERRED",  # "Hormone",
+    "T129": "PREFERRED",  # "Immunologic Factor",
+    "T126": "PREFERRED",  # "Enzyme",
+    "T127": "PREFERRED",  # "Vitamin",
+    "T131": "PREFERRED",  # "Hazardous or Poisonous Substance",
+    "T167": "PREFERRED",  # "Substance",
+    "T191": "PREFERRED",  # "Neoplastic Process",
+    "T196": "PREFERRED",  # "Element, Ion, or Isotope"
+    # "T192": "ACCEPTED",  # "Receptor",
+    "T200": "PREFERRED",  # "Clinical Drug"
+    # "T201": "ACCEPTED",  # Clinical Attribute
 }
+
+SUPPRESSED_TYPES = [
+    "T041",  # mental process - e.g. "like" (as in, "I like X")
+    "T077",  # Conceptual Entity
+    "T078",  # (idea or concept) INFORMATION, bias, group
+    "T079",  # (Temporal Concept) date, future
+    "T080",  # (Qualitative Concept) includes solid, biomass
+    "T081",  # (Quantitative Concept) includes Bioavailability, bacterial
+    "T082",  # spatial - includes bodily locations like 'Prostatic', terms like Occlusion, Polycyclic, lateral
+    "T090",  # (occupation) Technology, engineering, Magnetic <?>
+    "T169",  # functional - includes ROAs and endogenous/exogenous, but still probably okay to remove
+]
 
 # map term to specified cui
 COMPOSITE_WORD_OVERRIDES = {
@@ -85,16 +108,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
 
     - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
-    - potentially suppress some types as means to "this is not substantive"
-        - T077 residue, means, cure
-        - T090 (occupation) Technology, engineering, Magnetic <?>
-        - T079 (Temporal Concept) date, future
-        - T078 (idea or concept) INFORMATION, bias, group
-        - T080 (Qualitative Concept) includes solid, biomass
-        - T081 (Quantitative Concept) includes Bioavailability, bacterial
-        - T082 spatial - includes bodily locations like 'Prostatic', terms like Occlusion, Polycyclic, lateral
-        - T169 functional - includes ROAs and endogenous/exogenous, but still probably okay to remove
-        - T041 mental process - e.g. "like" (as in, "I like X")
     """
 
     def __init__(self, *args, min_similarity: float, **kwargs):
@@ -157,6 +170,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 for c in candidates
                 if c.similarities[0] >= self.min_similarity
                 and c.concept_id not in CANDIDATE_CUI_SUPPRESSIONS
+                and not all(
+                    [
+                        t in SUPPRESSED_TYPES
+                        for t in self.kb.cui_to_entity[c.concept_id].types
+                    ]
+                )
                 and not has_intersection(
                     CANDIDATE_NAME_SUPPRESSIONS,
                     self.kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
@@ -207,8 +226,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     ent_words = ce.canonical_name.split(" ")
                     return (
                         len(a)
+                        # prefer same first word
                         + (5 if a.split(" ")[0].lower() != ent_words[0].lower() else 0)
+                        # prefer same first letter
                         + (20 if a[0].lower() != ce.canonical_name[0].lower() else 0)
+                        # prefer non-comma
+                        + (5 if "," in a else 0)
                     )
 
                 # if 1-2 words or no aliases, prefer canonical name

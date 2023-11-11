@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import re
-from typing import TypedDict
+from typing import Literal
 
 from utils.classes import ByDefinitionOrderEnum
 from utils.re import get_or_re
@@ -13,6 +13,9 @@ GENERAL_CATEGORY_TYPE_IDS = {
 
 GENERAL_CATEGORY_IDS = {
     "C1328819": "Small Molecule",
+    "C1258062": "Molecular Mechanisms of Pharmacological Action",
+    "C0600511": "Pharmacologic Actions",
+    "C1258064": "Therapeutic Uses",
 }
 
 GENERAL_CATEGORY_RES = [
@@ -66,7 +69,7 @@ def is_name_semantic_type(canonical_name: str, type_name: str) -> bool:
     )
 
 
-THRESHOLD_COUNT_FOR_CATEGORY = 100
+THRESHOLD_COUNT_FOR_CATEGORY = 200
 THRESHOLD_COUNT_FOR_INSTANCE = 5
 
 
@@ -100,7 +103,8 @@ class OntologyLevel(ByDefinitionOrderEnum):
         TODO: make this a model
         """
         if (
-            type_id in GENERAL_CATEGORY_TYPE_IDS.keys()
+            (len(ancestor_ids) == 0 and num_descendants > 0)
+            or type_id in GENERAL_CATEGORY_TYPE_IDS.keys()
             or re.search(GENERAL_CATEGORY_RE, canonical_name) is not None
             or is_name_semantic_type(canonical_name, type_name)
             or num_descendants >= THRESHOLD_COUNT_FOR_CATEGORY
@@ -108,8 +112,7 @@ class OntologyLevel(ByDefinitionOrderEnum):
             return cls.GENERAL_CATEGORY
 
         if (
-            len(ancestor_ids) == 0
-            or num_descendants <= THRESHOLD_COUNT_FOR_INSTANCE
+            num_descendants <= THRESHOLD_COUNT_FOR_INSTANCE
             or type_id in INSTANCE_TYPE_IDS.keys()
         ):
             return cls.INSTANCE
@@ -117,8 +120,11 @@ class OntologyLevel(ByDefinitionOrderEnum):
         return cls.CATEGORY
 
 
+RollupLevel = Literal[OntologyLevel.INSTANCE, OntologyLevel.INSTANCE]  # type: ignore
+
+
 @dataclass(frozen=True)
 class UmlsLookupRecord(UmlsRecord):
     level: OntologyLevel
-    instance_ancestor: str | None
-    category_ancestor: str | None
+    instance_rollup: str | None
+    category_rollup: str | None

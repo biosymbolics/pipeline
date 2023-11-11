@@ -28,9 +28,7 @@ def filter_terms_by_domain(rec: TermDict, domain: str) -> list[str]:
     return dedup(terms)
 
 
-def format_search_result(
-    results: Sequence[dict[str, Any]]
-) -> Sequence[PatentApplication]:
+def format_search_result(results: Sequence[dict[str, Any]]) -> list[PatentApplication]:
     """
     Format patent search results and adds scores
 
@@ -70,4 +68,4 @@ def format_search_result(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
     )
 
-    return cast(Sequence[PatentApplication], df.to_dicts())
+    return cast(list[PatentApplication], df.to_dicts())
