@@ -1,10 +1,10 @@
 import unittest
+from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
 from data.common.biomedical import (
     remove_trailing_leading,
-    DELETION_TERMS,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 
@@ -91,63 +91,63 @@ class TestNerUtils(unittest.TestCase):
             # tgf beta r1 inhibitor
             {
                 "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgfβ1 accessory receptor",
+                "expected": "tgfb1 accessory receptor",
             },
             {
                 "input": "inhibitor of tgfβ1 activity",
-                "expected": "tgfβ1 inhibitor",
+                "expected": "tgfb1 inhibitor",
             },
             {
                 "input": "tgf beta antisense oligonucleotide",
-                "expected": "tgfβ antisense oligonucleotide",
+                "expected": "tgfb antisense oligonucleotide",
             },
             {
                 "input": "tgfβ receptor 1",
-                "expected": "tgfβ receptor 1",  # TODO
+                "expected": "tgfb receptor 1",  # TODO
             },
             {
                 "input": "transforming growth factor β (tgfβ) antagonist",
-                "expected": "tgfβ (tgfβ) antagonist",
+                "expected": "tgfb (tgfb) antagonist",
             },
             {
                 "input": "transforming growth factor beta3",
-                "expected": "tgfβ3",
+                "expected": "tgfb3",
             },
             {
                 "input": "tgfβ1 inhibitor",
-                "expected": "tgfβ1 inhibitor",
+                "expected": "tgfb1 inhibitor",
             },
             {
                 "input": "tgf β superfamily type ii receptor",
-                "expected": "tgfβii receptor",  # TODO
+                "expected": "tgfbii receptor",  # TODO
             },
             {
                 "input": "tgf-beta superfamily proteins",
-                "expected": "tgfβ superfamily protein",
+                "expected": "tgfb superfamily protein",
             },
             {
                 "input": "anti tgf β 1 antibody",
-                "expected": "anti tgfβ1 antibody",
+                "expected": "anti tgfb1 antibody",
             },
             {
                 "input": "tgfβ",
-                "expected": "tgfβ",
+                "expected": "tgfb",
             },
             {
                 "input": "TGF-β type I receptor",
-                "expected": "tgfβi receptor",  # TGFβRI
+                "expected": "tgfbi receptor",  # TGFβRI
             },
             {
                 "input": "tgfb inhibitor",
-                "expected": "tgfβ inhibitor",
+                "expected": "tgfb inhibitor",
             },
             {
                 "input": "tgfb1",
-                "expected": "tgfβ1",
+                "expected": "tgfb1",
             },
             {
-                "input": "(tumor necrosis factor)-α inhibitor tgf",
-                "expected": "(tumor necrosis factor)-α inhibitor tgf",  # TODO
+                "input": "(tumor necrosis factor)-alpha inhibitor tgf",
+                "expected": "(tumor necrosis factor)-alpha inhibitor tgf",  # TODO
             },
             {
                 "input": "EGFR vIII mRNA",
@@ -155,15 +155,15 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "tgf-β1",
-                "expected": "tgfβ1",
+                "expected": "tgfb1",
             },
             {
                 "input": "anti-TGF-β siRNA",
-                "expected": "anti tgfβ sirna",
+                "expected": "anti tgfb sirna",
             },
             {
                 "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "tgfβ (tgfβ) overexpression disorder",  # TODO
+                "expected": "tgfb (tgfb) overexpression disorder",  # TODO
             },
             {
                 "input": "angiotensin-ii",
@@ -221,6 +221,38 @@ class TestNerUtils(unittest.TestCase):
                 "input": "FOLFIRINOX treatment",
                 "expected": "folfirinox",
             },
+            {
+                "input": "TGF-β inhibitor",
+                "expected": "tgfb inhibitor",
+            },
+            {
+                "input": "NF-kB",
+                "expected": "nfkb",
+            },
+            {
+                "input": "NF-kB",
+                "expected": "nfkb",
+            },
+            {
+                "input": "DIURETICS CONTAINING η-TOCOTRIENOL",
+                "expected": "diuretics containing eta tocotrienol",
+            },
+            {
+                "input": "FcηRII bridging agent",
+                "expected": "fc eta rii bridging agent",  # TODO
+            },
+            {
+                "input": "β-methyl-β-hydroxy-η-butyrolactone",
+                "expected": "beta methyl beta hydroxy eta butyrolactone",
+            },
+            {
+                "input": "α,ω-dihalogen substituted alkane",
+                "expected": "alpha, omega dihalogen substituted alkane",  # TODO ?
+            },
+            {
+                "input": "aβ42",
+                "expected": "abeta42",
+            },
         ]
 
         for condition in test_conditions:
@@ -265,7 +297,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "conditions characterized by up-regulation of IL-10",
-                "expected": "il-10 up-regulation conditions",
+                "expected": "il-10 up-regulation conditions",  # up-regulation of IL-10 conditions
             },
             {"input": "alleviation of tumors", "expected": "tumor alleviation"},
             {
@@ -288,6 +320,10 @@ class TestNerUtils(unittest.TestCase):
                 "input": "inhibitors of the interaction between mdm2 and XYZ",
                 "expected": "interaction inhibitors",  # TODO
             },
+            # {
+            #     "input": "inhibiting thrombin",
+            #     "expected": "thrombin inhibiting",
+            # },
             {
                 "input": "middle-of-the night insomnia",
                 "expected": "-the night insomnia middle-",  # TODO eek should be "middle of the night insomnia",
@@ -298,12 +334,36 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "inhibitors for use in the treatment of blood-borne cancers",
-                "expected": "inhibitors for use in blood-borne cancer the treatment",  # TODO: "blood-borne cancer treatment inhibitors",
+                "expected": "blood-borne cancer treatment inhibitors",  # TODO: "blood-borne cancer inhibitors",
             },
             {
                 "input": "antibody against urokinase receptor",
                 "expected": "urokinase receptor antibody",
             },
+            {
+                "input": "antagonist to tumor angiogenesis",
+                "expected": "tumor angiogenesis antagonist",
+            },
+            {
+                "input": "antagonist for use in the diabetes",
+                "expected": "diabetes antagonist",
+            },
+            {
+                "input": "antagonist for the cb1 receptor",
+                "expected": "cb1 receptor antagonist",
+            },
+            {
+                "input": "antagonist for the cb1 receptor",
+                "expected": "cb1 receptor antagonist",
+            },
+            {
+                "input": "modulator tmem230",
+                "expected": "tmem230 modulator",
+            },
+            {
+                "input": "inhibitor 5a reductase enzyme",
+                "expected": "inhibitor 5a reductase enzyme",  # TODO
+            }
             # {
             #     "input": "useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
             #     "expected": "disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
@@ -314,7 +374,9 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = list(rearrange_terms([input]))[0]
+            result = list(
+                rearrange_terms([input], list(PRIMARY_MECHANISM_BASE_TERMS.keys()))
+            )[0]
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 

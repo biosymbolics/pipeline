@@ -15,6 +15,7 @@ logger.setLevel(logging.INFO)
 T = TypeVar("T")
 
 DEFAULT_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")
+REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 
 def get_boto_client(service: str):
@@ -26,7 +27,7 @@ def get_boto_client(service: str):
     Returns:
         boto3.client: boto client
     """
-    session = boto3.Session(region_name="us-east-1")
+    session = boto3.Session(region_name=REGION)
     return session.client(service)
 
 

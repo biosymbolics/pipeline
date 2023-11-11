@@ -51,7 +51,9 @@ def __create_annotations_table():
                     'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
-                    1 as character_offset_end
+                    1 as character_offset_end,
+                    '' as instance_rollup,
+                    '' as category_rollup
                 FROM applications a,
                 unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
@@ -65,7 +67,9 @@ def __create_annotations_table():
                     'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
-                    1 as character_offset_end
+                    1 as character_offset_end,
+                    '' as instance_rollup,
+                    '' as category_rollup
                 FROM applications a,
                 unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -75,27 +79,55 @@ def __create_annotations_table():
                 -- gpr annotations (just diseases)
                 SELECT
                     publication_number,
-                    LOWER(case when map.term is null then preferred_name else map.term end) as term,
+                    s.norm_term as term,
                     domain,
                     source,
                     character_offset_start,
-                    character_offset_end
-                from {GPR_ANNOTATIONS_TABLE}
-                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
+                    character_offset_end,
+                    '' as instance_rollup,
+                    '' as category_rollup
+                    FROM (
+                        SELECT
+                            *,
+                            LOWER(case when map.term is null then preferred_name else map.term end) as norm_term,
+                            ROW_NUMBER() OVER(
+                                PARTITION BY publication_number,
+                                (case when map.term is null then preferred_name else map.term end)
+                                ORDER BY character_offset_start DESC
+                            ) AS rn
+                        FROM {GPR_ANNOTATIONS_TABLE}
+                        LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
+                    ) s
+                    WHERE rn = 1
 
                 UNION ALL
 
                 --- biosym annotations
                 SELECT
                     publication_number,
-                    LOWER(case when syn_map.term is null then ba.original_term else syn_map.term end) as term,
+                    s.norm_term as term,
                     domain,
                     source,
                     character_offset_start,
-                    character_offset_end
-                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                LEFT JOIN synonym_map syn_map ON LOWER(ba.original_term) = syn_map.synonym
-                WHERE length(ba.term) > 0
+                    character_offset_end,
+                    t.instance_rollup as instance_rollup,
+                    t.category_rollup as category_rollup
+                    FROM (
+                        SELECT
+                            *,
+                            LOWER(case when map.term is null then original_term else map.term end) as norm_term,
+                            ROW_NUMBER() OVER(
+                                PARTITION BY publication_number,
+                                (case when map.term is null then original_term else map.term end),
+                                domain
+                                ORDER BY character_offset_start DESC
+                            ) AS rn
+                        FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
+                        LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
+                        WHERE length(ba.term) > 0
+                    ) s
+                    LEFT JOIN terms t on s.norm_term = lower(t.term)
+                    WHERE rn = 1
         )
         SELECT
             publication_number,
@@ -103,12 +135,31 @@ def __create_annotations_table():
             domain,
             source,
             character_offset_start,
-            character_offset_end
+            character_offset_end,
+            COALESCE(instance_rollup, term) as instance_rollup, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
+            COALESCE(category_rollup, term) as category_rollup -- min category term (i.e. the closest ancestor considered to be a category)
         FROM terms
         ORDER BY character_offset_start
     """
     client.create_from_select(entity_query, ANNOTATIONS_TABLE)
 
+    # add attributes at the last moment
+    client.select_insert_into_table(
+        f"""
+            SELECT
+                publication_number,
+                original_term,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end,
+                original_term as instance_rollup,
+                original_term as category_rollup
+            from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
+            where domain='attributes'
+        """,
+        ANNOTATIONS_TABLE,
+    )
     client.create_indices(
         [
             {
@@ -122,14 +173,18 @@ def __create_annotations_table():
         ]
     )
 
+    # non-distinct because order matters
     mat_view_query = f"""
         DROP MATERIALIZED VIEW IF EXISTS {AGGREGATED_ANNOTATIONS_TABLE};
         CREATE MATERIALIZED VIEW {AGGREGATED_ANNOTATIONS_TABLE} AS
         SELECT
             publication_number,
-            ARRAY_AGG(term) AS terms,
-            ARRAY_AGG(domain) AS domains
-        FROM {ANNOTATIONS_TABLE}
+            ARRAY_AGG(a.term) AS terms,
+            ARRAY_AGG(domain) AS domains,
+            ARRAY_AGG(t.instance_rollup) as rollup_terms,
+            ARRAY_AGG(t.category_rollup) as rollup_categories
+        FROM {ANNOTATIONS_TABLE} a
+        LEFT JOIN terms t on t.term = a.term
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)
@@ -287,16 +342,14 @@ def main(bootstrap: bool = False):
 
     # post
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
-    # update annotations set term=regexp_replace(term, '^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
-    # update annotations set term=regexp_replace(term, '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
+    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
+    # update annotations set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
     # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
-    # update annotations set term=regexp_replace(term, '^([a-z0-9-]{3,}) protein$', '\1', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
-    #####
+    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
     # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:(?:super)?family )?protein$';
     # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
     # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
     # update annotations set term=regexp_replace(term, ', human', '', 'i') where term ~* ', human$';
-    #####
     # update annotations set term=regexp_replace(term, 'modulat(?:ed?|ing|ion)$', 'modulator') where term ~* '\ymodulat(?:ed?|ing|ion)$';
     # update annotations set term=regexp_replace(term, 'activat(?:ed?|ing|ion)$', 'activator') where term ~* '\yactivat(?:ed?|ing|ion)$'; -- 0 recs
     # update annotations set term=regexp_replace(term, 'stimulat(?:ed?|ing|ion)$', 'stimulator') where term ~* '\ystimulat(?:ed?|ing|ion)$';
@@ -317,15 +370,18 @@ def main(bootstrap: bool = False):
     # update annotations set term=regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
     # update annotations set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
     # update annotations set term=regexp_replace(term, '\s{1,}$', '', 'g') where term ~* '\s{1,}$';
-    # leading "inhibiting" -> trailing "inhibitor"
+    # update annotations set term=regexp_replace(term, '^((?:ant)?agonists?) ([^ ]+)$', '\2 \1') where term ~* '^(?:ant)?agonist [^ ]+$';
+    # update annotations set term=regexp_replace(term, '^(inhibit[a-z]+) ([^ ]+)$', '\2 \1') where term ~* '^inhibit[a-z]+ [^ ]+$';
+    # update annotations set term=regexp_replace(term, '^(modulat[a-z]+) ([^ ]+)$', '\2 \1') where term ~* '^modulat(?:or|ion|ing|ed)s? [^ ]+$';
 
     # UPDATE trials
     # SET interventions = sub.new_interventions
     # FROM (
-    #   SELECT nct_id, array_agg(
-    #       regexp_replace(i, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1')
+    #   SELECT nct_id, array_agg(i), array_agg(
+    #       regexp_replace(i, '\y[0-9]{1,}\.?[0-9]*[ ]?(?:mg|mcg|ug|µg|ml|gm?)(?:[ /](?:kgs?|lbs?|m2|m^2|day|mg))*\y', '', 'ig')
     #   ) AS new_interventions
-    #   FROM trials, unnest(interventions) i group by nct_id
+    #   FROM trials, unnest(interventions) i
+    #   group by nct_id
     # ) sub
     # where sub.nct_id=trials.nct_id
 

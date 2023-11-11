@@ -91,6 +91,10 @@ OWNER_SUPPRESSIONS = [
 
 
 COMPANY_MAP = {
+    "abbott": "Abbott",
+    "abbvie": "Abbvie",
+    "allergan": "Allergan",
+    "california inst of techn": "CalTech",
     "massachusetts inst technology": "Massachusetts Institute of Technology",
     "roche": "Roche",
     "biogen": "Biogen",
@@ -101,15 +105,12 @@ COMPANY_MAP = {
     "glaxo": "GlaxoSmithKline",
     "merck sharp & dohme": "Merck",
     "merck frosst": "Merck",
-    "california inst of techn": "CalTech",
     "sinai": "Mount Sinai",
     "medtronic": "Medtronic",
     "sloan kettering": "Sloan Kettering",
-    "sanofi": "Sanofi",
-    "sanofis": "Sanofi",
+    "sanofis?": "Sanofi",
     "basf": "Basf",
     "3m": "3M",
-    "abbott": "Abbott",
     "medical res council": "Medical Research Council",
     "mayo": "Mayo Clinic",  # FPs
     "unilever": "Unilever",
@@ -130,8 +131,10 @@ COMPANY_MAP = {
     "novartis": "Novartis",
     "pfizer": "Pfizer",
     "gilead": "Gilead",
+    "merck": "Merck",
     "dow": "Dow",
     "regeneron": "Regeneron",
+    "takeda": "Takeda",
     "johnson & johnson": "JnJ",
     "janssen": "Janssen",
     "Johns? Hopkins?": "Johns Hopkins",
@@ -143,6 +146,7 @@ COMPANY_MAP = {
     "bristol[- ]?myers squibb": "Bristol-Myers Squibb",
     "Celgene": "Bristol-Myers Squibb",
     "Samsung": "Samsung",
+    "ucb": "UCB",
 }
 
 OWNER_TERM_MAP = {

@@ -126,8 +126,7 @@ def clean_owners(owners: list[str]) -> list[str]:
             f"Length of cleaned assignees ({len(final)}) does not match length of original assignees ({len(owners)})"
         )
 
-    # one more run thru mapping
-    return [norm_map.get(owner) or owner for owner in with_overiddes]
+    return final
 
 
 # alter table applications alter column priority_date type date USING priority_date::date;

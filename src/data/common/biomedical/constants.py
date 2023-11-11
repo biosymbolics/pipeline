@@ -1,8 +1,9 @@
-from constants.patterns.device import DEVICE_RES
 from constants.patterns.intervention import (
     COMPOUND_BASE_TERMS_GENERIC,
     INTERVENTION_PREFIXES_GENERIC,
+    PRIMARY_MECHANISM_BASE_TERMS,
 )
+from utils.re import WORD_CHAR_RE, WORD_DIGIT_RE, ALPHA_CHARS, get_or_re
 
 
 from .types import WordPlace
@@ -16,11 +17,15 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "-+": "leading",
     "stable": "all",
     "various": "all",
+    "responsible": "trailing",
     "the": "leading",
+    "associated": "leading",
+    "prepared": "leading",
     "example": "all",
     "unwanted": "leading",
     "comprised?": "all",
     "contagious": "leading",
+    "compositions that include a": "leading",
     "recognition": "trailing",
     "binding": "trailing",
     "prevention": "leading",
@@ -28,11 +33,10 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "discreet": "all",
     "subject": "leading",
     "properties": "trailing",
-    "administration(?: of)?": "all",
+    "(?:co[- ]?)?administration(?: of)?": "all",
     "treatment(?: of)?": "all",
     "library": "all",
     "more": "leading",
-    "% ": "leading",
     "active control": "all",
     "classic": "all",
     "present": "leading",
@@ -66,7 +70,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "efficacy": "all",
     "therapeutic procedure": "all",
     "therefor": "all",
-    "(?:co[ -]?)?therapy": "trailing",
     "(?:pre[ -]?)?treatment (?:method|with|of)": "all",
     "treating": "all",
     "contact": "trailing",
@@ -126,7 +129,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "is": "leading",
     "engineered": "leading",
     "engineered": "trailing",
-    "medicinal": "all",
     "sufficient": "all",
     "due": "trailing",
     "locate": "all",
@@ -138,7 +140,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "contemplated": "all",
     "is indicative of": "all",
     "via": "leading",
-    "effect": "trailing",
     "level": "trailing",
     "disclosed": "all",
     "wild type": "all",  # TODO
@@ -146,7 +147,6 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "effects of": "all",
     "soluble": "leading",
     "competitive": "leading",
-    "application": "trailing",
     # "type": "leading", # type II diabetes
     # model/source
     "murine": "all",
@@ -190,24 +190,154 @@ TARGET_PARENS = r"\([a-z0-9-]{3,}\)"
 
 # no "for", since typically that is "intervention for disease" (but "antagonists for metabotropic glutamate receptors")
 # with, as in "with efficacy against"
-EXPAND_CONNECTING_RE = "(?:(?:of|the|that|to|(?:the )?expression|encoding|comprising|with|(?:directed |effective |with efficacy )?against)[ ]?)"
+EXPAND_CONNECTING_RES = [
+    "of",
+    "the",
+    "that",
+    "to",
+    "(?:the )?expression",
+    "encoding",
+    "comprising",
+    "with",
+    "(?:directed |effective |with efficacy )?against",
+]
+EXPAND_CONNECTING_RE = get_or_re(EXPAND_CONNECTING_RES)
 # when expanding annotations, we don't want to make it too long
 EXPANSION_NUM_CUTOFF_TOKENS = 7
 # leave longer terms alone
-POTENTIAL_EXPANSION_MAX_TOKENS = 4
+POTENTIAL_EXPANSION_MAX_TOKENS = 6
 
 EXPANSION_ENDING_DEPS = ["agent", "nsubj", "nsubjpass", "dobj", "pobj"]
 EXPANSION_ENDING_POS = ["NOUN", "PROPN"]
 
 # overrides POS, eg "inhibiting the expression of XYZ"
-EXPANSION_POS_OVERRIDE_TERMS = ["expression", "encoding", "coding"]
+EXPANSION_POS_OVERRIDE_TERMS = ["directed", "expression", "encoding", "coding"]
+
+
+# compounds that inhibit ...
+MOA_COMPOUND_PREFIX = (
+    "(?:compound|composition)s?[ ]?(?:that (?:are|have(?: a)?)|for|of|as|which)?"
+)
+LOW_INFO_MOA_PREFIX = f"(?:(?:{MOA_COMPOUND_PREFIX}|activity|symmetric|axis|binding|formula|pathway|production|receptor|(?:non )?selective|small molecule|superfamily)[ ])"
+GENERIC_COMPOUND_TERM = get_or_re(COMPOUND_BASE_TERMS_GENERIC)
+
+# e.g. "production enhancer" -> "enhancer"
+# e.g. "blahblah derivative" -> "blahblah"
+MOA_PATTERNS = {
+    f"{LOW_INFO_MOA_PREFIX}?{pattern}(?: {GENERIC_COMPOUND_TERM})?": f" {canonical} "  # extra space removed later
+    for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
+}
+
+# inhibitory activity -> inhibitor
+ACTIVITY_MOA_PATTERNS = {
+    f"{pattern} (?:activity|action|function)": f" {canonical} "
+    for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
+}
+
+PHRASE_REWRITES = {
+    **MOA_PATTERNS,
+    **ACTIVITY_MOA_PATTERNS,
+    r"κB": "kappa-b",
+    r"nf[- ]?κ[BβΒ]": "nfkb",
+    r"(?:α|a|amyloid)[ ]?(?:β|b|beta)[ ]?([-0-9]{1,5})": r"abeta\1",  # scispacy does better with this
+    f"({ALPHA_CHARS('*')})[ ]?[Αα][ ]?({ALPHA_CHARS(2)}|,)": r"\1 alpha \2",
+    f"({ALPHA_CHARS('*')})[ ]?[βΒ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 beta \2",
+    f"({ALPHA_CHARS('*')})[ ]?[γΓ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 gamma \2",
+    f"({ALPHA_CHARS('*')})[ ]?[δΔ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 delta \2",
+    f"({ALPHA_CHARS('*')})[ ]?[ωΩ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 omega \2",
+    f"({ALPHA_CHARS('*')})[ ]?[ηΗ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 eta \2",
+    rf"({ALPHA_CHARS('*')})[ ]?[κ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 kappa \2",
+    f"({ALPHA_CHARS('*')})Αα(-?(?:[0-9]+|[a-z]))": r"\1 alpha\2",
+    f"({ALPHA_CHARS('*')})βΒ(-?(?:[0-9]+|[a-z]))": r"\1 beta\2",
+    f"({ALPHA_CHARS('*')})γΓ(-?(?:[0-9]+|[a-z]))": r"\1 gamma\2",
+    f"({ALPHA_CHARS('*')})δΔ(-?(?:[0-9]+|[a-z]))": r"\1 delta\2",
+    f"({ALPHA_CHARS('*')})ωΩ(-?(?:[0-9]+|[a-z]))": r"\1 omega\2",
+    f"({ALPHA_CHARS('*')})ηΗ(-?(?:[0-9]+|[a-z]))": r"\1 eta\2",
+    f"({ALPHA_CHARS('*')})κ(-?(?:[0-9]+|[a-z]))": r"\1 kappa\2",
+    "analogue": "analog",
+    "antibody conjugate": "antibody",
+    "antibody immunoconjugate": "antibody",
+    "antibodies?": "antibody",
+    "antibody(?: construct| drug)": "antibody",
+    "associated protein": "protein",
+    "associated illness": "associated disease",
+    "biologic(?:al)? response modifiers?": "modulator",
+    "chimeric[ -]?(?:antigen|antibody)[ -]?receptor": "chimeric antigen receptor",
+    "chimeric[ -]?(?:antigen|antibody)[ -]?(?:t[ -]?cell )receptor": "chimeric antigen receptor t-cell",
+    "car[ -]t": "chimeric antigen receptor t-cell",
+    "conditions and disease": "diseases",
+    "disease factors": "diseases",
+    "disease states": "diseases",
+    "diseases? and condition": "diseases",
+    "diseases? and disorder": "diseases",
+    "disorders? and disease": "diseases",
+    "expression disorders?": "diseases",
+    "disease state": "diseases",
+    "diseases and condition": "diseases",
+    "pathological condition": "diseases",
+    "induced diseases": "diseases",
+    "mediated condition": "associated disease",
+    "mediated disease": "associated disease",
+    "related condition": "associated disease",
+    "related disease": "associated disease",
+    "related illness": "associated disease",
+    "induced condition": "associated disease",
+    "induced illness": "associated disease",
+    "induced disease": "associated disease",
+    "induced by": "associated with",
+    "family member": "family",
+    "family protein": "protein",
+    "formulae": "formula",
+    # "disease states mediated by": "associated disease",  # disease states mediated by CCR5 (rearrange)
+    "diarrhoea": "diarrhea",
+    "faecal": "fecal",
+    "g[ -]?protein[ -]?(?:coupled|linked)[ -]?receptor": "gpcr",
+    "g[-]?pcrs?": "gpcr",
+    "gplrs?": "gpcr",
+    "homologue": "homolog",
+    "ifn": "interferon",
+    "immunisation": "immunization",
+    "kinases": "kinase",
+    "non[ -]?steroidal": "nonsteroidal",
+    "protein kinase": "kinase",
+    "protein degrader": "degrader",
+    "peptide (?:conjugate|sequence|complex(?:es)?)": "peptide",
+    "(?:poly)?peptide chain": "polypeptide",
+    "polypeptide sequence": "polypeptide",
+    "risk of (?:disorder|disease)s?": "diseases",
+    "responsive protein": "protein",
+    "re[ -]?uptake": "reuptake",
+    "(?:therapy|therapeutic) agent": "therapy",
+    "target(?:ing)? protein": "protein",
+    "target(?:ed|ing) (?:antibody|antibody conjugate)": "antibody",  # TODO - keep ADC? but often abbr as antibody, antibody conjugate, etc.
+    "toll[ -]?like": "toll-like",
+    "tumour": "tumor",
+    "transporter inhibitor": "transport inhibitor",
+    "t cell": "t-cell",
+    "b cell": "b-cell",
+    "interleukin[- ]?([0-9]{1,3})": r"IL\1",
+    "il ([0-9]{1,3})": r"IL\1",
+    "immunoglobulin ([a-z][0-9]{0,3})": r"IG\1",
+    "peginterferon": "pegylated interferon",
+    "([a-z]{1,3}) ([0-9]{1,4})": r"\1\2",  # e.g. CCR 5 -> CCR5 (dashes handled in normalize_by_pos)
+    "PEG": "pegylated",
+    "(?:tgf|transforming growth factor)[ -]?(?:b|β)(?:eta)?(?:[ -]?(?:(?:superfamily )?type )?([0-9]|v?i{1,3}))?": r"tgfb\1",
+    # superfamily type ii
+    "(?:tgfr?|transforming growth factor(?: receptors?))[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tgfa\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:a|α)(?:lpha)?(?:[ -]?([0-9]))?": r"tnfa\1",
+    "(?:tnf|tumor necrosis factor)[ -]?(?:b|β)(?:beta)?(?:[ -]?([0-9]))?": r"tnfb\1",
+    "(?:egf|epidermal growth factor)": r"egf",
+    "(?:egfr|epidermal growth factor receptor)(?:[ ]?(v?i{1,3}|[0-9]))?": r"egfr \1",
+    # # vascular endothelial growth factor (VEGF), VEGFR1
+    # # fibroblast growth factor (FGF), fibroblast growth factor receptor 2
+}
 
 
 DELETION_TERMS = [
-    *DEVICE_RES,
     "[(][0-9a-z]{1,4}[)]?[.,]?[ ]?",
     "[0-9., ]+",  # del if only numbers . and ,
     # mangled
+    "having formula",
     "acid addition salt",
     "potentially useful",
     "above protein",
@@ -222,7 +352,7 @@ DELETION_TERMS = [
     "further",
     "individual suffering",
     ".{1,5}-",  # tri-
-    "(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
+    ".*(?:composition|compound|substance|agent|kit|group)s? (?:useful|capable)",
     "optionally other modification",
     "co[- ]?operate",
     "light[ -]?receiving",
@@ -261,6 +391,14 @@ DELETION_TERMS = [
     "reform",
     "conformat(?:ion|ional)",
     # thing (unwanted because generic)
+    "material",
+    "compositions comprising the compounds",
+    "support arm",
+    "information system",
+    "support structure",
+    "support system",
+    "backing material",
+    "operation part",
     "oxide",
     "agricultural",
     "system",
@@ -279,14 +417,11 @@ DELETION_TERMS = [
     "(?:product|reaction) (?:mixture|product|solution|vessel|mixture|system|medium)",
     "(?:.* )?activit",
     "(?:.* )?member",
-    "module",
     "group",
     "product stream",
     "operator",
     "field of(?:.* )",
     # thing (unwanted because wrong type of thing)
-    "(?:.* )?food",
-    "(?:.* )?diet",
     "(?:.* )?propert(?:y|ie)",
     "constraint",
     "(?:side|adverse)[ -]?effect",
@@ -298,7 +433,6 @@ DELETION_TERMS = [
     "distract",  # distraction
     "(?:.* )?configuration",
     "considerat",  # consideration
-    "strateg(?:y|ie)",
     "(?:.* )?arrangement",
     "(?:.* )?position",
     "(?:.* )?frame",
@@ -310,7 +444,6 @@ DELETION_TERMS = [
     "gene transfer",
     "mother milk",
     "drug development",
-    "(?:.* )?administration",
     "(?:.* )?patient",
     "(?:.* )?pest",
     "(?:.* )?examinee",
@@ -328,7 +461,6 @@ DELETION_TERMS = [
     "(?:.* )?animal",
     "(?:.* )?retardant",  # e.g. flame retardant
     "aroma",
-    "(?:.* )?reaction",
     "(?:.* )?cosmetic.*",  # may re-enable in the future
     "(?:.* )?hair condition",  # may re-enable in the future
     "(?:.* )?fragrance",
@@ -340,7 +472,6 @@ DELETION_TERMS = [
     "(?:.* )?mode",
     "(?:.* )?region",
     "(?:tumou?r|eukaryotic|liv(?:e|ing)|normal|animal|bacterial|yeast|single|skin|cancer(?:ous)?|insect|host|biological|isolated|primary|diseased?|plant|cultur(?:ing|ed?)|individual) cell",
-    "virus",  # generic
     "titanium dioxide",
     "microorganism",
     "(?:.* )?area",
@@ -388,6 +519,9 @@ DELETION_TERMS = [
     "disorder",
     "dysfunction",
     # part or characteristic of body, or fluid
+    "rib",
+    "back",
+    "cardiovascular",
     "(?:.* )?urine",
     "(?:.* )?appendage",
     "(?:.* )?ventricle",
@@ -434,6 +568,7 @@ DELETION_TERMS = [
     "jaw",
     "liver",
     "heart",
+    "ankle",
     "intraocular len",
     "femoral",
     "respiratory(?: tract)?",
@@ -471,6 +606,8 @@ DELETION_TERMS = [
     "standard treatment",
     "standard of care",
     # category errors
+    "buttress",
+    "wastewater",
     "individual",
     "formability",
     "(?:fe)?male",
@@ -511,6 +648,10 @@ DELETION_TERMS = [
     "compound having",
     "non-",
     # generic
+    "mechanical",
+    "compound of general",
+    "compositions of matter",
+    "compounds of the formula",
     "(?:.* )?period",  # never used for menstruation
     "integrated system",
     "renewable resource",
@@ -570,6 +711,9 @@ DELETION_TERMS = [
     "(?:bioactive |medicinal )?agent",
     "chemical entit",
     # general characteristic
+    "sanitary",
+    "instant",
+    "purity",
     "hydrophobic",
     "serum-free",
     "moldability",
@@ -673,6 +817,7 @@ DELETION_TERMS = [
     "(?:.* )?rigid",
     "(?:.* )?adverse",
     # physical process
+    "(?:.* )?reaction",
     "elut",  # elution
     "drug release",
     "sustained[ -]?release",
@@ -680,6 +825,7 @@ DELETION_TERMS = [
     "evaporat",
     "agglomerat",
     # measurable thing
+    "(?:.* )?movement",
     "(?:.* )?measurement",
     "(?:.* )?curvature",
     "(?:.* )?degree",
@@ -711,23 +857,6 @@ DELETION_TERMS = [
     "(?:.* )?step",
     "(?:.* )?value",
     "(?:.* )?time",
-    # roa
-    "aerosol",
-    "parenteral",
-    "inhalation",
-    "insufflation",
-    "intranasal",
-    "intramuscular",
-    "intravenous",
-    "subcutaneous",
-    "topical",
-    "(?:trans|intra)dermal",
-    "oral",
-    "rectal",
-    "vaginal",
-    "intrathecal",
-    "intraocular",
-    "intraperitoneal",
     # intangible thing
     "(?:.* )?concept",
     "(?:.* )?data",
@@ -754,49 +883,13 @@ DELETION_TERMS = [
     "(?:.* )?graphene(?: oxide)?",
     "(?:.* )?metal",  # temporary?
     # non-medical procedure or process"
-    "session",
-    "wash",
     "solid-liquid separation",
     "mix",
     "pattern form",  # pattern forming
     "crystallizat",
     "quantitat",
-    "(?:administrative )?procedure",
-    "support (?:.*)",  # ??
     "(?:.* )?communicat",
-    "(?:.* )?sequenc",
     "(?:.* )?(?:micro)?process",
-    # behavioral
-    "(?:.* )?program",
-    "(?:.* )?counsel",
-    "(?:.* )?rehabilitation",
-    "(?:.* )?physical therapy",
-    "(?:.* )?behavioral therapy",
-    "(?:.* )?visit",
-    # procedure
-    "(?:.* )?monitor",
-    "(?:.* )?procedure",
-    "(?:.* )?technique",
-    "(?:.* )?(?:endo|lapro)scop(?:ic|y)(?: procedure)?",
-    "root canal",
-    "punctur",  # puncture
-    "transplant(?:at)",  # transplantation
-    "(?:.* )?electrolysis",
-    "(?:.* )?incision",
-    "(?:.* )?graft",
-    "(?:.* )?ablation",
-    "(?:.* )?technique",
-    "(?:.* )?retract",
-    "(?:.* )?care",
-    "(?:.* )?amplification",
-    "(?:.* )?ablation",
-    "(?:.* )?surger(?:y|ie)",
-    "(?:.* )?operat",
-    "(?:.* )?extraction",
-    "brachytherapy",
-    "radiotherapy",
-    "sealant",
-    "microelectronic",
     # agtech
     "feed(?: material|substance)?",
     "pest control",
@@ -848,6 +941,7 @@ DELETION_TERMS = [
     "alkaline",  # industrial
     "trifluoromethyl",  # industrial
     "thermoplastic(?: .*)?",  # industrial
+    "plastic material",
     "(?:.* )?resin",
     "(?:.* )?epoxy",
     "(?:.* )?polyurethane",
@@ -859,22 +953,4 @@ DELETION_TERMS = [
     # start military
     "explosive",
     # end military
-    # diagnostic or lab
-    "(?:.* )?contrast",
-    "(?:.* )?screen",
-    "(?:.* )?media",
-    "imaging agent",
-    "(?:.* )?culture",
-    "(?:.* )?polymerase chain reaction",
-    "(?:.* )?test(?:ing)?",
-    "(?:.* )?detect",
-    "(?:.* )?diagnostic",
-    "(?:.* )?diagnosis",
-    "(?:.* )?analyt",  # analyte
-    "(?:.* )?assay",
-    "(?:.* )?microarray",
-    "prognosticat",
-    "(?:.* )?scopy",
-    "(?:.* )?reagent",
-    # end diagnostic
 ]

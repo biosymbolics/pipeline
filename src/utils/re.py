@@ -6,16 +6,26 @@ import regex as re
 from typing import Iterable, Literal, Optional, Sequence, Union
 import logging
 
+from utils.list import is_sequence
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE | re.DOTALL
+RE_STANDARD_FLAGS = re.IGNORECASE | re.MULTILINE
 
 
+# (includes greek chars)
 def WORD_CHAR_RE(additional_chars: list[str] = []):
-    return (
-        "[\\w\u0370-\u03FF" + "".join(additional_chars) + "]"
-    )  # (includes greek chars)
+    """
+    Returns a regex for a single word char
+
+    Args:
+        additional_chars (list[str]): additional chars to include (as string literals)
+    """
+    return "[\\w\u0370-\u03FF" + "".join(additional_chars) + "]"
+
+
+WORD_DIGIT_RE = rf"(?:{WORD_CHAR_RE()}|\d)"
 
 
 COPYRIGHT_SYM = "\u00A9"  # ©
@@ -24,8 +34,19 @@ TM_SYM = "\u2122"  # ™
 
 LEGAL_SYMBOLS = [COPYRIGHT_SYM, REGISTERED_SYM, TM_SYM]
 
+HACKY_STEMMING_RE = (
+    ".?(?:ing|e|ied|ed|er|or|en|ion|ist|ly|able|ive|al|ic|ous|y|ate|at|ry|y|ie)*s?"
+)
 
 ReCount = Union[Literal["*", "+", "?"], int]
+
+
+def get_hacky_stem_re(terms: list[str], **kwargs) -> str:
+    """
+    Get re that matches terms with hacky stemming
+    (requires that terms be stemmed; this adds the "s", "ing", "ed", etc suffixes)
+    """
+    return "(?i)" + f"^{get_or_re(terms, **kwargs)}{HACKY_STEMMING_RE}$"
 
 
 def get_or_re(
@@ -34,6 +55,8 @@ def get_or_re(
     upper: Optional[int] = None,
     permit_trailing_space: bool = False,
     enforce_word_boundaries: bool = False,
+    permit_plural: bool = True,
+    word_boundary_char: str = "\\b",  # \y for postgres
 ) -> str:
     """
     Gets a regex that ORs a list of regexes
@@ -45,9 +68,16 @@ def get_or_re(
         permit_trailing_space (bool): whether to permit trailing space between each re (defaults to False)
         enforce_word_boundaries (bool): whether to enforce word boundaries (defaults to False)
     """
+    if not is_sequence(_re_strs):
+        raise Exception("re_strs must be a sequence")
+
     re_strs = [*_re_strs]
+    if permit_plural:
+        re_strs = [re_str + r"s?" for re_str in re_strs]
+
+    wbc = word_boundary_char
     if enforce_word_boundaries:
-        re_strs = [rf"\b{re_str}\b" for re_str in re_strs]
+        re_strs = [f"{wbc}{re_str}{wbc}" for re_str in re_strs]
 
     if permit_trailing_space:
         re_strs = [re_str + r"\s*" for re_str in re_strs]

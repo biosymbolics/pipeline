@@ -14,6 +14,9 @@ ExecuteResult = TypedDict(
     "ExecuteResult", {"columns": dict[str, str], "data": Sequence[dict]}
 )
 
+# receives batch and all records, outputs a transformed batch
+TransformFunction = Callable[[Sequence[M], Sequence[M]], Sequence[M]]
+
 
 class DatabaseClient:
     def __init__(self):
@@ -94,7 +97,7 @@ class DatabaseClient:
         table_name: str,
         columns: Sequence[str] | Mapping[str, str] | None = None,
         truncate_if_exists: bool = True,
-        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
+        transform: TransformFunction | None = None,
         batch_size: int = 1000,
     ):
         """
@@ -115,7 +118,7 @@ class DatabaseClient:
         self,
         records: Sequence[M],
         table_name: str,
-        transform: Callable[[Sequence[M]], Sequence[M]] | None = None,
+        transform: TransformFunction | None = None,
         batch_size: int = 1000,
     ):
         """
@@ -124,15 +127,15 @@ class DatabaseClient:
         Args:
             records (Sequence[dict]): list of records to insert
             table_name (str): name of the table
-            transform (Callable[[Sequence[M]], Sequence[M]], optional): function to transform records before inserting. Defaults to None.
+            transform (TransformFunction, optional): function to transform records before inserting. Defaults to None.
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
         batched = batch(records, batch_size)
 
         for i, b in enumerate(batched):
             logging.debug("Inserting batch %s into table %s", i, table_name)
-            _records = transform(b) if transform else b
-            self._insert(table_name, _records)
+            transformed = transform(b, records) if transform else b
+            self._insert(table_name, transformed)
 
             logging.debug("Successfully inserted %s rows", len(b))
 

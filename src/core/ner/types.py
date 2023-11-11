@@ -25,7 +25,10 @@ NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group":
 class CanonicalEntity(NamedTuple):
     id: str
     name: str
-    aliases: Optional[List[str]] = []
+    ids: Optional[list[str]] = None
+    description: Optional[str] = None
+    aliases: list[str] = []
+    types: list[str] = []
 
 
 class DocEntity(
@@ -67,22 +70,6 @@ def is_entity_doc_list(obj: Any) -> TypeGuard[DocEntities]:
     return isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], DocEntity)
 
 
-class SpacyCanonicalEntity(NamedTuple):
-    concept_id: str
-    canonical_name: str
-    aliases: List[str]
-    types: List[str] = []
-    definition: Optional[str] = None
-
-
-class KbLinker(NamedTuple):
-    cui_to_entity: dict[str, SpacyCanonicalEntity]
-
-
-class SciSpacyLinker(NamedTuple):
-    kb: KbLinker
-
-
 SpacyPattern = Mapping[str, Union[str, Collection[Mapping[str, Any]]]]
 SpacyPatterns = Collection[SpacyPattern]
 
@@ -97,13 +84,6 @@ def is_ner_result(entity: Any) -> TypeGuard[NerResult]:
         and entity.get("score") is not None
         and entity.get("entity_group") is not None
     )
-
-
-def is_sci_spacy_linker(linker: Pipe) -> TypeGuard[SciSpacyLinker]:
-    """
-    Check if entity is a valid SciSpacyLinker
-    """
-    return hasattr(linker, "kb") is not None
 
 
 GetTokenizer = Callable[[Language], Tokenizer]

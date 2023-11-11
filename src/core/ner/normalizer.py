@@ -3,7 +3,7 @@ Linking/cleaning of terms
 """
 from typing import Sequence
 from core.ner.cleaning import CleanFunction, EntityCleaner
-from core.ner.linker import TermLinker
+from core.ner.linker.linker import TermLinker
 from core.ner.types import CanonicalEntity
 
 
@@ -46,21 +46,21 @@ class TermNormalizer:
             self.term_linker: TermLinker | None = TermLinker()
         else:
             self.term_linker = None
-        self.cleaner: EntityCleaner = EntityCleaner(
+
+        self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
 
-    def normalize(self, terms: list[str]) -> list[tuple[str, CanonicalEntity]]:
+    def normalize(self, terms: Sequence[str]) -> list[tuple[str, CanonicalEntity]]:
         """
         Normalize and link terms to canonical entities
 
         Args:
-            terms (list[str]): list of terms to normalize
+            terms (Sequence[str]): list of terms to normalize
 
         Note:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
-            - will return fewer terms than input, if term meets conditions for suppression
         """
         # removed_suppressed must be false to properly index against original terms
         normalized = self.cleaner.clean(terms, remove_suppressed=False)

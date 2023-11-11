@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from typing import Callable, Sequence
-from pydash import flatten
+from pydash import compact, flatten
 
 from system import initialize
 
@@ -69,7 +69,7 @@ FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
 def is_control(intervention_str: str) -> bool:
     return (
         re.match(
-            r".*\b(?:placebo|standard (?:of )?care|sham|standard treatment)s?\b.*",
+            r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Normal saline|Therapeutic procedure|Quality-of-Life Assessment|Questionnaire Administration|Dosage)s?\b.*",
             intervention_str,
             flags=RE_FLAGS,
         )
@@ -91,8 +91,9 @@ def transform_ct_records(
     - normalizes/extracts intervention names
     - normalizes status etc.
 
-    good check:
+    good checks:
     select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
+    select intervention, count(*) from trials, unnest(interventions) intervention, patent_to_trial ptt where ptt.nct_id=trials.nct_id group by intervention order by count(*) desc;
     """
 
     intervention_sets = [rec["interventions"] for rec in ctgov_records]
@@ -111,8 +112,9 @@ def transform_ct_records(
     )
     norm_map = tagger.extract_string_map(interventions)
 
+    # normalize interventions, dropping those without a normalized mapping
     def normalize_interventions(interventions: list[str]):
-        return flatten([norm_map.get(i) or i for i in interventions])
+        return compact(flatten([norm_map.get(i) for i in interventions]))
 
     return [
         dict_to_trial_summary(
@@ -170,6 +172,7 @@ def ingest_trials():
     """
 
     tagger = NerTagger(
+        # TODO: biologics, devices, maybe dosage_forms
         entity_types=frozenset(["compounds", "mechanisms"]),
         link=True,
         additional_cleaners=[
@@ -184,7 +187,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda records: transform_ct_records(records, tagger),  # type: ignore
+        transform=lambda batch, _: transform_ct_records(batch, tagger),
     )
 
     client = PsqlDatabaseClient()

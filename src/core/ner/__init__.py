@@ -3,7 +3,7 @@ NER module
 """
 # from .classifier import classify_by_keywords
 from .ner import NerTagger
-from .linker import TermLinker
+from .linker.linker import TermLinker
 from .normalizer import TermNormalizer
 
 __all__ = [

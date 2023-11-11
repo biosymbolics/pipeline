@@ -10,19 +10,24 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from constants.patterns.intervention import INTERVENTION_PREFIXES_GENERIC_RE
+from constants.patterns.intervention import (
+    INTERVENTION_PREFIXES_GENERIC_RE,
+    PRIMARY_MECHANISM_BASE_TERMS,
+)
 from constants.patterns.iupac import is_iupac
-from core.ner.binder.constants import PHRASE_MAP
-from utils.re import remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
+from data.common.biomedical.constants import PHRASE_REWRITES
+from utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
-from .spacy import Spacy
 from .types import DocEntity, is_entity_doc_list
 from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
 RE_FLAGS = RE_STANDARD_FLAGS
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class CleanFunction(Protocol):
@@ -39,13 +44,6 @@ SUBSTITUTIONS = {
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
     INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
-
-DEFAULT_ADDITIONAL_COMMON_WORDS = [
-    "(i)",  # so common in patents, e.g. "general formula (I)"
-    "(1)",
-    "sec",
-    "second",
-]
 
 
 class EntityCleaner:
@@ -71,7 +69,6 @@ class EntityCleaner:
         self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
         self.__removal_words: list[str] | None = None
-        self.nlp = Spacy.get_instance(disable=["ner"])._nlp
 
     @property
     def removal_words(self) -> list[str]:
@@ -96,11 +93,9 @@ class EntityCleaner:
 
         Args:
             terms (list[str]): terms
-            n_process (int): number of processes to use for parallelization
         """
-        start = time.time()
 
-        def make_substitutions(_terms: list[str]) -> Iterable[str]:
+        def make_substitutions(_terms: Sequence[str]) -> Iterable[str]:
             def __substitute_strings(term):
                 for pattern, replacement in self.substitutions.items():
                     term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
@@ -110,11 +105,11 @@ class EntityCleaner:
             for term in _terms:
                 yield __substitute_strings(term)
 
-        def decode_html(_terms: list[str]) -> Iterable[str]:
+        def decode_html(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 yield html.unescape(term)
 
-        def remove_after_newline(_terms: list[str]) -> Iterable[str]:
+        def remove_after_newline(_terms: Sequence[str]) -> Iterable[str]:
             """
             Remove everything after a newline
             e.g. "asthma\n is a disease" -> "asthma"
@@ -122,18 +117,18 @@ class EntityCleaner:
             for term in _terms:
                 yield re.sub(r"\n.*", "", term, flags=RE_FLAGS)
 
-        def lower(_terms: list[str]) -> Iterable[str]:
+        def lower(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 yield term.lower()
 
-        def unwrap(_terms: list[str]) -> Iterable[str]:
+        def unwrap(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 if term.startswith("(") and term.endswith(")"):
                     yield term.strip("()")
                     continue
                 yield term
 
-        def format_parentheticals(_terms: list[str]) -> Iterable[str]:
+        def format_parentheticals(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 # if iupac term, don't mess with its parens
                 if is_iupac(term):
@@ -156,20 +151,36 @@ class EntityCleaner:
                 )
                 yield no_parens
 
-        def normalize_phrases(_terms: list[str]) -> Iterable[str]:
+        def normalize_phrases(_terms: Sequence[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
 
             steps = [
                 partial(_map, syn=syn, canonical=canonical)
-                for syn, canonical in PHRASE_MAP.items()
+                for syn, canonical in PHRASE_REWRITES.items()
             ]
 
-            for term in _terms:
-                yield reduce(lambda x, func: func(x), steps, term)
+            pharse_to_norm_re = get_or_re(
+                list(PHRASE_REWRITES.keys()), enforce_word_boundaries=True
+            )
 
-        def exec_func(func, x):
-            logging.debug("Executing function: %s", func)
+            for term in _terms:
+                if (
+                    re.search(f".*{pharse_to_norm_re}.*", term, flags=RE_FLAGS)
+                    is not None
+                ):
+                    yield reduce(lambda x, func: func(x), steps, term)
+                else:
+                    yield term
+
+        def exec_func(func, x, debug: bool = True):
+            if debug:
+                start = time.time()
+                res = list(func(x))
+                logger.info(
+                    "Executing function %s took %s", func, round(time.time() - start, 2)
+                )
+                return res
             return func(x)
 
         cleaning_steps = [
@@ -179,7 +190,9 @@ class EntityCleaner:
             format_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
-            rearrange_terms,
+            partial(
+                rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
+            ),
             depluralize_tails,
             normalize_by_pos,
             normalize_phrases,  # order matters (after rearrange)
@@ -192,11 +205,6 @@ class EntityCleaner:
             reduce(lambda x, func: exec_func(func, x), cleaning_steps, terms)
         )
 
-        logging.debug(
-            "Normalized %s terms in %s seconds",
-            len(terms),
-            round(time.time() - start, 2),
-        )
         return normalized
 
     @staticmethod
@@ -210,7 +218,7 @@ class EntityCleaner:
         remove_suppressed: bool = False,
     ) -> Sequence[T]:
         if len(modified_texts) != len(orig_ents):
-            logging.info(
+            logger.info(
                 "Modified text: %s, original entities: %s", modified_texts, orig_ents
             )
             raise ValueError("Modified text must be same length as original entities")
@@ -249,12 +257,10 @@ class EntityCleaner:
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
-        cleaning_steps: list[CleanFunction] = [self.normalize_terms]
+        cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
 
-        terms: Sequence = [self.__get_text(ent) for ent in entities]
-        cleaned = reduce(lambda x, func: func(x), cleaning_steps, terms)
-
-        logging.info(
+        # INFO:core.ner.cleaning:Cleaned 2268406 entities in 1957.85 seconds
+        logger.info(
             "Cleaned %s entities in %s seconds",
             len(entities),
             round(time.time() - start, 2),

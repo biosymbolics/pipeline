@@ -7,12 +7,8 @@ import logging
 from typing import Sequence
 from spacy.tokens import Doc
 
-from system import initialize
 
-initialize()
-
-
-from utils.re import get_or_re
+from utils.re import get_or_re, RE_STANDARD_FLAGS
 
 from .constants import (
     EXPANSION_ENDING_DEPS,
@@ -87,7 +83,7 @@ def expand_parens_term(text: str, original_term: str) -> str | None:
         original_term (str): Original term
     """
     possible_parens_term = re.findall(
-        f"{TARGET_PARENS} {original_term}", text, re.IGNORECASE
+        f"{TARGET_PARENS} {re.escape(original_term)}", text, re.IGNORECASE
     )
 
     if len(possible_parens_term) == 0:
@@ -111,7 +107,15 @@ def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
         text (str): Text to search / full text
         text_doc (Doc): Spacy doc (passed in for perf reasons)
     """
-    s = re.search(rf"\b{re.escape(original_term)}\b", text_doc.text, re.IGNORECASE)
+    # owb/cwb in case original_term starts with (, which confuses the \b match
+    wb_chars = ["(", ")"]
+    owb = "" if original_term[0] in wb_chars else r"\b"
+    cwb = "" if original_term[-1] in wb_chars else r"\b"
+    s = re.search(
+        f"{owb}{re.escape(original_term)}{cwb}",
+        text_doc.text,
+        flags=RE_STANDARD_FLAGS,
+    )
 
     # shouldn't happen
     if s is None:

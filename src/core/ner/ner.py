@@ -16,7 +16,7 @@ from spacy.tokens import Span, Doc
 
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
-from typings.core import is_string_list, is_string_list_list
+from core.ner.spacy import Spacy
 from utils.args import make_hashable
 from utils.model import get_model_path
 from utils.re import remove_extra_spaces
@@ -44,6 +44,8 @@ logger.setLevel(logging.INFO)
 class NerTagger:
     """
     Named-entity recognition using spacy and other means
+
+    TODO: add abbr resolution
     """
 
     _instances: dict[str, Any] = {}
@@ -84,7 +86,6 @@ class NerTagger:
         self.use_llm = use_llm
         self.llm_config = llm_config
         self.rule_sets = rule_sets
-        self.additional_cleaners = additional_cleaners
         self.entity_types = entity_types
         self.normalizer = TermNormalizer(link, additional_cleaners)
         start_time = time.time()
@@ -117,13 +118,17 @@ class NerTagger:
             if len(self.rule_sets) > 0:
                 logger.info("Adding rule sets to NER pipeline")
                 # rules catch a few things the binder model misses
-                rule_nlp = spacy.load("en_core_sci_lg")
-                rule_nlp.add_pipe("merge_entities", after="ner")
-                ruler = rule_nlp.add_pipe(
-                    "entity_ruler",
-                    config={"validate": True, "overwrite_ents": True},
-                    after="merge_entities",
+                rule_nlp = Spacy.get_instance(
+                    model="en_core_sci_lg",
+                    additional_pipelines={
+                        "merge_entities": {"after": "ner"},
+                        "entity_ruler": {
+                            "config": {"validate": True, "overwrite_ents": True},
+                            "after": "merge_entities",
+                        },
+                    },
                 )
+
                 for rules in self.rule_sets:
                     ruler.add_patterns(rules)  # type: ignore
 
@@ -179,20 +184,13 @@ class NerTagger:
         To avoid reconstructing the SpaCy doc, just return DocEntities
         """
 
-        if is_string_list_list(content):
-            ents = flatten([self.__dual_model_extract(c) for c in content])
-            return ents
-        elif is_string_list(content):
-            binder_docs = self.nlp.pipe(content)
-            if self.rule_nlp:
-                rule_docs = self.rule_nlp.pipe(content)
-                return [
-                    self.__combine_ents(d1, d2)
-                    for d1, d2 in zip(binder_docs, rule_docs)
-                ]
-            return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
-        else:
-            raise Exception("Bad content type")
+        binder_docs = self.nlp.pipe(content)
+        if self.rule_nlp:
+            rule_docs = self.rule_nlp.pipe(content)
+            return [
+                self.__combine_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
+            ]
+        return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
     def __normalize(
         self,
@@ -215,7 +213,7 @@ class NerTagger:
                 linked_entity=linked_entity,
             )
 
-        # filter by entity types (if provided) and remove empty chars
+        # filter by entity types (if provided) and remove empty names
         norm_entity_sets = [
             [
                 get_doc_entity(e)

@@ -3,9 +3,11 @@ Utils for the NER pipeline
 """
 from functools import partial, reduce
 import logging
+import time
 import regex as re
-from typing import Iterable
-from spacy.tokens import Doc, Span
+from typing import Iterable, Sequence
+from spacy.tokens import Doc, Span, Token
+import polars as pl
 
 from constants.patterns.iupac import is_iupac
 from utils.re import (
@@ -18,6 +20,9 @@ from utils.re import (
 from .spacy import Spacy
 from .types import DocEntities, DocEntity, SynonymRecord
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # end-of-entity regex
 EOE_RE = "\\b" + ".*"
@@ -54,7 +59,7 @@ def get_entity_re(
 
 
 def get_infix_entity_re(
-    core_infix_res: list[str],
+    core_infix_res: Sequence[str],
     soe_re: str = SOE_RE,
     eoe_re: str = EOE_RE,
     count: ReCount = 2,
@@ -63,7 +68,7 @@ def get_infix_entity_re(
     Returns a regex for an entity with a prefix and suffix
 
     Args:
-        core_infix_res (list[str]): list of regexes for infixes
+        core_infix_res (Sequence[str]): list of regexes for infixes
         soe_re (str): start-of-entity regex (default: SOE_RE)
         eoe_re (str): end-of-entity regex (default: EOE_RE)
         count (ReCount): number of alpha chars in prefix and suffix
@@ -78,7 +83,7 @@ def get_infix_entity_re(
 
 
 def get_suffix_entitiy_re(
-    core_suffix_res: list[str],
+    core_suffix_res: Sequence[str],
     soe_re: str = SOE_RE,
     eoe_re: str = EOE_RE,
     prefix_count: ReCount = 2,
@@ -87,7 +92,7 @@ def get_suffix_entitiy_re(
     Returns a regex for an entity with a prefix and suffix
 
     Args:
-        core_suffix_res (list[str]): list of regexes for suffixes
+        core_suffix_res (Sequence[str]): list of regexes for suffixes
         soe_re (str): start-of-entity regex (default: SOE_RE)
         eoe_re (str): end-of-entity regex (default: EOE_RE)
         prefix_count (ReCount): number of alpha chars in prefix
@@ -96,9 +101,8 @@ def get_suffix_entitiy_re(
 
 
 def lemmatize_tail(
-    term: str | Doc,
-    exception_pattern: str | None = None,
-    lemma_tags: list[str] | None = None,
+    term: str | Doc | Span,
+    lemma_tags: Sequence[str] | None = None,
 ) -> str:
     """
     Lemmatizes the tail of a term
@@ -110,21 +114,17 @@ def lemmatize_tail(
 
     Args:
         term (str): term to lemmatize
-        exception_pattern (str): regex pattern to match against the term. If matched, returns the term as-is
-        lemma_tags (list[str]): list of spacy tags to lemmatize (default: None)
+        lemma_tags (Sequence[str]): list of spacy tags to lemmatize (default: None)
     """
     if isinstance(term, str):
-        nlp = Spacy.get_instance()
+        nlp = Spacy.get_instance(disable=["ner"])
         doc = nlp(term)  # turn into spacy doc (has lemma info)
-    elif isinstance(term, Doc):
+    elif isinstance(term, Doc) or isinstance(term, Span):
         doc = term
     else:
         raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
-    if exception_pattern is not None and re.match(exception_pattern, doc.text):
-        return doc.text
-
-    def maybe_lemmatize(token, i):
+    def maybe_lemmatize(token: Token, i: int) -> str:
         is_last = i == len(doc) - 1
 
         if not is_last:
@@ -143,26 +143,37 @@ def lemmatize_tail(
 
 
 def lemmatize_tails(
-    terms: list[str], n_process: int = 1, exception_pattern: str | None = None
+    terms: Sequence[str],
+    n_process: int = 1,
 ) -> Iterable[str]:
     """
     Lemmatizes the tails of a list of terms
+
+    e.g.
+    "heart attacks" -> "heart attack"
+
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     for doc in docs:
-        yield lemmatize_tail(doc, exception_pattern)
+        yield lemmatize_tail(doc)
 
 
 def depluralize_tails(
-    terms: list[str],
+    terms: Sequence[str],
     n_process: int = 1,
 ) -> Iterable[str]:
     """
     Singularize last terms
+
+    e.g. "heart attacks" -> "heart attack"
+
+    Args:
+        terms (Sequence[str]): terms to normalize
+        n_process (int): number of processes to use for parallelization
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)  # turn into spacy docs
 
     plural_pos_tags = ["NNS", "NNPS"]
@@ -176,7 +187,7 @@ def lemmatize_all(term: str | Doc) -> str:
     Lemmatizes all words in a string
     """
     if isinstance(term, str):
-        nlp = Spacy.get_instance()
+        nlp = Spacy.get_instance(disable=["ner"])
         doc = nlp(term)  # turn into spacy doc (has lemma info)
     elif isinstance(term, Doc):
         doc = term
@@ -191,12 +202,57 @@ def lemmatize_all(term: str | Doc) -> str:
     return lemmatized
 
 
-def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
+def rearrange_terms(
+    terms: Sequence[str], base_patterns: Sequence[str], n_process: int = 1
+) -> Iterable[str]:
+    """
+    Perform term rearragement normalization
+
+    - By ADP (e.g. "inhibitor of the kinase" -> "kinase inhibitor")
+    - By base (e.g. "inhibiting XYZ" -> "XYZ inhibiting") (which will be subsequently normalized to 'inhibitor')
+
+    Args:
+        terms (Sequence[str]): terms to normalize
+        base_patterns (Sequence[str]): patterns to match against for base rearrangement
+        n_process (int): number of processes to use for parallelization
+    """
+    steps = [
+        lambda _terms: rearrange_terms_by_base(_terms, base_patterns),
+        lambda _terms: rearrange_adp_terms(_terms, n_process=n_process),
+    ]
+
+    return reduce(lambda x, func: func(x), steps, terms)
+
+
+def rearrange_terms_by_base(
+    terms: Sequence[str], base_re_patterns: Sequence[str]
+) -> Iterable[str]:
+    """
+    Rearranges entity names that follow a known pattern of disorder,
+    i.e. leading "inhibitor XYZ" -> trailing "XYZ inhibitor" (currently only supports two word terms)
+
+    Args:
+        terms (Sequence[str]): terms to normalize
+        base_re_patterns (Sequence[str]): patterns to match against for base rearrangement
+    """
+    base_re = get_or_re(base_re_patterns)
+
+    def rearrange_term_by_base(term: str) -> str:
+        # base pattern followed by any non-space text
+        # e.g. "inhibitor XYZ" -> "XYZ inhibitor" but not "inhibitor of XYZ antibody" -> "XYZ inhibitor"
+        # (the latter is handled by rearrange_adp_terms)
+        if len(term.split(" ")) != 2:
+            return term
+        return re.sub(f"^({base_re}) (.+)$", r"\2 \1", term, flags=RE_STANDARD_FLAGS)
+
+    for term in terms:
+        yield rearrange_term_by_base(term)
+
+
+def rearrange_adp_terms(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
     turning "inhibitors of the kinase" into "kinase inhibitors"
-
-    ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
 
     # key: desired adposition term, value: regex that is mapped to adposition
@@ -204,20 +260,20 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
     adp_map = {
         "of": get_or_re(
             [
-                r"of (?:the|a|an)\b",
+                r"(?:of|to|for)(?: use in)?(?: (?:the|a|an))?\b",
                 r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed by(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
                 r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
                 r"targeting\b",
+                r"for(?: the)?\b",  # agonist for the mglur5 receptor -> mglur5 agonist
                 r"resulting(?: from)?\b",
                 r"(?:relevant(?: to)?) to\b",
             ]
         ),
         "with": r"associated with\b",
-        "against": r"against\b",
-        # antibody to
+        "against": r"against\b",  # ADP??
     }
 
-    def _rearrange(_terms: list[str], adp_term: str, adp_ext: str) -> Iterable[str]:
+    def _rearrange(_terms: Sequence[str], adp_term: str, adp_ext: str) -> Iterable[str]:
         normalized = [
             re.sub(adp_ext, adp_term, t, flags=RE_STANDARD_FLAGS) for t in _terms
         ]
@@ -233,7 +289,7 @@ def rearrange_terms(terms: list[str], n_process: int = 1) -> Iterable[str]:
 
 
 def __rearrange_adp(
-    terms: list[str], adp_term: str = "of", n_process: int = 1
+    terms: Sequence[str], adp_term: str = "of", n_process: int = 1
 ) -> Iterable[str]:
     """
     Rearranges & normalizes entity names with 'of' in them, e.g.
@@ -244,10 +300,10 @@ def __rearrange_adp(
 
     ADP == adposition (e.g. "of", "with", etc.) (https://universaldependencies.org/u/pos/all.html#al-u-pos/ADP)
     """
-    nlp = Spacy.get_instance()._nlp
+    nlp = Spacy.get_instance(disable=["ner"])
     docs = nlp.pipe(terms, n_process=n_process)
 
-    def __rearrange(doc: Doc) -> str:
+    def __rearrange(doc: Doc | Span) -> str:
         # get indices of all ADPs, to use those as stopping points
         # refusing to consider the first ADP (if any) because it's likely to be a preposition
         all_adp_indices = [t.i for i, t in enumerate(doc) if t.pos_ == "ADP" and i > 0]
@@ -261,17 +317,8 @@ def __rearrange_adp(
 
         if len(specific_adp_indices) > 1:
             # recursively process doc
-            head_doc = __rearrange(
-                nlp(
-                    "".join(
-                        [t.text_with_ws for t in doc[specific_adp_indices[0] + 1 :]]
-                    )
-                )
-            )
-
-            tail_doc = __rearrange(
-                nlp("".join([t.text_with_ws for t in doc[0 : specific_adp_indices[0]]]))
-            )
+            head_doc = __rearrange(doc[specific_adp_indices[0] + 1 :].as_doc())
+            tail_doc = __rearrange(doc[0 : specific_adp_indices[0]].as_doc())
 
             return f"{head_doc} {tail_doc}".strip()
 
@@ -290,9 +337,7 @@ def __rearrange_adp(
             before_start_idx = (
                 max(before_adp_indices) + 1 if len(before_adp_indices) > 0 else 0
             )
-
-            before_tokens = doc[before_start_idx:adp_index]
-            before_phrase = "".join([t.text_with_ws for t in before_tokens]).strip()
+            before_phrase = doc[before_start_idx:adp_index].text.strip()
 
             # all ADPs after
             after_adp_indices = all_adp_indices[rel_adp_index + 1 :]
@@ -300,35 +345,28 @@ def __rearrange_adp(
             after_start_idx = (
                 min(after_adp_indices) if len(after_adp_indices) > 0 else len(doc)
             )
-            after_tokens = doc[adp_index + 1 : after_start_idx]
-            after_phrase = lemmatize_tail(
-                "".join([t.text_with_ws for t in after_tokens])
-            )
+            after_phrase = lemmatize_tail(doc[adp_index + 1 : after_start_idx])
 
             # if we cut off stuff from the beginning, put back
             # e.g. (diseases associated with) expression of GU Protein
-            other_stuff = (
-                "".join([t.text_with_ws for t in doc[0:before_start_idx]])
-                if before_start_idx > 0
-                else ""
-            )
+            other_stuff = doc[0:before_start_idx].text if before_start_idx > 0 else ""
 
-            return f"{other_stuff}{after_phrase} {before_phrase}".strip()
+            return f"{other_stuff} {after_phrase} {before_phrase}".strip()
         except Exception as e:
-            logging.error("Error in rearrange_adp, returning orig text: %s", e)
+            logger.error("Error in rearrange_adp, returning orig text: %s", e)
             return doc.text
 
     for doc in docs:
         yield __rearrange(doc)
 
 
-def __normalize_by_pos(doc: Doc):
+def __normalize_by_pos(doc: Doc) -> str:
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
-    logging.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
+    logger.debug("Pos norm parts: %s", [(t.text, t.pos_) for t in doc])
 
-    def clean_by_pos(t, prev_t, next_t):
+    def clean_by_pos(t: Token, prev_t: Token | None, next_t: Token | None) -> str:
         # spacy only marks a token as SPACE if it is hanging out in a weird place
         if t.pos_ == "SPACE":
             return ""
@@ -339,8 +377,10 @@ def __normalize_by_pos(doc: Doc):
             if t.pos_ == "ADJ":
                 return " "
             if t.pos_ in ["PUNCT", "SYM"]:
+                if prev_t is None:
+                    return " "
                 if prev_t.pos_ == "PUNCT":
-                    # "(-)-ditoluoyltartaric acid" unchnaged
+                    # "(-)-ditoluoyltartaric acid" unchanged
                     return DASH
                 if (
                     next_t is not None
@@ -377,7 +417,7 @@ def __normalize_by_pos(doc: Doc):
     )
 
 
-def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
+def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -408,7 +448,7 @@ def normalize_by_pos(terms: list[str], n_process: int = 1) -> Iterable[str]:
     Other changes:
         - Alzheimer's disease -> Alzheimer disease
     """
-    nlp = Spacy.get_instance()
+    nlp = Spacy.get_instance(disable=["ner"])
 
     # avoid spacy keeping terms with - as a single token
     def sep_dash(term: str) -> str:
@@ -444,25 +484,26 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
 
 
 def cluster_terms(
-    terms: list[str], return_dict: bool = False
+    terms: Sequence[str], return_dict: bool = False
 ) -> list[SynonymRecord] | dict[str, str]:
     """
     Clusters terms using TF-IDF and DBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair)
 
-    TODO: returns one massive group (which it shouldn't because cluster -1 is the catch all)
+    TODO:
+    - returns one massive group (which it shouldn't because cluster -1 is the catch all)
+    - try with BERT embeddings?
 
     Args:
-        terms (list[str]): list of terms to cluster
+        terms (Sequence[str]): list of terms to cluster
     """
     # lazy loading
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.cluster import DBSCAN
-    import polars as pl
 
     vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
     X = vectorizer.fit_transform(terms)
-    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)
+    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)  # HDBSCAN ?
     labels = clustering.labels_
 
     df = pl.DataFrame({"cluster_id": labels, "name": terms})

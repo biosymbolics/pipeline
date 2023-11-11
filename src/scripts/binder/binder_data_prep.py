@@ -34,18 +34,18 @@ def get_annotations():
         SELECT
         (
             CASE WHEN RANDOM() > 0.49
-            THEN concat(title, '\n', abstract)
-            ELSE concat(abstract, '\n', title)
+            THEN concat(title, '\n', substring(abstract from 0 for 2000))
+            ELSE concat(substring(abstract from 0 for 2000), '\n', title)
             END
-        ) as text, -- switch title + abs and abs + title to improve generalizability
+        ) as text, -- switching title + abs and abs + title to improve generalizability
         s.publication_number as publication_number, original_term as term, domain
         FROM
         (
-            select publication_number, array_agg(distinct domain) as domains
-            FROM biosym_annotations
-            WHERE domain in ('compounds', 'diseases', 'mechanisms')
-            AND publication_number ~ '.*A1' -- limit total count, effective reduce dups
-            group by publication_number
+            select ba.publication_number, array_agg(distinct domain) as domains
+            FROM biosym_annotations ba
+            WHERE domain not in ('assignees', 'attributes')
+            AND ba.publication_number ~ '.*A1' -- limit total count, effective reduce dups
+            group by ba.publication_number
         ) s,
         biosym_annotations b_anns,
         applications apps
@@ -54,14 +54,15 @@ def get_annotations():
         AND apps.publication_number ~ '.*A1' -- limit total count, effective reduce dups
         AND not array_to_string(ipc_codes, ',') ~ '.*C01.*'
         and 'mechanisms' = any(s.domains)
-        and 'compounds' = any(s.domains)
+        and ARRAY['compounds', 'biologics'] && s.domains
         and 'diseases' = any(s.domains)
-        and domain in ('compounds', 'diseases', 'mechanisms')
+        and domain not in ('assignees', 'attributes')
         order by RANDOM()
+        limit 300000 -- 829,812
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))
-    df = pl.DataFrame(records)  # .explode("text", "publication_number")
+    df = pl.DataFrame(records)
     return df
 
 
@@ -205,7 +206,7 @@ def create_binder_data():
     mv xac train.json
     cat xad >> train.json
     cat xae >> train.json
-    rm xad xae
+    rm xad xae output.jsonl
     ```
 
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
