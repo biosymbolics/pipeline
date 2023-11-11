@@ -6,13 +6,14 @@ from pydash import is_list
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 HUB_DEGREE_THRESHOLD = 300
-
+BETWEENNESS_FILE = "umls_betweenness.json"
 
 # could include things like virus, bacteria, etc.
 BIOMEDICAL_TYPES = tuple(
@@ -91,18 +92,15 @@ class UmlsGraph:
     def __init__(self):
         umls_db = f"{BASE_DATABASE_URL}/umls"
         self.db = PsqlDatabaseClient(umls_db)
-        # self.nodes = self.load_nodes()
         self.G = self.load_graph()
         self.betweenness_map = self.load_betweenness()
 
-    def load_nodes(self):
-        nodes = {
-            rec["id"]: rec["term"]
-            for rec in self.db.select("SELECT cui as id, str as term FROM MRCONSO")
-        }
-        return nodes
-
     def load_graph(self) -> nx.Graph:
+        """
+        Load UMLS graph from database
+
+        Restricted to ancestoral relationships between biomedical entities
+        """
         start = time.monotonic()
         logger.info("Loading UMLS into graph")
         G = nx.Graph()
@@ -130,18 +128,16 @@ class UmlsGraph:
         )
         return G
 
-    def load_betweenness(
+    def _get_betweenness_subgraph(
         self, k: int = 50000, hub_degree_threshold: int = HUB_DEGREE_THRESHOLD
-    ) -> dict[str, float]:
+    ):
         """
-        Load betweenness centrality map
+        Get subgraph of top k nodes by degree, excluding "hubs" (high degree nodes)
 
         Args:
             k: number of nodes to include in the map (for performance reasons)
             hub_degree_threshold: nodes with degree above this threshold will be excluded
         """
-        logger.info("Getting top %s nodes...", k)
-        start = time.monotonic()
         degrees: list[tuple[str, int]] = self.G.degree  # type: ignore
         non_hub_degrees = [d for d in degrees if d[1] < hub_degree_threshold]
         top_nodes = [
@@ -150,8 +146,34 @@ class UmlsGraph:
                 :k
             ]
         ]
-        top_node_g = self.G.subgraph(top_nodes)
+        return self.G.subgraph(top_nodes)
+
+    def load_betweenness(
+        self,
+        k: int = 50000,
+        hub_degree_threshold: int = HUB_DEGREE_THRESHOLD,
+        file_name: str | None = BETWEENNESS_FILE,
+    ) -> dict[str, float]:
+        """
+        Load betweenness centrality map
+
+        Args:
+            k: number of nodes to include in the map (for performance reasons)
+            hub_degree_threshold: nodes with degree above this threshold will be excluded
+            file_name: if provided, will load from file instead of computing (or save to file after computing)
+        """
+        if file_name is not None:
+            try:
+                return load_json_from_file(file_name)
+            except FileNotFoundError:
+                pass
+
+        start = time.monotonic()
+        bc_subgraph = self._get_betweenness_subgraph(k, hub_degree_threshold)
+
         logger.info("Loading betweenness centrality map (slow)...")
-        bet_cen = betweenness_centrality_parallel(top_node_g)
+        bet_cen = betweenness_centrality_parallel(bc_subgraph)
+        save_json_as_file(bet_cen, BETWEENNESS_FILE)
+
         logger.info("Loaded bc map in %s seconds", round(time.monotonic() - start))
         return bet_cen
