@@ -19,7 +19,7 @@ from typings.patents import PatentApplication
 from utils.string import get_id
 
 from .formatting import format_search_result
-from .types import AutocompleteTerm, QueryType, TermResult
+from .types import AutocompleteTerm, QueryType, TermField, TermResult
 from .utils import get_max_priority_date
 
 QueryPieces = TypedDict(
@@ -60,7 +60,6 @@ SEARCH_RETURN_FIELDS = {
     "ipc_codes": "ipc_codes",
     "priority_date": "priority_date",
     "similar_patents": "similar_patents",
-    "terms": "terms",
     "url": "url",
 }
 
@@ -88,52 +87,6 @@ FIELDS: list[str] = [
     ],
     *[f"{field} as {new_field}" for field, new_field in TRIAL_RETURN_FIELDS.items()],
 ]
-
-
-def search(
-    terms: Sequence[str],
-    query_type: QueryType = "AND",
-    min_patent_years: int = 10,
-    limit: int = MAX_SEARCH_RESULTS,
-    skip_cache: bool = False,
-    is_exhaustive: bool = False,
-) -> Sequence[PatentApplication]:
-    """
-    Search patents by terms
-    Filters on
-    - lower'd terms
-    - priority date
-    - at least one composition of matter IPC code
-
-    Args:
-        terms (Sequence[str]): list of terms to search for
-        query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
-        skip_cache (bool, optional): whether to skip cache. Defaults to False.
-        is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
-
-    Returns: a list of matching patent applications
-
-    Example:
-    ```
-    from clients.patents import patent_client
-    patent_client.search(['asthma', 'astrocytoma'])
-    ```
-    """
-    args = {
-        "terms": terms,
-        "query_type": query_type,
-        "min_patent_years": min_patent_years,
-        "is_exhaustive": is_exhaustive,
-    }
-    key = get_id(args)
-    search_partial = partial(_search, **args)
-
-    if skip_cache:
-        return search_partial(limit=limit)
-
-    return retrieve_with_cache_check(search_partial, key=key, limit=limit)
 
 
 def __get_query_pieces(
@@ -204,6 +157,7 @@ def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     min_patent_years: int = 10,
+    term_field: TermField = "terms",
     limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
 ) -> Sequence[PatentApplication]:
@@ -221,12 +175,13 @@ def _search(
     # remove dups from annotations
     query = f"""
         SELECT {", ".join(qp["fields"])},
+        {term_field} as terms,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM applications AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
-        ) -- for returning all annotations
+        )
         JOIN annotations as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
@@ -246,6 +201,57 @@ def _search(
     )
 
     return formatted_results
+
+
+def search(
+    terms: Sequence[str],
+    query_type: QueryType = "AND",
+    min_patent_years: int = 10,
+    term_field: TermField = "terms",
+    limit: int = MAX_SEARCH_RESULTS,
+    skip_cache: bool = False,
+    is_exhaustive: bool = False,
+) -> Sequence[PatentApplication]:
+    """
+    Search patents by terms
+    Filters on
+    - lower'd terms
+    - priority date
+    - at least one composition of matter IPC code
+
+    Args:
+        terms (Sequence[str]): list of terms to search for
+        query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
+        min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
+        term_field (TermField, optional): which field to search on. Defaults to "terms".
+                Other values are `rollup_terms` (which are rollup terms at a high level of specificity, e.g. "Aspirin 50mg" might have a rollup term of "Aspirin")
+                and `rollup_categories` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
+        limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        skip_cache (bool, optional): whether to skip cache. Defaults to False.
+        is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
+
+    Returns: a list of matching patent applications
+
+    Example:
+    ```
+    from clients.patents import patent_client
+    patent_client.search(['asthma', 'astrocytoma'])
+    ```
+    """
+    args = {
+        "terms": terms,
+        "query_type": query_type,
+        "min_patent_years": min_patent_years,
+        "term_field": term_field,
+        "is_exhaustive": is_exhaustive,
+    }
+    key = get_id(args)
+    search_partial = partial(_search, **args)
+
+    if skip_cache:
+        return search_partial(limit=limit)
+
+    return retrieve_with_cache_check(search_partial, key=key, limit=limit)
 
 
 def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:

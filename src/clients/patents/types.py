@@ -5,6 +5,7 @@ from typing_extensions import NotRequired
 from typing import Literal, TypeGuard, TypedDict, Union
 import typing
 
+TermField = Literal["terms", "rollup_terms", "rollup_categories"]
 
 AutocompleteTerm = TypedDict("AutocompleteTerm", {"id": str, "label": str})
 TermResult = TypedDict("TermResult", {"term": str, "count": int})

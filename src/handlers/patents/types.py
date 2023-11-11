@@ -4,7 +4,7 @@ Types used by patent handlers
 from typing import TypedDict
 from typing_extensions import NotRequired
 
-from clients.patents.types import QueryType
+from clients.patents.types import QueryType, TermField
 
 
 class BasePatentSearchParams(TypedDict):
@@ -16,6 +16,7 @@ class BasePatentSearchParams(TypedDict):
 class PatentSearchParams(BasePatentSearchParams):
     is_exhaustive: NotRequired[str | bool]
     terms: str
+    term_field: NotRequired[TermField]
     skip_cache: NotRequired[str | bool]
 
 
