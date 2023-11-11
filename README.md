@@ -113,7 +113,6 @@ serverless invoke local --function search-patents
 #### Dependencies
 ```
 python3 -m pip freeze | grep -v @ | awk -F'==' '{print $1}' | xargs python3 -m pip install --upgrade
-# python3 -m pip install --upgrade --no-deps --force-reinstall --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 ```
 
 #### Debug Logging in REPL
