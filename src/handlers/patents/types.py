@@ -13,11 +13,14 @@ class BasePatentSearchParams(TypedDict):
     query_type: NotRequired[QueryType]
 
 
-class PatentSearchParams(BasePatentSearchParams):
+class OptionalPatentSearchParams(BasePatentSearchParams):
     is_exhaustive: NotRequired[str | bool]
-    terms: str
     term_field: NotRequired[TermField]
     skip_cache: NotRequired[str | bool]
+
+
+class PatentSearchParams(OptionalPatentSearchParams):
+    terms: str
 
 
 class ParsedPatentSearchParams(BasePatentSearchParams):

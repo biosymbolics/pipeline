@@ -10,6 +10,7 @@ from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import aggregate
 from handlers.patents.utils import parse_params
 
+from .constants import DEFAULT_REPORT_PARAMS
 from ..types import PatentSearchParams
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,13 @@ def summarize(event: ReportEvent, context):
 
     Invocation:
     - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
+    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma",  "term_field": "rollup_term" }}'`
     - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
     """
-    params = parse_params(event.get("queryStringParameters", {}), 10000)
+    params = parse_params(
+        event.get("queryStringParameters", {}), DEFAULT_REPORT_PARAMS, 10000
+    )
 
     if (
         not params
