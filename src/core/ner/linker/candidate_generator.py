@@ -45,7 +45,6 @@ CANONICAL_NAME_OVERRIDES = {
 
 # a bit too strong - protein will be preferred even if text is "XYZ gene"
 PREFFERED_TYPES = {
-    # "T004": "ACCEPTED",  # Fungus
     # "T023": "ACCEPTED",  # Body Part, Organ, or Organ Component
     # "T028": "ACCEPTED",  # "Gene or Genome", # prefer protein over gene
     # "T033": "ACCEPTED",  # Finding
