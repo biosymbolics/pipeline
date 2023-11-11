@@ -83,6 +83,8 @@ class UmlsTransformer:
         Args:
             record (UmlsLookupRecord): UMLS record
             level (OntologyLevel): level to find
+
+        Returns (str): ancestor id, or "" if none found
         """
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")

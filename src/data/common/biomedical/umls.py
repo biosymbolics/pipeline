@@ -59,9 +59,11 @@ def get_best_umls_candidate(
     return ok_candidates[0] if len(ok_candidates) > 0 else None
 
 
-def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
+def clean_umls_name(
+    cui: str, canonical_name: str, aliases: list[str] | None = None
+) -> str:
     """
-    Cleans up / prioritizes UMLS names
+    Cleans up UMLS names, potentially choosing an alias over the canonical name
 
     - prefer shorter names
     - prefer names that are `XYZ protein` vs `protein, XYZ`
@@ -69,6 +71,9 @@ def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
     """
     if cui in UMLS_NAME_OVERRIDES:
         return UMLS_NAME_OVERRIDES[cui]
+
+    if aliases is None:
+        return canonical_name
 
     name_words = canonical_name.split(" ")
 

@@ -2,9 +2,10 @@
 Functions to initialize the terms and synonym tables
 """
 import sys
-from typing import Sequence
+from typing import Sequence, TypeGuard, TypedDict
 import logging
-from pydash import flatten, group_by
+from pydash import compact, flatten, group_by
+from data.common.biomedical.umls import clean_umls_name
 
 import system
 
@@ -26,6 +27,31 @@ from .utils import clean_owners
 
 MIN_CANONICAL_NAME_COUNT = 2
 
+CanonicalRecord = TypedDict(
+    "CanonicalRecord",
+    {"id": str, "canonical_name": str, "instance_rollup": str, "category_rollup": str},
+)
+CanonicalMap = dict[str, CanonicalRecord]
+
+
+def is_canonical_record(record: dict) -> TypeGuard[CanonicalRecord]:
+    """
+    Check if record is a CanonicalRecord
+    """
+    return (
+        isinstance(record, dict)
+        and "id" in record
+        and "canonical_name" in record
+        and "instance_rollup" in record
+        and "category_rollup" in record
+    )
+
+
+def is_canonical_records(
+    records: Sequence[dict],
+) -> TypeGuard[Sequence[CanonicalRecord]]:
+    return all([is_canonical_record(r) for r in records])
+
 
 class TermAssembler:
     """
@@ -38,15 +64,19 @@ class TermAssembler:
 
     def __init__(self):
         self.client = PsqlDatabaseClient()
-        self.canonical_map = self.load_canonical()
+        self.canonical_map = self._load_canonical()
 
-    def load_canonical(self) -> dict:
+    def _load_canonical(self) -> CanonicalMap:
         """
         Load some UMLs data for canonical names
         """
         canonical_records = self.client.select(
             "select id, canonical_name, instance_rollup, category_rollup from umls_lookup"
         )
+        if not is_canonical_records(canonical_records):
+            raise ValueError(
+                f"Records are not CanonicalRecords: {canonical_records[:10]}"
+            )
         return {row["id"]: row for row in canonical_records}
 
     @staticmethod
@@ -55,7 +85,7 @@ class TermAssembler:
         Get canonical name from a list of term records
 
         Uses the most common "original_term" if used with sufficiently high frequency,
-        and otherwise uses the "canonical_term" (which is often a mangled composite of UMLS terms)
+        and otherwise uses the "canonical_term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
         """
         synonyms = sorted(
             group_by(term_records, "original_term").items(),
@@ -232,11 +262,11 @@ class TermAssembler:
         """
 
         def get_ancestor(ids: Sequence[str], type_name: str) -> str | None:
-            ancestor_ids = [
-                self.canonical_map.get(i, {}).get(f"{type_name}_rollup") for i in ids
-            ]
+            ancestor_ids: list[str] = compact(
+                [self.canonical_map.get(i, {}).get(f"{type_name}_rollup") for i in ids]
+            )
             names = [
-                self.canonical_map[ai]["canonical_name"]
+                clean_umls_name(ai, self.canonical_map[ai]["canonical_name"])
                 for ai in ancestor_ids
                 if ai in self.canonical_map and ai != record["id"]
             ]

@@ -22,6 +22,7 @@ BETWEENNESS_FILE = "umls_betweenness.json"
 class UmlsGraph:
     """
     UMLS graph in NetworkX form
+    Most importantly, computes betweenness centrality for nodes, which is used for ancestor selection.
 
     Usage:
     ```
@@ -131,7 +132,7 @@ class UmlsGraph:
             hub_degree_threshold: nodes with degree above this threshold will be excluded
             file_name: if provided, will load from file instead of computing (or save to file after computing)
 
-        11/23 - INFO:scripts.umls.ancestor_selection:Loaded bc map in 3236 seconds (50k nodes)
+        11/23 - Takes roughly 1 hour for 50k nodes using 6 cores
         """
         if file_name is not None:
             try:
@@ -143,8 +144,13 @@ class UmlsGraph:
         bc_subgraph = self._get_betweenness_subgraph(k, hub_degree_threshold)
 
         logger.info("Loading betweenness centrality map (slow)...")
-        bet_cen = betweenness_centrality_parallel(bc_subgraph)
-        save_json_as_file(bet_cen, BETWEENNESS_FILE)
+        bc_map = betweenness_centrality_parallel(bc_subgraph)
+
+        if file_name is not None:
+            logger.info("Saving bc map to %s", file_name)
+            save_json_as_file(bc_map, file_name)
+        else:
+            logger.warning("Not saving bc map to file, because no filename specified.")
 
         logger.info("Loaded bc map in %s seconds", round(time.monotonic() - start))
-        return bet_cen
+        return bc_map

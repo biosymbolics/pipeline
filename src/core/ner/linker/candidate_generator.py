@@ -25,9 +25,9 @@ CANDIDATE_CUI_SUPPRESSIONS = {
 
 # map term to specified cui
 COMPOSITE_WORD_OVERRIDES = {
-    "modulator": "C0005525",
+    "modulator": "C0005525",  # "Biological Response Modifiers"
     "modulators": "C0005525",
-    "binder": "C1145667",
+    "binder": "C1145667",  # "Binding action"
     "binders": "C1145667",
 }
 
