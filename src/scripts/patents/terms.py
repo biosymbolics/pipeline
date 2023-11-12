@@ -17,7 +17,7 @@ from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .constants import SYNONYM_MAP, TERMS_FILE, TERMS_TABLE
+from .constants import TERMS_FILE, TERMS_TABLE
 from .process_biosym_annotations import populate_working_biosym_annotations
 from .synonyms import SynonymMapper
 from .types import AggregatedTermRecord, Ancestors, TermRecord
@@ -220,7 +220,7 @@ class TermAssembler:
                 return term  # leave attributes alone
             entry = norm_map.get(term)
             if not entry:
-                return SYNONYM_MAP.get(term) or term
+                return term
             return entry.name
 
         term_records: list[TermRecord] = [
@@ -360,7 +360,7 @@ class TermAssembler:
         Idempotent (all tables are dropped and recreated)
         """
         TermAssembler().generate_and_persist_terms()
-        sm = SynonymMapper(SYNONYM_MAP)
+        sm = SynonymMapper()
         sm.add_synonyms()
         sm.index()
 
