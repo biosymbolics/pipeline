@@ -49,6 +49,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then assignee else map.term end) as term,
+                    '' as id,
                     'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
@@ -65,6 +66,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then inventor else map.term end) as term,
+                    '' as id,
                     'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
@@ -81,6 +83,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
+                    s.id as id,
                     domain,
                     source,
                     character_offset_start,
@@ -91,6 +94,7 @@ def __create_annotations_table():
                         SELECT
                             *,
                             LOWER(case when map.term is null then preferred_name else map.term end) as norm_term,
+                            (case when map.id is null then preferred_name else map.id end) as id, # TODO: need more reliable approach??
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then preferred_name else map.term end)
@@ -107,6 +111,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
+                    s.id as id,
                     domain,
                     source,
                     character_offset_start,
@@ -117,6 +122,7 @@ def __create_annotations_table():
                         SELECT
                             *,
                             LOWER(case when map.term is null then original_term else map.term end) as norm_term,
+                            (case when map.id is null then preferred_name else map.id end) as id,
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then original_term else map.term end),
@@ -133,6 +139,7 @@ def __create_annotations_table():
         SELECT
             publication_number,
             term,
+            id,
             domain,
             source,
             character_offset_start,
@@ -149,7 +156,8 @@ def __create_annotations_table():
         f"""
             SELECT
                 publication_number,
-                original_term,
+                original_term as term,
+                original_term as id,
                 domain,
                 source,
                 character_offset_start,
@@ -170,6 +178,10 @@ def __create_annotations_table():
             {
                 "table": ANNOTATIONS_TABLE,
                 "column": "term",
+            },
+            {
+                "table": ANNOTATIONS_TABLE,
+                "column": "id",
             },
         ]
     )
