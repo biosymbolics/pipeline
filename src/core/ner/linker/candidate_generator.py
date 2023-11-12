@@ -116,7 +116,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         def get_name(c):
             if c.concept_id in self.kb.cui_to_entity:
                 ce = self.kb.cui_to_entity[c.concept_id]
-
                 return clean_umls_name(ce.concept_id, ce.canonical_name, ce.aliases)
 
             return c.aliases[0]
@@ -177,11 +176,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             id="|".join(ids),
             ids=ids,
             name=self._create_composite_name(candidates),
+            # description=..., # TODO: composite description
             # aliases=... # TODO: all permutations
         )
 
     def generate_composite_entities(
-        self, matchless_mention_texts: Sequence[str], min_similarity: float
+        self, matchless_mention_texts: Sequence[str]
     ) -> dict[str, CanonicalEntity]:
         """
         For a list of mention text without a sufficiently similar direct match,
@@ -189,7 +189,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         Args:
             matchless_mention_texts (Sequence[str]): list of mention texts
-            min_similarity (float): minimum similarity to consider a match
         """
 
         # 1 and 2grams
@@ -243,7 +242,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         return CanonicalEntity(
             id=entity.concept_id,
             ids=[entity.concept_id],
-            name=entity.canonical_name,
+            name=clean_umls_name(entity.canonical_name, entity.aliases),
             aliases=entity.aliases,
             description=entity.definition,
             types=entity.types,
@@ -264,7 +263,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         matchless = self.generate_composite_entities(
             [text for text, canonical in matches.items() if canonical is None],
-            self.min_similarity,
         )
 
         # combine composite matches such that they override the original matches

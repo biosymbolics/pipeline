@@ -85,9 +85,9 @@ class TermAssembler:
         return {row["id"]: row for row in canonical_records}
 
     @staticmethod
-    def _get_canonical_name(term_records: Sequence[TermRecord]) -> str:
+    def _get_preferred_name(term_records: Sequence[TermRecord]) -> str:
         """
-        Get canonical name from a list of term records
+        Get preferred name from a list of term records
 
         Uses the most common "original_term" if used with sufficiently high frequency,
         and otherwise uses the "canonical_term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
@@ -115,15 +115,15 @@ class TermAssembler:
         )
 
         def __get_term_record(group: Sequence[TermRecord]) -> AggregatedTermRecord:
-            canonical_name = TermAssembler._get_canonical_name(group)
+            preferred_name = TermAssembler._get_preferred_name(group)
             return {
-                "term": canonical_name,
+                "term": preferred_name,
                 "count": sum(row["count"] for row in group),
                 "id": group[0].get("id") or "",
                 "ids": group[0].get("ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
                 # lemmatize tails for less duplication. todo: lemmatize all?
-                # 2x duplication for perf
+                # 2x dedup for perf
                 "synonyms": dedup(
                     lemmatize_tails(
                         dedup([row["original_term"] or "" for row in group])
@@ -134,15 +134,12 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
         return agg_terms
 
-    def generate_owner_terms(self) -> list[AggregatedTermRecord]:
+    def _generate_owner_terms(self) -> list[AggregatedTermRecord]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
         - aact (ctgov)
         - drugcentral approvals
-
-        TODO:
-        National Cancer Center, boston therapeutics
         """
         db_owner_query_map = {
             # patents db
@@ -198,7 +195,7 @@ class TermAssembler:
         terms = TermAssembler._group_terms(normalized)
         return terms
 
-    def generate_entity_terms(self) -> list[AggregatedTermRecord]:
+    def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations table
         Normalizes terms and associates to canonical ids
@@ -247,10 +244,10 @@ class TermAssembler:
         - applications (assignees + inventors)
         """
         logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = self.generate_owner_terms()
+        assignee_terms = self._generate_owner_terms()
 
         logging.info("Generating entity terms")
-        entity_terms = self.generate_entity_terms()
+        entity_terms = self._generate_entity_terms()
 
         terms = assignee_terms + entity_terms
 
