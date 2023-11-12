@@ -11,6 +11,7 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from data.common.biomedical.umls import clean_umls_name
 from typings.umls import OntologyLevel, UmlsRecord, UmlsLookupRecord
 
 from .ancestor_selection import UmlsGraph
@@ -70,6 +71,9 @@ class UmlsTransformer:
                 for i in range(MAX_DENORMALIZED_ANCESTORS)
             },
             "level": OntologyLevel.find(record["id"], self.betweenness_map),
+            "preferred_name": clean_umls_name(
+                record["canonical_name"], record["synonyms"]
+            ),
         }
 
     def find_level_ancestor(

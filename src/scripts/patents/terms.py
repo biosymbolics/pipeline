@@ -5,7 +5,6 @@ import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
 from pydash import compact, flatten, group_by
-from data.common.biomedical.umls import clean_umls_name
 
 import system
 
@@ -29,7 +28,13 @@ MIN_CANONICAL_NAME_COUNT = 2
 
 CanonicalRecord = TypedDict(
     "CanonicalRecord",
-    {"id": str, "canonical_name": str, "instance_rollup": str, "category_rollup": str},
+    {
+        "id": str,
+        "canonical_name": str,
+        "preferred_name": str,
+        "instance_rollup": str,
+        "category_rollup": str,
+    },
 )
 CanonicalMap = dict[str, CanonicalRecord]
 
@@ -71,7 +76,7 @@ class TermAssembler:
         Load some UMLs data for canonical names
         """
         canonical_records = self.client.select(
-            "select id, canonical_name, instance_rollup, category_rollup from umls_lookup"
+            "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
         )
         if not is_canonical_records(canonical_records):
             raise ValueError(
@@ -266,7 +271,7 @@ class TermAssembler:
                 [self.canonical_map.get(i, {}).get(f"{type_name}_rollup") for i in ids]
             )
             names = [
-                clean_umls_name(ai, self.canonical_map[ai]["canonical_name"])
+                self.canonical_map[ai]["preferred_name"]
                 for ai in ancestor_ids
                 if ai in self.canonical_map and ai != record["id"]
             ]

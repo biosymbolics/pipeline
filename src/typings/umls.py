@@ -49,11 +49,12 @@ class OntologyLevel(ByDefinitionOrderEnum):
         return cls.INSTANCE
 
 
-RollupLevel = Literal[OntologyLevel.INSTANCE, OntologyLevel.INSTANCE]  # type: ignore
-
-
 @dataclass(frozen=True)
 class UmlsLookupRecord(UmlsRecord):
+    preferred_name: str
     level: OntologyLevel
     instance_rollup: str | None
     category_rollup: str | None
+
+
+RollupLevel = Literal[OntologyLevel.INSTANCE, OntologyLevel.INSTANCE]  # type: ignore
