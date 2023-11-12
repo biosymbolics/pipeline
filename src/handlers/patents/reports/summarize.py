@@ -7,7 +7,7 @@ import logging
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
-from clients.patents.reports import aggregate
+from clients.patents.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -47,7 +47,7 @@ def summarize(event: ReportEvent, context):
 
     try:
         results = patent_client.search(**params)
-        summaries = aggregate(results, [*DOMAINS_OF_INTEREST, "similar_patents"])
+        summaries = group_by_xy(results, [*DOMAINS_OF_INTEREST, "similar_patents"])
     except Exception as e:
         message = f"Error reporting on patents: {e}"
         logger.error(message)

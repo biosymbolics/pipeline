@@ -7,7 +7,7 @@ import logging
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
-from clients.patents.reports import aggregate
+from clients.patents.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -50,7 +50,7 @@ def aggregate_over_time(event: ReportEvent, context):
             logging.info("No patents found for terms: %s", params["terms"])
             return {"statusCode": 200, "body": json.dumps([])}
 
-        summaries = aggregate(
+        summaries = group_by_xy(
             patents,
             x_dimensions=[*DOMAINS_OF_INTEREST, "similar_patents"],
             y_dimensions=["priority_date"],
