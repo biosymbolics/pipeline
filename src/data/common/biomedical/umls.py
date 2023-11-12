@@ -23,6 +23,8 @@ def get_best_umls_candidate(
 
     Args:
         candidates (Sequence[MentionCandidate]): candidates
+        min_similarity (float): minimum similarity
+        kb ([KnowledgeBase]): knowledge base (SciSpacy)
         cui_suppressions (list[str], optional): suppressed cuis. Defaults to [].
     """
 
@@ -35,26 +37,20 @@ def get_best_umls_candidate(
 
         return c.similarities[0]
 
-    ok_candidates = sorted(
-        [
-            c
-            for c in candidates
-            if c.similarities[0] >= min_similarity
-            and c.concept_id not in cui_suppressions
-            and not all(
-                [
-                    t in BIOMEDICAL_UMLS_TYPES
-                    for t in kb.cui_to_entity[c.concept_id].types
-                ]
-            )
-            and not has_intersection(
-                UMLS_NAME_SUPPRESSIONS,
-                kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
-            )
-        ],
-        key=sorter,
-        reverse=True,
-    )
+    # TODO: add back sort or remove sorter fn
+    ok_candidates = [
+        c
+        for c in candidates
+        if c.similarities[0] >= min_similarity
+        and c.concept_id not in cui_suppressions
+        and any(
+            [t in BIOMEDICAL_UMLS_TYPES for t in kb.cui_to_entity[c.concept_id].types]
+        )
+        and not has_intersection(
+            UMLS_NAME_SUPPRESSIONS,
+            kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
+        )
+    ]
 
     return ok_candidates[0] if len(ok_candidates) > 0 else None
 

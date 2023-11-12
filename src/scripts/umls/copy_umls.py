@@ -72,7 +72,7 @@ class UmlsTransformer:
             },
             "level": OntologyLevel.find(record["id"], self.betweenness_map),
             "preferred_name": clean_umls_name(
-                record["canonical_name"], record["synonyms"]
+                record["id"], record["canonical_name"], record["synonyms"]
             ),
         }
 
@@ -163,13 +163,14 @@ def create_umls_lookup():
             TRIM(max(entities.str)) as canonical_name,
             TRIM(max(ancestors.ptr)) as hierarchy,
             {", ".join(ANCESTOR_FIELDS)},
+            '' as preferred_name,
             '' as level,
             '' as instance_rollup,
             '' as category_rollup,
             TRIM(max(semantic_types.tui)) as type_id,
             TRIM(max(semantic_types.sty)) as type_name,
-            COALESCE(max(descendants.count), 0) as num_descendants
-            max(synonyms.term) as synonyms
+            COALESCE(max(descendants.count), 0) as num_descendants,
+            max(synonyms.terms) as synonyms
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         LEFT JOIN (
