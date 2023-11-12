@@ -17,10 +17,20 @@ UMLS_NAME_OVERRIDES = {
 
 # suppress UMLS entities matching these names
 # assumes closest matching alias would match the suppressed name (sketchy)
+# does not support re, and matches based on implicit (?:^|$|\s) (word in name.split(" "))
 UMLS_NAME_SUPPRESSIONS = set(
     [
         ", rat",
         ", mouse",
+        "categorized",  # tend to be generic categories, e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0729761
+        "preparations",  # https://uts.nlm.nih.gov/uts/umls/concept/C2267085
+        "used in",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3653437
+        "for treatment",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540759
+        "other",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540010
+        "and",
+        "or",
+        "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
+        "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
     ]
 )
 
