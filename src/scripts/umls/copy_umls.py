@@ -11,7 +11,10 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from data.common.biomedical.umls import clean_umls_name
 from typings.umls import OntologyLevel, UmlsRecord, UmlsLookupRecord
+
+from .ancestor_selection import UmlsGraph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -43,6 +46,7 @@ class UmlsTransformer:
     def __init__(self, aui_lookup: dict[str, str]):
         self.aui_lookup: dict[str, str] = aui_lookup
         self.lookup_dict: dict[str, UmlsLookupRecord] | None = None
+        self.betweenness_map: dict[str, float] = UmlsGraph().betweenness_map
 
     def initialize(self, all_records: Sequence[dict]):
         if not is_umls_record_list(all_records):
@@ -66,7 +70,10 @@ class UmlsTransformer:
                 f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestor_cuis) else None
                 for i in range(MAX_DENORMALIZED_ANCESTORS)
             },
-            "level": OntologyLevel.find_by_record(record, ancestor_cuis),
+            "level": OntologyLevel.find(record["id"], self.betweenness_map),
+            "preferred_name": clean_umls_name(
+                record["id"], record["canonical_name"], record["synonyms"]
+            ),
         }
 
     def find_level_ancestor(
@@ -80,6 +87,8 @@ class UmlsTransformer:
         Args:
             record (UmlsLookupRecord): UMLS record
             level (OntologyLevel): level to find
+
+        Returns (str): ancestor id, or "" if none found
         """
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")
@@ -154,12 +163,14 @@ def create_umls_lookup():
             TRIM(max(entities.str)) as canonical_name,
             TRIM(max(ancestors.ptr)) as hierarchy,
             {", ".join(ANCESTOR_FIELDS)},
+            '' as preferred_name,
             '' as level,
             '' as instance_rollup,
             '' as category_rollup,
             TRIM(max(semantic_types.tui)) as type_id,
             TRIM(max(semantic_types.sty)) as type_name,
-            COALESCE(max(descendants.count), 0) as num_descendants
+            COALESCE(max(descendants.count), 0) as num_descendants,
+            max(synonyms.terms) as synonyms
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         LEFT JOIN (
@@ -170,6 +181,10 @@ def create_umls_lookup():
             group by parent_cui
         ) descendants ON descendants.parent_cui = entities.cui
         LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
+        LEFT JOIN (
+            select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
+            group by cui
+        ) as synonyms on synonyms.id = entities.cui
         where entities.lat='ENG' -- english
         AND entities.ts='P' -- preferred terms
         AND entities.ispref='Y' -- preferred term

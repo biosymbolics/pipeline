@@ -46,7 +46,7 @@ def has_intersection(list_a: Sequence[T] | set[T], list_b: Sequence[T]) -> bool:
     return len(set(list_a).intersection(set(list_b))) > 0
 
 
-def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> Sequence[Sequence[T]]:
+def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
     """
     Turns a list into a list of lists of size `batch_size`
 
@@ -55,8 +55,8 @@ def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> Sequence[Sequence
         batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
     """
     if batch_size == -1:
-        return [items]
-    return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
+        return [list(items)]
+    return [list(items[i : i + batch_size]) for i in range(0, len(items), batch_size)]
 
 
 BT = TypeVar("BT", bound=Mapping)

@@ -1,7 +1,11 @@
 import json
 
 from clients.patents.types import QueryType, get_query_type
-from handlers.patents.types import PatentSearchParams, ParsedPatentSearchParams
+from handlers.patents.types import (
+    OptionalPatentSearchParams,
+    PatentSearchParams,
+    ParsedPatentSearchParams,
+)
 
 
 def parse_bool(value: bool | str | None) -> bool:
@@ -11,8 +15,17 @@ def parse_bool(value: bool | str | None) -> bool:
 
 
 def parse_params(
-    params: PatentSearchParams, default_limit: int = 1000
+    _params: PatentSearchParams,
+    default_params: OptionalPatentSearchParams = {},
+    default_limit: int = 1000,
 ) -> ParsedPatentSearchParams:
+    """
+    Parse patent params
+    """
+    # combine default and provided params
+    params: PatentSearchParams = {**default_params, **_params}
+
+    # parse ";"-delimited terms
     terms = params.get("terms")
     terms_list = [t.strip() for t in (terms.split(";") if terms else [])]
 

@@ -9,6 +9,7 @@ from clients import patents as patent_client
 from clients.patents.reports import aggregate
 from handlers.patents.utils import parse_params
 
+from .constants import DEFAULT_REPORT_PARAMS
 from ..types import PatentSearchParams
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,9 @@ def x_by_y(event: XByYReportEvent, context):
     - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
     - API: `curl 'https://api.biosymbolics.ai/patents/reports/x_by_y?terms=asthma&x=assignees&y=diseases'`
     """
-    params = parse_params(event.get("queryStringParameters", {}), 10000)
+    params = parse_params(
+        event.get("queryStringParameters", {}), DEFAULT_REPORT_PARAMS, 10000
+    )
     x_dimension = event.get("queryStringParameters", {}).get("x")
     y_dimension = event.get("queryStringParameters", {}).get("y")
 

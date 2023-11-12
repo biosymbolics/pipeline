@@ -6,10 +6,10 @@ from typing import Any, Sequence, TypedDict, cast
 import polars as pl
 import logging
 
-from clients.patents.constants import DOMAINS_OF_INTEREST
 from typings import PatentApplication
 from utils.list import dedup
 
+from .constants import DOMAINS_OF_INTEREST
 from .score import calculate_scores
 from .utils import get_patent_years
 
