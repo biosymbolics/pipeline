@@ -165,6 +165,7 @@ def create_umls_lookup():
             TRIM(max(semantic_types.tui)) as type_id,
             TRIM(max(semantic_types.sty)) as type_name,
             COALESCE(max(descendants.count), 0) as num_descendants
+            max(synonyms.term) as synonyms
         from mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         LEFT JOIN (
@@ -175,6 +176,10 @@ def create_umls_lookup():
             group by parent_cui
         ) descendants ON descendants.parent_cui = entities.cui
         LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
+        LEFT JOIN (
+            select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
+            group by cui
+        ) as synonyms on synonyms.id = entities.cui
         where entities.lat='ENG' -- english
         AND entities.ts='P' -- preferred terms
         AND entities.ispref='Y' -- preferred term
