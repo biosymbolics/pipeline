@@ -24,7 +24,7 @@ from .types import AggregatedTermRecord, Ancestors, TermRecord
 from .utils import clean_owners
 
 
-MIN_CANONICAL_NAME_COUNT = 2
+MIN_CANONICAL_NAME_COUNT = 4
 
 CanonicalRecord = TypedDict(
     "CanonicalRecord",

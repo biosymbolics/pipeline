@@ -97,6 +97,7 @@ class UmlsTransformer:
         if record["level"] == level:
             return record["id"]
 
+        # take the first ancestor that is at the right level
         for i in range(MAX_DENORMALIZED_ANCESTORS):
             acui = record[f"l{i}_ancestor"]
             if acui is not None and acui in self.lookup_dict:
@@ -135,10 +136,10 @@ class UmlsTransformer:
                 {
                     **r,  # type: ignore
                     "instance_rollup": self.find_level_ancestor(
-                        r, OntologyLevel.INSTANCE
+                        r, OntologyLevel.L1_CATEGORY
                     ),
                     "category_rollup": self.find_level_ancestor(
-                        r, OntologyLevel.CATEGORY
+                        r, OntologyLevel.L2_CATEGORY
                     ),
                 },
             )

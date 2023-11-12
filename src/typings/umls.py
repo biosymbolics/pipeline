@@ -18,9 +18,9 @@ class UmlsRecord:
 
 
 class OntologyLevel(ByDefinitionOrderEnum):
-    GENERAL_CATEGORY = "GENERAL_CATEGORY"  # least specific
-    CATEGORY = "CATEGORY"
-    INSTANCE = "INSTANCE"  # most specific
+    L2_CATEGORY = "L2_CATEGORY"  # least specific
+    L1_CATEGORY = "L1_CATEGORY"  # most specific
+    INSTANCE = "INSTANCE"
     UNKNOWN = "UNKNOWN"
 
     @classmethod
@@ -31,22 +31,17 @@ class OntologyLevel(ByDefinitionOrderEnum):
     ):
         """
         Simple heuristic to find approximate semantic level of UMLS record
-        TODO: make this a model
         """
         if id not in betweenness_map:
             # assume it isn't in the map due to too low degree
             return cls.INSTANCE
 
-        if betweenness_map[id] > 0.005:
-            # 163 as of 11/23
-            return cls.GENERAL_CATEGORY
+        if betweenness_map[id] < 0.0001:
+            # 49837 as of 11/23
+            return cls.L1_CATEGORY
 
-        if betweenness_map[id] > 0.0001:
-            # 6418 as of 11/23
-            return cls.CATEGORY
-
-        # 49837 as of 11/23
-        return cls.INSTANCE
+        # 6418 as of 11/23
+        return cls.L2_CATEGORY
 
 
 @dataclass(frozen=True)
@@ -57,4 +52,4 @@ class UmlsLookupRecord(UmlsRecord):
     category_rollup: str | None
 
 
-RollupLevel = Literal[OntologyLevel.INSTANCE, OntologyLevel.INSTANCE]  # type: ignore
+RollupLevel = Literal[OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY]  # type: ignore
