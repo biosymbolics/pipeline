@@ -124,6 +124,7 @@ class TermAssembler:
                 "domains": dedup([row["domain"] for row in group]),
                 # lemmatize tails for less duplication. todo: lemmatize all?
                 # 2x dedup for perf
+                # TODO: add synonyms from UMLS
                 "synonyms": dedup(
                     lemmatize_tails(
                         dedup([row["original_term"] or "" for row in group])
