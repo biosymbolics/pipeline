@@ -41,7 +41,7 @@ class UmlsGraph:
     @staticmethod
     def _format_name_sql(table: str, suppressions: Sequence[str] | set[str]) -> str:
         name_filter = (
-            " ".join([rf"and not {table}.str ~ '\y{s}\y'" for s in suppressions])
+            " ".join([rf"and not {table}.str ~* '\y{s}\y'" for s in suppressions])
             if len(suppressions) > 0
             else ""
         )

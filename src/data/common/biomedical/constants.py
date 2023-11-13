@@ -321,6 +321,8 @@ ACTIVITY_MOA_PATTERNS = {
     for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
 }
 
+# TODO: # 5-нт2а - нт
+
 PHRASE_REWRITES = {
     **MOA_PATTERNS,
     **ACTIVITY_MOA_PATTERNS,
