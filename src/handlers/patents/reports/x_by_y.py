@@ -6,7 +6,7 @@ from typing import TypedDict
 import logging
 
 from clients import patents as patent_client
-from clients.patents.reports import group_by_xy
+from clients.patents.reports.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
 from .constants import DEFAULT_REPORT_PARAMS

@@ -235,7 +235,7 @@ def copy_relationships():
         select
         cui1 as head_id, max(head.str) as head_name,
         cui2 as tail_id, max(tail.str) as tail_name,
-        rela as rel_type
+        rela as relationship
         from mrrel, mrconso head, mrconso tail
         where head.cui = mrrel.cui1
         AND tail.cui = mrrel.cui2
@@ -245,7 +245,7 @@ def copy_relationships():
         AND tail.lat='ENG'
         AND tail.ts='P'
         AND tail.ispref='Y'
-        group by head_id, tail_id, rel_type
+        group by head_id, tail_id, relationship
     """
 
     new_table_name = "umls_graph"
@@ -264,7 +264,7 @@ def copy_relationships():
             },
             {
                 "table": new_table_name,
-                "column": "rel_type",
+                "column": "relationship",
             },
         ]
     )

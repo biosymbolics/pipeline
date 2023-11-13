@@ -6,12 +6,12 @@ from typing import Any, Callable, Sequence, cast
 import polars as pl
 import logging
 
-from typings.patents import PatentApplication
 
-from .types import (
+from clients.patents.types import (
     PatentsReport,
     PatentsReportRecord,
 )
+from typings.patents import PatentApplication
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -98,30 +98,3 @@ def group_by_xy(
     ]
 
     return cast(list[PatentsReport], summaries)
-
-
-def graph_umls_ancestory(
-    patents: Sequence[PatentApplication],
-):
-    """
-    Graph UMLS ancestory for a set of patents
-
-    - Nodes are UMLS entities
-    - Edges are ancestory relationships OR patent co-occurrences (e.g. PD and anti-alpha-synucleins)
-    - Nodes contain metadata of the relevant patents
-
-    Process:
-        - Step 1: get all UMLS entities associated with each patent
-        - Step 2: get all UMLS ancestory relationships between those entities (ancestors from umls_lookup, other relationships from umls_graph)
-        - Step 3: Create NetworkX graph from relationships
-        - Step 4: Add co-occurrence edges to graph
-        - Step 5: Add patent metadata and size attribute to nodes
-
-    TODO: inefficient to load patents just to get ids
-    """
-    patent_ids = [p["publication_number"] for p in patents]
-
-    sql = """
-        select *
-        from annotations
-    """

@@ -111,6 +111,15 @@ functions:
     handler: src.handlers.patents.reports.x_by_y
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  graph-patents:
+    events:
+      - http:
+          path: patents/reports/graph
+          method: get
+          cors: true
+    handler: src.handlers.patents.reports.graph_patent_characteristics
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   describe-terms:
     vpc: ~ # no need to be in VPC; needs OB access
     events:
