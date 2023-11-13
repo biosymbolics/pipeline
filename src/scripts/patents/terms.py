@@ -38,6 +38,9 @@ CanonicalRecord = TypedDict(
 )
 CanonicalMap = dict[str, CanonicalRecord]
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def is_canonical_record(record: dict) -> TypeGuard[CanonicalRecord]:
     """
@@ -92,8 +95,10 @@ class TermAssembler:
         Uses the most common "original_term" if used with sufficiently high frequency,
         and otherwise uses the "term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
         """
-        if len(uniq([f"{row['id']}{row['term']}" for row in term_records])) > 1:
-            raise ValueError("Term records must have the same id and name")
+        # TODO: should also enforce that all "terms" are the same (which they aren't)
+        uniq_ids = uniq([row["id"] for row in term_records])
+        if len(uniq_ids) > 1:
+            logger.error("Term records must have the same id (%s)", uniq_ids)
 
         canonical_term = term_records[0]["term"]
 

@@ -236,6 +236,10 @@ def copy_bq_to_psql():
         ]
     )
 
+    client.create_index(
+        {"table": GPR_ANNOTATIONS_TABLE, "column": "preferred_term", "is_lower": True}
+    )
+
 
 if __name__ == "__main__":
     if "-h" in sys.argv:

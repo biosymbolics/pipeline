@@ -83,7 +83,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
-                    s.id as id,
+                    s.norm_id as id,
                     domain,
                     source,
                     character_offset_start,
@@ -94,7 +94,7 @@ def __create_annotations_table():
                         SELECT
                             *,
                             LOWER(case when map.term is null then preferred_name else map.term end) as norm_term,
-                            (case when map.id is null then preferred_name else map.id end) as id, # TODO: need more reliable approach??
+                            (case when map.id is null then preferred_name else map.id end) as norm_id, -- TODO: need more reliable approach??
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then preferred_name else map.term end)
@@ -111,7 +111,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
-                    s.id as id,
+                    s.norm_id as id,
                     domain,
                     source,
                     character_offset_start,
@@ -122,7 +122,7 @@ def __create_annotations_table():
                         SELECT
                             *,
                             LOWER(case when map.term is null then original_term else map.term end) as norm_term,
-                            (case when map.id is null then preferred_name else map.id end) as id,
+                            (case when map.id is null then original_term else map.id end) as norm_id,
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then original_term else map.term end),
@@ -133,7 +133,7 @@ def __create_annotations_table():
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
                         WHERE length(ba.term) > 0
                     ) s
-                    LEFT JOIN terms t on s.norm_term = lower(t.term)
+                    LEFT JOIN terms t on s.norm_id = t.id
                     WHERE rn = 1
         )
         SELECT
