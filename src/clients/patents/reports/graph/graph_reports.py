@@ -25,14 +25,7 @@ def graph_patent_relationships(
     - Edges are ancestory relationships OR patent co-occurrences (e.g. PD and anti-alpha-synucleins)
     - Nodes contain metadata of the relevant patents
 
-    Process:
-        - Step 1: get all UMLS entities associated with each patent
-        - Step 2: get all UMLS ancestory relationships between those entities (ancestors from umls_lookup, other relationships from umls_graph)
-        - Step 3: Create NetworkX graph from relationships
-        - Step 4: Add co-occurrence edges to graph
-        - Step 5: Add patent metadata and size attribute to nodes
-
-    TODO: inefficient to load patents just to get ids
+    Note: perhaps inefficient to load patents just for ids, but patent call is cached (+ used by other queries)
     """
     patent_ids = tuple([p["publication_number"] for p in patents])
 
@@ -53,7 +46,8 @@ def graph_patent_relationships(
     relationships = PsqlDatabaseClient().select(sql)
     G = nx.Graph()
     G.add_edges_from([(r["head"], r["tail"]) for r in relationships])
-    # nx.set_node_attributes(G, bb, "betweenness") bb is dict
+    node_to_patents = {r["head"]: r["patent_ids"] for r in relationships}
+    nx.set_node_attributes(G, node_to_patents, "patent_ids")
 
     link_data = nx.node_link_data(G)
 
