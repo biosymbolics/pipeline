@@ -158,6 +158,10 @@ class TestNerUtils(unittest.TestCase):
                 "expected": "tgfb1",
             },
             {
+                "input": "β-2-adrenergic agonist",
+                "expected": "beta 2 adrenergic agonist",
+            },
+            {
                 "input": "anti-TGF-β siRNA",
                 "expected": "anti tgfb sirna",
             },

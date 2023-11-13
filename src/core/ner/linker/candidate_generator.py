@@ -31,6 +31,10 @@ COMPOSITE_WORD_OVERRIDES = {
     "binders": "C1145667",
 }
 
+# pde-v inhibitor  - works of pde-v but not pde v or pdev
+# bace 2 inhibitor - base2
+# glp-2 agonist - works with dash
+
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
     """
@@ -88,16 +92,17 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             list(CANDIDATE_CUI_SUPPRESSIONS.keys()),
         )
 
-    def _get_matches(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
+    @classmethod
+    def _apply_word_overrides(
+        cls, texts: Sequence[str], candidates: list[list[MentionCandidate]]
+    ) -> list[list[MentionCandidate]]:
         """
-        Wrapper around super().__call__ that handles word overrides
+        Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
         """
         # look for any overrides (terms -> candidate)
         override_indices = [
             i for i, t in enumerate(texts) if t.lower() in COMPOSITE_WORD_OVERRIDES
         ]
-        candidates = super().__call__(list(texts), k=DEFAULT_K)
-
         for i in override_indices:
             candidates[i] = [
                 MentionCandidate(
@@ -107,6 +112,13 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 )
             ]
         return candidates
+
+    def _get_matches(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
+        """
+        Wrapper around super().__call__ that handles word overrides
+        """
+        candidates = super().__call__(list(texts), k=DEFAULT_K)
+        return self._apply_word_overrides(texts, candidates)
 
     def _create_composite_name(self, candidates: Sequence[MentionCandidate]) -> str:
         """
@@ -171,11 +183,14 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         candidates = get_candidates(all_words)
 
         ids = sorted([c.concept_id for c in candidates if c.similarities[0] > 0])
+        composite_name = self._create_composite_name(candidates)
+
+        # TODO!!! tfidf check - is sufficiently close to manufactured term?
 
         return CanonicalEntity(
             id="|".join(ids),
             ids=ids,
-            name=self._create_composite_name(candidates),
+            name=composite_name,
             # description=..., # TODO: composite description
             # aliases=... # TODO: all permutations
         )

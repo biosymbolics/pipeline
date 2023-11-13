@@ -4,7 +4,7 @@ Functions to initialize the terms and synonym tables
 import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
-from pydash import compact, flatten, group_by
+from pydash import compact, flatten, group_by, uniq
 
 import system
 
@@ -87,21 +87,34 @@ class TermAssembler:
     @staticmethod
     def _get_preferred_name(term_records: Sequence[TermRecord]) -> str:
         """
-        Get preferred name from a list of term records
+        Get preferred name from a list of term records with the same id
 
         Uses the most common "original_term" if used with sufficiently high frequency,
-        and otherwise uses the "canonical_term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
+        and otherwise uses the "term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
         """
-        synonyms = sorted(
+        if len(uniq([f"{row['id']}{row['term']}" for row in term_records])) > 1:
+            raise ValueError("Term records must have the same id and name")
+
+        canonical_term = term_records[0]["term"]
+
+        # use canonical name if there is only one id
+        if len(term_records[0]["ids"] or []) == 1:
+            return canonical_term
+
+        # otherwise, group the records so we can determine which term has the most synonyms
+        grouped_synonyms = sorted(
             group_by(term_records, "original_term").items(),
             key=lambda x: len(x[1]),
             reverse=True,
         )
-        return (
-            synonyms[0][0]
-            if len(synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT
-            else term_records[0]["term"]
-        )
+
+        # if the top term is sufficiently common, use that as the preferred name
+        if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
+            return grouped_synonyms[0][0]
+
+        # hydrolytic Enzyme Inhibitors
+        # otherwise, use the canonical term
+        return canonical_term
 
     @staticmethod
     def _group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
@@ -142,20 +155,23 @@ class TermAssembler:
         - aact (ctgov)
         - drugcentral approvals
         """
+        # uses this to roughly select for companies & universities over individuals
+        # otherwise the imperfect grouping gets confused
+        ASSIGNEE_PATENT_THRESHOLD = 20
         db_owner_query_map = {
             # patents db
-            "patents": """
+            "patents": f"""
                 SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 20 -- individuals unlikely to have more patents
+                having count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
 
                 UNION ALL
 
                 SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 20 -- individuals unlikely to have more patents
+                having count(*) > {ASSIGNEE_PATENT_THRESHOLD}
             """,
             # ctgov db
             "aact": """
@@ -289,6 +305,7 @@ class TermAssembler:
     def persist_terms(self):
         """
         Persists terms (TERMS_FILE) to a table
+        Applies a transformation (get_ancestors -> adding ancestor fields)
         """
         terms = load_json_from_file(TERMS_FILE)
 
