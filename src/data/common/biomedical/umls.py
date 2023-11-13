@@ -83,8 +83,12 @@ def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
             + (5 if "," in a else 0)
         )
 
-    # if 1-2 words or no aliases, prefer canonical name
-    if len(name_words) <= 2 or len(aliases) == 0:
+    # if 1-2 words (+non-gene/protein) or no aliases, prefer canonical name
+    if (
+        len(name_words) == 1
+        or (len(name_words) == 2 and name_words[1].lower() not in ["gene", "protein"])
+        or len(aliases) == 0
+    ):
         return canonical_name
 
     aliases = sorted(aliases, key=name_sorter)
