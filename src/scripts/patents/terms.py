@@ -237,8 +237,9 @@ class TermAssembler:
         logging.info("Finished creating normalization_map")
 
         def _normalize_term(term: str, domain: str) -> str:
+            # leave attributes alone
             if domain == "attributes":
-                return term  # leave attributes alone
+                return term
             entry = norm_map.get(term)
             if not entry:
                 return term

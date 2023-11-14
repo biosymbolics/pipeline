@@ -63,10 +63,8 @@ class EntityCleaner:
         self,
         substitutions: Mapping[str, str] = SUBSTITUTIONS,
         additional_cleaners: Sequence[CleanFunction] = [],
-        parallelize: bool = True,
     ):
         self.substitutions = substitutions
-        self.parallelize = parallelize
         self.additional_cleaners = additional_cleaners
         self.__removal_words: list[str] | None = None
 
