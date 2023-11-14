@@ -31,10 +31,6 @@ COMPOSITE_WORD_OVERRIDES = {
     "binders": "C1145667",
 }
 
-# pde-v inhibitor  - works of pde-v but not pde v or pdev
-# bace 2 inhibitor - base2
-# glp-2 agonist - works with dash
-
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
     """
@@ -44,6 +40,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
     select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
 
     - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
+
+    TODO:
+        pde-v inhibitor  - works of pde-v but not pde v or pdev
+        bace 2 inhibitor - base2
+        glp-2 agonist - works with dash
     """
 
     def __init__(self, *args, min_similarity: float, **kwargs):
@@ -82,7 +83,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         self, candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
-        Finds the best candidate
+        Wrapper for get_best_umls_candidate
         """
 
         return get_best_umls_candidate(
@@ -120,19 +121,49 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         candidates = super().__call__(list(texts), k=DEFAULT_K)
         return self._apply_word_overrides(texts, candidates)
 
-    def _create_composite_name(self, candidates: Sequence[MentionCandidate]) -> str:
+    def _create_composite_entity(
+        self, candidates: Sequence[MentionCandidate]
+    ) -> CanonicalEntity:
         """
         Create a composite name from a list of candidates
         """
 
-        def get_name(c):
+        def get_name_part(c):
             if c.concept_id in self.kb.cui_to_entity:
                 ce = self.kb.cui_to_entity[c.concept_id]
                 return clean_umls_name(ce.concept_id, ce.canonical_name, ce.aliases)
-
             return c.aliases[0]
 
-        return " ".join([get_name(c) for c in candidates])
+        # TODO: handle non-biomedical typed candidates
+        def get_member_candidates():
+            # Partial match if non-matched words, and only a single candidate (TODO: revisit)
+            is_partial = (
+                candidates.count(lambda c: c.similarities[0] < 0) > 0
+                and len(candidates) == 1
+            )
+
+            # if partial match, include *all* candidates, which includes the faked ones
+            # "UNMATCHED inhibitor" will have a name and id that reflects the unmatched word
+            if is_partial:
+                return candidates
+
+            # otherwise, we're going to drop unmatched words (and cross fingers)
+            # e.g. "cpla (2)-selective inhibitor" -> "cpla inhibitor"
+            return [c for c in candidates if c.similarities[0] >= 0]
+
+        member_candidates = get_member_candidates()
+
+        # sorted for the sake of consist composite ids
+        ids = sorted([c.concept_id for c in member_candidates])
+        name = " ".join([get_name_part(c) for c in member_candidates])
+
+        return CanonicalEntity(
+            id="|".join(ids),
+            ids=ids,
+            name=name,
+            # description=..., # TODO: composite description
+            # aliases=... # TODO: all permutations
+        )
 
     def _generate_composite(
         self,
@@ -170,9 +201,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             if words[0] in ngram_candidate_map:
                 return [ngram_candidate_map[words[0]], *get_candidates(remaining_words)]
 
+            # otherwise, no match. create a fake MentionCandidate.
             return [
+                # concept_id is the word itself, so
+                # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
                 MentionCandidate(
-                    concept_id="na",
+                    concept_id=words[0],
                     aliases=[words[0]],
                     similarities=[-1],
                 ),
@@ -182,18 +216,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         all_words = self.get_words(mention_text)
         candidates = get_candidates(all_words)
 
-        ids = sorted([c.concept_id for c in candidates if c.similarities[0] > 0])
-        composite_name = self._create_composite_name(candidates)
-
-        # TODO!!! tfidf check - is sufficiently close to manufactured term?
-
-        return CanonicalEntity(
-            id="|".join(ids),
-            ids=ids,
-            name=composite_name,
-            # description=..., # TODO: composite description
-            # aliases=... # TODO: all permutations
-        )
+        return self._create_composite_entity(candidates)
 
     def generate_composite_entities(
         self, matchless_mention_texts: Sequence[str]
