@@ -236,7 +236,7 @@ class TermAssembler:
         norm_map = dict(normalizer.normalize(terms))
         logging.info("Finished creating normalization_map")
 
-        def __normalize(term: str, domain: str) -> str:
+        def _normalize_term(term: str, domain: str) -> str:
             if domain == "attributes":
                 return term  # leave attributes alone
             entry = norm_map.get(term)
@@ -246,7 +246,7 @@ class TermAssembler:
 
         term_records: list[TermRecord] = [
             {
-                "term": __normalize(row["term"], row["domain"]),
+                "term": _normalize_term(row["term"], row["domain"]),
                 "count": row["count"] or 0,
                 "id": getattr(norm_map.get(row["term"]) or (), "id", None),
                 "ids": getattr(norm_map.get(row["term"]) or (), "ids", None),

@@ -10,16 +10,43 @@ from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
 from constants.core import ANNOTATIONS_TABLE, TERM_IDS_TABLE
 from typings.patents import PatentApplication
+from utils.list import is_tuple_list
 
 from .types import Node, SerializableGraph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+MAX_NODES = 1000
+
+
+def generate_graph(
+    relationships: Sequence[dict], max_nodes: int = MAX_NODES
+) -> nx.Graph:
+    """
+    Take UMLS query results and turn into a graph
+    """
+    g = nx.Graph()
+    g.add_edges_from(
+        [(r["head"], r["tail"]) for r in relationships if r["head"] != r["tail"]]
+    )
+    node_to_patents = {r["head"]: r["patent_ids"] for r in relationships}
+    nx.set_node_attributes(g, node_to_patents, "patent_ids")
+
+    if not is_tuple_list(g.degree):
+        raise ValueError(f"Expected tuple list, got {g.degree}")
+
+    # take the top `max_node` nodes by degree; create subgraph
+    top_nodes = [
+        node
+        for (node, _) in sorted(g.degree, key=lambda x: x[1], reverse=True)[:max_nodes]
+    ]
+    return g.subgraph(top_nodes)
+
 
 def graph_patent_relationships(
     patents: Sequence[PatentApplication],
-    max_nodes: int = 1000,
+    max_nodes: int = MAX_NODES,
 ) -> SerializableGraph:
     """
     Graph UMLS ancestory for a set of patents
@@ -46,7 +73,7 @@ def graph_patent_relationships(
         AND t.id = a.id
         AND g.head_id = t.cid
         AND head_id<>tail_id
-        GROUP BY head_name, tail_name, g.rel_type
+        GROUP BY head_name, tail_name, g.relationship
 
         UNION ALL
 
@@ -56,12 +83,16 @@ def graph_patent_relationships(
             tail_umls.canonical_name as tail,
             count(*) as weight,
             array_agg(publication_number) as patent_ids
-        FROM {ANNOTATIONS_TABLE} a, {TERM_IDS_TABLE} t, umls_lookup head_umls, umls_lookup tail_umls
+        FROM
+        {ANNOTATIONS_TABLE} a,
+        {TERM_IDS_TABLE} t,
+        umls_lookup head_umls,
+        umls_lookup tail_umls
         WHERE a.publication_number = ANY(ARRAY{patent_ids})
         AND a.domain in {tuple(ENTITY_DOMAINS)}
         AND t.id = a.id
         AND head_umls.id = t.cid
-        AND head_umls.category_rollup <> t.cid
+        AND head_umls.category_rollup <> t.cid -- no self-loops
         AND tail_umls.id = head_umls.category_rollup
         GROUP BY head, tail
     """
@@ -82,21 +113,10 @@ def graph_patent_relationships(
     #     GROUP BY a1.term, a2.term
     # """
     relationships = PsqlDatabaseClient().select(sql)
-    g = nx.Graph()
-    g.add_edges_from([(r["head"], r["tail"]) for r in relationships])
-    node_to_patents = {r["head"]: r["patent_ids"] for r in relationships}
-    nx.set_node_attributes(g, node_to_patents, "patent_ids")
-
-    # take the top `max_node` nodes by degree; create subgraph
-    degrees: list[tuple[str, int]] = g.degree  # type: ignore
-    top_nodes = [
-        node
-        for (node, _) in sorted(degrees, key=lambda x: x[1], reverse=True)[:max_nodes]
-    ]
-    sub_g = g.subgraph(top_nodes)
+    g = generate_graph(relationships, max_nodes=max_nodes)
 
     # create serialized link data
-    link_data = nx.node_link_data(sub_g)
+    link_data = nx.node_link_data(g)
 
     return SerializableGraph(
         links=link_data["links"],

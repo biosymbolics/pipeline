@@ -163,15 +163,15 @@ def create_umls_lookup():
             TRIM(entities.cui) as id,
             TRIM(max(entities.str)) as canonical_name,
             TRIM(max(ancestors.ptr)) as hierarchy,
+            TRIM(max(semantic_types.tui)) as type_id,
+            TRIM(max(semantic_types.sty)) as type_name,
+            COALESCE(max(descendants.count), 0) as num_descendants,
+            max(synonyms.terms) as synonyms,
             {", ".join(ANCESTOR_FIELDS)},
             '' as preferred_name,
             '' as level,
             '' as instance_rollup,
-            '' as category_rollup,
-            TRIM(max(semantic_types.tui)) as type_id,
-            TRIM(max(semantic_types.sty)) as type_name,
-            COALESCE(max(descendants.count), 0) as num_descendants,
-            max(synonyms.terms) as synonyms
+            '' as category_rollup
         FROM mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         LEFT JOIN (
@@ -240,7 +240,7 @@ def copy_relationships():
             rela as relationship
         FROM mrrel
         JOIN mrconso as head on head.cui = cui1
-        JOIN mrconso as tail on tail.cui = cui1
+        JOIN mrconso as tail on tail.cui = cui2
         JOIN mrsty as head_semantic_type on head_semantic_type.cui = cui1
         JOIN mrsty as tail_semantic_type on tail_semantic_type.cui = cui2
         WHERE head.lat='ENG'
