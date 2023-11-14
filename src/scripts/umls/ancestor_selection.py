@@ -59,8 +59,6 @@ class UmlsGraph:
         Load UMLS graph from database
 
         Restricted to ancestoral relationships between biomedical entities
-
-        NOTE: assumes suppressions are "ends-with" strings and proper casing, for perf.
         """
         start = time.monotonic()
         logger.info("Loading UMLS into graph")
