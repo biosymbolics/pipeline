@@ -49,13 +49,13 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then assignee else map.term end) as term,
-                    '' as id,
+                    null as id,
                     'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    null as instance_rollup,
+                    null as category_rollup
                 FROM applications a,
                 unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
@@ -66,13 +66,13 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then inventor else map.term end) as term,
-                    '' as id,
+                    null as id,
                     'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    null as instance_rollup,
+                    null as category_rollup
                 FROM applications a,
                 unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -88,8 +88,8 @@ def __create_annotations_table():
                     source,
                     character_offset_start,
                     character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    t.instance_rollup as instance_rollup,
+                    t.category_rollup as category_rollup
                     FROM (
                         SELECT
                             *,
@@ -103,6 +103,7 @@ def __create_annotations_table():
                         FROM {GPR_ANNOTATIONS_TABLE}
                         LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
                     ) s
+                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
                     WHERE rn = 1
 
                 UNION ALL

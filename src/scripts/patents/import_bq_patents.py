@@ -14,7 +14,7 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.patents import APPLICATIONS_TABLE
+from constants.core import APPLICATIONS_TABLE
 from typings.core import is_dict_list
 
 from .constants import (

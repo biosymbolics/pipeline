@@ -354,7 +354,8 @@ class TermAssembler:
         self.client.execute_query(
             f"""
             UPDATE {TERMS_TABLE}
-            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
+            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'))
+            where term<>'';
             """
         )
 

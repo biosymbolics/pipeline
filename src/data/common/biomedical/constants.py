@@ -23,6 +23,7 @@ UMLS_NAME_SUPPRESSIONS = set(
         ", rat",
         ", mouse",
         "categorized",  # tend to be generic categories, e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0729761
+        "category",  # https://uts.nlm.nih.gov/uts/umls/concept/C1709248
         "preparations",  # https://uts.nlm.nih.gov/uts/umls/concept/C2267085
         "used in",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3653437
         "for treatment",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540759
