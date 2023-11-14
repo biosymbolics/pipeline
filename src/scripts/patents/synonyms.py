@@ -5,9 +5,10 @@ from typing import Optional
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import SYNONYM_TABLE_NAME
 from utils.file import load_json_from_file
 
-from .constants import SYNONYM_TABLE_NAME, TERMS_FILE
+from .constants import TERMS_FILE
 from .types import AggregatedTermRecord
 
 
