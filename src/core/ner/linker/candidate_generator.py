@@ -136,10 +136,12 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         # TODO: handle non-biomedical typed candidates
         def get_member_candidates():
+            real_candidates = [c for c in candidates if c.similarities[0] >= 0]
+
             # Partial match if non-matched words, and only a single candidate (TODO: revisit)
             is_partial = (
                 candidates.count(lambda c: c.similarities[0] < 0) > 0
-                and len(candidates) == 1
+                and len(real_candidates) == 1
             )
 
             # if partial match, include *all* candidates, which includes the faked ones
@@ -149,7 +151,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
             # otherwise, we're going to drop unmatched words (and cross fingers)
             # e.g. "cpla (2)-selective inhibitor" -> "cpla inhibitor"
-            return [c for c in candidates if c.similarities[0] >= 0]
+            return real_candidates
 
         member_candidates = get_member_candidates()
 
