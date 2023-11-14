@@ -14,13 +14,13 @@ from constants.core import (
     AGGREGATED_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
+    APPLICATIONS_TABLE,
+    ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
 from scripts.umls.copy_umls import copy_umls
 
 from .constants import (
-    APPLICATIONS_TABLE,
-    ANNOTATIONS_TABLE,
     GPR_ANNOTATIONS_TABLE,
     TEXT_FIELDS,
 )
@@ -43,7 +43,7 @@ def __create_annotations_table():
     # to delete materialized view
     client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
-    entity_query = f"""
+    annotations_query = f"""
         WITH terms AS (
                 --- assignees as annotations
                 SELECT
@@ -133,7 +133,7 @@ def __create_annotations_table():
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
                         WHERE length(ba.term) > 0
                     ) s
-                    LEFT JOIN terms t on s.norm_id = t.id
+                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
                     WHERE rn = 1
         )
         SELECT
@@ -149,7 +149,7 @@ def __create_annotations_table():
         FROM terms
         ORDER BY character_offset_start
     """
-    client.create_from_select(entity_query, ANNOTATIONS_TABLE)
+    client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
 
     # add attributes at the last moment
     client.select_insert_into_table(
@@ -294,6 +294,9 @@ def main(bootstrap: bool = False):
             -t patent_to_trial \
             -t trials \
             -t regulatory_approvals \
+            -t umls_lookup \
+            -t umls_graph \
+            -t term_ids \
             -t patent_to_regulatory_approval > patents.psql
         zip patents.psql.zip patents.psql
         aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)

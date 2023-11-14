@@ -111,7 +111,7 @@ functions:
     handler: src.handlers.patents.reports.x_by_y
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  graph-patents:
+  patents-graph:
     events:
       - http:
           path: patents/reports/graph

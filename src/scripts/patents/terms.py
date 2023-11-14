@@ -11,13 +11,13 @@ import system
 system.initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
+from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
 from core.ner import TermNormalizer
 from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .constants import TERMS_FILE, TERMS_TABLE
+from .constants import TERMS_FILE
 from .process_biosym_annotations import populate_working_biosym_annotations
 from .synonyms import SynonymMapper
 from .types import AggregatedTermRecord, Ancestors, TermRecord
@@ -100,6 +100,7 @@ class TermAssembler:
         if len(uniq_ids) > 1:
             logger.error("Term records must have the same id (%s)", uniq_ids)
 
+        # TODO: because of how we create this, it isn't at all canonical!!!
         canonical_term = term_records[0]["term"]
 
         # use canonical name if there is only one id
@@ -117,7 +118,6 @@ class TermAssembler:
         if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
             return grouped_synonyms[0][0]
 
-        # hydrolytic Enzyme Inhibitors
         # otherwise, use the canonical term
         return canonical_term
 
@@ -307,6 +307,17 @@ class TermAssembler:
             "category_rollup": category_rollup,
         }
 
+    def _create_term_id_map(self):
+        """
+        Creates a materialized view of the term ids, for efficient querying
+        """
+        mat_view_query = f"""
+            DROP MATERIALIZED VIEW IF EXISTS {TERM_IDS_TABLE};
+            CREATE MATERIALIZED VIEW {TERM_IDS_TABLE} AS
+            select id, cid from {TERMS_TABLE}, unnest(terms.ids) cid
+        """
+        self.client.execute_query(mat_view_query)
+
     def persist_terms(self):
         """
         Persists terms (TERMS_FILE) to a table
@@ -333,6 +344,7 @@ class TermAssembler:
             transform=lambda batch, _: [{**r, **self.get_ancestors(r)} for r in batch],
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
+        self._create_term_id_map()
 
     def index_terms(self):
         """

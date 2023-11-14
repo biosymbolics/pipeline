@@ -10,9 +10,12 @@ from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     AGGREGATED_ANNOTATIONS_TABLE,
+    ANNOTATIONS_TABLE,
+    APPLICATIONS_TABLE,
     PATENT_TO_REGULATORY_APPROVAL_TABLE,
     REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
+    TERMS_TABLE,
     TRIALS_TABLE,
 )
 from typings.patents import PatentApplication
@@ -175,22 +178,22 @@ def _search(
     # remove dups from annotations
     query = f"""
         SELECT {", ".join(qp["fields"])},
-        {term_field} as terms,
+        max({term_field}) as terms,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
-        FROM applications AS apps
+        FROM {APPLICATIONS_TABLE} AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
             annotations.publication_number = apps.publication_number
             {qp["annotation_join_condition"]}
         )
-        JOIN annotations as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
+        JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["where"]}
-        group by apps.publication_number
+        GROUP BY apps.publication_number
         ORDER BY priority_date desc
-        limit {limit}
+        LIMIT {limit}
     """
 
     results = PsqlDatabaseClient().select(query, qp["params"])
@@ -272,7 +275,7 @@ def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
     search_sql = f"{' & '.join(string.split(' '))}:*"
     query = f"""
         SELECT DISTINCT ON (count, term) terms.term, count
-        FROM terms
+        FROM {TERMS_TABLE}
         WHERE text_search @@ to_tsquery('english', %s)
         ORDER BY count DESC
         limit {limit}

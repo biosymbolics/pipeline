@@ -10,7 +10,6 @@ from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
-from .constants import DEFAULT_REPORT_PARAMS
 from ..types import PatentSearchParams
 
 logger = logging.getLogger(__name__)
@@ -26,12 +25,14 @@ def aggregate_over_time(event: ReportEvent, context):
     Aggregate patents trends over time
 
     Invocation:
-    - Local: `serverless invoke local --function patents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Local: `serverless invoke local --function patents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma" }}'`
+    - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
     params = parse_params(
-        event.get("queryStringParameters", {}), DEFAULT_REPORT_PARAMS, 10000
+        event.get("queryStringParameters", {}),
+        {"term_field": "rollup_categories"},
+        10000,
     )
 
     if (

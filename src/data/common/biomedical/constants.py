@@ -3,7 +3,7 @@ from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC,
     PRIMARY_MECHANISM_BASE_TERMS,
 )
-from utils.re import ALPHA_CHARS, get_or_re
+from utils.re import get_or_re
 
 
 from .types import WordPlace

@@ -12,6 +12,12 @@ REGULATORY_APPROVAL_TABLE = "regulatory_approvals"
 PATENT_TO_REGULATORY_APPROVAL_TABLE = "patent_to_regulatory_approval"
 PATENT_TO_TRIAL_TABLE = "patent_to_trial"
 TRIALS_TABLE = "trials"
+APPLICATIONS_TABLE = "applications"
+ANNOTATIONS_TABLE = "annotations"
+TERMS_TABLE = "terms"
+TERM_IDS_TABLE = "term_ids"
+SYNONYM_TABLE_NAME = "synonym_map"
+
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
