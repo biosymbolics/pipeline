@@ -35,11 +35,7 @@ def search(event: SearchEvent, context):
 
     params = parse_params(event.get("queryStringParameters", {}))
 
-    if (
-        not params
-        or len(params["terms"]) < 1
-        or not all([len(t) > 1 for t in params["terms"]])
-    ):
+    if len(params["terms"]) < 1 or not all([len(t) > 1 for t in params["terms"]]):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "body": "Missing params(s)"}
 

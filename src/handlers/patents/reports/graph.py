@@ -28,7 +28,7 @@ def graph_patent_characteristics(event: ReportEvent, context):
     - Remote: `serverless invoke --function patents-graph --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
     """
-    params = parse_params(event.get("queryStringParameters", {}), {}, 10000)
+    params = parse_params(event.get("queryStringParameters", {}), default_limit=10000)
 
     if len(params["terms"]) < 1 or not all([len(t) > 1 for t in params["terms"]]):
         logger.error("Missing or malformed params: %s", params)

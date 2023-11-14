@@ -3,6 +3,7 @@
 boto3
 bs4
 langchain
+networkx
 openai
 polars
 psycopg[binary,pool]

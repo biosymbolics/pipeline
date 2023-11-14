@@ -35,11 +35,7 @@ def summarize(event: ReportEvent, context):
         event.get("queryStringParameters", {}), DEFAULT_REPORT_PARAMS, 10000
     )
 
-    if (
-        not params
-        or len(params["terms"]) < 1
-        or not all([len(t) > 1 for t in params["terms"]])
-    ):
+    if len(params["terms"]) < 1 or not all([len(t) > 1 for t in params["terms"]]):
         logger.error("Missing or malformed params: %s", params)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
