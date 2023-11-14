@@ -1,6 +1,7 @@
 """
 Patent client
 """
+from dataclasses import dataclass
 from functools import partial
 import logging
 import time
@@ -25,15 +26,15 @@ from .formatting import format_search_result
 from .types import AutocompleteTerm, QueryType, TermField, TermResult
 from .utils import get_max_priority_date
 
-QueryPieces = TypedDict(
-    "QueryPieces",
-    {
-        "annotation_join_condition": str,
-        "fields": list[str],
-        "where": str,
-        "params": list,
-    },
-)
+
+@dataclass(frozen=True)
+class QueryPieces:
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    fields: list[str]
+    where: str
+    params: list
 
 
 logger = logging.getLogger(__name__)
@@ -109,25 +110,21 @@ def __get_query_pieces(
         if not all([t.startswith("WO-") for t in terms]):
             raise ValueError("Cannot mix id and term search")
 
-        return {
-            "annotation_join_condition": f"AND apps.publication_number = any(%s)",
-            "fields": [*FIELDS, "1 as search_rank"],
-            "where": "",
-            "params": [terms],
-        }
+        return QueryPieces(
+            fields=[*FIELDS, "1 as search_rank"],
+            where=f"WHERE apps.publication_number = ANY(%s)",
+            params=[terms],
+        )
 
     max_priority_date = get_max_priority_date(int(min_patent_years))
     array_search_op = "@>" if query_type == "AND" else "&&"
 
-    base_params = {
-        # exp decay scaling for search terms; higher is better
-        "fields": [
-            *FIELDS,
-            f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
-        ],
-        "where": f"WHERE priority_date > '{max_priority_date}'::date",
-        "annotation_join_condition": f"terms {array_search_op} %s",
-    }
+    # exp decay scaling for search terms; higher is better
+    fields = [
+        *FIELDS,
+        f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
+    ]
+    base_where = f"WHERE priority_date > '{max_priority_date}'::date"
 
     if is_exhaustive:  # aka do tsquery search too
         join_char = " & " if query_type == "AND" else " | "
@@ -135,24 +132,22 @@ def __get_query_pieces(
             [" & ".join(t.split(" ")) for t in lower_terms]
         )
 
-        return cast(
-            QueryPieces,
-            {
-                **base_params,
-                # text_search in annotation_join_condition so we can use JOIN instead of LEFT_JOIN
-                # faster this way but still slow. TODO: fix!
-                "annotation_join_condition": f"AND ({base_params['annotation_join_condition']} OR text_search @@ to_tsquery('english', %s))",
-                "params": [lower_terms, ts_query_terms],
-            },
+        return QueryPieces(
+            fields=fields,
+            where=f"""
+                {base_where}
+                AND (
+                    terms {array_search_op} %s
+                    OR text_search @@ to_tsquery('english', %s)
+                )
+            """,
+            params=[lower_terms, ts_query_terms],
         )
 
-    return cast(
-        QueryPieces,
-        {
-            **base_params,
-            "annotation_join_condition": f"AND {base_params['annotation_join_condition']}",
-            "params": [lower_terms],
-        },
+    return QueryPieces(
+        fields=fields,
+        where=f"{base_where} AND terms {array_search_op} %s",
+        params=[lower_terms],
     )
 
 
@@ -181,10 +176,7 @@ def _search(
         max({term_field}) as terms,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM {APPLICATIONS_TABLE} AS apps
-        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (
-            annotations.publication_number = apps.publication_number
-            {qp["annotation_join_condition"]}
-        )
+        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (annotations.publication_number = apps.publication_number)
         JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
@@ -238,7 +230,7 @@ def search(
     Example:
     ```
     from clients.patents import patent_client
-    patent_client.search(['asthma', 'astrocytoma'])
+    patent_client.search(['asthma', 'astrocytoma'], skip_cache=True)
     ```
     """
     args = {
