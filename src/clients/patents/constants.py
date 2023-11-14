@@ -26,6 +26,7 @@ ENTITY_DOMAINS = [
 ]
 
 DOMAINS_OF_INTEREST = [
+    *ENTITY_DOMAINS,
     "assignees",
     ATTRIBUTE_FIELD,
     "inventors",
