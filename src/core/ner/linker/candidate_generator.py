@@ -4,7 +4,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
-from data.common.biomedical.constants import BIOMEDICAL_UMLS_TYPES
+from constants.umls import PREFERRED_UMLS_TYPES, MOST_PREFERRED_UMLS_TYPES
 from data.common.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
@@ -151,7 +151,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 c
                 for c in candidates
                 if has_intersection(
-                    candidate_to_types.get(c.concept_id, []), BIOMEDICAL_UMLS_TYPES
+                    candidate_to_types.get(c.concept_id, []),
+                    list(PREFERRED_UMLS_TYPES.keys()),
                 )
             ]
             return preferred_type_candidates

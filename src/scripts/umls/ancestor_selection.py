@@ -5,10 +5,8 @@ import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
-from data.common.biomedical.constants import (
-    BIOMEDICAL_UMLS_TYPES,
-    UMLS_NAME_SUPPRESSIONS,
-)
+from constants.umls import UMLS_NAME_SUPPRESSIONS, BIOMEDICAL_GRAPH_UMLS_TYPES
+
 from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
 
@@ -16,8 +14,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 BETWEENNESS_FILE = "umls_betweenness.json"
-
-# C0014930
 
 
 class UmlsGraph:
@@ -89,8 +85,8 @@ class UmlsGraph:
             and (relationship.rela is null or relationship.rela in (
                 'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
             )
-            and head_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
-            and tail_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
+            and head_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
+            and tail_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
             and ts_lexize('english_stem', head_semantic_type.sty) <> ts_lexize('english_stem', head_entity.str)   -- exclude entities with a name that is also the type (indicates an overly general)
             and ts_lexize('english_stem', tail_semantic_type.sty) <> ts_lexize('english_stem', tail_entity.str)
             {name_sql}                                                                                            -- applies lang and name filters

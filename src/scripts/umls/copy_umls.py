@@ -11,7 +11,8 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
-from data.common.biomedical.umls import clean_umls_name, BIOMEDICAL_UMLS_TYPES
+from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
+from data.common.biomedical.umls import clean_umls_name
 from typings.umls import OntologyLevel, UmlsRecord, UmlsLookupRecord
 
 from .ancestor_selection import UmlsGraph
@@ -249,8 +250,8 @@ def copy_relationships():
         AND tail.lat='ENG'
         AND tail.ts='P'
         AND tail.ispref='Y'
-        AND head_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
-        AND tail_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
+        AND head_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
+        AND tail_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
         GROUP BY head_id, tail_id, relationship
     """
 

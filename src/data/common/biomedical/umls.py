@@ -1,12 +1,12 @@
 from typing import Sequence
 from scispacy.candidate_generation import MentionCandidate
 
-from utils.list import has_intersection
-from .constants import (
-    BIOMEDICAL_UMLS_TYPES,
+from constants.umls import (
     UMLS_NAME_OVERRIDES,
     UMLS_NAME_SUPPRESSIONS,
+    BIOMEDICAL_GRAPH_UMLS_TYPES,
 )
+from utils.list import has_intersection
 
 
 def get_best_umls_candidate(
@@ -44,7 +44,7 @@ def get_best_umls_candidate(
             return min_similarity + 0.1
 
         # sort non-preferred-types to the bottom
-        if not has_intersection(types, BIOMEDICAL_UMLS_TYPES):
+        if not has_intersection(types, list(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())):
             # prefer slightly over potentially common word symbols
             return min_similarity + 0.11
 

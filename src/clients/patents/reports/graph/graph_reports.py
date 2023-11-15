@@ -141,6 +141,7 @@ def graph_patent_relationships(
     # AND head_umls.category_rollup <> t.cid -- no self-loops
     # AND tail_umls.id = head_umls.category_rollup
     # GROUP BY head, tail
+    #
     #     UNION ALL
     #     -- co-occurrence relationships
     #     SELECT
