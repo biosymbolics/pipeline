@@ -22,6 +22,16 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0179302": "Binder device",
     "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
     "C1179435": "Protein Component",  # sigh... matches "component"
+    "C0870814": "like",
+    "C1827422": "10",  # some tooth thing with "10" as alias
+    "C0080151": "Simian Acquired Immunodeficiency Syndrome",  # matches "said"
+    "C0163712": "Relate - vinyl resin",
+    "C2827757": "Antimicrobial Resistance Result",  # ("result") ugh
+    "C1882953": "ring",
+    "C0457385": "seconds",  # s
+    "C0179636": "cart",  # car-t
+    "C0039552": "terminally ill",
+    "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
 }
 
 
@@ -32,6 +42,9 @@ COMPOSITE_WORD_OVERRIDES = {
     "binder": "C1145667",  # "Binding action"
     "binders": "C1145667",
 }
+
+
+#  Phosphates Modulator
 
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
@@ -47,6 +60,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         pde-v inhibitor  - works of pde-v but not pde v or pdev
         bace 2 inhibitor - base2
         glp-2 agonist - works with dash
+        'at1 receptor antagonist'
     """
 
     def __init__(self, *args, min_similarity: float, **kwargs):

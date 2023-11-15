@@ -8,7 +8,7 @@ import networkx as nx
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
-from constants.core import ANNOTATIONS_TABLE, TERM_IDS_TABLE
+from constants.core import ANNOTATIONS_TABLE, TERM_IDS_TABLE, TERMS_TABLE
 from typings.patents import PatentApplication
 
 from .types import Node, Link, SerializableGraph
@@ -107,12 +107,25 @@ def graph_patent_relationships(
 
     # TODO: save relationship type, ancestors
     sql = f"""
-        -- direct relationships
+        -- patent-node to entity relationships
+        SELECT
+            publication_number as head,
+            umls.canonical_name as tail,
+            count(*) as weight,
+            'patent' as group
+        FROM {ANNOTATIONS_TABLE} a, {TERM_IDS_TABLE} t, umls_lookup umls
+        WHERE a.publication_number = ANY(ARRAY{patent_ids})
+        AND a.domain in {tuple(ENTITY_DOMAINS)}
+        AND t.id = a.id
+        AND umls.id = t.cid
+        GROUP BY publication_number, umls.canonical_name
+
+        -- entity to entity relationships
         SELECT
             head_name as head,
             tail_name as tail,
             count(*) as weight,
-            array_agg(publication_number) as patent_ids
+            'entity' as group
         FROM {ANNOTATIONS_TABLE} a, {TERM_IDS_TABLE} t, umls_graph g
         WHERE a.publication_number = ANY(ARRAY{patent_ids})
         AND a.domain in {tuple(ENTITY_DOMAINS)}

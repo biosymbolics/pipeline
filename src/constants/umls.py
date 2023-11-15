@@ -113,14 +113,14 @@ UMLS_DISEASE_TYPES = {
 
 UMLS_PHENOTYPE_TYPES = {
     "T022": "Body System",
-    "T023": "Body Part, Organ, or Organ Component",
+    # "T023": "Body Part, Organ, or Organ Component", # matches too many things, e.g. "10" for some tooth thing
     "T024": "Tissue",
     "T025": "Cell",
     "T026": "cell component",
     "T028": "Gene or Genome",
     "T033": "Finding",
     "T067": "Phenomenon or Process",
-    "T101": "Patient or Disabled Group",
+    # "T101": "Patient or Disabled Group",
 }
 
 

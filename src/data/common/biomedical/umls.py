@@ -65,6 +65,7 @@ def get_best_umls_candidate(
                 UMLS_NAME_SUPPRESSIONS,
                 kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
             )
+            and len(c.aliases[0]) > 2  # avoid silly short matches
         ],
         key=sorter,
         reverse=True,
@@ -92,7 +93,10 @@ def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
         # todo: use something like tfidf
 
         return (
+            # prefer short, but not too short, names
             len(a)
+            if len(a) > 3
+            else 10
             # prefer same first word
             + (5 if a.split(" ")[0].lower() != name_words[0].lower() else 0)
             # prefer same first letter
