@@ -97,4 +97,5 @@ def is_tuple_list(x: Any) -> TypeGuard[list[tuple]]:
     """
     if is_sequence(x) and len(x) > 0 and all([isinstance(e, tuple) for e in x]):
         return True
+
     return False

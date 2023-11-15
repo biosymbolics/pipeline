@@ -41,10 +41,7 @@ def describe(event: DescribeEvent, context):
             "Missing or malformed query params: %s",
             params,
         )
-        return {
-            "statusCode": 400,
-            "body": "Missing parameter(s)",
-        }
+        return {"statusCode": 400, "body": "Missing parameter(s)"}
 
     logger.info(
         "Fetching description for terms: %s",

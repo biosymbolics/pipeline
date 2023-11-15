@@ -24,8 +24,8 @@ def graph_patent_characteristics(event: ReportEvent, context):
     Return a graph of patent characteristics
 
     Invocation:
-    - Local: `serverless invoke local --function patents-graph --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - Remote: `serverless invoke --function patents-graph --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Local: `serverless invoke local --function patents-graph --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - Remote: `serverless invoke --function patents-graph --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
     """
     params = parse_params(event.get("queryStringParameters", {}), default_limit=10000)
@@ -40,7 +40,7 @@ def graph_patent_characteristics(event: ReportEvent, context):
         patents = patent_client.search(**params)
         if len(patents) == 0:
             logging.info("No patents found for terms: %s", params["terms"])
-            return {"statusCode": 200, "body": json.dumps([])}
+            return {"statusCode": 200, "body": json.dumps({})}
 
         graph = graph_patent_relationships(patents)
     except Exception as e:
@@ -48,4 +48,4 @@ def graph_patent_characteristics(event: ReportEvent, context):
         logger.error(message)
         return {"statusCode": 500, "body": message}
 
-    return {"statusCode": 200, "body": json.dumps(graph, default=str)}
+    return {"statusCode": 200, "body": graph.to_json()}

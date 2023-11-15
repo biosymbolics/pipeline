@@ -17,6 +17,8 @@ logger.setLevel(logging.INFO)
 
 BETWEENNESS_FILE = "umls_betweenness.json"
 
+# C0014930
+
 
 class UmlsGraph:
     """
@@ -142,7 +144,7 @@ class UmlsGraph:
         start = time.monotonic()
         bc_subgraph = self._get_betweenness_subgraph(k)
 
-        logger.info("Loading betweenness centrality map (slow)...")
+        logger.info("Loading betweenness centrality map (%s records)", k)
         bc_map = betweenness_centrality_parallel(bc_subgraph)
 
         if file_name is not None:
