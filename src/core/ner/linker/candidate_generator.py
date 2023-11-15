@@ -4,7 +4,9 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
+from data.common.biomedical.constants import BIOMEDICAL_UMLS_TYPES
 from data.common.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
 
 MIN_WORD_LENGTH = 1
@@ -20,6 +22,9 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C1709060": "Modulator device",
     "C0179302": "Binder device",
     "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
+    "C1421951": "MIXL1 gene",  # matches "mix"
+    "C1424212": "ADHFE1 gene",  # matches "hot"
+    "C1420817": "TNFSF14 gene",  # matches "light"
 }
 
 
@@ -134,7 +139,27 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 return clean_umls_name(ce.concept_id, ce.canonical_name, ce.aliases)
             return c.aliases[0]
 
-        # TODO: handle non-biomedical typed candidates
+        def get_preferred_typed_candidates(
+            candidates: Sequence[MentionCandidate],
+        ) -> list[MentionCandidate]:
+            """
+            Get candidates that are of a preferred type
+            """
+            entities = [self.kb.cui_to_entity.get(c.concept_id) for c in candidates]
+            candidate_to_types = {
+                c.concept_id: e.types
+                for c, e in zip(candidates, entities)
+                if e is not None
+            }
+            preferred_type_candidates = [
+                c
+                for c in candidates
+                if has_intersection(
+                    candidate_to_types.get(c.concept_id, []), BIOMEDICAL_UMLS_TYPES
+                )
+            ]
+            return preferred_type_candidates
+
         def get_member_candidates():
             real_candidates = [c for c in candidates if c.similarities[0] >= 0]
 
@@ -151,8 +176,15 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             if is_partial:
                 return candidates
 
-            # otherwise, we're going to drop unmatched words (and cross fingers)
+            # else, we're going to drop unmatched words
             # e.g. "cpla (2)-selective inhibitor" -> "cpla inhibitor"
+
+            # if we have 1+ preferred candidates, return those
+            # this prevents composites like C0024579|C0441833 ("Maleimides Groups") - wherein "Group" offers little value
+            preferred = get_preferred_typed_candidates(real_candidates)
+            if len(preferred) >= 1:
+                return preferred
+
             return real_candidates
 
         member_candidates = get_member_candidates()
