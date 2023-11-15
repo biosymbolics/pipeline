@@ -17,7 +17,7 @@ from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .constants import TERMS_FILE
+from .constants import GPR_ANNOTATIONS_TABLE, TERMS_FILE
 from .process_biosym_annotations import populate_working_biosym_annotations
 from .synonyms import SynonymMapper
 from .types import AggregatedTermRecord, Ancestors, TermRecord
@@ -219,14 +219,23 @@ class TermAssembler:
 
     def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
-        Creates entity terms from the annotations table
+        Creates entity terms from the annotations and gpr annotations tables
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT lower(original_term) as term, domain, COUNT(*) as count
-                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(original_term) > 0
-                group by lower(original_term), domain
+                SELECT term, domain, sum(count) as count FROM (
+                    SELECT lower(preferred_name) as term, domain, COUNT(*) as count
+                    from {GPR_ANNOTATIONS_TABLE}
+                    group by preferred_name, domain
+
+                    UNION ALL
+
+                    SELECT lower(original_term) as term, domain, COUNT(*) as count
+                    FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                    group by original_term, domain
+                ) s
+
+                group by term, domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
