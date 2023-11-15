@@ -78,13 +78,14 @@ def save_json_as_file(
     JSON encodes and persists serializable_obj
     """
     try:
-        json_str = json.dumps(serializable_obj)
+        json_str = json.dumps(serializable_obj, default=str)
         save_as_file(json_str, filename)
     except Exception as e:
         logger.error("Failure to save JSON to file %s: %s", filename, e)
         if pickle_on_error:
             pickle_file = save_as_pickle(serializable_obj, filename)
             logger.error("Saved as pickle: %s", pickle_file)
+        raise e
 
 
 def load_json_from_file(filename: str) -> Any:
