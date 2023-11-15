@@ -8,6 +8,9 @@ import pickle
 import uuid
 from typing import Any, Optional, Union
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def save_as_file(content: Union[str, bytes], filename: str):
     """
@@ -68,12 +71,20 @@ def load_pickles(directory: str = PICKLE_BASE) -> dict[str, Any]:
     return dict(pickles)
 
 
-def save_json_as_file(serializable_obj: Any, filename: str):
+def save_json_as_file(
+    serializable_obj: Any, filename: str, pickle_on_error: bool = True
+):
     """
     JSON encodes and persists serializable_obj
     """
-    json_str = json.dumps(serializable_obj)
-    save_as_file(json_str, filename)
+    try:
+        json_str = json.dumps(serializable_obj)
+        save_as_file(json_str, filename)
+    except Exception as e:
+        logger.error("Failure to save JSON to file %s: %s", filename, e)
+        if pickle_on_error:
+            pickle_file = save_as_pickle(serializable_obj, filename)
+            logger.error("Saved as pickle: %s", pickle_file)
 
 
 def load_json_from_file(filename: str) -> Any:
@@ -84,5 +95,5 @@ def load_json_from_file(filename: str) -> Any:
     try:
         return json.loads(json_str)
     except json.decoder.JSONDecodeError as e:
-        logging.error("Failure to load JSON from file %s", filename)
+        logger.error("Failure to load JSON from file %s", filename)
         raise e
