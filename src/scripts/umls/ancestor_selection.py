@@ -85,8 +85,10 @@ class UmlsGraph:
             and relationship.cui2 = tail_semantic_type.cui
             and hierarchy.cui = relationship.cui1
             and hierarchy.ptr is not null                                 -- suppress entities wo parent (otherwise overly general)
-            and relationship.rel in ('RN', 'CHD')                         -- narrower, child
-            and (relationship.rela is null or relationship.rela = 'isa')  -- no specified relationship, or 'is a'
+            and relationship.rel in ('RN', 'RB', 'CHD', 'PAR')            -- narrower, broader, child, parent
+            and (relationship.rela is null or relationship.rela in (
+                'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
+            )
             and head_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
             and tail_semantic_type.tui in {BIOMEDICAL_UMLS_TYPES}
             and ts_lexize('english_stem', head_semantic_type.sty) <> ts_lexize('english_stem', head_entity.str)   -- exclude entities with a name that is also the type (indicates an overly general)
