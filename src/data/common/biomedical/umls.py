@@ -4,7 +4,8 @@ from scispacy.candidate_generation import MentionCandidate
 from constants.umls import (
     UMLS_NAME_OVERRIDES,
     UMLS_NAME_SUPPRESSIONS,
-    BIOMEDICAL_GRAPH_UMLS_TYPES,
+    PREFERRED_UMLS_TYPES,
+    MOST_PREFERRED_UMLS_TYPES,
 )
 from utils.list import has_intersection
 
@@ -44,9 +45,13 @@ def get_best_umls_candidate(
             return min_similarity + 0.1
 
         # sort non-preferred-types to the bottom
-        if not has_intersection(types, list(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())):
+        if not has_intersection(types, list(PREFERRED_UMLS_TYPES.keys())):
             # prefer slightly over potentially common word symbols
             return min_similarity + 0.11
+
+        # if most preferred types, bump up its "similarity"
+        if has_intersection(types, list(MOST_PREFERRED_UMLS_TYPES.keys())):
+            return max([1, c.similarities[0] + 0.5])
 
         return c.similarities[0]
 

@@ -4,7 +4,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
-from constants.umls import PREFERRED_UMLS_TYPES, MOST_PREFERRED_UMLS_TYPES
+from constants.umls import PREFERRED_UMLS_TYPES
 from data.common.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
@@ -21,6 +21,7 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C1709060": "Modulator device",
     "C0179302": "Binder device",
     "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
+    "C1179435": "Protein Component",  # sigh... matches "component"
 }
 
 
