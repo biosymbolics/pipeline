@@ -140,7 +140,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
             # Partial match if non-matched words, and only a single candidate (TODO: revisit)
             is_partial = (
-                candidates.count(lambda c: c.similarities[0] < 0) > 0
+                # has 1+ fake candidates (i.e. unmatched)
+                sum(c.similarities[0] < 0 for c in candidates) > 0
+                # and only one real candidate match
                 and len(real_candidates) == 1
             )
 
