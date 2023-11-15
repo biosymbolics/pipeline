@@ -15,16 +15,12 @@ DEFAULT_K = 3  # mostly wanting to avoid suppressions. increase if adding a lot 
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     "C0432616": "Blood group antibody A",  # matches "anti", sigh
-    "C1413336": "CEL gene",  # matches "cell"; TODO fix so this gene can match
-    "C1413568": "COIL gene",  # matches "coil"
+    "C1704653": "cell device",  # matches "cell"
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
     "C0205263": "Induce (action)",
     "C1709060": "Modulator device",
     "C0179302": "Binder device",
     "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
-    "C1421951": "MIXL1 gene",  # matches "mix"
-    "C1424212": "ADHFE1 gene",  # matches "hot"
-    "C1420817": "TNFSF14 gene",  # matches "light"
 }
 
 

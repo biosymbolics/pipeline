@@ -31,9 +31,22 @@ def get_best_umls_candidate(
     def sorter(c: MentionCandidate):
         types = set(kb.cui_to_entity[c.concept_id].types)
 
+        # if the alias is all caps, short and all words, it's probably an acronym
+        # sometimes these are common words, like "MIX" (C1421951), "HOT" (C1424212) and "LIGHT" (C1420817)
+        if (
+            c.aliases[0].upper() == c.aliases[0]
+            and len(c.aliases[0]) < 6
+            and c.aliases[0].isalpha()
+            # a non-common-word symbol will often have both upper and lower as aliases, e.g. ['NADP', 'nadp']
+            # both which will have the same similarity score (since tfidf was trained on lower())
+            and len(c.aliases) == 1
+        ):
+            return min_similarity + 0.1
+
         # sort non-preferred-types to the bottom
         if not has_intersection(types, BIOMEDICAL_UMLS_TYPES):
-            return min_similarity
+            # prefer slightly over potentially common word symbols
+            return min_similarity + 0.11
 
         return c.similarities[0]
 
