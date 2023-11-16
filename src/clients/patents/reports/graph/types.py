@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from json import JSONEncoder
 import json
 
 
@@ -7,14 +6,21 @@ import json
 class Link:
     source: str
     target: str
-    weight: int
+    # weight: int
+
+
+@dataclass(frozen=True)
+class NodePosition:
+    x: float
+    y: float
 
 
 @dataclass(frozen=True)
 class Node:
     id: str
+    group: str
     label: str
-    patent_ids: list[str]
+    position: NodePosition
     size: int
 
 
