@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Sequence, cast
 import requests
 import polars as pl
 from typing_extensions import TypedDict
@@ -23,7 +23,7 @@ EnrichrEntity = TypedDict(
 )
 
 
-def __format_gene_list(genes: list[str]) -> str:
+def __format_gene_list(genes: Sequence[str]) -> str:
     """
     Format genes how Enrichr requires (as a string; one per line)
 
@@ -33,7 +33,7 @@ def __format_gene_list(genes: list[str]) -> str:
     return "\n".join(genes)
 
 
-def __generate_list(genes: list[str]) -> str:
+def __generate_list(genes: Sequence[str]) -> str:
     """
     Generate enrichr list (which is later retrieved)
 
@@ -89,7 +89,7 @@ def __retrieve_list(list_id: str, gene_library: str) -> list[EnrichrEntity]:
 
 
 def call_enrichr(
-    genes: list[str], gene_library: str = DEFAULT_GENE_LIBRARY
+    genes: Sequence[str], gene_library: str = DEFAULT_GENE_LIBRARY
 ) -> list[EnrichrEntity]:
     """
     Call Enrichr (https://maayanlab.cloud/Enrichr/help#api)

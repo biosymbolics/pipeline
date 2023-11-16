@@ -3,7 +3,7 @@ Reactome client
 """
 from collections.abc import MutableMapping
 import json
-from typing import Optional
+from typing import Optional, Sequence
 from typing_extensions import TypedDict
 import logging
 import regex as re
@@ -47,7 +47,7 @@ def __extract_reactome_id(entity_id: str) -> str:
     return match[0] if match else entity_id
 
 
-def __extract_reactome_ids(entity_ids: list[str]) -> list[str]:
+def __extract_reactome_ids(entity_ids: Sequence[str]) -> list[str]:
     """
     Extract reactome ids from a list of entity ids (not all are ids) and dedups.
 
@@ -114,7 +114,7 @@ def __add_lineage(lineage: Lineage, tree: TreeMap) -> TreeMap:
     return tree
 
 
-def __get_lineages(reactome_ids: list[str]) -> list[Lineage]:
+def __get_lineages(reactome_ids: Sequence[str]) -> list[Lineage]:
     """
     Get reactome hierachies by id
 
@@ -124,7 +124,7 @@ def __get_lineages(reactome_ids: list[str]) -> list[Lineage]:
     return [__get_lineage(id) for id in reactome_ids]
 
 
-def __create_tree(lineages: list[Lineage]) -> TreeRecords:
+def __create_tree(lineages: Sequence[Lineage]) -> TreeRecords:
     """
     Create a tree out of multiple lineages
 
@@ -138,7 +138,7 @@ def __create_tree(lineages: list[Lineage]) -> TreeRecords:
     return list(tree.values())
 
 
-def fetch_reactome_tree(entity_ids: list[str]) -> TreeRecords:
+def fetch_reactome_tree(entity_ids: Sequence[str]) -> TreeRecords:
     """
     Fetch reactome tree for a list of entity ids
 
