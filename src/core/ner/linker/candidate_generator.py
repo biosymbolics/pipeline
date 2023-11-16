@@ -23,7 +23,6 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
     "C1179435": "Protein Component",  # sigh... matches "component"
     "C0870814": "like",
-    "C1827422": "10",  # some tooth thing with "10" as alias
     "C0080151": "Simian Acquired Immunodeficiency Syndrome",  # matches "said"
     "C0163712": "Relate - vinyl resin",
     "C2827757": "Antimicrobial Resistance Result",  # ("result") ugh
@@ -32,6 +31,7 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0179636": "cart",  # car-t
     "C0039552": "terminally ill",
     "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
+    "C0243072": "derivative",
 }
 
 
@@ -61,6 +61,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         bace 2 inhibitor - base2
         glp-2 agonist - works with dash
         'at1 receptor antagonist'
+        "hyperproliferative disease cancer"
     """
 
     def __init__(self, *args, min_similarity: float, **kwargs):
