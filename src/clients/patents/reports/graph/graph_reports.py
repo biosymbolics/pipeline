@@ -177,7 +177,7 @@ def graph_patent_relationships(
     relationships = PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
-    layout = nx.kamada_kawai_layout(g)
+    layout = nx.circular_layout(g)
 
     # create serialized link data
     link_data = nx.node_link_data(g)
