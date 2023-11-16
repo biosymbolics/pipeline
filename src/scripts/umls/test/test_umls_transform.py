@@ -11,19 +11,24 @@ class TestTrialUtils(unittest.TestCase):
                 "description": "finds distant instance ancestor",
                 "record": {
                     "level": OntologyLevel.INSTANCE,
-                    "id": "VERY SPECIFIC THING",
+                    "id": "C1415265|C4721408",
+                    "canonical_name": "gpr84 antagonist",
                 },
                 "ancestors": tuple(
                     [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
                         {"level": OntologyLevel.INSTANCE, "id": "bb8"},
                         {"level": OntologyLevel.INSTANCE, "id": "cc7"},
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C1415265",
+                            "canonical_name": "gpr84",
+                        },
                         {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
                 "level": OntologyLevel.INSTANCE,
-                "expected": "cc7",
+                "expected": "C1415265",
             },
             {
                 "description": "takes self if no ancestors",
