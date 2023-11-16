@@ -6,28 +6,26 @@ from typing import Any, Callable, Sequence, cast
 import polars as pl
 import logging
 
-from typings.patents import PatentApplication
-from typings.umls import RollupLevel
 
-from .types import (
+from clients.patents.types import (
     PatentsReport,
     PatentsReportRecord,
 )
+from typings.patents import PatentApplication
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def aggregate(
+def group_by_xy(
     patents: Sequence[PatentApplication],
     x_dimensions: list[str],
     y_dimensions: list[str] | None = None,
     x_transform: Callable[[Any], Any] = lambda x: x,
     y_transform: Callable[[Any], Any] = lambda y: y,
-    rollup_level: RollupLevel | None = None,
-) -> Sequence[PatentsReport]:
+) -> list[PatentsReport]:
     """
-    Aggregate summary stats
+    Group summary stats by x and optionally y dimensions
     Returns one report per (x_dimension x y_dimension)
 
     Args:
@@ -38,7 +36,7 @@ def aggregate(
         y_transform (Callable[[Any], Any], optional): transform y dimension. Defaults to lambda y: y.
         rollup_level (RollupLevel, optional): rollup level. Defaults to None.
 
-    TODO: SQL for agg?
+    TODO: use SQL for agg instead of polars/df?
 
     Usage:
     ```
@@ -59,6 +57,7 @@ def aggregate(
             # explode y_dim if list
             if df.select(pl.col(y_dim)).dtypes == pl.List:
                 df = df.explode(y_dim)
+
             col_df = (
                 # apply y_transform; keep y around
                 df.with_columns(pl.col(y_dim).apply(y_transform).alias("y"))

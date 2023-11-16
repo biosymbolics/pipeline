@@ -6,7 +6,7 @@ from typing import TypedDict
 import logging
 
 from clients import patents as patent_client
-from clients.patents.reports import aggregate
+from clients.patents.reports.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -58,7 +58,7 @@ def x_by_y(event: XByYReportEvent, context):
             logging.info("No patents found for terms: %s", params["terms"])
             return {"statusCode": 200, "body": json.dumps([])}
 
-        reports = aggregate(
+        reports = group_by_xy(
             patents,
             x_dimensions=[x_dimension],
             y_dimensions=[y_dimension],

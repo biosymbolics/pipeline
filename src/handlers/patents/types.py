@@ -27,3 +27,4 @@ class ParsedPatentSearchParams(BasePatentSearchParams):
     is_exhaustive: NotRequired[bool]
     skip_cache: NotRequired[bool]
     terms: list[str]
+    term_field: NotRequired[TermField]

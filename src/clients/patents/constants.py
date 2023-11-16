@@ -17,13 +17,17 @@ RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
 EST_MAX_CLINDEV = 10
 MAX_PATENT_LIFE = 20
 
-DOMAINS_OF_INTEREST = [
-    "assignees",
-    ATTRIBUTE_FIELD,
+ENTITY_DOMAINS = [
     "biologics",
     "compounds",
     "devices",
     "diseases",
-    "inventors",
     "mechanisms",
+]
+
+DOMAINS_OF_INTEREST = [
+    *ENTITY_DOMAINS,
+    "assignees",
+    ATTRIBUTE_FIELD,
+    "inventors",
 ]

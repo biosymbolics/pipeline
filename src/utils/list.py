@@ -3,7 +3,7 @@ Utils for lists/arrays
 """
 
 
-from typing import Iterable, Mapping, Sequence, TypeVar, cast
+from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar, cast
 import numpy as np
 from pydash import compact
 import polars as pl
@@ -89,3 +89,13 @@ def is_sequence(obj: object) -> bool:
     return not isinstance(obj, str) and isinstance(
         obj, (Sequence, list, tuple, pl.Series, np.ndarray)
     )
+
+
+def is_tuple_list(x: Any) -> TypeGuard[list[tuple]]:
+    """
+    Simple typeguard for list of tuples
+    """
+    if is_sequence(x) and len(x) > 0 and all([isinstance(e, tuple) for e in x]):
+        return True
+
+    return False

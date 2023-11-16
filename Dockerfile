@@ -2,8 +2,6 @@ FROM public.ecr.aws/lambda/python:3.10
 
 WORKDIR /var/task
 
-# ENV HNSWLIB_NO_NATIVE=1
-
 COPY . .
 
 # RUN yum install python3-dev

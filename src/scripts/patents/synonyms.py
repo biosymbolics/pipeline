@@ -5,9 +5,10 @@ from typing import Optional
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import SYNONYM_TABLE_NAME
 from utils.file import load_json_from_file
 
-from .constants import SYNONYM_TABLE_NAME, TERMS_FILE
+from .constants import TERMS_FILE
 from .types import AggregatedTermRecord
 
 
@@ -16,7 +17,7 @@ class SynonymMapper:
     Static class for synonym mapping functions
     """
 
-    def __init__(self, synonym_map: dict[str, str]):
+    def __init__(self):
         """
         Create a table of synonyms
 
@@ -28,13 +29,10 @@ class SynonymMapper:
         logging.info("Creating synonym map (truncating if exists)")
         self.client.create_table(
             SYNONYM_TABLE_NAME,
-            {"synonym": "TEXT", "term": "TEXT"},
+            {"synonym": "TEXT", "term": "TEXT", "id": "TEXT"},
             exists_ok=True,
             truncate_if_exists=True,
         )
-
-        logging.info("Adding default/hard-coded synonym map entries")
-        self.add_map(synonym_map)
 
     def add_synonyms(
         self,
@@ -51,7 +49,7 @@ class SynonymMapper:
 
         # Persist term -> synonyms as synonyms
         synonym_map = {
-            og_term: row["term"]
+            og_term: {"term": row["term"], "id": row["id"]}
             for row in terms
             for og_term in row["synonyms"]
             if len(row["term"]) > 1
@@ -60,7 +58,7 @@ class SynonymMapper:
         logging.info("Adding %s terms to synonym map", len(synonym_map))
         self.add_map(synonym_map)
 
-    def add_map(self, synonym_map: dict[str, str]):
+    def add_map(self, synonym_map: dict[str, dict]):
         """
         Add common entity names to the synonym map, taking in a map of form {synonym: term}
 
@@ -69,11 +67,12 @@ class SynonymMapper:
         """
         records = [
             {
-                "synonym": entry[0].lower(),
-                "term": entry[1].lower(),
+                "synonym": syn.lower(),
+                "term": entry["term"].lower(),
+                "id": entry["id"],
             }
-            for entry in synonym_map.items()
-            if len(entry[0]) > 0 and entry[0] != entry[1]
+            for syn, entry in synonym_map.items()
+            if len(syn) > 0 and syn != entry["term"]
         ]
 
         self.client.insert_into_table(records, SYNONYM_TABLE_NAME)

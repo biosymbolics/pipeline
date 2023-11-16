@@ -3,87 +3,11 @@ from constants.patterns.intervention import (
     INTERVENTION_PREFIXES_GENERIC,
     PRIMARY_MECHANISM_BASE_TERMS,
 )
-from utils.re import ALPHA_CHARS, get_or_re
+from utils.re import get_or_re
 
 
 from .types import WordPlace
 
-# TODO: maybe choose NCI as canonical name
-UMLS_NAME_OVERRIDES = {
-    "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
-    "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
-    "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
-}
-
-# suppress UMLS entities matching these names
-# assumes closest matching alias would match the suppressed name (sketchy)
-UMLS_NAME_SUPPRESSIONS = set(
-    [
-        ", rat",
-        ", mouse",
-    ]
-)
-
-
-# could include things like virus, bacteria, etc.
-BIOMEDICAL_UMLS_TYPES = tuple(
-    [
-        # "T023"  # Body Part, Organ, or Organ Component
-        "T020",  # acquired abnormality
-        "T019",  # congenital abnormality
-        # "T025",  # cell
-        # "T026",  # cell component
-        "T043",  # cell function
-        "T028",  # "Gene or Genome",
-        # "T033", # Finding
-        # "T034",  # laboratory or test result
-        "T037",  # Injury or Poisoning
-        "T044",  # molecular function
-        "T046",  # Pathologic Function
-        "T047",  # "Disease or Syndrome",
-        "T048",  # "Mental or Behavioral Dysfunction",
-        "T049",  # "Cell or Molecular Dysfunction",
-        "T046",  # "Pathologic Function",
-        "T059",  # laboratory procedure
-        "T060",  # diagnostic procedure
-        "T061",  # "Therapeutic or Preventive Procedure",
-        "T063",  # research activity
-        "T074",  # medical device
-        "T075",  # research device
-        "T085",  # "Molecular Sequence",
-        "T086",  # "Nucleotide Sequence",
-        "T087",  # "Amino Acid Sequence",
-        "T088",  # "Carbohydrate Sequence",
-        "T103",  # "Chemical",
-        "T104",  # "Chemical Viewed Structurally",
-        "T109",  # "Organic Chemical",
-        "T114",  # "Nucleic Acid, Nucleoside, or Nucleotide",
-        "T116",  # "Amino Acid, Peptide, or Protein",
-        "T120",  # "Chemical Viewed Functionally",
-        "T121",  # "Pharmacologic Substance",
-        "T122",  # biomedical or dental material
-        "T123",  # "Biologically Active Substance",
-        "T125",  # "Hormone",
-        "T129",  # "Immunologic Factor",
-        "T126",  # "Enzyme",
-        "T127",  # "Vitamin",
-        "T129",  # "Immunologic Factor",
-        "T130",  # "Indicator, Reagent, or Diagnostic Aid",
-        "T131",  # "Hazardous or Poisonous Substance",
-        "T167",  # "Substance",
-        "T168",  # food
-        "T184",  # sign or symptom
-        "T190",  # Anotomic abnormality
-        "T191",  # "Neoplastic Process",
-        "T192",  # "Receptor",
-        "T195",  # antibiotic
-        "T196",  # "Element, Ion, or Isotope"
-        "T197",  # "Inorganic Chemical"
-        "T200",  # "Clinical Drug"
-        "T203",  # drug delivery device
-        # "T201",  # Clinical Attribute
-    ]
-)
 
 REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     **{k: "leading" for k in INTERVENTION_PREFIXES_GENERIC},
@@ -311,26 +235,21 @@ ACTIVITY_MOA_PATTERNS = {
     for pattern, canonical in PRIMARY_MECHANISM_BASE_TERMS.items()
 }
 
+# TODO: # 5-нт2а - нт
+
 PHRASE_REWRITES = {
     **MOA_PATTERNS,
     **ACTIVITY_MOA_PATTERNS,
     r"κB": "kappa-b",
     r"nf[- ]?κ[BβΒ]": "nfkb",
     r"(?:α|a|amyloid)[ ]?(?:β|b|beta)[ ]?([-0-9]{1,5})": r"abeta\1",  # scispacy does better with this
-    f"({ALPHA_CHARS('*')})[ ]?[Αα][ ]?({ALPHA_CHARS(2)}|,)": r"\1 alpha \2",
-    f"({ALPHA_CHARS('*')})[ ]?[βΒ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 beta \2",
-    f"({ALPHA_CHARS('*')})[ ]?[γΓ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 gamma \2",
-    f"({ALPHA_CHARS('*')})[ ]?[δΔ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 delta \2",
-    f"({ALPHA_CHARS('*')})[ ]?[ωΩ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 omega \2",
-    f"({ALPHA_CHARS('*')})[ ]?[ηΗ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 eta \2",
-    rf"({ALPHA_CHARS('*')})[ ]?[κ][ ]?({ALPHA_CHARS(2)}|,)": r"\1 kappa \2",
-    f"({ALPHA_CHARS('*')})Αα(-?(?:[0-9]+|[a-z]))": r"\1 alpha\2",
-    f"({ALPHA_CHARS('*')})βΒ(-?(?:[0-9]+|[a-z]))": r"\1 beta\2",
-    f"({ALPHA_CHARS('*')})γΓ(-?(?:[0-9]+|[a-z]))": r"\1 gamma\2",
-    f"({ALPHA_CHARS('*')})δΔ(-?(?:[0-9]+|[a-z]))": r"\1 delta\2",
-    f"({ALPHA_CHARS('*')})ωΩ(-?(?:[0-9]+|[a-z]))": r"\1 omega\2",
-    f"({ALPHA_CHARS('*')})ηΗ(-?(?:[0-9]+|[a-z]))": r"\1 eta\2",
-    f"({ALPHA_CHARS('*')})κ(-?(?:[0-9]+|[a-z]))": r"\1 kappa\2",
+    "(.*)[Αα](.*)": r"\1alpha\2",
+    "(.*)[βΒ](.*)": r"\1beta\2",
+    "(.*)[γΓ](.*)": r"\1gamma\2",
+    "(.*)[δΔ](.*)": r"\1delta\2",
+    "(.*)[ωΩ](.*)": r"\1omega\2",
+    "(.*)[ηΗ](.*)": r"\1eta\2",
+    "(.*)[κ](.*)": r"\1kappa\2",
     "analogue": "analog",
     "antibody conjugate": "antibody",
     "antibody immunoconjugate": "antibody",

@@ -11,6 +11,7 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
+from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 from data.common.biomedical.umls import clean_umls_name
 from typings.umls import OntologyLevel, UmlsRecord, UmlsLookupRecord
 
@@ -159,37 +160,37 @@ def create_umls_lookup():
     ]
 
     source_sql = f"""
-        select
+        SELECT
             TRIM(entities.cui) as id,
             TRIM(max(entities.str)) as canonical_name,
             TRIM(max(ancestors.ptr)) as hierarchy,
+            TRIM(max(semantic_types.tui)) as type_id,
+            TRIM(max(semantic_types.sty)) as type_name,
+            COALESCE(max(descendants.count), 0) as num_descendants,
+            max(synonyms.terms) as synonyms,
             {", ".join(ANCESTOR_FIELDS)},
             '' as preferred_name,
             '' as level,
             '' as instance_rollup,
-            '' as category_rollup,
-            TRIM(max(semantic_types.tui)) as type_id,
-            TRIM(max(semantic_types.sty)) as type_name,
-            COALESCE(max(descendants.count), 0) as num_descendants,
-            max(synonyms.terms) as synonyms
-        from mrconso as entities
+            '' as category_rollup
+        FROM mrconso as entities
         LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
         LEFT JOIN (
-            select cui1 as parent_cui, count(*) as count
-            from mrrel
-            where rel in ('RN', 'CHD') -- narrower, child
-            and (rela is null or rela = 'isa') -- no specified relationship, or 'is a' rel
-            group by parent_cui
+            SELECT cui1 as parent_cui, count(*) as count
+            FROM mrrel
+            WHERE rel in ('RN', 'CHD') -- narrower, child
+            AND (rela is null or rela = 'isa') -- no specified relationship, or 'is a' rel
+            GROUP BY parent_cui
         ) descendants ON descendants.parent_cui = entities.cui
         LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
         LEFT JOIN (
             select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
             group by cui
         ) as synonyms on synonyms.id = entities.cui
-        where entities.lat='ENG' -- english
+        WHERE entities.lat='ENG' -- english
         AND entities.ts='P' -- preferred terms
         AND entities.ispref='Y' -- preferred term
-        group by entities.cui -- because multiple preferred terms
+        GROUP BY entities.cui -- because multiple preferred terms
     """
 
     new_table_name = "umls_lookup"
@@ -229,23 +230,29 @@ def create_umls_lookup():
 def copy_relationships():
     """
     Copy relationships from umls to patents
+
+    - Creates a table of UMLS relationships: head_id, head_name, tail_id, tail_name, relationship
+    - Limits based on language and semantic type
     """
-    # cui1 inverse_isa cui2 for parent (cui2 is parent); rel=PAR
-    source_sql = """
-        select
-        cui1 as head_id, max(head.str) as head_name,
-        cui2 as tail_id, max(tail.str) as tail_name,
-        rela as rel_type
-        from mrrel, mrconso head, mrconso tail
-        where head.cui = mrrel.cui1
-        AND tail.cui = mrrel.cui2
-        AND head.lat='ENG'
+    source_sql = f"""
+        SELECT
+            cui1 as head_id, max(head.str) as head_name,
+            cui2 as tail_id, max(tail.str) as tail_name,
+            rela as relationship
+        FROM mrrel
+        JOIN mrconso as head on head.cui = cui1
+        JOIN mrconso as tail on tail.cui = cui2
+        JOIN mrsty as head_semantic_type on head_semantic_type.cui = cui1
+        JOIN mrsty as tail_semantic_type on tail_semantic_type.cui = cui2
+        WHERE head.lat='ENG'
         AND head.ts='P'
         AND head.ispref='Y'
         AND tail.lat='ENG'
         AND tail.ts='P'
         AND tail.ispref='Y'
-        group by head_id, tail_id, rel_type
+        AND head_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+        AND tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+        GROUP BY head_id, tail_id, relationship
     """
 
     new_table_name = "umls_graph"
@@ -264,7 +271,7 @@ def copy_relationships():
             },
             {
                 "table": new_table_name,
-                "column": "rel_type",
+                "column": "relationship",
             },
         ]
     )
@@ -275,7 +282,7 @@ def copy_umls():
     Copy data from umls to patents
     """
     create_umls_lookup()
-    # copy_relationships()
+    copy_relationships()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import json
 
-from clients.patents.types import QueryType, get_query_type
+from clients.patents.types import QueryType, TermField, get_query_type
 from handlers.patents.types import (
     OptionalPatentSearchParams,
     PatentSearchParams,
@@ -30,10 +30,11 @@ def parse_params(
     terms_list = [t.strip() for t in (terms.split(";") if terms else [])]
 
     is_exhaustive = parse_bool(params.get("is_exhaustive", "false"))
-    min_patent_years = params.get("min_patent_years") or 10
     limit = params.get("limit") or default_limit
-    skip_cache = parse_bool(params.get("skip_cache", "false"))
+    min_patent_years = params.get("min_patent_years") or 10
     query_type: QueryType = get_query_type(params.get("query_type"))
+    skip_cache = parse_bool(params.get("skip_cache", "false"))
+    term_field: TermField = params.get("term_field") or "terms"
 
     return {
         "terms": terms_list,
@@ -42,4 +43,5 @@ def parse_params(
         "min_patent_years": min_patent_years,
         "limit": limit,
         "skip_cache": skip_cache,
+        "term_field": term_field,
     }

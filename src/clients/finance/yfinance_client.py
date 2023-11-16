@@ -4,7 +4,11 @@ yfinance client
 from datetime import date
 from typing import TypedDict
 import yfinance as yf
+import polars as pl
 import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 StockPrice = TypedDict(
@@ -26,7 +30,7 @@ def __normalize(data) -> list[StockPrice]:
         df = data[["date", "close", "open", "volume"]]
         return df.to_dict("records")
     except Exception as e:
-        logging.warning("Error normalizing data: %s (data: %s)", e, data)
+        logger.warning("Error normalizing data: %s (data: %s)", e, data)
         raise e
 
 
@@ -40,6 +44,9 @@ def fetch_yfinance_data(
         ticker (str): ticker to get data for
         start_date (date): start date
         end_date (date): end date
+
+
+
     """
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
@@ -52,3 +59,12 @@ def fetch_yfinance_data(
         return __normalize(data)
 
     return []
+
+
+def get_cash_minus_debt(ticker: str) -> float:
+    t = yf.Ticker(ticker)
+    bs_df = pl.DataFrame(t.get_balance_sheet().reset_index())  # type: ignore
+    net_debt = bs_df.row(by_predicate=(pl.col("index") == "NetDebt"))
+
+    # t.info # find market cap
+    return net_debt[1]

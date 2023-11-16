@@ -14,13 +14,13 @@ from constants.core import (
     AGGREGATED_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
+    APPLICATIONS_TABLE,
+    ANNOTATIONS_TABLE,
 )
 from scripts.ctgov.copy_ctgov import copy_ctgov
 from scripts.umls.copy_umls import copy_umls
 
 from .constants import (
-    APPLICATIONS_TABLE,
-    ANNOTATIONS_TABLE,
     GPR_ANNOTATIONS_TABLE,
     TEXT_FIELDS,
 )
@@ -43,18 +43,19 @@ def __create_annotations_table():
     # to delete materialized view
     client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
-    entity_query = f"""
+    annotations_query = f"""
         WITH terms AS (
                 --- assignees as annotations
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then assignee else map.term end) as term,
+                    null as id,
                     'assignees' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    null as instance_rollup,
+                    null as category_rollup
                 FROM applications a,
                 unnest(a.assignees) as assignee
                 LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
@@ -65,12 +66,13 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     LOWER(case when map.term is null then inventor else map.term end) as term,
+                    null as id,
                     'inventors' as domain,
                     'record' as source,
                     1 as character_offset_start,
                     1 as character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    null as instance_rollup,
+                    null as category_rollup
                 FROM applications a,
                 unnest(a.inventors) as inventor
                 LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
@@ -81,16 +83,18 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
+                    s.norm_id as id,
                     domain,
                     source,
                     character_offset_start,
                     character_offset_end,
-                    '' as instance_rollup,
-                    '' as category_rollup
+                    t.instance_rollup as instance_rollup,
+                    t.category_rollup as category_rollup
                     FROM (
                         SELECT
                             *,
                             LOWER(case when map.term is null then preferred_name else map.term end) as norm_term,
+                            (case when map.id is null then preferred_name else map.id end) as norm_id, -- TODO: need more reliable approach??
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then preferred_name else map.term end)
@@ -99,6 +103,7 @@ def __create_annotations_table():
                         FROM {GPR_ANNOTATIONS_TABLE}
                         LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
                     ) s
+                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
                     WHERE rn = 1
 
                 UNION ALL
@@ -107,6 +112,7 @@ def __create_annotations_table():
                 SELECT
                     publication_number,
                     s.norm_term as term,
+                    s.norm_id as id,
                     domain,
                     source,
                     character_offset_start,
@@ -117,6 +123,7 @@ def __create_annotations_table():
                         SELECT
                             *,
                             LOWER(case when map.term is null then original_term else map.term end) as norm_term,
+                            (case when map.id is null then original_term else map.id end) as norm_id,
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
                                 (case when map.term is null then original_term else map.term end),
@@ -127,12 +134,13 @@ def __create_annotations_table():
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
                         WHERE length(ba.term) > 0
                     ) s
-                    LEFT JOIN terms t on s.norm_term = lower(t.term)
+                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
                     WHERE rn = 1
         )
         SELECT
             publication_number,
             term,
+            id,
             domain,
             source,
             character_offset_start,
@@ -142,14 +150,15 @@ def __create_annotations_table():
         FROM terms
         ORDER BY character_offset_start
     """
-    client.create_from_select(entity_query, ANNOTATIONS_TABLE)
+    client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
 
     # add attributes at the last moment
     client.select_insert_into_table(
         f"""
             SELECT
                 publication_number,
-                original_term,
+                original_term as term,
+                original_term as id,
                 domain,
                 source,
                 character_offset_start,
@@ -170,6 +179,10 @@ def __create_annotations_table():
             {
                 "table": ANNOTATIONS_TABLE,
                 "column": "term",
+            },
+            {
+                "table": ANNOTATIONS_TABLE,
+                "column": "id",
             },
         ]
     )
@@ -264,37 +277,40 @@ def add_application_search():
 
 def main(bootstrap: bool = False):
     """
-        Copy tables from patents-public-data to a local dataset.
-        Order matters.
+    Copy tables from patents-public-data to a local dataset.
+    Order matters.
 
-        Usage:
-            >>> python3 -m scripts.patents.initialize_patents -bootstrap
-            >>> python3 -m scripts.patents.initialize_patents
+    Usage:
+        >>> python3 -m scripts.patents.initialize_patents -bootstrap
+        >>> python3 -m scripts.patents.initialize_patents
 
-        Followed by:
-        ```
-        # from local machine
-        pg_dump --no-owner patents \
-            -t aggregated_annotations \
-            -t annotations \
-            -t applications \
-            -t terms \
-            -t patent_to_trial \
-            -t trials \
-            -t regulatory_approvals \
-            -t patent_to_regulatory_approval > patents.psql
-        zip patents.psql.zip patents.psql
-        aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
-        aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
-        rm patents.psql*
+    Followed by:
+    ```
+    # from local machine
+    pg_dump --no-owner patents \
+        -t aggregated_annotations \
+        -t annotations \
+        -t applications \
+        -t terms \
+        -t patent_to_trial \
+        -t trials \
+        -t regulatory_approvals \
+        -t umls_lookup \
+        -t umls_graph \
+        -t term_ids \
+        -t patent_to_regulatory_approval > patents.psql
+    zip patents.psql.zip patents.psql
+    aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
+    aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
+    rm patents.psql*
 
-        # then proceeding in ec2
-        aws configure sso
-        aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
-        unzip patents.psql.zip
-        y
-        export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
-        echo "
+    # then proceeding in ec2
+    aws configure sso
+    aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
+    unzip patents.psql.zip
+    y
+    export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
+    echo "
     CREATE ROLE readaccess;
     GRANT USAGE ON SCHEMA public TO readaccess;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;

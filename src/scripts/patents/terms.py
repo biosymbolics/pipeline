@@ -4,20 +4,20 @@ Functions to initialize the terms and synonym tables
 import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
-from pydash import compact, flatten, group_by
+from pydash import compact, flatten, group_by, uniq
 
 import system
 
 system.initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import WORKING_BIOSYM_ANNOTATIONS_TABLE
+from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
 from core.ner import TermNormalizer
 from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
-from .constants import SYNONYM_MAP, TERMS_FILE, TERMS_TABLE
+from .constants import GPR_ANNOTATIONS_TABLE, TERMS_FILE
 from .process_biosym_annotations import populate_working_biosym_annotations
 from .synonyms import SynonymMapper
 from .types import AggregatedTermRecord, Ancestors, TermRecord
@@ -37,6 +37,9 @@ CanonicalRecord = TypedDict(
     },
 )
 CanonicalMap = dict[str, CanonicalRecord]
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def is_canonical_record(record: dict) -> TypeGuard[CanonicalRecord]:
@@ -87,21 +90,36 @@ class TermAssembler:
     @staticmethod
     def _get_preferred_name(term_records: Sequence[TermRecord]) -> str:
         """
-        Get preferred name from a list of term records
+        Get preferred name from a list of term records with the same id
 
         Uses the most common "original_term" if used with sufficiently high frequency,
-        and otherwise uses the "canonical_term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
+        and otherwise uses the "term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
         """
-        synonyms = sorted(
+        # TODO: should also enforce that all "terms" are the same (which they aren't)
+        uniq_ids = uniq([row["id"] for row in term_records])
+        if len(uniq_ids) > 1:
+            logger.error("Term records must have the same id (%s)", uniq_ids)
+
+        # TODO: because of how we create this, it isn't at all canonical!!!
+        canonical_term = term_records[0]["term"]
+
+        # use canonical name if there is only one id
+        if len(term_records[0]["ids"] or []) == 1:
+            return canonical_term
+
+        # otherwise, group the records so we can determine which term has the most synonyms
+        grouped_synonyms = sorted(
             group_by(term_records, "original_term").items(),
             key=lambda x: len(x[1]),
             reverse=True,
         )
-        return (
-            synonyms[0][0]
-            if len(synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT
-            else term_records[0]["term"]
-        )
+
+        # if the top term is sufficiently common, use that as the preferred name
+        if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
+            return grouped_synonyms[0][0]
+
+        # otherwise, use the canonical term
+        return canonical_term
 
     @staticmethod
     def _group_terms(terms: list[TermRecord]) -> list[AggregatedTermRecord]:
@@ -142,20 +160,23 @@ class TermAssembler:
         - aact (ctgov)
         - drugcentral approvals
         """
+        # uses this to roughly select for companies & universities over individuals
+        # otherwise the imperfect grouping gets confused
+        ASSIGNEE_PATENT_THRESHOLD = 20
         db_owner_query_map = {
             # patents db
-            "patents": """
+            "patents": f"""
                 SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 20 -- individuals unlikely to have more patents
+                having count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
 
                 UNION ALL
 
                 SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
                 group by name
-                having count(*) > 20 -- individuals unlikely to have more patents
+                having count(*) > {ASSIGNEE_PATENT_THRESHOLD}
             """,
             # ctgov db
             "aact": """
@@ -198,14 +219,23 @@ class TermAssembler:
 
     def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
-        Creates entity terms from the annotations table
+        Creates entity terms from the annotations and gpr annotations tables
         Normalizes terms and associates to canonical ids
         """
         terms_query = f"""
-                SELECT lower(original_term) as term, domain, COUNT(*) as count
-                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                where length(original_term) > 0
-                group by lower(original_term), domain
+                SELECT term, domain, sum(count) as count FROM (
+                    SELECT lower(preferred_name) as term, domain, COUNT(*) as count
+                    from {GPR_ANNOTATIONS_TABLE}
+                    group by preferred_name, domain
+
+                    UNION ALL
+
+                    SELECT lower(original_term) as term, domain, COUNT(*) as count
+                    FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                    group by original_term, domain
+                ) s
+
+                group by term, domain
             """
         rows = self.client.select(terms_query)
         terms: list[str] = [row["term"] for row in rows]
@@ -215,17 +245,18 @@ class TermAssembler:
         norm_map = dict(normalizer.normalize(terms))
         logging.info("Finished creating normalization_map")
 
-        def __normalize(term: str, domain: str) -> str:
+        def _normalize_term(term: str, domain: str) -> str:
+            # leave attributes alone
             if domain == "attributes":
-                return term  # leave attributes alone
+                return term
             entry = norm_map.get(term)
             if not entry:
-                return SYNONYM_MAP.get(term) or term
+                return term
             return entry.name
 
         term_records: list[TermRecord] = [
             {
-                "term": __normalize(row["term"], row["domain"]),
+                "term": _normalize_term(row["term"], row["domain"]),
                 "count": row["count"] or 0,
                 "id": getattr(norm_map.get(row["term"]) or (), "id", None),
                 "ids": getattr(norm_map.get(row["term"]) or (), "ids", None),
@@ -286,9 +317,21 @@ class TermAssembler:
             "category_rollup": category_rollup,
         }
 
+    def _create_term_id_map(self):
+        """
+        Creates a materialized view of the term ids, for efficient querying
+        """
+        mat_view_query = f"""
+            DROP MATERIALIZED VIEW IF EXISTS {TERM_IDS_TABLE};
+            CREATE MATERIALIZED VIEW {TERM_IDS_TABLE} AS
+            select id, cid from {TERMS_TABLE}, unnest(terms.ids) cid
+        """
+        self.client.execute_query(mat_view_query)
+
     def persist_terms(self):
         """
         Persists terms (TERMS_FILE) to a table
+        Applies a transformation (get_ancestors -> adding ancestor fields)
         """
         terms = load_json_from_file(TERMS_FILE)
 
@@ -311,6 +354,7 @@ class TermAssembler:
             transform=lambda batch, _: [{**r, **self.get_ancestors(r)} for r in batch],
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
+        self._create_term_id_map()
 
     def index_terms(self):
         """
@@ -319,7 +363,8 @@ class TermAssembler:
         self.client.execute_query(
             f"""
             UPDATE {TERMS_TABLE}
-            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'));
+            SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'))
+            where term<>'';
             """
         )
 
@@ -360,7 +405,7 @@ class TermAssembler:
         Idempotent (all tables are dropped and recreated)
         """
         TermAssembler().generate_and_persist_terms()
-        sm = SynonymMapper(SYNONYM_MAP)
+        sm = SynonymMapper()
         sm.add_synonyms()
         sm.index()
 
