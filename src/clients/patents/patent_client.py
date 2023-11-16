@@ -93,6 +93,27 @@ FIELDS: list[str] = [
 ]
 
 
+def _get_term_query(
+    lower_terms: Sequence[str],
+    query_type: QueryType,
+) -> str:
+    """
+    Form term query based on AND/OR (query_type) and term fields
+
+    TODO: This is really confusing esp. since param order matters
+
+    Example:
+    ```
+    >>> _get_term_query(["asthma", "melanoma"], "OR")
+    'AND ((term=%s OR instance_rollup=%s) OR (term=%s OR instance_rollup=%s))'
+    >>>
+    ```
+    """
+    base_query = "(term=%s OR instance_rollup=%s)"
+    criteria = f" {query_type} ".join([base_query] * len(lower_terms))
+    return f"({criteria})"
+
+
 def __get_query_pieces(
     terms: list[str],
     query_type: QueryType,
@@ -116,15 +137,14 @@ def __get_query_pieces(
             params=[terms],
         )
 
-    max_priority_date = get_max_priority_date(int(min_patent_years))
-    array_search_op = "@>" if query_type == "AND" else "&&"
-
     # exp decay scaling for search terms; higher is better
     fields = [
         *FIELDS,
         f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
     ]
-    base_where = f"WHERE priority_date > '{max_priority_date}'::date"
+    max_priority_date = get_max_priority_date(int(min_patent_years))
+    date_criteria = f"priority_date > '{max_priority_date}'::date"
+    term_criteria = _get_term_query(lower_terms, query_type)
 
     if is_exhaustive:  # aka do tsquery search too
         join_char = " & " if query_type == "AND" else " | "
@@ -135,19 +155,16 @@ def __get_query_pieces(
         return QueryPieces(
             fields=fields,
             where=f"""
-                {base_where}
-                AND (
-                    terms {array_search_op} %s
-                    OR text_search @@ to_tsquery('english', %s)
-                )
+                WHERE {date_criteria}
+                AND ({term_criteria} OR text_search @@ to_tsquery('english', %s))
             """,
-            params=[lower_terms, ts_query_terms],
+            params=[*sorted(lower_terms * 2), ts_query_terms],
         )
 
     return QueryPieces(
         fields=fields,
-        where=f"{base_where} AND terms {array_search_op} %s",
-        params=[lower_terms],
+        where=f"WHERE {date_criteria} AND {term_criteria}",
+        params=[*sorted(lower_terms * 2)],
     )
 
 
@@ -170,7 +187,6 @@ def _search(
 
     qp = __get_query_pieces(terms, query_type, min_patent_years, is_exhaustive)
 
-    # remove dups from annotations
     query = f"""
         SELECT {", ".join(qp["fields"])},
         max({term_field}) as terms,
