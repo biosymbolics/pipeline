@@ -3,7 +3,7 @@
 boto3
 bs4
 langchain
-networkx
+networkx[default]
 openai
 polars
 psycopg[binary,pool]
@@ -11,5 +11,5 @@ pydash
 python-dotenv
 regex
 requests
-sec_api
+# scipy # nx layout
 typing_extensions
