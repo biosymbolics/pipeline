@@ -250,8 +250,8 @@ def copy_relationships():
         AND tail.lat='ENG'
         AND tail.ts='P'
         AND tail.ispref='Y'
-        AND head_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
-        AND tail_semantic_type.tui in {BIOMEDICAL_GRAPH_UMLS_TYPES}
+        AND head_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+        AND tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
         GROUP BY head_id, tail_id, relationship
     """
 

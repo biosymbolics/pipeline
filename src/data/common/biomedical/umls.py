@@ -65,7 +65,7 @@ def get_best_umls_candidate(
                 UMLS_NAME_SUPPRESSIONS,
                 kb.cui_to_entity[c.concept_id].canonical_name.split(" "),
             )
-            and len(c.aliases[0]) > 2  # avoid silly short matches
+            and len(c.aliases[0].replace(" ", "")) > 2  # avoid silly short matches
         ],
         key=sorter,
         reverse=True,
@@ -74,16 +74,27 @@ def get_best_umls_candidate(
     return ok_candidates[0] if len(ok_candidates) > 0 else None
 
 
-def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
+def clean_umls_name(
+    cui: str,
+    canonical_name: str,
+    aliases: list[str],
+    overrides: dict[str, str] = UMLS_NAME_OVERRIDES,
+) -> str:
     """
     Cleans up UMLS names, potentially choosing an alias over the canonical name
 
     - prefer shorter names
     - prefer names that are `XYZ protein` vs `protein, XYZ`
     - prefer names that start with the same word/letter as the canonical name
+
+    Args:
+        cui (str): cui
+        canonical_name (str): canonical name
+        aliases (list[str]): aliases
+        overrides (dict[str, str], optional): overrides. Defaults to UMLS_NAME_OVERRIDES.
     """
-    if cui in UMLS_NAME_OVERRIDES:
-        return UMLS_NAME_OVERRIDES[cui]
+    if cui in overrides:
+        return overrides[cui]
 
     name_words = canonical_name.split(" ")
 
@@ -91,12 +102,9 @@ def clean_umls_name(cui: str, canonical_name: str, aliases: list[str]) -> str:
         # prefer shorter aliases that start with the same word/letter as the canonical name
         # e.g. TNFSF11 for "TNFSF11 protein, human"
         # todo: use something like tfidf
-
         return (
             # prefer short, but not too short, names
-            len(a)
-            if len(a) > 3
-            else 10
+            (len(a) if len(a) > 3 else 20)
             # prefer same first word
             + (5 if a.split(" ")[0].lower() != name_words[0].lower() else 0)
             # prefer same first letter
