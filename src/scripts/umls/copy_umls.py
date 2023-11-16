@@ -3,7 +3,6 @@ Utils for ETLing UMLs data
 """
 import sys
 import logging
-from typing import Sequence, TypeGuard, cast
 
 from system import initialize
 
@@ -12,140 +11,12 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
-from data.common.biomedical.umls import clean_umls_name
-from typings.umls import OntologyLevel, UmlsRecord, UmlsLookupRecord
 
-from .ancestor_selection import UmlsGraph
+from .constants import MAX_DENORMALIZED_ANCESTORS
+from .utils import UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-MAX_DENORMALIZED_ANCESTORS = 10
-
-
-def is_umls_record_list(
-    records: Sequence[dict],
-) -> TypeGuard[Sequence[UmlsRecord]]:
-    """
-    Check if list of records is a list of UmlsRecords
-    """
-    return (
-        isinstance(records, list)
-        and len(records) > 0
-        and isinstance(records[0], dict)
-        and "id" in records[0]
-        and "canonical_name" in records[0]
-        and "hierarchy" in records[0]
-        and "type_id" in records[0]
-        and "type_name" in records[0]
-        and "level" in records[0]
-    )
-
-
-class UmlsTransformer:
-    def __init__(self, aui_lookup: dict[str, str]):
-        self.aui_lookup: dict[str, str] = aui_lookup
-        self.lookup_dict: dict[str, UmlsLookupRecord] | None = None
-        self.betweenness_map: dict[str, float] = UmlsGraph().betweenness_map
-
-    def initialize(self, all_records: Sequence[dict]):
-        if not is_umls_record_list(all_records):
-            raise ValueError(f"Records are not UmlsRecords: {all_records[:10]}")
-
-        logger.info("Initializing UMLS lookup dict with %s records", len(all_records))
-        lookup_records = [self.create_lookup_record(r) for r in all_records]
-        self.lookup_dict = {r["id"]: r for r in lookup_records}
-        logger.info("Initializing UMLS lookup dict")
-
-    def create_lookup_record(self, record: UmlsRecord) -> UmlsLookupRecord:
-        hier = record["hierarchy"]
-        # reverse to get nearest ancestor first
-        ancestors = (hier.split(".") if hier is not None else [])[::-1]
-        ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
-
-        return {
-            **record,  # type: ignore
-            **{f"l{i}_ancestor": None for i in range(MAX_DENORMALIZED_ANCESTORS)},
-            **{
-                f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestor_cuis) else None
-                for i in range(MAX_DENORMALIZED_ANCESTORS)
-            },
-            "level": OntologyLevel.find(record["id"], self.betweenness_map),
-            "preferred_name": clean_umls_name(
-                record["id"], record["canonical_name"], record["synonyms"]
-            ),
-        }
-
-    def find_level_ancestor(
-        self,
-        record: UmlsLookupRecord,
-        level: OntologyLevel,
-    ) -> str:
-        """
-        Find first ancestor at the specified level
-
-        Args:
-            record (UmlsLookupRecord): UMLS record
-            level (OntologyLevel): level to find
-
-        Returns (str): ancestor id, or "" if none found
-        """
-        if self.lookup_dict is None:
-            raise ValueError("Lookup dict is not initialized")
-
-        # use self as rollup if at the right level
-        if record["level"] == level:
-            return record["id"]
-
-        # take the first ancestor that is at the right level
-        for i in range(MAX_DENORMALIZED_ANCESTORS):
-            acui = record[f"l{i}_ancestor"]
-            if acui is not None and acui in self.lookup_dict:
-                ancestor_rec = self.lookup_dict[acui]
-                if ancestor_rec["level"] == level:
-                    return ancestor_rec["id"]
-            elif acui is not None:
-                logger.error("Missing ancestor %s for %s", acui, record["id"])
-
-        return ""
-
-    def __call__(
-        self,
-        batch: Sequence[dict],
-        all_records: Sequence[dict],
-    ) -> list[UmlsLookupRecord]:
-        """
-        Transform umls relationship
-
-        Args:
-            batch (Sequence[dict]): batch of records to transform
-            all_records (Sequence[dict]): all records
-        """
-        if not is_umls_record_list(batch):
-            raise ValueError(f"Records are not UmlsRecords: {batch[:10]}")
-
-        if self.lookup_dict is None:
-            self.initialize(all_records)
-            assert self.lookup_dict is not None
-
-        batch_records = [self.lookup_dict[r["id"]] for r in batch]
-
-        return [
-            cast(
-                UmlsLookupRecord,
-                {
-                    **r,  # type: ignore
-                    "instance_rollup": self.find_level_ancestor(
-                        r, OntologyLevel.L1_CATEGORY
-                    ),
-                    "category_rollup": self.find_level_ancestor(
-                        r, OntologyLevel.L2_CATEGORY
-                    ),
-                },
-            )
-            for r in batch_records
-        ]
 
 
 def create_umls_lookup():

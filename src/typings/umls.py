@@ -4,23 +4,10 @@ from typing import Literal
 from utils.classes import ByDefinitionOrderEnum
 
 
-@dataclass(frozen=True)
-class UmlsRecord:
-    def __getitem__(self, item):
-        return getattr(self, item)
-
-    id: str
-    canonical_name: str
-    num_descendants: int
-    hierarchy: str | None
-    type_id: str
-    type_name: str
-
-
 class OntologyLevel(ByDefinitionOrderEnum):
     L2_CATEGORY = "L2_CATEGORY"  # least specific
-    L1_CATEGORY = "L1_CATEGORY"  # most specific
-    INSTANCE = "INSTANCE"
+    L1_CATEGORY = "L1_CATEGORY"
+    INSTANCE = "INSTANCE"  # most specific
     UNKNOWN = "UNKNOWN"
 
     @classmethod
@@ -42,6 +29,19 @@ class OntologyLevel(ByDefinitionOrderEnum):
 
         # 6418 as of 11/23
         return cls.L2_CATEGORY
+
+
+@dataclass(frozen=True)
+class UmlsRecord:
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    id: str
+    canonical_name: str
+    num_descendants: int
+    hierarchy: str | None
+    type_id: str
+    type_name: str
 
 
 @dataclass(frozen=True)
