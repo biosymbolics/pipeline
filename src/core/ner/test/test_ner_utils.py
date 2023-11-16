@@ -3,7 +3,7 @@ from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
 from core.ner.utils import rearrange_terms, normalize_by_pos
-from data.common.biomedical import (
+from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )

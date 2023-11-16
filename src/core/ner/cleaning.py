@@ -15,7 +15,7 @@ from constants.patterns.intervention import (
     PRIMARY_MECHANISM_BASE_TERMS,
 )
 from constants.patterns.iupac import is_iupac
-from data.common.biomedical.constants import PHRASE_REWRITES
+from data.domain.biomedical.constants import PHRASE_REWRITES
 from utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 

@@ -5,7 +5,6 @@ which persists these attributes to a table for later use.
 import sys
 import logging
 
-import torch
 
 from system import initialize
 

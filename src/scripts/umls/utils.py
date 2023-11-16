@@ -1,7 +1,7 @@
 from typing import Sequence
 import logging
 
-from data.common.biomedical.umls import clean_umls_name
+from data.domain.biomedical.umls import clean_umls_name
 from typings.umls import (
     IntermediateUmlsRecord,
     OntologyLevel,
