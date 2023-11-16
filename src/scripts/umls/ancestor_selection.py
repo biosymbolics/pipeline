@@ -30,11 +30,18 @@ class UmlsGraph:
     ```
     """
 
-    def __init__(self):
+    def __init__(self, file_name: str | None = BETWEENNESS_FILE):
         umls_db = f"{BASE_DATABASE_URL}/umls"
         self.db = PsqlDatabaseClient(umls_db)
-        self.G = self.load_graph()
-        self.betweenness_map = self.load_betweenness()
+
+        if file_name is not None:
+            try:
+                self.betweenness_map = load_json_from_file(file_name)
+            except FileNotFoundError:
+                pass
+        else:
+            self.G = self.load_graph()
+            self.betweenness_map = self.load_betweenness()
 
     @staticmethod
     def _format_name_sql(table: str, suppressions: Sequence[str] | set[str]) -> str:
@@ -136,12 +143,6 @@ class UmlsGraph:
 
         11/23 - Takes roughly 1 hour for 50k nodes using 6 cores
         """
-        if file_name is not None:
-            try:
-                return load_json_from_file(file_name)
-            except FileNotFoundError:
-                pass
-
         start = time.monotonic()
         bc_subgraph = self._get_betweenness_subgraph(k)
 

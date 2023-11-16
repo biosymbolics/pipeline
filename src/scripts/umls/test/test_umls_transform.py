@@ -87,6 +87,28 @@ class TestTrialUtils(unittest.TestCase):
                 "level": OntologyLevel.L2_CATEGORY,
                 "expected": "ALREADY_L2_CATEGORY",
             },
+            {
+                "description": "Takes self as INSTANCE ancestor even if no ancestors",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C1415265",
+                    "canonical_name": "GPR84 gene",
+                },
+                "ancestors": tuple([]),
+                "level": OntologyLevel.INSTANCE,
+                "expected": "C1415265",
+            },
+            {
+                "description": "returns '' if no matching ancestors above INSTANCE",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C1415265",
+                    "canonical_name": "GPR84 gene",
+                },
+                "ancestors": tuple([]),
+                "level": OntologyLevel.L1_CATEGORY,
+                "expected": "",
+            },
         ]
 
         for test in test_cases:

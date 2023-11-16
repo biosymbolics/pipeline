@@ -153,7 +153,7 @@ def copy_umls():
     Copy data from umls to patents
     """
     create_umls_lookup()
-    copy_relationships()
+    # copy_relationships()
 
 
 if __name__ == "__main__":

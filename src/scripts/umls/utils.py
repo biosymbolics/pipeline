@@ -1,8 +1,13 @@
-from typing import Sequence, cast
+from typing import Sequence
 import logging
 
 from data.common.biomedical.umls import clean_umls_name
-from typings.umls import OntologyLevel, UmlsLookupRecord, UmlsRecord
+from typings.umls import (
+    IntermediateUmlsRecord,
+    OntologyLevel,
+    UmlsLookupRecord,
+    UmlsRecord,
+)
 
 from .ancestor_selection import UmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
@@ -14,9 +19,9 @@ logger.setLevel(logging.INFO)
 
 
 def find_level_ancestor(
-    record: UmlsLookupRecord,
+    record: IntermediateUmlsRecord,
     level: OntologyLevel,
-    ancestors: tuple[UmlsLookupRecord, ...],
+    ancestors: tuple[IntermediateUmlsRecord, ...],
 ) -> str:
     """
     Find first ancestor at the specified level
@@ -56,7 +61,7 @@ class UmlsTransformer:
 
     def __init__(self, aui_lookup: dict[str, str]):
         self.aui_lookup: dict[str, str] = aui_lookup
-        self.lookup_dict: dict[str, UmlsLookupRecord] | None = None
+        self.lookup_dict: dict[str, IntermediateUmlsRecord] | None = None
         self.betweenness_map: dict[str, float] = UmlsGraph().betweenness_map
 
     def initialize(self, all_records: Sequence[dict]):
@@ -64,13 +69,13 @@ class UmlsTransformer:
             raise ValueError(f"Records are not UmlsRecords: {all_records[:10]}")
 
         logger.info("Initializing UMLS lookup dict with %s records", len(all_records))
-        lookup_records = self.create_lookup_records(all_records)
+        lookup_records = [self._create_lookup_record(r) for r in all_records]
         self.lookup_dict = {r["id"]: r for r in lookup_records}
         logger.info("Initializing UMLS lookup dict")
 
-    def create_lookup_record(self, record: UmlsRecord) -> UmlsLookupRecord:
+    def _create_lookup_record(self, record: UmlsRecord) -> IntermediateUmlsRecord:
         """
-        Create a lookup record from a UMLS record
+        Create a record for each UMLS entity, to be used for internal purposes
         """
         hier = record["hierarchy"]
         # reverse to get nearest ancestor first
@@ -90,15 +95,10 @@ class UmlsTransformer:
             ),
         }
 
-    def create_lookup_records(
-        self, records: Sequence[UmlsRecord]
-    ) -> list[UmlsLookupRecord]:
+    def transform_record(self, r: IntermediateUmlsRecord) -> UmlsLookupRecord:
         """
-        Create lookup records
+        Transform a single UMLS record, intended to be persisted
         """
-        return [self.create_lookup_record(r) for r in records]
-
-    def transform_record(self, r: UmlsLookupRecord) -> UmlsLookupRecord:
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")
 
@@ -106,17 +106,12 @@ class UmlsTransformer:
         ancestors = tuple(
             [self.lookup_dict[cui] for cui in cuis if cui in self.lookup_dict]
         )
-        return cast(
-            UmlsLookupRecord,
-            {
-                **r,  # type: ignore
-                "instance_rollup": find_level_ancestor(
-                    r, OntologyLevel.L1_CATEGORY, ancestors
-                ),
-                "category_rollup": find_level_ancestor(
-                    r, OntologyLevel.L2_CATEGORY, ancestors
-                ),
-            },
+        return UmlsLookupRecord.from_intermediate(
+            r,
+            instance_rollup=find_level_ancestor(r, OntologyLevel.INSTANCE, ancestors),
+            category_rollup=find_level_ancestor(
+                r, OntologyLevel.L1_CATEGORY, ancestors
+            ),
         )
 
     def __call__(
