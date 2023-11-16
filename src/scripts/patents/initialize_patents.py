@@ -195,10 +195,9 @@ def __create_annotations_table():
             publication_number,
             ARRAY_AGG(a.term) AS terms,
             ARRAY_AGG(domain) AS domains,
-            ARRAY_AGG(t.instance_rollup) as rollup_terms,
-            ARRAY_AGG(t.category_rollup) as rollup_categories
+            ARRAY_AGG(instance_rollup) as rollup_terms,
+            ARRAY_AGG(category_rollup) as rollup_categories
         FROM {ANNOTATIONS_TABLE} a
-        LEFT JOIN terms t on t.term = a.term
         GROUP BY publication_number;
     """
     client.execute_query(mat_view_query)
