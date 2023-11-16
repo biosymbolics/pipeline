@@ -148,7 +148,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         def get_name_part(c):
             if c.concept_id in self.kb.cui_to_entity:
                 ce = self.kb.cui_to_entity[c.concept_id]
-                return clean_umls_name(ce.concept_id, ce.canonical_name, ce.aliases)
+                return clean_umls_name(
+                    ce.concept_id, ce.canonical_name, ce.aliases, True
+                )
             return c.aliases[0]
 
         def get_preferred_typed_candidates(
@@ -325,7 +327,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         # go to kb to get canonical name
         entity = self.kb.cui_to_entity[top_candidate.concept_id]
-        name = clean_umls_name(entity.concept_id, entity.canonical_name, entity.aliases)
+        name = clean_umls_name(
+            entity.concept_id, entity.canonical_name, entity.aliases, False
+        )
 
         return CanonicalEntity(
             id=entity.concept_id,

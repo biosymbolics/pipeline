@@ -78,6 +78,7 @@ def clean_umls_name(
     cui: str,
     canonical_name: str,
     aliases: list[str],
+    is_composite: bool,
     overrides: dict[str, str] = UMLS_NAME_OVERRIDES,
 ) -> str:
     """
@@ -95,6 +96,11 @@ def clean_umls_name(
     """
     if cui in overrides:
         return overrides[cui]
+
+    # if not composite, prefer canonical name
+    if not is_composite:
+        print("NOT COMPOSITE", canonical_name, is_composite)
+        return canonical_name
 
     name_words = canonical_name.split(" ")
 

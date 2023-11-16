@@ -83,12 +83,40 @@ class TestUmlsUtils(unittest.TestCase):
                 ],
                 "expected": "Antagonist",
             },
+            {
+                "description": "is not composite, still apply overrides",
+                "cui": "C4721408",
+                "canonical_name": "blah blah xyz abc",
+                "aliases": [
+                    "grp12",
+                    "xx122",
+                    "happy fake example",
+                ],
+                "is_composite": False,
+                "expected": "Antagonist",
+            },
+            {
+                "description": "if isn't composite, prefer canonical name",
+                "cui": "C0968164",
+                "canonical_name": "GPR84 protein, human",
+                "aliases": [
+                    "GPR84 protein, human",
+                    "EX33 protein, human",
+                    "GPR84 a human protein",  # fabricated alias
+                    "G protein-coupled receptor 84, human",
+                ],
+                "is_composite": False,
+                "expected": "GPR84 protein, human",
+            },
         ]
 
         for test in test_cases:
             expected_output = test["expected"]
 
             result = clean_umls_name(
-                test["cui"], test["canonical_name"], test["aliases"]
+                test["cui"],
+                test["canonical_name"],
+                test["aliases"],
+                test.get("is_composite", True),
             )
             self.assertEqual(result, expected_output)
