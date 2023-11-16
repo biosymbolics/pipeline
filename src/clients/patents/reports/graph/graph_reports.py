@@ -87,12 +87,15 @@ def generate_graph(
     }
     nx.set_node_attributes(g, node_to_group, "group")
 
-    degrees: list[tuple[str, number]] = g.degree  # type: ignore
+    if isinstance(g.degree, int):
+        raise Exception("Graph has no nodes")
 
-    # take the top `max_node` nodes by degree; create subgraph
+    degree_map = {n: d for (n, d) in g.degree}
+    nx.set_node_attributes(g, degree_map, "size")
+
     top_nodes = [
         node
-        for (node, _) in sorted(degrees, key=lambda x: x[1], reverse=True)[:max_nodes]
+        for (node, _) in sorted(g.degree, key=lambda x: x[1], reverse=True)[:max_nodes]
     ]
     return g.subgraph(
         uniq(
@@ -174,7 +177,7 @@ def graph_patent_relationships(
     relationships = PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
-    layout = nx.multipartite_layout(g, subset_key="group")
+    layout = nx.kamada_kawai_layout(g)
 
     # create serialized link data
     link_data = nx.node_link_data(g)
@@ -187,7 +190,7 @@ def graph_patent_relationships(
             Node(
                 id=n["id"],
                 label=n["id"],
-                size=1,  # n["weight"],
+                size=n["size"],
                 group=n["group"],
                 position=NodePosition(
                     x=layout[n["id"]][0],
