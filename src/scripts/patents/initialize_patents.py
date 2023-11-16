@@ -277,40 +277,40 @@ def add_application_search():
 
 def main(bootstrap: bool = False):
     """
-        Copy tables from patents-public-data to a local dataset.
-        Order matters.
+    Copy tables from patents-public-data to a local dataset.
+    Order matters.
 
-        Usage:
-            >>> python3 -m scripts.patents.initialize_patents -bootstrap
-            >>> python3 -m scripts.patents.initialize_patents
+    Usage:
+        >>> python3 -m scripts.patents.initialize_patents -bootstrap
+        >>> python3 -m scripts.patents.initialize_patents
 
-        Followed by:
-        ```
-        # from local machine
-        pg_dump --no-owner patents \
-            -t aggregated_annotations \
-            -t annotations \
-            -t applications \
-            -t terms \
-            -t patent_to_trial \
-            -t trials \
-            -t regulatory_approvals \
-            -t umls_lookup \
-            -t umls_graph \
-            -t term_ids \
-            -t patent_to_regulatory_approval > patents.psql
-        zip patents.psql.zip patents.psql
-        aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
-        aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
-        rm patents.psql*
+    Followed by:
+    ```
+    # from local machine
+    pg_dump --no-owner patents \
+        -t aggregated_annotations \
+        -t annotations \
+        -t applications \
+        -t terms \
+        -t patent_to_trial \
+        -t trials \
+        -t regulatory_approvals \
+        -t umls_lookup \
+        -t umls_graph \
+        -t term_ids \
+        -t patent_to_regulatory_approval > patents.psql
+    zip patents.psql.zip patents.psql
+    aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
+    aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
+    rm patents.psql*
 
-        # then proceeding in ec2
-        aws configure sso
-        aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
-        unzip patents.psql.zip
-        y
-        export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
-        echo "
+    # then proceeding in ec2
+    aws configure sso
+    aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
+    unzip patents.psql.zip
+    y
+    export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
+    echo "
     CREATE ROLE readaccess;
     GRANT USAGE ON SCHEMA public TO readaccess;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
