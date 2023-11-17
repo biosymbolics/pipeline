@@ -6,7 +6,8 @@ import math
 import logging
 
 from constants.patents import SUITABILITY_SCORE_MAP
-from typings.patents import SuitabilityScoreMap
+from typings.companies import Company
+from typings.patents import AvailabilityLikelihood, SuitabilityScoreMap
 
 from .constants import EST_MAX_CLINDEV, MAX_PATENT_LIFE
 
@@ -111,17 +112,12 @@ def score_patents(
         .apply(lambda py: calc_adj_patent_years(py))  # type: ignore
         .alias("adj_patent_years"),  # type: ignore
         pl.Series(
-            name="availability_score",
-            values=[random.betavariate(2, 6) for _ in range(len(df))],
-        ),
-        pl.Series(
             name="probability_of_success",
             values=[random.betavariate(2, 8) for _ in range(len(df))],
         ),
     ).with_columns(
         pl.col("suitability_score")
         .mul(df[years_column] / MAX_PATENT_LIFE)
-        .add(pl.col("availability_score"))
         .add(pl.col("probability_of_success"))
         .mul(1 / 3)  # average
         .alias("score"),
@@ -139,3 +135,27 @@ def calculate_scores(df: pl.DataFrame) -> pl.DataFrame:
         df (pl.DataFrame): The DataFrame with the patents data.
     """
     return score_patents(df, "attributes", "patent_years", SUITABILITY_SCORE_MAP)
+
+
+def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.DataFrame:
+    """
+    Add availability likelihood to patents
+
+    df must already have assignees, publication_number, and is_stale columns
+    """
+    avail_likelihood_map: dict[str, tuple] = {
+        rec["publication_number"]: AvailabilityLikelihood.find(
+            rec["assignees"], rec["is_stale"], company_map
+        )
+        for rec in df.to_dicts()
+    }
+    return df.with_columns(
+        pl.col("publication_number")
+        .map_dict(avail_likelihood_map)
+        .apply(lambda x: x[0])
+        .alias("availability_likelihood"),
+        pl.col("publication_number")
+        .map_dict(avail_likelihood_map)
+        .apply(lambda x: x[1])
+        .alias("availability_explanation"),
+    ).drop("is_stale")

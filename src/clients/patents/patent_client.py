@@ -1,11 +1,11 @@
 """
 Patent client
 """
-from dataclasses import dataclass
 from functools import partial
 import logging
 import time
-from typing import Sequence, TypedDict, cast
+from typing import Sequence, cast
+from clients.companies.companies import get_company_map
 
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.low_level.postgres import PsqlDatabaseClient
@@ -22,19 +22,9 @@ from constants.core import (
 from typings.patents import PatentApplication
 from utils.string import get_id
 
-from .formatting import format_search_result
-from .types import AutocompleteTerm, QueryType, TermField, TermResult
+from .enrich import enrich_search_result
+from .types import AutocompleteTerm, QueryPieces, QueryType, TermField, TermResult
 from .utils import get_max_priority_date
-
-
-@dataclass(frozen=True)
-class QueryPieces:
-    def __getitem__(self, item):
-        return getattr(self, item)
-
-    fields: list[str]
-    where: str
-    params: list
 
 
 logger = logging.getLogger(__name__)
@@ -205,13 +195,15 @@ def _search(
     """
 
     results = PsqlDatabaseClient().select(query, qp["params"])
-    formatted_results = format_search_result(results)
+
+    company_map = get_company_map()
+    enriched_results = enrich_search_result(results, company_map)
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
     )
 
-    return formatted_results
+    return enriched_results
 
 
 def search(

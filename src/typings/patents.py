@@ -4,6 +4,10 @@ Patent types
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
+from typings.companies import Company
+
+from utils.classes import ByDefinitionOrderEnum
 
 from .core import Dataclass
 
@@ -56,10 +60,50 @@ class PatentApplication(PatentBasicInfo):
     approval_indications: list[str]
 
 
+class AvailabilityLikelihood(ByDefinitionOrderEnum):
+    LIKELY = "LIKELY"
+    POSSIBLE = "POSSIBLE"
+    UNLIKELY = "UNLIKELY"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def find(
+        cls, assignees: list[str], is_stale: bool, financials_map: dict[str, Company]
+    ) -> tuple[str, str]:
+        """
+        Find availability likelihood
+        """
+        if len(financials_map) == 0:
+            return (AvailabilityLikelihood.UNKNOWN, "No financials provided.")
+
+        # mark all patents of troubled companies as "possibly" available
+        is_troubled = any(
+            company in financials_map and financials_map[company].is_troubled
+            for company in assignees
+        )
+
+        explanation = f"""
+            Patent is owned by a financially troubled company: {is_troubled}.
+            Patent is stale: {is_stale}.
+        """
+
+        if is_troubled and is_stale:
+            return (AvailabilityLikelihood.LIKELY, explanation)
+
+        if is_troubled or is_stale:
+            return (AvailabilityLikelihood.POSSIBLE, explanation)
+
+        return (AvailabilityLikelihood.UNKNOWN, explanation)
+
+
 @dataclass(frozen=True)
 class ScoredPatentApplication(PatentApplication):
+    def __getattribute__(self, __name: str) -> Any:
+        return super().__getattribute__(__name)
+
     adj_patent_years: int
-    availability_score: int
+    availability_likelihood: AvailabilityLikelihood
+    availability_explanation: str
     search_rank: float
     probability_of_success: float
     suitability_score: float
