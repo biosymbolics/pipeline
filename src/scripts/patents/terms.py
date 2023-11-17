@@ -192,6 +192,11 @@ class TermAssembler:
                 where applicant is not null
                 group by lower(applicant)
             """,
+            "stock": """
+                select lower(name) as name, 'companies' as domain, count(*) as count
+                from companies
+                group by lower(name)
+            """,
         }
         rows = flatten(
             [
