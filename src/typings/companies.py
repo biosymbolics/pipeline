@@ -13,11 +13,14 @@ class Company(Dataclass):
     id: str
     name: str
     symbol: str
-    market_cap: float
-    net_debt: float
-    is_trading_below_cash: bool
-    synonyms: Optional[list[str]]
+    current_ratio: float | None
+    debt_equity_ratio: float | None
+    is_troubled: bool | None
+    market_cap: float | None
+    net_debt: float | None
+    total_debt: float | None
     parent_company_id: Optional[str]  # id
+    synonyms: Optional[list[str]]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
