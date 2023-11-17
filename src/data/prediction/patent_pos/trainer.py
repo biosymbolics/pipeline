@@ -6,7 +6,7 @@ import torch
 from ignite.metrics import Precision, Recall
 
 from clients.patents import patent_client
-from typings.patents import ApprovedPatentApplication as PatentApplication
+from typings.patents import PatentApplication
 
 from .constants import (
     BATCH_SIZE,
@@ -151,7 +151,7 @@ class ModelTrainer:
     def train_from_patents():
         patents = cast(
             Sequence[PatentApplication],
-            patent_client.search(["asthma"], None, 0, limit=100000),
+            patent_client.search(["asthma"], "AND", 0, limit=100000),
         )
         input_dict = prepare_inputs(
             patents, BATCH_SIZE, CATEGORICAL_FIELDS, TEXT_FIELDS, GNN_CATEGORICAL_FIELDS

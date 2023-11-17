@@ -2,11 +2,11 @@
 Patent client
 """
 import time
-from typing import Any, Sequence, TypedDict, cast
+from typing import Any, Sequence, TypedDict
 import polars as pl
 import logging
 
-from typings import PatentApplication
+from typings import ScoredPatentApplication
 from utils.list import dedup
 
 from .constants import DOMAINS_OF_INTEREST
@@ -28,7 +28,9 @@ def filter_terms_by_domain(rec: TermDict, domain: str) -> list[str]:
     return dedup(terms)
 
 
-def format_search_result(results: Sequence[dict[str, Any]]) -> list[PatentApplication]:
+def format_search_result(
+    results: Sequence[dict[str, Any]]
+) -> list[ScoredPatentApplication]:
     """
     Format patent search results and adds scores
 
@@ -68,4 +70,4 @@ def format_search_result(results: Sequence[dict[str, Any]]) -> list[PatentApplic
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
     )
 
-    return cast(list[PatentApplication], df.to_dicts())
+    return [ScoredPatentApplication(**p) for p in df.to_dicts()]

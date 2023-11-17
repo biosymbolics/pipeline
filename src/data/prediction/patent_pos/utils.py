@@ -13,7 +13,7 @@ from data.prediction.utils import (
     resize_and_batch,
 )
 from typings.core import Primitive
-from typings.patents import ApprovedPatentApplication as PatentApplication
+from typings.patents import PatentApplication
 
 
 # Query for approval data

@@ -7,7 +7,7 @@ from ignite.metrics import Precision, Recall
 from clients.patents import patent_client
 from data.types import ModelMetrics
 from utils.tensor import pad_or_truncate_to_size
-from typings.patents import ApprovedPatentApplication as PatentApplication
+from typings.patents import PatentApplication
 
 from .constants import (
     BATCH_SIZE,

@@ -69,7 +69,7 @@ SEARCH_RETURN_FIELDS = {
 
 APPROVED_SEARCH_RETURN_FIELDS = {
     "approval_dates": "approval_date",
-    "approval_indications": "indications",
+    "approval_indications": "approval_indications",
     "brand_name": "brand_name",
     "generic_name": "generic_name",
 }
