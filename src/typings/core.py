@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, TypeGuard, Union, List, Dict
 
 JsonSerializable = Union[
@@ -5,6 +6,21 @@ JsonSerializable = Union[
 ]
 
 Primitive = bool | str | int | float | None
+
+
+@dataclass(frozen=True)
+class Dataclass:
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def keys(self):
+        return self.__dataclass_fields__.keys()
+
+    def values(self):
+        return self.__dataclass_fields__.values()
+
+    def items(self):
+        return self.__dataclass_fields__.items()
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:

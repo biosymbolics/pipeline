@@ -17,6 +17,7 @@ ANNOTATIONS_TABLE = "annotations"
 TERMS_TABLE = "terms"
 TERM_IDS_TABLE = "term_ids"
 SYNONYM_TABLE_NAME = "synonym_map"
+COMPANIES_TABLE_NAME = "companies"
 
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
