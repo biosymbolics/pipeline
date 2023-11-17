@@ -61,13 +61,13 @@ def load_companies():
     pharmas = pharmas.rename({col: col.lower() for col in pharmas.columns})
     pharmas = pharmas.with_columns(
         pl.col("symbol").alias("id"),
-        pl.lit(False).alias("is_trading_below_cash"),
-        pl.lit(None).alias("current_ratio"),
-        pl.lit(None).alias("debt_equity_ratio"),
-        pl.lit(None).alias("market_cap"),
-        pl.lit(None).alias("net_debt"),
-        pl.lit(None).alias("total_debt"),
-        pl.lit(None).alias("parent_company_id"),
+        pl.lit(None).alias("current_ratio").cast(pl.Float32),
+        pl.lit(None).alias("debt_equity_ratio").cast(pl.Float32),
+        pl.lit(None).alias("is_troubled").cast(pl.Boolean),
+        pl.lit(None).alias("market_cap").cast(pl.Float32),
+        pl.lit(None).alias("net_debt").cast(pl.Float32),
+        pl.lit(None).alias("total_debt").cast(pl.Float32),
+        pl.lit(None).alias("parent_company_id").cast(pl.Utf8),
         pl.lit(None).alias("synonyms"),
     )
 

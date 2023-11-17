@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 import polars as pl
 from pydash import compact
 import yfinance as yf
@@ -21,6 +21,8 @@ TD = "TotalDebt"
 CA = "CurrentAssets"
 TSE = "StockholdersEquity"
 CL = "CurrentLiabilities"
+
+SIG_DIGITS = 2
 
 
 class CompanyFinancials(StockPerformance):
@@ -49,7 +51,11 @@ class CompanyFinancials(StockPerformance):
     @property
     def market_cap(self) -> float | None:
         try:
-            return self.client.fast_info["marketCap"]
+            mc = self.client.fast_info["marketCap"]
+            if mc is None:
+                return None
+
+            return round(mc, SIG_DIGITS)
         except Exception as e:
             logger.error("Unable to fetch market cap for %s: %s", self.ticker, e)
             return None
@@ -106,7 +112,10 @@ class CompanyFinancials(StockPerformance):
                 calc_td,
             )
 
-        return tds[0] if len(tds) > 0 else None
+        if len(tds) == 0:
+            return None
+
+        return tds[0]
 
     @property
     def cash_and_cash_equivalents(self) -> float | None:
@@ -121,9 +130,12 @@ class CompanyFinancials(StockPerformance):
         "Net debt shows how much cash would remain if all debts were paid off and if a company has enough
         liquidity to meet its debt obligations." -- https://www.investopedia.com/terms/n/netdebt.asp
 
-        # CashAndCashEquivalents
-
         NET_DEBT = STD + LTD - CASH
+
+        Notes:
+            - some balance sheets don't include NetDebt, in which case we calculate it.
+            - the calculated and reported NetDebt values can differ,
+              in which case we return the reported value and log a warning
         """
         if self.balance_sheet is None:
             return None
@@ -144,7 +156,10 @@ class CompanyFinancials(StockPerformance):
                 calc_nd,
             )
 
-        return nds[0] if len(nds) > 0 else None
+        if len(nds) == 0:
+            return None
+
+        return nds[0]
 
     @property
     def is_trading_below_cash(self) -> bool | None:
@@ -171,7 +186,7 @@ class CompanyFinancials(StockPerformance):
         ):
             return None
 
-        return current_assets / current_liabilities
+        return round(current_assets / current_liabilities, SIG_DIGITS)
 
     @property
     def is_bad_current_ratio(self) -> bool:
@@ -197,7 +212,7 @@ class CompanyFinancials(StockPerformance):
         if total_debt is None or total_equity is None or total_equity == 0:
             return None
 
-        return total_debt / total_equity
+        return round(total_debt / total_equity, SIG_DIGITS)
 
     @property
     def is_bad_debt_equity_ratio(self, max_ratio: float = 1.5) -> bool:
