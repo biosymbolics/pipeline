@@ -3,6 +3,7 @@ import polars as pl
 from pydash import compact
 import yfinance as yf
 import logging
+import requests_cache
 
 from utils.list import contains
 
@@ -40,7 +41,9 @@ class CompanyFinancials(StockPerformance):
             ticker (str): company ticker
         """
         self.ticker = ticker
-        self.client = yf.Ticker(ticker)
+        session = requests_cache.CachedSession("yfinance.cache")
+        session.headers["User-agent"] = "my-program/1.0"
+        self.client = yf.Ticker(ticker, session=session)
         self.timeframe = timeframe
 
     @property
@@ -60,14 +63,17 @@ class CompanyFinancials(StockPerformance):
             logger.error("Unable to fetch balance sheet for %s: %s", self.ticker, e)
             return None
 
-    def get_balance_sheet_value(self, key: str) -> float | None:
+    def get_balance_sheet_value(
+        self, key: str, suppress_warning: bool = False
+    ) -> float | None:
         if self.balance_sheet is None:
             return None
 
         if key not in self.balance_sheet_keys:
-            logger.error(
-                "Unable to fetch balance sheet value %s for %s", key, self.ticker
-            )
+            if not suppress_warning:
+                logger.warning(
+                    "Unable to fetch balance sheet value %s for %s", key, self.ticker
+                )
             return None
 
         return self.balance_sheet.row(by_predicate=(pl.col("index") == key))[1]
@@ -83,11 +89,8 @@ class CompanyFinancials(StockPerformance):
         if self.balance_sheet is None:
             return None
 
-        td = None
         calc_td = None
-
-        if TD in self.balance_sheet_keys:
-            td = self.get_balance_sheet_value(TD)
+        td = self.get_balance_sheet_value(TD)
 
         if contains([STD, LTD], self.balance_sheet_keys):
             std = self.get_balance_sheet_value(STD) or 0
@@ -110,10 +113,7 @@ class CompanyFinancials(StockPerformance):
         if self.balance_sheet is None:
             return None
 
-        if CCE in self.balance_sheet_keys:
-            return self.get_balance_sheet_value(CCE)
-
-        return None
+        return self.get_balance_sheet_value(CCE)
 
     @property
     def net_debt(self) -> float | None:
@@ -128,7 +128,7 @@ class CompanyFinancials(StockPerformance):
         if self.balance_sheet is None:
             return None
 
-        nd = self.get_balance_sheet_value(ND)
+        nd = self.get_balance_sheet_value(ND, suppress_warning=True)
         calc_nd = None
 
         if self.total_debt is not None and self.cash_and_cash_equivalents is not None:
@@ -149,7 +149,7 @@ class CompanyFinancials(StockPerformance):
     @property
     def is_trading_below_cash(self) -> bool | None:
         if self.market_cap is None or self.net_debt is None:
-            logger.error("Unable to fetch market cap or net debt for %s", self.ticker)
+            logger.warning("Unable to fetch market cap or net debt for %s", self.ticker)
             return None
         return self.market_cap < self.net_debt
 
@@ -164,7 +164,11 @@ class CompanyFinancials(StockPerformance):
         current_assets = self.get_balance_sheet_value(CA)
         current_liabilities = self.get_balance_sheet_value(CL)
 
-        if current_assets is None or current_liabilities is None:
+        if (
+            current_assets is None
+            or current_liabilities is None
+            or current_liabilities == 0
+        ):
             return None
 
         return current_assets / current_liabilities
@@ -190,7 +194,7 @@ class CompanyFinancials(StockPerformance):
         total_debt = self.total_debt
         total_equity = self.get_balance_sheet_value(TSE)
 
-        if total_debt is None or total_equity is None:
+        if total_debt is None or total_equity is None or total_equity == 0:
             return None
 
         return total_debt / total_equity
