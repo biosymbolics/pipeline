@@ -69,12 +69,12 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     @classmethod
     def find(
         cls, assignees: list[str], is_stale: bool, financials_map: dict[str, Company]
-    ) -> tuple[str, str]:
+    ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood
         """
         if len(financials_map) == 0:
-            return (AvailabilityLikelihood.UNKNOWN, "No financials provided.")
+            return (AvailabilityLikelihood.UNKNOWN, "No financials provided.")  # type: ignore
 
         # mark all patents of troubled companies as "possibly" available
         is_troubled = any(
@@ -88,12 +88,12 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         """
 
         if is_troubled and is_stale:
-            return (AvailabilityLikelihood.LIKELY, explanation)
+            return (AvailabilityLikelihood.LIKELY, explanation)  # type: ignore
 
         if is_troubled or is_stale:
-            return (AvailabilityLikelihood.POSSIBLE, explanation)
+            return (AvailabilityLikelihood.POSSIBLE, explanation)  # type: ignore
 
-        return (AvailabilityLikelihood.UNKNOWN, explanation)
+        return (AvailabilityLikelihood.UNKNOWN, explanation)  # type: ignore
 
 
 @dataclass(frozen=True)
