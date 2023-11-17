@@ -35,7 +35,9 @@ def dedup(a_list: Sequence[T] | Iterable[T]) -> list[T]:
     return compact(list(set(a_list)))
 
 
-def has_intersection(list_a: Sequence[T] | set[T], list_b: Sequence[T]) -> bool:
+def has_intersection(
+    list_a: Sequence[T] | set[T], list_b: Sequence[T] | set[T]
+) -> bool:
     """
     Returns True if list_a and list_b have at least one element in common
 
@@ -44,6 +46,17 @@ def has_intersection(list_a: Sequence[T] | set[T], list_b: Sequence[T]) -> bool:
         list_b (list): list to compare
     """
     return len(set(list_a).intersection(set(list_b))) > 0
+
+
+def contains(list_a: Sequence[T] | set[T], list_b: Sequence[T] | set[T]) -> bool:
+    """
+    Returns True if list_a contains all elements in list_b
+
+    Args:
+        list_a (list): list to compare
+        list_b (list): list to compare
+    """
+    return len(set(list_a).intersection(set(list_b))) == len(set(list_b))
 
 
 def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:

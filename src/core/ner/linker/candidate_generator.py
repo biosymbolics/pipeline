@@ -5,7 +5,7 @@ from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 
 from core.ner.types import CanonicalEntity
 from constants.umls import PREFERRED_UMLS_TYPES
-from data.common.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
 

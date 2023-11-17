@@ -1,9 +1,12 @@
 """
 Patent types
 """
+from dataclasses import dataclass
 from typing_extensions import NotRequired
 from typing import Literal, TypeGuard, TypedDict, Union
 import typing
+
+from typings.core import Dataclass
 
 TermField = Literal["terms", "rollup_terms", "rollup_categories"]
 
@@ -46,3 +49,10 @@ def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThres
         value (Union[str, tuple]): value to check
     """
     return isinstance(value, str) and value in typing.get_args(RelevancyThreshold)
+
+
+@dataclass(frozen=True)
+class QueryPieces(Dataclass):
+    fields: list[str]
+    where: str
+    params: list

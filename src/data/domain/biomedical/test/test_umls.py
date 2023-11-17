@@ -1,6 +1,6 @@
 import unittest
 
-from data.common.biomedical.umls import clean_umls_name
+from data.domain.biomedical.umls import clean_umls_name
 
 
 UMLS_NAME_OVERRIDES = {

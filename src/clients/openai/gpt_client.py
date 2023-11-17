@@ -81,10 +81,12 @@ class GptApiClient:
             client="chat",
             model=self.model,
             max_tokens=DEFAULT_MAX_TOKENS,
-            openai_api_key=OPENAI_API_KEY,
+            api_key=OPENAI_API_KEY,
         )
         output = chat_model(input.to_messages())
         try:
+            if not isinstance(output.content, str):
+                raise ValueError("Expected string output from GPT")
             return self.__format_answer(output.content, is_array=is_array)
         except Exception as e:
             logging.warning("Error formatting answer: %s", e)

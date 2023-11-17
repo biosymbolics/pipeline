@@ -36,7 +36,7 @@ from constants.patterns.intervention import (
 )
 from core.ner.cleaning import EntityCleaner
 from core.ner.spacy import Spacy
-from data.common.biomedical import (
+from data.domain.biomedical import (
     expand_term,
     expand_parens_term,
     remove_trailing_leading as _remove_trailing_leading,

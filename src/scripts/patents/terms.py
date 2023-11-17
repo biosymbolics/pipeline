@@ -168,15 +168,21 @@ class TermAssembler:
             "patents": f"""
                 SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
                 FROM applications a
-                group by name
-                having count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
+                GROUP BY name
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
 
                 UNION ALL
 
                 SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
                 FROM applications a
-                group by name
-                having count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+                GROUP BY name
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+
+                UNION ALL
+
+                SELECT lower(name) as name, 'companies' as domain, count(*) as count
+                FROM companies
+                GROUP BY lower(name)
             """,
             # ctgov db
             "aact": """

@@ -16,7 +16,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import NerTagger
 from constants.core import BASE_DATABASE_URL
 from core.ner.cleaning import RE_FLAGS
-from data.common.biomedical import (
+from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
