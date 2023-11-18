@@ -13,7 +13,7 @@ from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
-from .utils import UmlsTransformer
+from .transform import UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

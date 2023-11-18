@@ -1,29 +1,38 @@
 from dataclasses import asdict, dataclass
-from typing import Literal
+from typing import Callable, Literal
+
+from typings.core import Dataclass
 
 from utils.classes import ByDefinitionOrderEnum
 
+L1_CATEGORY_CUTOFF = 0.0001
+
 
 class OntologyLevel(ByDefinitionOrderEnum):
-    L2_CATEGORY = "L2_CATEGORY"  # least specific
-    L1_CATEGORY = "L1_CATEGORY"
     INSTANCE = "INSTANCE"  # most specific
-    UNKNOWN = "UNKNOWN"
+    L1_CATEGORY = "L1_CATEGORY"
+    L2_CATEGORY = "L2_CATEGORY"  # least specific
+    NA = "NA"  # not a valid level
 
     @classmethod
     def find(
         cls,
         id: str,
-        betweenness_map: dict[str, float],
+        get_centrality: Callable[[str], float],
     ):
         """
         Simple heuristic to find approximate semantic level of UMLS record
         """
-        if id not in betweenness_map:
+        centrality = get_centrality(id)
+
+        if centrality == -1:
+            return cls.NA  # not eligible for inclusion
+
+        if centrality == 0:
             # assume it isn't in the map due to too low degree
             return cls.INSTANCE
 
-        if betweenness_map[id] < 0.0001:
+        if centrality < L1_CATEGORY_CUTOFF:
             # 49837 as of 11/23
             return cls.L1_CATEGORY
 
@@ -32,31 +41,18 @@ class OntologyLevel(ByDefinitionOrderEnum):
 
 
 @dataclass(frozen=True)
-class UmlsRecord:
-    def __getitem__(self, item):
-        return getattr(self, item)
-
-    def keys(self):
-        return self.__dataclass_fields__.keys()
-
-    def values(self):
-        return self.__dataclass_fields__.values()
-
-    def items(self):
-        return self.__dataclass_fields__.items()
-
+class UmlsRecord(Dataclass):
     id: str
     canonical_name: str
-    num_descendants: int
+    category_rollup: str | None
     hierarchy: str | None
+    instance_rollup: str | None
+    num_descendants: int
+    level: OntologyLevel
+    preferred_name: str
+    synonyms: list[str]
     type_id: str
     type_name: str
-
-
-@dataclass(frozen=True)
-class IntermediateUmlsRecord(UmlsRecord):
-    preferred_name: str
-    level: OntologyLevel
     l0_ancestor: str | None
     l1_ancestor: str | None
     l2_ancestor: str | None
@@ -67,22 +63,6 @@ class IntermediateUmlsRecord(UmlsRecord):
     l7_ancestor: str | None
     l8_ancestor: str | None
     l9_ancestor: str | None
-    synonyms: list[str]
-
-
-@dataclass(frozen=True)
-class UmlsLookupRecord(IntermediateUmlsRecord):
-    instance_rollup: str | None
-    category_rollup: str | None
-
-    @classmethod
-    def from_intermediate(cls, ir: IntermediateUmlsRecord, **kwargs):
-        is_data_class = getattr(ir, "__dataclass_fields__", None) is not None
-
-        if is_data_class:
-            return cls(**asdict(ir), **kwargs)
-
-        return cls(**{**ir, **kwargs})  # type: ignore
 
 
 RollupLevel = Literal[OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY]  # type: ignore

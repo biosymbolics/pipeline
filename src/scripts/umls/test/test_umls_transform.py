@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.umls.utils import find_level_ancestor
+from scripts.umls.transform import UmlsTransformer
 from typings.umls import OntologyLevel
 
 
@@ -114,12 +114,28 @@ class TestTrialUtils(unittest.TestCase):
                 "level": OntologyLevel.L1_CATEGORY,
                 "expected": "",
             },
+            {
+                "description": "does not go to lower level",
+                "record": {
+                    "level": OntologyLevel.L2_CATEGORY,
+                    "id": "anl2cat",
+                },
+                "ancestors": tuple(
+                    [
+                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
+                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
+                    ]
+                ),
+                "level": OntologyLevel.L1_CATEGORY,
+                "expected": "anl2cat",
+            },
         ]
 
         for test in test_cases:
             expected_output = test["expected"]
 
-            result = find_level_ancestor(
+            result = UmlsTransformer.find_level_ancestor(
                 test["record"], test["level"], test["ancestors"]
             )
             self.assertEqual(result, expected_output)
