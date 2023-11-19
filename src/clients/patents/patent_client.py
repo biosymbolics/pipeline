@@ -19,7 +19,7 @@ from constants.core import (
     TERMS_TABLE,
     TRIALS_TABLE,
 )
-from typings.patents import PatentApplication
+from typings.patents import ScoredPatentApplication as PatentApplication
 from utils.string import get_id
 
 from .enrich import enrich_search_result
@@ -164,7 +164,7 @@ def _search(
     term_field: TermField = "terms",
     limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
-) -> Sequence[PatentApplication]:
+) -> list[PatentApplication]:
     """
     Search patents by terms
     """
@@ -218,7 +218,7 @@ def search(
     limit: int = MAX_SEARCH_RESULTS,
     skip_cache: bool = False,
     is_exhaustive: bool = False,
-) -> Sequence[PatentApplication]:
+) -> list[PatentApplication]:
     """
     Search patents by terms
     Filters on
