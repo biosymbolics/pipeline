@@ -1,12 +1,10 @@
+import time
 from typing import Sequence
 import logging
 from pydash import omit
 
 from data.domain.biomedical.umls import clean_umls_name
-from typings.umls import (
-    OntologyLevel,
-    UmlsRecord,
-)
+from typings.umls import OntologyLevel, UmlsRecord
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
@@ -58,9 +56,16 @@ class UmlsTransformer:
                 }
             )
 
+        start = time.monotonic()
         logger.info("Initializing UMLS lookup dict with %s records", len(records))
         lookup_records = [_enrich(r) for r in records]
-        return {r["id"]: r for r in lookup_records}
+        lookup_map = {r["id"]: r for r in lookup_records}
+        logger.info(
+            "Finished initializing UMLS lookup dict in %s",
+            round(time.monotonic() - start, 2),
+        )
+
+        return lookup_map
 
     @staticmethod
     def find_level_ancestor(
@@ -110,7 +115,7 @@ class UmlsTransformer:
             [self.lookup_dict[cui] for cui in cuis if cui in self.lookup_dict]
         )
         return UmlsRecord(
-            **omit(r, ["instance_rollup", "category_rollup"]),
+            **omit(r.__dict__, ["instance_rollup", "category_rollup"]),
             instance_rollup=UmlsTransformer.find_level_ancestor(
                 r, OntologyLevel.INSTANCE, ancestors
             ),

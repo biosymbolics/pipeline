@@ -26,6 +26,7 @@ class UmlsGraph(object):
         umls_db = f"{BASE_DATABASE_URL}/umls"
         self.db = PsqlDatabaseClient(umls_db)
         self.G = self.load_graph()
+        self.nodes: dict[str, dict] = dict(self.G.nodes.data())
 
         if file_name is not None:
             try:
@@ -35,17 +36,12 @@ class UmlsGraph(object):
         else:
             self.betweenness_map = self._load_betweenness()
 
-    @property
-    def nodes(self) -> dict[str, dict]:
-        nodes = dict(self.G.nodes.data())
-        return nodes
-
     @abstractmethod
     def edge_query(self, suppressions: Sequence[str] | set[str]) -> str:
         """
         Query edges from umls
 
-        TODO: make "get_edges" and enforce type
+        TODO: make "get_edges" and enforce type (head/tail)
         """
         raise NotImplementedError
 
