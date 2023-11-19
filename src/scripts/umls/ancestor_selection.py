@@ -1,9 +1,12 @@
-from abc import abstractmethod
 from typing import Sequence
 import logging
 
 from clients.umls.graph import UmlsGraph
-from constants.umls import UMLS_NAME_SUPPRESSIONS, BIOMEDICAL_GRAPH_UMLS_TYPES
+from constants.umls import (
+    UMLS_CUI_SUPPRESSIONS,
+    UMLS_NAME_SUPPRESSIONS,
+    BIOMEDICAL_GRAPH_UMLS_TYPES,
+)
 from utils.classes import overrides
 
 logger = logging.getLogger(__name__)
@@ -72,6 +75,8 @@ class AncestorUmlsGraph(UmlsGraph):
             and tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
             and ts_lexize('english_stem', head_semantic_type.sty) <> ts_lexize('english_stem', head_entity.str)  -- exclude entities with a name that is also the type
             and ts_lexize('english_stem', tail_semantic_type.sty) <> ts_lexize('english_stem', tail_entity.str)
+            and cui1 not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
+            and cui2 not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
             {name_sql}  -- applies lang and name filters
             group by cui1, cui2
             """

@@ -2,6 +2,7 @@ from typing import Mapping, Sequence
 from pydash import flatten, omit_by, uniq
 from spacy.lang.en.stop_words import STOP_WORDS
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
+from constants.patterns.iupac import is_iupac
 
 from core.ner.types import CanonicalEntity
 from constants.umls import PREFERRED_UMLS_TYPES
@@ -42,9 +43,6 @@ COMPOSITE_WORD_OVERRIDES = {
     "binder": "C1145667",  # "Binding action"
     "binders": "C1145667",
 }
-
-
-#  Phosphates Modulator
 
 
 class CompositeCandidateGenerator(CandidateGenerator, object):
@@ -138,11 +136,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         candidates = super().__call__(list(texts), k=DEFAULT_K)
         return self._apply_word_overrides(texts, candidates)
 
-    def _create_composite_entity(
+    def _candidates_to_composite(
         self, candidates: Sequence[MentionCandidate]
     ) -> CanonicalEntity:
         """
-        Create a composite name from a list of candidates
+        Form a composite from a list of candidates
         """
 
         def get_name_part(c):
@@ -267,7 +265,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         all_words = self.get_words(mention_text)
         candidates = get_candidates(all_words)
 
-        return self._create_composite_entity(candidates)
+        return self._candidates_to_composite(candidates)
 
     def generate_composite_entities(
         self, matchless_mention_texts: Sequence[str]
@@ -310,6 +308,21 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         }
 
         return {t: m for t, m in composite_matches.items() if m is not None}
+
+    @staticmethod
+    def _is_composite_eligible(text: str, canonical: CanonicalEntity | None) -> bool:
+        """
+        Is a text a composite candidate?
+
+        - False if we have a canonical candidate
+        - False if it's an IUPAC name, which are just too easy to mangle (e.g. 3'-azido-2',3'-dideoxyuridine matching 'C little e')
+        - Otherwise true
+        """
+        if canonical is None:
+            return False
+        if is_iupac(text):
+            return False
+        return True
 
     def _get_canonical(
         self, candidates: Sequence[MentionCandidate]
@@ -354,7 +367,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         }
 
         matchless = self.generate_composite_entities(
-            [text for text, canonical in matches.items() if canonical is None],
+            [
+                text
+                for text, canonical in matches.items()
+                if CompositeCandidateGenerator._is_composite_eligible(text, canonical)
+            ],
         )
 
         # combine composite matches such that they override the original matches

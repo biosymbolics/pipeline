@@ -97,11 +97,12 @@ def clean_umls_name(
     if cui in overrides:
         return overrides[cui]
 
-    # if not composite, prefer canonical name
-    if not is_composite:
-        return canonical_name
-
     name_words = canonical_name.split(" ")
+
+    # if not composite and not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
+    # prefer canonical name
+    if not is_composite and len(name_words) < 5:
+        return canonical_name
 
     def name_sorter(a: str) -> int:
         # prefer shorter aliases that start with the same word/letter as the canonical name

@@ -7,6 +7,7 @@ import logging
 
 from clients import patents as patent_client
 from handlers.patents.utils import parse_params
+from utils.encoding.json_encoder import EnhancedJSONEncoder
 
 from .types import PatentSearchParams
 
@@ -49,4 +50,7 @@ def search(event: SearchEvent, context):
         logger.error(message)
         return {"statusCode": 500, "body": message}
 
-    return {"statusCode": 200, "body": json.dumps(results, default=str)}
+    return {
+        "statusCode": 200,
+        "body": json.dumps(results, cls=EnhancedJSONEncoder),
+    }

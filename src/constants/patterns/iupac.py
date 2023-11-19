@@ -394,6 +394,9 @@ def extract_iupac(string: str) -> list[str]:
 def is_iupac(term: str) -> bool:
     """
     Checks if term is IUPAC
+
+    - checks if term matches IUPAC_RE (compound name parts)
+    - checks a simple name heuristic - lots of dashes and has at least 1 number
     """
     matches_iupac = re.match(IUPAC_RE, term) is not None
 

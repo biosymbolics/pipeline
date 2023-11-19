@@ -90,7 +90,7 @@ def group_by_xy(
         )
         return cast(list[PatentsReportRecord], grouped.to_dicts())
 
-    patent_df = pl.DataFrame(patents, infer_schema_length=None)
+    patent_df = pl.DataFrame(patents, infer_schema_length=None)  # slow
     summaries = [
         {"x": x_dim, "y": y_dim, "data": _aggregate(patent_df, x_dim, y_dim)}
         for x_dim in x_dimensions

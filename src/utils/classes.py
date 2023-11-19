@@ -57,3 +57,6 @@ class ByDefinitionOrderEnum(Enum):
         if self.__class__ is other.__class__:
             return self._order < other._order
         return NotImplemented
+
+    def __str__(self):
+        return self.value

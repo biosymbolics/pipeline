@@ -48,7 +48,7 @@ class UmlsRecord(Dataclass):
     hierarchy: str | None
     instance_rollup: str | None
     num_descendants: int
-    level: OntologyLevel
+    level: OntologyLevel | None
     preferred_name: str
     synonyms: list[str]
     type_id: str

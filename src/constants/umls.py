@@ -9,6 +9,10 @@ UMLS_NAME_OVERRIDES = {
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
 }
 
+UMLS_CUI_SUPPRESSIONS = {
+    "C1440188": "C little e",  # matches too much stuff
+}
+
 # suppress UMLS entities matching these names
 # assumes closest matching alias would match the suppressed name (sketchy)
 # does not support re, and matches based on implicit (?:^|$|\s) (word in name.split(" "))
@@ -24,6 +28,7 @@ UMLS_NAME_SUPPRESSIONS = set(
         "other",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540010
         "and",
         "or",
+        "by",  # https://uts.nlm.nih.gov/uts/umls/concept/C0682899
         "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
         "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
     ]
