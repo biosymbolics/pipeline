@@ -5,6 +5,7 @@ import yfinance as yf
 import logging
 import requests_cache
 
+from typings.companies import COMPANY_STR_KEYS
 from utils.list import contains
 
 from .stock import StockPerformance
@@ -25,6 +26,15 @@ CL = "CurrentLiabilities"
 SIG_DIGITS = 2
 
 
+COMPANY_STR_KEYS_EXT = [
+    *COMPANY_STR_KEYS,
+    "is_bad_current_ratio",
+    "is_trading_below_cash",
+    "is_bad_debt_equity_ratio",
+    "timeframe",
+]
+
+
 class CompanyFinancials(StockPerformance):
     """
     Company financial performance client
@@ -34,19 +44,25 @@ class CompanyFinancials(StockPerformance):
     """
 
     def __init__(
-        self, ticker: str, timeframe: Literal["quarterly", "annual"] = "quarterly"
+        self, symbol: str, timeframe: Literal["quarterly", "annual"] = "quarterly"
     ):
         """
         Initialize company financial performance client
 
         Args:
-            ticker (str): company ticker
+            symbol (str): company symbol
         """
-        self.ticker = ticker
+        self.symbol = symbol
         session = requests_cache.CachedSession("yfinance.cache")
         session.headers["User-agent"] = "my-program/1.0"
-        self.client = yf.Ticker(ticker, session=session)
+        self.client = yf.Ticker(symbol, session=session)
         self.timeframe = timeframe
+
+    def __str__(self):
+        return ", ".join([f"{k}={getattr(self, k)}" for k in COMPANY_STR_KEYS_EXT])
+
+    def __repr__(self):
+        return self.__str__()
 
     @property
     def market_cap(self) -> float | None:
@@ -57,7 +73,7 @@ class CompanyFinancials(StockPerformance):
 
             return round(mc, SIG_DIGITS)
         except Exception as e:
-            logger.error("Unable to fetch market cap for %s: %s", self.ticker, e)
+            logger.error("Unable to fetch market cap for %s: %s", self.symbol, e)
             return None
 
     @property
@@ -66,7 +82,7 @@ class CompanyFinancials(StockPerformance):
             balance_sheet = pl.DataFrame(self.client.get_balance_sheet().reset_index())  # type: ignore
             return balance_sheet
         except Exception as e:
-            logger.error("Unable to fetch balance sheet for %s: %s", self.ticker, e)
+            logger.error("Unable to fetch balance sheet for %s: %s", self.symbol, e)
             return None
 
     def get_balance_sheet_value(
@@ -78,7 +94,7 @@ class CompanyFinancials(StockPerformance):
         if key not in self.balance_sheet_keys:
             if not suppress_warning:
                 logger.warning(
-                    "Unable to fetch balance sheet value %s for %s", key, self.ticker
+                    "Unable to fetch balance sheet value %s for %s", key, self.symbol
                 )
             return None
 
@@ -107,7 +123,7 @@ class CompanyFinancials(StockPerformance):
         if len(tds) == 2 and td != calc_td:
             logger.warning(
                 "Total debt mismatch for %s: td %s != calc_td %s",
-                self.ticker,
+                self.symbol,
                 td,
                 calc_td,
             )
@@ -151,7 +167,7 @@ class CompanyFinancials(StockPerformance):
         if len(nds) == 2 and nd != calc_nd:
             logger.warning(
                 "Net debt mismatch for %s: nd %s != calc_nd %s",
-                self.ticker,
+                self.symbol,
                 nd,
                 calc_nd,
             )
@@ -164,7 +180,7 @@ class CompanyFinancials(StockPerformance):
     @property
     def is_trading_below_cash(self) -> bool | None:
         if self.market_cap is None or self.net_debt is None:
-            logger.warning("Unable to fetch market cap or net debt for %s", self.ticker)
+            logger.warning("Unable to fetch market cap or net debt for %s", self.symbol)
             return None
         return self.market_cap < self.net_debt
 
@@ -194,7 +210,7 @@ class CompanyFinancials(StockPerformance):
         Current ratio should be > 1
         """
         if self.current_ratio is None:
-            logger.warning("Unable to fetch current ratio for %s", self.ticker)
+            logger.warning("Unable to fetch current ratio for %s", self.symbol)
             return False
         return self.current_ratio < 1
 
@@ -220,7 +236,7 @@ class CompanyFinancials(StockPerformance):
         Debt equity ratio should be < 1.5
         """
         if self.debt_equity_ratio is None:
-            logger.warning("Unable to fetch d/e ratio for %s", self.ticker)
+            logger.warning("Unable to fetch d/e ratio for %s", self.symbol)
             return False
         return self.debt_equity_ratio > max_ratio
 

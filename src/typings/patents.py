@@ -4,7 +4,9 @@ Patent types
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Sequence
+
+from pydash import compact
 from typings.companies import Company
 
 from utils.classes import ByDefinitionOrderEnum
@@ -67,6 +69,31 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
+    def compose_explanation(
+        cls,
+        troubled_assignees: Sequence[str],
+        is_stale: bool,
+        financials_map: dict[str, Company],
+    ) -> str:
+        """
+        Compose explanation for availability likelihood
+        """
+        explanations = compact(
+            [
+                *[
+                    f"{company} has some poor financial signal ({financials_map[company]})."
+                    for company in troubled_assignees
+                ],
+                "Patent is stale." if is_stale else None,
+            ]
+        )
+
+        if len(explanations) == 0:
+            return "N/A"
+
+        return "\n".join(explanations)
+
+    @classmethod
     def find(
         cls, assignees: list[str], is_stale: bool, financials_map: dict[str, Company]
     ) -> tuple["AvailabilityLikelihood", str]:
@@ -77,15 +104,16 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
             return (AvailabilityLikelihood.UNKNOWN, "No financials provided.")  # type: ignore
 
         # mark all patents of troubled companies as "possibly" available
-        is_troubled = any(
-            company in financials_map and financials_map[company].is_troubled
+        troubled_assignees = [
+            company
             for company in assignees
-        )
+            if company in financials_map and financials_map[company].is_troubled
+        ]
+        is_troubled = len(troubled_assignees) > 0
 
-        explanation = f"""
-            Patent is owned by a financially troubled company: {is_troubled}.
-            Patent is stale: {is_stale}.
-        """
+        explanation = cls.compose_explanation(
+            troubled_assignees, is_stale, financials_map
+        )
 
         if is_troubled and is_stale:
             return (AvailabilityLikelihood.LIKELY, explanation)  # type: ignore
