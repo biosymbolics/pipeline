@@ -58,7 +58,6 @@ SEARCH_RETURN_FIELDS = {
 }
 
 APPROVED_SEARCH_RETURN_FIELDS = {
-    "approval_dates": "approval_date",
     "approval_indications": "approval_indications",
     "brand_name": "brand_name",
     "generic_name": "generic_name",
@@ -180,6 +179,11 @@ def _search(
     query = f"""
         SELECT {", ".join(qp["fields"])},
         max({term_field}) as terms,
+        (CASE
+            WHEN max(approval_dates) IS NOT NULL AND ARRAY_LENGTH(max(approval_dates), 1) > 0
+            THEN (max(approval_dates))[1]
+            ELSE NULL END
+        ) as approval_date,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM {APPLICATIONS_TABLE} AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (annotations.publication_number = apps.publication_number)
