@@ -297,6 +297,7 @@ def main(bootstrap: bool = False):
         -t umls_lookup \
         -t umls_graph \
         -t term_ids \
+        -t companies \
         -t patent_to_regulatory_approval > patents.psql
     zip patents.psql.zip patents.psql
     aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
