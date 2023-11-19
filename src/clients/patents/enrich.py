@@ -54,6 +54,9 @@ def enrich_search_result(
         lambda _df: _df.with_columns(
             get_patent_years().alias("patent_years"),
             is_patent_stale().alias("is_stale"),
+            pl.col("similar_patents")
+            .apply(lambda l: [item for item in l if item.startswith("WO")])
+            .alias("similar_patents"),
             *[
                 df.select(
                     pl.struct(["terms", "domains"])
