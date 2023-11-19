@@ -85,7 +85,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?tool",
     "(?:.* )?sequencer",
     "(?:.* )?centrifuge",
-    "(?:.* )?surfaces?(?: |-|$).*",
+    # "(?:.* )?surfaces?(?: |-|$).*", # cell surface
     "(?:.* )?recording medium(?: |-|$).*",
     "(?:.* )?field",
     "(?:.* )?garment(?: |-|$).*",
@@ -189,7 +189,7 @@ HIGH_LIKELIHOOD_DEVICES = [
 # for use in patents; might need adjustment to be more generally applicable.
 DEVICE_RES = [
     *HIGH_LIKELIHOOD_DEVICES,
-    "(?:.* )?fibers?(?: |-|$).*",  # TODO could be bio
+    # "(?:.* )?fibers?(?: |-|$).*",  # muscle fibers
     "(?:.* )?head",
     "(?:.* )?source",  # TODO
     "(?:.* )?windows?(?: |-|$).*",

@@ -41,7 +41,6 @@ UMLS_COMPOUND_TYPES = {
     "T109": "Organic Chemical",
     "T120": "Chemical Viewed Functionally",
     "T121": "Pharmacologic Substance",
-    "T122": "biomedical or dental material",
     "T123": "Biologically Active Substance",
     "T127": "Vitamin",
     "T167": "Substance",
@@ -138,6 +137,7 @@ UMLS_RESEARCH_TYPES = {"T063": "research activity"}
 
 UMLS_OTHER_TYPES = {
     # "T068": "Human-caused Phenomenon or Process",  # ??
+    "T122": "biomedical or dental material",
     "T131": "Hazardous or Poisonous Substance",
     "T196": "Element, Ion, or Isotope",
 }
