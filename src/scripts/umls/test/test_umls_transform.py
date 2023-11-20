@@ -27,7 +27,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "level": OntologyLevel.INSTANCE,
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C1415265",
             },
             {
@@ -41,7 +41,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
                     ]
                 ),
-                "level": OntologyLevel.INSTANCE,
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "VERY SPECIFIC THING",
             },
             {
@@ -57,7 +57,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "level": OntologyLevel.L1_CATEGORY,
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "dd6",
             },
             {
@@ -73,7 +73,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "level": OntologyLevel.L2_CATEGORY,
+                "levels": [OntologyLevel.L2_CATEGORY],
                 "expected": "ee5",
             },
             {
@@ -89,7 +89,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "level": OntologyLevel.L2_CATEGORY,
+                "levels": [OntologyLevel.L2_CATEGORY],
                 "expected": "ALREADY_L2_CATEGORY",
             },
             {
@@ -100,7 +100,7 @@ class TestTrialUtils(unittest.TestCase):
                     "canonical_name": "GPR84 gene",
                 },
                 "ancestors": tuple([]),
-                "level": OntologyLevel.INSTANCE,
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C1415265",
             },
             {
@@ -111,7 +111,7 @@ class TestTrialUtils(unittest.TestCase):
                     "canonical_name": "GPR84 gene",
                 },
                 "ancestors": tuple([]),
-                "level": OntologyLevel.L1_CATEGORY,
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "",
             },
             {
@@ -127,8 +127,23 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "level": OntologyLevel.L1_CATEGORY,
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "anl2cat",
+            },
+            {
+                "description": "multiple",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "anl2cat",
+                },
+                "ancestors": tuple(
+                    [
+                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
+                    ]
+                ),
+                "levels": [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
+                "expected": "ee5",
             },
         ]
 
@@ -136,6 +151,6 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = UmlsTransformer.find_level_ancestor(
-                test["record"], test["level"], test["ancestors"]
+                test["record"], test["levels"], test["ancestors"]
             )
             self.assertEqual(result, expected_output)
