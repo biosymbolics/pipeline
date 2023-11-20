@@ -363,8 +363,6 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             entity.concept_id, entity.canonical_name, entity.aliases, False
         )
 
-        print("ENTITY", entity)
-
         return CanonicalEntity(
             id=entity.concept_id,
             ids=[entity.concept_id],

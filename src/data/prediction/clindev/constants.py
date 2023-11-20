@@ -81,6 +81,8 @@ input_field_lists = InputFieldLists(
     quantitative=QUANTITATIVE_FIELDS,
 )
 
+ALL_INPUT_FIELD_LISTS: list[str] = flatten(input_field_lists.__dict__.values())
+
 output_field_lists = OutputFieldLists(
     y1_categorical=Y1_CATEGORICAL_FIELDS,
     y2=Y2_FIELD,

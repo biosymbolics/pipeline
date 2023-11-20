@@ -1,13 +1,18 @@
 import argparse
+from datetime import date
 import logging
 import sys
+from typing import cast
 from pydash import flatten
 import torch
+import polars as pl
+
 
 import system
 
 system.initialize()
 
+from data.prediction.clindev.types import PatentTrialPrediction, PatentTrialPredictions
 from data.prediction.utils import ModelInput, decode_output
 
 from .constants import (
@@ -16,6 +21,7 @@ from .constants import (
     DEVICE,
     InputRecord,
     input_field_lists,
+    ALL_INPUT_FIELD_LISTS,
     output_field_lists,
 )
 from .model import ClindevPredictionModel
@@ -78,26 +84,89 @@ class ModelPredictor:
             _, _, y2_preds, y1_probs_list = self.model(
                 ModelInput.get_instance(**batch.__dict__)
             )
-            return decode_output(
+            decoded = decode_output(
                 y1_probs_list,
                 y2_preds,
                 output_field_lists,
                 directory=BASE_ENCODER_DIRECTORY,
                 actual_length=min(len(records) - i * batch_size, batch_size),
             )
+            res = {k: [_v.item() for _v in v] for k, v in decoded.items()}
+            return [
+                dict(zip(res.keys(), vals))
+                for vals in zip(*(res[k] for k in res.keys()))
+            ]
 
         predictions = [predict_batch(i) for i in range(len(records))]
-        return predictions
+        return flatten(predictions)
 
 
-def predict(records: list[InputRecord]):
+PHASES = ["PHASE_1", "PHASE_2", "PHASE_3"]
+
+
+def predict(inputs: list[dict]) -> list[PatentTrialPredictions]:
+    """
+    Output: dict[publication_number: str, trials: list[dict]]
+
+    from data.prediction.clindev.predictor import predict
+    input = [{ "publication_number": 'abcd123', "mesh_conditions": "heart disease", "interventions": "gpr86 antagonist", "enrollment": 10 }, { "publication_number": 'bb3311', "mesh_conditions": "asthma", "interventions": "advair", "enrollment": 100 }]
+    predict(input)
+    """
     predictor = ModelPredictor()
-    return predictor.predict(records)
+
+    def predict_phase(
+        phase: str, start_dates: list[int]
+    ) -> list[PatentTrialPrediction]:
+        records = [
+            InputRecord(
+                **{
+                    **{k: v for k, v in input.items() if k in ALL_INPUT_FIELD_LISTS},
+                    "phase": phase,
+                    "start_date": sd,
+                    "sponsor_type": "INDUSTRY",
+                }
+            )
+            for input, sd in zip(inputs, start_dates)
+        ]
+        predictions = predictor.predict(records)
+        return [
+            PatentTrialPrediction(
+                **{**pred, **rec._asdict(), **input, "publication_number": input["publication_number"]}  # type: ignore
+            )
+            for input, rec, pred in zip(inputs, records, predictions)
+        ]
+
+    predictions: list[list[PatentTrialPrediction]] = []
+    for phase in PHASES:
+        start_dates = (
+            [
+                round(max(1, round(sum(d) / 365)) + date.today().year)
+                for d in zip(*[[r.duration_exact for r in p] for p in predictions])
+            ]
+            if len(predictions) > 0
+            else [date.today().year] * len(inputs)
+        )
+        predictions.append(predict_phase(phase, start_dates))
+
+    df = pl.DataFrame(flatten(predictions))
+    return cast(
+        list[PatentTrialPredictions],
+        (
+            df.groupby(["publication_number"])
+            .agg([pl.struct(pl.all().exclude("publication_number")).alias("trials")])
+            .to_dicts()
+        ),
+    )
 
 
-def predict_single(record: InputRecord):
+def predict_single(input: dict):
     predictor = ModelPredictor()
-    return predictor.predict([record])
+
+    def predict_phase(phase: str, start_year: str):
+        record = InputRecord(**{**input, "phase": phase, "start_date": start_year})
+        return predictor.predict([record])[0]
+
+    return {phase: predict_phase(phase, input["start_date"]) for phase in PHASES}
 
 
 if __name__ == "__main__":
@@ -108,7 +177,6 @@ if __name__ == "__main__":
 
             Example:
             python3 -m data.prediction.clindev.predictor --interventions pf07264660 --mesh_conditions Hypertension
-
             python3 -m data.prediction.clindev.predictor --interventions lianhuaqingwen --mesh_conditions 'Coronavirus Infections'
             python3 -m data.prediction.clindev.predictor --interventions 'apatinib mesylate' --mesh_conditions Neoplasms
             """
@@ -120,15 +188,14 @@ if __name__ == "__main__":
         # "mesh_conditions": ["covid-19"],
         # "interventions": ["hydroxychloroquine"],
         "sponsor_type": "INDUSTRY",
-        "phase": "PHASE_3",
+        # "phase": "PHASE_3",
         "enrollment": 1000,
-        "start_date": 2024,
+        # "start_date": 2024,
     }
 
     parser = argparse.ArgumentParser()
     for field in flatten(input_field_lists.__dict__.values()):
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
-    record = InputRecord(**parser.parse_args().__dict__)
-    res = predict_single(record)
+    res = predict_single(parser.parse_args().__dict__)
     print("RESULT:", res)

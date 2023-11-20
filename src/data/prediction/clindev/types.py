@@ -90,3 +90,26 @@ class StageSizes:
     input: int
     hidden: int
     output: int
+
+
+@dataclass(frozen=True)
+class PatentTrialPrediction:
+    publication_number: str
+    comparison_type: str
+    design: str
+    duration: str
+    duration_exact: float
+    enrollment: str
+    interventions: str
+    masking: str
+    mesh_conditions: str
+    phase: str
+    randomization: str
+    sponsor_type: str
+    start_date: str
+
+
+@dataclass(frozen=True)
+class PatentTrialPredictions:
+    publication_number: str
+    trials: list[PatentTrialPrediction]
