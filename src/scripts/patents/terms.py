@@ -13,7 +13,6 @@ system.initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
 from core.ner import TermNormalizer
-from core.ner.utils import lemmatize_tails
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 
@@ -95,12 +94,12 @@ class TermAssembler:
         Uses the most common "original_term" if used with sufficiently high frequency,
         and otherwise uses the "term" (often a mangled composite of UMLS terms, which is why we don't use it by default)
         """
-        # TODO: should also enforce that all "terms" are the same (which they aren't)
         uniq_ids = uniq([row["id"] for row in term_records])
         if len(uniq_ids) > 1:
             logger.error("Term records must have the same id (%s)", uniq_ids)
 
-        # TODO: because of how we create this, it isn't at all canonical!!!
+        # TODO: some names are better than others,
+        # e.g. (['C0007648|C0037473 cellulose sodium', 'C0007648|C0037473 sodium cellulose'])
         canonical_term = term_records[0]["term"]
 
         # use canonical name if there is only one id
@@ -227,12 +226,14 @@ class TermAssembler:
                 SELECT term, domain, sum(count) as count FROM (
                     SELECT lower(preferred_name) as term, domain, COUNT(*) as count
                     from {GPR_ANNOTATIONS_TABLE}
+                    where preferred_name ~* '.*sodium.*'
                     group by preferred_name, domain
 
                     UNION ALL
 
                     SELECT lower(original_term) as term, domain, COUNT(*) as count
                     FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                    where original_term ~* '.*sodium.*'
                     group by original_term, domain
                 ) s
 
@@ -298,7 +299,10 @@ class TermAssembler:
 
         def get_ancestor(ids: Sequence[str], type_name: str) -> str | None:
             ancestor_ids: list[str] = compact(
-                [self.canonical_map.get(i, {}).get(f"{type_name}_rollup") for i in ids]
+                [
+                    self.canonical_map.get(id, {}).get(f"{type_name}_rollup")
+                    for id in ids
+                ]
             )
             names = [
                 self.canonical_map[ai]["preferred_name"]
@@ -347,6 +351,7 @@ class TermAssembler:
             "instance_rollup": "TEXT",
             "category_rollup": "TEXT",
         }
+        self.client.delete_table(TERMS_TABLE, is_cascade=True)
         self.client.create_and_insert(
             terms,
             TERMS_TABLE,
@@ -367,7 +372,7 @@ class TermAssembler:
             SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'))
             where term<>'';
 
-            ALTER TABLE {TERMS_TABLE} DROP COLUMN 'synonyms'; -- no longer needed
+            ALTER TABLE {TERMS_TABLE} DROP COLUMN synonyms; -- no longer needed
             """
         )
 

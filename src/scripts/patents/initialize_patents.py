@@ -48,7 +48,7 @@ def __create_annotations_table():
                 --- assignees as annotations
                 SELECT
                     publication_number,
-                    LOWER(case when map.term is null then assignee else map.term end) as term,
+                    (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
                     null as id,
                     'assignees' as domain,
                     'record' as source,
@@ -65,7 +65,7 @@ def __create_annotations_table():
                 --- inventors as annotations
                 SELECT
                     publication_number,
-                    LOWER(case when map.term is null then inventor else map.term end) as term,
+                    (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
                     null as id,
                     'inventors' as domain,
                     'record' as source,
@@ -93,17 +93,17 @@ def __create_annotations_table():
                     FROM (
                         SELECT
                             *,
-                            LOWER(case when map.term is null then preferred_name else map.term end) as norm_term,
-                            (case when map.id is null then preferred_name else map.id end) as norm_id, -- TODO: need more reliable approach??
+                            (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term END) as norm_term,
+                            (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id END) as norm_id, -- TODO: need more reliable approach??
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
-                                (case when map.term is null then preferred_name else map.term end)
+                                (CASE WHEN map.term is null THEN preferred_name ELSE map.term END)
                                 ORDER BY character_offset_start DESC
                             ) AS rn
-                        FROM {GPR_ANNOTATIONS_TABLE}
+                        FROM gpr_annotations
                         LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
                     ) s
-                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
+                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
                     WHERE rn = 1
 
                 UNION ALL
@@ -122,11 +122,11 @@ def __create_annotations_table():
                     FROM (
                         SELECT
                             *,
-                            LOWER(case when map.term is null then original_term else map.term end) as norm_term,
-                            (case when map.id is null then original_term else map.id end) as norm_id,
+                            (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END) as norm_term,
+                            (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id END) as norm_id,
                             ROW_NUMBER() OVER(
                                 PARTITION BY publication_number,
-                                (case when map.term is null then original_term else map.term end),
+                                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END),
                                 domain
                                 ORDER BY character_offset_start DESC
                             ) AS rn
@@ -134,7 +134,7 @@ def __create_annotations_table():
                         LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
                         WHERE length(ba.term) > 0
                     ) s
-                    LEFT JOIN terms t on s.norm_id = t.id and t.id <> ''
+                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
                     WHERE rn = 1
         )
         SELECT
