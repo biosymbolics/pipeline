@@ -34,6 +34,7 @@ CANDIDATE_CUI_SUPPRESSIONS = {
     "C0039552": "terminally ill",
     "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
     "C0243072": "derivative",
+    "C1744692": "NOS inhibitor",  # matches "inhibitor"
 }
 
 
@@ -203,6 +204,10 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         member_candidates = get_member_candidates()
 
+        # if just a single composite match, treat it like a non-composite match
+        if len(member_candidates) == 1:
+            return self._candidate_to_canonical(member_candidates[0])
+
         # sorted for the sake of consist composite ids
         ids = sorted([c.concept_id for c in member_candidates])
         name = " ".join([get_name_part(c) for c in member_candidates])
@@ -256,7 +261,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 # concept_id is the word itself, so
                 # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
                 MentionCandidate(
-                    concept_id=words[0],
+                    concept_id=words[0].lower(),
                     aliases=[words[0]],
                     similarities=[-1],
                 ),
@@ -325,7 +330,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             return False
         return True
 
-    def _get_canonical(
+    def _get_best_canonical(
         self, candidates: Sequence[MentionCandidate]
     ) -> CanonicalEntity | None:
         """
@@ -339,8 +344,14 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         if top_candidate is None:
             return None
 
+        return self._candidate_to_canonical(top_candidate)
+
+    def _candidate_to_canonical(self, candidate: MentionCandidate) -> CanonicalEntity:
+        """
+        Convert a MentionCandidate to a CanonicalEntity
+        """
         # go to kb to get canonical name
-        entity = self.kb.cui_to_entity[top_candidate.concept_id]
+        entity = self.kb.cui_to_entity[candidate.concept_id]
         name = clean_umls_name(
             entity.concept_id, entity.canonical_name, entity.aliases, False
         )
@@ -363,7 +374,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         candidates = self._get_candidates(mention_texts)
 
         matches = {
-            mention_text: self._get_canonical(candidate_set)
+            mention_text: self._get_best_canonical(candidate_set)
             for mention_text, candidate_set in zip(mention_texts, candidates)
         }
 
