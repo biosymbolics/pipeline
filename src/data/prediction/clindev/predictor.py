@@ -37,7 +37,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 20,
+        checkpoint_epoch: int = 155,
         device: str = DEVICE,
     ):
         """
@@ -55,19 +55,6 @@ class ModelPredictor:
         Alias for self.predict
         """
         self.predict(*args, **kwargs)
-
-    @staticmethod
-    def __get_batch(i: int, input: ModelInput) -> ModelInput:
-        """
-        Get input_dict for batch i
-        """
-        return ModelInput(
-            **{
-                f: v[i] if len(v) > i else torch.Tensor()
-                for f, v in input.items()
-                if v is not None
-            }
-        )
 
     def predict(
         self,
@@ -96,6 +83,7 @@ class ModelPredictor:
                 y2_preds,
                 output_field_lists,
                 directory=BASE_ENCODER_DIRECTORY,
+                actual_length=min(len(records) - i * batch_size, batch_size),
             )
 
         predictions = [predict_batch(i) for i in range(len(records))]
@@ -120,7 +108,6 @@ if __name__ == "__main__":
 
             Example:
             python3 -m data.prediction.clindev.predictor --interventions pf07264660 --mesh_conditions Hypertension
-            --conditions 'Clinically Significant Portal Hypertension'
 
             python3 -m data.prediction.clindev.predictor --interventions lianhuaqingwen --mesh_conditions 'Coronavirus Infections'
             python3 -m data.prediction.clindev.predictor --interventions 'apatinib mesylate' --mesh_conditions Neoplasms

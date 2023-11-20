@@ -33,7 +33,7 @@ class OutputCorrelation(nn.Module):
         super().__init__()
         self.decoder = nn.Linear(other_outputs_size, this_output_size)
 
-    def forward(self, *inputs):
+    def forward(self, *inputs) -> torch.Tensor:
         x = torch.cat(inputs, dim=1)
         return self.decoder(x)
 
@@ -58,7 +58,7 @@ class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
 
             self.to(self.device)
 
-    def forward(self, y1_probs_list):
+    def forward(self, y1_probs_list) -> torch.Tensor:
         values = [
             model(*[y1_prob for i2, y1_prob in enumerate(y1_probs_list) if i2 != i])
             for i, model in enumerate(self.values())
@@ -83,7 +83,7 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
 
             self.to(self.device)
 
-    def forward(self, x):
+    def forward(self, x) -> tuple[torch.Tensor, list[torch.Tensor]]:
         values = list([module(x) for module in self.values()])
         return torch.cat(values, dim=1).to(self.device), values
 
@@ -139,7 +139,7 @@ class InputModel(SaveableModel):
     def forward(
         self,
         input: SplitModelInput,
-    ):
+    ) -> torch.Tensor:
         all_inputs = []
         if len(input.text) > 0:
             all_inputs.append(self.text(input.text))
@@ -200,7 +200,7 @@ class Stage1Model(SaveableModel):
 
             self.to(self.device)
 
-    def forward(self, input):
+    def forward(self, input) -> torch.Tensor:
         x = self.layer1(input)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -237,7 +237,7 @@ class Stage2Model(SaveableModel):
 
             self.to(self.device)
 
-    def forward(self, y1, x):
+    def forward(self, y1, x) -> torch.Tensor:
         input = torch.cat([y1, x], dim=1)
         x = self.layer1(input)
         x = self.layer2(x)
@@ -330,7 +330,7 @@ class ClinDevModel(nn.Module):
 
     def forward(
         self, input: SplitModelInput
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[torch.Tensor]]:
         """
         Note to self: if not training, first check if weights are updating
         print(list(self.stage2_model.modules())[0].layer3[0].weight)
@@ -348,6 +348,14 @@ class ClinDevModel(nn.Module):
         y2_pred = self.stage2_model(y1_pred, x)
 
         return (y1_probs, y1_corr_probs, y2_pred, y1_probs_list)
+
+    def __call__(
+        self, *args, **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[torch.Tensor]]:
+        """
+        Alias for self.forward
+        """
+        return self.forward(*args, **kwargs)
 
 
 class ClindevPredictionModel(ClinDevModel):
