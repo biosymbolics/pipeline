@@ -107,22 +107,12 @@ class TestCandidateGenerator(unittest.TestCase):
             {
                 "description": "no composite match for IUPAC name",
                 "text": ["-((6-oxo-1,6-dihydropyridazin-4-yl)methyl)piperazine"],
-                "expected": [
-                    {
-                        "id": "",
-                        "name": "",
-                    }
-                ],
+                "expected": [None],
             },
             {
                 "description": "no match for short partial terms",
                 "text": ["1,3"],
-                "expected": [
-                    {
-                        "id": "",
-                        "name": "",
-                    }
-                ],
+                "expected": [None],
             },
             {
                 "description": "test no match (should return None)",
@@ -137,6 +127,7 @@ class TestCandidateGenerator(unittest.TestCase):
             text = test["text"]
 
             result = self.candidate_generator(text)[0]
+            print("RESULT", result)
 
             for field in fields_to_test:
                 if test["expected"][0] is None:
