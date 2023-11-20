@@ -12,13 +12,14 @@ from utils.classes import overrides
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-BETWEENNESS_FILE = "umls_betweenness.json"
-
 
 class AncestorUmlsGraph(UmlsGraph):
     """
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
     """
+
+    def __init__(self):
+        super().__init__()
 
     @staticmethod
     def _format_name_sql(table: str, suppressions: Sequence[str] | set[str]) -> str:

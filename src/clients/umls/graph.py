@@ -22,18 +22,15 @@ class UmlsGraph(object):
     Cmputes betweenness centrality for nodes, which is used for ancestor selection.
     """
 
-    def __init__(self, file_name: str | None = BETWEENNESS_FILE):
+    def __init__(self, file_name: str = BETWEENNESS_FILE):
         umls_db = f"{BASE_DATABASE_URL}/umls"
         self.db = PsqlDatabaseClient(umls_db)
         self.G = self.load_graph()
         self.nodes: dict[str, dict] = dict(self.G.nodes.data())
 
-        if file_name is not None:
-            try:
-                self.betweenness_map = load_json_from_file(file_name)
-            except FileNotFoundError:
-                pass
-        else:
+        try:
+            self.betweenness_map = load_json_from_file(file_name)
+        except FileNotFoundError:
             self.betweenness_map = self._load_betweenness()
 
     @abstractmethod
