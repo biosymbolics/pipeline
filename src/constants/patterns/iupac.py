@@ -364,10 +364,8 @@ def compose_iupac_re() -> str:
 
     TODO: improve!!
     """
-
-    extra_chars = [r"(", r")", r"\]", r"\[", ",", r"-", "'"]
+    extra_chars = [r"(", r")", r"\]", r"\[", ",", r"-"]
     iupac_substr = ALPHA_CHARS("*", None, extra_chars)
-
     # must include at least 1 IUPAC string
     regex = (
         r"\b((?:"

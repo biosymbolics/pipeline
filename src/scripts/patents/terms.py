@@ -226,14 +226,12 @@ class TermAssembler:
                 SELECT term, domain, sum(count) as count FROM (
                     SELECT lower(preferred_name) as term, domain, COUNT(*) as count
                     from {GPR_ANNOTATIONS_TABLE}
-                    where preferred_name ~* '.*sodium.*'
                     group by preferred_name, domain
 
                     UNION ALL
 
                     SELECT lower(original_term) as term, domain, COUNT(*) as count
                     FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                    where original_term ~* '.*sodium.*'
                     group by original_term, domain
                 ) s
 

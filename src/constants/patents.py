@@ -147,6 +147,7 @@ COMPANY_MAP = {
     "Celgene": "Bristol-Myers Squibb",
     "Samsung": "Samsung",
     "ucb": "UCB",
+    "r and s": "R&S Northeast",  # mostly to avoid this over-matching other assignee terms
 }
 
 OWNER_TERM_MAP = {

@@ -139,9 +139,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         with_overrides = self._apply_word_overrides(texts, candidates)
         return with_overrides
 
-    def _candidates_to_composite(
+    def _assemble_composite(
         self, candidates: Sequence[MentionCandidate]
-    ) -> CanonicalEntity:
+    ) -> CanonicalEntity | None:
         """
         Form a composite from a list of candidates
         """
@@ -205,6 +205,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         member_candidates = get_member_candidates()
 
+        if len(member_candidates) == 0:
+            return None
+
         # if just a single composite match, treat it like a non-composite match
         if len(member_candidates) == 1:
             return self._candidate_to_canonical(member_candidates[0])
@@ -236,7 +239,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         if mention_text.strip() == "":
             return None
 
-        def get_candidates(words: tuple[str, ...]) -> list[MentionCandidate]:
+        def get_composite_candidates(words: tuple[str, ...]) -> list[MentionCandidate]:
             """
             Recursive function to see if the first ngram has a match, then the first n-1, etc.
             """
@@ -249,13 +252,16 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     remaining_words = tuple(words[NGRAMS_N:])
                     return [
                         ngram_candidate_map[ngram],
-                        *get_candidates(remaining_words),
+                        *get_composite_candidates(remaining_words),
                     ]
 
             # otherwise, let's map only the first word
             remaining_words = tuple(words[1:])
             if words[0] in ngram_candidate_map:
-                return [ngram_candidate_map[words[0]], *get_candidates(remaining_words)]
+                return [
+                    ngram_candidate_map[words[0]],
+                    *get_composite_candidates(remaining_words),
+                ]
 
             # otherwise, no match. create a fake MentionCandidate.
             return [
@@ -266,13 +272,13 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     aliases=[words[0]],
                     similarities=[-1],
                 ),
-                *get_candidates(remaining_words),
+                *get_composite_candidates(remaining_words),
             ]
 
         all_words = self.get_words(mention_text)
-        candidates = get_candidates(all_words)
+        candidates = get_composite_candidates(all_words)
 
-        return self._candidates_to_composite(candidates)
+        return self._assemble_composite(candidates)
 
     def generate_composite_entities(
         self, matchless_mention_texts: Sequence[str]
@@ -285,7 +291,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             matchless_mention_texts (Sequence[str]): list of mention texts
         """
 
-        # 1 and 2grams
+        # create 1 and 2grams
         matchless_ngrams = uniq(
             flatten(
                 [
@@ -296,10 +302,10 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             )
         )
 
-        # get candidates from superclass
+        # get candidates for all ngrams
         matchless_candidates = self._get_candidates(matchless_ngrams)
 
-        # create a map of ngrams to (acceptable) candidates
+        # create a map of ngrams to the best candidate
         ngram_candidate_map: dict[str, MentionCandidate] = omit_by(
             {
                 ngram: self.get_best_candidate(candidate_set)
@@ -356,6 +362,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         name = clean_umls_name(
             entity.concept_id, entity.canonical_name, entity.aliases, False
         )
+
+        print("ENTITY", entity)
 
         return CanonicalEntity(
             id=entity.concept_id,

@@ -124,6 +124,11 @@ class TestCandidateGenerator(unittest.TestCase):
                     }
                 ],
             },
+            {
+                "description": "test no match (should return None)",
+                "text": ["4-pyrimidinediamine disodium"],
+                "expected": [None],
+            },
         ]
 
         fields_to_test = ["id", "name"]
@@ -134,4 +139,9 @@ class TestCandidateGenerator(unittest.TestCase):
             result = self.candidate_generator(text)[0]
 
             for field in fields_to_test:
-                self.assertEqual(result._asdict()[field], test["expected"][0][field])
+                if test["expected"][0] is None:
+                    self.assertEqual(result, None)
+                else:
+                    self.assertEqual(
+                        result._asdict()[field], test["expected"][0][field]
+                    )
