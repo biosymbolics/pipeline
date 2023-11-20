@@ -19,7 +19,7 @@ from constants.core import (
     TERMS_TABLE,
     TRIALS_TABLE,
 )
-from typings.patents import PatentApplication
+from typings.patents import ScoredPatentApplication as PatentApplication
 from utils.string import get_id
 
 from .enrich import enrich_search_result
@@ -58,7 +58,6 @@ SEARCH_RETURN_FIELDS = {
 }
 
 APPROVED_SEARCH_RETURN_FIELDS = {
-    "approval_dates": "approval_date",
     "approval_indications": "approval_indications",
     "brand_name": "brand_name",
     "generic_name": "generic_name",
@@ -165,7 +164,7 @@ def _search(
     term_field: TermField = "terms",
     limit: int = MAX_SEARCH_RESULTS,
     is_exhaustive: bool = False,  # will search via tsquery too (slow)
-) -> Sequence[PatentApplication]:
+) -> list[PatentApplication]:
     """
     Search patents by terms
     """
@@ -180,6 +179,11 @@ def _search(
     query = f"""
         SELECT {", ".join(qp["fields"])},
         max({term_field}) as terms,
+        (CASE
+            WHEN max(approval_dates) IS NOT NULL AND ARRAY_LENGTH(max(approval_dates), 1) > 0
+            THEN (max(approval_dates))[1]
+            ELSE NULL END
+        ) as approval_date,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM {APPLICATIONS_TABLE} AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (annotations.publication_number = apps.publication_number)
@@ -214,7 +218,7 @@ def search(
     limit: int = MAX_SEARCH_RESULTS,
     skip_cache: bool = False,
     is_exhaustive: bool = False,
-) -> Sequence[PatentApplication]:
+) -> list[PatentApplication]:
     """
     Search patents by terms
     Filters on

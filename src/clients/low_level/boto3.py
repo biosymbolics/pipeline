@@ -8,6 +8,7 @@ import boto3
 import logging
 
 from utils.date import date_deserialier
+from utils.encoding.json_encoder import EnhancedJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -89,9 +90,17 @@ def retrieve_with_cache_check(
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
+    encode: Callable[[T], str | bytes] = EnhancedJSONEncoder().encode,
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.
+
+    Args:
+        operation (Callable[[int], T] | Callable[[], T]): operation to perform
+        key (str): key
+        limit (int): limit
+        cache_name (str): cache name
+        encode (Callable[[T], str | bytes]): encoder function
     """
     s3 = boto3.client("s3")
 
@@ -125,7 +134,7 @@ def retrieve_with_cache_check(
         s3.put_object(
             Bucket=cache_name,
             Key=cache_key,
-            Body=json.dumps(data, default=str),
+            Body=encode(data),  # type: ignore
             ContentType="application/json",
         )
 

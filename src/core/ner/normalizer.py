@@ -63,8 +63,8 @@ class TermNormalizer:
         def get_canonical(
             entity: tuple[str, CanonicalEntity | None] | None, normalized: str
         ) -> CanonicalEntity:
+            # create a pseudo-canonical entity if no canonical entity found
             if entity is None or entity[1] is None:
-                # create a pseudo-canonical entity
                 return CanonicalEntity(id="", name=normalized, aliases=[])
             return entity[1]
 

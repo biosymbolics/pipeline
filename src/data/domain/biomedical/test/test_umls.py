@@ -108,6 +108,18 @@ class TestUmlsUtils(unittest.TestCase):
                 "is_composite": False,
                 "expected": "GPR84 protein, human",
             },
+            {
+                "description": "avoid stupidly long canonical names",
+                "cui": "C4086713",
+                "canonical_name": "Substance with programmed cell death protein 1 inhibitor mechanism of action (substance)",
+                "aliases": [
+                    "Programmed Cell Death Protein 1 Inhibitors",
+                    "PD1 Inhibitor",
+                    "PD-1 Inhibitor",
+                ],
+                "is_composite": False,
+                "expected": "PD1 Inhibitor",
+            },
         ]
 
         for test in test_cases:

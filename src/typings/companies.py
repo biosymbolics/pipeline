@@ -3,6 +3,15 @@ from typing import Any, Optional
 
 from typings.core import Dataclass
 
+COMPANY_STR_KEYS = [
+    "symbol",
+    "market_cap",
+    "total_debt",
+    "net_debt",
+    "current_ratio",
+    "debt_equity_ratio",
+]
+
 
 @dataclass(frozen=True)
 class Company(Dataclass):
@@ -24,3 +33,9 @@ class Company(Dataclass):
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def __str__(self):
+        return ", ".join([f"{k}={getattr(self, k)}" for k in COMPANY_STR_KEYS])
+
+    def __repr__(self):
+        return self.__str__()

@@ -362,17 +362,18 @@ def compose_iupac_re() -> str:
     """
     Extracts IUPAC from string
 
-    returns "(?i)\b((?:[\\wͰ-Ͽ()\\]\\[,-]*(?:alky|deoxy|tetr|...){1,100}[\\wͰ-Ͽ()\\]\\[,-]*){2,})(?:[ \n]|$)"
+    TODO: improve!!
     """
-
     extra_chars = [r"(", r")", r"\]", r"\[", ",", r"-"]
     iupac_substr = ALPHA_CHARS("*", None, extra_chars)
+    # must include at least 1 IUPAC string
     regex = (
         r"\b((?:"
         + iupac_substr
         + get_or_re(IUPAC_STRINGS, 1)
         + iupac_substr
-        + r"){1,})(?:[ \n]|$)"
+        + r"){3,})"
+        + "(?:[ \n]|$)"
     )
     return regex
 
@@ -394,6 +395,11 @@ def extract_iupac(string: str) -> list[str]:
 def is_iupac(term: str) -> bool:
     """
     Checks if term is IUPAC
+
+    - checks if term matches IUPAC_RE (compound name parts)
+    - checks a simple name heuristic - lots of dashes and has at least 1 number
+
+    TODO: improve! IUPAC_RE is flawed
     """
     matches_iupac = re.match(IUPAC_RE, term) is not None
 

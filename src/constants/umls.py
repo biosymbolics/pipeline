@@ -7,6 +7,13 @@ UMLS_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
+    "C1420201": "SGLT2",  # otherwise SLC5A2
+}
+
+UMLS_CUI_SUPPRESSIONS = {
+    "C1440188": "C little e",  # matches too much stuff
+    "C0313108": "Blood group antibody big C little e",
+    "C0243083": "associated disease",
 }
 
 # suppress UMLS entities matching these names
@@ -24,6 +31,7 @@ UMLS_NAME_SUPPRESSIONS = set(
         "other",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540010
         "and",
         "or",
+        "by",  # https://uts.nlm.nih.gov/uts/umls/concept/C0682899
         "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
         "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
     ]
@@ -36,7 +44,6 @@ UMLS_COMPOUND_TYPES = {
     "T109": "Organic Chemical",
     "T120": "Chemical Viewed Functionally",
     "T121": "Pharmacologic Substance",
-    "T122": "biomedical or dental material",
     "T123": "Biologically Active Substance",
     "T127": "Vitamin",
     "T167": "Substance",
@@ -133,6 +140,7 @@ UMLS_RESEARCH_TYPES = {"T063": "research activity"}
 
 UMLS_OTHER_TYPES = {
     # "T068": "Human-caused Phenomenon or Process",  # ??
+    "T122": "biomedical or dental material",
     "T131": "Hazardous or Poisonous Substance",
     "T196": "Element, Ion, or Isotope",
 }

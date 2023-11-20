@@ -52,7 +52,6 @@ class SynonymMapper:
             og_term: {"term": row["term"], "id": row["id"]}
             for row in terms
             for og_term in row["synonyms"]
-            if len(row["term"]) > 1
         }
 
         logging.info("Adding %s terms to synonym map", len(synonym_map))

@@ -31,7 +31,7 @@ def clean_owners(owners: list[str]) -> list[str]:
 
     def remove_suppressions(terms: list[str]) -> Iterable[str]:
         """
-        Remove suppressions (generic terms like LLC, country, etc),
+        Remove term suppressions (generic terms like LLC, country, etc)
         Examples:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
