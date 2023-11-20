@@ -5,7 +5,7 @@ from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 from constants.patterns.iupac import is_iupac
 
 from core.ner.types import CanonicalEntity
-from constants.umls import PREFERRED_UMLS_TYPES
+from constants.umls import PREFERRED_UMLS_TYPES, UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
@@ -15,6 +15,7 @@ NGRAMS_N = 2
 DEFAULT_K = 3  # mostly wanting to avoid suppressions. increase if adding a lot more suppressions.
 
 CANDIDATE_CUI_SUPPRESSIONS = {
+    **UMLS_CUI_SUPPRESSIONS,
     "C0432616": "Blood group antibody A",  # matches "anti", sigh
     "C1704653": "cell device",  # matches "cell"
     "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
@@ -129,7 +130,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             ]
         return candidates
 
-    def _get_matches(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
+    def _get_candidates(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
         """
         Wrapper around super().__call__ that handles word overrides
         """
@@ -290,7 +291,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         )
 
         # get candidates from superclass
-        matchless_candidates = self._get_matches(matchless_ngrams)
+        matchless_candidates = self._get_candidates(matchless_ngrams)
 
         # create a map of ngrams to (acceptable) candidates
         ngram_candidate_map: dict[str, MentionCandidate] = omit_by(
@@ -359,7 +360,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = self._get_matches(mention_texts)
+        candidates = self._get_candidates(mention_texts)
 
         matches = {
             mention_text: self._get_canonical(candidate_set)
@@ -370,7 +371,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             [
                 text
                 for text, canonical in matches.items()
-                if CompositeCandidateGenerator._is_composite_eligible(text, canonical)
+                if not CompositeCandidateGenerator._is_composite_eligible(
+                    text, canonical
+                )
             ],
         )
 
