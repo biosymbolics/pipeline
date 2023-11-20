@@ -59,7 +59,7 @@ class TestCandidateGenerator(unittest.TestCase):
                 "text": ["AABBCC modulator"],
                 "expected": [
                     {
-                        "id": "aabbcc|C0005525",
+                        "id": "C0005525|aabbcc",
                         "name": "AABBCC Modulator",
                     }
                 ],
@@ -107,6 +107,16 @@ class TestCandidateGenerator(unittest.TestCase):
             {
                 "description": "no composite match for IUPAC name",
                 "text": ["-((6-oxo-1,6-dihydropyridazin-4-yl)methyl)piperazine"],
+                "expected": [
+                    {
+                        "id": "",
+                        "name": "",
+                    }
+                ],
+            },
+            {
+                "description": "no match for short partial terms",
+                "text": ["1,3"],
                 "expected": [
                     {
                         "id": "",
