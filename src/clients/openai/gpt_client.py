@@ -2,7 +2,7 @@
 Client stub for GPT
 """
 import os
-from langchain import PromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Literal, Optional, cast
@@ -77,8 +77,8 @@ class GptApiClient:
         """
         input = self.prompt_template.format_prompt(query=query)
         chat_model = ChatOpenAI(
+            verbose=True,
             temperature=0,
-            client="chat",
             model=self.model,
             max_tokens=DEFAULT_MAX_TOKENS,
             api_key=OPENAI_API_KEY,
