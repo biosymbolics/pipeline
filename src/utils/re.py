@@ -87,7 +87,7 @@ def get_or_re(
     if count is None:
         return base_re
     if isinstance(count, int):
-        return base_re + f"{{{str(count)}, {str(upper or '100')}}}"
+        return base_re + f"{{{str(count)},{str(upper or '100')}}}"
 
     return base_re + count
 
