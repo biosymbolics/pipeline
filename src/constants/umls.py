@@ -7,10 +7,13 @@ UMLS_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
+    "C1420201": "SGLT2",  # otherwise SLC5A2
 }
 
 UMLS_CUI_SUPPRESSIONS = {
     "C1440188": "C little e",  # matches too much stuff
+    "C0313108": "Blood group antibody big C little e",
+    "C0243083": "associated disease",
 }
 
 # suppress UMLS entities matching these names
