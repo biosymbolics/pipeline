@@ -320,7 +320,7 @@ def main(bootstrap: bool = False):
     CREATE USER patents with password '$PASSWORD';
     GRANT readaccess TO patents;
 
-    -- analyze annotations;
+    -- vacuum analyze;
     -- analyze applications;
     -- reindex database patents;
         " >> patents.psql

@@ -140,14 +140,9 @@ class TermAssembler:
                 "id": group[0].get("id") or "",
                 "ids": group[0].get("ids") or [],
                 "domains": dedup([row["domain"] for row in group]),
-                # lemmatize tails for less duplication. todo: lemmatize all?
-                # 2x dedup for perf
                 # TODO: add synonyms from UMLS
-                "synonyms": dedup(
-                    lemmatize_tails(
-                        dedup([row["original_term"] or "" for row in group])
-                    )
-                ),
+                # ** don't modify the original_term, since it is used for linking (equals match)
+                "synonyms": dedup([row["original_term"] or "" for row in group]),
             }
 
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
@@ -371,6 +366,8 @@ class TermAssembler:
             UPDATE {TERMS_TABLE}
             SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'))
             where term<>'';
+
+            ALTER TABLE {TERMS_TABLE} DROP COLUMN 'synonyms'; -- no longer needed
             """
         )
 

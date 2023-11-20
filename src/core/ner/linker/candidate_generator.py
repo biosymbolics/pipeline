@@ -136,7 +136,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         Wrapper around super().__call__ that handles word overrides
         """
         candidates = super().__call__(list(texts), k=DEFAULT_K)
-        return self._apply_word_overrides(texts, candidates)
+        with_overrides = self._apply_word_overrides(texts, candidates)
+        return with_overrides
 
     def _candidates_to_composite(
         self, candidates: Sequence[MentionCandidate]
