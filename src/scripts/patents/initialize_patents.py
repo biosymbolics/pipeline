@@ -181,8 +181,9 @@ def __create_annotations_table():
             publication_number,
             ARRAY_AGG(a.term) AS terms,
             ARRAY_AGG(domain) AS domains,
-            ARRAY_AGG(instance_rollup) as rollup_terms,
-            ARRAY_AGG(category_rollup) as rollup_categories
+            ARRAY_AGG(instance_rollup) as instance_rollup,
+            ARRAY_AGG(category_rollup) as category_rollup,
+            ARRAY_CAT(ARRAY_AGG(instance_rollup), ARRAY_AGG(a.term)) as search_terms
         FROM {ANNOTATIONS_TABLE} a
         GROUP BY publication_number;
     """
