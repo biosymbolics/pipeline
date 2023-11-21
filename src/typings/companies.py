@@ -10,6 +10,9 @@ COMPANY_STR_KEYS = [
     "net_debt",
     "current_ratio",
     "debt_equity_ratio",
+    "is_bad_current_ratio",
+    "is_trading_below_cash",
+    "is_bad_debt_equity_ratio",
 ]
 
 
@@ -25,6 +28,9 @@ class Company(Dataclass):
     current_ratio: float | None
     debt_equity_ratio: float | None
     is_troubled: bool | None
+    is_trading_below_cash: bool | None
+    is_bad_current_ratio: bool | None
+    is_bad_debt_equity_ratio: bool | None
     market_cap: float | None
     net_debt: float | None
     total_debt: float | None

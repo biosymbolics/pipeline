@@ -81,7 +81,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         explanations = compact(
             [
                 *[
-                    f"{company} has some poor financial signal ({financials_map[company]})."
+                    f"{company} has some financial signal ({financials_map[company]})."
                     for company in troubled_assignees
                 ],
                 "Patent is stale." if is_stale else None,
@@ -107,7 +107,8 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         troubled_assignees = [
             company
             for company in assignees
-            if company in financials_map and financials_map[company].is_troubled
+            if company in financials_map
+            and (financials_map[company].is_troubled or False)
         ]
         is_troubled = len(troubled_assignees) > 0
 
