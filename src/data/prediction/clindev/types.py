@@ -99,7 +99,7 @@ class PatentTrialPrediction:
     design: str
     duration: str
     duration_exact: float
-    enrollment: str
+    # enrollment: str
     interventions: str
     masking: str
     mesh_conditions: str

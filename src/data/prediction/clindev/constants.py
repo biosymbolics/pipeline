@@ -27,7 +27,6 @@ TRAINING_PROPORTION = 0.8
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
-    "enrollment",
     # "facilities", ??
     # "countries" ??
 ]
@@ -37,8 +36,8 @@ MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "interventions",
 ]
 TEXT_FIELDS: list[str] = [
-    # "conditions",  # typically only the specific condition
-    "mesh_conditions",  # normalized; includes ancestors
+    "conditions",
+    # "mesh_conditions",  # normalized; includes ancestors
     "interventions",
 ]
 
@@ -52,6 +51,7 @@ QUANTITATIVE_FIELDS: list[str] = [
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
+    # "max_timeframe",
     # dropout_count
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
@@ -59,6 +59,8 @@ Y1_CATEGORICAL_FIELDS: list[str] = [
     "masking",
     "randomization",
     "comparison_type",
+    "enrollment",
+    # "max_timeframe",
     # "hypothesis_type"
     # "termination_reason",
     # dropout_count

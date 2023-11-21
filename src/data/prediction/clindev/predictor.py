@@ -69,7 +69,7 @@ class ModelPredictor:
         device: str = DEVICE,
     ):
         inputs, _ = prepare_input_data(
-            preprocess_inputs(records, ["enrollment"]),
+            preprocess_inputs(records, []),  # ["enrollment"]
             field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
@@ -109,7 +109,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPredictions]:
     Output: dict[publication_number: str, trials: list[dict]]
 
     from data.prediction.clindev.predictor import predict
-    input = [{ "publication_number": 'abcd123', "mesh_conditions": "heart disease", "interventions": "gpr86 antagonist", "enrollment": 10 }, { "publication_number": 'bb3311', "mesh_conditions": "asthma", "interventions": "advair", "enrollment": 100 }]
+    input = [{ "publication_number": 'abcd123', "mesh_conditions": "heart disease", "interventions": "gpr86 antagonist" }, { "publication_number": 'bb3311', "mesh_conditions": "asthma", "interventions": "advair" }]
     predict(input)
     """
     predictor = ModelPredictor()
@@ -162,11 +162,11 @@ def predict(inputs: list[dict]) -> list[PatentTrialPredictions]:
 def predict_single(input: dict):
     predictor = ModelPredictor()
 
-    def predict_phase(phase: str, start_year: str):
-        record = InputRecord(**{**input, "phase": phase, "start_date": start_year})
+    def predict_phase(phase: str):
+        record = InputRecord(**{**input, "phase": phase})
         return predictor.predict([record])[0]
 
-    return {phase: predict_phase(phase, input["start_date"]) for phase in PHASES}
+    return {phase: predict_phase(phase) for phase in PHASES}
 
 
 if __name__ == "__main__":
@@ -176,20 +176,16 @@ if __name__ == "__main__":
             Usage: python3 -m data.prediction.clindev.predictor --field: value
 
             Example:
-            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --mesh_conditions Hypertension
-            python3 -m data.prediction.clindev.predictor --interventions lianhuaqingwen --mesh_conditions 'Coronavirus Infections'
-            python3 -m data.prediction.clindev.predictor --interventions 'apatinib mesylate' --mesh_conditions Neoplasms
+            python3 -m data.prediction.clindev.predictor --interventions pf07264660 --conditions Hypertension
+            python3 -m data.prediction.clindev.predictor --interventions lianhuaqingwen --conditions 'Coronavirus Infections'
+            python3 -m data.prediction.clindev.predictor --interventions 'apatinib mesylate' --conditions Neoplasms
             """
         )
         sys.exit()
 
     standard_fields = {
-        # "conditions": ["covid-19"],
-        # "mesh_conditions": ["covid-19"],
-        # "interventions": ["hydroxychloroquine"],
         "sponsor_type": "INDUSTRY",
         # "phase": "PHASE_3",
-        "enrollment": 1000,
         # "start_date": 2024,
     }
 

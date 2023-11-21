@@ -345,7 +345,7 @@ class ModelTrainer:
             {
                 k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
                 for k, v in true.items()
-                if k in ["nct_id", "mesh_conditions"]
+                if k in ["nct_id", "conditions", "enrollment", "phase"]
                 or k in flatten(output_field_lists.__dict__.values())
             }
             for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
@@ -359,7 +359,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
+        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=40000))
 
         inputs, category_sizes = prepare_data(
             cast(Sequence[InputAndOutputRecord], trials),
