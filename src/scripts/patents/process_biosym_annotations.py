@@ -423,6 +423,14 @@ def populate_working_biosym_annotations():
     remove_common_terms()  # remove one-off generic terms
     normalize_domains()
 
+    client.create_index(
+        {
+            "table": WORKING_TABLE,
+            "column": "original_term",
+            "is_lower": True,
+        }
+    )
+
 
 if __name__ == "__main__":
     """
