@@ -44,113 +44,99 @@ def __create_annotations_table():
     client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     annotations_query = f"""
-        WITH terms AS (
-                --- assignees as annotations
-                SELECT
-                    publication_number,
-                    (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
-                    null as id,
-                    'assignees' as domain,
-                    'record' as source,
-                    1 as character_offset_start,
-                    1 as character_offset_end,
-                    null as instance_rollup,
-                    null as category_rollup
-                FROM applications a,
-                unnest(a.assignees) as assignee
-                LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
-
-                UNION ALL
-
-                --- inventors as annotations
-                SELECT
-                    publication_number,
-                    (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
-                    null as id,
-                    'inventors' as domain,
-                    'record' as source,
-                    1 as character_offset_start,
-                    1 as character_offset_end,
-                    null as instance_rollup,
-                    null as category_rollup
-                FROM applications a,
-                unnest(a.inventors) as inventor
-                LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
-
-                UNION ALL
-
-                -- gpr annotations (just diseases)
-                SELECT
-                    publication_number,
-                    s.norm_term as term,
-                    s.norm_id as id,
-                    domain,
-                    source,
-                    character_offset_start,
-                    character_offset_end,
-                    t.instance_rollup as instance_rollup,
-                    t.category_rollup as category_rollup
-                    FROM (
-                        SELECT
-                            *,
-                            (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term END) as norm_term,
-                            (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id END) as norm_id, -- TODO: need more reliable approach??
-                            ROW_NUMBER() OVER(
-                                PARTITION BY publication_number,
-                                (CASE WHEN map.term is null THEN preferred_name ELSE map.term END)
-                                ORDER BY character_offset_start DESC
-                            ) AS rn
-                        FROM gpr_annotations
-                        LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
-                    ) s
-                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
-                    WHERE rn = 1
-
-                UNION ALL
-
-                --- biosym annotations
-                SELECT
-                    publication_number,
-                    s.norm_term as term,
-                    s.norm_id as id,
-                    domain,
-                    source,
-                    character_offset_start,
-                    character_offset_end,
-                    t.instance_rollup as instance_rollup,
-                    t.category_rollup as category_rollup
-                    FROM (
-                        SELECT
-                            *,
-                            (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END) as norm_term,
-                            (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id END) as norm_id,
-                            ROW_NUMBER() OVER(
-                                PARTITION BY publication_number,
-                                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END),
-                                domain
-                                ORDER BY character_offset_start DESC
-                            ) AS rn
-                        FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                        LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
-                        WHERE length(ba.term) > 0
-                    ) s
-                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
-                    WHERE rn = 1
-        )
+        --- assignees as annotations
         SELECT
             publication_number,
-            term,
-            id,
-            domain,
-            source,
-            character_offset_start,
-            character_offset_end,
-            COALESCE(instance_rollup, term) as instance_rollup, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
-            COALESCE(category_rollup, term) as category_rollup -- min category term (i.e. the closest ancestor considered to be a category)
-        FROM terms
-        ORDER BY character_offset_start
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
+            null as id,
+            'assignees' as domain,
+            'record' as source,
+            1 as character_offset_start,
+            1 as character_offset_end,
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as instance_rollup,
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as category_rollup
+        FROM applications a,
+        unnest(a.assignees) as assignee
+        LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
+
+        UNION ALL
+
+        --- inventors as annotations
+        SELECT
+            publication_number,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
+            null as id,
+            'inventors' as domain,
+            'record' as source,
+            1 as character_offset_start,
+            1 as character_offset_end,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as instance_rollup,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as category_rollup
+        FROM applications a,
+        unnest(a.inventors) as inventor
+        LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
     """
     client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
+
+    # add biosym annotations
+    client.select_insert_into_table(
+        f"""
+        SELECT publication_number,
+            s.term as term,
+            s.id as id,
+            domain,
+            max(source) as source,
+            min(character_offset_start) as character_offset_start,
+            min(character_offset_end) as character_offset_end,
+            max(t.instance_rollup) as instance_rollup,
+            max(t.category_rollup) as category_rollup
+        from (
+            SELECT
+                publication_number,
+                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term end) as term,
+                (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id end) as id,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end
+                FROM biosym_annotations
+                LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
+            ) s
+            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+            group by publication_number, s.term, s.id, domain
+        """,
+        ANNOTATIONS_TABLE,
+    )
+
+    # add gpr annotations
+    client.select_insert_into_table(
+        f"""
+        SELECT publication_number,
+            s.term as term,
+            s.id as id,
+            domain,
+            max(source) as source,
+            min(character_offset_start) as character_offset_start,
+            min(character_offset_end) as character_offset_end,
+            max(t.instance_rollup) as instance_rollup,
+            max(t.category_rollup) as category_rollup
+        from (
+            SELECT
+                publication_number,
+                (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term end) as term,
+                (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id end) as id,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end
+                FROM gpr_annotations
+                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
+            ) s
+            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+            group by publication_number, s.term, s.id, domain
+        """,
+        ANNOTATIONS_TABLE,
+    )
 
     # add attributes at the last moment
     client.select_insert_into_table(
