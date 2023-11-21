@@ -128,6 +128,7 @@ class NerTagger:
                         },
                     },
                 )
+                ruler = rule_nlp.get_pipe("entity_ruler")
 
                 for rules in self.rule_sets:
                     ruler.add_patterns(rules)  # type: ignore
