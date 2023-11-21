@@ -101,10 +101,10 @@ def clean_umls_name(
 
     name_words = canonical_name.split(" ")
 
-    # if not composite,
-    # not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
-    # and not a gene/protein
-    # prefer canonical name
+    # prefer canonical name if:
+    # - not composite,
+    # - not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
+    # - and not a gene/protein
     if (
         not is_composite
         and len(name_words) < 5
