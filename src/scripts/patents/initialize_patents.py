@@ -99,7 +99,7 @@ def __create_annotations_table():
                 source,
                 character_offset_start,
                 character_offset_end
-                FROM biosym_annotations
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
                 LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
             ) s
             LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
@@ -129,7 +129,7 @@ def __create_annotations_table():
                 source,
                 character_offset_start,
                 character_offset_end
-                FROM gpr_annotations
+                FROM {GPR_ANNOTATIONS_TABLE}
                 LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
             ) s
             LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
@@ -284,6 +284,7 @@ def main(bootstrap: bool = False):
         -t umls_graph \
         -t term_ids \
         -t companies \
+        -t patent_clindev_predictions \
         -t patent_to_regulatory_approval > patents.psql
     zip patents.psql.zip patents.psql
     aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
