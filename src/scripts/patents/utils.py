@@ -77,7 +77,10 @@ def clean_owners(owners: list[str]) -> list[str]:
         """
         to_check = [clean_assignee, og_assignee]
         has_mapping = any(
-            [re.findall(rf"\b{key}\b", check, flags=RE_FLAGS) for check in to_check]
+            [
+                re.match(rf"\b{key}\b", check, flags=RE_FLAGS) is not None
+                for check in to_check
+            ]
         )
         if has_mapping:
             return key

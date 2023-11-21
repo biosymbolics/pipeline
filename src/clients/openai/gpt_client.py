@@ -77,7 +77,6 @@ class GptApiClient:
         """
         input = self.prompt_template.format_prompt(query=query)
         chat_model = ChatOpenAI(
-            verbose=True,
             temperature=0,
             model=self.model,
             max_tokens=DEFAULT_MAX_TOKENS,

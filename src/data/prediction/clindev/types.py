@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import Any, Optional
 
 from data.prediction.types import AllCategorySizes
 from typings.core import Dataclass
@@ -110,9 +110,3 @@ class PatentTrialPrediction(Dataclass):
     sponsor_type: str
     start_date: str
     starting_phase: str
-
-
-@dataclass(frozen=True)
-class PatentTrialPredictions(Dataclass):
-    publication_number: str
-    trials: list[PatentTrialPrediction]

@@ -39,8 +39,8 @@ def generate_trial_predictions():
         """
         SELECT
             apps.publication_number as publication_number,
-            array_agg(distinct term) as terms,
-            array_agg(distinct domain) as domains,
+            array_agg(term) as terms,
+            array_agg(domain) as domains,
             (array_agg(t.phase ORDER BY t.start_date desc))[1] as starting_phase
         FROM annotations a, applications apps
         LEFT JOIN patent_to_trial ptt on ptt.publication_number = apps.publication_number
@@ -48,25 +48,33 @@ def generate_trial_predictions():
         where a.publication_number = apps.publication_number
         and domain in ('diseases', 'mechanisms', 'biologics', 'compounds')
         group by apps.publication_number
-        limit 1000
+        order by apps.publication_number desc
+        limit 10000
     """
     )
 
     df = pl.from_dicts(patents, infer_schema_length=None)
 
-    df = df.with_columns(
-        *[
-            df.select(
-                pl.struct(["terms", "domains"])
-                .map_elements(lambda rec: filter_terms_by_domain(rec, domains))  # type: ignore
-                .alias(t)
-            ).to_series()
-            for t, domains in {
-                "conditions": ["diseases"],
-                "interventions": ["mechanisms", "biologics", "compounds"],
-            }.items()
-        ]
-    ).drop("terms", "domains")
+    df = (
+        df.with_columns(
+            *[
+                df.select(
+                    pl.struct(["terms", "domains"])
+                    .map_elements(lambda rec: filter_terms_by_domain(rec, domains))  # type: ignore
+                    .alias(t)
+                ).to_series()
+                for t, domains in {
+                    "conditions": ["diseases"],
+                    "interventions": ["mechanisms", "biologics", "compounds"],
+                }.items()
+            ]
+        )
+        .drop("terms", "domains")
+        .filter(
+            (pl.col("conditions").list.len() > 0)
+            & (pl.col("interventions").list.len() > 0)
+        )
+    )
 
     patents = df.to_dicts()
 

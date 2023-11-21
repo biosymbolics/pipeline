@@ -1,6 +1,7 @@
 import argparse
 from datetime import date
 import logging
+import math
 import sys
 from typing import cast
 from pydash import flatten
@@ -12,7 +13,7 @@ import system
 
 system.initialize()
 
-from data.prediction.clindev.types import PatentTrialPrediction, PatentTrialPredictions
+from data.prediction.clindev.types import PatentTrialPrediction
 from data.prediction.utils import ModelInput, decode_output
 
 from .constants import (
@@ -43,7 +44,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 220,
+        checkpoint_epoch: int = 80,
         device: str = DEVICE,
     ):
         """
@@ -97,7 +98,9 @@ class ModelPredictor:
                 for vals in zip(*(res[k] for k in res.keys()))
             ]
 
-        predictions = [predict_batch(i) for i in range(len(records))]
+        predictions = [
+            predict_batch(i) for i in range(math.ceil(len(records) / BATCH_SIZE))
+        ]
         return flatten(predictions)
 
 
@@ -109,7 +112,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
     Output: dict[publication_number: str, trials: list[dict]]
 
     from data.prediction.clindev.predictor import predict
-    input = [{ "publication_number": 'abcd123', "mesh_conditions": "heart disease", "interventions": "gpr86 antagonist" }, { "publication_number": 'bb3311', "mesh_conditions": "asthma", "interventions": "advair" }]
+    input = [{ "publication_number": 'abcd123', "starting_phase": None, "conditions": ["heart disease"], "interventions": ["gpr86 antagonist", "antagonist"] }, { "publication_number": 'bb3311', "starting_phase": None, "conditions": ["asthma"], "interventions": ["advair"] }]
     predict(input)
     """
     predictor = ModelPredictor()
@@ -131,7 +134,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
         predictions = predictor.predict(records)
         return [
             PatentTrialPrediction(
-                **{**pred, **rec._asdict(), **input, "publication_number": input["publication_number"]}  # type: ignore
+                **{**rec._asdict(), **input, **pred, "publication_number": input["publication_number"]}  # type: ignore
             )
             for input, rec, pred in zip(inputs, records, predictions)
         ]
