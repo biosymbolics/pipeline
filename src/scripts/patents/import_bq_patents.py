@@ -236,8 +236,15 @@ def copy_bq_to_psql():
         ]
     )
 
-    client.create_index(
-        {"table": GPR_ANNOTATIONS_TABLE, "column": "preferred_term", "is_lower": True}
+    client.create_indices(
+        [
+            {
+                "table": GPR_ANNOTATIONS_TABLE,
+                "column": "preferred_term",
+                "is_lower": True,
+            },
+            {"table": GPR_ANNOTATIONS_TABLE, "column": "publication_number"},
+        ]
     )
 
 
