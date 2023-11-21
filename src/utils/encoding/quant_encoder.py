@@ -48,7 +48,7 @@ class BinEncoder(Encoder):
     @staticmethod
     def estimate_n_bins(
         values: npt.NDArray,
-        bins_to_test=range(3, 20),
+        bins_to_test=range(5, 20),
     ):
         """
         Estimate the optimal number of bins

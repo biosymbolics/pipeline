@@ -43,7 +43,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 155,
+        checkpoint_epoch: int = 220,
         device: str = DEVICE,
     ):
         """
@@ -104,7 +104,7 @@ class ModelPredictor:
 PHASES = ["PHASE_1", "PHASE_2", "PHASE_3"]
 
 
-def predict(inputs: list[dict]) -> list[PatentTrialPredictions]:
+def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
     """
     Output: dict[publication_number: str, trials: list[dict]]
 
@@ -148,15 +148,8 @@ def predict(inputs: list[dict]) -> list[PatentTrialPredictions]:
         )
         predictions.append(predict_phase(phase, start_dates))
 
-    df = pl.DataFrame(flatten(predictions))
-    return cast(
-        list[PatentTrialPredictions],
-        (
-            df.groupby(["publication_number"])
-            .agg([pl.struct(pl.all().exclude("publication_number")).alias("trials")])
-            .to_dicts()
-        ),
-    )
+    df = pl.DataFrame(flatten(predictions), infer_schema_length=None)
+    return [PatentTrialPrediction(**p) for p in df.to_dicts()]
 
 
 def predict_single(input: dict):

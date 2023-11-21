@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 import math
+from typing import Any
 
 from data.prediction.types import AllCategorySizes
+from typings.core import Dataclass
 
 
 @dataclass(frozen=True)
@@ -93,23 +95,24 @@ class StageSizes:
 
 
 @dataclass(frozen=True)
-class PatentTrialPrediction:
+class PatentTrialPrediction(Dataclass):
     publication_number: str
     comparison_type: str
+    conditions: list[str]
     design: str
     duration: str
     duration_exact: float
-    # enrollment: str
-    interventions: str
+    enrollment: str
+    interventions: list[str]
     masking: str
-    mesh_conditions: str
     phase: str
     randomization: str
     sponsor_type: str
     start_date: str
+    starting_phase: str
 
 
 @dataclass(frozen=True)
-class PatentTrialPredictions:
+class PatentTrialPredictions(Dataclass):
     publication_number: str
     trials: list[PatentTrialPrediction]

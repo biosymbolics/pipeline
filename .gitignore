@@ -6,6 +6,7 @@ storage
 storage/**
 sec_docs
 data/**
+predictions.json
 patent_model_checkpoints/**
 clindev_model_checkpoints/**
 models/
