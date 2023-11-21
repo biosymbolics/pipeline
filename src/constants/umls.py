@@ -8,12 +8,23 @@ UMLS_NAME_OVERRIDES = {
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
     "C1420201": "SGLT2",  # otherwise SLC5A2
+    # "C1706082": "Compound",
+    "C1550602": "Additive",  # otherwise "Additive (substance)"
 }
 
 UMLS_CUI_SUPPRESSIONS = {
     "C1440188": "C little e",  # matches too much stuff
     "C0313108": "Blood group antibody big C little e",
     "C0243083": "associated disease",
+    "C1706082": "Compound",
+    "C0009429": "combo",
+    "C1547776": "substance",
+    "C0991538": "orderable drug form",
+    "C1698899": "solid drug form",
+    "C1550602": "additive",
+    "C1951340": "process",
+    "C1963578": "procedure",
+    "C0009429": "combination",
 }
 
 # suppress UMLS entities matching these names
