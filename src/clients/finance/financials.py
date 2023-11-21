@@ -28,9 +28,6 @@ SIG_DIGITS = 2
 
 COMPANY_STR_KEYS_EXT = [
     *COMPANY_STR_KEYS,
-    "is_bad_current_ratio",
-    "is_trading_below_cash",
-    "is_bad_debt_equity_ratio",
     "timeframe",
 ]
 
@@ -178,10 +175,10 @@ class CompanyFinancials(StockPerformance):
         return nds[0]
 
     @property
-    def is_trading_below_cash(self) -> bool | None:
+    def is_trading_below_cash(self) -> bool:
         if self.market_cap is None or self.net_debt is None:
             logger.warning("Unable to fetch market cap or net debt for %s", self.symbol)
-            return None
+            return False
         return self.market_cap < self.net_debt
 
     @property
