@@ -31,7 +31,7 @@ def aggregate_over_time(event: ReportEvent, context):
     """
     params = parse_params(
         event.get("queryStringParameters", {}),
-        {"term_field": "rollup_categories"},
+        {"term_field": "category_rollup"},
         10000,
     )
 

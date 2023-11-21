@@ -8,7 +8,7 @@ import typing
 
 from typings.core import Dataclass
 
-TermField = Literal["terms", "rollup_terms", "rollup_categories"]
+TermField = Literal["terms", "instance_rollup", "category_rollup"]
 
 AutocompleteTerm = TypedDict("AutocompleteTerm", {"id": str, "label": str})
 TermResult = TypedDict("TermResult", {"term": str, "count": int})
