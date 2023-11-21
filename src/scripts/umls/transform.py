@@ -40,7 +40,9 @@ class UmlsTransformer:
 
             ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
             level = OntologyLevel.find(r.id, self.umls_graph.get_umls_centrality)
-            preferred_name = clean_umls_name(r.id, r.canonical_name, r.synonyms, False)
+            preferred_name = clean_umls_name(
+                r.id, r.canonical_name, r.synonyms, [r.type_id], False
+            )
 
             return UmlsRecord(
                 **{

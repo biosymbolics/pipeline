@@ -109,6 +109,19 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "GPR84 protein, human",
             },
             {
+                "description": "...unless it's a gene/protein",
+                "cui": "C0061355",
+                "canonical_name": "Glucagon-Like Peptide 1",
+                "aliases": [
+                    "Glucagon-Like Peptide 1",
+                    "GLP-1",
+                    "Glucagon-like peptide 1 (substance)",
+                ],
+                "type_ids": ["T116"],
+                "is_composite": False,
+                "expected": "GLP-1",
+            },
+            {
                 "description": "avoid stupidly long canonical names",
                 "cui": "C4086713",
                 "canonical_name": "Substance with programmed cell death protein 1 inhibitor mechanism of action (substance)",
@@ -129,6 +142,7 @@ class TestUmlsUtils(unittest.TestCase):
                 test["cui"],
                 test["canonical_name"],
                 test["aliases"],
+                test.get("type_ids", []),
                 test.get("is_composite", True),
             )
             self.assertEqual(result, expected_output)

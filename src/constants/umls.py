@@ -63,17 +63,20 @@ UMLS_COMPOUND_TYPES = {
     "T200": "Clinical Drug",
 }
 
+UMLS_GENE_PROTEIN_TYPES = {
+    "T028": "Gene or Genome",
+    "T116": "Amino Acid, Peptide, or Protein",
+}
 
 UMLS_BIOLOGIC_TYPES = {
+    **UMLS_GENE_PROTEIN_TYPES,
     "T043": "cell function",
-    "T028": "Gene or Genome",
     "T085": "Molecular Sequence",
     "T086": "Nucleotide Sequence",
     "T087": "Amino Acid Sequence",
     "T088": "Carbohydrate Sequence",
     "T192": "Receptor",
     "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
-    "T116": "Amino Acid, Peptide, or Protein",
     "T125": "Hormone",
     "T126": "Enzyme",
     "T129": "Immunologic Factor",
