@@ -725,7 +725,7 @@ def dict_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
         TrialSummary,
         {
             **trial,
-            "blinding": masking,
+            "blinding": TrialBlinding.find(masking),
             "comparison_type": ComparisonType.find(
                 trial["arm_types"], trial["interventions"], design
             ),
