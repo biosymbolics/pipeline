@@ -1,8 +1,4 @@
---prefer-binary
-# -f https://download.pytorch.org/whl/torch_stable.html
-torch # ==2.0.1+cpu
-
-boto3
+torch boto3
 bs4
 langchain
 openai
@@ -12,7 +8,6 @@ psycopg_pool
 pydash
 python-dotenv
 requests
-scipy # for nx multipartite_layout
 spacy
 transformers
 typing_extensions

@@ -1,5 +1,3 @@
---prefer-binary
-
 boto3
 bs4
 langchain
@@ -11,5 +9,4 @@ pydash
 python-dotenv
 regex
 requests
-# scipy # nx layout
 typing_extensions
