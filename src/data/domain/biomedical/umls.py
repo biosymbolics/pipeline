@@ -109,7 +109,7 @@ def clean_umls_name(
         not is_composite
         and len(name_words) < 5
         and not has_intersection(type_ids, list(UMLS_GENE_PROTEIN_TYPES.keys()))
-    ):
+    ) or (len(aliases) == 0):
         return canonical_name
 
     def name_sorter(a: str) -> int:

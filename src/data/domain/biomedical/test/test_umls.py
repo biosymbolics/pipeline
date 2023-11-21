@@ -51,7 +51,7 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "Rheumatoid Arthritis",
             },
             {
-                "description": "choose canonical name if 2 words",
+                "description": "choose canonical name if short-ish (5 words or fewer)",
                 "cui": "C0003873",
                 "canonical_name": "Rheumatoid Arthritis",
                 "aliases": [
@@ -122,7 +122,7 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "GLP-1",
             },
             {
-                "description": "avoid stupidly long canonical names",
+                "description": "...unless it is a stupidly long name",
                 "cui": "C4086713",
                 "canonical_name": "Substance with programmed cell death protein 1 inhibitor mechanism of action (substance)",
                 "aliases": [
