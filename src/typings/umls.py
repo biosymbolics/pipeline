@@ -51,8 +51,8 @@ class UmlsRecord(Dataclass):
     level: OntologyLevel | None
     preferred_name: str
     synonyms: list[str]
-    type_id: str
-    type_name: str
+    type_ids: list[str]
+    type_names: list[str]
     l0_ancestor: str | None
     l1_ancestor: str | None
     l2_ancestor: str | None
