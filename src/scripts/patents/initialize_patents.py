@@ -196,7 +196,7 @@ def __create_annotations_table():
             },
             {
                 "table": AGGREGATED_ANNOTATIONS_TABLE,
-                "column": "terms",
+                "column": "search_terms",
                 "is_gin": True,
             },
         ]
@@ -351,20 +351,6 @@ def main(bootstrap: bool = False):
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
     # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
     # update annotations set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
-    # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
-    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
-    # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:(?:super)?family )?protein$';
-    # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
-    # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
-    # update annotations set term=regexp_replace(term, ', human', '', 'i') where term ~* ', human$';
-    # update annotations set term=regexp_replace(term, '^(?:\.\s?|\,\s?|;\s?|to[ ,]|tha(?:n|t)[ ,]|for[ ,]|or[ ,]|then?[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+', '', 'i') where term ~* '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|then?[ ,]|are[ ,]|tha(?:n|t)[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+';
-    # update annotations set term=regexp_replace(term, '(.*)[ ]?(?:\(.*)', '\1') where term like '%(%' and term not like '%)%' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '(.*)[ ]?(?:.*\))', '\1') where term like '%)%' and term not like '%(%' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '[0-9a-z]{0,1}\)[ ](.*)', '\1', 'i') where term ~* '^[0-9a-z]{0,1}\)[ ]' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
-    # update annotations set term=regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
-    # update annotations set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
-    # update annotations set term=regexp_replace(term, '\s{1,}$', '', 'g') where term ~* '\s{1,}$';
 
     # UPDATE trials
     # SET interventions = sub.new_interventions

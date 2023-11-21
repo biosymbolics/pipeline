@@ -34,7 +34,7 @@ from data.prediction.types import (
     ModelOutput,
     OutputCategorySizes,
 )
-from typings.core import Primitive
+from typings.core import Dataclass, Primitive
 from utils.encoding.quant_encoder import BinEncoder
 from utils.encoding.saveable_encoder import LabelCategoryEncoder
 from utils.encoding.text_encoder import WORD_VECTOR_LENGTH, TextEncoder
@@ -309,12 +309,16 @@ def encode_outputs(
 
 
 def encode_quantitative(
-    records: Sequence[dict],
+    records: Sequence[T],
     fields: list[str],
     device: str = "cpu",
 ) -> torch.Tensor:
+    print(fields)
+    print(records[0:1])
     return F.normalize(
-        torch.Tensor([[to_float(r[field]) for field in fields] for r in records]),
+        torch.Tensor(
+            [[to_float(r._asdict()[field]) for field in fields] for r in records]
+        ),
     ).to(device)
 
 
@@ -472,7 +476,7 @@ def encode_and_batch_all(
     return ModelInputAndOutput(**batched), AllCategorySizes(**sizes)
 
 
-R = TypeVar("R", bound=Mapping)
+R = TypeVar("R", bound=Mapping | Dataclass)
 
 
 def split_train_and_test(

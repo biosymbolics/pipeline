@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Sequence, TypeGuard, TypedDict, cast
 import logging
@@ -8,6 +9,7 @@ import re
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
 from scripts.ctgov.utils import extract_max_timeframe
+from typings.core import Dataclass
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
 
@@ -145,6 +147,9 @@ class TrialMasking(ByDefinitionOrderEnum):
     QUADRUPLE = "QUADRUPLE"
     UNKNOWN = "UNKNOWN"
 
+    def is_blinded(self) -> bool:
+        return self not in [self.NONE, self.UNKNOWN]
+
     @classmethod
     def _missing_(cls, value):
         masking_term_map = {
@@ -157,6 +162,18 @@ class TrialMasking(ByDefinitionOrderEnum):
         if value in masking_term_map:
             return masking_term_map[value]
         return cls.UNKNOWN
+
+
+class TrialBlinding(ByDefinitionOrderEnum):
+    BLINDED = "BLINDED"
+    UNBLINDED = "UNBLINDED"
+    UNKNOWN = "UNKNOWN"
+
+    @classmethod
+    def find(cls, value: TrialMasking):
+        if TrialMasking(value).is_blinded():
+            return cls.BLINDED
+        return cls.UNBLINDED
 
 
 class TrialPurpose(ByDefinitionOrderEnum):
@@ -557,7 +574,8 @@ class ComparisonType(ByDefinitionOrderEnum):
         return cls.UNKNOWN
 
 
-class BaseTrial(TypedDict):
+@dataclass(frozen=True)
+class BaseTrial(Dataclass):
     """
     Base trial info
     """
@@ -581,6 +599,7 @@ class BaseTrial(TypedDict):
     title: str
 
 
+@dataclass(frozen=True)
 class TrialRecord(BaseTrial):
     design: str
     intervention_types: list[str]
@@ -591,11 +610,17 @@ class TrialRecord(BaseTrial):
     status: str
 
 
+@dataclass(frozen=True)
 class TrialSummary(BaseTrial):
     """
     Patent trial info
     """
 
+    @property
+    def blinding(self) -> TrialBlinding:
+        return TrialBlinding.find(self.masking)
+
+    acronym: str | None
     comparison_type: ComparisonType
     design: TrialDesign
     duration: int  # in days
@@ -608,9 +633,10 @@ class TrialSummary(BaseTrial):
     randomization: TrialRandomization
     sponsor_type: SponsorType
     status: TrialStatus
+    why_stopped: str | None
 
 
-def is_trial_record(trial: dict) -> TypeGuard[TrialRecord]:
+def is_trial_record(trial: dict | TrialRecord) -> TypeGuard[TrialRecord]:
     """
     Check if dict is a trial record
     """
@@ -653,6 +679,13 @@ def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
     )
 
 
+def is_trial_record_list(trials: Sequence[dict]) -> TypeGuard[Sequence[TrialRecord]]:
+    """
+    Check if list of trial records
+    """
+    return all(is_trial_record(trial) for trial in trials)
+
+
 def is_trial_summary_list(trials: Sequence[dict]) -> TypeGuard[Sequence[TrialSummary]]:
     """
     Check if list of trial records
@@ -672,7 +705,7 @@ def calc_duration(start_date: date | None, end_date: date | None) -> int:
     return (end_date - start_date).days
 
 
-def dict_to_trial_summary(trial: dict) -> TrialSummary:
+def dict_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
     """
     Get trial summary from db record
 
@@ -686,11 +719,13 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
     design = TrialDesign.find(
         trial["design"], trial["arm_types"], trial["phase"], trial["title"]
     )
+    masking = TrialMasking(trial["masking"])
 
     return cast(
         TrialSummary,
         {
             **trial,
+            "blinding": masking,
             "comparison_type": ComparisonType.find(
                 trial["arm_types"], trial["interventions"], design
             ),
@@ -699,7 +734,7 @@ def dict_to_trial_summary(trial: dict) -> TrialSummary:
             "max_timeframe": extract_max_timeframe(trial["time_frames"]),
             "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "intervention_type": InterventionType(trial["intervention_types"]),
-            "masking": TrialMasking(trial["masking"]),
+            "masking": masking,
             "phase": TrialPhase(trial["phase"]),
             "purpose": TrialPurpose(trial["purpose"]),
             "randomization": TrialRandomization.find(trial["randomization"], design),

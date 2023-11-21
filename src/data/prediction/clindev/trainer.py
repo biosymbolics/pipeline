@@ -5,7 +5,7 @@ import os
 import random
 import sys
 from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
-from pydash import flatten
+from pydash import flatten, pick
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
@@ -25,6 +25,7 @@ from typings.trials import TrialSummary
 from utils.list import batch
 
 from .constants import (
+    ALL_FIELD_LISTS,
     BASE_ENCODER_DIRECTORY,
     BATCH_SIZE,
     DEVICE,
@@ -359,10 +360,16 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=40000))
+        trials = fetch_trials("COMPLETED", limit=100)
+        trials = preprocess_inputs(trials)
 
         inputs, category_sizes = prepare_data(
-            cast(Sequence[InputAndOutputRecord], trials),
+            [
+                InputAndOutputRecord(
+                    **{k: v for k, v in t.items() if k in ALL_FIELD_LISTS}
+                )
+                for t in trials
+            ],
             field_lists,
             batch_size=batch_size,
             device=DEVICE,

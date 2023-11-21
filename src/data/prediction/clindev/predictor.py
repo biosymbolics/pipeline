@@ -44,7 +44,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 80,
+        checkpoint_epoch: int = 240,
         device: str = DEVICE,
     ):
         """
@@ -181,8 +181,7 @@ if __name__ == "__main__":
 
     standard_fields = {
         "sponsor_type": "INDUSTRY",
-        # "phase": "PHASE_3",
-        # "start_date": 2024,
+        "start_date": 2024,
     }
 
     parser = argparse.ArgumentParser()

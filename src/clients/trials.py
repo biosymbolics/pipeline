@@ -3,7 +3,7 @@ import logging
 from typing import Sequence
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from typings.trials import TrialSummary, is_trial_summary_list
+from typings.trials import TrialSummary, dict_to_trial_summary, is_trial_record_list
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
     if len(trials) == 0:
         raise ValueError(f"No trials found for status {status}")
 
-    if not is_trial_summary_list(trials):
+    if not is_trial_record_list(trials):
         raise ValueError(f"Trials are not in summary format: {trials[0:10]}")
 
     logger.info(
@@ -58,4 +58,4 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         round(time.time() - start, 2),
     )
 
-    return trials
+    return [dict_to_trial_summary(t) for t in trials]

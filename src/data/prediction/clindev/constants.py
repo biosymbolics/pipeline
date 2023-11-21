@@ -30,14 +30,9 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "facilities", ??
     # "countries" ??
 ]
-MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    # "conditions",  # typically only the specific condition
-    # "mesh_conditions",  # normalized; includes ancestors
-    # "interventions",
-]
+MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
 TEXT_FIELDS: list[str] = [
     "conditions",
-    # "mesh_conditions",  # normalized; includes ancestors
     "interventions",
 ]
 
@@ -56,7 +51,7 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
-    "masking",
+    "blinding",
     "randomization",
     "comparison_type",
     "enrollment",
@@ -85,6 +80,8 @@ input_field_lists = InputFieldLists(
 
 ALL_INPUT_FIELD_LISTS: list[str] = flatten(input_field_lists.__dict__.values())
 
+ALL_FIELD_LISTS: list[str] = flatten(field_lists.__dict__.values())
+
 output_field_lists = OutputFieldLists(
     y1_categorical=Y1_CATEGORICAL_FIELDS,
     y2=Y2_FIELD,
@@ -112,7 +109,15 @@ def get_fields_to_types(
     _field_lists: AnyFieldLists,
 ) -> tuple[tuple[str, type | UnionType], ...]:
     vals = _field_lists.__dict__.items()
-    return tuple([(fv, _get_type(k)) for k, fvs in vals for fv in fvs])
+    vals = flatten(
+        [
+            [(v, _get_type(k))]
+            if isinstance(v, str)
+            else list(zip(v, [_get_type(k)] * len(v)))
+            for k, v in vals
+        ]
+    )
+    return tuple(vals)
 
 
 # sigh https://github.com/python/mypy/issues/848
@@ -126,7 +131,7 @@ AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
 
 
 def is_output_record(record: AnyRecord) -> TypeGuard[OutputRecord]:
-    record_keys = (record.__dict__ if not isinstance(record, dict) else record).keys()
+    record_keys = (record._asdict() if not isinstance(record, dict) else record).keys()
     output_fields = set(flatten(output_field_lists.__dict__.values()))
     return output_fields.issubset(record_keys)
 
