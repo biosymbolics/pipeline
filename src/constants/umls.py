@@ -46,7 +46,7 @@ UMLS_COMPOUND_TYPES = {
     "T121": "Pharmacologic Substance",
     "T123": "Biologically Active Substance",
     "T127": "Vitamin",
-    "T167": "Substance",
+    # "T167": "Substance",
     "T195": "Antibiotic",
     "T197": "Inorganic Chemical",
     "T200": "Clinical Drug",
@@ -71,7 +71,7 @@ UMLS_BIOLOGIC_TYPES = {
 
 UMLS_MECHANISM_TYPES = {
     "T038": "Biologic Function",
-    "T041": "Mental Process",
+    # "T041": "Mental Process",
     "T044": "Molecular Function",
     "T045": "Genetic Function",
     "T123": "Biologically Active Substance",  # e.g. inhibitor, agonist, antagonist
