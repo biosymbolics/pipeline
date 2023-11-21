@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, TypeGuard, Union, List, Dict
 
 JsonSerializable = Union[
@@ -21,6 +21,9 @@ class Dataclass:
 
     def items(self):
         return self.__dataclass_fields__.items()
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:
