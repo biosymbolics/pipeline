@@ -1,15 +1,19 @@
 import argparse
 from datetime import date
+from enum import Enum
+import json
 import logging
 import math
 import sys
-from typing import cast
-from pydash import flatten
+from typing import Any, Sequence, cast
+from pydash import flatten, omit_by
 import torch
 import polars as pl
 
 
 import system
+from typings.trials import SponsorType, TrialPhase
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 system.initialize()
 
@@ -68,7 +72,7 @@ class ModelPredictor:
         records: list[InputRecord],
         batch_size: int = BATCH_SIZE,
         device: str = DEVICE,
-    ):
+    ) -> list[dict[str, Any]]:
         inputs, _ = prepare_input_data(
             preprocess_inputs(records, []),  # ["enrollment"]
             field_lists=input_field_lists,
@@ -76,7 +80,7 @@ class ModelPredictor:
             device=device,
         )
 
-        def predict_batch(i: int):
+        def predict_batch(i: int) -> Sequence[dict[str, Any]]:
             batch = get_batch(i, inputs)
 
             if batch is None:
@@ -92,11 +96,8 @@ class ModelPredictor:
                 directory=BASE_ENCODER_DIRECTORY,
                 actual_length=min(len(records) - i * batch_size, batch_size),
             )
-            res = {k: [_v.item() for _v in v] for k, v in decoded.items()}
-            return [
-                dict(zip(res.keys(), vals))
-                for vals in zip(*(res[k] for k in res.keys()))
-            ]
+            as_records = pl.DataFrame(decoded).to_dicts()
+            return as_records
 
         predictions = [
             predict_batch(i) for i in range(math.ceil(len(records) / BATCH_SIZE))
@@ -104,7 +105,7 @@ class ModelPredictor:
         return flatten(predictions)
 
 
-PHASES = ["PHASE_1", "PHASE_2", "PHASE_3"]
+PHASES = [TrialPhase.PHASE_1, TrialPhase.PHASE_2, TrialPhase.PHASE_3]
 
 
 def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
@@ -118,7 +119,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
     predictor = ModelPredictor()
 
     def predict_phase(
-        phase: str, start_dates: list[int]
+        phase: TrialPhase, start_dates: list[int]
     ) -> list[PatentTrialPrediction]:
         records = [
             InputRecord(
@@ -126,7 +127,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
                     **{k: v for k, v in input.items() if k in ALL_INPUT_FIELD_LISTS},
                     "phase": phase,
                     "start_date": sd,
-                    "sponsor_type": "INDUSTRY",
+                    "sponsor_type": SponsorType.INDUSTRY,
                 }
             )
             for input, sd in zip(inputs, start_dates)
@@ -155,14 +156,22 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
     return [PatentTrialPrediction(**p) for p in df.to_dicts()]
 
 
-def predict_single(input: dict):
+def predict_single(record: dict):
     predictor = ModelPredictor()
 
-    def predict_phase(phase: str):
-        record = InputRecord(**{**input, "phase": phase})
-        return predictor.predict([record])[0]
+    def predict_phase(phase: TrialPhase):
+        input = InputRecord(
+            **{
+                "sponsor": "Janssen",
+                **omit_by(record, lambda x: x is None),
+                "phase": phase,
+                "max_timeframe": phase._order,
+            }
+        )
+        pred = predictor.predict([input])[0]
+        return PatentTrialPrediction(**{**record, **input._asdict(), **pred})
 
-    return {phase: predict_phase(phase) for phase in PHASES}
+    return {str(phase): predict_phase(phase) for phase in PHASES}
 
 
 if __name__ == "__main__":
@@ -180,7 +189,7 @@ if __name__ == "__main__":
         sys.exit()
 
     standard_fields = {
-        "sponsor_type": "INDUSTRY",
+        "sponsor_type": SponsorType.INDUSTRY,
         "start_date": 2024,
     }
 
@@ -189,4 +198,4 @@ if __name__ == "__main__":
         parser.add_argument(f"--{field}", nargs="*", default=standard_fields.get(field))
 
     res = predict_single(parser.parse_args().__dict__)
-    print("RESULT:", res)
+    print("RESULT:", json.dumps(res, indent=2, cls=DataclassJSONEncoder))

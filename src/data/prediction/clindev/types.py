@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from data.prediction.types import AllCategorySizes
 from typings.core import Dataclass
+from typings.trials import ComparisonType
 
 
 @dataclass(frozen=True)
@@ -96,17 +97,21 @@ class StageSizes:
 
 @dataclass(frozen=True)
 class PatentTrialPrediction(Dataclass):
-    publication_number: str
-    comparison_type: str
+    # publication_number: Optional[str]
+    blinding: str
+    comparison_type: ComparisonType
     conditions: list[str]
     design: str
     duration: str
     duration_exact: float
     enrollment: str
     interventions: list[str]
-    masking: str
+    # masking: Optional[str]
     phase: str
     randomization: str
     sponsor_type: str
     start_date: str
-    starting_phase: str
+    # starting_phase: Optional[str]
+
+    max_timeframe: Optional[float]
+    sponsor: Optional[str]

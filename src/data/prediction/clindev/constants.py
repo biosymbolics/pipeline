@@ -1,6 +1,7 @@
 from types import UnionType
-from typing import NamedTuple, Sequence, TypeGuard
+from typing import Any, NamedTuple, Sequence, TypeGuard
 from pydash import flatten
+from dataclasses import make_dataclass
 
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
@@ -27,14 +28,13 @@ TRAINING_PROPORTION = 0.8
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
+    "max_timeframe",
+    # "dropout_count",
     # "facilities", ??
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
-TEXT_FIELDS: list[str] = [
-    "conditions",
-    "interventions",
-]
+TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor"]  #  "title"
 
 
 QUANTITATIVE_FIELDS: list[str] = [
@@ -46,7 +46,7 @@ QUANTITATIVE_FIELDS: list[str] = [
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
-    # "max_timeframe",
+    "max_timeframe",
     # dropout_count
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
@@ -121,12 +121,12 @@ def get_fields_to_types(
 
 
 # sigh https://github.com/python/mypy/issues/848
+# https://github.com/python/mypy/issues/6063
 InputRecord = NamedTuple("InputRecord", get_fields_to_types(input_field_lists))  # type: ignore
 InputAndOutputRecord = NamedTuple(  # type: ignore
     "InputAndOutputRecord", get_fields_to_types(field_lists)  # type: ignore
 )
 OutputRecord = NamedTuple("OutputRecord", get_fields_to_types(output_field_lists))  # type: ignore
-
 AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
 
 
@@ -142,3 +142,14 @@ def is_output_records(
     return len(records) > 0 and all(
         is_output_record(record) for record in records[0:10]
     )
+
+
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.7
+# INFO:__main__:Evaluation Stage1 blinding accuracy: 0.65
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.72
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.44
+# INFO:__main__:Evaluation Stage1 enrollment accuracy: 0.59
+# INFO:__main__:Evaluation Stage2 accuracy: 0.91
+# INFO:__main__:Evaluation Stage2 precision: 0.41
+# INFO:__main__:Evaluation Stage2 recall: 0.05
+# INFO:__main__:Evaluation Stage2 mae: 1.18

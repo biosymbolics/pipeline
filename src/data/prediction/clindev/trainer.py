@@ -12,7 +12,7 @@ from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
 import polars as pl
 
 import system
-from utils.encoding.json_encoder import EnhancedJSONEncoder
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 system.initialize()
 
@@ -356,20 +356,20 @@ class ModelTrainer:
             "Comparisons: %s",
             json.dumps(
                 sorted(comparison, key=lambda x: random.random())[0:1],
-                cls=EnhancedJSONEncoder,
+                cls=DataclassJSONEncoder,
                 indent=2,
             ),
         )
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = fetch_trials("COMPLETED", limit=40000)
+        trials = fetch_trials("COMPLETED", limit=2000)
         trials = preprocess_inputs(trials)
 
         inputs, category_sizes = prepare_data(
             [
                 InputAndOutputRecord(
-                    **{k: v for k, v in t.items() if k in ALL_FIELD_LISTS}
+                    **{k: v for k, v in t._asdict().items() if k in ALL_FIELD_LISTS}
                 )
                 for t in trials
             ],
