@@ -45,7 +45,6 @@ class PatentApplication(PatentBasicInfo):
     country: str
     devices: list[str]
     diseases: list[str]
-    embeddings: list[float]
     inventors: list[str]
     last_trial_status: str
     last_trial_update: date

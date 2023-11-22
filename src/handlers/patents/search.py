@@ -29,6 +29,7 @@ def search(event: SearchEvent, context):
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "term_field": "instance_rollup" }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"idiopathic pulmonary arterial hypertension", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1", "skip_cache": true }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "exemplar_patents":"WO-2019191008-A1", "skip_cache": true }}'`
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"hemolysis" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`

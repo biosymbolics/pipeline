@@ -14,7 +14,7 @@ class BasePatentSearchParams(TypedDict):
 
 
 class OptionalPatentSearchParams(BasePatentSearchParams):
-    is_exhaustive: NotRequired[str | bool]
+    exemplar_patents: NotRequired[str]
     term_field: NotRequired[TermField]
     skip_cache: NotRequired[str | bool]
 
@@ -24,7 +24,7 @@ class PatentSearchParams(OptionalPatentSearchParams):
 
 
 class ParsedPatentSearchParams(BasePatentSearchParams):
-    is_exhaustive: NotRequired[bool]
+    exemplar_patents: NotRequired[list[str]]
     skip_cache: NotRequired[bool]
     terms: list[str]
     term_field: NotRequired[TermField]
