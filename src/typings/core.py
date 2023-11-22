@@ -20,13 +20,13 @@ class Dataclass:
         return asdict(self)
 
     def keys(self):
-        return self._asdict.keys()
+        return self._asdict().keys()
 
     def values(self):
-        return self._asdict.values()
+        return self._asdict().values()
 
     def items(self):
-        return self._asdict.items()
+        return self._asdict().items()
 
     def replace(self, **kwargs):
         return replace(self, **kwargs)

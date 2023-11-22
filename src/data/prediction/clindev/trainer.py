@@ -373,7 +373,7 @@ class ModelTrainer:
         inputs, category_sizes = prepare_data(
             [
                 InputAndOutputRecord(
-                    **{k: v for k, v in t._asdict().items() if k in ALL_FIELD_LISTS}
+                    **{k: v for k, v in t.items() if k in ALL_FIELD_LISTS}
                 )
                 for t in trials
             ],

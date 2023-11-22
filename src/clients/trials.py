@@ -3,7 +3,7 @@ import logging
 from typing import Sequence
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from typings.trials import TrialSummary, dict_to_trial_summary, is_trial_record_list
+from typings.trials import TrialSummary, is_trial_record_list
 
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND randomization not in ('UNKNOWN') -- rare
         AND masking not in ('UNKNOWN')
         AND phase in ('PHASE_1', 'PHASE_2', 'PHASE_3') -- there are others, but for model we're only estimating these
-        AND sponsor_type not in ('OTHER')
+        AND sponsor_type not in ('OTHER', 'OTHER_ORGANIZATION')
         AND enrollment is not null
-        ORDER BY start_date DESC
+        ORDER BY RANDOM() -- start_date DESC
         limit {limit}
     """
     trials = PsqlDatabaseClient().select(query, [status])
@@ -57,4 +57,4 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         round(time.time() - start, 2),
     )
 
-    return [dict_to_trial_summary(t) for t in trials]
+    return [TrialSummary(**t) for t in trials]

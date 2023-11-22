@@ -20,7 +20,7 @@ from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
-from typings.trials import TrialSummary, dict_to_trial_summary
+from typings.trials import TrialSummary, raw_to_trial_summary
 from utils.list import dedup
 
 logger = logging.getLogger(__name__)
@@ -117,13 +117,13 @@ def transform_ct_records(
     #     return compact(flatten([norm_map.get(i) for i in interventions]))
 
     # return [
-    #     dict_to_trial_summary(
+    #     raw_to_trial_summary(
     #         {**rec, "interventions": normalize_interventions(rec["interventions"])}
     #     )
     #     for rec in ctgov_records
     # ]
 
-    return [dict_to_trial_summary(rec) for rec in ctgov_records]
+    return [raw_to_trial_summary(rec) for rec in ctgov_records]
 
 
 def ingest_trials():

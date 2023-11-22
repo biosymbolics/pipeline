@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Sequence, TypeGuard, TypedDict, cast
+from typing import Sequence, TypeGuard
 import logging
 
-from pydash import omit, uniq
+from pydash import uniq
 import re
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
@@ -589,8 +589,10 @@ class BaseTrial(Dataclass):
     enrollment: int
     hypothesis_types: list[str]
     interventions: list[str]
+    intervention_types: list[str]
     last_updated_date: date
     mesh_conditions: list[str]
+    normalized_sponsor: str
     primary_outcomes: list[str]
     sponsor: str
     start_date: date
@@ -602,7 +604,6 @@ class BaseTrial(Dataclass):
 @dataclass(frozen=True)
 class TrialRecord(BaseTrial):
     design: str
-    intervention_types: list[str]
     masking: str
     phase: str
     purpose: str
@@ -702,7 +703,7 @@ def calc_duration(start_date: date | None, end_date: date | None) -> int:
     return (end_date - start_date).days
 
 
-def dict_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
+def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
     """
     Get trial summary from db record
 
@@ -720,7 +721,7 @@ def dict_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
 
     return TrialSummary(
         **{
-            **omit(trial, ["intervention_types", "normalized_sponsor"]),
+            **trial,
             "blinding": TrialBlinding.find(masking),
             "comparison_type": ComparisonType.find(
                 trial["arm_types"], trial["interventions"], design
