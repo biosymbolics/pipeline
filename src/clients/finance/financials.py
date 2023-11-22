@@ -30,7 +30,6 @@ SIG_DIGITS = 2
 
 COMPANY_STR_KEYS_EXT = [
     *COMPANY_STR_KEYS,
-    "is_troubled",
     "timeframe",
 ]
 
@@ -58,6 +57,7 @@ class CompanyFinancials(StockPerformance):
         Args:
             symbol (str): company symbol
         """
+        logger.info("Loading CompanyFinancials for %s", symbol)
         self.symbol = symbol
         session = requests_cache.CachedSession("yfinance.cache")
         session.headers["User-agent"] = "my-program/1.0"

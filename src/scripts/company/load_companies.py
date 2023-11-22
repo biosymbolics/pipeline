@@ -5,7 +5,7 @@ from clients.finance.financials import CompanyFinancials
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import COMPANIES_TABLE_NAME
-from typings.companies import Company
+from typings.companies import Company, COMPANY_STR_KEYS
 
 
 def clean_name(name: str) -> str:
@@ -67,15 +67,13 @@ def load_companies():
     pharmas = pharmas.rename({col: col.lower() for col in pharmas.columns})
     pharmas = pharmas.with_columns(
         pl.col("symbol").alias("id"),
-        pl.lit(None).alias("current_ratio").cast(pl.Float32),
-        pl.lit(None).alias("debt_equity_ratio").cast(pl.Float32),
-        pl.lit(None).alias("is_bad_debt_equity_ratio").cast(pl.Boolean),
-        pl.lit(None).alias("is_bad_current_ratio").cast(pl.Boolean),
-        pl.lit(None).alias("is_trading_below_cash").cast(pl.Boolean),
-        pl.lit(None).alias("is_troubled").cast(pl.Boolean),
-        pl.lit(None).alias("market_cap").cast(pl.Float32),
-        pl.lit(None).alias("net_debt").cast(pl.Float32),
-        pl.lit(None).alias("total_debt").cast(pl.Float32),
+        *[
+            pl.lit(None)
+            .alias(col)
+            .cast(pl.Boolean if col.startswith("is") else pl.Float32)
+            for col in COMPANY_STR_KEYS
+            if col not in ["id", "symbol", "parent_company_id", "synonyms"]
+        ],
         pl.lit(None).alias("parent_company_id").cast(pl.Utf8),
         pl.lit(None).alias("synonyms"),
     )
