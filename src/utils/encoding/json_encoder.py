@@ -3,7 +3,7 @@ from enum import Enum
 from datetime import date
 
 
-class EnhancedJSONEncoder(json.JSONEncoder):
+class DataclassJSONEncoder(json.JSONEncoder):
     """
     JSON encoder that supports dataclasses
 
@@ -19,4 +19,6 @@ class EnhancedJSONEncoder(json.JSONEncoder):
             return o.isoformat()
         if isinstance(o, Enum):
             return str(o)
+        if isinstance(o, dataclasses.Field):
+            return o.name
         return super().default(o)
