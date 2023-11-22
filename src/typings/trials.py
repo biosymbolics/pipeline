@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Sequence, TypeGuard, TypedDict, cast
 import logging
 
-from pydash import uniq
+from pydash import omit, uniq
 import re
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
@@ -616,11 +616,8 @@ class TrialSummary(BaseTrial):
     Patent trial info
     """
 
-    @property
-    def blinding(self) -> TrialBlinding:
-        return TrialBlinding.find(self.masking)
-
     acronym: str | None
+    blinding: TrialBlinding
     comparison_type: ComparisonType
     design: TrialDesign
     duration: int  # in days
@@ -721,10 +718,9 @@ def dict_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
     )
     masking = TrialMasking(trial["masking"])
 
-    return cast(
-        TrialSummary,
-        {
-            **trial,
+    return TrialSummary(
+        **{
+            **omit(trial, ["intervention_types", "normalized_sponsor"]),
             "blinding": TrialBlinding.find(masking),
             "comparison_type": ComparisonType.find(
                 trial["arm_types"], trial["interventions"], design

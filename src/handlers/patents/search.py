@@ -7,7 +7,7 @@ import logging
 
 from clients import patents as patent_client
 from handlers.patents.utils import parse_params
-from utils.encoding.json_encoder import EnhancedJSONEncoder
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .types import PatentSearchParams
 
@@ -29,7 +29,7 @@ def search(event: SearchEvent, context):
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "term_field": "instance_rollup" }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"idiopathic pulmonary arterial hypertension", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1", "skip_cache": true }}'`
-    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"roche" }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"hemolysis" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
@@ -52,5 +52,5 @@ def search(event: SearchEvent, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps(results, cls=EnhancedJSONEncoder),
+        "body": json.dumps(results, cls=DataclassJSONEncoder),
     }

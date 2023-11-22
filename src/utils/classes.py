@@ -60,3 +60,6 @@ class ByDefinitionOrderEnum(Enum):
 
     def __str__(self):
         return self.value
+
+    def __repr__(self) -> str:
+        return self.__str__()

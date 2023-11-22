@@ -107,8 +107,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         troubled_assignees = [
             company
             for company in assignees
-            if company in financials_map
-            and (financials_map[company].is_troubled or False)
+            if company in financials_map and financials_map[company].is_troubled
         ]
         is_troubled = len(troubled_assignees) > 0
 

@@ -28,6 +28,7 @@ SIG_DIGITS = 2
 
 COMPANY_STR_KEYS_EXT = [
     *COMPANY_STR_KEYS,
+    "is_troubled",
     "timeframe",
 ]
 

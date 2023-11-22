@@ -27,10 +27,10 @@ class Company(Dataclass):
     symbol: str
     current_ratio: float | None
     debt_equity_ratio: float | None
-    is_troubled: bool | None
-    is_trading_below_cash: bool | None
-    is_bad_current_ratio: bool | None
-    is_bad_debt_equity_ratio: bool | None
+    is_troubled: bool
+    is_trading_below_cash: bool
+    is_bad_current_ratio: bool
+    is_bad_debt_equity_ratio: bool
     market_cap: float | None
     net_debt: float | None
     total_debt: float | None
