@@ -32,6 +32,7 @@ logger.setLevel(logging.INFO)
 
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
+EXEMPLAR_SIMILARITY_THRESHOLD = 0.7
 
 """
 Larger decay rates will result in more matches
@@ -49,7 +50,6 @@ SEARCH_RETURN_FIELDS = {
     "application_number": "application_number",
     "country": "country",
     "domains": "domains",
-    "embeddings": "embeddings",
     "family_id": "family_id",
     "ipc_codes": "ipc_codes",
     "priority_date": "priority_date",
@@ -83,10 +83,10 @@ FIELDS: list[str] = [
 
 
 def __get_query_pieces(
-    terms: list[str],
+    terms: Sequence[str],
+    exemplar_embeddings: Sequence[str],
     query_type: QueryType,
     min_patent_years: int,
-    is_exhaustive: bool = False,
 ) -> QueryPieces:
     """
     Helper to generate pieces of patent search query
@@ -96,8 +96,11 @@ def __get_query_pieces(
 
     # if ids, ignore most of the standard criteria
     if is_id_search:
-        if not all([t.startswith("WO-") for t in terms]):
-            raise ValueError("Cannot mix id and term search")
+        if (
+            not all([t.startswith("WO-") for t in terms])
+            or len(exemplar_embeddings) > 0
+        ):
+            raise ValueError("Cannot mix id and (term or exemplar patent) search")
 
         return QueryPieces(
             fields=[*FIELDS, "1 as search_rank"],
@@ -113,38 +116,48 @@ def __get_query_pieces(
     max_priority_date = get_max_priority_date(int(min_patent_years))
     date_criteria = f"priority_date > '{max_priority_date}'::date"
 
+    # search term comparison
     comparison = "&&" if query_type == "OR" else "@>"
     term_criteria = f"search_terms {comparison} %s"
 
-    if is_exhaustive:  # aka do tsquery search too
-        join_char = " & " if query_type == "AND" else " | "
-        ts_query_terms = (join_char).join(
-            [" & ".join(t.split(" ")) for t in lower_terms]
-        )
-
-        return QueryPieces(
-            fields=fields,
-            where=f"""
-                WHERE {date_criteria}
-                AND ({term_criteria} OR text_search @@ to_tsquery('english', %s))
-            """,
-            params=[lower_terms, ts_query_terms],
-        )
+    # exemplar patent similarity
+    # todo: add as part of search_rank
+    if len(exemplar_embeddings) > 0:
+        exemplar_criterion = [
+            f"(1 - (embeddings <=> '{e}')) > {EXEMPLAR_SIMILARITY_THRESHOLD}"
+            for e in exemplar_embeddings
+        ]
+        exemplar_criteria = f"AND ({f' {query_type} '.join(exemplar_criterion)})"
+    else:
+        exemplar_criteria = ""
 
     return QueryPieces(
         fields=fields,
-        where=f"WHERE {date_criteria} AND {term_criteria}",
+        where=f"WHERE {date_criteria} AND {term_criteria} {exemplar_criteria}",
         params=[lower_terms],
     )
 
 
+def _get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
+    """
+    Get embeddings for exemplar patents
+    """
+    return [
+        rec["embeddings"]
+        for rec in PsqlDatabaseClient().select(
+            "SELECT embeddings FROM applications WHERE publication_number = ANY(%s)",
+            [exemplar_patents],
+        )
+    ]
+
+
 def _search(
     terms: Sequence[str],
+    exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "AND",
     min_patent_years: int = 10,
     term_field: TermField = "terms",
     limit: int = MAX_SEARCH_RESULTS,
-    is_exhaustive: bool = False,  # will search via tsquery too (slow)
 ) -> list[PatentApplication]:
     """
     Search patents by terms
@@ -155,7 +168,10 @@ def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    qp = __get_query_pieces(terms, query_type, min_patent_years, is_exhaustive)
+    exemplar_embeddings = (
+        _get_exemplar_embeddings(exemplar_patents) if len(exemplar_patents) > 0 else []
+    )
+    qp = __get_query_pieces(terms, exemplar_embeddings, query_type, min_patent_years)
 
     query = f"""
         SELECT {", ".join(qp["fields"])},
@@ -193,12 +209,12 @@ def _search(
 
 def search(
     terms: Sequence[str],
+    exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "AND",
     min_patent_years: int = 10,
     term_field: TermField = "terms",
     limit: int = MAX_SEARCH_RESULTS,
     skip_cache: bool = False,
-    is_exhaustive: bool = False,
 ) -> list[PatentApplication]:
     """
     Search patents by terms
@@ -209,6 +225,7 @@ def search(
 
     Args:
         terms (Sequence[str]): list of terms to search for
+        exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
         query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         term_field (TermField, optional): which field to search on. Defaults to "terms".
@@ -216,7 +233,6 @@ def search(
                 and `category_rollup` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
         limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
-        is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.
 
     Returns: a list of matching patent applications
 
@@ -228,10 +244,10 @@ def search(
     """
     args = {
         "terms": terms,
+        "exemplar_patents": exemplar_patents,
         "query_type": query_type,
         "min_patent_years": min_patent_years,
         "term_field": term_field,
-        "is_exhaustive": is_exhaustive,
     }
     key = get_id(args)
     search_partial = partial(_search, **args)

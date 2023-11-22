@@ -29,7 +29,14 @@ def parse_params(
     terms = params.get("terms")
     terms_list = [t.strip() for t in (terms.split(";") if terms else [])]
 
-    is_exhaustive = parse_bool(params.get("is_exhaustive", "false"))
+    # exemplar patents
+    exemplar_patents = params.get("exemplar_patents")
+    exemplar_patents_list = (
+        [t.strip() for t in (exemplar_patents.split(";") if exemplar_patents else [])]
+        if exemplar_patents
+        else []
+    )
+
     limit = params.get("limit") or default_limit
     min_patent_years = params.get("min_patent_years") or 10
     query_type: QueryType = get_query_type(params.get("query_type"))
@@ -38,8 +45,8 @@ def parse_params(
 
     return {
         "terms": terms_list,
+        "exemplar_patents": exemplar_patents_list,
         "query_type": query_type,
-        "is_exhaustive": is_exhaustive,
         "min_patent_years": min_patent_years,
         "limit": limit,
         "skip_cache": skip_cache,
