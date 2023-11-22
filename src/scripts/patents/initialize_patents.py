@@ -44,113 +44,99 @@ def __create_annotations_table():
     client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     annotations_query = f"""
-        WITH terms AS (
-                --- assignees as annotations
-                SELECT
-                    publication_number,
-                    (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
-                    null as id,
-                    'assignees' as domain,
-                    'record' as source,
-                    1 as character_offset_start,
-                    1 as character_offset_end,
-                    null as instance_rollup,
-                    null as category_rollup
-                FROM applications a,
-                unnest(a.assignees) as assignee
-                LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
-
-                UNION ALL
-
-                --- inventors as annotations
-                SELECT
-                    publication_number,
-                    (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
-                    null as id,
-                    'inventors' as domain,
-                    'record' as source,
-                    1 as character_offset_start,
-                    1 as character_offset_end,
-                    null as instance_rollup,
-                    null as category_rollup
-                FROM applications a,
-                unnest(a.inventors) as inventor
-                LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
-
-                UNION ALL
-
-                -- gpr annotations (just diseases)
-                SELECT
-                    publication_number,
-                    s.norm_term as term,
-                    s.norm_id as id,
-                    domain,
-                    source,
-                    character_offset_start,
-                    character_offset_end,
-                    t.instance_rollup as instance_rollup,
-                    t.category_rollup as category_rollup
-                    FROM (
-                        SELECT
-                            *,
-                            (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term END) as norm_term,
-                            (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id END) as norm_id, -- TODO: need more reliable approach??
-                            ROW_NUMBER() OVER(
-                                PARTITION BY publication_number,
-                                (CASE WHEN map.term is null THEN preferred_name ELSE map.term END)
-                                ORDER BY character_offset_start DESC
-                            ) AS rn
-                        FROM gpr_annotations
-                        LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
-                    ) s
-                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
-                    WHERE rn = 1
-
-                UNION ALL
-
-                --- biosym annotations
-                SELECT
-                    publication_number,
-                    s.norm_term as term,
-                    s.norm_id as id,
-                    domain,
-                    source,
-                    character_offset_start,
-                    character_offset_end,
-                    t.instance_rollup as instance_rollup,
-                    t.category_rollup as category_rollup
-                    FROM (
-                        SELECT
-                            *,
-                            (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END) as norm_term,
-                            (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id END) as norm_id,
-                            ROW_NUMBER() OVER(
-                                PARTITION BY publication_number,
-                                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term END),
-                                domain
-                                ORDER BY character_offset_start DESC
-                            ) AS rn
-                        FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE} ba
-                        LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
-                        WHERE length(ba.term) > 0
-                    ) s
-                    LEFT JOIN terms t ON s.norm_id = t.id AND t.id <> ''
-                    WHERE rn = 1
-        )
+        --- assignees as annotations
         SELECT
             publication_number,
-            term,
-            id,
-            domain,
-            source,
-            character_offset_start,
-            character_offset_end,
-            COALESCE(instance_rollup, term) as instance_rollup, -- max instance term (i.e. the furthest away ancestor still considered an "instance" entity)
-            COALESCE(category_rollup, term) as category_rollup -- min category term (i.e. the closest ancestor considered to be a category)
-        FROM terms
-        ORDER BY character_offset_start
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
+            null as id,
+            'assignees' as domain,
+            'record' as source,
+            1 as character_offset_start,
+            1 as character_offset_end,
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as instance_rollup,
+            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as category_rollup
+        FROM applications a,
+        unnest(a.assignees) as assignee
+        LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
+
+        UNION ALL
+
+        --- inventors as annotations
+        SELECT
+            publication_number,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
+            null as id,
+            'inventors' as domain,
+            'record' as source,
+            1 as character_offset_start,
+            1 as character_offset_end,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as instance_rollup,
+            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as category_rollup
+        FROM applications a,
+        unnest(a.inventors) as inventor
+        LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
     """
     client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
+
+    # add biosym annotations
+    client.select_insert_into_table(
+        f"""
+        SELECT publication_number,
+            s.term as term,
+            s.id as id,
+            domain,
+            max(source) as source,
+            min(character_offset_start) as character_offset_start,
+            min(character_offset_end) as character_offset_end,
+            max(t.instance_rollup) as instance_rollup,
+            max(t.category_rollup) as category_rollup
+        from (
+            SELECT
+                publication_number,
+                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term end) as term,
+                (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id end) as id,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
+            ) s
+            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+            group by publication_number, s.term, s.id, domain
+        """,
+        ANNOTATIONS_TABLE,
+    )
+
+    # add gpr annotations
+    client.select_insert_into_table(
+        f"""
+        SELECT publication_number,
+            s.term as term,
+            s.id as id,
+            domain,
+            max(source) as source,
+            min(character_offset_start) as character_offset_start,
+            min(character_offset_end) as character_offset_end,
+            max(t.instance_rollup) as instance_rollup,
+            max(t.category_rollup) as category_rollup
+        from (
+            SELECT
+                publication_number,
+                (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term end) as term,
+                (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id end) as id,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end
+                FROM {GPR_ANNOTATIONS_TABLE}
+                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
+            ) s
+            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+            group by publication_number, s.term, s.id, domain
+        """,
+        ANNOTATIONS_TABLE,
+    )
 
     # add attributes at the last moment
     client.select_insert_into_table(
@@ -195,8 +181,9 @@ def __create_annotations_table():
             publication_number,
             ARRAY_AGG(a.term) AS terms,
             ARRAY_AGG(domain) AS domains,
-            ARRAY_AGG(instance_rollup) as rollup_terms,
-            ARRAY_AGG(category_rollup) as rollup_categories
+            ARRAY_AGG(instance_rollup) as instance_rollup,
+            ARRAY_AGG(category_rollup) as category_rollup,
+            ARRAY_CAT(ARRAY_AGG(instance_rollup), ARRAY_AGG(a.term)) as search_terms
         FROM {ANNOTATIONS_TABLE} a
         GROUP BY publication_number;
     """
@@ -209,7 +196,7 @@ def __create_annotations_table():
             },
             {
                 "table": AGGREGATED_ANNOTATIONS_TABLE,
-                "column": "terms",
+                "column": "search_terms",
                 "is_gin": True,
             },
         ]
@@ -298,6 +285,7 @@ def main(bootstrap: bool = False):
         -t umls_graph \
         -t term_ids \
         -t companies \
+        -t patent_clindev_predictions \
         -t patent_to_regulatory_approval > patents.psql
     zip patents.psql.zip patents.psql
     aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
@@ -363,35 +351,6 @@ def main(bootstrap: bool = False):
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
     # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
     # update annotations set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
-    # update annotations set term=regexp_replace(term, '(?i)(agonist|inhibitor|blocker|modulator)s$', '\1') where term ~* '(agonist|inhibitor|blocker|modulator)s$';
-    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where  term ~* '^[a-z0-9]{3,5} protein$';
-    # update annotations set term=regexp_replace(term, ' (?:(?:super)?family )?protein$', '') where  term ~* '^[a-z0-9]{3,5}[0-9] (?:(?:super)?family )?protein$';
-    # update annotations set term=regexp_replace(term, '(?:target(?:ed|ing) antibody|antibody conjugate)', 'antibody') where term ~* '\y(?:target(?:ed|ing) antibody|antibody conjugate)\y';
-    # update annotations set term=regexp_replace(term, ', rat', '', 'i') where term ~* ', rat$';
-    # update annotations set term=regexp_replace(term, ', human', '', 'i') where term ~* ', human$';
-    # update annotations set term=regexp_replace(term, 'modulat(?:ed?|ing|ion)$', 'modulator') where term ~* '\ymodulat(?:ed?|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'activat(?:ed?|ing|ion)$', 'activator') where term ~* '\yactivat(?:ed?|ing|ion)$'; -- 0 recs
-    # update annotations set term=regexp_replace(term, 'stimulat(?:ed?|ing|ion)$', 'stimulator') where term ~* '\ystimulat(?:ed?|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'stabili[sz](?:ed?|ing|ion)$', 'stabilizer') where term ~* '\ystabili[sz](?:ed?|ing|ion)$';
-    # update annotations set term=regexp_replace(term, 'inhibit(?:ion|ing|ed)$', 'inhibitor') where term ~* '\yinhibit(?:ion|ing|ed)$';
-    # update annotations set term=regexp_replace(term, 'agonist(?:ic)? action$', 'agonist') where term ~* 'agonist(?:ic)? action$';
-    # update annotations set term=regexp_replace(term, 'receptor activat(?:ion|or)$', 'activator') where term ~* '\yreceptor activat(?:ion|or)$';
-    # update annotations set term=regexp_replace(term, 'agon(?:ism|i[zs])(?:ing|ed|e)$', 'agonist') where term ~* '\yagon(?:ism|i[zs])(?:ing|ed|e)$';
-    # update annotations set term=regexp_replace(term, '^([a-z]{2,3}[0-9]{0,2}) ([a-zαβγδεζηθικλμνξοπρστυφχψω]{1}[ ])', '\1\2') where term ~* '^[a-z]{2,3}[0-9]{0,2} [a-zαβγδεζηθικλμνξοπρστυφχψω]{1} (?:inhibitor|modulator|antagonist|agonist|protein|(?:poly)?peptide|antibody|isoform|domain|bispecific|chain|activator|stimulator|dna)';
-    # update annotations set term=regexp_replace(term, '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$', '', 'i') where term ~* '(?:\.\s?|\,\s?|;\s?| to| for| or| the| in| are| and| as| used| using| its| be| which)+$';
-    # update annotations set term=regexp_replace(term, '^vitro', 'in-vitro', 'i') where term ~* '^vitro .*';
-    # update annotations set term=regexp_replace(term, '^vivo', 'in-vivo', 'i') where term ~* '^vivo .*';
-    # update annotations set term=regexp_replace(term, '^(?:\.\s?|\,\s?|;\s?|to[ ,]|tha(?:n|t)[ ,]|for[ ,]|or[ ,]|then?[ ,]|are[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+', '', 'i') where term ~* '^(?:\.\s?|\,\s?|;\s?|to[ ,]|for[ ,]|or[ ,]|then?[ ,]|are[ ,]|tha(?:n|t)[ ,]|and[ ,]|as[ ,]|used[ ,]|using[ ,]|its[ ,]|be[ ,])+';
-    # update annotations set term=regexp_replace(term, '(.*)[ ]?(?:\(.*)', '\1') where term like '%(%' and term not like '%)%' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '(.*)[ ]?(?:.*\))', '\1') where term like '%)%' and term not like '%(%' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '[0-9a-z]{0,1}\)[ ](.*)', '\1', 'i') where term ~* '^[0-9a-z]{0,1}\)[ ]' and not term ~ '(?:\[|\])' and term not like '%-%-%';
-    # update annotations set term=regexp_replace(term, '\( \)', '') where term ~ '\( \)';
-    # update annotations set term=regexp_replace(term, '[.,]+$', '')  where term ~ '.*[ a-z][.,]+$';
-    # update annotations set term=regexp_replace(term, '\s{2,}', ' ', 'g') where term ~* '\s{2,}';
-    # update annotations set term=regexp_replace(term, '\s{1,}$', '', 'g') where term ~* '\s{1,}$';
-    # update annotations set term=regexp_replace(term, '^((?:ant)?agonists?) ([^ ]+)$', '\2 \1') where term ~* '^(?:ant)?agonist [^ ]+$';
-    # update annotations set term=regexp_replace(term, '^(inhibit[a-z]+) ([^ ]+)$', '\2 \1') where term ~* '^inhibit[a-z]+ [^ ]+$';
-    # update annotations set term=regexp_replace(term, '^(modulat[a-z]+) ([^ ]+)$', '\2 \1') where term ~* '^modulat(?:or|ion|ing|ed)s? [^ ]+$';
 
     # UPDATE trials
     # SET interventions = sub.new_interventions

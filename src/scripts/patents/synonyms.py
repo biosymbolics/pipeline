@@ -82,4 +82,9 @@ class SynonymMapper:
         )
 
     def index(self):
-        self.client.create_index({"table": "synonym_map", "column": "synonym"})
+        self.client.create_indices(
+            [
+                {"table": "synonym_map", "column": "synonym"},
+                {"table": "synonym_map", "column": "id"},
+            ]
+        )

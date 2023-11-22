@@ -8,12 +8,24 @@ UMLS_NAME_OVERRIDES = {
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
     "C1420201": "SGLT2",  # otherwise SLC5A2
+    # "C1706082": "Compound",
+    "C1550602": "Additive",  # otherwise "Additive (substance)"
 }
 
 UMLS_CUI_SUPPRESSIONS = {
     "C1440188": "C little e",  # matches too much stuff
     "C0313108": "Blood group antibody big C little e",
     "C0243083": "associated disease",
+    "C1706082": "Compound",
+    "C0009429": "combo",
+    "C1547776": "substance",
+    "C0991538": "orderable drug form",
+    "C1698899": "solid drug form",
+    "C1550602": "additive",
+    "C1951340": "process",
+    "C1963578": "procedure",
+    "C0009429": "combination",
+    "C0596316": "chemical group",
 }
 
 # suppress UMLS entities matching these names
@@ -46,23 +58,26 @@ UMLS_COMPOUND_TYPES = {
     "T121": "Pharmacologic Substance",
     "T123": "Biologically Active Substance",
     "T127": "Vitamin",
-    "T167": "Substance",
+    # "T167": "Substance",
     "T195": "Antibiotic",
     "T197": "Inorganic Chemical",
     "T200": "Clinical Drug",
 }
 
+UMLS_GENE_PROTEIN_TYPES = {
+    "T028": "Gene or Genome",
+    "T116": "Amino Acid, Peptide, or Protein",
+}
 
 UMLS_BIOLOGIC_TYPES = {
+    **UMLS_GENE_PROTEIN_TYPES,
     "T043": "cell function",
-    "T028": "Gene or Genome",
     "T085": "Molecular Sequence",
     "T086": "Nucleotide Sequence",
     "T087": "Amino Acid Sequence",
     "T088": "Carbohydrate Sequence",
     "T192": "Receptor",
     "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
-    "T116": "Amino Acid, Peptide, or Protein",
     "T125": "Hormone",
     "T126": "Enzyme",
     "T129": "Immunologic Factor",
@@ -71,7 +86,7 @@ UMLS_BIOLOGIC_TYPES = {
 
 UMLS_MECHANISM_TYPES = {
     "T038": "Biologic Function",
-    "T041": "Mental Process",
+    # "T041": "Mental Process",
     "T044": "Molecular Function",
     "T045": "Genetic Function",
     "T123": "Biologically Active Substance",  # e.g. inhibitor, agonist, antagonist

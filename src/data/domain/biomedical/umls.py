@@ -2,6 +2,7 @@ from typing import Sequence
 from scispacy.candidate_generation import MentionCandidate
 
 from constants.umls import (
+    UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
     UMLS_NAME_SUPPRESSIONS,
     PREFERRED_UMLS_TYPES,
@@ -77,7 +78,8 @@ def get_best_umls_candidate(
 def clean_umls_name(
     cui: str,
     canonical_name: str,
-    aliases: list[str],
+    aliases: Sequence[str],
+    type_ids: Sequence[str],
     is_composite: bool,
     overrides: dict[str, str] = UMLS_NAME_OVERRIDES,
 ) -> str:
@@ -99,9 +101,15 @@ def clean_umls_name(
 
     name_words = canonical_name.split(" ")
 
-    # if not composite and not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
-    # prefer canonical name
-    if not is_composite and len(name_words) < 5:
+    # prefer canonical name if:
+    # - not composite,
+    # - not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
+    # - and not a gene/protein
+    if (
+        not is_composite
+        and len(name_words) < 5
+        and not has_intersection(type_ids, list(UMLS_GENE_PROTEIN_TYPES.keys()))
+    ) or (len(aliases) == 0):
         return canonical_name
 
     def name_sorter(a: str) -> int:

@@ -53,7 +53,7 @@ def preprocess_inputs(
             inputs, quant_to_cat_fields, directory=BASE_ENCODER_DIRECTORY
         ),
     ]
-    output = reduce(lambda x, f: f(x), transformations, records)
+    output: T = reduce(lambda x, f: f(x), transformations, records)  # type: ignore
 
     return output
 

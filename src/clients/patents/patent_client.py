@@ -82,27 +82,6 @@ FIELDS: list[str] = [
 ]
 
 
-def _get_term_query(
-    lower_terms: Sequence[str],
-    query_type: QueryType,
-) -> str:
-    """
-    Form term query based on AND/OR (query_type) and term fields
-
-    TODO: This is really confusing esp. since param order matters
-
-    Example:
-    ```
-    >>> _get_term_query(["asthma", "melanoma"], "OR")
-    'AND ((term=%s OR instance_rollup=%s) OR (term=%s OR instance_rollup=%s))'
-    >>>
-    ```
-    """
-    base_query = "(term=%s OR instance_rollup=%s)"
-    criteria = f" {query_type} ".join([base_query] * len(lower_terms))
-    return f"({criteria})"
-
-
 def __get_query_pieces(
     terms: list[str],
     query_type: QueryType,
@@ -133,7 +112,9 @@ def __get_query_pieces(
     ]
     max_priority_date = get_max_priority_date(int(min_patent_years))
     date_criteria = f"priority_date > '{max_priority_date}'::date"
-    term_criteria = _get_term_query(lower_terms, query_type)
+
+    comparison = "&&" if query_type == "OR" else "@>"
+    term_criteria = f"search_terms {comparison} %s"
 
     if is_exhaustive:  # aka do tsquery search too
         join_char = " & " if query_type == "AND" else " | "
@@ -147,13 +128,13 @@ def __get_query_pieces(
                 WHERE {date_criteria}
                 AND ({term_criteria} OR text_search @@ to_tsquery('english', %s))
             """,
-            params=[*sorted(lower_terms * 2), ts_query_terms],
+            params=[lower_terms, ts_query_terms],
         )
 
     return QueryPieces(
         fields=fields,
         where=f"WHERE {date_criteria} AND {term_criteria}",
-        params=[*sorted(lower_terms * 2)],
+        params=[lower_terms],
     )
 
 
@@ -178,7 +159,7 @@ def _search(
 
     query = f"""
         SELECT {", ".join(qp["fields"])},
-        max({term_field}) as terms,
+        max(agg_annotations.{term_field}) as terms,
         (CASE
             WHEN max(approval_dates) IS NOT NULL AND ARRAY_LENGTH(max(approval_dates), 1) > 0
             THEN (max(approval_dates))[1]
@@ -186,7 +167,7 @@ def _search(
         ) as approval_date,
         (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
         FROM {APPLICATIONS_TABLE} AS apps
-        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as annotations ON (annotations.publication_number = apps.publication_number)
+        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as agg_annotations ON (agg_annotations.publication_number = apps.publication_number)
         JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
@@ -231,8 +212,8 @@ def search(
         query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
         min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         term_field (TermField, optional): which field to search on. Defaults to "terms".
-                Other values are `rollup_terms` (which are rollup terms at a high level of specificity, e.g. "Aspirin 50mg" might have a rollup term of "Aspirin")
-                and `rollup_categories` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
+                Other values are `instance_rollup` (which are rollup terms at a high level of specificity, e.g. "Aspirin 50mg" might have a rollup term of "Aspirin")
+                and `category_rollup` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
         limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         skip_cache (bool, optional): whether to skip cache. Defaults to False.
         is_exhaustive (bool, optional): whether to search via tsquery too (slow). Defaults to False.

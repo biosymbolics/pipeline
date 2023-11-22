@@ -1,10 +1,9 @@
 import json
 import logging
 import math
-import os
 import random
 import sys
-from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
+from typing import Any, Callable, NamedTuple, Optional, Sequence
 from pydash import flatten
 import torch
 import torch.nn as nn
@@ -12,10 +11,11 @@ from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
 import polars as pl
 
 import system
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 system.initialize()
 
-from clients.trials import fetch_trials
+from clients.trial_client import fetch_trials
 from data.prediction.utils import (
     ModelInputAndOutput,
     decode_output,
@@ -25,6 +25,7 @@ from typings.trials import TrialSummary
 from utils.list import batch
 
 from .constants import (
+    ALL_FIELD_LISTS,
     BASE_ENCODER_DIRECTORY,
     BATCH_SIZE,
     DEVICE,
@@ -341,28 +342,41 @@ class ModelTrainer:
             output_field_lists,
             directory=BASE_ENCODER_DIRECTORY,
         )
+        print_fields = [
+            "nct_id",
+            "conditions",
+            "phase",
+            *flatten(output_field_lists.__dict__.values()),
+        ]
         comparison = [
             {
                 k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
                 for k, v in true.items()
-                if k in ["nct_id", "mesh_conditions"]
-                or k in flatten(output_field_lists.__dict__.values())
+                if k in print_fields
             }
             for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
         ]
         logger.info(
             "Comparisons: %s",
             json.dumps(
-                sorted(comparison, key=lambda x: random.random())[0:1], indent=2
+                sorted(comparison, key=lambda x: random.random())[0:1],
+                cls=DataclassJSONEncoder,
+                indent=2,
             ),
         )
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = preprocess_inputs(fetch_trials("COMPLETED", limit=2000))
+        trials = fetch_trials("COMPLETED", limit=40000)
+        trials = preprocess_inputs(trials)
 
         inputs, category_sizes = prepare_data(
-            cast(Sequence[InputAndOutputRecord], trials),
+            [
+                InputAndOutputRecord(
+                    **{k: v for k, v in t.items() if k in ALL_FIELD_LISTS}
+                )
+                for t in trials
+            ],
             field_lists,
             batch_size=batch_size,
             device=DEVICE,

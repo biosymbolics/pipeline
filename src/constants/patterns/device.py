@@ -11,7 +11,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?bolus",
     ".*mattress.*",
     ".*dental floss.*",
-    ".*assembly",
+    # ".*assembly", # complex assembly
     "(?:.* )?retainer",
     "(?:.* )?infusion pump.*",
     "(?:.* )?pacemaker.*",

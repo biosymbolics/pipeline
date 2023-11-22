@@ -8,7 +8,7 @@ import boto3
 import logging
 
 from utils.date import date_deserialier
-from utils.encoding.json_encoder import EnhancedJSONEncoder
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -90,7 +90,7 @@ def retrieve_with_cache_check(
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
-    encode: Callable[[T], str | bytes] = EnhancedJSONEncoder().encode,
+    encode: Callable[[T], str | bytes] = DataclassJSONEncoder().encode,
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.

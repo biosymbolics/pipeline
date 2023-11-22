@@ -40,7 +40,9 @@ class UmlsTransformer:
 
             ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
             level = OntologyLevel.find(r.id, self.umls_graph.get_umls_centrality)
-            preferred_name = clean_umls_name(r.id, r.canonical_name, r.synonyms, False)
+            preferred_name = clean_umls_name(
+                r.id, r.canonical_name, r.synonyms, r.type_ids, False
+            )
 
             return UmlsRecord(
                 **{
@@ -70,7 +72,7 @@ class UmlsTransformer:
     @staticmethod
     def find_level_ancestor(
         record: UmlsRecord,
-        level: OntologyLevel,
+        levels: Sequence[OntologyLevel],
         ancestors: tuple[UmlsRecord, ...],
     ) -> str:
         """
@@ -83,21 +85,21 @@ class UmlsTransformer:
 
         Returns (str): ancestor id, or "" if none found
         """
-        level_ancestors = [a for a in ancestors if a["level"] == level]
+        level_ancestors = [a for a in ancestors if a["level"] in levels]
 
         if len(level_ancestors) == 0:
             # return self as instance ancestor if no ancestors
-            if record["level"] == level:
+            if record["level"] in levels:
                 return record["id"]
 
             return ""
 
         # for instance level, use the last "INSTANCE" ancestor
-        if level == OntologyLevel.INSTANCE:
+        if OntologyLevel.INSTANCE in levels:
             return level_ancestors[-1]["id"]
 
         # else, use self as ancestor if matching or exceeding level
-        if record["level"] >= level:
+        if all(record["level"] >= level for level in levels):
             return record["id"]
 
         # otherwise, use the first matching ancestor
@@ -117,10 +119,10 @@ class UmlsTransformer:
         return UmlsRecord(
             **omit(r.__dict__, ["instance_rollup", "category_rollup"]),
             instance_rollup=UmlsTransformer.find_level_ancestor(
-                r, OntologyLevel.INSTANCE, ancestors
+                r, [OntologyLevel.INSTANCE], ancestors
             ),
             category_rollup=UmlsTransformer.find_level_ancestor(
-                r, OntologyLevel.L1_CATEGORY, ancestors
+                r, [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY], ancestors
             ),
         )
 

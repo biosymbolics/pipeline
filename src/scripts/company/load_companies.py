@@ -5,7 +5,7 @@ from clients.finance.financials import CompanyFinancials
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import COMPANIES_TABLE_NAME
-from typings.companies import Company
+from typings.companies import Company, COMPANY_STR_KEYS
 
 
 def clean_name(name: str) -> str:
@@ -37,9 +37,17 @@ def transform_companies(rows, synonym_map) -> list[Company]:
             symbol=row["symbol"],
             current_ratio=financials.current_ratio,
             debt_equity_ratio=financials.debt_equity_ratio,
+            ebitda=financials.ebitda,
+            gross_profit=financials.gross_profit,
+            is_bad_current_ratio=financials.is_bad_current_ratio,
+            is_bad_debt_equity_ratio=financials.is_bad_debt_equity_ratio,
+            is_low_return_on_equity=financials.is_low_return_on_equity,
+            is_trading_below_cash=financials.is_trading_below_cash,
             is_troubled=financials.is_troubled,
             market_cap=financials.market_cap,
             net_debt=financials.net_debt,
+            return_on_equity=financials.return_on_equity,
+            return_on_research_capital=financials.return_on_research_capital,
             total_debt=financials.total_debt,
             synonyms=[row["name"], clean_name(row["name"])],
             parent_company_id=None,
@@ -61,12 +69,13 @@ def load_companies():
     pharmas = pharmas.rename({col: col.lower() for col in pharmas.columns})
     pharmas = pharmas.with_columns(
         pl.col("symbol").alias("id"),
-        pl.lit(None).alias("current_ratio").cast(pl.Float32),
-        pl.lit(None).alias("debt_equity_ratio").cast(pl.Float32),
-        pl.lit(None).alias("is_troubled").cast(pl.Boolean),
-        pl.lit(None).alias("market_cap").cast(pl.Float32),
-        pl.lit(None).alias("net_debt").cast(pl.Float32),
-        pl.lit(None).alias("total_debt").cast(pl.Float32),
+        *[
+            pl.lit(None)
+            .alias(col)
+            .cast(pl.Boolean if col.startswith("is") else pl.Float32)
+            for col in COMPANY_STR_KEYS
+            if col not in ["id", "symbol", "parent_company_id", "synonyms"]
+        ],
         pl.lit(None).alias("parent_company_id").cast(pl.Utf8),
         pl.lit(None).alias("synonyms"),
     )

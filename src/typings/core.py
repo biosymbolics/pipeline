@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass, replace
 from typing import Any, TypeGuard, Union, List, Dict
 
 JsonSerializable = Union[
@@ -13,14 +13,23 @@ class Dataclass:
     def __getitem__(self, item):
         return getattr(self, item)
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def _asdict(self) -> dict[str, Any]:
+        return asdict(self)
+
     def keys(self):
-        return self.__dataclass_fields__.keys()
+        return self._asdict().keys()
 
     def values(self):
-        return self.__dataclass_fields__.values()
+        return self._asdict().values()
 
     def items(self):
-        return self.__dataclass_fields__.items()
+        return self._asdict().items()
+
+    def replace(self, **kwargs):
+        return replace(self, **kwargs)
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:

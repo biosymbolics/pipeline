@@ -17,7 +17,7 @@ def parse_bool(value: bool | str | None) -> bool:
 def parse_params(
     _params: PatentSearchParams,
     default_params: OptionalPatentSearchParams = {},
-    default_limit: int = 1000,
+    default_limit: int = 800,
 ) -> ParsedPatentSearchParams:
     """
     Parse patent params

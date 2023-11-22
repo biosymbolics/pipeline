@@ -51,7 +51,7 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "Rheumatoid Arthritis",
             },
             {
-                "description": "choose canonical name if 2 words",
+                "description": "choose canonical name if short-ish (5 words or fewer)",
                 "cui": "C0003873",
                 "canonical_name": "Rheumatoid Arthritis",
                 "aliases": [
@@ -109,7 +109,20 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "GPR84 protein, human",
             },
             {
-                "description": "avoid stupidly long canonical names",
+                "description": "...unless it's a gene/protein",
+                "cui": "C0061355",
+                "canonical_name": "Glucagon-Like Peptide 1",
+                "aliases": [
+                    "Glucagon-Like Peptide 1",
+                    "GLP-1",
+                    "Glucagon-like peptide 1 (substance)",
+                ],
+                "type_ids": ["T116"],
+                "is_composite": False,
+                "expected": "GLP-1",
+            },
+            {
+                "description": "...unless it is a stupidly long name",
                 "cui": "C4086713",
                 "canonical_name": "Substance with programmed cell death protein 1 inhibitor mechanism of action (substance)",
                 "aliases": [
@@ -129,6 +142,7 @@ class TestUmlsUtils(unittest.TestCase):
                 test["cui"],
                 test["canonical_name"],
                 test["aliases"],
+                test.get("type_ids", []),
                 test.get("is_composite", True),
             )
             self.assertEqual(result, expected_output)

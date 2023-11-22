@@ -1,6 +1,8 @@
+from enum import Enum
 from types import UnionType
-from typing import NamedTuple, Sequence, TypeGuard
+from typing import Any, NamedTuple, Sequence, TypeGuard
 from pydash import flatten
+from dataclasses import make_dataclass
 
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
@@ -27,20 +29,13 @@ TRAINING_PROPORTION = 0.8
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
     "sponsor_type",
-    "enrollment",
+    "max_timeframe",
+    # "dropout_count",
     # "facilities", ??
     # "countries" ??
 ]
-MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = [
-    # "conditions",  # typically only the specific condition
-    # "mesh_conditions",  # normalized; includes ancestors
-    # "interventions",
-]
-TEXT_FIELDS: list[str] = [
-    # "conditions",  # typically only the specific condition
-    "mesh_conditions",  # normalized; includes ancestors
-    "interventions",
-]
+MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
+TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor"]  #  "title"
 
 
 QUANTITATIVE_FIELDS: list[str] = [
@@ -52,13 +47,16 @@ QUANTITATIVE_FIELDS: list[str] = [
 QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
+    "max_timeframe",
     # dropout_count
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
-    "masking",
+    "blinding",
     "randomization",
     "comparison_type",
+    "enrollment",
+    # "max_timeframe",
     # "hypothesis_type"
     # "termination_reason",
     # dropout_count
@@ -81,6 +79,10 @@ input_field_lists = InputFieldLists(
     quantitative=QUANTITATIVE_FIELDS,
 )
 
+ALL_INPUT_FIELD_LISTS: list[str] = flatten(input_field_lists.__dict__.values())
+
+ALL_FIELD_LISTS: list[str] = flatten(field_lists.__dict__.values())
+
 output_field_lists = OutputFieldLists(
     y1_categorical=Y1_CATEGORICAL_FIELDS,
     y2=Y2_FIELD,
@@ -89,9 +91,9 @@ output_field_lists = OutputFieldLists(
 
 def _get_type(field_type: str) -> type | UnionType:
     if field_type == "single_select":
-        return str | int | float
+        return str | int | float | Enum
     if field_type == "multi_select":
-        return list[str] | list[int] | list[float]
+        return list[str] | list[int] | list[float] | list[Enum]
     if field_type == "text":
         return str | list[str]
     if field_type == "quantitative":
@@ -108,21 +110,29 @@ def get_fields_to_types(
     _field_lists: AnyFieldLists,
 ) -> tuple[tuple[str, type | UnionType], ...]:
     vals = _field_lists.__dict__.items()
-    return tuple([(fv, _get_type(k)) for k, fvs in vals for fv in fvs])
+    vals = flatten(
+        [
+            [(v, _get_type(k))]
+            if isinstance(v, str)
+            else list(zip(v, [_get_type(k)] * len(v)))
+            for k, v in vals
+        ]
+    )
+    return tuple(vals)
 
 
 # sigh https://github.com/python/mypy/issues/848
+# https://github.com/python/mypy/issues/6063
 InputRecord = NamedTuple("InputRecord", get_fields_to_types(input_field_lists))  # type: ignore
 InputAndOutputRecord = NamedTuple(  # type: ignore
     "InputAndOutputRecord", get_fields_to_types(field_lists)  # type: ignore
 )
 OutputRecord = NamedTuple("OutputRecord", get_fields_to_types(output_field_lists))  # type: ignore
-
 AnyRecord = InputRecord | InputAndOutputRecord | OutputRecord
 
 
 def is_output_record(record: AnyRecord) -> TypeGuard[OutputRecord]:
-    record_keys = (record.__dict__ if not isinstance(record, dict) else record).keys()
+    record_keys = (record._asdict() if not isinstance(record, dict) else record).keys()
     output_fields = set(flatten(output_field_lists.__dict__.values()))
     return output_fields.issubset(record_keys)
 
@@ -133,3 +143,14 @@ def is_output_records(
     return len(records) > 0 and all(
         is_output_record(record) for record in records[0:10]
     )
+
+
+# INFO:__main__:Evaluation Stage1 design accuracy: 0.7
+# INFO:__main__:Evaluation Stage1 blinding accuracy: 0.65
+# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.72
+# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.44
+# INFO:__main__:Evaluation Stage1 enrollment accuracy: 0.59
+# INFO:__main__:Evaluation Stage2 accuracy: 0.91
+# INFO:__main__:Evaluation Stage2 precision: 0.41
+# INFO:__main__:Evaluation Stage2 recall: 0.05
+# INFO:__main__:Evaluation Stage2 mae: 1.18
