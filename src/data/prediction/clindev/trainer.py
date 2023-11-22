@@ -1,11 +1,10 @@
 import json
 import logging
 import math
-import os
 import random
 import sys
-from typing import Any, Callable, NamedTuple, Optional, Sequence, cast
-from pydash import flatten, pick
+from typing import Any, Callable, NamedTuple, Optional, Sequence
+from pydash import flatten
 import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
@@ -343,12 +342,17 @@ class ModelTrainer:
             output_field_lists,
             directory=BASE_ENCODER_DIRECTORY,
         )
+        print_fields = [
+            "nct_id",
+            "conditions",
+            "phase",
+            *flatten(output_field_lists.__dict__.values()),
+        ]
         comparison = [
             {
                 k: f"{v} (pred: {pred[k]})" if pred.get(k) is not None else v
                 for k, v in true.items()
-                if k in ["nct_id", "conditions", "enrollment", "phase"]
-                or k in flatten(output_field_lists.__dict__.values())
+                if k in print_fields
             }
             for true, pred in zip(records, pl.DataFrame(outputs).to_dicts())
         ]

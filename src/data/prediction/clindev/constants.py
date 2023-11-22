@@ -1,3 +1,4 @@
+from enum import Enum
 from types import UnionType
 from typing import Any, NamedTuple, Sequence, TypeGuard
 from pydash import flatten
@@ -90,9 +91,9 @@ output_field_lists = OutputFieldLists(
 
 def _get_type(field_type: str) -> type | UnionType:
     if field_type == "single_select":
-        return str | int | float
+        return str | int | float | Enum
     if field_type == "multi_select":
-        return list[str] | list[int] | list[float]
+        return list[str] | list[int] | list[float] | list[Enum]
     if field_type == "text":
         return str | list[str]
     if field_type == "quantitative":

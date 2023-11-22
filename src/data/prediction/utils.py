@@ -50,6 +50,8 @@ logger.setLevel(logging.INFO)
 
 T = TypeVar("T", bound=AnyRecord)
 
+GetEncoder = Callable[[str, str, int], Any]
+
 
 class EncodedCategories(NamedTuple):
     category_size_map: dict[str, int]
@@ -129,10 +131,10 @@ def resize_and_batch(
 
 def encode_categories(
     records: Sequence[T],
-    fields: list[str],
+    fields: Sequence[str],
     max_items_per_cat: int,
     directory: str,
-    get_encoder: Callable = lambda field, directory, max_items_per_cat: LabelCategoryEncoder(
+    get_encoder: GetEncoder = lambda field, directory, max_items_per_cat: LabelCategoryEncoder(
         field, directory
     ),
     device: str = "cpu",
@@ -182,7 +184,7 @@ def encode_categories_as_text(
     max_items_per_cat: int,
     max_tokens_per_item: int,
     directory: str,
-    get_encoder: Callable = (lambda f, dir, max_in_cat: TextEncoder(f, max_in_cat)),
+    get_encoder: GetEncoder = (lambda f, dir, max_in_cat: TextEncoder(f, max_in_cat)),
     device: str = "cpu",
 ) -> torch.Tensor:
     """
@@ -246,7 +248,7 @@ def encode_multi_select(
 
 def encode_quantitative_fields(
     records: Sequence[T],
-    fields: list[str],
+    fields: Sequence[str],
     directory: str,
 ) -> list[T]:
     """

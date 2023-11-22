@@ -30,7 +30,6 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND purpose = 'TREATMENT'
         AND array_length(conditions, 1) > 0
         AND array_length(mesh_conditions, 1) > 0
-        AND mesh_conditions[1] is not null
         AND max_timeframe is not null
         AND array_length(interventions, 1) > 0
         AND comparison_type not in ('UNKNOWN', 'OTHER')
@@ -38,8 +37,8 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND design not in ('UNKNOWN', 'FACTORIAL')
         AND randomization not in ('UNKNOWN') -- rare
         AND masking not in ('UNKNOWN')
-        AND phase in ('PHASE_1', 'PHASE_2', 'PHASE_3') -- others, but for model we're only estimating these
-        -- AND sponsor_type in ('INDUSTRY', 'INDUSTRY_LARGE', 'OTHER')
+        AND phase in ('PHASE_1', 'PHASE_2', 'PHASE_3') -- there are others, but for model we're only estimating these
+        AND sponsor_type not in ('OTHER')
         AND enrollment is not null
         ORDER BY start_date DESC
         limit {limit}

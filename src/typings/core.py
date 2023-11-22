@@ -13,20 +13,20 @@ class Dataclass:
     def __getitem__(self, item):
         return getattr(self, item)
 
-    def keys(self):
-        return self.__dataclass_fields__.keys()
-
-    def values(self):
-        return self.__dataclass_fields__.values()
-
-    def items(self):
-        return self.__dataclass_fields__.items()
-
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def _asdict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def keys(self):
+        return self._asdict.keys()
+
+    def values(self):
+        return self._asdict.values()
+
+    def items(self):
+        return self._asdict.items()
 
     def replace(self, **kwargs):
         return replace(self, **kwargs)
