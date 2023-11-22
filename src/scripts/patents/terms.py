@@ -224,6 +224,7 @@ class TermAssembler:
         """
         terms_query = f"""
                 SELECT term, domain, sum(count) as count FROM (
+                    -- TODO: can we prevent these from being matched to anything but diseases?
                     SELECT lower(preferred_name) as term, domain, COUNT(*) as count
                     from {GPR_ANNOTATIONS_TABLE}
                     group by preferred_name, domain

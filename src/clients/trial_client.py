@@ -38,8 +38,8 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         AND randomization not in ('UNKNOWN') -- rare
         AND masking not in ('UNKNOWN')
         -- AND phase in ('PHASE_1', 'PHASE_2', 'PHASE_3') -- there are others, but for model we're only estimating these
-        AND sponsor_type not in ('OTHER', 'OTHER_ORGANIZATION')
-        -- AND sponsor_type in ('INDUSTRY', 'LARGE_INDUSTRY')
+        -- AND sponsor_type not in ('OTHER', 'OTHER_ORGANIZATION')
+        AND sponsor_type in ('INDUSTRY', 'LARGE_INDUSTRY')
         AND enrollment is not null
         ORDER BY RANDOM() -- start_date DESC
         limit {limit}

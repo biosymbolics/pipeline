@@ -15,7 +15,7 @@ from utils.encoding.json_encoder import DataclassJSONEncoder
 
 system.initialize()
 
-from clients.trials import fetch_trials
+from clients.trial_client import fetch_trials
 from data.prediction.utils import (
     ModelInputAndOutput,
     decode_output,
@@ -367,7 +367,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = fetch_trials("COMPLETED", limit=2000)
+        trials = fetch_trials("COMPLETED", limit=40000)
         trials = preprocess_inputs(trials)
 
         inputs, category_sizes = prepare_data(

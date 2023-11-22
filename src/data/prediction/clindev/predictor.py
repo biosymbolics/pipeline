@@ -5,20 +5,21 @@ import json
 import logging
 import math
 import sys
-from typing import Any, Sequence, cast
+from typing import Any, Sequence
 from pydash import flatten, omit_by
 import torch
 import polars as pl
 
 
 import system
-from typings.trials import SponsorType, TrialPhase
-from utils.encoding.json_encoder import DataclassJSONEncoder
+
 
 system.initialize()
 
 from data.prediction.clindev.types import PatentTrialPrediction
 from data.prediction.utils import ModelInput, decode_output
+from typings.trials import SponsorType, TrialPhase
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import (
     BASE_ENCODER_DIRECTORY,
@@ -125,6 +126,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
             InputRecord(
                 **{
                     **{k: v for k, v in input.items() if k in ALL_INPUT_FIELD_LISTS},
+                    "max_timeframe": phase._order,
                     "phase": phase,
                     "start_date": sd,
                     "sponsor_type": SponsorType.INDUSTRY,

@@ -25,6 +25,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1951340": "process",
     "C1963578": "procedure",
     "C0009429": "combination",
+    "C0596316": "chemical group",
 }
 
 # suppress UMLS entities matching these names

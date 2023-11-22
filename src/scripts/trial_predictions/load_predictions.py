@@ -39,6 +39,7 @@ def generate_trial_predictions():
         """
         SELECT
             apps.publication_number as publication_number,
+            (apps.assignees)[1] as sponsor,
             array_agg(term) as terms,
             array_agg(domain) as domains,
             (array_agg(t.phase ORDER BY t.start_date desc))[1] as starting_phase
@@ -47,9 +48,8 @@ def generate_trial_predictions():
         LEFT JOIN trials t on t.nct_id = ptt.nct_id
         where a.publication_number = apps.publication_number
         and domain in ('diseases', 'mechanisms', 'biologics', 'compounds')
-        group by apps.publication_number
+        group by apps.publication_number, apps.assignees
         order by apps.publication_number desc
-        limit 10000
     """
     )
 

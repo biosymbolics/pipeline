@@ -159,7 +159,7 @@ def _search(
 
     query = f"""
         SELECT {", ".join(qp["fields"])},
-        max({term_field}) as terms,
+        max(agg_annotations.{term_field}) as terms,
         (CASE
             WHEN max(approval_dates) IS NOT NULL AND ARRAY_LENGTH(max(approval_dates), 1) > 0
             THEN (max(approval_dates))[1]

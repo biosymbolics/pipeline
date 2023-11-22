@@ -37,6 +37,8 @@ def transform_companies(rows, synonym_map) -> list[Company]:
             symbol=row["symbol"],
             current_ratio=financials.current_ratio,
             debt_equity_ratio=financials.debt_equity_ratio,
+            ebitda=financials.ebitda,
+            gross_profit=financials.gross_profit,
             is_bad_current_ratio=financials.is_bad_current_ratio,
             is_bad_debt_equity_ratio=financials.is_bad_debt_equity_ratio,
             is_low_return_on_equity=financials.is_low_return_on_equity,
