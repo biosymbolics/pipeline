@@ -1,3 +1,4 @@
+from dataclasses import asdict, dataclass
 from datetime import date
 from functools import partial
 from typing import (
@@ -140,10 +141,7 @@ def encode_categories(
     Get category **encodings** given a list of dicts
     """
 
-    dicts = [
-        record._asdict() if not isinstance(record, dict) else record
-        for record in records
-    ]
+    dicts = [record._asdict() for record in records]
     df = pl.from_dicts(dicts, infer_schema_length=1000)
 
     # total records by field
@@ -247,10 +245,10 @@ def encode_multi_select(
 
 
 def encode_quantitative_fields(
-    records: Sequence[dict],
+    records: Sequence[T],
     fields: list[str],
     directory: str,
-) -> Sequence[dict]:
+) -> list[T]:
     """
     Encode quantitative fields into categorical
     (Intended for use as a preprocessing step, so that the
@@ -264,18 +262,17 @@ def encode_quantitative_fields(
     Returns:
         Sequence[dict]: List of dicts with encoded fields
     """
-    df = pl.from_dicts(records, infer_schema_length=None)
+    _records = [*records]
+
+    def encode(field) -> list[T]:
+        col_vals = [r.__dict__[field] for r in records]
+        encoded = BinEncoder(field, directory).fit_transform(col_vals)
+        return [r.replace(**{field: e}) for r, e in zip(_records, encoded)]
+
     for field in fields:
-        df = df.with_columns(
-            [
-                pl.col(field)
-                .map_batches(
-                    lambda v: pl.Series(BinEncoder(field, directory).fit_transform(v))
-                )
-                .alias(field)
-            ]
-        )
-    return df.to_dicts()
+        _records = encode(field)
+
+    return _records
 
 
 def encode_outputs(
@@ -313,8 +310,6 @@ def encode_quantitative(
     fields: list[str],
     device: str = "cpu",
 ) -> torch.Tensor:
-    print(fields)
-    print(records[0:1])
     return F.normalize(
         torch.Tensor(
             [[to_float(r._asdict()[field]) for field in fields] for r in records]
@@ -421,8 +416,10 @@ def decode_output(
     y2_decoded = LabelCategoryEncoder(field_lists.y2, directory).inverse_transform(
         y2_pred.detach().cpu().numpy()
     )
-    y2_quant_decoded = BinEncoder(field_lists.y2, directory).inverse_transform(
-        y2_decoded.reshape(-1, 1)
+    y2_quant_decoded = (
+        BinEncoder(field_lists.y2, directory)
+        .inverse_transform(y2_decoded.reshape(-1, 1))
+        .reshape(-1)
     )
     return {
         **y1_decoded,
