@@ -21,7 +21,7 @@ from .constants import (
     GPR_ANNOTATIONS_TABLE,
     GPR_PUBLICATIONS_TABLE,
 )
-from .utils import determine_bq_data_type
+from .utils import determine_data_type
 
 
 storage_client = storage.Client()
@@ -176,7 +176,7 @@ def import_into_psql(today: str):
 
         first_record = records[0]
         columns = dict(
-            [(f'"{k}"', determine_bq_data_type(v, k)) for k, v in first_record.items()]
+            [(f'"{k}"', determine_data_type(v, k)) for k, v in first_record.items()]
         )
         client.create_table(table_name, columns, exists_ok=True)
         client.insert_into_table(df.to_dicts(), table_name)
