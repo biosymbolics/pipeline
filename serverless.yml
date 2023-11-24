@@ -184,19 +184,17 @@ custom:
 
 resources:
   Resources:
-    RDSCluster:
+    ServerlessV2Cluster:
       Type: AWS::RDS::DBCluster
       Properties:
+        Engine: aurora-postgresql
         MasterUsername: ${ssm:/biosymbolics/pipeline/database/patents/main_username}
         MasterUserPassword: ${ssm:/biosymbolics/pipeline/database/patents/main_password}
         DatabaseName: ${ssm:/biosymbolics/pipeline/database/patents/db_name}
-        Engine: aurora-postgresql
-        EngineMode: serverless
-        ScalingConfiguration:
-          AutoPause: true
+        AutoMinorVersionUpgrade: true
+        ServerlessV2ScalingConfiguration:
           MaxCapacity: 16
-          MinCapacity: 4
-          SecondsUntilAutoPause: 600 # 10 minutes
+          MinCapacity: 0.5
         EnableHttpEndpoint: true
         StorageEncrypted: true
     LambdaSecurityGroup:
