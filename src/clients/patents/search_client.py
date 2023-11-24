@@ -4,7 +4,7 @@ Patent client
 from functools import partial
 import logging
 import time
-from typing import Sequence, cast
+from typing import Sequence
 from clients.companies.companies import get_company_map
 
 from clients.low_level.boto3 import retrieve_with_cache_check
@@ -16,14 +16,13 @@ from constants.core import (
     PATENT_TO_REGULATORY_APPROVAL_TABLE,
     REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
-    TERMS_TABLE,
     TRIALS_TABLE,
 )
 from typings.patents import ScoredPatentApplication as PatentApplication
 from utils.string import get_id
 
 from .enrich import enrich_search_result
-from .types import AutocompleteTerm, QueryPieces, QueryType, TermField, TermResult
+from .types import QueryPieces, QueryType, TermField
 from .utils import get_max_priority_date
 
 
@@ -256,38 +255,3 @@ def search(
         return search_partial(limit=limit)
 
     return retrieve_with_cache_check(search_partial, key=key, limit=limit)
-
-
-def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
-    """
-    Fetch all terms from table `terms`
-    Sort by term, then by count.
-
-    Args:
-        string (str): string to search for
-
-    Returns: a list of matching terms
-    """
-    start = time.time()
-
-    def format_term(entity: TermResult) -> AutocompleteTerm:
-        return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
-
-    search_sql = f"{' & '.join(string.split(' '))}:*"
-    query = f"""
-        SELECT DISTINCT ON (count, term) terms.term, count
-        FROM {TERMS_TABLE}
-        WHERE text_search @@ to_tsquery('english', %s)
-        ORDER BY count DESC
-        limit {limit}
-    """
-    results = PsqlDatabaseClient().select(query, [search_sql])
-    formatted = [format_term(cast(TermResult, result)) for result in results]
-
-    logger.info(
-        "Autocomplete for string %s took %s seconds",
-        string,
-        round(time.time() - start, 2),
-    )
-
-    return formatted

@@ -10,7 +10,8 @@ from typings.core import Dataclass
 
 TermField = Literal["terms", "instance_rollup", "category_rollup"]
 
-AutocompleteTerm = TypedDict("AutocompleteTerm", {"id": str, "label": str})
+AutocompleteMode = Literal["id", "term"]
+AutocompleteResult = TypedDict("AutocompleteResult", {"id": str, "label": str})
 TermResult = TypedDict("TermResult", {"term": str, "count": int})
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
