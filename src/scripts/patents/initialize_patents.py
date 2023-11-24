@@ -307,6 +307,7 @@ def main(bootstrap: bool = False):
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
     CREATE USER patents with password '$PASSWORD';
     GRANT readaccess TO patents;
+    create extension vector; -- todo: move to beginning
 
     -- vacuum analyze;
     -- analyze applications;

@@ -51,9 +51,8 @@ def rds_control(raw_event: dict, context):
     RDS control handler for stopping/starting RDS cluster
 
     Invocation:
-    - Local: `serverless invoke local --function rds-control --param='ENV=local' --data='{"queryStringParameters": { "action":"STOP" }}'`
+    - Local: `serverless invoke local --function rds-control --param='ENV=local' --data='{"queryStringParameters": { "action":"START" }}'`
     - Remote: `serverless invoke --function rds-control --data='{"queryStringParameters": { "action":"STOP" }}'`
-    - API: `curl https://api.biosymbolics.ai/system/rds/control?action=STOP`
     """
     event = RdsControlEvent(**raw_event)
     p = event.queryStringParameters
