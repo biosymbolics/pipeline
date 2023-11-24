@@ -4,7 +4,7 @@ Patent client
 from functools import partial
 import logging
 import time
-from typing import Sequence, cast
+from typing import Sequence
 from clients.companies.companies import get_company_map
 
 from clients.low_level.boto3 import retrieve_with_cache_check
@@ -16,14 +16,14 @@ from constants.core import (
     PATENT_TO_REGULATORY_APPROVAL_TABLE,
     REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
-    TERMS_TABLE,
     TRIALS_TABLE,
 )
+from handlers.patents.types import PatentSearchParams
 from typings.patents import ScoredPatentApplication as PatentApplication
 from utils.string import get_id
 
 from .enrich import enrich_search_result
-from .types import AutocompleteTerm, QueryPieces, QueryType, TermField, TermResult
+from .types import QueryPieces, QueryType, TermField
 from .utils import get_max_priority_date
 
 
@@ -207,15 +207,7 @@ def _search(
     return enriched_results
 
 
-def search(
-    terms: Sequence[str],
-    exemplar_patents: Sequence[str] = [],
-    query_type: QueryType = "AND",
-    min_patent_years: int = 10,
-    term_field: TermField = "terms",
-    limit: int = MAX_SEARCH_RESULTS,
-    skip_cache: bool = False,
-) -> list[PatentApplication]:
+def search(p: PatentSearchParams) -> list[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -224,15 +216,15 @@ def search(
     - at least one composition of matter IPC code
 
     Args:
-        terms (Sequence[str]): list of terms to search for
-        exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
-        query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        term_field (TermField, optional): which field to search on. Defaults to "terms".
+        p.terms (Sequence[str]): list of terms to search for
+        p.exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
+        p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
+        p.min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
+        p.term_field (TermField, optional): which field to search on. Defaults to "terms".
                 Other values are `instance_rollup` (which are rollup terms at a high level of specificity, e.g. "Aspirin 50mg" might have a rollup term of "Aspirin")
                 and `category_rollup` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
-        limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
-        skip_cache (bool, optional): whether to skip cache. Defaults to False.
+        p.limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
 
     Returns: a list of matching patent applications
 
@@ -243,51 +235,16 @@ def search(
     ```
     """
     args = {
-        "terms": terms,
-        "exemplar_patents": exemplar_patents,
-        "query_type": query_type,
-        "min_patent_years": min_patent_years,
-        "term_field": term_field,
+        "terms": p.terms,
+        "exemplar_patents": p.exemplar_patents,
+        "query_type": p.query_type,
+        "min_patent_years": p.min_patent_years,
+        "term_field": p.term_field,
     }
     key = get_id(args)
     search_partial = partial(_search, **args)
 
-    if skip_cache:
-        return search_partial(limit=limit)
+    if p.skip_cache:
+        return search_partial(limit=p.limit)
 
-    return retrieve_with_cache_check(search_partial, key=key, limit=limit)
-
-
-def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteTerm]:
-    """
-    Fetch all terms from table `terms`
-    Sort by term, then by count.
-
-    Args:
-        string (str): string to search for
-
-    Returns: a list of matching terms
-    """
-    start = time.time()
-
-    def format_term(entity: TermResult) -> AutocompleteTerm:
-        return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
-
-    search_sql = f"{' & '.join(string.split(' '))}:*"
-    query = f"""
-        SELECT DISTINCT ON (count, term) terms.term, count
-        FROM {TERMS_TABLE}
-        WHERE text_search @@ to_tsquery('english', %s)
-        ORDER BY count DESC
-        limit {limit}
-    """
-    results = PsqlDatabaseClient().select(query, [search_sql])
-    formatted = [format_term(cast(TermResult, result)) for result in results]
-
-    logger.info(
-        "Autocomplete for string %s took %s seconds",
-        string,
-        round(time.time() - start, 2),
-    )
-
-    return formatted
+    return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)

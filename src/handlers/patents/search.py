@@ -4,30 +4,31 @@ Handler for patents search
 import json
 from typing import TypedDict
 import logging
+from pydantic import BaseModel
 
 from clients import patents as patent_client
 from handlers.patents.utils import parse_params
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
-from .types import PatentSearchParams
+from .types import RawPatentSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class SearchEvent(TypedDict):
-    queryStringParameters: PatentSearchParams
+class SearchEvent(BaseModel):
+    queryStringParameters: RawPatentSearchParams
 
 
-def search(event: SearchEvent, context):
+def search(raw_event: dict, context):
     """
     Search patents by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "domain": "diseases", "query_type": "OR" }}'`
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"presbyopia", "is_exhaustive": false }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "query_type": "OR" }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"presbyopia" }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "term_field": "instance_rollup" }}'`
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"idiopathic pulmonary arterial hypertension", "skip_cache": true }}'`
+    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "exemplar_patents":"WO-2019191008-A1", "skip_cache": true }}'`
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"hemolysis" }}'`
@@ -35,16 +36,17 @@ def search(event: SearchEvent, context):
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
 
-    params = parse_params(event.get("queryStringParameters", {}))
+    event = SearchEvent(**raw_event)
+    p = parse_params(event.queryStringParameters)
 
-    if len(params["terms"]) < 1 or not all([len(t) > 1 for t in params["terms"]]):
-        logger.error("Missing or malformed params: %s", params)
+    if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+        logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching patents for params: %s", params)
+    logger.info("Fetching patents for params: %s", p)
 
     try:
-        results = patent_client.search(**params)
+        results = patent_client.search(p)
 
     except Exception as e:
         message = f"Error searching patents: {e}"

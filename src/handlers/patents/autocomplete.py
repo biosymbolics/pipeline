@@ -3,31 +3,34 @@ Handler for patents autocomplete
 """
 import json
 import logging
-from typing_extensions import NotRequired
-from typing import TypedDict
+from pydantic import BaseModel
+
+from clients import patents as patent_client
+from clients.patents.types import AutocompleteMode
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-from clients import patents as patent_client
+
+class AutocompleteParams(BaseModel):
+    string: str
+    limit: int = 25
+    mode: AutocompleteMode = "term"
 
 
-AutocompleteParams = TypedDict(
-    "AutocompleteParams", {"term": str, "limit": NotRequired[int]}
-)
-AutocompleteEvent = TypedDict(
-    "AutocompleteEvent", {"queryStringParameters": AutocompleteParams}
-)
+class AutocompleteEvent(BaseModel):
+    queryStringParameters: AutocompleteParams
 
 
-def autocomplete(event: AutocompleteEvent, context):
+def autocomplete(raw_event: dict, context):
     """
-    Autocomplete term for patents (used in patent term autocomplete)
+    Autocomplete terms or ids for patents
 
     Invocation:
-    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "term":"asthm" }}'`
-    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "term":"alzheim" }}'`
-    - API: `curl https://api.biosymbolics.ai/terms/search?term=asthm`
+    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"asthm" }}'`
+    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"WO-0224", "mode": "id" }}'`
+    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "string":"alzheim" }}'`
+    - API: `curl https://api.biosymbolics.ai/autocomplete?string=asthm`
 
     Output (for string "asthm"):
     ```json
@@ -45,24 +48,23 @@ def autocomplete(event: AutocompleteEvent, context):
     }
     ```
     """
-    params = event.get("queryStringParameters", {})
-    term = params.get("term")
-    limit = params.get("limit") or 25
+    event = AutocompleteEvent(**raw_event)
+    p = event.queryStringParameters
 
-    if not params or not term:
+    if not p or not p.string:
         logger.error(
-            "Missing query or param `term`, params: %s",
-            params,
+            "Missing query or param `string`, params: %s",
+            p,
         )
         return {
             "statusCode": 400,
             "body": "Missing parameter(s)",
         }
 
-    if len(term) < 3:
+    if len(p.string) < 3:
         logger.info("Term too short, skipping autocomplete")
-        return {"statusCode": 200, "body": json.dumps({"terms": []})}
+        return {"statusCode": 200, "body": json.dumps([])}
 
-    terms = patent_client.autocomplete_terms(term, limit)
+    terms = patent_client.autocomplete(p.string, p.mode, p.limit)
 
-    return {"statusCode": 200, "body": json.dumps({"terms": terms})}
+    return {"statusCode": 200, "body": json.dumps(terms)}

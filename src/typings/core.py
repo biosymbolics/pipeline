@@ -13,6 +13,9 @@ class Dataclass:
     def __getitem__(self, item):
         return getattr(self, item)
 
+    def get(self, item, default=None):
+        return getattr(self, item, default)
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 

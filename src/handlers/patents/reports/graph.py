@@ -2,24 +2,24 @@
 Handler for patent graph reports
 """
 import json
-from typing import TypedDict
 import logging
+from pydantic import BaseModel
 
 from clients import patents as patent_client
 from clients.patents.reports.graph import graph_patent_relationships
 from handlers.patents.utils import parse_params
 
-from ..types import PatentSearchParams
+from ..types import RawPatentSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class ReportEvent(TypedDict):
-    queryStringParameters: PatentSearchParams
+class ReportEvent(BaseModel):
+    queryStringParameters: RawPatentSearchParams
 
 
-def graph_patent_characteristics(event: ReportEvent, context):
+def graph_patent_characteristics(raw_event: dict, context):
     """
     Return a graph of patent characteristics
 
@@ -28,18 +28,19 @@ def graph_patent_characteristics(event: ReportEvent, context):
     - Remote: `serverless invoke --function patents-graph --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
     """
-    params = parse_params(event.get("queryStringParameters", {}), default_limit=10000)
+    event = ReportEvent(**raw_event)
+    p = parse_params(event.queryStringParameters, default_limit=10000)
 
-    if len(params["terms"]) < 1 or not all([len(t) > 1 for t in params["terms"]]):
-        logger.error("Missing or malformed params: %s", params)
+    if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+        logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching reports for params: %s", params)
+    logger.info("Fetching reports for params: %s", p)
 
     try:
-        patents = patent_client.search(**params)
+        patents = patent_client.search(p)
         if len(patents) == 0:
-            logging.info("No patents found for terms: %s", params["terms"])
+            logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
 
         graph = graph_patent_relationships(patents)

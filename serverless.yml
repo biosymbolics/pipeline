@@ -75,10 +75,10 @@ functions:
     handler: src.handlers.patents.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  autocomplete-patents:
+  autocomplete:
     events:
       - http:
-          path: terms/search
+          path: autocomplete
           method: get
           cors: true
     handler: src.handlers.patents.autocomplete

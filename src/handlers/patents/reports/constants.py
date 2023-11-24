@@ -1,5 +1,3 @@
-from ..types import OptionalPatentSearchParams
+from ..types import OptionalRawPatentSearchParams
 
-DEFAULT_REPORT_PARAMS: OptionalPatentSearchParams = {
-    "term_field": "instance_rollup",
-}
+DEFAULT_REPORT_PARAMS = OptionalRawPatentSearchParams(term_field="instance_rollup")

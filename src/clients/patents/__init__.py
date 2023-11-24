@@ -1,4 +1,16 @@
-from .patent_client import autocomplete_terms, search
-from .types import RelevancyThreshold
+from .autocomplete_client import (
+    autocomplete,
+    autocomplete_id,
+    autocomplete_terms,
+)
+from .search_client import search
+from .types import AutocompleteMode, RelevancyThreshold
 
-__all__ = ["autocomplete_terms", "search", "RelevancyThreshold"]
+__all__ = [
+    "autocomplete",
+    "autocomplete_id",
+    "autocomplete_terms",
+    "search",
+    "AutocompleteMode",
+    "RelevancyThreshold",
+]
