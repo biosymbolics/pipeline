@@ -8,7 +8,7 @@ from clients.patents.types import QueryType, TermField
 
 class BasePatentSearchParams(BaseModel):
     min_patent_years: int = 10
-    limit: int = 100
+    limit: int = 800
     query_type: QueryType = "AND"
 
 
