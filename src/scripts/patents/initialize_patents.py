@@ -350,7 +350,19 @@ def main(bootstrap: bool = False):
     # post
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
     # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
+    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein$';
+    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
     # update annotations set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
+
+    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
+    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein$';
+    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
+    # update terms set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
+
+    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} gene$';
+    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} protein$';
+    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
+    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where instance_rollup ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
 
     # UPDATE trials
     # SET interventions = sub.new_interventions
