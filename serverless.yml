@@ -37,6 +37,14 @@ provider:
             - 's3:PutObject'
           Resource:
             - 'arn:aws:s3:::biosym-patents-*/*'
+        - Effect: Allow
+          Action:
+            - 'rds:StartDBCluster'
+            - 'rds:StopDBCluster'
+            - 'rds:StopDBInstance'
+            - 'rds:StartDBInstance'
+          Resource:
+            - 'arn:aws:rds:*:*:cluster:*'
   apiGateway:
     apiKeys:
       - free:
