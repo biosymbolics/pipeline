@@ -3,13 +3,12 @@ Patent client
 """
 import logging
 import time
-from typing import Literal, cast
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import APPLICATIONS_TABLE, TERMS_TABLE
 
 
-from .types import AutocompleteMode, AutocompleteResult, TermResult
+from .types import is_term_results, AutocompleteMode, AutocompleteResult, TermResult
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,11 @@ def _autocomplete(
     query = f"{query} limit {limit}"
 
     results = PsqlDatabaseClient().select(query, [search_sql])
-    formatted = [_format_term(cast(TermResult, result)) for result in results]
+
+    if not is_term_results(results):
+        raise ValueError(f"Expected term results, got {results}")
+
+    formatted = [_format_term(result) for result in results]
 
     logger.info(
         "Autocomplete for string %s took %s seconds",

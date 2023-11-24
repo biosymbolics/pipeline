@@ -1,10 +1,9 @@
 import json
 
-from clients.patents.types import QueryType, TermField, get_query_type
 from handlers.patents.types import (
-    OptionalPatentSearchParams,
+    OptionalRawPatentSearchParams as OptionalParams,
     PatentSearchParams,
-    ParsedPatentSearchParams,
+    RawPatentSearchParams as RawParams,
 )
 
 
@@ -15,40 +14,34 @@ def parse_bool(value: bool | str | None) -> bool:
 
 
 def parse_params(
-    _params: PatentSearchParams,
-    default_params: OptionalPatentSearchParams = {},
+    _params: RawParams,
+    default_params: OptionalParams = OptionalParams(),
     default_limit: int = 800,
-) -> ParsedPatentSearchParams:
+) -> PatentSearchParams:
     """
     Parse patent params
     """
     # combine default and provided params
-    params: PatentSearchParams = {**default_params, **_params}
+    p = RawParams(**{**default_params.__dict__, **_params.__dict__})
 
     # parse ";"-delimited terms
-    terms = params.get("terms")
-    terms_list = [t.strip() for t in (terms.split(";") if terms else [])]
+    terms_list = [t.strip() for t in (p.terms.split(";") if p.terms else [])]
 
     # exemplar patents
-    exemplar_patents = params.get("exemplar_patents")
-    exemplar_patents_list = (
-        [t.strip() for t in (exemplar_patents.split(";") if exemplar_patents else [])]
-        if exemplar_patents
-        else []
+    exemplar_patents_list = [
+        t.strip() for t in (p.exemplar_patents.split(";") if p.exemplar_patents else [])
+    ]
+
+    limit = p.limit or default_limit
+
+    return PatentSearchParams(
+        **{
+            "terms": terms_list,
+            "exemplar_patents": exemplar_patents_list,
+            "query_type": p.query_type,
+            "min_patent_years": p.min_patent_years,
+            "limit": limit,
+            "skip_cache": p.skip_cache,
+            "term_field": p.term_field,
+        }
     )
-
-    limit = params.get("limit") or default_limit
-    min_patent_years = params.get("min_patent_years") or 10
-    query_type: QueryType = get_query_type(params.get("query_type"))
-    skip_cache = parse_bool(params.get("skip_cache", "false"))
-    term_field: TermField = params.get("term_field") or "terms"
-
-    return {
-        "terms": terms_list,
-        "exemplar_patents": exemplar_patents_list,
-        "query_type": query_type,
-        "min_patent_years": min_patent_years,
-        "limit": limit,
-        "skip_cache": skip_cache,
-        "term_field": term_field,
-    }

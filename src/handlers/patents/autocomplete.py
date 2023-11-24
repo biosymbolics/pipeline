@@ -6,7 +6,7 @@ import logging
 from pydantic import BaseModel
 
 from clients import patents as patent_client
-from clients.patents import AutocompleteMode
+from clients.patents.types import AutocompleteMode
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -30,7 +30,7 @@ def autocomplete(raw_event: dict, context):
     - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"asthm" }}'`
     - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"WO-0224", "mode": "id" }}'`
     - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "string":"alzheim" }}'`
-    - API: `curl https://api.biosymbolics.ai/terms/search?string=asthm`
+    - API: `curl https://api.biosymbolics.ai/autocomplete?string=asthm`
 
     Output (for string "asthm"):
     ```json

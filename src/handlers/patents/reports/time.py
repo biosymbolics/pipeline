@@ -2,25 +2,28 @@
 Handler for patent timewise reports
 """
 import json
-from typing import TypedDict
 import logging
+from pydantic import BaseModel
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
 from handlers.patents.utils import parse_params
 
-from ..types import PatentSearchParams
+from ..types import (
+    RawPatentSearchParams,
+    OptionalRawPatentSearchParams as OptionalParams,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class ReportEvent(TypedDict):
-    queryStringParameters: PatentSearchParams
+class ReportEvent(BaseModel):
+    queryStringParameters: RawPatentSearchParams
 
 
-def aggregate_over_time(event: ReportEvent, context):
+def aggregate_over_time(raw_event: dict, context):
     """
     Aggregate patents trends over time
 
@@ -29,26 +32,23 @@ def aggregate_over_time(event: ReportEvent, context):
     - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
-    params = parse_params(
-        event.get("queryStringParameters", {}),
-        {"term_field": "category_rollup"},
+    event = ReportEvent(**raw_event)
+    p = parse_params(
+        event.queryStringParameters,
+        OptionalParams(term_field="category_rollup"),
         10000,
     )
 
-    if (
-        not params
-        or len(params["terms"]) < 1
-        or not all([len(t) > 1 for t in params["terms"]])
-    ):
-        logger.error("Missing or malformed params: %s", params)
+    if not p or len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+        logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching reports forparams: %s", params)
+    logger.info("Fetching reports forparams: %s", p)
 
     try:
-        patents = patent_client.search(**params)
+        patents = patent_client.search(p)
         if len(patents) == 0:
-            logging.info("No patents found for terms: %s", params["terms"])
+            logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps([])}
 
         summaries = group_by_xy(
