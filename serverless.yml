@@ -223,6 +223,8 @@ resources:
           - IpProtocol: tcp
             ToPort: 5432
             FromPort: 5432
+            SourceSecurityGroupId:
+              Ref: LambdaSecurityGroup
     RdsCluster:
       Type: AWS::RDS::DBCluster
       Properties:
