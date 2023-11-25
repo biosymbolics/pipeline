@@ -9,7 +9,6 @@ import logging
 
 from utils.date import date_deserialier
 from utils.encoding.json_encoder import DataclassJSONEncoder
-from utils.list import is_sequence
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -129,7 +128,7 @@ def retrieve_with_cache_check(
 
         # if limit is set and result is list, see if the result size is less than limit.
         # if so, adjust the cache key to indicate that this is all the results.
-        is_all = limit is not None and is_sequence(data) and len(data) < limit
+        is_all = limit is not None and isinstance(data, list) and len(data) < limit
         cache_key = get_cache_key(key, is_all=is_all, limit=limit)
 
         s3.put_object(

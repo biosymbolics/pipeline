@@ -27,9 +27,9 @@ def autocomplete(raw_event: dict, context):
     Autocomplete terms or ids for patents
 
     Invocation:
-    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"asthm" }}'`
-    - Local: `serverless invoke local --function autocomplete-patents --param='ENV=local' --data='{"queryStringParameters": { "string":"WO-0224", "mode": "id" }}'`
-    - Remote: `serverless invoke --function autocomplete-patents --data='{"queryStringParameters": { "string":"alzheim" }}'`
+    - Local: `serverless invoke local --function autocomplete --param='ENV=local' --data='{"queryStringParameters": { "string":"asthm" }}'`
+    - Local: `serverless invoke local --function autocomplete --param='ENV=local' --data='{"queryStringParameters": { "string":"WO-0224", "mode": "id" }}'`
+    - Remote: `serverless invoke --function autocomplete --data='{"queryStringParameters": { "string":"alzheim" }}'`
     - API: `curl https://api.biosymbolics.ai/autocomplete?string=asthm`
 
     Output (for string "asthm"):

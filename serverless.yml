@@ -37,6 +37,14 @@ provider:
             - 's3:PutObject'
           Resource:
             - 'arn:aws:s3:::biosym-patents-*/*'
+        - Effect: Allow
+          Action:
+            - 'rds:StartDBCluster'
+            - 'rds:StopDBCluster'
+            - 'rds:StopDBInstance'
+            - 'rds:StartDBInstance'
+          Resource:
+            - 'arn:aws:rds:*:*:cluster:*'
   apiGateway:
     apiKeys:
       - free:
@@ -56,6 +64,8 @@ provider:
     AWS_ACCOUNT_ID: ${AWS::AccountId}
     CACHE_BUCKET: biosym-patents-${self:provider.stage}
     DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
+    DB_CLUSTER:
+      Ref: RdsCluster
     ENV: ${param:ENV, 'dev'}
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
@@ -66,6 +76,25 @@ provider:
     TOKENIZERS_PARALLELISM: False
 
 functions:
+  rds-control:
+    events:
+      # stop at 8pm MST
+      - schedule:
+          enabled: true
+          rate: cron(0 20 * * ? *)
+          # timezone: America/Denver
+          input:
+            action: 'STOP'
+      # stop at 7am MST
+      - schedule:
+          enabled: true
+          rate: cron(0 7 * * ? *)
+          # timezone: America/Denver
+          input:
+            action: 'START'
+    handler: src.handlers.system.rds_control
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   search-patents:
     events:
       - http:
@@ -160,6 +189,7 @@ custom:
   subnetA: subnet-097d7452bff44a9bc
   subnetB: subnet-0af5fe0054c832df3
   igw: igw-0cd81e264ec0cab9f
+  rdsEngine: aurora-postgresql
   serverless-offline:
     httpPort: 3001
   pythonRequirements:
@@ -184,21 +214,40 @@ custom:
 
 resources:
   Resources:
-    RDSCluster:
+    RdsClusterSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Allow ingress on 5432 (psql)
+        VpcId: ${self:custom.vpcId}
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            ToPort: 5432
+            FromPort: 5432
+            SourceSecurityGroupId:
+              Ref: LambdaSecurityGroup
+    RdsCluster:
       Type: AWS::RDS::DBCluster
       Properties:
+        Engine: ${self:custom.rdsEngine}
         MasterUsername: ${ssm:/biosymbolics/pipeline/database/patents/main_username}
         MasterUserPassword: ${ssm:/biosymbolics/pipeline/database/patents/main_password}
         DatabaseName: ${ssm:/biosymbolics/pipeline/database/patents/db_name}
-        Engine: aurora-postgresql
-        EngineMode: serverless
-        ScalingConfiguration:
-          AutoPause: true
+        Port: 5432
+        AutoMinorVersionUpgrade: true
+        ServerlessV2ScalingConfiguration:
           MaxCapacity: 16
-          MinCapacity: 4
-          SecondsUntilAutoPause: 600 # 10 minutes
+          MinCapacity: 0.5
         EnableHttpEndpoint: true
         StorageEncrypted: true
+        VpcSecurityGroupIds:
+          - "Fn::GetAtt": ["RdsClusterSecurityGroup", "GroupId"]
+    DBInstance:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        DBClusterIdentifier: !Ref RdsCluster
+        DBInstanceClass: db.serverless
+        Engine: ${self:custom.rdsEngine}
+        PubliclyAccessible: false
     LambdaSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
@@ -256,3 +305,8 @@ resources:
         GatewayId: ${self:custom.igw}
         RouteTableId:
           Ref: StackRouteTable
+  Outputs:
+    RdsClusterId:
+      Description: id of RDS cluster
+      Value:
+        Ref: RdsCluster

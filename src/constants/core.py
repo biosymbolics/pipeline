@@ -30,6 +30,7 @@ DATABASE_URL = (
     if IS_DEPLOYED
     else "postgres://:@localhost:5432/patents"
 )
+DB_CLUSTER = os.environ.get("DB_CLUSTER")
 DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 
 
