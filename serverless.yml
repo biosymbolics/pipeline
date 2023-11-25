@@ -214,15 +214,15 @@ custom:
 
 resources:
   Resources:
-    ClusterSecurityGroup:
+    RdsClusterSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
         GroupDescription: Allow ingress on 5432 (psql)
-        SecurityGroupIngress:
-        - IpProtocol: tcp
-          SourceSecurityGroupId: Ref LambdaSecurityGroup
-          ToPort: 5432
         VpcId: ${self:custom.vpcId}
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            ToPort: 5432
+            FromPort: 5432
     RdsCluster:
       Type: AWS::RDS::DBCluster
       Properties:
@@ -238,11 +238,11 @@ resources:
         EnableHttpEndpoint: true
         StorageEncrypted: true
         VpcSecurityGroupIds:
-          - Ref ClusterSecurityGroup
+          - "Fn::GetAtt": ["RdsClusterSecurityGroup", "GroupId"]
     DBInstance:
       Type: AWS::RDS::DBInstance
       Properties:
-        DBClusterIdentifier: Ref RdsCluster
+        DBClusterIdentifier: !Ref RdsCluster
         DBInstanceClass: db.serverless
         Engine: ${self:custom.rdsEngine}
         PubliclyAccessible: false
