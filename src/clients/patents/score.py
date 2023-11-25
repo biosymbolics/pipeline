@@ -1,8 +1,6 @@
-from functools import partial
 import random
-from typing import TypedDict
+from typing import Sequence, TypedDict
 import polars as pl
-import math
 import logging
 
 from constants.patents import SUITABILITY_SCORE_MAP
@@ -44,23 +42,27 @@ def calc_suitability_score(
     return score
 
 
-def calc_and_explain_suitability_score(
-    attributes: list[str], score_map: SuitabilityScoreMap
-) -> ExplainedSuitabilityScore:
+def calc_suitability_score_map(
+    attributes_by_patent: Sequence[Sequence[str]], score_map: SuitabilityScoreMap
+) -> list[ExplainedSuitabilityScore]:
     """
     Calculate the suitability score & generate explanation
     """
-    upper_attributes = [attr.upper() for attr in attributes]
-    score = calc_suitability_score(upper_attributes, score_map)
-    explanations = [
-        f"{attr}: {score_map.get(attr, 0)}"
-        for attr in upper_attributes
-        if attr in score_map
-    ]
-    return {
-        "suitability_score": score,
-        "suitability_score_explanation": ", ".join(explanations),
-    }
+
+    def calc_score(attributes: Sequence[str]) -> ExplainedSuitabilityScore:
+        upper_attributes = [attr.upper() for attr in attributes]
+        score = calc_suitability_score(upper_attributes, score_map)
+        explanations = [
+            f"{attr}: {score_map.get(attr, 0)}"
+            for attr in upper_attributes
+            if attr in score_map
+        ]
+        return {
+            "suitability_score": score,
+            "suitability_score_explanation": ", ".join(explanations),
+        }
+
+    return [calc_score(attrs) for attrs in attributes_by_patent]
 
 
 def calc_adj_patent_years(py: int) -> int:
@@ -100,27 +102,32 @@ def score_patents(
     """
 
     # score and explanation are in the same column, so we need to unnest
-    df = df.with_columns(
-        pl.col(attributes_column)
-        .apply(partial(calc_and_explain_suitability_score, score_map=score_map))
-        .alias("result")
-    ).unnest("result")
+    suit_score_df = pl.from_records(
+        calc_suitability_score_map(
+            df.select(pl.col(attributes_column)).to_series().to_list(),
+            score_map=score_map,
+        )
+    )
 
     # multiply score by pct patent life remaining
-    df = df.with_columns(
-        pl.col("patent_years")
-        .apply(lambda py: calc_adj_patent_years(py))  # type: ignore
-        .alias("adj_patent_years"),  # type: ignore
-        pl.Series(
-            name="probability_of_success",
-            values=[random.betavariate(2, 8) for _ in range(len(df))],
-        ),
-    ).with_columns(
-        pl.col("suitability_score")
-        .mul(df[years_column] / MAX_PATENT_LIFE)
-        .add(pl.col("probability_of_success"))
-        .mul(1 / 3)  # average
-        .alias("score"),
+    df = (
+        pl.concat([df, suit_score_df], how="horizontal")
+        .with_columns(
+            pl.col("patent_years")
+            .apply(lambda py: calc_adj_patent_years(py))  # type: ignore
+            .alias("adj_patent_years"),  # type: ignore
+            pl.Series(
+                name="probability_of_success",
+                values=[random.betavariate(2, 8) for _ in range(len(df))],
+            ),
+        )
+        .with_columns(
+            pl.col("suitability_score")
+            .mul(df[years_column] / MAX_PATENT_LIFE)
+            .add(pl.col("probability_of_success"))
+            .mul(1 / 3)  # average
+            .alias("score"),
+        )
     )
 
     return df

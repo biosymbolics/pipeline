@@ -215,12 +215,12 @@ custom:
 resources:
   Resources:
     ClusterSecurityGroup:
-      Type: 'AWS::EC2::SecurityGroup'
+      Type: AWS::EC2::SecurityGroup
       Properties:
-        GroupDescription: Ref 'AWS::StackName'
+        GroupDescription: Allow ingress on 5432 (psql)
         SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 5432
+          SourceSecurityGroupId: Ref LambdaSecurityGroup
           ToPort: 5432
         VpcId: ${self:custom.vpcId}
     RdsCluster:
