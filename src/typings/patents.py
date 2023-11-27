@@ -71,7 +71,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def compose_explanation(
         cls,
         troubled_assignees: Sequence[str],
-        is_stale: bool,
+        is_stale: bool | None,
         financials_map: dict[str, Company],
     ) -> str:
         """
@@ -94,7 +94,10 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
 
     @classmethod
     def find(
-        cls, assignees: list[str], is_stale: bool, financials_map: dict[str, Company]
+        cls,
+        assignees: list[str],
+        is_stale: bool | None,
+        financials_map: dict[str, Company],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood
@@ -109,6 +112,12 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
             if company in financials_map and financials_map[company].is_troubled
         ]
         is_troubled = len(troubled_assignees) > 0
+
+        if is_stale is not None and not is_stale and not is_troubled:
+            return (
+                AvailabilityLikelihood.UNLIKELY,  # type: ignore
+                "Patent has recently updated trial.",
+            )
 
         explanation = cls.compose_explanation(
             troubled_assignees, is_stale, financials_map
