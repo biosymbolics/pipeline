@@ -37,7 +37,12 @@ def is_patent_stale() -> pl.Expr:
     """
     Check if patent is stale (i.e. possibly abandoned)
     """
-    expr = (pl.lit(date.today()) - pl.col("last_trial_update")) > pl.duration(
-        days=365 * STALE_YEARS
+    expr = (
+        pl.when(pl.col("last_trial_update").is_null())
+        .then(pl.lit(False))
+        .otherwise(
+            (pl.lit(date.today()) - pl.col("last_trial_update"))
+            > pl.duration(days=(365 * STALE_YEARS))
+        )
     )
     return expr

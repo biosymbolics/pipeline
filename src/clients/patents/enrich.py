@@ -48,7 +48,11 @@ def enrich_search_result(
     if len(results) == 0:
         raise ValueError("No results returned. Try adjusting parameters.")
 
-    df = pl.from_dicts(results, infer_schema_length=None)  # slow
+    df = pl.from_dicts(
+        results,
+        # infrequently non-null, messing up type inference
+        schema_overrides={"last_trial_update": pl.Date},
+    )
 
     steps = [
         lambda _df: _df.with_columns(
