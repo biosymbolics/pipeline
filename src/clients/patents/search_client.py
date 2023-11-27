@@ -232,7 +232,8 @@ def search(p: PatentSearchParams) -> list[PatentApplication]:
     ```
     from clients.patents import search_client
     from handlers.patents.types import PatentSearchParams
-    p = search_client.search(['migraine disorders'], skip_cache=True, limit=5)
+    p = search_client.search(PatentSearchParams(terms=['migraine disorders'], skip_cache=True, limit=5))
+    [t.search_rank for t in p]
     ```
     """
     args = {

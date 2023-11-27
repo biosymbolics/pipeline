@@ -23,5 +23,5 @@ class DataclassJSONEncoder(json.JSONEncoder):
         if isinstance(o, dataclasses.Field):
             return o.name
         if isinstance(o, decimal.Decimal):
-            return str(o)
+            return float(o)
         return super().default(o)

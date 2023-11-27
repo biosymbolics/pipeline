@@ -1,6 +1,6 @@
-torch
 boto3
 bs4
+exrex
 langchain
 openai
 polars
@@ -10,5 +10,6 @@ pydantic
 python-dotenv
 requests
 spacy
+torch
 transformers
 typing_extensions
