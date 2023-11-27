@@ -32,6 +32,8 @@ class AncestorUmlsGraph(UmlsGraph):
         - limits types to biomedical
         - applies some naming restrictions (via 'suppressions')
         - suppresses entities whose name is also a type (indicates overly general)
+
+        Query took 4.51 minutes (depth < 3)
         """
         return rf"""
             -- patent to umls edges
@@ -54,15 +56,15 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN working_terms ut ON ut.tail = head_id
                 JOIN umls_lookup as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls_lookup as tail_entity on tail_entity.id = umls_graph.tail_id
-                where ut.depth < 9
+                where ut.depth < 3
                 and (
                     relationship is null
                     OR relationship in (
                         'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
                     )
                 )
-                and head_entity.type_ids::text[] && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
-                and tail_entity.type_ids::text[] && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and head_entity.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and tail_entity.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
                 and head_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'

@@ -23,7 +23,6 @@ class UmlsGraph(object):
     """
 
     def __init__(self, file_name: str = BETWEENNESS_FILE):
-        # umls_db = f"{BASE_DATABASE_URL}/umls"
         self.db = PsqlDatabaseClient()
         self.G = self.load_graph()
         self.nodes: dict[str, dict] = dict(self.G.nodes.data())
