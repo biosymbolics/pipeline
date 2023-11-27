@@ -5,6 +5,7 @@ import json
 import os
 from typing import Any, Callable, TypeVar, cast
 import boto3
+from botocore.exceptions import ClientError
 import logging
 
 from utils.date import date_deserialier
@@ -38,7 +39,7 @@ def fetch_s3_obj(
     """
     Fetch S3 object
     """
-    s3 = boto3.client("s3")
+    s3 = get_boto_client("s3")
 
     if new_filename is not None:
         logger.info("Downloading S3 object `%s` to `%s`", key, new_filename)
@@ -76,7 +77,7 @@ def get_cache_with_all_check(
     First see if a limit=all result exists. If so, return.
     Otherwise, attempt to get the result with limit=limit. Throws exception if not found.
     """
-    s3 = boto3.client("s3")
+    s3 = get_boto_client("s3")
     try:
         all_cache_key = get_cache_key(key, is_all=True, limit=limit)
         return s3.get_object(Bucket=cache_name, Key=all_cache_key)
@@ -102,7 +103,7 @@ def retrieve_with_cache_check(
         cache_name (str): cache name
         encode (Callable[[T], str | bytes]): encoder function
     """
-    s3 = boto3.client("s3")
+    s3 = get_boto_client("s3")
 
     try:
         logger.info("Checking cache `%s` for key `%s`", cache_name, key)
@@ -117,7 +118,10 @@ def retrieve_with_cache_check(
             response["Body"].read().decode("utf-8"), object_hook=date_deserialier
         )
         return data
-    except s3.exceptions.NoSuchKey:
+    except ClientError as ex:
+        if not ex.response["Error"]["Code"] == "NoSuchKey":
+            raise ex
+
         logger.info("Checking miss for key: %s", key)
 
         # If not in cache, perform the operation

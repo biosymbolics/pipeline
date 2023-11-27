@@ -82,7 +82,7 @@ provider:
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
     PINECONE_API_KEY: ${ssm:/biosymbolics/pipeline/pinecone/api_key}
     PINECONE_ENVIRONMENT: ${ssm:/biosymbolics/pipeline/pinecone/environment}
-    PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.11/site-packages
+    PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.11/site-packages:/var/lang/lib/python3.11/site-packages/
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
 
@@ -209,15 +209,19 @@ custom:
     strip: true
     # https://biercoff.com/how-to-fix-package-not-found-error-importlib-metadata/
     slimPatternsAppendDefaults: false
+    # if problems only with deployed lambdas, it might be this ↓↓↓
     slimPatterns:
+      - "**/*.py[c|o]"
       - "**/__pycache__/**"
       - "**/tests/**"
-      - "**/botocore/data/**"
+      # - "**/botocore/data/**"
       - "**/cygrpc.cpython-311-x86_64-linux-gnu.so"
     fileName: src/handlers/requirements.txt
     layer:
       compatibleRuntimes:
           - "python3.11"
+    # noDeploy isn't working for layers
+    # https://github.com/serverless/serverless-python-requirements/issues/577
     noDeploy:
       - pytest
       - grpc
