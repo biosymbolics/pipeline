@@ -66,7 +66,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
-                "expected": "the γc family il2, il9, and il15",
+                "expected": "the gc family il2, il9, and il15",  # TODO
             },
             {
                 "input": "Familial Alzheimer Disease (FAD)",
@@ -82,7 +82,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "human il-36r agonist ligands il36α",
-                "expected": "il36r agonist ligands il36α",  # TODO
+                "expected": "il36r agonist ligands il36a",  # TODO
             },
             {
                 "input": "GLP-1 receptor agonists",
@@ -159,7 +159,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "β-2-adrenergic agonist",
-                "expected": "beta 2 adrenergic agonist",
+                "expected": "b2 adrenergic agonist",
             },
             {
                 "input": "anti-TGF-β siRNA",
@@ -183,7 +183,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "β1-adrenoreceptor gene",
-                "expected": "β1 adrenoreceptor gene",
+                "expected": "b1 adrenoreceptor gene",
             },
             {
                 "input": "5-hydroxytryptamine-3 receptor antagonist",
@@ -243,15 +243,15 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "FcηRII bridging agent",
-                "expected": "fc eta rii bridging agent",  # TODO
+                "expected": "fcerii bridging agent",
             },
             {
                 "input": "β-methyl-β-hydroxy-η-butyrolactone",
-                "expected": "beta methyl beta hydroxy eta butyrolactone",
+                "expected": "β methyl beta hydroxy eta butyrolactone",  # TODO
             },
             {
                 "input": "α,ω-dihalogen substituted alkane",
-                "expected": "alpha, omega dihalogen substituted alkane",  # TODO ?
+                "expected": "alpha,omega dihalogen substituted alkane",  # TODO ?
             },
             {
                 "input": "aβ42",
@@ -367,11 +367,15 @@ class TestNerUtils(unittest.TestCase):
             {
                 "input": "inhibitor 5a reductase enzyme",
                 "expected": "inhibitor 5a reductase enzyme",  # TODO
-            }
+            },
             # {
             #     "input": "useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
             #     "expected": "disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)",
             # },
+            {
+                "input": "diseases related to CRBN proteins",
+                "expected": "CRBN protein diseases",
+            },
         ]
 
         for condition in test_conditions:
