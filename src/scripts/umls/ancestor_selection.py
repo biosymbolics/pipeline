@@ -23,9 +23,7 @@ class AncestorUmlsGraph(UmlsGraph):
         super().__init__()
 
     @overrides(UmlsGraph)
-    def edge_query(
-        self, suppressions: Sequence[str] | set[str] = UMLS_NAME_SUPPRESSIONS
-    ) -> str:
+    def edge_query(self, suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS) -> str:
         """
         Query edges from umls
         - non-null hierarchy (good idea??)
@@ -37,14 +35,6 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         return rf"""
             -- patent to umls edges
-            SELECT
-                publication_number as head,
-                term_ids.cid as tail
-            FROM annotations, term_ids
-            WHERE annotations.id=term_ids.id
-
-            UNION ALL
-
             WITH RECURSIVE working_terms AS (
                 -- Start with UMLS terms associated directly to patents
                 SELECT
@@ -64,19 +54,19 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN working_terms ut ON ut.tail = head_id
                 JOIN umls_lookup as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls_lookup as tail_entity on tail_entity.id = umls_graph.tail_id
-                where ut.depth < 2
+                where ut.depth < 9
                 and (
                     relationship is null
                     OR relationship in (
                         'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
                     )
                 )
-                and head_entity.type_ids && {list(MOST_PREFERRED_UMLS_TYPES.keys())}
-                and tail_entity.type_ids && {list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and head_entity.type_ids::text[] && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and tail_entity.type_ids::text[] && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
                 and head_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
-                and not head_entity.canonical_name ~* '\y{get_or_re(suppressions)}\y'"
-                and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions)}\y'"
+                and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
             )
             SELECT DISTINCT head, tail
             FROM working_terms;
