@@ -1,11 +1,12 @@
-torch boto3
+torch
+boto3
 bs4
 langchain
 openai
 polars
-psycopg[binary]
-psycopg_pool
+psycopg[binary,pool]
 pydash
+pydantic
 python-dotenv
 requests
 spacy

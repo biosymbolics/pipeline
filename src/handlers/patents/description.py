@@ -25,8 +25,8 @@ def describe(event: DescribeEvent, context):
     Get GPT description of terms
 
     Invocation:
-    - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
-    - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma" }}'`
+    - Local: `serverless invoke local --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma", "skip_cache": true }}'`
+    - Remote: `serverless invoke --function describe-terms --data='{"queryStringParameters": { "terms":"asthma;melanoma", "skip_cache": true }}'`
     - API: `curl https://api.biosymbolics.ai/terms/describe?terms=asthma`
     """
     gpt_client = GptApiClient(model="gpt-3.5-turbo")  # gpt-4 too slow

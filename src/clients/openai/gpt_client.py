@@ -2,6 +2,7 @@
 Client stub for GPT
 """
 import os
+from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
@@ -11,7 +12,6 @@ import logging
 from typings.gpt import OutputParser
 from utils.parse import parse_answer
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
 
@@ -32,26 +32,25 @@ class GptApiClient:
         self.client = None
         self.model = model
 
-        if schemas:
-            prompt_template, output_parser = self.__get_schema_things(schemas)
-            self.output_parser: Optional[StructuredOutputParser] = output_parser
-        else:
-            self.output_parser = None
-            prompt_template = PromptTemplate(
-                template="Answer this query as best as possible.\n{query}",
-                input_variables=["query"],
-            )
-
+        prompt_template, output_parser = self._get_prompt_and_parser(schemas)
+        self.output_parser: Optional[StructuredOutputParser] = output_parser
         self.prompt_template: PromptTemplate = prompt_template
 
-    def __get_schema_things(
-        self, schemas: list[ResponseSchema]
-    ) -> tuple[PromptTemplate, StructuredOutputParser]:
+    def _get_prompt_and_parser(
+        self, schemas: list[ResponseSchema] | None
+    ) -> tuple[PromptTemplate, StructuredOutputParser | None]:
         """
         Get prompt template and output parser from response schemas, respectively serving to:
           - modify the prompt to request the desired output format
           - parse the output to the desired format.
         """
+        if not schemas:
+            prompt_template = PromptTemplate(
+                template="Answer this query as best as possible.\n{query}",
+                input_variables=["query"],
+            )
+            return (prompt_template, None)
+
         output_parser = StructuredOutputParser.from_response_schemas(schemas)
         format_intructions = output_parser.get_format_instructions()
 
@@ -62,7 +61,7 @@ class GptApiClient:
         )
         return (prompt_template, output_parser)
 
-    def __format_answer(self, answer: str, is_array: bool = False) -> Any:
+    def _format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
             logging.debug("Formatting answer: %s", answer)
             return parse_answer(
@@ -75,21 +74,17 @@ class GptApiClient:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
-        input = self.prompt_template.format_prompt(query=query)
-        chat_model = ChatOpenAI(
-            temperature=0,
+        llm = ChatOpenAI(
+            temperature=DEFAULT_TEMPERATURE,
             model=self.model,
-            max_tokens=DEFAULT_MAX_TOKENS,
-            api_key=OPENAI_API_KEY,
         )
-        output = chat_model(input.to_messages())
+        llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
+        output = llm_chain.run(query)
         try:
-            if not isinstance(output.content, str):
-                raise ValueError("Expected string output from GPT")
-            return self.__format_answer(output.content, is_array=is_array)
+            return self._format_answer(output, is_array=is_array)
         except Exception as e:
             logging.warning("Error formatting answer: %s", e)
-            return output.content
+            return output
 
     def describe_terms(
         self, terms: list[str], context_terms: Optional[list[str]] = None
@@ -123,7 +118,8 @@ class GptApiClient:
         )
         return self.query(query)
 
-    def clindev_timelines(self, indication: str) -> list[dict]:
+    @staticmethod
+    def clindev_timelines(indication: str) -> list[dict]:
         """
         Query GPT about clindev timelines
 
