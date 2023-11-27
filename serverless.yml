@@ -6,7 +6,7 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: python3.10
+  runtime: python3.11
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   timeout: 300
@@ -70,6 +70,8 @@ provider:
             limit: 100
             period: DAY
   environment:
+    # TODO: env is stored in plaintext on aws, so should access ssm from the code instead
+    runtime: "python3.11"
     AWS_ACCOUNT_ID: ${AWS::AccountId}
     CACHE_BUCKET: biosym-patents-${self:provider.stage}
     DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
@@ -80,7 +82,7 @@ provider:
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
     PINECONE_API_KEY: ${ssm:/biosymbolics/pipeline/pinecone/api_key}
     PINECONE_ENVIRONMENT: ${ssm:/biosymbolics/pipeline/pinecone/environment}
-    PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.10/site-packages
+    PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.11/site-packages
     SEC_API_KEY: ${ssm:/biosymbolics/pipeline/sec/api_key}
     TOKENIZERS_PARALLELISM: False
 
@@ -185,7 +187,6 @@ plugins:
   - serverless-offline
 
 package:
-  # individually: true
   patterns:
     - "!**"
     - "src/**"
@@ -204,19 +205,19 @@ custom:
     httpPort: 3001
   pythonRequirements:
     dockerizePip: true
-    # dockerImage: public.ecr.aws/sam/build-python3.10:latest-arm64
     slim: true
     strip: true
-    slimPatternsAppendDefaults: true
+    # https://biercoff.com/how-to-fix-package-not-found-error-importlib-metadata/
+    slimPatternsAppendDefaults: false
     slimPatterns:
       - "**/__pycache__/**"
       - "**/tests/**"
       - "**/botocore/data/**"
-      # - "**/libopenblas64_p-r0-5007b62f.3.23.dev.so"
-      # - "**/polars.abi3.so"
-      - "**/cygrpc.cpython-310-x86_64-linux-gnu.so"
+      - "**/cygrpc.cpython-311-x86_64-linux-gnu.so"
     fileName: src/handlers/requirements.txt
-    layer: true
+    layer:
+      compatibleRuntimes:
+          - "python3.11"
     noDeploy:
       - pytest
       - grpc

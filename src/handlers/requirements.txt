@@ -1,8 +1,8 @@
 boto3
 bs4
-langchain
+langchain==0.0.340
 networkx
-openai
+openai==1.3.5
 polars
 psycopg[binary,pool]
 pydash

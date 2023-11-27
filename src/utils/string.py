@@ -5,7 +5,7 @@ String utilities
 
 from datetime import date
 import regex as re
-from typing import Any, Mapping, Sequence, TypeGuard, Union
+from typing import Mapping, TypeGuard, Union
 
 
 _Idable = str | list[str] | int | date

@@ -1,6 +1,5 @@
 import argparse
 from datetime import date
-from enum import Enum
 import json
 import logging
 import math
@@ -12,7 +11,6 @@ import polars as pl
 
 
 import system
-
 
 system.initialize()
 
