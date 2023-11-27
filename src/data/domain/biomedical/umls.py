@@ -37,13 +37,13 @@ def get_best_umls_candidate(
         # sometimes these are common words, like "MIX" (C1421951), "HOT" (C1424212) and "LIGHT" (C1420817)
         if (
             c.aliases[0].upper() == c.aliases[0]
-            and len(c.aliases[0]) < 6
+            and len(c.aliases[0]) < 10
             and c.aliases[0].isalpha()
             # a non-common-word symbol will often have both upper and lower as aliases, e.g. ['NADP', 'nadp']
             # both which will have the same similarity score (since tfidf was trained on lower())
             and len(c.aliases) == 1
         ):
-            return min_similarity + 0.1
+            return min_similarity - 0.1
 
         # sort non-preferred-types to the bottom
         if not has_intersection(types, list(PREFERRED_UMLS_TYPES.keys())):
@@ -52,7 +52,7 @@ def get_best_umls_candidate(
 
         # if most preferred types, bump up its "similarity"
         if has_intersection(types, list(MOST_PREFERRED_UMLS_TYPES.keys())):
-            return max([1, c.similarities[0] + 0.5])
+            return max([1, c.similarities[0] + 0.2])
 
         return c.similarities[0]
 

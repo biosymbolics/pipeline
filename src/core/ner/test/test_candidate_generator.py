@@ -119,6 +119,11 @@ class TestCandidateGenerator(unittest.TestCase):
                 "text": ["4-pyrimidinediamine disodium"],
                 "expected": [None],
             },
+            {
+                "description": "avoid gene match from common word",
+                "text": ["twist driver"],
+                "expected": [None],  # avoid C1539188 / DNAAF6 ("TWISTER")
+            },
         ]
 
         fields_to_test = ["id", "name"]

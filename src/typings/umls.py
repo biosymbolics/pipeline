@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 from typings.core import Dataclass
-
 from utils.classes import ByDefinitionOrderEnum
 
 L1_CATEGORY_CUTOFF = 0.0001
