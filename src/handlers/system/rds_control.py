@@ -4,8 +4,8 @@ Handler for RDS start/stop
 import logging
 from typing import Literal
 from pydantic import BaseModel
-
 from clients.low_level import boto3
+
 from constants.core import DB_CLUSTER
 
 logger = logging.getLogger(__name__)
@@ -31,17 +31,13 @@ def update_rds_cluster(action: Action):
         raise ValueError("DB_CLUSTER is not set")
 
     logger.info(f"Taking action {action} on {DB_CLUSTER}")
+    instances = rds_client.describe_db_instances()["DBInstances"]
+    logger.info("Found instances: %s", instances)
 
     if action == "START":
-        try:
-            rds_client.start_db_cluster(DBClusterIdentifier=DB_CLUSTER)
-        except Exception as e:
-            logger.error("Error starting RDS cluster: %s", e)
+        rds_client.start_db_cluster(DBClusterIdentifier=DB_CLUSTER)
     elif action == "STOP":
-        try:
-            rds_client.stop_db_cluster(DBClusterIdentifier=DB_CLUSTER)
-        except Exception as e:
-            logger.error("Error stopping RDS cluster: %s", e)
+        rds_client.stop_db_cluster(DBClusterIdentifier=DB_CLUSTER)
     else:
         raise ValueError(f"Invalid action: {action}")
 

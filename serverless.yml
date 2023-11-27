@@ -39,12 +39,21 @@ provider:
             - 'arn:aws:s3:::biosym-patents-*/*'
         - Effect: Allow
           Action:
-            - 'rds:StartDBCluster'
+            - 'rds:DescribeDBClusters'
+            - 'rds:DescribeDBInstances'
             - 'rds:StopDBCluster'
+            - 'rds:StartDBCluster'
             - 'rds:StopDBInstance'
             - 'rds:StartDBInstance'
+            - 'rds:RestoreDBClusterFromSnapshot'
+            - 'rds:CreateDBClusterSnapshot'
+            - 'rds:ListTagsForResource'
           Resource:
+            # arn:aws:rds:*:*:cluster:biosymbolics-pipeline-dev-rdscluster-*
             - 'arn:aws:rds:*:*:cluster:*'
+            # arn:aws:rds:*:*:db:biosymbolics-pipeline-dev-dbinstance-*
+            - 'arn:aws:rds:*:*:db:*'
+            - 'arn:aws:rds:*:*:cluster-snapshot:*'
   apiGateway:
     apiKeys:
       - free:
@@ -77,21 +86,22 @@ provider:
 
 functions:
   rds-control:
+    vpc: ~ # no need to be in VPC; needs OB access
     events:
-      # stop at 8pm MST
+      # stop at 8pm MST / 3am UTC
       - schedule:
           enabled: true
-          rate: cron(0 20 * * ? *)
-          # timezone: America/Denver
+          rate: cron(0 3 * * ? *)
           input:
-            action: 'STOP'
-      # stop at 7am MST
+            queryStringParameters:
+              action: 'STOP'
+      # stop at 7am MST / 2pm UTC
       - schedule:
           enabled: true
-          rate: cron(0 7 * * ? *)
-          # timezone: America/Denver
+          rate: cron(0 14 * * ? *)
           input:
-            action: 'START'
+            queryStringParameters:
+              action: 'START'
     handler: src.handlers.system.rds_control
     layers:
       - Ref: PythonRequirementsLambdaLayer
