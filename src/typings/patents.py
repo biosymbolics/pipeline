@@ -77,6 +77,9 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         """
         Compose explanation for availability likelihood
         """
+        if is_stale is not None and not is_stale:
+            return "Patent has recently updated trial."
+
         explanations = compact(
             [
                 *[
@@ -113,15 +116,12 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         ]
         is_troubled = len(troubled_assignees) > 0
 
-        if is_stale is not None and not is_stale and not is_troubled:
-            return (
-                AvailabilityLikelihood.UNLIKELY,  # type: ignore
-                "Patent has recently updated trial.",
-            )
-
         explanation = cls.compose_explanation(
             troubled_assignees, is_stale, financials_map
         )
+
+        if is_stale is not None and not is_stale and not is_troubled:
+            return (AvailabilityLikelihood.UNLIKELY, explanation)  # type: ignore
 
         if is_troubled and is_stale:
             return (AvailabilityLikelihood.LIKELY, explanation)  # type: ignore
