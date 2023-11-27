@@ -50,7 +50,7 @@ def get_hacky_stem_re(terms: list[str], **kwargs) -> str:
 
 
 def get_or_re(
-    _re_strs: Sequence[str] | set[str],
+    _re_strs: Sequence[str],
     count: Optional[ReCount] = None,
     upper: Optional[int] = None,
     permit_trailing_space: bool = False,

@@ -48,10 +48,11 @@ def enrich_search_result(
     if len(results) == 0:
         raise ValueError("No results returned. Try adjusting parameters.")
 
+    pl.Config.activate_decimals()  # otherwise butchers decimal values
     df = pl.from_dicts(
         results,
         # infrequently non-null, messing up type inference
-        schema_overrides={"last_trial_update": pl.Date},
+        schema_overrides={"last_trial_update": pl.Date, "search_rank": pl.Float32},
     )
 
     steps = [
