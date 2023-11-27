@@ -1,4 +1,5 @@
 import dataclasses, json
+import decimal
 from enum import Enum
 from datetime import date
 
@@ -21,4 +22,6 @@ class DataclassJSONEncoder(json.JSONEncoder):
             return str(o)
         if isinstance(o, dataclasses.Field):
             return o.name
+        if isinstance(o, decimal.Decimal):
+            return str(o)
         return super().default(o)
