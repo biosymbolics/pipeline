@@ -5,7 +5,6 @@ from collections.abc import MutableMapping
 import json
 from typing import Optional, Sequence
 from typing_extensions import TypedDict
-import logging
 import regex as re
 import requests
 from pydash import flatten

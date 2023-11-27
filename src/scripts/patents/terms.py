@@ -267,7 +267,10 @@ class TermAssembler:
             for row in rows
         ]
 
-        return TermAssembler._group_terms(term_records)
+        # filter out single character terms
+        filtered = [tr for tr in term_records if len(tr["term"]) > 2]
+
+        return TermAssembler._group_terms(filtered)
 
     def generate_terms(self) -> list[AggregatedTermRecord]:
         """
@@ -328,9 +331,25 @@ class TermAssembler:
         mat_view_query = f"""
             DROP MATERIALIZED VIEW IF EXISTS {TERM_IDS_TABLE};
             CREATE MATERIALIZED VIEW {TERM_IDS_TABLE} AS
-            select id, cid from {TERMS_TABLE}, unnest(terms.ids) cid
+            select distinct id, cid from {TERMS_TABLE}, unnest(terms.ids) cid
         """
         self.client.execute_query(mat_view_query)
+
+        self.client.create_indices(
+            [
+                {
+                    "table": TERM_IDS_TABLE,
+                    "column": "id",
+                },
+                {
+                    "table": TERM_IDS_TABLE,
+                    "column": "cid",
+                },
+                {
+                    "sql": f"CREATE UNIQUE INDEX index_unique ON {TERM_IDS_TABLE} (id, cid)",
+                },
+            ]
+        )
 
     def persist_terms(self):
         """
