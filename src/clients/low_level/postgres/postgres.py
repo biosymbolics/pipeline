@@ -314,8 +314,8 @@ class PsqlDatabaseClient(DatabaseClient):
         logger.info("Creating table/inserting records (%s)", len(records))
         # add records
         dest_client.create_and_insert(
-            records,
             dest_table_name,
+            records,
             schema,
             truncate_if_exists=truncate_if_exists,
             transform=transform,

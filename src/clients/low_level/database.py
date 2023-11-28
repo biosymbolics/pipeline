@@ -3,13 +3,14 @@ import logging
 import time
 from typing import Any, Callable, Mapping, Sequence, TypeVar, TypedDict
 import logging
+from typings.core import Dataclass
 
 from utils.list import batch
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-M = TypeVar("M", bound=Mapping)
+M = TypeVar("M", bound=Mapping | Dataclass)
 ExecuteResult = TypedDict(
     "ExecuteResult", {"columns": dict[str, str], "data": Sequence[dict]}
 )
@@ -93,8 +94,8 @@ class DatabaseClient:
 
     def create_and_insert(
         self,
-        records: Sequence[M],
         table_name: str,
+        records: Sequence[M],
         columns: Sequence[str] | Mapping[str, str] | None = None,
         truncate_if_exists: bool = True,
         transform: TransformFunction | None = None,
