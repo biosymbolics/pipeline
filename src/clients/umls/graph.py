@@ -5,7 +5,6 @@ import networkx as nx
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import BASE_DATABASE_URL
 from constants.umls import UMLS_NAME_SUPPRESSIONS
 from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
@@ -96,7 +95,7 @@ class UmlsGraph(object):
         bc_subgraph = self._get_betweenness_subgraph(k)
 
         logger.info("Loading betweenness centrality map (%s records)", k)
-        bc_map = betweenness_centrality_parallel(bc_subgraph)
+        bc_map = betweenness_centrality_parallel(bc_subgraph, 25000)
 
         if file_name is not None:
             logger.info("Saving bc map to %s", file_name)

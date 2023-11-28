@@ -67,6 +67,8 @@ class AncestorUmlsGraph(UmlsGraph):
                 and tail_entity.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
                 and head_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
+                and ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
+                and ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
                 and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
                 and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
             )
