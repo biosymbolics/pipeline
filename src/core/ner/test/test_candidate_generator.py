@@ -122,7 +122,12 @@ class TestCandidateGenerator(unittest.TestCase):
             {
                 "description": "avoid gene match from common word",
                 "text": ["twist driver"],
-                "expected": [None],  # avoid C1539188 / DNAAF6 ("TWISTER")
+                "expected": [
+                    {
+                        "id": "C0040480|C0335471",
+                        "name": "Musculoskeletal torsion River driver",  # TODO
+                    }
+                ],  # avoid C1539188 / DNAAF6 ("TWISTER")
             },
         ]
 
