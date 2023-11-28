@@ -52,7 +52,15 @@ def enrich_search_result(
     df = pl.from_dicts(
         results,
         # infrequently non-null, messing up type inference
-        schema_overrides={"last_trial_update": pl.Date, "search_rank": pl.Float32},
+        schema_overrides={
+            "last_trial_status": pl.Utf8,
+            "last_trial_update": pl.Date,
+            "max_trial_phase": pl.Utf8,
+            "brand_name": pl.Utf8,
+            "generic_name": pl.Utf8,
+            "approval_date": pl.Date,
+            "approval_indications": pl.List(pl.Utf8),
+        },
     )
 
     steps = [

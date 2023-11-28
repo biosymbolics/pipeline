@@ -106,6 +106,7 @@ def __get_query_pieces(
             fields=[*FIELDS, "1 as search_rank"],
             where=f"WHERE apps.publication_number = ANY(%s)",
             params=[terms],
+            cosine_source="",
         )
 
     # exp decay scaling for search terms; higher is better
@@ -120,21 +121,25 @@ def __get_query_pieces(
     comparison = "&&" if query_type == "OR" else "@>"
     term_criteria = f"search_terms {comparison} %s"
 
-    # exemplar patent similarity
-    # todo: add as part of search_rank
     if len(exemplar_embeddings) > 0:
         exemplar_criterion = [
             f"(1 - (embeddings <=> '{e}')) > {EXEMPLAR_SIMILARITY_THRESHOLD}"
             for e in exemplar_embeddings
         ]
         exemplar_criteria = f"AND ({f' {query_type} '.join(exemplar_criterion)})"
+        cosine_scores = [f"(1 - (embeddings <=> '{e}'))" for e in exemplar_embeddings]
+        cosine_source = f", unnest (ARRAY[{','.join(cosine_scores)}]) cosine_scores"
+        fields.append("AVG(cosine_scores) as exemplar_similarity")
     else:
         exemplar_criteria = ""
+        cosine_source = ""
+        fields.append("0 as exemplar_similarity")
 
     return QueryPieces(
         fields=fields,
         where=f"WHERE {date_criteria} AND {term_criteria} {exemplar_criteria}",
         params=[lower_terms],
+        cosine_source=cosine_source,
     )
 
 
@@ -189,6 +194,7 @@ def _search(
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
+        {qp["cosine_source"]}
         {qp["where"]}
         GROUP BY apps.publication_number
         ORDER BY priority_date desc

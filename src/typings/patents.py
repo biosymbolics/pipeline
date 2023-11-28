@@ -140,6 +140,7 @@ class ScoredPatentApplication(PatentApplication):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
+    exemplar_similarity: float
     probability_of_success: float
     search_rank: float
     suitability_score: float
