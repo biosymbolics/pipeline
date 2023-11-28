@@ -51,6 +51,17 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "Rheumatoid Arthritis",
             },
             {
+                "description": "avoid alias with ()",
+                "cui": "C5200928",
+                "canonical_name": "High (finding)",
+                "aliases": [
+                    "High (finding)",
+                    "High",
+                ],
+                "is_composite": True,
+                "expected": "High",
+            },
+            {
                 "description": "choose canonical name if short-ish (5 words or fewer)",
                 "cui": "C0003873",
                 "canonical_name": "Rheumatoid Arthritis",

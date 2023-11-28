@@ -75,6 +75,9 @@ def get_best_umls_candidate(
     return ok_candidates[0] if len(ok_candidates) > 0 else None
 
 
+BAD_NAME_CHARS = [",", ")", "("]
+
+
 def clean_umls_name(
     cui: str,
     canonical_name: str,
@@ -124,13 +127,17 @@ def clean_umls_name(
             # prefer same first letter
             + (20 if a[0].lower() != canonical_name[0].lower() else 0)
             # prefer non-comma
-            + (5 if "," in a else 0)
+            + (5 if has_intersection(BAD_NAME_CHARS, list(a)) else 0)
         )
 
     # if 1-2 words (+non-gene/protein) or no aliases, prefer canonical name
     if (
         len(name_words) == 1
-        or (len(name_words) == 2 and name_words[1].lower() not in ["gene", "protein"])
+        or (
+            len(name_words) == 2
+            and name_words[1].lower() not in ["gene", "protein"]
+            and not has_intersection(BAD_NAME_CHARS, list(canonical_name))
+        )
         or len(aliases) == 0
     ):
         return canonical_name

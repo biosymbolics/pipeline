@@ -81,6 +81,8 @@ REMOVAL_WORDS_PRE: dict[str, WordPlace] = {
     "relevant": "all",
     "patient": "all",
     "thereto": "all",
+    "therein": "all",
+    "thereinof": "all",
     "against": "trailing",
     "other": "leading",
     "use of": "leading",

@@ -422,7 +422,7 @@ PROCEDURE_RES = [
     ".*placement",
     ".*plasty",
     "(?:.* )?procedures?(?: .*)?",
-    ".*puncture",  # puncture
+    ".*puncture",
     "(?:.* )?radiation",
     ".*radiotherapy",
     "root canal",
