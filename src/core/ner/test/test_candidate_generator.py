@@ -139,6 +139,16 @@ class TestCandidateGenerator(unittest.TestCase):
                     }
                 ],
             },
+            {
+                "description": "considering bigram match sufficient",
+                "text": ["blah blah inhibitor of SGLT2"],
+                "expected": [
+                    {
+                        "id": "C3273807",
+                        "name": "Sodium-Glucose Transporter 2 Inhibitors",
+                    }
+                ],
+            },
         ]
 
         fields_to_test = ["id", "name"]

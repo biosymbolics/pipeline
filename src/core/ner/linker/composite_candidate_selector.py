@@ -132,6 +132,8 @@ class CompositeCandidateSelector(CandidateSelector):
                 sum(c.similarities[0] < 0 for c in candidates) > 0
                 # and only one real candidate match
                 and len(real_candidates) == 1
+                # and that candidate is a single word (imperfect proxy for it being a 1gram match)
+                and len(real_candidates[0].aliases[0].split(" ")) == 1
             )
 
             # if partial match, include *all* candidates, which includes the faked ones
