@@ -94,8 +94,9 @@ class UmlsGraph(object):
         start = time.monotonic()
         bc_subgraph = self._get_betweenness_subgraph(k)
 
-        logger.info("Loading betweenness centrality map (%s records)", k)
-        bc_map = betweenness_centrality_parallel(bc_subgraph, 25000)
+        sample_k = round(k / 4)
+        logger.info("Calcing betweenness centrality (top %s; sampling %s)", k, sample_k)
+        bc_map = betweenness_centrality_parallel(bc_subgraph, sample_k)
 
         if file_name is not None:
             logger.info("Saving bc map to %s", file_name)
