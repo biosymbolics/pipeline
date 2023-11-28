@@ -18,6 +18,8 @@ from .transform import UmlsTransformer
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+UMLS_LOOKUP_TABLE = "umls_lookup"
+
 
 def create_umls_lookup():
     """
@@ -35,8 +37,8 @@ def create_umls_lookup():
             TRIM(entities.cui) as id,
             TRIM(max(entities.str)) as canonical_name,
             TRIM(max(ancestors.ptr)) as hierarchy,
-            array_agg(distinct semantic_types.tui) as type_ids,
-            array_agg(distinct semantic_types.sty) as type_names,
+            array_agg(distinct semantic_types.tui::text) as type_ids,
+            array_agg(distinct semantic_types.sty::text) as type_names,
             COALESCE(max(descendants.count), 0) as num_descendants,
             max(synonyms.terms) as synonyms,
             {", ".join(ANCESTOR_FIELDS)},
@@ -64,8 +66,6 @@ def create_umls_lookup():
         GROUP BY entities.cui -- because multiple preferred terms
     """
 
-    new_table_name = "umls_lookup"
-
     umls_db = f"{BASE_DATABASE_URL}/umls"
     aui_lookup = {
         r["aui"]: r["cui"]
@@ -74,26 +74,32 @@ def create_umls_lookup():
         )
     }
 
-    PsqlDatabaseClient(umls_db).truncate_table(new_table_name)
+    PsqlDatabaseClient(umls_db).truncate_table(UMLS_LOOKUP_TABLE)
     transform = UmlsTransformer(aui_lookup)
     PsqlDatabaseClient.copy_between_db(
         umls_db,
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
-        new_table_name,
+        UMLS_LOOKUP_TABLE,
         transform=lambda batch, all_records: transform(batch, all_records),
     )
 
     PsqlDatabaseClient().create_indices(
         [
             {
-                "table": new_table_name,
+                "table": UMLS_LOOKUP_TABLE,
                 "column": "id",
             },
-            *[
-                {"table": new_table_name, "column": f"l{i}_ancestor"}
-                for i in range(MAX_DENORMALIZED_ANCESTORS)
-            ],
+            {
+                "table": UMLS_LOOKUP_TABLE,
+                "column": "type_ids",
+                "is_gin": True,
+            },
+            {
+                "table": UMLS_LOOKUP_TABLE,
+                "column": "canonical_name",
+                "is_tgrm": True,
+            },
         ]
     )
 

@@ -39,7 +39,7 @@ def is_patent_stale() -> pl.Expr:
     """
     expr = (
         pl.when(pl.col("last_trial_update").is_null())
-        .then(pl.lit(False))
+        .then(pl.lit(None))
         .otherwise(
             (pl.lit(date.today()) - pl.col("last_trial_update"))
             > pl.duration(days=(365 * STALE_YEARS))

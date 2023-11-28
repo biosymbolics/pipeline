@@ -5,7 +5,6 @@ import networkx as nx
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import BASE_DATABASE_URL
 from constants.umls import UMLS_NAME_SUPPRESSIONS
 from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
@@ -23,8 +22,7 @@ class UmlsGraph(object):
     """
 
     def __init__(self, file_name: str = BETWEENNESS_FILE):
-        umls_db = f"{BASE_DATABASE_URL}/umls"
-        self.db = PsqlDatabaseClient(umls_db)
+        self.db = PsqlDatabaseClient()
         self.G = self.load_graph()
         self.nodes: dict[str, dict] = dict(self.G.nodes.data())
 
@@ -54,9 +52,8 @@ class UmlsGraph(object):
         logger.info("Loading UMLS into graph")
         G = nx.Graph()
 
-        ancestory_edges = self.db.select(self.edge_query(suppressions))
-
-        G.add_edges_from([(e["head"], e["tail"]) for e in ancestory_edges])
+        edges = self.db.select(self.edge_query(suppressions))
+        G.add_edges_from([(e["head"], e["tail"]) for e in edges])
 
         logger.info(
             "Graph has %s nodes, %s edges (took %s seconds)",
@@ -68,11 +65,10 @@ class UmlsGraph(object):
 
     def _get_betweenness_subgraph(self, k: int = 50000):
         """
-        Get subgraph of top k nodes by degree, excluding "hubs" (high degree nodes)
+        Get subgraph of top k nodes by degree
 
         Args:
             k: number of nodes to include in the map (for performance reasons)
-            hub_degree_threshold: nodes with degree above this threshold will be excluded
         """
         degrees: list[tuple[str, int]] = self.G.degree  # type: ignore
         top_nodes = [
@@ -98,8 +94,9 @@ class UmlsGraph(object):
         start = time.monotonic()
         bc_subgraph = self._get_betweenness_subgraph(k)
 
-        logger.info("Loading betweenness centrality map (%s records)", k)
-        bc_map = betweenness_centrality_parallel(bc_subgraph)
+        sample_k = round(k / 4)
+        logger.info("Calcing betweenness centrality (top %s; sampling %s)", k, sample_k)
+        bc_map = betweenness_centrality_parallel(bc_subgraph, sample_k)
 
         if file_name is not None:
             logger.info("Saving bc map to %s", file_name)

@@ -261,7 +261,7 @@ def rearrange_adp_terms(terms: Sequence[str], n_process: int = 1) -> Iterable[st
         "of": get_or_re(
             [
                 r"(?:of|to|for)(?: use in)?(?: (?:the|a|an))?\b",
-                r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed by(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
+                r"(?:caus|mediat|characteri[sz]|influenc|modulat|regulat|relat)ed (?:by|to)(?: the|to|a)?\b",  # diseases characterized by reduced tgfb signaling -> tgfb reduced diseases (TODO)
                 r"involving\b",  # diseases involving tgfβ -> tgfβ diseases
                 r"targeting\b",
                 r"for(?: the)?\b",  # agonist for the mglur5 receptor -> mglur5 agonist
@@ -512,7 +512,7 @@ def cluster_terms(
         .groupby("cluster_id")
         .agg(pl.col("name"))
         # hack fix for big-ass catchall that shouldn't happen
-        .filter(pl.col("name").list.lengths() < 100000)
+        # .filter(pl.col("name").arr.lengths() < 100000)
         .drop("cluster_id")
         .to_series()
         .to_list()

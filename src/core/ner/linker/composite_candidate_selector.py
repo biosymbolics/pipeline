@@ -1,53 +1,22 @@
 from typing import Mapping, Sequence
 from pydash import flatten, omit_by, uniq
 from spacy.lang.en.stop_words import STOP_WORDS
-from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
+from scispacy.candidate_generation import MentionCandidate
 from constants.patterns.iupac import is_iupac
 
 from core.ner.types import CanonicalEntity
-from constants.umls import PREFERRED_UMLS_TYPES, UMLS_CUI_SUPPRESSIONS
-from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from constants.umls import PREFERRED_UMLS_TYPES
+from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 from utils.string import generate_ngram_phrases
 
-MIN_WORD_LENGTH = 1
+from .candidate_selector import CandidateSelector
+
 NGRAMS_N = 2
-DEFAULT_K = 3  # mostly wanting to avoid suppressions. increase if adding a lot more suppressions.
-
-CANDIDATE_CUI_SUPPRESSIONS = {
-    **UMLS_CUI_SUPPRESSIONS,
-    "C0432616": "Blood group antibody A",  # matches "anti", sigh
-    "C1704653": "cell device",  # matches "cell"
-    "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
-    "C0205263": "Induce (action)",
-    "C1709060": "Modulator device",
-    "C0179302": "Binder device",
-    "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
-    "C1179435": "Protein Component",  # sigh... matches "component"
-    "C0870814": "like",
-    "C0080151": "Simian Acquired Immunodeficiency Syndrome",  # matches "said"
-    "C0163712": "Relate - vinyl resin",
-    "C2827757": "Antimicrobial Resistance Result",  # ("result") ugh
-    "C1882953": "ring",
-    "C0457385": "seconds",  # s
-    "C0179636": "cart",  # car-t
-    "C0039552": "terminally ill",
-    "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
-    "C0243072": "derivative",
-    "C1744692": "NOS inhibitor",  # matches "inhibitor"
-}
+MIN_WORD_LENGTH = 1
 
 
-# map term to specified cui
-COMPOSITE_WORD_OVERRIDES = {
-    "modulator": "C0005525",  # "Biological Response Modifiers"
-    "modulators": "C0005525",
-    "binder": "C1145667",  # "Binding action"
-    "binders": "C1145667",
-}
-
-
-class CompositeCandidateGenerator(CandidateGenerator, object):
+class CompositeCandidateSelector(CandidateSelector):
     """
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
 
@@ -64,12 +33,23 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         "hyperproliferative disease cancer"
     """
 
-    def __init__(self, *args, min_similarity: float, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.min_similarity = min_similarity
+    @staticmethod
+    def _is_composite_eligible(text: str, canonical: CanonicalEntity | None) -> bool:
+        """
+        Is a text a composite candidate?
+
+        - False if we have a canonical candidate
+        - False if it's an IUPAC name, which are just too easy to mangle (e.g. 3'-azido-2',3'-dideoxyuridine matching 'C little e')
+        - Otherwise true
+        """
+        if canonical is None:
+            return False
+        if is_iupac(text):
+            return False
+        return True
 
     @classmethod
-    def get_words(cls, text: str) -> tuple[str, ...]:
+    def _get_words(cls, text: str) -> tuple[str, ...]:
         """
         Get all words in a text, above min length and non-stop-word
         """
@@ -82,11 +62,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         )
 
     @classmethod
-    def get_ngrams(cls, text: str, n: int) -> list[str]:
+    def _get_ngrams(cls, text: str, n: int) -> list[str]:
         """
         Get all ngrams in a text
         """
-        words = cls.get_words(text)
+        words = cls._get_words(text)
 
         # if fewer words than n, just return words
         # (this is expedient but probably confusing)
@@ -96,54 +76,11 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         ngrams = generate_ngram_phrases(words, n)
         return ngrams
 
-    def get_best_candidate(
-        self, candidates: Sequence[MentionCandidate]
-    ) -> MentionCandidate | None:
+    def _form_composite_name(
+        self, member_candidates: Sequence[MentionCandidate]
+    ) -> str:
         """
-        Wrapper for get_best_umls_candidate
-        """
-
-        return get_best_umls_candidate(
-            candidates,
-            self.min_similarity,
-            self.kb,
-            list(CANDIDATE_CUI_SUPPRESSIONS.keys()),
-        )
-
-    @classmethod
-    def _apply_word_overrides(
-        cls, texts: Sequence[str], candidates: list[list[MentionCandidate]]
-    ) -> list[list[MentionCandidate]]:
-        """
-        Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
-        """
-        # look for any overrides (terms -> candidate)
-        override_indices = [
-            i for i, t in enumerate(texts) if t.lower() in COMPOSITE_WORD_OVERRIDES
-        ]
-        for i in override_indices:
-            candidates[i] = [
-                MentionCandidate(
-                    concept_id=COMPOSITE_WORD_OVERRIDES[texts[i].lower()],
-                    aliases=[texts[i]],
-                    similarities=[1],
-                )
-            ]
-        return candidates
-
-    def _get_candidates(self, texts: Sequence[str]) -> list[list[MentionCandidate]]:
-        """
-        Wrapper around super().__call__ that handles word overrides
-        """
-        candidates = super().__call__(list(texts), k=DEFAULT_K)
-        with_overrides = self._apply_word_overrides(texts, candidates)
-        return with_overrides
-
-    def _assemble_composite(
-        self, candidates: Sequence[MentionCandidate]
-    ) -> CanonicalEntity | None:
-        """
-        Form a composite from a list of candidates
+        Form a composite name from the candidates from which it is comprised
         """
 
         def get_name_part(c):
@@ -153,6 +90,16 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                     ce.concept_id, ce.canonical_name, ce.aliases, ce.types, True
                 )
             return c.aliases[0]
+
+        name = " ".join([get_name_part(c) for c in member_candidates])
+        return name
+
+    def _form_composite(
+        self, candidates: Sequence[MentionCandidate]
+    ) -> CanonicalEntity | None:
+        """
+        Form a composite from a list of candidates
+        """
 
         def get_preferred_typed_candidates(
             candidates: Sequence[MentionCandidate],
@@ -176,7 +123,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             ]
             return preferred_type_candidates
 
-        def get_member_candidates():
+        def select_members():
             real_candidates = [c for c in candidates if c.similarities[0] >= 0]
 
             # Partial match if non-matched words, and only a single candidate (TODO: revisit)
@@ -185,6 +132,8 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 sum(c.similarities[0] < 0 for c in candidates) > 0
                 # and only one real candidate match
                 and len(real_candidates) == 1
+                # and that candidate is a single word (imperfect proxy for it being a 1gram match)
+                and len(real_candidates[0].aliases[0].split(" ")) == 1
             )
 
             # if partial match, include *all* candidates, which includes the faked ones
@@ -203,7 +152,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
             return real_candidates
 
-        member_candidates = get_member_candidates()
+        member_candidates = select_members()
 
         if len(member_candidates) == 0:
             return None
@@ -214,7 +163,9 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
 
         # sorted for the sake of consist composite ids
         ids = sorted([c.concept_id for c in member_candidates])
-        name = " ".join([get_name_part(c) for c in member_candidates])
+
+        # form name from comprising candidates
+        name = self._form_composite_name(member_candidates)
 
         return CanonicalEntity(
             id="|".join(ids),
@@ -275,12 +226,32 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
                 *get_composite_candidates(remaining_words),
             ]
 
-        all_words = self.get_words(mention_text)
+        all_words = self._get_words(mention_text)
         candidates = get_composite_candidates(all_words)
 
-        return self._assemble_composite(candidates)
+        return self._form_composite(candidates)
 
-    def generate_composite_entities(
+    def _optimize_composites(
+        self, composite_matches: dict[str, CanonicalEntity | None]
+    ) -> dict[str, CanonicalEntity | None]:
+        """
+        Taking the new composite names, see if there is now a singular match
+        (e.g. a composite name might be "SGLT2 inhibitor", comprised of two candidates, for which a single match exists)
+        """
+        composite_names = uniq(
+            [cm.name for cm in composite_matches.values() if cm is not None]
+        )
+        direct_match_map = {
+            n: self._get_best_canonical(c)
+            for n, c in zip(composite_names, self._get_candidates(composite_names))
+        }
+        # combine composite and potential single matches
+        return {
+            t: (direct_match_map.get(cm.name) if cm is not None else cm) or cm
+            for t, cm in composite_matches.items()
+        }
+
+    def _generate_composite_entities(
         self, matchless_mention_texts: Sequence[str]
     ) -> dict[str, CanonicalEntity]:
         """
@@ -295,7 +266,7 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
         matchless_ngrams = uniq(
             flatten(
                 [
-                    self.get_ngrams(text, i + 1)
+                    self._get_ngrams(text, i + 1)
                     for text in matchless_mention_texts
                     for i in range(NGRAMS_N)
                 ]
@@ -320,63 +291,13 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             for mention_text in matchless_mention_texts
         }
 
-        return {t: m for t, m in composite_matches.items() if m is not None}
+        # "optimize" the matches by passing the composite names back through the candidate generator
+        # to see if there is now a direct match
+        optimized_matches = self._optimize_composites(composite_matches)
 
-    @staticmethod
-    def _is_composite_eligible(text: str, canonical: CanonicalEntity | None) -> bool:
-        """
-        Is a text a composite candidate?
+        return omit_by(optimized_matches, lambda v: v is None)
 
-        - False if we have a canonical candidate
-        - False if it's an IUPAC name, which are just too easy to mangle (e.g. 3'-azido-2',3'-dideoxyuridine matching 'C little e')
-        - Otherwise true
-        """
-        if canonical is None:
-            return False
-        if is_iupac(text):
-            return False
-        return True
-
-    def _get_best_canonical(
-        self, candidates: Sequence[MentionCandidate]
-    ) -> CanonicalEntity | None:
-        """
-        Get canonical candidate if suggestions exceed min similarity
-
-        Args:
-            candidates (Sequence[MentionCandidate]): candidates
-        """
-        top_candidate = self.get_best_candidate(candidates)
-
-        if top_candidate is None:
-            return None
-
-        return self._candidate_to_canonical(top_candidate)
-
-    def _candidate_to_canonical(self, candidate: MentionCandidate) -> CanonicalEntity:
-        """
-        Convert a MentionCandidate to a CanonicalEntity
-        """
-        # go to kb to get canonical name
-        entity = self.kb.cui_to_entity[candidate.concept_id]
-        name = clean_umls_name(
-            entity.concept_id,
-            entity.canonical_name,
-            entity.aliases,
-            entity.types,
-            False,
-        )
-
-        return CanonicalEntity(
-            id=entity.concept_id,
-            ids=[entity.concept_id],
-            name=name,
-            aliases=entity.aliases,
-            description=entity.definition,
-            types=entity.types,
-        )
-
-    def __call__(self, mention_texts: Sequence[str]) -> list[CanonicalEntity]:
+    def __call__(self, mention_texts: Sequence[str]) -> list[CanonicalEntity | None]:
         """
         Generate candidates for a list of mention texts
 
@@ -389,18 +310,18 @@ class CompositeCandidateGenerator(CandidateGenerator, object):
             for mention_text, candidate_set in zip(mention_texts, candidates)
         }
 
-        matchless = self.generate_composite_entities(
+        matchless = self._generate_composite_entities(
             [
                 text
                 for text, canonical in matches.items()
-                if not CompositeCandidateGenerator._is_composite_eligible(
+                if not CompositeCandidateSelector._is_composite_eligible(
                     text, canonical
                 )
             ],
         )
 
         # combine composite matches such that they override the original matches
-        all_matches: dict[str, CanonicalEntity] = {**matches, **matchless}  # type: ignore
+        all_matches: dict[str, CanonicalEntity | None] = {**matches, **matchless}
 
         # ensure order
         return [all_matches[mention_text] for mention_text in mention_texts]

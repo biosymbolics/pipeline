@@ -2,6 +2,7 @@ from itertools import islice
 from multiprocessing import Pool
 import networkx as nx
 from networkx.classes.reportviews import NodeView
+from random import sample
 
 
 def chunk_nodes(nodes: list[NodeView], n: int):
@@ -17,7 +18,7 @@ def chunk_nodes(nodes: list[NodeView], n: int):
 
 
 def betweenness_centrality_parallel(
-    G: nx.Graph, num_process: int = 6
+    G: nx.Graph, k: int | None = None, num_process: int = 6
 ) -> dict[str, float]:
     """
     Parallelized betweenness centrality (normalized)
@@ -26,10 +27,20 @@ def betweenness_centrality_parallel(
     - Naive impl cost: O(n^3)
     - Probable impl cost: O(nm+n^2log n). (n nodes, m edges), maybe less
     (https://cs-people.bu.edu/edori/betweenness.pdf - but we should actually check the NetworkX docs)
+
+    Args:
+        G: graph
+        k: number of nodes to include in the map (for performance reasons)
+        num_process: number of processes to use for parallelization
     """
+    if k is not None:
+        selected_nodes = sample(list(G.nodes()), k)
+    else:
+        selected_nodes = list(G.nodes())
+
     p = Pool(processes=num_process)
     node_divisor = len(p._pool) * 4  # type: ignore
-    node_chunks = list(chunk_nodes(G.nodes(), G.order() // node_divisor))
+    node_chunks = list(chunk_nodes(selected_nodes, len(selected_nodes) // node_divisor))
     num_chunks = len(node_chunks)
     bt_sc = p.starmap(
         nx.betweenness_centrality_subset,

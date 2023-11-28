@@ -71,12 +71,15 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def compose_explanation(
         cls,
         troubled_assignees: Sequence[str],
-        is_stale: bool,
+        is_stale: bool | None,
         financials_map: dict[str, Company],
     ) -> str:
         """
         Compose explanation for availability likelihood
         """
+        if is_stale is not None and not is_stale:
+            return "Patent has recently updated trial."
+
         explanations = compact(
             [
                 *[
@@ -94,7 +97,10 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
 
     @classmethod
     def find(
-        cls, assignees: list[str], is_stale: bool, financials_map: dict[str, Company]
+        cls,
+        assignees: list[str],
+        is_stale: bool | None,
+        financials_map: dict[str, Company],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood
@@ -114,6 +120,9 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
             troubled_assignees, is_stale, financials_map
         )
 
+        if is_stale is not None and not is_stale and not is_troubled:
+            return (AvailabilityLikelihood.UNLIKELY, explanation)  # type: ignore
+
         if is_troubled and is_stale:
             return (AvailabilityLikelihood.LIKELY, explanation)  # type: ignore
 
@@ -131,6 +140,7 @@ class ScoredPatentApplication(PatentApplication):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
+    exemplar_similarity: float
     probability_of_success: float
     search_rank: float
     suitability_score: float

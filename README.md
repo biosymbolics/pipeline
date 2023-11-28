@@ -6,6 +6,7 @@
 - `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
 - `python3 -m spacy download en_core_web_md`
+- `CFLAGS="-mavx -DWARN(a)=(a)" pip install 'nmslib @ git+https://github.com/nmslib/nmslib.git#egg=nmslib'`
 - Create/copy binder.pt for non-GPT NER
 - AWS authenticate if needed: `aws configure sso`
 - psql
@@ -13,6 +14,15 @@
 - sls offlne
   - https://github.com/dherault/serverless-offline/issues/1696
 - Docker - new ECR for lambda
+
+curl https://api.openai.com/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "input": "autoactivates",
+    "model": "text-embedding-ada-002"
+  }'
+
 ```
 aws ecr create-repository --repository-name biosym_lambda-repo
 
@@ -136,24 +146,3 @@ importlib.reload(common.ner.ner)
 - `FLUSHALL`
 - `keys *`
 - `HGETALL "term:PD-1 inhibitors"`
-
-#### Other
-```
-ns = dict_to_named_tuple({
-    "company": "PFE",
-    "doc_source": "SEC",
-    "doc_type": "10-K",
-    "period": "2020-12-31",
-})
-si = core.indices.source_doc_index.SourceDocIndex()
-```
-
-#### Test
-```
-import system
-system.initialize()
-from core.ner import NerTagger
-tagger = NerTagger()
-text = "Asthma may be associated with Parkinson's disease and treated with SHAI inhibitors)."
-tagger.extract([text])
-```

@@ -2,7 +2,6 @@
 Handler for patents search
 """
 import json
-from typing import TypedDict
 import logging
 from pydantic import BaseModel
 
@@ -31,7 +30,7 @@ def search(raw_event: dict, context):
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "exemplar_patents":"WO-2019191008-A1", "skip_cache": true }}'`
-    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"hemolysis" }}'`
+    - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
@@ -47,7 +46,6 @@ def search(raw_event: dict, context):
 
     try:
         results = patent_client.search(p)
-
     except Exception as e:
         message = f"Error searching patents: {e}"
         logger.error(message)

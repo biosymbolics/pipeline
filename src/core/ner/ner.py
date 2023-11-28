@@ -11,7 +11,6 @@ from pydash import flatten
 import logging
 import warnings
 import html
-import spacy
 from spacy.tokens import Span, Doc
 
 from core.ner.cleaning import CleanFunction

@@ -65,3 +65,4 @@ class QueryPieces(Dataclass):
     fields: list[str]
     where: str
     params: list
+    cosine_source: str

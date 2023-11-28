@@ -36,12 +36,12 @@ class TermLinker:
         Initialize term normalizer using existing model
         """
         # lazy (Umls is big)
-        logger.info("Loading CompositeCandidateGenerator (slow...)")
-        from core.ner.linker.candidate_generator import (
-            CompositeCandidateGenerator as CandidateGenerator,
-        )
+        logger.info("Loading CompositeCandidateSelector (slow...)")
+        from .composite_candidate_selector import CompositeCandidateSelector
 
-        self.candidate_generator = CandidateGenerator(min_similarity=min_similarity)
+        self.candidate_generator = CompositeCandidateSelector(
+            min_similarity=min_similarity
+        )
 
     def generate_map(self, terms: Sequence[str]) -> LinkedEntityMap:
         """

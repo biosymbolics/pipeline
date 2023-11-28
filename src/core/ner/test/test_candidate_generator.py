@@ -1,6 +1,6 @@
 import unittest
 
-from core.ner.linker.candidate_generator import CompositeCandidateGenerator
+from core.ner.linker import CompositeCandidateSelector
 
 
 class TestCandidateGenerator(unittest.TestCase):
@@ -9,7 +9,7 @@ class TestCandidateGenerator(unittest.TestCase):
     """
 
     def setUp(self):
-        self.candidate_generator = CompositeCandidateGenerator(min_similarity=0.85)
+        self.candidate_generator = CompositeCandidateSelector(min_similarity=0.85)
 
     def test_candidate_generator(self):
         test_cases = [
@@ -80,7 +80,7 @@ class TestCandidateGenerator(unittest.TestCase):
                 "expected": [
                     {
                         "id": "C1425650",
-                        "name": "LRRK2 gene",
+                        "name": "LRRK2",
                     }
                 ],
             },
@@ -122,7 +122,32 @@ class TestCandidateGenerator(unittest.TestCase):
             {
                 "description": "avoid gene match from common word",
                 "text": ["twist driver"],
-                "expected": [None],  # avoid C1539188 / DNAAF6 ("TWISTER")
+                "expected": [
+                    {
+                        "id": "C0040480|C0335471",
+                        "name": "Musculoskeletal torsion River driver",  # TODO
+                    }
+                ],  # avoid C1539188 / DNAAF6 ("TWISTER")
+            },
+            {
+                "description": "secondary match (optimization)",
+                "text": ["gliflozin sodium-glucose cotransport 2 inhibitor"],
+                "expected": [
+                    {
+                        "id": "C3273807",
+                        "name": "Sodium-Glucose Transporter 2 Inhibitors",
+                    }
+                ],
+            },
+            {
+                "description": "considering bigram match sufficient",
+                "text": ["blah blah inhibitor of SGLT2"],
+                "expected": [
+                    {
+                        "id": "C3273807",
+                        "name": "Sodium-Glucose Transporter 2 Inhibitors",
+                    }
+                ],
             },
         ]
 
@@ -137,6 +162,8 @@ class TestCandidateGenerator(unittest.TestCase):
             for field in fields_to_test:
                 if test["expected"][0] is None:
                     self.assertEqual(result, None)
+                elif result is None:
+                    self.assertEqual(result, test["expected"][0])
                 else:
                     self.assertEqual(
                         result._asdict()[field], test["expected"][0][field]

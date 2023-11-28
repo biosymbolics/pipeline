@@ -8,6 +8,7 @@ from constants.umls import (
     UMLS_NAME_SUPPRESSIONS,
 )
 from utils.classes import overrides
+from utils.re import get_or_re
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -21,24 +22,8 @@ class AncestorUmlsGraph(UmlsGraph):
     def __init__(self):
         super().__init__()
 
-    @staticmethod
-    def _format_name_sql(table: str, suppressions: Sequence[str] | set[str]) -> str:
-        name_filter = (
-            " ".join([rf"and not {table}.str ~* '\y{s}\y'" for s in suppressions])
-            if len(suppressions) > 0
-            else ""
-        )
-        lang_filter = f"""
-            and {table}.lat='ENG' -- english
-            and {table}.ts='P' -- preferred terms
-            and {table}.ispref='Y' -- preferred term
-        """
-        return name_filter + lang_filter
-
     @overrides(UmlsGraph)
-    def edge_query(
-        self, suppressions: Sequence[str] | set[str] = UMLS_NAME_SUPPRESSIONS
-    ) -> str:
+    def edge_query(self, suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS) -> str:
         """
         Query edges from umls
         - non-null hierarchy (good idea??)
@@ -47,39 +32,48 @@ class AncestorUmlsGraph(UmlsGraph):
         - limits types to biomedical
         - applies some naming restrictions (via 'suppressions')
         - suppresses entities whose name is also a type (indicates overly general)
+
+        Query took 4.51 minutes (depth < 3)
         """
-        head_name_sql = AncestorUmlsGraph._format_name_sql("head_entity", suppressions)
-        tail_name_sql = AncestorUmlsGraph._format_name_sql("tail_entity", suppressions)
-        name_sql = head_name_sql + "\n" + tail_name_sql
-        return f"""
-            SELECT cui1 as head, cui2 as tail
-            FROM mrrel as relationship,
-            mrhier as hierarchy,
-            mrsty as head_semantic_type,
-            mrsty as tail_semantic_type,
-            mrconso as head_entity,
-            mrconso as tail_entity
-            where head_entity.cui = cui1
-            and tail_entity.cui = cui2
-            and relationship.cui1 = head_semantic_type.cui
-            and relationship.cui2 = tail_semantic_type.cui
-            and hierarchy.cui = relationship.cui1
-            and hierarchy.ptr is not null  -- suppress entities wo parent (otherwise overly general)
-            and relationship.rel in ('RN', 'RB', 'CHD', 'PAR')  -- narrower, broader, child, parent
-            and (
-                relationship.rela is null
-                OR relationship.rela in (
-                    'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
+        return rf"""
+            -- patent to umls edges
+            WITH RECURSIVE working_terms AS (
+                -- Start with UMLS terms associated directly to patents
+                SELECT
+                    publication_number as head,
+                    term_ids.cid as tail,
+                    1 AS depth
+                FROM annotations, term_ids
+                WHERE annotations.id=term_ids.id
+
+                UNION
+
+                SELECT
+                    head_id as head,
+                    tail_id as tail,
+                    ut.depth + 1
+                FROM umls_graph
+                JOIN working_terms ut ON ut.tail = head_id
+                JOIN umls_lookup as head_entity on head_entity.id = umls_graph.head_id
+                JOIN umls_lookup as tail_entity on tail_entity.id = umls_graph.tail_id
+                where ut.depth < 3
+                and (
+                    relationship is null
+                    OR relationship in (
+                        'isa', 'inverse_isa', 'mapped_from', 'mapped_to'
+                    )
                 )
+                and head_entity.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and tail_entity.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
+                and head_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
+                and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
+                and ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
+                and ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
+                and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
             )
-            and ts_lexize('english_stem', head_semantic_type.sty) <> ts_lexize('english_stem', head_entity.str)  -- exclude entities with a name that is also the type
-            and ts_lexize('english_stem', tail_semantic_type.sty) <> ts_lexize('english_stem', tail_entity.str)
-            and head_semantic_type.tui in {tuple(MOST_PREFERRED_UMLS_TYPES.keys())}
-            and tail_semantic_type.tui in {tuple(MOST_PREFERRED_UMLS_TYPES.keys())}
-            and cui1 not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
-            and cui2 not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
-            {name_sql}  -- applies lang and name filters
-            group by cui1, cui2
+            SELECT DISTINCT head, tail
+            FROM working_terms;
             """
 
     def get_umls_centrality(self, id: str) -> float:

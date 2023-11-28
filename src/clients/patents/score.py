@@ -106,7 +106,7 @@ def score_patents(
         calc_suitability_score_map(
             df.select(pl.col(attributes_column)).to_series().to_list(),
             score_map=score_map,
-        )
+        )  # type: ignore
     )
 
     # multiply score by pct patent life remaining
