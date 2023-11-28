@@ -73,7 +73,7 @@ class ModelPredictor:
         device: str = DEVICE,
     ) -> list[dict[str, Any]]:
         inputs, _ = prepare_input_data(
-            preprocess_inputs(records, []),  # ["enrollment"]
+            preprocess_inputs(records, []),
             field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
@@ -107,7 +107,7 @@ class ModelPredictor:
 PHASES = [TrialPhase.PHASE_1, TrialPhase.PHASE_2, TrialPhase.PHASE_3]
 
 
-def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
+def predict(inputs: Sequence[dict]) -> list[PatentTrialPrediction]:
     """
     Output: dict[publication_number: str, trials: list[dict]]
 
@@ -152,8 +152,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
         )
         predictions.append(predict_phase(phase, start_dates))
 
-    df = pl.DataFrame(flatten(predictions), infer_schema_length=None)
-    return [PatentTrialPrediction(**p) for p in df.to_dicts()]
+    return flatten(predictions)
 
 
 def predict_single(record: dict):

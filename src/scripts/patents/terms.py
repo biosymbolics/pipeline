@@ -371,8 +371,8 @@ class TermAssembler:
         }
         self.client.delete_table(TERMS_TABLE, is_cascade=True)
         self.client.create_and_insert(
-            terms,
             TERMS_TABLE,
+            terms,
             schema,
             truncate_if_exists=True,
             transform=lambda batch, _: [{**r, **self.get_ancestors(r)} for r in batch],
