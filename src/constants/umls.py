@@ -106,6 +106,8 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0017345": "genes, fungal",
     "C0017343": "genes, env",  # matches envelope
     "C0678941": "mutant gene",  # matches variation
+    "C0443640": "Specific antibody",
+    # "C1516451": "chemical modifier",
 }
 
 # "C1425681": "RTTN",  # matches 'rotatin' sigh
