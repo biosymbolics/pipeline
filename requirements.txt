@@ -13,7 +13,7 @@ pydantic
 python-dotenv
 requests
 scispacy
-sklearn
+scikit-learn
 spacy_llm
 spacy
 torch
