@@ -80,7 +80,7 @@ class TestCandidateGenerator(unittest.TestCase):
                 "expected": [
                     {
                         "id": "C1425650",
-                        "name": "LRRK2 gene",
+                        "name": "LRRK2",
                     }
                 ],
             },

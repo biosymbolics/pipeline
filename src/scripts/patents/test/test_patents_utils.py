@@ -47,7 +47,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "AstraZeneca",
                     "Japan",
                     "Matsushita Electric",
-                    "Government",
+                    "Government",  # TODO: US GOV!!
                     "Government",
                     "Government",
                     "Korea Advanced Institute And Technology",
