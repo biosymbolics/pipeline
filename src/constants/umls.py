@@ -23,6 +23,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1698899": "solid drug form",
     "C1550602": "additive",
     "C1951340": "process",
+    "C0013227": "Pharmaceutical Preparations",
     "C1963578": "procedure",
     "C0009429": "combination",
     "C0596316": "chemical group",
