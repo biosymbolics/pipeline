@@ -512,7 +512,7 @@ def cluster_terms(
         .groupby("cluster_id")
         .agg(pl.col("name"))
         # hack fix for big-ass catchall that shouldn't happen
-        .filter(pl.col("name").arr.lengths() < 100000)
+        # .filter(pl.col("name").arr.lengths() < 100000)
         .drop("cluster_id")
         .to_series()
         .to_list()

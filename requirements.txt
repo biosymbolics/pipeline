@@ -1,5 +1,6 @@
 boto3
 bs4
+CuPy # only for github
 en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.6.0/en_core_web_lg-3.6.0-py3-none-any.whl#sha256=9012584a8fcf5bc61bedb13a4b511fb81ffff9f770958ee06366671be10632e9
 en-core-sci-lg @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz#sha256=df78175e425965fd4131a0b66fddaaaa21ee8515c773794e721100679a30d9b2
 exrex
@@ -13,6 +14,7 @@ pydantic
 python-dotenv
 requests
 scispacy
+sklearn
 spacy_llm
 spacy
 torch
