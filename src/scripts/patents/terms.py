@@ -5,8 +5,10 @@ import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
 from pydash import compact, flatten, group_by, uniq
+from constants.patents import COMPANY_INDICATORS
 
 import system
+from utils.re import get_or_re
 
 system.initialize()
 
@@ -24,6 +26,7 @@ from .utils import clean_owners
 
 
 MIN_CANONICAL_NAME_COUNT = 4
+ASSIGNEE_PATENT_THRESHOLD = 20
 
 CanonicalRecord = TypedDict(
     "CanonicalRecord",
@@ -154,9 +157,15 @@ class TermAssembler:
         - aact (ctgov)
         - drugcentral approvals
         """
-        # uses this to roughly select for companies & universities over individuals
-        # otherwise the imperfect grouping gets confused
-        ASSIGNEE_PATENT_THRESHOLD = 20
+        company_re = get_or_re(
+            COMPANY_INDICATORS,
+            enforce_word_boundaries=True,
+            permit_plural=False,
+            word_boundary_char="\\y",
+        )
+
+        # attempts to select for companies & universities over individuals
+        # (because the clustering makes a mess of individuals)
         db_owner_query_map = {
             # patents db
             "patents": f"""
@@ -164,6 +173,15 @@ class TermAssembler:
                 FROM applications a
                 GROUP BY name
                 HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
+
+                UNION ALL
+
+                -- if fewer than 20 patents, BUT the name looks like a company, include it.
+                SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
+                FROM applications a
+                where name ~* {company_re}\\.?
+                GROUP BY name
+                HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
 
                 UNION ALL
 
