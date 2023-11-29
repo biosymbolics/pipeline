@@ -383,9 +383,12 @@ class TerminationReason(ByDefinitionOrderEnum):
     OVERSIGHT = "OVERSIGHT"
     PROTOCOL_REVISION = "PROTOCOL_REVISION"
     OTHER = "OTHER"
+    NA = "N/A"
 
     @classmethod
-    def _missing_(cls, value: str):
+    def _missing_(cls, value: str | None):
+        if value is None:
+            return cls.NA
         reason = classify_string(
             value,
             TERMINATION_KEYWORD_MAP,
@@ -619,7 +622,6 @@ class BaseTrial(Dataclass):
     primary_outcomes: list[str]
     sponsor: str
     start_date: date
-    termination_reason: TerminationReason
     time_frames: list[str]
     title: str
 
@@ -632,6 +634,7 @@ class TrialRecord(BaseTrial):
     purpose: str
     randomization: str
     status: str
+    termination_reason: str
 
 
 @dataclass(frozen=True)
@@ -654,6 +657,7 @@ class TrialSummary(BaseTrial):
     purpose: TrialPurpose
     randomization: TrialRandomization
     sponsor_type: SponsorType
+    termination_reason: TerminationReason
     status: TrialStatus
     why_stopped: str | None
 

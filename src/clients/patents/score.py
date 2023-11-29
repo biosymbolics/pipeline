@@ -148,11 +148,11 @@ def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.Da
     """
     Add availability likelihood to patents
 
-    df must already have assignees, publication_number, and is_stale columns
+    df must already have assignees, publication_number, and is_active columns
     """
     avail_likelihood_map: dict[str, tuple] = {
-        rec["publication_number"]: AvailabilityLikelihood.find(
-            rec["assignees"], rec["is_stale"], company_map
+        rec["publication_number"]: AvailabilityLikelihood.find_from_record(
+            rec, company_map
         )
         for rec in df.to_dicts()
     }
@@ -165,4 +165,4 @@ def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.Da
         .map_dict(avail_likelihood_map)
         .apply(lambda x: x[1])
         .alias("availability_explanation"),
-    ).drop("is_stale")
+    )

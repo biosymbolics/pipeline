@@ -13,7 +13,7 @@ from utils.list import dedup
 
 from .constants import DOMAINS_OF_INTEREST
 from .score import add_availability, calculate_scores
-from .utils import get_patent_years, is_patent_stale
+from .utils import get_patent_years
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -56,6 +56,7 @@ def enrich_search_result(
             "last_trial_status": pl.Utf8,
             "last_trial_update": pl.Date,
             "max_trial_phase": pl.Utf8,
+            "termination_reason": pl.Utf8,
             "brand_name": pl.Utf8,
             "generic_name": pl.Utf8,
             "approval_date": pl.Date,
@@ -66,7 +67,6 @@ def enrich_search_result(
     steps = [
         lambda _df: _df.with_columns(
             get_patent_years().alias("patent_years"),
-            is_patent_stale().alias("is_stale"),
             pl.col("similar_patents")
             .apply(lambda l: [item for item in l if item.startswith("WO")])
             .alias("similar_patents"),

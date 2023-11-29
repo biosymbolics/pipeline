@@ -54,6 +54,7 @@ class PatentApplication(PatentBasicInfo):
     mechanisms: list[str]
     nct_ids: list[str]
     similar_patents: list[str]
+    termination_reason: str
 
     # approved patent fields
     is_approved: str
