@@ -3,7 +3,7 @@ Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
-from constants.patterns.iupac import IUPAC_RE, IUPAC_STRINGS
+from constants.patterns.iupac import IUPAC_STRINGS
 from utils.re import get_or_re
 
 
@@ -540,7 +540,7 @@ DOSAGE_FORM_RES = [
     "bolus",
     "(?:micro[ -]?|nano[ -]?|soft )?capsule",
     "cream",
-    "(?:dose|dosage)",
+    "(?:dose|dosage)(?: forms?.*)?",
     "drip",
     "(?:eye |nasal )?drop(?:let)",
     "emulsion",
