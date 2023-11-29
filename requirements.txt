@@ -23,3 +23,4 @@ torch
 pytorch-ignite
 transformers
 typing_extensions
+umap-learn

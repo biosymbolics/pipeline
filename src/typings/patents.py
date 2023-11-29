@@ -4,7 +4,7 @@ Patent types
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Sequence
+from typing import Any, Sequence, TypedDict
 
 from pydash import compact
 from typings.companies import Company
@@ -14,6 +14,11 @@ from utils.classes import ByDefinitionOrderEnum
 from .core import Dataclass
 
 STALE_YEARS = 5
+
+PatentsTopicReport = TypedDict(
+    "PatentsTopicReport",
+    {"x": float, "y": float, "publication_number": str},
+)
 
 
 @dataclass(frozen=True)
@@ -47,6 +52,7 @@ class PatentApplication(PatentBasicInfo):
     country: str
     devices: list[str]
     diseases: list[str]
+    embeddings: list[float]
     inventors: list[str]
     last_trial_status: str
     last_trial_update: date

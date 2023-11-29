@@ -47,6 +47,7 @@ PatentsReport = TypedDict(
     {"x": str, "y": str | None, "data": list[PatentsReportRecord] | None},
 )
 
+
 QueryType = Literal["AND", "OR"]
 
 
