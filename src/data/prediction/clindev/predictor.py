@@ -47,7 +47,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 240,
+        checkpoint_epoch: int = 245,
         device: str = DEVICE,
     ):
         """
@@ -127,7 +127,6 @@ def predict(inputs: Sequence[dict]) -> list[PatentTrialPrediction]:
                     "max_timeframe": phase._order,
                     "phase": phase,
                     "start_date": sd,
-                    "sponsor_type": SponsorType.INDUSTRY,
                 }
             )
             for input, sd in zip(inputs, start_dates)
@@ -168,7 +167,15 @@ def predict_single(record: dict):
             }
         )
         pred = predictor.predict([input])[0]
-        return PatentTrialPrediction(**{**record, **input._asdict(), **pred})
+        return PatentTrialPrediction(
+            **{
+                **record,
+                **input._asdict(),
+                **pred,
+                "publication_number": "fake123",
+                "starting_phase": "",
+            }
+        )
 
     return {str(phase): predict_phase(phase) for phase in PHASES}
 
@@ -188,7 +195,6 @@ if __name__ == "__main__":
         sys.exit()
 
     standard_fields = {
-        "sponsor_type": SponsorType.INDUSTRY,
         "start_date": 2024,
     }
 

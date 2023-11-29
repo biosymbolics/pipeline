@@ -16,8 +16,8 @@ requests
 scispacy
 scikit-learn
 spacy_llm
-spacy
 spacy[apple]
 torch
+pytorch-ignite
 transformers
 typing_extensions

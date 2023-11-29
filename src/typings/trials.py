@@ -12,9 +12,23 @@ from scripts.ctgov.utils import extract_max_timeframe
 from typings.core import Dataclass
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
+from utils.re import get_or_re
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+DOSE_TERMS = [
+    "dose",
+    "doses",
+    "dosing",
+    "dosage",
+    "dosages",
+    "mad",
+    "sad",
+    "pharmacokinetic",
+    "titration",
+    "titrating",
+]
 
 
 class TrialDesign(ByDefinitionOrderEnum):
@@ -28,30 +42,34 @@ class TrialDesign(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def find(cls, design: str, arm_types: list[str], phase: str, title: str):
+    def find(cls, record: "TrialRecord"):
         """
-        Extract enum, switching the type IFF:
-        - design is ostensibly 'single group' but there are multiple arms
+        Find trial design from record
+        """
 
-        Note: there are ostensibly parallel trials with only 1 (or zero) arms,
-        but we're going to assume those aren't miscategorized (e.g. sometimes people put in only the experimental arm)
-        """
-        if TrialPhase(phase) in [
-            TrialPhase.PHASE_1,
-            TrialPhase.PHASE_1_2,
-        ]:
-            if has_intersection(
-                re.split("[ -]", title.lower()),
-                ["dose", "doses", "dosing", "dosage", "dosages", "mad", "sad"],
-            ):
+        if TrialPhase(record["phase"]).is_phase_1():
+            if has_intersection(re.split("[ -]", record["title"].lower()), DOSE_TERMS):
                 return TrialDesign.DOSING
-        if TrialDesign(design) == TrialDesign.SINGLE_GROUP:
-            if len(arm_types) > 1:
-                # if more than one arm, it's not single group 🙄🙄🙄 (unless dosing)
-                # NOTE: it *could* be Crossover or factorial in this case, but ¯\_(ツ)_/¯
+
+        provisional_design = TrialDesign(record["design"])
+
+        if provisional_design == TrialDesign.SINGLE_GROUP:
+            # if more than one arm or has control, it's not single group.
+            # same if trial is blinded or randomized (these fields tend to be more accurate than design)
+            # we'll just assume it is parallel, but it could be crossover, dosing, etc.
+            randomization = TrialRandomization.find(record["randomization"])
+            comparison = ComparisonType.find_from_record(record)
+            blinding = TrialBlinding.find(record["masking"])
+            if (
+                not comparison in [ComparisonType.UNKNOWN, ComparisonType.NO_CONTROL]
+                or (record["arm_count"] or 0) > 1
+                or blinding == TrialBlinding.BLINDED
+                or randomization == TrialRandomization.RANDOMIZED
+            ):
                 return TrialDesign.PARALLEL
             return TrialDesign.SINGLE_GROUP
-        return TrialDesign(design)
+
+        return provisional_design
 
     @classmethod
     def _missing_(cls, value):
@@ -75,12 +93,9 @@ class TrialRandomization(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def find(cls, randomization: str, design: TrialDesign):
-        if (
-            design == TrialDesign.SINGLE_GROUP
-            and cls(randomization) == cls.NON_RANDOMIZED
-        ):
-            # if single group / non-randomized, let's call it randomization=NA
+    def find(cls, randomization: str, design: TrialDesign | None = None):
+        if design == TrialDesign.SINGLE_GROUP:
+            # if single group, let's call it randomization=NA
             return cls.NA
         return cls(randomization)
 
@@ -316,7 +331,7 @@ class TrialStatus(ByDefinitionOrderEnum):
 
 
 class TrialPhase(ByDefinitionOrderEnum):
-    # EARLY_PHASE_1 = "EARLY_PHASE_1"  # Early Phase 1
+    EARLY_PHASE_1 = "EARLY_PHASE_1"  # Early Phase 1
     PHASE_1 = "PHASE_1"  # Phase 1
     PHASE_1_2 = "PHASE_1_2"  # Phase 1/Phase 2
     PHASE_2 = "PHASE_2"  # Phase 2
@@ -326,6 +341,9 @@ class TrialPhase(ByDefinitionOrderEnum):
     NA = "N/A"  # Not Applicable
     UNKNOWN = "UNKNOWN"  # Unknown status
 
+    def is_phase_1(self) -> bool:
+        return self in [self.EARLY_PHASE_1, self.PHASE_1, self.PHASE_1_2]
+
     @classmethod
     def _missing_(cls, value):
         """
@@ -333,7 +351,7 @@ class TrialPhase(ByDefinitionOrderEnum):
         TrialStatus("Active, not recruiting") -> TrialStatus.PRE_ENROLLMENT
         """
         phase_term_map = {
-            "Early Phase 1": cls.PHASE_1,
+            "Early Phase 1": cls.EARLY_PHASE_1,
             "Phase 1": cls.PHASE_1,
             "Phase 1/Phase 2": cls.PHASE_1_2,
             "Phase 2": cls.PHASE_2,
@@ -509,15 +527,12 @@ class ComparisonType(ByDefinitionOrderEnum):
         intervention_names: list[str],
         comp_type: "str | ComparisonType",
     ) -> bool:
-        ACTIVE_RE = r"(?:active comparator|standard|routine|\bSOC\b)"
-        PLACEBO_RE = r"(?:placebo|sham|comparator|control\b)"
-
-        if comp_type == cls.ACTIVE:
-            pattern = ACTIVE_RE
-        elif comp_type == cls.PLACEBO:
-            pattern = PLACEBO_RE
-        else:
-            return False
+        intervention_re: dict[str | ComparisonType, str] = {
+            cls.DOSE: get_or_re(DOSE_TERMS),
+            cls.ACTIVE: r"(?:active comparator|standard|routine|conventional|\bSOC\b)",
+            cls.PLACEBO: r"(?:placebo|sham|comparator|control\b)",
+        }
+        pattern = intervention_re.get(comp_type) or False
 
         def is_match(pattern, it):
             return re.search(pattern, it, re.IGNORECASE) is not None
@@ -531,11 +546,21 @@ class ComparisonType(ByDefinitionOrderEnum):
         """
         As a last resort, look at the intervention names to determine the comparison type
         """
+        if all([cls.is_intervention_match(intervention_names, cls.DOSE)]):
+            return cls.DOSE
         if cls.is_intervention_match(intervention_names, cls.ACTIVE):
             return cls.ACTIVE
         if cls.is_intervention_match(intervention_names, cls.PLACEBO):
             return cls.PLACEBO
         return default
+
+    @classmethod
+    def find_from_record(cls, record: "TrialRecord"):
+        """
+        Find comparison type from record
+        NOTE: does not use trial design (avoid recursive loop)
+        """
+        return cls.find(record["arm_types"], record["interventions"])
 
     @classmethod
     def find(
@@ -555,20 +580,15 @@ class ComparisonType(ByDefinitionOrderEnum):
         if len(arm_types) == 0:
             return cls.find_from_interventions(interventions, cls.UNKNOWN)
         if "Active Comparator" in arm_types:
-            if "Experimental" in arm_types:
-                return cls.ACTIVE
-            if all("Active Comparator" in at for at in arm_types):
-                return cls.ACTIVE
-            if len(arm_types) == 1 or "Other" in arm_types:
-                return cls.PLACEBO  # just guessing
-        if not set(["Placebo Comparator", "Sham Comparator"]).isdisjoint(arm_types):
+            return cls.ACTIVE
+        if has_intersection(["Placebo Comparator", "Sham Comparator"], arm_types):
             return cls.PLACEBO
         if "No Intervention" in arm_types:
             return cls.NO_INTERVENTION
         if "Experimental" in arm_types:
             # all experimental
-            if len(uniq(arm_types)) == 1:
-                return cls.find_from_interventions(interventions, cls.NO_CONTROL)
+            if len(arm_types) == 1:
+                return cls.find_from_interventions(interventions, cls.UNKNOWN)
         if "Other" in arm_types:
             return cls.find_from_interventions(interventions, cls.OTHER)
         return cls.UNKNOWN
@@ -618,6 +638,7 @@ class TrialSummary(BaseTrial):
     """
 
     acronym: str | None
+    arm_count: int | None
     blinding: TrialBlinding
     comparison_type: ComparisonType
     design: TrialDesign
@@ -714,9 +735,7 @@ def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
     if not is_trial_record(trial):
         raise ValueError("Invalid trial record")
 
-    design = TrialDesign.find(
-        trial["design"], trial["arm_types"], trial["phase"], trial["title"]
-    )
+    design = TrialDesign.find(trial)
     masking = TrialMasking(trial["masking"])
 
     return TrialSummary(
@@ -724,7 +743,7 @@ def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
             **trial,
             "blinding": TrialBlinding.find(masking),
             "comparison_type": ComparisonType.find(
-                trial["arm_types"], trial["interventions"], design
+                trial["arm_types"] or [], trial["interventions"], design
             ),
             "design": design,
             "duration": calc_duration(trial["start_date"], trial["end_date"]),

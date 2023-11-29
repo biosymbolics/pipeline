@@ -29,11 +29,12 @@ logger.setLevel(logging.INFO)
 SINGLE_FIELDS = {
     "studies.nct_id": "nct_id",
     "studies.acronym": "acronym",
-    "studies.brief_title": "title",
+    "coalesce(studies.official_title, studies.brief_title)": "title",
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
     "studies.last_update_posted_date": "last_updated_date",
     "studies.overall_status": "status",  # vs last_known_status
     "studies.phase": "phase",
+    "studies.number_of_arms": "arm_count",
     "studies.primary_completion_date": "end_date",  # Actual or est.
     "studies.source": "sponsor",  # lead sponsor
     "studies.start_date": "start_date",
@@ -137,6 +138,7 @@ def ingest_trials():
     source_sql = f"""
         select {", ".join(FIELDS)},
         0 as duration,
+        '' as blinding,
         '' as comparison_type,
         '' as hypothesis_type,
         '' as intervention_type,

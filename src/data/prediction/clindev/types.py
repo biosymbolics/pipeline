@@ -109,7 +109,7 @@ class PatentTrialPrediction(Dataclass):
     # masking: Optional[str]
     phase: str
     randomization: str
-    sponsor_type: str
+    # sponsor_type: str
     start_date: str
     starting_phase: Optional[str]
 

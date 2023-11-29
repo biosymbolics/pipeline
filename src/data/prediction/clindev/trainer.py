@@ -57,8 +57,8 @@ class MetricWrapper(NamedTuple):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-STAGE2_MSE_WEIGHT = 6
-STAGE1_CORR_WEIGHT = 0.2
+STAGE2_MSE_WEIGHT = 15
+STAGE1_CORR_WEIGHT = 0.3
 
 
 class ModelTrainer:
@@ -180,7 +180,7 @@ class ModelTrainer:
         # TOTAL loss
         loss = stage1_loss + stage1_corr_loss + stage2_ce_loss + stage2_mse_loss
 
-        logger.debug(
+        logger.info(
             "Batch %s Loss %s (Stage1 loss: %s (%s), Stage2: %s (%s))",
             i,
             loss.detach().item(),
