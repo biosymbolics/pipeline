@@ -16,7 +16,7 @@ system.initialize()
 
 from data.prediction.clindev.types import PatentTrialPrediction
 from data.prediction.utils import ModelInput, decode_output
-from typings.trials import SponsorType, TrialPhase
+from typings.trials import TrialPhase
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import (
@@ -47,7 +47,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 245,
+        checkpoint_epoch: int = 50,
         device: str = DEVICE,
     ):
         """

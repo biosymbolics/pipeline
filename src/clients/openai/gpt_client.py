@@ -77,6 +77,7 @@ class GptApiClient:
         llm = ChatOpenAI(
             temperature=DEFAULT_TEMPERATURE,
             model=self.model,
+            client=self.client,
         )
         llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
         output = llm_chain.run(query)
@@ -99,9 +100,9 @@ class GptApiClient:
         context_query = (
             " in the context of: " + ", ".join(context_terms) if context_terms else ""
         )
-        multiple_query = " and how they relate" if len(terms) > 1 else ""
+        multiple_query = " , focusing on how they relate" if len(terms) > 1 else ""
         query = f"""
-            Assuming the role of a technical expert in biomedical R&D, provide succinct information about
+            Assuming the role of a technical expert in biomedical R&D, provide 1-2 paragraphs about
             the following{context_query}{multiple_query},
             in markdown:
             {", ".join(terms)}
@@ -135,17 +136,14 @@ class GptApiClient:
             ResponseSchema(
                 name="offset",
                 description="equal to cumulative median duration of previous stages, 0 for the first stage.",
-                type="float",
             ),
             ResponseSchema(
                 name="median_duration",
                 description="median duration of this stage in years (e.g. 2.5)",
-                type="float",
             ),
             ResponseSchema(
                 name="iqr",
                 description="interquartile range of this stage's duration in years (e.g. 0.8)",
-                type="float",
             ),
         ]
 

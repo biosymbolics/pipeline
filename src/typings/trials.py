@@ -26,6 +26,8 @@ DOSE_TERMS = [
     "mad",
     "sad",
     "pharmacokinetic",
+    "pharmacokinetics",
+    "pharmacodynamics",
     "titration",
     "titrating",
 ]
@@ -579,10 +581,11 @@ class ComparisonType(ByDefinitionOrderEnum):
             return cls.NO_CONTROL
         if len(arm_types) == 0:
             return cls.find_from_interventions(interventions, cls.UNKNOWN)
-        if "Active Comparator" in arm_types:
-            return cls.ACTIVE
         if has_intersection(["Placebo Comparator", "Sham Comparator"], arm_types):
             return cls.PLACEBO
+        if "Active Comparator" in arm_types:
+            # after placebo, because sometimes "experimental" is meant by "active"
+            return cls.ACTIVE
         if "No Intervention" in arm_types:
             return cls.NO_INTERVENTION
         if "Experimental" in arm_types:

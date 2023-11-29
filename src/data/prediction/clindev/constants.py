@@ -34,7 +34,7 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
-TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor"]  #  "title"
+TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor", "title"]
 
 
 QUANTITATIVE_FIELDS: list[str] = [
@@ -47,7 +47,7 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
     "max_timeframe",
-    # dropout_count
+    # "dropout_count",
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",
