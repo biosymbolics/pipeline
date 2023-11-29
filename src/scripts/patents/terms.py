@@ -177,10 +177,10 @@ class TermAssembler:
                 UNION ALL
 
                 -- if fewer than 20 patents, BUT the name looks like a company, include it.
-                SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
-                FROM applications a
-                where name ~* {company_re}\\.?
-                GROUP BY name
+                SELECT max(name) as name, 'assignees' as domain, count(*) as count
+                FROM applications a, unnest(assignees) as name
+                where name ~* '{company_re}\\.?'
+                GROUP BY lower(name)
                 HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
 
                 UNION ALL
