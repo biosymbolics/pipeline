@@ -97,7 +97,7 @@ class StageSizes:
 
 @dataclass(frozen=True)
 class PatentTrialPrediction(Dataclass):
-    # publication_number: Optional[str]
+    publication_number: Optional[str]
     blinding: str
     comparison_type: ComparisonType
     conditions: list[str]
@@ -109,9 +109,9 @@ class PatentTrialPrediction(Dataclass):
     # masking: Optional[str]
     phase: str
     randomization: str
-    sponsor_type: str
+    # sponsor_type: str
     start_date: str
-    # starting_phase: Optional[str]
+    starting_phase: Optional[str]
 
     max_timeframe: Optional[float]
     sponsor: Optional[str]

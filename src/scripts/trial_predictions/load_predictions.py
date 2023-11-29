@@ -1,21 +1,19 @@
 import sys
 from typing import Sequence
 import polars as pl
+import logging
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from data.prediction.clindev.predictor import predict
-from utils.list import dedup
-
-
-def transform_predictions(rows) -> list[dict]:
-    """
-    Transform
-    """
-
-    return rows
+from utils.list import batch, dedup
 
 
 MAX_TERMS_PER_DOMAIN = 10
+TRIAL_PREDICTIONS_TABLE = "patent_clindev_predictions"
+BATCH_SIZE = 20000
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def filter_terms_by_domain(rec, domains: Sequence[str]) -> list[str]:
@@ -60,7 +58,7 @@ def generate_trial_predictions():
             *[
                 df.select(
                     pl.struct(["terms", "domains"])
-                    .map_elements(lambda rec: filter_terms_by_domain(rec, domains))  # type: ignore
+                    .apply(lambda rec: filter_terms_by_domain(rec, domains))
                     .alias(t)
                 ).to_series()
                 for t, domains in {
@@ -71,20 +69,23 @@ def generate_trial_predictions():
         )
         .drop("terms", "domains")
         .filter(
-            (pl.col("conditions").list.len() > 0)
-            & (pl.col("interventions").list.len() > 0)
+            (pl.col("conditions").arr.lengths() > 0)
+            & (pl.col("interventions").arr.lengths() > 0)
         )
     )
 
-    patents = df.to_dicts()
+    batches = batch(df.to_dicts(), BATCH_SIZE)
 
-    predictions = predict(patents)
+    for i, b in enumerate(batches):
+        logger.info("Starting batch %s", i)
+        predictions = predict(b)
 
-    client.create_and_insert(
-        predictions,  # type: ignore
-        "patent_clindev_predictions",
-        transform=lambda batch, _: transform_predictions(batch),
-    )
+        if i == 0:
+            client.create_and_insert(
+                TRIAL_PREDICTIONS_TABLE, predictions, batch_size=BATCH_SIZE
+            )
+        else:
+            client._insert(TRIAL_PREDICTIONS_TABLE, predictions)
 
 
 def main():

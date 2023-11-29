@@ -27,7 +27,7 @@ def fetch_trials(status: str, limit: int = 2000) -> Sequence[TrialSummary]:
         FROM trials
         WHERE status=%s
         AND duration > 0
-        AND purpose = 'TREATMENT'
+        AND purpose in ('TREATMENT', 'BASIC_SCIENCE')
         AND array_length(conditions, 1) > 0
         AND array_length(mesh_conditions, 1) > 0
         AND max_timeframe is not null

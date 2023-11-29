@@ -1,8 +1,7 @@
 from enum import Enum
 from types import UnionType
-from typing import Any, NamedTuple, Sequence, TypeGuard
+from typing import NamedTuple, Sequence, TypeGuard
 from pydash import flatten
-from dataclasses import make_dataclass
 
 from data.prediction.constants import (
     DEFAULT_OPTIMIZER_CLASS,
@@ -28,14 +27,14 @@ TRAINING_PROPORTION = 0.8
 
 SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     "phase",
-    "sponsor_type",
+    # "sponsor_type",
     "max_timeframe",
     # "dropout_count",
     # "facilities", ??
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
-TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor"]  #  "title"
+TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor", "title"]
 
 
 QUANTITATIVE_FIELDS: list[str] = [
@@ -48,7 +47,7 @@ QUANTITATIVE_TO_CATEGORY_FIELDS: list[str] = [
     "enrollment",
     "duration",
     "max_timeframe",
-    # dropout_count
+    # "dropout_count",
 ]
 Y1_CATEGORICAL_FIELDS: list[str] = [
     "design",

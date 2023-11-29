@@ -16,7 +16,7 @@ system.initialize()
 
 from data.prediction.clindev.types import PatentTrialPrediction
 from data.prediction.utils import ModelInput, decode_output
-from typings.trials import SponsorType, TrialPhase
+from typings.trials import TrialPhase
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import (
@@ -47,7 +47,7 @@ class ModelPredictor:
 
     def __init__(
         self,
-        checkpoint_epoch: int = 240,
+        checkpoint_epoch: int = 50,
         device: str = DEVICE,
     ):
         """
@@ -73,7 +73,7 @@ class ModelPredictor:
         device: str = DEVICE,
     ) -> list[dict[str, Any]]:
         inputs, _ = prepare_input_data(
-            preprocess_inputs(records, []),  # ["enrollment"]
+            preprocess_inputs(records, []),
             field_lists=input_field_lists,
             batch_size=batch_size,
             device=device,
@@ -107,7 +107,7 @@ class ModelPredictor:
 PHASES = [TrialPhase.PHASE_1, TrialPhase.PHASE_2, TrialPhase.PHASE_3]
 
 
-def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
+def predict(inputs: Sequence[dict]) -> list[PatentTrialPrediction]:
     """
     Output: dict[publication_number: str, trials: list[dict]]
 
@@ -127,7 +127,6 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
                     "max_timeframe": phase._order,
                     "phase": phase,
                     "start_date": sd,
-                    "sponsor_type": SponsorType.INDUSTRY,
                 }
             )
             for input, sd in zip(inputs, start_dates)
@@ -152,8 +151,7 @@ def predict(inputs: list[dict]) -> list[PatentTrialPrediction]:
         )
         predictions.append(predict_phase(phase, start_dates))
 
-    df = pl.DataFrame(flatten(predictions), infer_schema_length=None)
-    return [PatentTrialPrediction(**p) for p in df.to_dicts()]
+    return flatten(predictions)
 
 
 def predict_single(record: dict):
@@ -169,7 +167,15 @@ def predict_single(record: dict):
             }
         )
         pred = predictor.predict([input])[0]
-        return PatentTrialPrediction(**{**record, **input._asdict(), **pred})
+        return PatentTrialPrediction(
+            **{
+                **record,
+                **input._asdict(),
+                **pred,
+                "publication_number": "fake123",
+                "starting_phase": "",
+            }
+        )
 
     return {str(phase): predict_phase(phase) for phase in PHASES}
 
@@ -189,7 +195,6 @@ if __name__ == "__main__":
         sys.exit()
 
     standard_fields = {
-        "sponsor_type": SponsorType.INDUSTRY,
         "start_date": 2024,
     }
 

@@ -190,7 +190,7 @@ def _update_annotation_values(term_to_fixed_term: list[TermMap]):
     )
 
     temp_table_name = "temp_annotations"
-    client.create_and_insert(term_to_fixed_term, temp_table_name)
+    client.create_and_insert(temp_table_name, term_to_fixed_term)
 
     sql = f"""
         UPDATE {WORKING_TABLE}

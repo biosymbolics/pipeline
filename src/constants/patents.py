@@ -9,32 +9,6 @@ BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))
 
 
-COMPOSITION_OF_MATTER_IPC_CODES = [
-    "C01",  # inorganic chemistry
-    "C07",  # organic chemistry
-    "C08",  # organic macromolecular compounds
-    "C12",  # biochemistry; beer; spirits; wine; vinegar; microbiology; enzymology; mutation or genetic engineering
-]
-
-# less likely
-# "C09",  # dyes; paints; polishes; natural resins; adhesives; compositions not otherwise provided for
-# "C10",  # petroleum, gas or coke industries; technical gases containing carbon monoxide; fuels; lubricants; peat
-# "C11",  # ANIMAL OR VEGETABLE OILS, FATS, FATTY SUBSTANCES OR WAXES; FATTY ACIDS THEREFROM; DETERGENTS; CANDLES
-
-METHOD_OF_USE_IPC_CODES = [
-    "A01N",  # Methods of using biocides or herbicides
-    "A61B",  # Methods of using surgical instruments or devices
-    "A61F",  # Methods of using implants or prostheses
-    "A61K",  # Preparations for medical, dental, or toilet purposes.
-    "A61M",  # Methods of using catheters or other medical devices
-    "A61P",  # Specific therapeutic activity of chemical compounds or medicinal preparations.
-    "C07K",  # Methods of using immunoglobulins
-    "C12N",  # Methods of using microorganisms or enzymes in food or beverage production
-    "G01N",  # Methods of using immunoassays or other analytical techniques
-    "H04N",  # Methods of using video or multimedia systems
-    "H04R",  # Methods of using audio or acoustic systems
-]
-
 COMPANY_SUPPRESSIONS = [
     "»",
     "«",
@@ -53,6 +27,16 @@ UNIVERSITY_SUPPRESSIONS = [
 HEALTH_SYSTEM_SUPPRESSIONS = [
     "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
     "health[ ]?system",
+]
+
+COMPANY_INDICATORS = [
+    "inc",
+    "llc",
+    "ltd",
+    "corp",
+    "corporation",
+    "co",
+    "gmbh",
 ]
 
 
@@ -86,7 +70,8 @@ OWNER_SUPPRESSIONS = [
     *COMPANY_SUPPRESSIONS,
     *UNIVERSITY_SUPPRESSIONS,
     *COMPANY_STRINGS,
-    *[f"(?<!of ){c}" for c in COUNTRIES],
+    # no country names unless at start of string or preceded by "of"
+    *[f"(?<!^)(?<!of ){c}" for c in COUNTRIES],
 ]
 
 

@@ -16,17 +16,22 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1440188": "C little e",  # matches too much stuff
     "C0313108": "Blood group antibody big C little e",
     "C0243083": "associated disease",
+    "C3263722": "Traumatic AND/OR non-traumatic injury",
     "C1706082": "Compound",
     "C0009429": "combo",
+    "C0596316": "chemical group",
     "C1547776": "substance",
     "C0991538": "orderable drug form",
     "C1698899": "solid drug form",
+    "C0525067": "laboratory chemicals",
     "C1550602": "additive",
     "C1951340": "process",
     "C0013227": "Pharmaceutical Preparations",
     "C1963578": "procedure",
     "C0009429": "combination",
+    "C0963641": "cat combination",
     "C0596316": "chemical group",
+    "C4293691": "abnormality of digestive system morphology",
     "C0268275": "AB variant",  # Tay-Sachs AB variant
     "C1173729": "SPES herbal extract",
     "C0031516": "pheromone",  # matches scented
@@ -268,7 +273,6 @@ UMLS_PHENOTYPE_TYPES = {
     "T067": "Phenomenon or Process",
     # "T101": "Patient or Disabled Group",
 }
-# ARRAY['T019', 'T020', 'T037', 'T046', 'T047', 'T048', 'T049', 'T184', 'T190', 'T191', 'T042', 'T033', 'T005', 'T004', 'T007', 'T050', 'T204', 'T001']
 
 UMLS_DIAGNOSTIC_TYPES = {
     "T034": "laboratory or test result",

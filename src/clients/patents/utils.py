@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import date, timedelta
 import polars as pl
 
-from .constants import MAX_PATENT_LIFE, STALE_YEARS
+from .constants import MAX_PATENT_LIFE
 
 
 def get_max_priority_date(min_patent_years: Optional[int] = 0) -> date:
@@ -30,19 +30,4 @@ def get_patent_years() -> pl.Expr:
         pl.lit(MAX_PATENT_LIFE)
         - (pl.lit(current_year) - pl.col("priority_date").dt.year())
     ).clip(lower_bound=0, upper_bound=MAX_PATENT_LIFE)
-    return expr
-
-
-def is_patent_stale() -> pl.Expr:
-    """
-    Check if patent is stale (i.e. possibly abandoned)
-    """
-    expr = (
-        pl.when(pl.col("last_trial_update").is_null())
-        .then(pl.lit(None))
-        .otherwise(
-            (pl.lit(date.today()) - pl.col("last_trial_update"))
-            > pl.duration(days=(365 * STALE_YEARS))
-        )
-    )
     return expr

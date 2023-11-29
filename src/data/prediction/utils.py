@@ -1,4 +1,3 @@
-from dataclasses import asdict, dataclass
 from datetime import date
 from functools import partial
 from typing import (
@@ -143,12 +142,18 @@ def encode_categories(
     Get category **encodings** given a list of dicts
     """
 
-    dicts = [record._asdict() for record in records]
-    df = pl.from_dicts(dicts, infer_schema_length=1000)
+    df = pl.from_records(records)
 
     # total records by field
-    size_map = dict(
-        [(field, df.select(pl.col(field).flatten()).n_unique()) for field in fields]
+    exploded_df = df.with_columns(pl.col(pl.List).explode())
+    size_map: dict[str, int] = dict(
+        [
+            (
+                field,
+                exploded_df.select(pl.col(field)).n_unique(),
+            )
+            for field in fields
+        ]
     )
 
     # e.g. [{'conditions': array([413]), 'phase': array([2])}, {'conditions': array([436]), 'phase': array([2])}]

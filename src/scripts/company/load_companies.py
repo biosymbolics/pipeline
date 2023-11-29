@@ -85,8 +85,8 @@ def load_companies():
     synonyms = client.select("SELECT * FROM synonym_map")
     synonym_map = {synonym["synonym"]: synonym["term"] for synonym in synonyms}
     client.create_and_insert(
-        pharmas.to_dicts(),
         COMPANIES_TABLE_NAME,
+        pharmas.to_dicts(),
         transform=lambda batch, _: transform_companies(batch, synonym_map),
     )
 

@@ -57,7 +57,7 @@ class MetricWrapper(NamedTuple):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-STAGE2_MSE_WEIGHT = 6
+STAGE2_MSE_WEIGHT = 20
 STAGE1_CORR_WEIGHT = 0.2
 
 
@@ -116,9 +116,6 @@ class ModelTrainer:
         }
 
         self.stage2_metrics = {
-            "accuracy": MetricWrapper(
-                metric=Accuracy(), transform=lambda x: (x > 0.49).float()
-            ),
             "precision": MetricWrapper(
                 metric=Precision(), transform=lambda x: (x > 0.49).float()
             ),
@@ -367,7 +364,7 @@ class ModelTrainer:
 
     @staticmethod
     def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = fetch_trials("COMPLETED", limit=40000)
+        trials = fetch_trials("COMPLETED", limit=50000)
         trials = preprocess_inputs(trials)
 
         inputs, category_sizes = prepare_data(

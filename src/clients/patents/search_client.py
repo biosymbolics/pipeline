@@ -68,6 +68,7 @@ TRIAL_RETURN_FIELDS = {
     "(array_agg(trials.phase ORDER BY trials.start_date desc))[1]": "max_trial_phase",
     "(array_agg(trials.status ORDER BY trials.start_date desc))[1]": "last_trial_status",
     "(array_agg(trials.last_updated_date ORDER BY trials.start_date desc))[1]": "last_trial_update",
+    "(array_agg(trials.termination_reason ORDER BY trials.start_date desc))[1]": "termination_reason",
 }
 
 FIELDS: list[str] = [
