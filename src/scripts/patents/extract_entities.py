@@ -157,7 +157,7 @@ class BaseEnricher:
         flattened_df = (
             # polars can't handle explode list[struct] as of 08/14/23
             unprocessed_patents.with_columns(entity_dicts)
-            .filter(pl.col("entities").list.lengths() > 0)
+            .filter(pl.col("entities").arr.lengths() > 0)
             .explode("entities")
             .lazy()
             .select(
