@@ -3,7 +3,7 @@ Patent types
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Sequence
 
 from pydash import compact
@@ -12,6 +12,8 @@ from typings.companies import Company
 from utils.classes import ByDefinitionOrderEnum
 
 from .core import Dataclass
+
+STALE_YEARS = 5
 
 
 @dataclass(frozen=True)
@@ -68,38 +70,58 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def compose_explanation(
+    def compose_financial_explanation(
         cls,
         troubled_assignees: Sequence[str],
-        is_stale: bool | None,
         financials_map: dict[str, Company],
-    ) -> str:
+    ) -> list[str]:
         """
         Compose explanation for availability likelihood
         """
-        if is_stale is not None and not is_stale:
-            return "Patent has recently updated trial."
-
         explanations = compact(
             [
-                *[
-                    f"{company} has some financial signal ({financials_map[company]})."
-                    for company in troubled_assignees
-                ],
-                "Patent is stale." if is_stale else None,
+                f"{company} has some financial signal ({financials_map[company]})."
+                for company in troubled_assignees
             ]
         )
 
-        if len(explanations) == 0:
-            return "N/A"
+        return explanations
 
-        return "\n".join(explanations)
+    @classmethod
+    def is_patent_active(cls, record: dict[str, Any]) -> bool | None:
+        if record["last_trial_update"] is None:
+            return None
+        return date.today() - record["last_trial_update"] < timedelta(
+            days=STALE_YEARS * 365
+        )
+
+    @classmethod
+    def find_from_record(
+        cls,
+        record: dict[str, Any],
+        financials_map: dict[str, Company],
+    ) -> tuple["AvailabilityLikelihood", str]:
+        """
+        Find availability likelihood from record
+        """
+        is_active = cls.is_patent_active(record)
+        is_terminated = record["termination_reason"] is not None
+
+        return cls.find(
+            record["assignees"],
+            is_active,
+            is_terminated,
+            record["termination_reason"],
+            financials_map,
+        )
 
     @classmethod
     def find(
         cls,
         assignees: list[str],
-        is_stale: bool | None,
+        is_active: bool | None,
+        is_terminated: bool,
+        termination_reason: str | None,
         financials_map: dict[str, Company],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
@@ -116,20 +138,25 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         ]
         is_troubled = len(troubled_assignees) > 0
 
-        explanation = cls.compose_explanation(
-            troubled_assignees, is_stale, financials_map
+        troubled_detail = cls.compose_financial_explanation(
+            troubled_assignees, financials_map
         )
 
-        if is_stale is not None and not is_stale and not is_troubled:
-            return (AvailabilityLikelihood.UNLIKELY, explanation)  # type: ignore
-
-        if is_troubled and is_stale:
-            return (AvailabilityLikelihood.LIKELY, explanation)  # type: ignore
-
-        if is_troubled or is_stale:
+        if is_terminated:
+            explanation = "\n".join(
+                [*troubled_detail, f"Trial terminated: {termination_reason}"]
+            )
             return (AvailabilityLikelihood.POSSIBLE, explanation)  # type: ignore
 
-        return (AvailabilityLikelihood.UNKNOWN, explanation)  # type: ignore
+        if is_active == True:
+            explanation = "\n".join([*troubled_detail, f"Trial is active"])
+            return (AvailabilityLikelihood.UNLIKELY, explanation)  # type: ignore
+
+        if is_troubled or is_active == False:
+            explanation = "\n".join([*troubled_detail, f"Trial is active: {is_active}"])
+            return (AvailabilityLikelihood.POSSIBLE, explanation)  # type: ignore
+
+        return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
 @dataclass(frozen=True)

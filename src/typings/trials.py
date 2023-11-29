@@ -385,9 +385,9 @@ class TerminationReason(ByDefinitionOrderEnum):
     OTHER = "OTHER"
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value: str):
         reason = classify_string(
-            value,  # type: ignore
+            value,
             TERMINATION_KEYWORD_MAP,
             TerminationReason.OTHER,
         )
@@ -759,6 +759,6 @@ def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
             "randomization": TrialRandomization.find(trial["randomization"], design),
             "sponsor_type": SponsorType(trial["sponsor"]),
             "status": TrialStatus(trial["status"]),
-            "termination_reason": TerminationReason(trial["termination_reason"]),
+            "termination_reason": TerminationReason(trial["why_stopped"]),
         },
     )

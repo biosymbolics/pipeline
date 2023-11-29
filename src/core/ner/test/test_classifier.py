@@ -1,13 +1,35 @@
 import unittest
 
-from core.ner.classifier import classify_by_keywords
+from core.ner.classifier import classify_by_keywords, classify_string
 from constants.patents import get_patent_attribute_map
+from typings.trials import TERMINATION_KEYWORD_MAP, TerminationReason
 
 
 PATENT_ATTRIBUTE_MAP = get_patent_attribute_map()
 
 
 class TestClassifier(unittest.TestCase):
+    def test_trial_termination_classification(self):
+        test_conditions = [
+            {
+                "text": "This trial failed due to business reasons",
+                "expected_output": [TerminationReason.BUSINESS],
+            },
+            {
+                "text": "Insufficient Accrual",
+                "expected_output": [TerminationReason.ENROLLMENT],
+            },
+        ]
+
+        km = TERMINATION_KEYWORD_MAP
+        for condition in test_conditions:
+            text = condition["text"]
+            expected_output = condition["expected_output"]
+
+            result = classify_string(text, km)
+            print("Actual", result, "expected", expected_output)
+            self.assertEqual(result, expected_output)
+
     def test_classify_by_keywords(self):
         test_conditions = [
             {
