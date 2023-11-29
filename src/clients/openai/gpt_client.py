@@ -102,7 +102,7 @@ class GptApiClient:
         )
         multiple_query = " , focusing on how they relate" if len(terms) > 1 else ""
         query = f"""
-            Assuming the role of a technical expert in biomedical R&D, provide 1-2 paragraphs about
+            Provide 1-2 paragraphs of scientific and technical information about
             the following{context_query}{multiple_query},
             in markdown:
             {", ".join(terms)}

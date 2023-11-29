@@ -88,8 +88,8 @@ def __create_annotations_table():
             max(source) as source,
             min(character_offset_start) as character_offset_start,
             min(character_offset_end) as character_offset_end,
-            max(t.instance_rollup) as instance_rollup,
-            max(t.category_rollup) as category_rollup
+            coalesce(max(t.instance_rollup), term) as instance_rollup,
+            coalesce(max(t.category_rollup), term) as category_rollup
         from (
             SELECT
                 publication_number,
@@ -118,8 +118,8 @@ def __create_annotations_table():
             max(source) as source,
             min(character_offset_start) as character_offset_start,
             min(character_offset_end) as character_offset_end,
-            max(t.instance_rollup) as instance_rollup,
-            max(t.category_rollup) as category_rollup
+            coalesce(max(t.instance_rollup), term) as instance_rollup,
+            coalesce(max(t.category_rollup), term) as category_rollup
         from (
             SELECT
                 publication_number,
@@ -443,6 +443,9 @@ def main(bootstrap: bool = False):
     #     and not original_term ~* '.*(?:anti|inflammation|therapeutic|repair).*'
     #     and t.id not in ('C0268275', 'C1173729', 'C0031516', 'C0332837', 'C0037188', 'C0027627', 'C0011175', 'C0015967', 'C0151747', 'C0026837', 'C0700198', 'C0233656', 'C0043242', 'C0332875', 'C1510411', 'C2926602', 'C0242781', 'C0220811', 'C4074771', 'C0158328', 'C0011119', 'C0555975', 'C0877578', 'C0856151', 'C0263557', 'C0276640', 'C0858714', 'C0595920', 'C1318484', 'C0020488', 'C0278134', 'C0220724', 'C2029593', 'C0265604', 'C0012359', 'C0234985', 'C0027960', 'C1384489', 'C0277825', 'C0392483', 'C0010957', 'C0015376', 'C0011389', 'C0597561', 'C0036974', 'C0233494', 'C0011334', 'C0013146', 'C0030201', 'C0000925', 'C0332157', 'C0151908', 'C0024524', 'C0037293', 'C0233601', 'C4023747', 'C0262568', 'C0542351', 'C0036572', 'C0858950', 'C0001511', 'C0080194', 'C1514893', 'C0003516', 'C0332568', 'C0445243', 'C0349506', 'C0599156', 'C0033119', 'C4721411', 'C3658343', 'C1136365', 'C1704681', 'C0017374', 'C1334103', 'C0017345', 'C0017343', 'C0678941')
     #     and array_length(t.synonyms, 1) < 15;
+
+    # update annotations set instance_rollup=term where domain not in ('attributes', 'assignees') and instance_rollup in ('Inhibitor', 'disease', 'syndrome', 'abnormality of digestive system morphology', 'Proteins', 'Catalyst', 'Agent', 'promoters', 'Enhancer of transcription', 'Laboratory Chemicals', 'monomers', 'Syndrome', 'Disease', 'Cells', 'chemical group', 'Copolymer', 'Polymers', 'Plant-based Natural Product')
+    # refresh materialized view aggregated_annotations;
 
 
 if __name__ == "__main__":
