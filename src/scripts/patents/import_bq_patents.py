@@ -249,10 +249,12 @@ def copy_bq_to_psql():
                 "column": "title",
                 "is_tgrm": True,
             },
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "priority_date",
-            },
+            # As long as this date is used for the order by, DO NOT index it - it will ironically kill perf
+            # https://dba.stackexchange.com/questions/110636/poor-performance-on-query-with-limit-when-i-add-an-order-by
+            # {
+            #     "table": APPLICATIONS_TABLE,
+            #     "column": "priority_date",
+            # },
             {
                 "table": APPLICATIONS_TABLE,
                 "column": "all_base_publication_numbers",
