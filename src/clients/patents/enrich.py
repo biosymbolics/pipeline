@@ -49,21 +49,7 @@ def enrich_search_result(
         raise ValueError("No results returned. Try adjusting parameters.")
 
     pl.Config.activate_decimals()  # otherwise butchers decimal values
-    df = pl.from_dicts(
-        results,
-        # infrequently non-null, messing up type inference
-        schema_overrides={
-            "last_trial_status": pl.Utf8,
-            "last_trial_update": pl.Date,
-            "max_trial_phase": pl.Utf8,
-            "nct_ids": pl.List(pl.Utf8),
-            "termination_reason": pl.Utf8,
-            "brand_name": pl.Utf8,
-            "generic_name": pl.Utf8,
-            "approval_date": pl.Date,
-            "approval_indications": pl.List(pl.Utf8),
-        },
-    )
+    df = pl.from_dicts(results, infer_schema_length=None)
 
     steps = [
         lambda _df: _df.with_columns(
