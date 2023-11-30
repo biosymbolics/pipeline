@@ -50,6 +50,7 @@ SEARCH_RETURN_FIELDS = {
     "application_number": "application_number",
     "country": "country",
     "domains": "domains",
+    "embeddings::real[]": "embeddings",
     "family_id": "family_id",
     "ipc_codes": "ipc_codes",
     "priority_date": "priority_date",
@@ -58,9 +59,9 @@ SEARCH_RETURN_FIELDS = {
 }
 
 APPROVED_SEARCH_RETURN_FIELDS = {
-    "approval_indications": "approval_indications",
-    "brand_name": "brand_name",
-    "generic_name": "generic_name",
+    "max(approval_indications)": "approval_indications",
+    "max(brand_name)": "brand_name",
+    "max(generic_name)": "generic_name",
 }
 
 TRIAL_RETURN_FIELDS = {
@@ -73,7 +74,7 @@ TRIAL_RETURN_FIELDS = {
 
 FIELDS: list[str] = [
     *[
-        f"max({field}) as {new_field}"
+        f"{field} as {new_field}"
         for field, new_field in {
             **SEARCH_RETURN_FIELDS,
             **APPROVED_SEARCH_RETURN_FIELDS,
@@ -104,7 +105,7 @@ def __get_query_pieces(
             raise ValueError("Cannot mix id and (term or exemplar patent) search")
 
         return QueryPieces(
-            fields=[*FIELDS, "1 as search_rank"],
+            fields=[*FIELDS, "1 as search_rank", "0 as exemplar_similarity"],
             where=f"WHERE apps.publication_number = ANY(%s)",
             params=[terms],
             cosine_source="",
@@ -197,7 +198,7 @@ def _search(
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["cosine_source"]}
         {qp["where"]}
-        GROUP BY apps.publication_number
+        GROUP BY {",".join(SEARCH_RETURN_FIELDS.keys())}
         ORDER BY priority_date desc
         LIMIT {limit}
     """

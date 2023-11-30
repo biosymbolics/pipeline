@@ -56,6 +56,7 @@ def enrich_search_result(
             "last_trial_status": pl.Utf8,
             "last_trial_update": pl.Date,
             "max_trial_phase": pl.Utf8,
+            "nct_ids": pl.List(pl.Utf8),
             "termination_reason": pl.Utf8,
             "brand_name": pl.Utf8,
             "generic_name": pl.Utf8,
