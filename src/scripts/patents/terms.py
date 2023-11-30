@@ -5,7 +5,6 @@ import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
 from pydash import compact, flatten, group_by, uniq
-from constants.patents import COMPANY_INDICATORS
 
 import system
 from utils.re import get_or_re
@@ -14,6 +13,7 @@ system.initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
+from constants.patents import COMPANY_INDICATORS
 from core.ner import TermNormalizer
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup

@@ -88,8 +88,8 @@ def __create_annotations_table():
             max(source) as source,
             min(character_offset_start) as character_offset_start,
             min(character_offset_end) as character_offset_end,
-            coalesce(max(t.instance_rollup), term) as instance_rollup,
-            coalesce(max(t.category_rollup), term) as category_rollup
+            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
+            coalesce(max(t.category_rollup), s.term) as category_rollup
         from (
             SELECT
                 publication_number,
@@ -118,8 +118,8 @@ def __create_annotations_table():
             max(source) as source,
             min(character_offset_start) as character_offset_start,
             min(character_offset_end) as character_offset_end,
-            coalesce(max(t.instance_rollup), term) as instance_rollup,
-            coalesce(max(t.category_rollup), term) as category_rollup
+            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
+            coalesce(max(t.category_rollup), s.term) as category_rollup
         from (
             SELECT
                 publication_number,
