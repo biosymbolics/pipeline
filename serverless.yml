@@ -74,7 +74,7 @@ provider:
     runtime: "python3.11"
     AWS_ACCOUNT_ID: ${AWS::AccountId}
     CACHE_BUCKET: biosym-patents-${self:provider.stage}
-    DATABASE_URL: ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
+    DATABASE_URL: postgres://localhost:5432/patents # ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
     DB_CLUSTER:
       Ref: RdsCluster
     ENV: ${param:ENV, 'dev'}
