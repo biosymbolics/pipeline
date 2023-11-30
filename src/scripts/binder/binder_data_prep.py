@@ -133,20 +133,16 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
         (
             df.explode("indices")
             .filter(pl.col("indices").is_not_null())
-            .group_by("publication_number")
+            .groupby("publication_number")
             .agg(
                 [
                     pl.col("publication_number").first().alias("id"),
                     pl.col("text").first(),
                     pl.col("indices")
-                    .map_elements(
-                        lambda indices: sorted([idx[1][0] for idx in indices])
-                    )
+                    .apply(lambda indices: sorted([idx[1][0] for idx in indices]))
                     .alias("entity_start_chars"),
                     pl.col("indices")
-                    .map_elements(
-                        lambda indices: sorted([idx[1][1] for idx in indices])
-                    )
+                    .apply(lambda indices: sorted([idx[1][1] for idx in indices]))
                     .alias("entity_end_chars"),
                     pl.struct(["domain", "indices"]).alias("entity_info"),
                 ]
@@ -156,7 +152,7 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
         )
         .with_columns(
             pl.col("entity_info")
-            .map_elements(
+            .apply(
                 lambda recs: [
                     d
                     for _, d in sorted(
@@ -174,14 +170,14 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
 
     with_word_indices = formatted.with_columns(
         pl.col("text")
-        .map_elements(lambda text: generate_word_indices(str(text), tokenizer))
+        .apply(lambda text: generate_word_indices(str(text), tokenizer))
         .alias("word_indices")
     ).with_columns(
         pl.col("word_indices")
-        .map_elements(lambda idxs: [i[0] for i in idxs])
+        .apply(lambda idxs: [i[0] for i in idxs])
         .alias("word_start_chars"),
         pl.col("word_indices")
-        .map_elements(lambda idxs: [i[1] for i in idxs])
+        .apply(lambda idxs: [i[1] for i in idxs])
         .alias("word_end_chars"),
     )
     records = with_word_indices.to_dicts()
@@ -216,7 +212,7 @@ def create_binder_data():
     logger.info("Getting entity indices for %s annotations", annotations.shape[0])
     df = annotations.with_columns(
         pl.struct(["text", "term"])
-        .map_elements(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
+        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
         .alias("indices")
     )
     return format_into_binder(df, tokenizer)
