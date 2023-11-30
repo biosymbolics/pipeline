@@ -14,7 +14,7 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import APPLICATIONS_TABLE
+from constants.core import APPLICATIONS_TABLE, PUBLICATION_NUMBER_MAP_TABLE
 from typings.core import is_dict_list
 
 from .constants import (
@@ -171,7 +171,7 @@ def import_into_psql(today: str):
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
         df = df.select(
-            *[pl.col(c).map_elements(lambda s: transform(s, c)) for c in df.columns]
+            *[pl.col(c).apply(lambda s: transform(s, c)) for c in df.columns]
         )
 
         first_record = records[0]
@@ -198,6 +198,29 @@ def import_into_psql(today: str):
         load_data_from_json(blob, table_name)
 
 
+def create_derived_tables(client: PsqlDatabaseClient):
+    """
+    Create derived tables
+    """
+    # create mapping between the main publication number (WPO) and all other publication numbers
+    client.create_from_select(
+        f"select publication_number, unnest(all_base_publication_numbers) as other_publication_number from {APPLICATIONS_TABLE}",
+        PUBLICATION_NUMBER_MAP_TABLE,
+    )
+    client.create_indices(
+        [
+            {
+                "table": PUBLICATION_NUMBER_MAP_TABLE,
+                "column": "publication_number",
+            },
+            {
+                "table": PUBLICATION_NUMBER_MAP_TABLE,
+                "column": "other_publication_number",
+            },
+        ]
+    )
+
+
 def copy_bq_to_psql():
     """
     Copy data from BigQuery to psql + create index
@@ -207,6 +230,8 @@ def copy_bq_to_psql():
     import_into_psql(today)
 
     client = PsqlDatabaseClient()
+    create_derived_tables(client)
+
     client.create_indices(
         [
             {
