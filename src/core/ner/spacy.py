@@ -51,7 +51,7 @@ class Spacy:
         """
         # acceleration via https://github.com/explosion/thinc-apple-ops
         # details: https://github.com/explosion/spaCy/discussions/12713
-        spacy.require_gpu()  # type: ignore
+        spacy.prefer_gpu()  # type: ignore
 
         self.model = model
         self._nlp: Language = spacy.load(self.model, **kwargs)
@@ -71,7 +71,7 @@ class Spacy:
 
     @classmethod
     def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs) -> "Spacy":
-        spacy.require_gpu()  # type: ignore
+        spacy.prefer_gpu()  # type: ignore
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
