@@ -14,6 +14,7 @@ from constants.core import (
     ANNOTATIONS_TABLE,
     APPLICATIONS_TABLE,
     PATENT_TO_REGULATORY_APPROVAL_TABLE,
+    PUBLICATION_NUMBER_MAP_TABLE,
     REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
     TRIALS_TABLE,
@@ -192,7 +193,8 @@ def _search(
         FROM {APPLICATIONS_TABLE} AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as agg_annotations ON (agg_annotations.publication_number = apps.publication_number)
         JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
-        LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = ANY(apps.all_base_publication_numbers)
+        JOIN {PUBLICATION_NUMBER_MAP_TABLE} as pub_map ON pub_map.publication_number = apps.publication_number
+        LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = pub_map.other_publication_number
         LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
