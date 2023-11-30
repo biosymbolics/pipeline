@@ -1,8 +1,10 @@
 import unittest
+import pytest
 
 from core.ner.linker import CompositeCandidateSelector
 
 
+@pytest.mark.skip(reason="Too slow to include in CI")
 class TestCandidateGenerator(unittest.TestCase):
     """
     Note: test initialization is slow because of the UMLS cache
