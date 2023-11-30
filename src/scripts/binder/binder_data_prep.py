@@ -56,9 +56,9 @@ def get_annotations():
         and 'mechanisms' = any(s.domains)
         and ARRAY['compounds', 'biologics'] && s.domains
         and 'diseases' = any(s.domains)
-        and domain not in ('assignees', 'attributes')
+        and domain not in ('assignees', 'attributes', 'dosage_forms', 'roas', 'research_tools', 'behavioral_interventions')
         order by RANDOM()
-        limit 300000 -- 829,812
+        limit 400000 -- 829,812
     """
     records = client.select(query)
     logger.info("Got % s annotations", len(records))
