@@ -35,7 +35,7 @@ class BinderNlp:
 
         logger.info("Loading torch model from: %s", model_file)
         self.model = torch.load(model_file).to(device)
-        self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
+        self._tokenizer = AutoTokenizer.from_pretrained(base_model)
         self.nlp = Spacy.get_instance()
 
     def __call__(self, texts: list[str]):
@@ -49,7 +49,7 @@ class BinderNlp:
         return dict([(i, t["name"]) for i, t in enumerate(NER_TYPES)])
 
     @property
-    def __type_descriptions(self):
+    def type_descriptions(self):
         """
         Get the type descriptions used by the Binder model
         """
@@ -66,7 +66,7 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def get_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
+    def create_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
@@ -127,7 +127,7 @@ class BinderNlp:
             text (Union[str, list[str]]): text or list of texts to tokenize
         """
         all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
-        return self.__tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
+        return self._tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
     def extract(self, doc: str | Doc) -> Doc:
         """
@@ -137,7 +137,6 @@ class BinderNlp:
             doc (str | Doc): The Spacy Docs (or strings) to annotate.
 
         ```
-        import system; system.initialize()
         from core.ner.binder.binder import BinderNlp
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
@@ -154,13 +153,13 @@ class BinderNlp:
 
         predictions = self.model(
             **inputs,
-            **self.__type_descriptions,
+            **self.type_descriptions,
         )
 
         annotations = extract_predictions(
             features, predictions.span_scores, self.type_map
         )
-        return self.get_doc(doc, annotations)
+        return self.create_doc(doc, annotations)
 
     def pipe(
         self,

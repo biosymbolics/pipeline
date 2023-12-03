@@ -2,9 +2,9 @@
 Utility functions for the Binder NER model
 """
 
-import numpy as np
 import numpy.typing as npt
 from pydash import compact, flatten
+import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
 import logging
@@ -22,25 +22,24 @@ def extract_prediction(
     Extract predictions from a single feature.
     """
 
-    def start_end_types() -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+    def start_end_types() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Extracts predictions from the tensor
         """
         # https://github.com/pytorch/pytorch/issues/77764
-        cpu_span_logits = span_logits.detach().cpu().clone().numpy()
-        token_start_mask = np.array(feature["token_start_mask"]).astype(bool)
-        token_end_mask = np.array(feature["token_end_mask"]).astype(bool)
-
+        token_start_mask = torch.tensor(feature["token_start_mask"], device="mps")
+        token_end_mask = torch.tensor(feature["token_end_mask"], device="mps")
         # using the [CLS] logits as thresholds
-        span_preds = np.triu(cpu_span_logits > cpu_span_logits[:, 0:1, 0:1])
-
-        type_ids, start_indexes, end_indexes = (
-            token_start_mask[np.newaxis, :, np.newaxis]
-            & token_end_mask[np.newaxis, np.newaxis, :]
-            & span_preds
+        span_preds = torch.triu(span_logits > span_logits[:, 0:1, 0:1])
+        type_ids, start_indexes, end_indexes = torch.bitwise_and(
+            torch.bitwise_and(
+                token_start_mask.unsqueeze(0).unsqueeze(2),
+                token_end_mask.unsqueeze(0).unsqueeze(1),
+            ),
+            span_preds,
         ).nonzero()
 
-        return (start_indexes, end_indexes, type_ids)
+        return start_indexes, end_indexes, type_ids
 
     def create_annotation(start, end, type, idx: int):
         """
@@ -103,8 +102,6 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     Args:
         text: the text to prepare features for.
         tokenized: the tokenized text.
-
-    Note: this is kinda convoluted and should be refactored.
     """
     num_features = len(tokenized["input_ids"])  # type: ignore
     offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
@@ -112,7 +109,7 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     def process_feature(i: int):
         sequence_ids = tokenized.sequence_ids(i)
 
-        offset_mapping_i = offset_mapping[i].cpu()
+        offset_mapping_i = [(om[0].item(), om[1].item()) for om in offset_mapping[i]]
         feature: Feature = {
             "id": f"feat-{str(i + 1)}",
             "text": text,

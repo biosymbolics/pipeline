@@ -2,6 +2,7 @@
 NER types
 """
 from collections import namedtuple
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -18,6 +19,8 @@ from spacy.language import Language
 from spacy.pipeline import Pipe
 from spacy.tokenizer import Tokenizer
 
+from typings.core import Dataclass
+
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
@@ -31,12 +34,16 @@ class CanonicalEntity(NamedTuple):
     types: list[str] = []
 
 
-class DocEntity(
-    namedtuple(
-        "DocEntity",
-        ["term", "type", "start_char", "end_char", "normalized_term", "linked_entity"],
-    )
-):
+@dataclass(frozen=True)
+class DocEntity(Dataclass):
+    term: str
+    type: str
+    start_char: int
+    end_char: int
+    normalized_term: str
+    linked_entity: Optional[CanonicalEntity]
+    span_embeddings: Optional[List[float]] = None
+
     def __str__(self):
         norm_term = (
             self.linked_entity.name if self.linked_entity else self.normalized_term
