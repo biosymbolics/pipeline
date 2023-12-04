@@ -2,12 +2,15 @@
 Utility functions for the Binder NER model
 """
 
+import numpy as np
 import numpy.typing as npt
 from pydash import compact, flatten
 import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
 import logging
+
+from constants.core import DEFAULT_TORCH_DEVICE as DEVICE
 
 from .types import Feature, Annotation
 
@@ -16,7 +19,7 @@ logger.setLevel(logging.INFO)
 
 
 def extract_prediction(
-    span_logits, feature: Feature, type_map: dict[int, str]
+    span_logits: torch.Tensor, feature: Feature, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
     Extract predictions from a single feature.
@@ -26,18 +29,21 @@ def extract_prediction(
         """
         Extracts predictions from the tensor
         """
-        # https://github.com/pytorch/pytorch/issues/77764
-        token_start_mask = torch.tensor(feature["token_start_mask"], device="mps")
-        token_end_mask = torch.tensor(feature["token_end_mask"], device="mps")
+        token_start_mask = torch.tensor(feature["token_start_mask"], device=DEVICE)
+        token_end_mask = torch.tensor(feature["token_end_mask"], device=DEVICE)
         # using the [CLS] logits as thresholds
         span_preds = torch.triu(span_logits > span_logits[:, 0:1, 0:1])
-        type_ids, start_indexes, end_indexes = torch.bitwise_and(
-            torch.bitwise_and(
-                token_start_mask.unsqueeze(0).unsqueeze(2),
-                token_end_mask.unsqueeze(0).unsqueeze(1),
-            ),
-            span_preds,
-        ).nonzero()
+        r = (
+            (
+                token_start_mask.unsqueeze(0).unsqueeze(2).bool()
+                & token_end_mask.unsqueeze(0).unsqueeze(1).bool()
+                & span_preds
+            )
+            .nonzero()
+            .transpose(0, 1)
+        )
+
+        type_ids, start_indexes, end_indexes = r[0], r[1], r[2]
 
         return start_indexes, end_indexes, type_ids
 
@@ -52,7 +58,7 @@ def extract_prediction(
         )
         pred = Annotation(
             id=f"{feature['id']}-{idx}",
-            entity_type=type_map[type],
+            entity_type=type_map[type.item()],
             start_char=int(start_char),
             end_char=int(end_char),
             text=feature["text"][start_char:end_char],

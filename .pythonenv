@@ -1,4 +1,4 @@
-PYTHONPATH=$(pwd)/src:$(pwd)/
+PYTHONPATH=$(pwd)/src:$(pwd)/:../binder/src
 # PYTHONPATH=$(pwd)/src:$(pwd)/
 
 export PYTHONPATH
