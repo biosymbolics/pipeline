@@ -161,6 +161,8 @@ class NerTagger:
             lambda c: flatten(chunk_list(c, CHUNK_SIZE)) if self.use_llm else c,
             lambda _content: [html.unescape(c) for c in _content],
             remove_extra_spaces,
+            # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
+            lambda _content: [" " + c for c in _content],
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
