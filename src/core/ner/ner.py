@@ -7,7 +7,7 @@ from functools import reduce
 from itertools import groupby
 import time
 from typing import Any, Literal, Optional, Sequence, TypeVar
-from pydash import compact, flatten
+from pydash import compact
 import logging
 import html
 from spacy.tokens import Span, Doc
@@ -18,7 +18,6 @@ from core.ner.spacy import Spacy
 from utils.args import make_hashable
 from utils.model import get_model_path
 from utils.re import remove_extra_spaces
-from utils.string import chunk_list
 
 from .binder import BinderNlp
 from .patterns import (
@@ -26,7 +25,7 @@ from .patterns import (
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
-from .types import DocEntities, DocEntity, SpacyPatterns
+from .types import CanonicalEntity, DocEntities, DocEntity, SpacyPatterns
 from .utils import spans_to_doc_entities
 
 T = TypeVar("T", bound=Span | str)
@@ -50,7 +49,7 @@ class NerTagger:
 
     def __init__(
         self,
-        model: Optional[str] = "binder.pt",
+        model: str = "binder.pt",
         entity_types: Optional[frozenset[str]] = None,
         rule_sets: list[SpacyPatterns] = list(
             [
@@ -95,36 +94,33 @@ class NerTagger:
         if not link:
             logger.warning("Linking is disabled")
 
-        elif self.model:
-            if not self.model.endswith(".pt"):
-                raise ValueError("Model must be torch")
+        if not self.model.endswith(".pt"):
+            raise ValueError("Model must be torch")
 
-            model_filename = get_model_path(self.model)
-            self.nlp = BinderNlp(model_filename)
+        model_filename = get_model_path(self.model)
+        self.nlp = BinderNlp(model_filename)
 
-            if len(self.rule_sets) > 0:
-                logger.info("Adding rule sets to NER pipeline")
-                # rules catch a few things the binder model misses
-                rule_nlp = Spacy.get_instance(
-                    model="en_core_sci_lg",
-                    additional_pipelines={
-                        "merge_entities": {"after": "ner"},
-                        "entity_ruler": {
-                            "config": {"validate": True, "overwrite_ents": True},
-                            "after": "merge_entities",
-                        },
+        if len(self.rule_sets) > 0:
+            logger.info("Adding rule sets to NER pipeline")
+            # rules catch a few things the binder model misses
+            rule_nlp = Spacy.get_instance(
+                model="en_core_sci_lg",
+                additional_pipelines={
+                    "merge_entities": {"after": "ner"},
+                    "entity_ruler": {
+                        "config": {"validate": True, "overwrite_ents": True},
+                        "after": "merge_entities",
                     },
-                )
-                ruler = rule_nlp.get_pipe("entity_ruler")
+                },
+            )
+            ruler = rule_nlp.get_pipe("entity_ruler")
 
-                for rules in self.rule_sets:
-                    ruler.add_patterns(rules)  # type: ignore
+            for rules in self.rule_sets:
+                ruler.add_patterns(rules)  # type: ignore
 
-                self.rule_nlp = rule_nlp
-            else:
-                self.rule_nlp = None
+            self.rule_nlp = rule_nlp
         else:
-            raise ValueError("Must provide either use_llm or model")
+            self.rule_nlp = None
 
         logger.info(
             "Init NER pipeline took %s seconds",
@@ -195,11 +191,9 @@ class NerTagger:
             logger.debug("Skipping normalization step")
             return entity_sets
 
-        terms: list[str] = [e.term for e in flatten(entity_sets)]
-        normalization_map = dict(self.normalizer.normalize(terms))
-
-        def get_doc_entity(e: DocEntity) -> DocEntity | None:
-            norm_entity = normalization_map[e.term]
+        def get_doc_entity(
+            e: DocEntity, norm_entity: CanonicalEntity
+        ) -> DocEntity | None:
             if len(norm_entity.name) == 0:
                 return None
             return DocEntity(
@@ -208,18 +202,21 @@ class NerTagger:
                 linked_entity=norm_entity,
             )
 
-        # filter by entity types (if provided) and remove empty names
-        norm_entity_sets = [
-            compact(
+        def get_doc_entities(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
+            if not self.normalizer:
+                return list(entity_set)
+            normalizations = self.normalizer.normalize(entity_set)
+            return compact(
                 [
-                    get_doc_entity(e)
-                    for e in es
-                    if len(e.term) > 0
-                    and ((self.entity_types is None) or (e.type in self.entity_types))
+                    get_doc_entity(es, norm)
+                    for es, norm in zip(entity_set, normalizations)
+                    if len(es.term) > 0
+                    and ((self.entity_types is None) or (es.type in self.entity_types))
                 ]
             )
-            for es in entity_sets
-        ]
+
+        # filter by entity types (if provided) and remove empty names
+        norm_entity_sets = [get_doc_entities(es) for es in entity_sets]
 
         if len(norm_entity_sets) != len(entity_sets):
             raise ValueError("Normalization changed number of entities")

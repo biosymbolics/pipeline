@@ -3,9 +3,10 @@ SpaCy client
 """
 
 import logging
-from typing import Any
+from typing import Any, Iterator
 import spacy
 from spacy.language import Language
+from spacy.tokens import Doc
 
 from utils.args import make_hashable
 
@@ -68,6 +69,9 @@ class Spacy:
     @classmethod
     def nlp(cls, text: str) -> Any:
         return cls.get_instance()._nlp(text)
+
+    def pipe(self, *args, **kwargs) -> Iterator[Doc]:
+        return self._nlp.pipe(*args, **kwargs)
 
     @classmethod
     def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs) -> "Spacy":

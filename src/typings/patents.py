@@ -51,6 +51,7 @@ class PatentApplication(PatentBasicInfo):
     compounds: list[str]
     country: str
     devices: list[str]
+    diagnostics: list[str]
     diseases: list[str]
     embeddings: list[float]
     inventors: list[str]
@@ -59,6 +60,7 @@ class PatentApplication(PatentBasicInfo):
     max_trial_phase: str
     mechanisms: list[str]
     nct_ids: list[str]
+    procedures: list[str]
     similar_patents: list[str]
     termination_reason: str
 

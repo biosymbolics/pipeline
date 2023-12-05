@@ -2,11 +2,11 @@
 Term Normalizer
 """
 import logging
-import time
 from typing import Sequence
+from pydash import compact
 
 
-from ..types import CanonicalEntity
+from ..types import CanonicalEntity, DocEntities, DocEntity
 
 LinkedEntityMap = dict[str, CanonicalEntity]
 
@@ -43,52 +43,22 @@ class TermLinker:
             min_similarity=min_similarity
         )
 
-    def generate_map(self, terms: Sequence[str]) -> LinkedEntityMap:
-        """
-        Generate a map of terms to normalized/canonical entities (containing name and id)
-
-        Args:
-            terms (Sequence[str]): list of terms to normalize
-
-        Returns:
-            LinkedEntityMap: mapping of terms to canonical entities
-        """
-        logging.info("Starting candidate generation")
-        start_time = time.time()
-        entities = self.candidate_generator(list(terms))
-
-        # INFO:root:Finished candidate generation (took 1703 seconds)
-        logging.info(
-            "Finished candidate generation (took %s seconds)",
-            round(time.time() - start_time),
-        )
-        return {
-            key: value
-            for key, value in zip(terms, entities)
-            if value is not None and len(key) > 1
-        }
-
-    def link(
-        self, terms: Sequence[str]
-    ) -> Sequence[tuple[str, CanonicalEntity | None]]:
+    def link(self, entity_set: Sequence[DocEntity]) -> list[CanonicalEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
             terms (Sequence[str]): list of terms to normalize
         """
-        if len(terms) == 0:
-            logging.warning("No terms to link")
+        if len(entity_set) == 0:
+            logging.warning("No entities to link")
             return []
 
-        canonical_map = self.generate_map(terms)
-        linked_entities = [(t, canonical_map.get(t)) for t in terms]
+        linked_entities = compact([self.candidate_generator(e) for e in entity_set])
 
-        logging.info("Completed linking batch of %s terms", len(terms))
+        logging.info("Completed linking batch of %s entity sets", len(entity_set))
 
         return linked_entities
 
-    def __call__(
-        self, terms: Sequence[str]
-    ) -> Sequence[tuple[str, CanonicalEntity | None]]:
-        return self.link(terms)
+    def __call__(self, entity_set: Sequence[DocEntity]) -> list[CanonicalEntity]:
+        return self.link(entity_set)

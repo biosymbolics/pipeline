@@ -1,11 +1,17 @@
 from typing import Sequence
+from annoy import AnnoyIndex
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
+from core.ner.spacy import Spacy
+import logging
 
-from core.ner.types import CanonicalEntity
+from core.ner.types import CanonicalEntity, DocEntity
 from constants.umls import UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from utils.encoding.text_encoder import WORD_VECTOR_LENGTH
 
-DEFAULT_K = 3  # mostly wanting to avoid suppressions. increase if adding a lot more suppressions.
+DEFAULT_K = 25
+MIN_SIMILARITY = 0.85  # only used if entity.embeddings is None
+MAX_DISTANCE = 0.5
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     **UMLS_CUI_SUPPRESSIONS,
@@ -40,20 +46,33 @@ COMPOSITE_WORD_OVERRIDES = {
 }
 
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 class CandidateSelector(CandidateGenerator, object):
     """
     Wraps a CandidateGenerator to select the best candidate for a mention
     """
 
-    def __init__(self, *args, min_similarity: float, **kwargs):
+    def __init__(
+        self,
+        *args,
+        min_similarity: float = MIN_SIMILARITY,
+        max_distance: float = MAX_DISTANCE,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.min_similarity = min_similarity
+        self.max_distance = max_distance
+        self.nlp = Spacy.get_instance(disable=["ner", "parser", "tagger"])
 
-    def get_best_candidate(
+    def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
         Wrapper for get_best_umls_candidate
+        (legacy-ish, since semantic similarity is better)
         """
 
         return get_best_umls_candidate(
@@ -65,42 +84,80 @@ class CandidateSelector(CandidateGenerator, object):
 
     @classmethod
     def _apply_word_overrides(
-        cls, texts: Sequence[str], candidates: list[list[MentionCandidate]]
-    ) -> list[list[MentionCandidate]]:
+        cls, text: str, candidates: list[MentionCandidate]
+    ) -> list[MentionCandidate]:
         """
         Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
         """
         # look for any overrides (terms -> candidate)
-        override_indices = [
-            i for i, t in enumerate(texts) if t.lower() in COMPOSITE_WORD_OVERRIDES
-        ]
-        for i in override_indices:
-            candidates[i] = [
+        has_override = text.lower() in COMPOSITE_WORD_OVERRIDES
+        if has_override:
+            return [
                 MentionCandidate(
-                    concept_id=COMPOSITE_WORD_OVERRIDES[texts[i].lower()],
-                    aliases=[texts[i]],
+                    concept_id=COMPOSITE_WORD_OVERRIDES[text.lower()],
+                    aliases=[text],
                     similarities=[1],
                 )
             ]
         return candidates
 
-    def _get_candidates(
-        self, mention_texts: Sequence[str]
-    ) -> list[list[MentionCandidate]]:
+    def _get_candidates(self, text: str) -> list[MentionCandidate]:
         """
         Wrapper around super().__call__ that handles word overrides
         """
-        candidates = super().__call__(list(mention_texts), k=DEFAULT_K)
-        with_overrides = self._apply_word_overrides(mention_texts, candidates)
+        candidates = super().__call__([text], k=DEFAULT_K)[0]
+        with_overrides = self._apply_word_overrides(text, candidates)
         return with_overrides
 
+    def create_ann_index(self, candidates: Sequence[MentionCandidate]) -> AnnoyIndex:
+        """
+        Create an Annoy index for a list of candidates
+        """
+        umls_ann = AnnoyIndex(WORD_VECTOR_LENGTH, metric="angular")
+
+        candidate_docs = self.nlp.pipe([c.aliases[0] for c in candidates])
+        for i, doc in enumerate(candidate_docs):
+            umls_ann.add_item(i, doc.vector)
+
+        umls_ann.build(len(candidates))
+        return umls_ann
+
+    def get_best_by_semantic_similarity(
+        self, mention_embeddings: list[float], candidates: Sequence[MentionCandidate]
+    ) -> MentionCandidate | None:
+        """
+        Get best candidate by semantic similarity
+        """
+        umls_ann = self.create_ann_index(candidates)
+        cui, dist = umls_ann.get_nns_by_vector(
+            mention_embeddings, 10, search_k=10, include_distances=True
+        )
+        top_candidate = candidates[cui[0]]
+        distance = dist[cui[0]]
+        logger.info([(candidates[c], d) for c, d in list(zip(cui, dist))])
+
+        if distance > self.max_distance:
+            logger.warning(
+                "Best candidate (%s) too distant (%s)", top_candidate, distance
+            )
+            return None
+
+        return top_candidate
+
     def _get_best_canonical(
-        self, candidates: Sequence[MentionCandidate]
+        self, candidates: Sequence[MentionCandidate], entity: DocEntity
     ) -> CanonicalEntity | None:
         """
         Get canonical candidate if suggestions exceed min similarity
         """
-        top_candidate = self.get_best_candidate(candidates)
+
+        if entity.embeddings is None:
+            top_candidate = self.get_best_by_rules(candidates)
+        else:
+            top_candidate = self.get_best_by_semantic_similarity(
+                entity.embeddings,
+                candidates,
+            )
 
         if top_candidate is None:
             return None
@@ -130,18 +187,12 @@ class CandidateSelector(CandidateGenerator, object):
             types=entity.types,
         )
 
-    def __call__(self, mention_texts: Sequence[str]) -> list[CanonicalEntity | None]:
+    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate candidates for a list of mention texts
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = self._get_candidates(mention_texts)
+        candidates = self._get_candidates(entity.term)
 
-        matches = {
-            mention_text: self._get_best_canonical(candidate_set)
-            for mention_text, candidate_set in zip(mention_texts, candidates)
-        }
-
-        # ensure order
-        return [matches[mention_text] for mention_text in mention_texts]
+        return self._get_best_canonical(candidates, entity)
