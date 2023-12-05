@@ -50,7 +50,7 @@ class NerTagger:
 
     def __init__(
         self,
-        model: Optional[str] = "binder.pt",  # ignored if use_llm is True
+        model: Optional[str] = "binder.pt",
         entity_types: Optional[frozenset[str]] = None,
         rule_sets: list[SpacyPatterns] = list(
             [
