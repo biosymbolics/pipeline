@@ -40,8 +40,8 @@ class DocEntity(Dataclass):
     type: str
     start_char: int
     end_char: int
-    normalized_term: str
-    linked_entity: Optional[CanonicalEntity]
+    normalized_term: Optional[str] = None
+    linked_entity: Optional[CanonicalEntity] = None
     span_embeddings: Optional[List[float]] = None
 
     def __str__(self):

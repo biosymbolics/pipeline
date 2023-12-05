@@ -17,7 +17,11 @@ from constants.core import (
 
 from .constants import NER_TYPES
 from .types import Annotation
-from .utils import extract_predictions, remove_overlapping_spans, prepare_features
+from .utils import (
+    extract_predictions,
+    remove_overlapping_spans,
+    prepare_features,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -34,7 +38,7 @@ class BinderNlp:
         device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info("Loading torch model from: %s", model_file)
-        self.model = torch.load(model_file).to(device)
+        self.model = torch.load(model_file, map_location=device)
         self._tokenizer = AutoTokenizer.from_pretrained(base_model)
         self.nlp = Spacy.get_instance()
 
@@ -140,15 +144,16 @@ class BinderNlp:
         from core.ner.binder.binder import BinderNlp
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
-            "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-            for i in range(2)
+        "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+        for i in range(2)
         ]) + " and some melanoma."
-        b.extract(text).ents
+        b.extract(" melanoma").ents
         ```
         """
         text = doc.text if isinstance(doc, Doc) else doc
         inputs = self.tokenize(text)
         features = prepare_features(text, inputs)
+
         inputs.pop("overflow_to_sample_mapping")
 
         predictions = self.model(

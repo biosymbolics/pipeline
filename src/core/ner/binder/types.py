@@ -1,7 +1,13 @@
+from dataclasses import dataclass
 from typing import Optional, TypedDict
 
+import torch
 
-class Annotation(TypedDict):
+from typings.core import Dataclass
+
+
+@dataclass(frozen=True)
+class Annotation(Dataclass):
     """
     Annotation class
     """
@@ -19,7 +25,7 @@ Feature = TypedDict(
         "id": str,
         "text": str,
         "offset_mapping": list[Optional[tuple[int, int]]],
-        "token_start_mask": list[int],
-        "token_end_mask": list[int],
+        "token_start_mask": torch.Tensor,
+        "token_end_mask": torch.Tensor,
     },
 )

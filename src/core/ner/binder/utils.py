@@ -2,77 +2,90 @@
 Utility functions for the Binder NER model
 """
 
-import numpy as np
 import numpy.typing as npt
-from pydash import compact, flatten
+from pydash import flatten
 import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
+import polars as pl
 import logging
 
 from constants.core import DEFAULT_TORCH_DEVICE as DEVICE
-
-from .types import Feature, Annotation
+from core.ner.binder.types import Feature, Annotation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+MAX_SPAN_LENGTH = 15
 
 
 def extract_prediction(
     span_logits: torch.Tensor, feature: Feature, type_map: dict[int, str]
 ) -> list[Annotation]:
     """
-    Extract predictions from a single feature.
+    Extracts predictions from the tensor
     """
+    if feature["offset_mapping"] is None:
+        return []
 
-    def start_end_types() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Extracts predictions from the tensor
-        """
-        token_start_mask = torch.tensor(feature["token_start_mask"], device=DEVICE)
-        token_end_mask = torch.tensor(feature["token_end_mask"], device=DEVICE)
-        # using the [CLS] logits as thresholds
-        span_preds = torch.triu(span_logits > span_logits[:, 0:1, 0:1])
-        r = (
-            (
-                token_start_mask.unsqueeze(0).unsqueeze(2).bool()
-                & token_end_mask.unsqueeze(0).unsqueeze(1).bool()
-                & span_preds
-            )
-            .nonzero()
-            .transpose(0, 1)
-        )
+    start_offset_mapping = {
+        i: (tup[0] if tup is not None else None)
+        for i, tup in enumerate(feature["offset_mapping"])
+    }
+    end_offset_mapping = {
+        i: (tup[1] if tup is not None else None)
+        for i, tup in enumerate(feature["offset_mapping"])
+    }
 
-        type_ids, start_indexes, end_indexes = r[0], r[1], r[2]
+    token_start_mask = feature["token_start_mask"]
+    token_end_mask = feature["token_end_mask"]
+    # using the [CLS] logits as thresholds
+    span_preds = torch.triu(span_logits > span_logits[:, 0:1, 0:1])
 
-        return start_indexes, end_indexes, type_ids
-
-    def create_annotation(start, end, type, idx: int):
-        """
-        Applies offset and creates an annotation.
-        """
-        offset_mapping = feature["offset_mapping"]
-        start_char, end_char = (
-            offset_mapping[start][0],  # type: ignore
-            offset_mapping[end][1],  # type: ignore
-        )
-        pred = Annotation(
-            id=f"{feature['id']}-{idx}",
-            entity_type=type_map[type.item()],
-            start_char=int(start_char),
-            end_char=int(end_char),
-            text=feature["text"][start_char:end_char],
-        )
-        return pred
-
-    start_indexes, end_indexes, type_ids = start_end_types()
-
-    annotations = compact(
-        [
-            create_annotation(*tup, idx)
-            for idx, tup in enumerate(zip(start_indexes, end_indexes, type_ids))
-        ]
+    # get mask of all valid spans
+    mask = (
+        token_start_mask.unsqueeze(0).unsqueeze(2)
+        & token_end_mask.unsqueeze(0).unsqueeze(1)
+        & span_preds
     )
+
+    scores = torch.concat([mask.nonzero(), span_logits[mask].unsqueeze(1)], dim=1)
+    df = (
+        pl.from_numpy(
+            scores.cpu().detach().numpy(),
+            schema={
+                "type": pl.Int8,
+                "start": pl.Int32,
+                "end": pl.Int32,
+                "score": pl.Float32,
+            },
+        )
+        .filter(
+            pl.col("start").is_in(start_offset_mapping.keys())
+            & pl.col("end").is_in(end_offset_mapping.keys())
+            & ((pl.col("end") - pl.col("start")) < MAX_SPAN_LENGTH)
+        )
+        .with_columns(
+            pl.col("start").replace(start_offset_mapping).alias("start_char"),
+            pl.col("end").replace(end_offset_mapping).alias("end_char"),
+            pl.col("type").replace(type_map).alias("entity_type"),
+        )
+        .with_columns(
+            pl.struct(["start_char", "end_char"]).apply(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
+        )
+        .sort(by="score", descending=True)
+        .unique(("start", "end"), maintain_order=True)
+    )
+
+    print(df)
+
+    df = df.drop(["type", "start", "end", "score"])
+
+    annotations = [
+        Annotation(**r, id=f"{feature['id']}-{i}") for i, r in enumerate(df.to_dicts())
+    ]
+    print(annotations)
+    print(len(annotations))
     return annotations
 
 
@@ -115,15 +128,18 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
     def process_feature(i: int):
         sequence_ids = tokenized.sequence_ids(i)
 
-        offset_mapping_i = [(om[0].item(), om[1].item()) for om in offset_mapping[i]]
         feature: Feature = {
             "id": f"feat-{str(i + 1)}",
             "text": text,
-            "token_start_mask": [om[0] for om in offset_mapping_i],
-            "token_end_mask": [om[1] for om in offset_mapping_i],
+            "token_start_mask": torch.tensor(
+                [om[0] for om in offset_mapping[i]], device=DEVICE
+            ).bool(),
+            "token_end_mask": torch.tensor(
+                [om[1] for om in offset_mapping[i]], device=DEVICE
+            ).bool(),
             "offset_mapping": [
                 om if sequence_ids[k] == 0 else None
-                for k, om in enumerate(offset_mapping_i)
+                for k, om in enumerate(offset_mapping[i])
             ],
         }
 

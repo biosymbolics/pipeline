@@ -27,5 +27,7 @@
       "path": "bash",
       "args": ["-l"]
     }
-  }
+  },
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "jupyter.config.NotebookApp.extra_paths": ["${workspaceFolder}/src"]
 }
