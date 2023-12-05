@@ -145,7 +145,7 @@ class BinderNlp:
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
         "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-        for i in range(2)
+        for i in range(3)
         ]) + " and some melanoma."
         b.extract(text).ents
         ```

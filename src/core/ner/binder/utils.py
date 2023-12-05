@@ -2,6 +2,7 @@
 Utility functions for the Binder NER model
 """
 
+import time
 import numpy.typing as npt
 from pydash import flatten
 import torch
@@ -37,60 +38,60 @@ def extract_prediction(
         for i, tup in enumerate(feature["offset_mapping"])
     }
 
-    token_start_mask = feature["token_start_mask"]
-    token_end_mask = feature["token_end_mask"]
     # using the [CLS] logits as thresholds
     span_preds = torch.triu(span_logits > span_logits[:, 0:1, 0:1])
 
     # get mask of all valid spans
     mask = (
-        token_start_mask.unsqueeze(0).unsqueeze(2)
-        & token_end_mask.unsqueeze(0).unsqueeze(1)
+        feature["token_start_mask"].unsqueeze(0).unsqueeze(2)
+        & feature["token_end_mask"].unsqueeze(0).unsqueeze(1)
         & span_preds
     )
 
+    # slow part - mask.nonzero() can take 1-2 seconds
     scores = torch.concat([mask.nonzero(), span_logits[mask].unsqueeze(1)], dim=1)
 
     if scores.size(0) == 0:
         logger.warning("No valid spans found")
         return []
 
-    df = (
-        pl.from_numpy(
-            scores.cpu().detach().numpy(),
-            schema={
-                "type": pl.Int8,
-                "start": pl.Int32,
-                "end": pl.Int32,
-                "score": pl.Float32,
-            },
+    try:
+        df = (
+            pl.from_numpy(
+                scores.cpu().detach().numpy(),
+                schema={
+                    "type": pl.Int8,
+                    "start": pl.Int32,
+                    "end": pl.Int32,
+                    "score": pl.Float32,
+                },
+            )
+            .with_columns(
+                pl.col("start").replace(start_offset_mapping).alias("start_char"),
+                pl.col("end").replace(end_offset_mapping).alias("end_char"),
+                pl.col("type").replace(type_map).alias("entity_type"),
+            )
+            .filter(
+                ((pl.col("end") - pl.col("start")) < MAX_SPAN_LENGTH)
+                & (pl.col("start_char") is not None)
+                & (pl.col("end_char") is not None)
+            )
+            .with_columns(
+                pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
+            )
+            .sort(by="score", descending=True)
+            .unique(("start", "end"), maintain_order=True)
         )
-        .filter(
-            pl.col("start").is_in(start_offset_mapping.keys())
-            & pl.col("end").is_in(end_offset_mapping.keys())
-            & ((pl.col("end") - pl.col("start")) < MAX_SPAN_LENGTH)
-        )
-        .with_columns(
-            pl.col("start").replace(start_offset_mapping).alias("start_char"),
-            pl.col("end").replace(end_offset_mapping).alias("end_char"),
-            pl.col("type").replace(type_map).alias("entity_type"),
-        )
-        .with_columns(
-            pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
-        )
-        .sort(by="score", descending=True)
-        .unique(("start", "end"), maintain_order=True)
-    )
 
-    print(df)
-
-    df = df.drop(["type", "start", "end", "score"])
+        print(df)
+    except Exception as e:
+        logger.error("Error creating dataframe: %s, %s", e, scores)
+        return []
 
     annotations = [
-        Annotation(**r, id=f"{feature['id']}-{i}") for i, r in enumerate(df.to_dicts())
+        Annotation(**r, id=f"{feature['id']}-{i}")
+        for i, r in enumerate(df.drop(["type", "start", "end", "score"]).to_dicts())
     ]
-    print(annotations)
-    print(len(annotations))
     return annotations
 
 

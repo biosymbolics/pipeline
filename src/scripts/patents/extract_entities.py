@@ -251,7 +251,7 @@ class PatentEnricher(BaseEnricher):
         """
         Initialize the enricher
         """
-        batch_size = 1000
+        batch_size = 250
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES, link=False)
 
@@ -264,7 +264,6 @@ class PatentEnricher(BaseEnricher):
                 ID_FIELD,
                 "term",
                 "domain",
-                "embeddings",
                 "source",
                 "character_offset_start",
                 "character_offset_end",

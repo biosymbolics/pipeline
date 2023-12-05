@@ -62,7 +62,7 @@ class BQDatabaseClient(DatabaseClient):
         """
         return (
             f"{BQ_DATASET_ID}.{table_name}"
-            if BQ_DATASET_ID or "" not in table_name
+            if (BQ_DATASET_ID or "") not in table_name
             else table_name
         )
 
