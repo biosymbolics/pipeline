@@ -9,7 +9,6 @@ import time
 from typing import Any, Literal, Optional, Sequence, TypeVar
 from pydash import compact, flatten
 import logging
-import warnings
 import html
 from spacy.tokens import Span, Doc
 
@@ -51,8 +50,6 @@ class NerTagger:
 
     def __init__(
         self,
-        use_llm: Optional[bool] = False,
-        llm_config: Optional[str] = "configs/patents/config.cfg",
         model: Optional[str] = "binder.pt",  # ignored if use_llm is True
         entity_types: Optional[frozenset[str]] = None,
         rule_sets: list[SpacyPatterns] = list(
@@ -72,8 +69,6 @@ class NerTagger:
         NOTE: if using binder, requires binder model class be in PYTHONPATH. (TODO: fix this)
 
         Args:
-            use_llm (Optional[bool], optional): Use LLM model. Defaults to False. If true, no rules or anything are used.
-            llm_config (Optional[str], optional): LLM config file. Defaults to "configs/patents/config.cfg".
             model (str, optional): torch NER model. Defaults to "binder.pt".
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
             additional_cleaners (list[Callable[[Sequence[str]], Sequence[str]]], optional): Additional cleaners funs. Defaults to [].
@@ -83,8 +78,6 @@ class NerTagger:
         start_time = time.time()
 
         self.model = model
-        self.use_llm = use_llm
-        self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.entity_types = entity_types
         self.normalizer = (
@@ -101,21 +94,6 @@ class NerTagger:
             logger.warning("Normalization is disabled")
         if not link:
             logger.warning("Linking is disabled")
-
-        if self.use_llm:
-            # lazy imports / inits
-            import spacy_llm
-            from spacy_llm.util import assemble
-
-            spacy_llm.logger.addHandler(logging.StreamHandler())
-            spacy_llm.logger.setLevel(logging.INFO)
-            warnings.filterwarnings(
-                "ignore", category=UserWarning, module="torch.amp.autocast_mode"
-            )
-
-            if not self.llm_config:
-                raise ValueError("Must provide llm_config if use_llm is True")
-            self.nlp = assemble(self.llm_config)
 
         elif self.model:
             if not self.model.endswith(".pt"):
@@ -158,7 +136,6 @@ class NerTagger:
         Prepares a list of content for NER
         """
         steps = [
-            lambda c: flatten(chunk_list(c, CHUNK_SIZE)) if self.use_llm else c,
             lambda _content: [html.unescape(c) for c in _content],
             remove_extra_spaces,
             # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
