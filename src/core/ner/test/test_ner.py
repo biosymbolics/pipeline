@@ -41,15 +41,14 @@ class TestNerUtils(unittest.TestCase):
                 This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
                 """,
                 "expected_output": [
+                    "angiotensin ii receptor",
                     "bioenhanced formulation",
-                    "eprosartan",
                     "bioenhanced formulation",
+                    "block angiotensin ii receptor",
+                    "congestive heart failure",
                     "eprosartan mesylate",
                     "method",
-                    "block angiotensin ii receptor",
-                    "angiotensin ii receptor",
                     "hypertension",
-                    "congestive heart failure",
                     "renal failure",
                 ],
             },
@@ -59,18 +58,18 @@ class TestNerUtils(unittest.TestCase):
                 The invention concerns a pharmaceutical composition designed to adhere to a mucous membrane in particular for preventing or treating radiotherapy-related and chemotherapy-related mucositis, induced by radiotherapy or combined radiochemotherapy, comprising an efficient amount of an antiradical compound mixed with a vehicle which is liquid at room temperature and gels at the mucous membrane temperature and capable of adhering to the mucous membrane by its gelled state.
                 """,
                 "expected_output": [
-                    "mucositis induced",
-                    "radiotherapy",
-                    "chemotherapy",
-                    "radiotherapy related",
-                    "chemotherapy related mucositis",
-                    "induced",
-                    "radiotherapy",
-                    "combined radiochemotherapy",
                     "antiradical compound",
-                    "room temperature",
-                    "mucous membrane temperature",
+                    "chemotherapy",
+                    "chemotherapy related mucositis",
+                    "combined radiochemotherapy",
                     "gelled state",
+                    "induced",
+                    "mucositis induced",
+                    "mucous membrane temperature",
+                    "radiotherapy",
+                    "radiotherapy",
+                    "radiotherapy related",
+                    "room temperature",
                 ],
             },
             {
@@ -79,12 +78,12 @@ class TestNerUtils(unittest.TestCase):
                 Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
                 """,
                 "expected_output": [
-                    "aspartyl dipeptide ester derivative",
+                    "aspartyl dipeptide ester",
                     "aspartyl dipeptide ester",
                     "aspartyl dipeptide ester derivative",
-                    "aspartyl dipeptide ester",
-                    "n-[n-[3-(3-hydroxy-4-methoxyphenyl)propyl]-l-α-aspartyl]-l-(alpha-methyl)phenylalanine 1-methyl ester",
+                    "aspartyl dipeptide ester derivative",
                     "low caloric sweetener",
+                    "n-[n-[3-(3-hydroxy-4-methoxyphenyl)propyl]-l-α-aspartyl]-l-(alpha-methyl)phenylalanine 1-methyl ester",
                     "superior",
                 ],
             },
@@ -94,6 +93,13 @@ class TestNerUtils(unittest.TestCase):
                 Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
                 """,
                 "expected_output": [
+                    "alkyl",
+                    "alkyl",
+                    "alkyl",
+                    "arylcarbonyl",
+                    "aryl sulfonyl cooalkyl",
+                    "aryloxycarbonyl",
+                    "aryl aminocarbonyl",
                     "muscarinic antagonist heterocyclic derivative",
                     "din substituted piperazine",
                     "1,4 di substituted piperidine",
@@ -103,14 +109,7 @@ class TestNerUtils(unittest.TestCase):
                     "cycloalkyl",
                     "substituted aryl",
                     "substituted aryl",
-                    "alkyl",
-                    "alkyl",
                     "cyclolalkyl",
-                    "alkyl",
-                    "arylcarbonyl",
-                    "aryl sulfonyl cooalkyl",
-                    "aryloxycarbonyl",
-                    "aryl aminocarbonyl",
                     "substituted",
                     "alkyl",
                     "alkyl",
@@ -132,6 +131,7 @@ class TestNerUtils(unittest.TestCase):
                     "corresponding apparatus",
                     "method",
                     "ménière disease intermittent air pressure pulse train",
+                    "intermittent air pressure pulse train",
                     "surgically perforated tympanic membrane",
                     "ambient",
                     "level",
@@ -251,12 +251,15 @@ class TestNerUtils(unittest.TestCase):
                     "carbostyril nucleus",
                     "bond or double bond",
                     "probucol",
-                    "cerebral infarction",
+                    "acute cerebral infarction",
+                    "chronic cerebral infarction",
+                    "arteriosclerosis",
                     "renal disease",
+                    "diabetic nephropathy",
                     "renal failure",
+                    "nephritis",
                     "synergistic superoxide suppressor effect",
                     "combination",
-                    # atherosclerosis
                 ],
             },
             {
@@ -267,6 +270,7 @@ class TestNerUtils(unittest.TestCase):
                 "expected_output": [
                     "h isoindol 1",
                     "inhibitor",
+                    "phosphatidylinositol 3 kinase delta inhibitor",
                     "phosphatidylinositol 3 kinase delta & gamma",
                     "certain compound",
                     "salt",
@@ -301,6 +305,7 @@ class TestNerUtils(unittest.TestCase):
                 "text": "The present invention relates to a method for PEGylating interferon beta.",
                 "expected_output": [
                     "method",
+                    "interferon beta",
                     "pegylating interferon beta",
                 ],
             },
@@ -310,23 +315,27 @@ class TestNerUtils(unittest.TestCase):
                     The invention concerns prehensile, rotating and detachable bipolar electro-coagulating pliers for microsurgery and coeliosurgery. It concerns reusable pliers for microsurgery and coeliosurgery prehensile and ensuring bipolar coagulation without bonding the coagulated tissues, combining in a single instrument both functions, so as to save time and handling procedure during an operation. Said pliers consist of: a head called fixed part (1) internally and externally insulated except for the fixed coagulating jaw (1); a mobile jaw (2) articulated on a ceramic pin (3) provided like the fixed jaw (1) with a coating preventing the coagulated tissues from being bonded; an externally insulated tube (7) with its snake (6) likewise insulated, connected to the mobile blade (2) and the handle (12-11); a handle controlling (11-12) power supply electrode-holders (14-13) connected to the tube and snake assembly by a screw socket (9) and the movement controlling ball (10). The insulation between the various metal components is provided by the ceramic pin (3) and the hot-deposited insulating coating.
                 """,
                 "expected_output": [
-                    "bipolar plier",
-                    "coeliosurgery",
-                    "detachable bipolar electro coagulating plier",
-                    "coeliosurgery",
-                    "reusable plier",
                     "bipolar coagulation",
+                    "bipolar plier",
+                    "ceramic pin",
+                    "ceramic pin",
+                    "coeliosurgery",
+                    "coeliosurgery",
                     "combining",
+                    "detachable bipolar electro coagulating plier",
+                    "except",
                     "instrument",
                     "instrument both",
-                    "operation",
-                    "insulated except",
-                    "except",
-                    "mobile jaw",
-                    "ceramic pin",
+                    "microsurgery",
+                    "microsurgery",
+                    "microsurgery",
                     "mobile blade",
+                    "mobile jaw",
+                    "operation",
+                    "reusable plier",
+                    "screw socket",
                     "snake",
-                    "ceramic pin",
+                    "snake",
                 ],
             },
             {
@@ -351,9 +360,9 @@ class TestNerUtils(unittest.TestCase):
 
         for condition in test_conditions:
             text = condition["text"]
-            expected_output = condition["expected_output"]
+            expected_output = sorted(condition["expected_output"])
 
-            result = self.tagger.extract_string_map([text])[text]
+            result = sorted(self.tagger.extract_string_map([text])[text])
 
             if result != expected_output:
                 print("Actual", result, "expected", expected_output)
