@@ -13,6 +13,7 @@ initialize()
 
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.patents.constants import ENTITY_DOMAINS
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from core.ner.classifier import classify_by_keywords
@@ -22,18 +23,17 @@ from utils.classes import overrides
 
 
 ID_FIELD = "publication_number"
-ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
+ENTITY_TYPES = frozenset(ENTITY_DOMAINS)
 MAX_TEXT_LENGTH = 2000
 ENRICH_PROCESSED_PUBS_FILE = "data/enrich_processed_pubs.txt"
 CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
-BASE_DIR = "data/ner_enriched"
 
 
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
     attr_map = get_patent_attribute_map()
     return [
         [
-            DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, a_set, None)
+            DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, None, a_set, None)
             for a_set in attribute_set
         ]
         for attribute_set in classify_by_keywords(patent_docs, attr_map)
@@ -54,7 +54,7 @@ class BaseEnricher:
         self.processed_pubs_file = processed_pubs_file
         self.batch_size = batch_size
 
-    def __get_processed_pubs(self) -> list[str]:
+    def _get_processed_pubs(self) -> list[str]:
         """
         Returns a list of already processed publication numbers
         """
@@ -64,7 +64,7 @@ class BaseEnricher:
         except FileNotFoundError:
             return []
 
-    def __checkpoint(self, df: pl.DataFrame) -> None:
+    def _checkpoint(self, df: pl.DataFrame) -> None:
         """
         Persists processing state
         - processed publication numbers added to a file
@@ -73,7 +73,7 @@ class BaseEnricher:
         with open(self.processed_pubs_file, "a+") as f:
             f.write("\n" + "\n".join(df["publication_number"].to_list()))
 
-    def __fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
+    def _fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
         """
         Fetch a batch of patents from BigQuery
 
@@ -95,7 +95,7 @@ class BaseEnricher:
         patents = self.db.select(query)
         return patents
 
-    def __format_patent_docs(self, patents: pl.DataFrame) -> list[str]:
+    def _format_patent_docs(self, patents: pl.DataFrame) -> list[str]:
         """
         Get patent descriptions (title + abstract)
         Concatenates title and abstract into `text` column, trucates to MAX_TEXT_LENGTH
@@ -111,7 +111,7 @@ class BaseEnricher:
 
         return texts
 
-    def __extract(self, patents: pl.DataFrame) -> Optional[pl.DataFrame]:
+    def _extract(self, patents: pl.DataFrame) -> Optional[pl.DataFrame]:
         """
         Enriches patents with entities
 
@@ -122,7 +122,7 @@ class BaseEnricher:
             pl.DataFrame: enriched patents
         """
 
-        processed_pubs = self.__get_processed_pubs()
+        processed_pubs = self._get_processed_pubs()
 
         # remove already processed patents
         unprocessed_patents = patents.filter(
@@ -140,7 +140,7 @@ class BaseEnricher:
             )
 
         # get patent descriptions
-        patent_docs = self.__format_patent_docs(unprocessed_patents)
+        patent_docs = self._format_patent_docs(unprocessed_patents)
 
         # extract entities
         entities = self.extractor(patent_docs)
@@ -149,32 +149,36 @@ class BaseEnricher:
             logging.info("No entities found")
             return None
 
+        unprocessed_patent_ids = unprocessed_patents["publication_number"].to_list()
+
         # turn into dicts for polars' sake
-        entity_dicts = pl.Series(
-            "entities", ([[a.to_flat_dict() for a in es] for es in entities])
+        entity_dicts = [
+            [
+                {
+                    **a.to_flat_dict(),
+                    "publication_number": unprocessed_patent_ids[i],
+                }
+                for a in es
+            ]
+            for i, es in enumerate(entities)
+        ]
+
+        # TODO: probably some to suppress?
+        flattened_df = (
+            pl.DataFrame(flatten(entity_dicts))
+            .rename(
+                {
+                    "type": "domain",
+                    "start_char": "character_offset_start",
+                    "end_char": "character_offset_end",
+                }
+            )
+            .drop(["normalized_term", "linked_entity"])
+            .with_columns(
+                pl.lit("title+abstract").alias("source"),
+            )
         )
 
-        flattened_df = (
-            # polars can't handle explode list[struct] as of 08/14/23
-            unprocessed_patents.with_columns(entity_dicts)
-            .filter(pl.col("entities").arr.lengths() > 0)
-            .explode("entities")
-            .lazy()
-            .select(
-                pl.col("publication_number"),
-                pl.col("entities").map_elements(lambda e: e["term"]).alias("original_term"),  # type: ignore
-                pl.col("entities").map_elements(lambda e: e["normalized_term"]).alias("term"),  # type: ignore
-                pl.col("entities").map_elements(lambda e: e["type"]).alias("domain"),  # type: ignore
-                pl.lit("title+abstract").alias("source"),
-                pl.col("entities")
-                .map_elements(lambda e: e["start_char"])  # type: ignore
-                .alias("character_offset_start"),
-                pl.col("entities")
-                .map_elements(lambda e: e["end_char"])  # type: ignore
-                .alias("character_offset_end"),
-            )
-            .collect()
-        )
         return flattened_df
 
     @abstractmethod
@@ -192,17 +196,17 @@ class BaseEnricher:
         Args:
             starting_id (Optional[str], optional): last id to paginate from. Defaults to None.
         """
-        patents = self.__fetch_patents_batch(last_id=starting_id)
+        patents = self._fetch_patents_batch(last_id=starting_id)
         last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
-            df = self.__extract(pl.DataFrame(patents))
+            df = self._extract(pl.DataFrame(patents))
 
             if df is not None:
                 self.upsert(df)
-                self.__checkpoint(df)
+                self._checkpoint(df)
 
-            patents = self.__fetch_patents_batch(last_id=str(last_id))
+            patents = self._fetch_patents_batch(last_id=str(last_id))
             if patents:
                 last_id = max(patent["publication_number"] for patent in patents)
 
@@ -259,8 +263,8 @@ class PatentEnricher(BaseEnricher):
             id_fields=[
                 ID_FIELD,
                 "term",
-                "original_term",
                 "domain",
+                "embeddings",
                 "source",
                 "character_offset_start",
                 "character_offset_end",
@@ -268,9 +272,8 @@ class PatentEnricher(BaseEnricher):
             insert_fields=[
                 ID_FIELD,
                 "term",
-                "original_term",
                 "domain",
-                # "confidence",
+                "embeddings",
                 "source",
                 "character_offset_start",
                 "character_offset_end",

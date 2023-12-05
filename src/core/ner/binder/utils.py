@@ -50,6 +50,11 @@ def extract_prediction(
     )
 
     scores = torch.concat([mask.nonzero(), span_logits[mask].unsqueeze(1)], dim=1)
+
+    if scores.size(0) == 0:
+        logger.warning("No valid spans found")
+        return []
+
     df = (
         pl.from_numpy(
             scores.cpu().detach().numpy(),
@@ -71,7 +76,7 @@ def extract_prediction(
             pl.col("type").replace(type_map).alias("entity_type"),
         )
         .with_columns(
-            pl.struct(["start_char", "end_char"]).apply(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
+            pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
         )
         .sort(by="score", descending=True)
         .unique(("start", "end"), maintain_order=True)

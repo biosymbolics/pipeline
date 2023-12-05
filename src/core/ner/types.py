@@ -40,9 +40,10 @@ class DocEntity(Dataclass):
     type: str
     start_char: int
     end_char: int
+    # embeddings of mention
+    embeddings: Optional[List[float]] = None
     normalized_term: Optional[str] = None
     linked_entity: Optional[CanonicalEntity] = None
-    span_embeddings: Optional[List[float]] = None
 
     def __str__(self):
         norm_term = (
@@ -64,6 +65,7 @@ class DocEntity(Dataclass):
             "start_char": self.start_char,
             "end_char": self.end_char,
             "normalized_term": self.normalized_term,
+            "embeddings": self.embeddings,
         }
 
 

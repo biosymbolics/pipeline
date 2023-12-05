@@ -7,7 +7,7 @@ from functools import reduce
 from itertools import groupby
 import time
 from typing import Any, Literal, Optional, Sequence, TypeVar
-from pydash import flatten
+from pydash import compact, flatten
 import logging
 import warnings
 import html
@@ -64,6 +64,7 @@ class NerTagger:
         ),
         additional_cleaners: list[CleanFunction] = [],
         link: bool = True,
+        normalize: bool = True,
     ):
         """
         Named-entity recognition using spacy
@@ -77,20 +78,29 @@ class NerTagger:
             rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
             additional_cleaners (list[Callable[[Sequence[str]], Sequence[str]]], optional): Additional cleaners funs. Defaults to [].
             link (bool, optional): Whether to link entities. Defaults to True.
+            normalize (bool, optional): Whether to normalize entities. Defaults to True.
         """
-        # prefer_gpu()
-        # set_gpu_allocator("pytorch")
+        start_time = time.time()
 
         self.model = model
         self.use_llm = use_llm
         self.llm_config = llm_config
         self.rule_sets = rule_sets
         self.entity_types = entity_types
-        self.normalizer = TermNormalizer(link, additional_cleaners)
-        start_time = time.time()
+        self.normalizer = (
+            TermNormalizer(link, additional_cleaners) if normalize else None
+        )
+
+        if link and not normalize:
+            raise ValueError("Cannot link entities without normalizing")
 
         if entity_types is not None and not isinstance(entity_types, frozenset):
             raise ValueError("entity_types must be a frozenset")
+
+        if not normalize:
+            logger.warning("Normalization is disabled")
+        if not link:
+            logger.warning("Linking is disabled")
 
         if self.use_llm:
             # lazy imports / inits
@@ -143,20 +153,20 @@ class NerTagger:
             round(time.time() - start_time, 2),
         )
 
-    def __prep_for_extract(self, content: Sequence[str]) -> Sequence[str]:
+    def _prep_for_extract(self, content: Sequence[str]) -> Sequence[str]:
         """
         Prepares a list of content for NER
         """
         steps = [
             lambda c: flatten(chunk_list(c, CHUNK_SIZE)) if self.use_llm else c,
             lambda _content: [html.unescape(c) for c in _content],
-            remove_extra_spaces,  # important; model gets confused by weird spacing
+            remove_extra_spaces,
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
 
     @staticmethod
-    def __combine_ents(doc1: Doc, doc2: Doc) -> DocEntities:
+    def _combine_ents(doc1: Doc, doc2: Doc) -> DocEntities:
         """
         Extract entities from two docs (produced by two different nlp pipelines)
         and combine them.
@@ -177,7 +187,7 @@ class NerTagger:
         entity_set = spans_to_doc_entities(sorted(deduped, key=lambda e: e.start_char))
         return entity_set
 
-    def __dual_model_extract(self, content: Sequence[str]) -> list[DocEntities]:
+    def _dual_model_extract(self, content: Sequence[str]) -> list[DocEntities]:
         """
         Run both NLP pipelines (rule_nlp and binder)
 
@@ -188,11 +198,11 @@ class NerTagger:
         if self.rule_nlp:
             rule_docs = self.rule_nlp.pipe(content)
             return [
-                self.__combine_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
+                self._combine_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
             ]
         return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
-    def __normalize(
+    def _normalize(
         self,
         entity_sets: list[DocEntities],
     ) -> list[DocEntities]:
@@ -202,27 +212,38 @@ class NerTagger:
         Args:
             entity_set (DocEntities): Entities to normalize
         """
-        terms: list[str] = [e[0] for e in flatten(entity_sets)]
+        if not self.normalizer:
+            logger.debug("Skipping normalization step")
+            return entity_sets
+
+        terms: list[str] = [e.term for e in flatten(entity_sets)]
         normalization_map = dict(self.normalizer.normalize(terms))
 
-        def get_doc_entity(e: DocEntity) -> DocEntity:
-            linked_entity = normalization_map.get(e.term)
+        def get_doc_entity(e: DocEntity) -> DocEntity | None:
+            norm_entity = normalization_map[e.term]
+            if len(norm_entity.name) == 0:
+                return None
             return DocEntity(
-                *e[0:4],
-                normalized_term=linked_entity.name if linked_entity else e.term,
-                linked_entity=linked_entity,
+                *e[0:5],
+                normalized_term=norm_entity.name,
+                linked_entity=norm_entity,
             )
 
         # filter by entity types (if provided) and remove empty names
         norm_entity_sets = [
-            [
-                get_doc_entity(e)
-                for e in es
-                if len(e[0]) > 0
-                and ((self.entity_types is None) or (e[1] in self.entity_types))
-            ]
+            compact(
+                [
+                    get_doc_entity(e)
+                    for e in es
+                    if len(e.term) > 0
+                    and ((self.entity_types is None) or (e.type in self.entity_types))
+                ]
+            )
             for es in entity_sets
         ]
+
+        if len(norm_entity_sets) != len(entity_sets):
+            raise ValueError("Normalization changed number of entities")
 
         return norm_entity_sets
 
@@ -259,12 +280,9 @@ class NerTagger:
         if not isinstance(content, list):
             raise Exception("Content must be a list")
 
-        prepped_content = self.__prep_for_extract(content)
-        entity_sets = self.__dual_model_extract(prepped_content)
-        norm_entity_sets = self.__normalize(entity_sets)
-
-        if len(norm_entity_sets) != len(entity_sets):
-            raise ValueError("Normalization changed number of entities")
+        prepped_content = self._prep_for_extract(content)
+        entity_sets = self._dual_model_extract(prepped_content)
+        norm_entity_sets = self._normalize(entity_sets)
 
         logger.info(
             "Full entity extraction took %s seconds for %s docs, yielded %s",
@@ -287,11 +305,8 @@ class NerTagger:
                 return entity.linked_entity.name
             return entity.normalized_term or entity.term
 
-        def as_strings(entities: DocEntities) -> list[str]:
-            return [as_string(e) for e in entities]
-
         ents_by_doc = self.extract(content, **kwargs)
-        map = {orig: as_strings(v) for orig, v in zip(content, ents_by_doc)}
+        map = {orig: [as_string(e) for e in v] for orig, v in zip(content, ents_by_doc)}
 
         return map
 

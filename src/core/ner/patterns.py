@@ -16,7 +16,7 @@ from constants.patterns import (
     SMALL_MOLECULE_INFIXES,
     SMALL_MOLECULE_SUFFIXES,
 )
-from constants.patterns.intervention import ALL_COMPOUND_BASE_TERMS_RE
+from constants.patterns.intervention import COMPOUND_BASE_TERMS_SPECIFIC
 from utils.re import get_or_re, wrap, ALPHA_CHARS
 
 from .types import SpacyPatterns
@@ -132,7 +132,7 @@ SMALL_MOLECULE_REGEXES = [
     get_suffix_entitiy_re(list(SMALL_MOLECULE_SUFFIXES.keys()), prefix_count="+"),
     get_infix_entity_re(list(SMALL_MOLECULE_INFIXES.keys()), count="+"),
     IUPAC_RE,
-    ALL_COMPOUND_BASE_TERMS_RE + ".*",
+    get_or_re(COMPOUND_BASE_TERMS_SPECIFIC) + ".*",
 ]
 
 SMALL_MOLECULE_PATTERNS: list[list[dict]] = [

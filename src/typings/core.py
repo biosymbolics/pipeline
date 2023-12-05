@@ -11,6 +11,9 @@ Primitive = bool | str | int | float | None
 @dataclass(frozen=True)
 class Dataclass:
     def __getitem__(self, item):
+        # e.g. e[0], *e[0:5]
+        if isinstance(item, int) or isinstance(item, slice):
+            return list(self.values())[item]
         return getattr(self, item)
 
     def get(self, item, default=None):

@@ -223,11 +223,15 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity(*orig_ents[i][0:4], modified_texts[i], orig_ents[i][5])
+                DocEntity(
+                    *orig_ents[i][0:5],
+                    normalized_term=modified_texts[i],
+                    linked_entity=orig_ents[i].linked_entity,
+                )
                 for i in range(len(orig_ents))
             ]
             if remove_suppressed:
-                doc_ents = [d for d in doc_ents if len(d.normalized_term) > 0]
+                doc_ents = [d for d in doc_ents if len(d.normalized_term or "") > 0]
             return cast(list[T], doc_ents)
 
         if is_string_list(orig_ents):

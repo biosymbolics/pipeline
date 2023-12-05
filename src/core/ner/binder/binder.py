@@ -86,9 +86,9 @@ class BinderNlp:
         new_ents = [
             Doc.char_span(
                 new_doc,
-                a["start_char"],
-                a["end_char"],
-                label=a["entity_type"],
+                a.start_char,
+                a.end_char,
+                label=a.entity_type,
                 # alignment_mode="expand", # results in "," captured
             )
             for a in annotations
@@ -147,7 +147,7 @@ class BinderNlp:
         "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
         for i in range(2)
         ]) + " and some melanoma."
-        b.extract(" melanoma").ents
+        b.extract(text).ents
         ```
         """
         text = doc.text if isinstance(doc, Doc) else doc

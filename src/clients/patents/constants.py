@@ -24,6 +24,8 @@ ENTITY_DOMAINS = [
     "devices",
     "diseases",
     "mechanisms",
+    "procedures",
+    "diagnostics",
 ]
 
 DOMAINS_OF_INTEREST = [

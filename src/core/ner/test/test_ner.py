@@ -1,6 +1,7 @@
 import unittest
 import pytest
 
+from clients.patents.constants import ENTITY_DOMAINS
 from core.ner import NerTagger
 
 
@@ -15,7 +16,7 @@ from core.ner import NerTagger
 # Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
 
 
-@pytest.mark.skip(reason="Too stocastic to include in CI")
+# @pytest.mark.skip(reason="Too stocastic to include in CI")
 class TestNerUtils(unittest.TestCase):
     """
     from core.ner import NerTagger; tagger=NerTagger()
@@ -25,72 +26,65 @@ class TestNerUtils(unittest.TestCase):
 
     def setUp(self):
         self.tagger = NerTagger(
-            entity_types=frozenset(["compounds", "diseases", "mechanisms"]),
-            link=False
+            entity_types=frozenset(ENTITY_DOMAINS),
+            link=False,
+            normalize=True,
             # rule_sets=[],
         )
 
     def test_ner(self):
         test_conditions = [
-            # {
-            #     "text": """
-            #     Bioenhanced formulations comprising eprosartan in oral solid dosage form.
-            #     This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
-            #     """,
-            #     "expected_output": [
-            #         "amorphous form",
-            #         "bioenhanced formulation",
-            #         "block angiotensin ii receptor",
-            #         "congestive heart failure",
-            #         "eprosartan mesylate",
-            #         "hypertension",
-            #         "renal failure",
-            #     ],
-            # },
-            # {
-            #     "text": [
-            #         """
-            #     Bioenhanced formulations comprising eprosartan in oral solid dosage form.
-            #     This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
-            #     """,
-            #         "Cox-2 inhibitors in combination with centrally acting analgesics",
-            #     ],
-            #     "expected_output": [
-            #         [
-            #             "amorphous form",
-            #             "bioenhanced formulation",
-            #             "block angiotensin ii receptor",
-            #             "congestive heart failure",
-            #             "eprosartan mesylate",
-            #             "hypertension",
-            #             "renal failure",
-            #         ],
-            #         ["analgesic", "centrally acting analgesic", "cox2 inhibitor"],
-            #     ],
-            # },
-            # {
-            #     "text": """
-            #     Pharmaceutical composition in particular for preventing and treating mucositis induced by radiotherapy or chemotherapy.
-            #     The invention concerns a pharmaceutical composition designed to adhere to a mucous membrane in particular for preventing or treating radiotherapy-related and chemotherapy-related mucositis, induced by radiotherapy or combined radiochemotherapy, comprising an efficient amount of an antiradical compound mixed with a vehicle which is liquid at room temperature and gels at the mucous membrane temperature and capable of adhering to the mucous membrane by its gelled state.
-            #     """,
-            #     "expected_output": [
-            #         "antiradical compound",
-            #         "chemotherapy",
-            #         "chemotherapy related mucositis",
-            #         "combined radiochemotherapy",
-            #         "radiotherapy",
-            #         "radiotherapy relate",
-            #     ],
-            # },
+            {
+                "text": """
+                Bioenhanced formulations comprising eprosartan in oral solid dosage form.
+                This invention relates to bioenhanced formulations comprising eprosartan or eprosartan mesylate in the amorphous form, a process for its production, compositions containing the compound and methods of using the compound to block angiotensin II receptors and to treat hypertension, congestive heart failure and renal failure.
+                """,
+                "expected_output": [
+                    "bioenhanced formulation",
+                    "eprosartan",
+                    "bioenhanced formulation",
+                    "eprosartan mesylate",
+                    "method",
+                    "block angiotensin ii receptor",
+                    "angiotensin ii receptor",
+                    "hypertension",
+                    "congestive heart failure",
+                    "renal failure",
+                ],
+            },
+            {
+                "text": """
+                Pharmaceutical composition in particular for preventing and treating mucositis induced by radiotherapy or chemotherapy.
+                The invention concerns a pharmaceutical composition designed to adhere to a mucous membrane in particular for preventing or treating radiotherapy-related and chemotherapy-related mucositis, induced by radiotherapy or combined radiochemotherapy, comprising an efficient amount of an antiradical compound mixed with a vehicle which is liquid at room temperature and gels at the mucous membrane temperature and capable of adhering to the mucous membrane by its gelled state.
+                """,
+                "expected_output": [
+                    "mucositis induced",
+                    "radiotherapy",
+                    "chemotherapy",
+                    "radiotherapy related",
+                    "chemotherapy related mucositis",
+                    "induced",
+                    "radiotherapy",
+                    "combined radiochemotherapy",
+                    "antiradical compound",
+                    "room temperature",
+                    "mucous membrane temperature",
+                    "gelled state",
+                ],
+            },
             {
                 "text": """
                 Novel aspartyl dipeptide ester derivatives and sweeteners.
                 Novel aspartyl dipeptide ester derivatives (including salts thereof) such as N-[N-[3-(3-hydroxy-4-methoxyphenyl)propyl]-L-α-aspartyl]-L-(α-methyl)phenylalanine 1-methyl ester which are usable as sweeteners; and sweeteners, foods, etc. containing the same. These compounds are usable as low-caloric sweeteners being much superior in the degree of sweetness to the conventional ones.
                 """,
                 "expected_output": [
+                    "aspartyl dipeptide ester derivative",
                     "aspartyl dipeptide ester",
-                    "n[n[33 hydroxy 4 methoxyphenylpropyl]-lα aspartyl]-l(α methyl)phenylalanine 1 methyl ester",
-                    "novel aspartyl dipeptide ester derivative",
+                    "aspartyl dipeptide ester derivative",
+                    "aspartyl dipeptide ester",
+                    "n-[n-[3-(3-hydroxy-4-methoxyphenyl)propyl]-l-α-aspartyl]-l-(alpha-methyl)phenylalanine 1-methyl ester",
+                    "low caloric sweetener",
+                    "superior",
                 ],
             },
             # {
@@ -151,17 +145,34 @@ class TestNerUtils(unittest.TestCase):
                 This invention relates generally to methods of detecting and quantifying biomarkers of oxidative stress in proteins. The biomarker may be any amino acid that has undergone oxidation, or other modification such as chloro-tyrosine, dityrosin. Emphasis is given herein on oxidized sulfur- or selenium-containing amino acids (SSAA). The biomarker of oxidative stress in proteins may be detected with an antibody that binds to oxidized amino acids, specifically oxidized sulfur- or selenium-containing amino acids. The antibody may be monoclonal or polyclonal. The presence of biomarker or amount of biomarker present in a sample may be used to aid in assessing the efficacy of environmental, nutritional and therapeutic interventions, among other uses.
                 """,
                 "expected_output": [
-                    "antibody",
-                    "dityrosine)",
-                    "monoclonal",
+                    "biomarker",
                     "oxidative stress",
-                    "polyclonal",
-                    "protein",
+                    "method",
                     "quantifying biomarker",
-                    "selenium containing amino acid"
-                    # antibody that binds to oxidized amino acids # TODO
-                    # chloro-tyrosine # TODO
-                    # oxidized sulfur- or selenium-containing amino acids (SSAA) # TODO
+                    "oxidative stress",
+                    "protein",
+                    "biomarker",
+                    "amino acid",
+                    "other modifier",
+                    "chloro tyrosine",
+                    "dityrosin",
+                    "sulfur oxidizer",
+                    "selenium containing amino acid",
+                    "biomarker",
+                    "oxidative stress",
+                    "protein",
+                    "antibody",
+                    "oxidizer amino acid binds",
+                    "oxidizer amino acid",
+                    "sulfur oxidizer",
+                    "selenium containing amino acid",
+                    "antibody",
+                    "monoclonal",
+                    "polyclonal",
+                    "biomarker",
+                    "biomarker present",
+                    "nutritional",
+                    "intervention",
                 ],
             },
             # {
@@ -187,15 +198,24 @@ class TestNerUtils(unittest.TestCase):
                 This invention relates to a combination drug comprising a combination of a tetrazolylalkoxy-dihydrocarbostyril derivative of the formula: wherein R is cycloalkyl, A is lower alkylene, and the bond between 3-and 4-positions of carbostyril nucleus is single bond or double bond, or a salt thereof and Probucol, which is useful for preventing and treating cerebral infarction including acute cerebral infarction and chronic cerebral infarction, arteriosclerosis, renal diseases, e.g. diabetic nephropathy, renal failure, nephritis, and diabetes owing to synergistic superoxide suppressant effects of the combination.
                 """,
                 "expected_output": [
-                    "arteriosclerosis",
-                    "cerebral infarction",
-                    "derivative",
+                    "combination drug",
                     "probucol",
+                    "tetrazolylalkoxy-dihydrocarbostyril",
+                    "superoxide supressant effect",
+                    "combination drug",
+                    "combination",
+                    "tetrazolylalkoxy-dihydrocarbostyril",
+                    "cycloalkyl",
+                    "alkylene",
+                    "carbostyril nucleus",
+                    "bond or double bond",
+                    "probucol",
+                    "cerebral infarction",
                     "renal disease",
                     "renal failure",
-                    "superoxide supressant effect",
-                    "synergistic superoxide suppressant effect",
-                    "tetrazolylalkoxy dihydrocarbostyril",
+                    "synergistic superoxide suppressor effect",
+                    "combination",
+                    # atherosclerosis
                 ],
             },
             {
@@ -204,14 +224,19 @@ class TestNerUtils(unittest.TestCase):
                     There are disclosed certain novel compounds (including pharmaceutically acceptable salts thereof) (I) that inhibit phosphatidylinositol 3-kinase gamma (PI3Kδ) and phosphatidylinositol 3-kinase gamma (ΡΙ3Κγ) activity, to their utility in treating and/or preventing clinical conditions including respiratory diseases, such as asthma and chronic obstructive pulmonary disease (COPD), to their use in therapy, to pharmaceutical compositions containing them and to processes for preparing such compounds.
                 """,
                 "expected_output": [
+                    "h isoindol 1",
+                    "inhibitor",
+                    "phosphatidylinositol 3 kinase delta & gamma",
+                    "certain compound",
+                    "salt",
+                    "inhibit phosphatidylinositol 3 kinase gamma",
+                    "phosphatidylinositol 3 kinase gamma",
+                    "activity",
+                    "respiratory disease",
                     "asthma",
                     "chronic obstructive pulmonary disease",
-                    "derivative",
-                    "dual inhibitor",
-                    "phosphatidylinositol 3 kinase delta & gamma",
-                    "phosphatidylinositol 3 kinase gamma (pi3kδ",
-                    "phosphatidylinositol 3 kinase gamma (ρι3κγ) activity",
-                    "respiratory disease",
+                    "therapy",
+                    "compound",
                 ],
             },
             {
@@ -219,23 +244,23 @@ class TestNerUtils(unittest.TestCase):
                     Compounds useful in the treatment of disorders responsive to the inhibition of apoptosis signal-regulating kinase 1 (ASK1)
                 """,
                 "expected_output": [
-                    # "apoptosis signal regulating kinase 1",
+                    "compound",
                     # "disorders response to the inhibition of apoptosis signal regulating kinase 1",
                     "disorders responsive",
-                    "apoptosis signal regulating kinase",
+                    "inhibitor",
+                    "apoptosis signal regulating kinase 1",
                     # "ask1 inhibitor"
                 ],
             },
             {
                 "text": "Compositions containing reduced amounts of daclizumab acidic isoforms and methods for preparing the same.",
-                "expected_output": [
-                    "daclizumab acidic isoform",
-                ],
+                "expected_output": ["daclizumab acidic isoform", "method"],
             },
             {
                 "text": "The present invention relates to a method for PEGylating interferon beta.",
                 "expected_output": [
-                    # "pegylating interferon beta",
+                    "method",
+                    "pegylating interferon beta",
                 ],
             },
             {
