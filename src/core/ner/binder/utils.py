@@ -55,38 +55,34 @@ def extract_prediction(
         logger.warning("No valid spans found")
         return []
 
-    try:
-        df = (
-            pl.from_numpy(
-                scores.cpu().detach().numpy(),
-                schema={
-                    "type": pl.Int8,
-                    "start": pl.Int32,
-                    "end": pl.Int32,
-                    "score": pl.Float32,
-                },
-            )
-            .with_columns(
-                pl.col("start").replace(start_offset_mapping).alias("start_char"),
-                pl.col("end").replace(end_offset_mapping).alias("end_char"),
-                pl.col("type").replace(type_map).alias("entity_type"),
-            )
-            .filter(
-                ((pl.col("end") - pl.col("start")) < MAX_SPAN_LENGTH)
-                & (pl.col("start_char") is not None)
-                & (pl.col("end_char") is not None)
-            )
-            .with_columns(
-                pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]]).alias("text"),  # type: ignore
-            )
-            .sort(by="score", descending=True)
-            .unique(("start", "end"), maintain_order=True)
+    df = (
+        pl.from_numpy(
+            scores.cpu().detach().numpy(),
+            schema={
+                "type": pl.Int8,
+                "start": pl.Int32,
+                "end": pl.Int32,
+                "score": pl.Float32,
+            },
         )
+        .with_columns(
+            pl.col("start").replace(start_offset_mapping).alias("start_char"),
+            pl.col("end").replace(end_offset_mapping).alias("end_char"),
+            pl.col("type").replace(type_map).alias("entity_type"),
+        )
+        .filter(
+            ((pl.col("end") - pl.col("start")) < MAX_SPAN_LENGTH)
+            & (pl.col("start_char") is not None)
+            & (pl.col("end_char") is not None)
+        )
+        .with_columns(
+            pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]], return_dtype=pl.Utf8).alias("text"),  # type: ignore
+        )
+        .sort(by="score", descending=True)
+        .unique(("start", "end"), maintain_order=True)
+    )
 
-        print(df)
-    except Exception as e:
-        logger.error("Error creating dataframe: %s, %s", e, scores)
-        return []
+    print(df)
 
     annotations = [
         Annotation(**r, id=f"{feature['id']}-{i}")
