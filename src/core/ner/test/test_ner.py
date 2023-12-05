@@ -5,6 +5,7 @@ from clients.patents.constants import ENTITY_DOMAINS
 from core.ner import NerTagger
 
 
+# Good random test cases.
 # PROTEIN BINDING TO Akt2
 # Acetylated hmgb1 protein
 # Hla-a24-restricted cancer antigen peptide
@@ -87,58 +88,91 @@ class TestNerUtils(unittest.TestCase):
                     "superior",
                 ],
             },
-            # {
-            #     "text": """
-            #     Muscarinic antagonists
-            #     Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
-            #     """,
-            #     "expected_output": [
-            #         "muscarinic antagonists heterocyclic derivative",
-            #         "din substituted piperazine",
-            #         "1,4 di substituted piperidine",
-            #         "di substituted piperidine compound",
-            #         "optionally substituted aryl",
-            #         "arylcarbonyl",
-            #         "aryloxycarbonyl",
-            #         "aryl aminocarbonyl",
-            #         "optionally",  # TODO
-            #         "muscarinic antagonists useful",
-            #         "alzheimer disease",
-            #     ],
-            # },
-            # {
-            #     "text": """
-            #     Method of treating meniere&#39;s disease and corresponding apparatus
-            #     In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
-            #     """,
-            #     "expected_output": [
-            #         "intermittent air pressure pulse train",
-            #         "meniere disease",
-            #         "ménière disease intermittent air pressure pulse train",
-            #         "modulation frequency",
-            #         "surgically perforated tympanic membrane",
-            #     ],
-            # },
-            # {
-            #     "text": """
-            #     Cox-2 inhibitors in combination with centrally acting analgesics
-            #     A method of alleviating a pain state not associated with a cough condition is provided which comprises administering a cyclooxygenase-2 inhibitor and a centrally active analgesic selected from the group consisting of a narcotic analgesic selected from the group consisitng of codeine and hydrocodone; an agonist-antagonist analgesic and tramadol. A method and analgesic composition therefor is also provided for treating all pain states which comprises administering a cyclooxygenase-2 inhibitor and a centrally acting analgesic selected from the group consisting of a narcotic analgesic other than codeine and hydrocodone; an agonist-antagonist analgesic and tramadol.
-            #     """,
-            #     "expected_output": [
-            #         "active analgesic",
-            #         "agonist antagonist analgesic",
-            #         "analgesic",
-            #         "analgesic composition therefor",  # ugh
-            #         "centrally acting analgesic",
-            #         "codeine",
-            #         "cough condition",
-            #         "cox2 inhibitor",
-            #         "cyclooxygenase 2 inhibitor",
-            #         "narcotic analgesic",
-            #         "narcotic analgesic other",
-            #         "pain state",
-            #     ],
-            # },
+            {
+                "text": """
+                Muscarinic antagonists
+                Heterocyclic derivatives of di-N-substituted piperazine or 1,4 di-substituted piperidine compounds in accordance with formula (I) (including all isomers, salts and solvates), wherein one of Y and Z is -N- and the other is -N- or -CH-; X is -O-, -S-, -SO-, -SO2- or -CH2-; Q is (1), (2), (3); R is alkyl, cycloalkyl, optionally substituted aryl or heteroaryl; R?1, R2 and R3¿ are H or alkyl; R4 is alkyl, cyclolalkyl or (4); R5 is H, alkyl, -C(O)alkyl, arylcarbonyl, -SO¿2?alkyl, aryl-sulfonyl-C(O)Oalkyl, aryloxycarbonyl, -C(O)NH-alkyl or aryl-aminocarbonyl, wherein the aryl portion is optionally substituted; R?6¿ is H or alkyl; and R7 is H, alkyl, hydroxyalkyl or alkoxyalkyl; are muscarinic antagonists useful for treating cognitive disorders such as Alzheimer&#39;s disease. Pharmaceutical compositions and methods of treatment are also disclosed.
+                """,
+                "expected_output": [
+                    "muscarinic antagonist heterocyclic derivative",
+                    "din substituted piperazine",
+                    "1,4 di substituted piperidine",
+                    "di substituted piperidine compound",
+                    "isomer",
+                    "alkyl",
+                    "cycloalkyl",
+                    "substituted aryl",
+                    "substituted aryl",
+                    "alkyl",
+                    "alkyl",
+                    "cyclolalkyl",
+                    "alkyl",
+                    "arylcarbonyl",
+                    "aryl sulfonyl cooalkyl",
+                    "aryloxycarbonyl",
+                    "aryl aminocarbonyl",
+                    "substituted",
+                    "alkyl",
+                    "alkyl",
+                    "hydroxyalkyl",
+                    "alkoxyalkyl",
+                    "muscarinic antagonist",
+                    "cognitive disorder",
+                    "alzheimer disease",
+                    "method",
+                ],
+            },
+            {
+                "text": """
+                Method of treating meniere&#39;s disease and corresponding apparatus. In a method of treating Ménière&#39;s disease intermittent air pressure pulse trains are administred to an outwardly sealed external ear volume bordering to a surgically perforated tympanic membrane. In a pulse train air pressure is increased from ambient (p0) to a first level (p1) and from there repeatedly to a second level (p2) and repeatedly decreased to the first level (p1), and finally decreased to ambient (p0). P1 is from 4 to 16 cm H2O, p2 is from 8 to 16 cm H2O, with the proviso that p1 &gt; p2, the pressure increase rate is from 0 to 4 mm H2O per millisecond, the pressure decrease rate is from 0 to 2 mm H2O per millisecond, the modulation frequency is from 3 to 9 Hz, the intermittent time period is from 3 to 10 seconds. Also disclosed is an apparatus for carrying out the method.
+                """,
+                "expected_output": [
+                    "method",
+                    "meniere disease",
+                    "corresponding apparatus",
+                    "method",
+                    "ménière disease intermittent air pressure pulse train",
+                    "surgically perforated tympanic membrane",
+                    "ambient",
+                    "level",
+                    "level",
+                    "level",
+                    "ambient",
+                    "pressure increase rate",
+                    "millisecond",
+                    "pressure decrease rate",
+                    "millisecond",
+                    "frequency modulator",
+                    "apparatus",
+                    "method",
+                ],
+            },
+            {
+                "text": """
+                Cox-2 inhibitors in combination with centrally acting analgesics
+                A method of alleviating a pain state not associated with a cough condition is provided which comprises administering a cyclooxygenase-2 inhibitor and a centrally active analgesic selected from the group consisting of a narcotic analgesic selected from the group consisitng of codeine and hydrocodone; an agonist-antagonist analgesic and tramadol. A method and analgesic composition therefor is also provided for treating all pain states which comprises administering a cyclooxygenase-2 inhibitor and a centrally acting analgesic selected from the group consisting of a narcotic analgesic other than codeine and hydrocodone; an agonist-antagonist analgesic and tramadol.
+                """,
+                "expected_output": [
+                    "cox2 inhibitor",
+                    "combination",
+                    "centrally acting analgesic",
+                    "method",
+                    "cyclooxygenase 2 inhibitor",
+                    "analgesic",
+                    "narcotic analgesic",
+                    "codeine",
+                    "hydrocodone",
+                    "agonist antagonist analgesic",
+                    "method",
+                    "analgesic composition thereof",
+                    "cyclooxygenase 2 inhibitor",
+                    "analgesic",
+                    "narcotic analgesic other",
+                    "codeine",
+                    "hydrocodone",
+                    "agonist antagonist analgesic",
+                ],
+            },
             {
                 "text": """
                 Biomarkers for oxidative stress
@@ -175,23 +209,30 @@ class TestNerUtils(unittest.TestCase):
                     "intervention",
                 ],
             },
-            # {
-            #     "text": """
-            #     Antagonistic peptide targeting il-2, il-9, and il-15 signaling for the treatment of cytokine-release syndrome and cytokine storm associated disorders
-            #     The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15) cytokines are associated with important human diseases, such as cytokine-release syndrome and cytokine storm associated disorders. Compositions, methods, and kits to modulate signaling by at least one IL-2, IL-9, or IL-15 γc-cytokine family members for inhibiting, ameliorating, reducing a severity of, treating, delaying the onset of, or preventing at least one cytokine storm related disorder are described.
-            #     """,
-            #     "expected_output": [
-            #         "antagonistic peptide targeting il2",
-            #         "cytokine",
-            #         "cytokine release syndrome",
-            #         "cytokine storm",
-            #         "cytokine storm associated disorder",
-            #         "cytokine storm related disorder",
-            #         "il15 γc cytokine family",
-            #         "inhibiting",
-            #         "modulate signal",
-            #     ],
-            # },
+            {
+                "text": """
+                Antagonistic peptide targeting il-2, il-9, and il-15 signaling for the treatment of cytokine-release syndrome and cytokine storm associated disorders
+                The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15) cytokines are associated with important human diseases, such as cytokine-release syndrome and cytokine storm associated disorders. Compositions, methods, and kits to modulate signaling by at least one IL-2, IL-9, or IL-15 γc-cytokine family members for inhibiting, ameliorating, reducing a severity of, treating, delaying the onset of, or preventing at least one cytokine storm related disorder are described.
+                """,
+                "expected_output": [
+                    "antagonistic peptide il2",
+                    "cytokine release syndrome",
+                    "cytokine storm associated disorder",
+                    "gc family il2",
+                    "il9",
+                    "il15",
+                    "cytokine",
+                    "important human disease",
+                    "cytokine release syndrome",
+                    "cytokine storm associated disorder",
+                    "method",
+                    "signaling modulator",
+                    "il15 gc cytokine family",
+                    "inhibitor",
+                    "ameliorating",
+                    "cytokine storm related disorder",
+                ],
+            },
             {
                 "text": """
                 Combination drug containing probucol and a tetrazolylalkoxy-dihydrocarbostyril derivative with superoxide supressant effects
@@ -268,14 +309,44 @@ class TestNerUtils(unittest.TestCase):
                     Bipolar pliers for microsurgery and coeliosurgery
                     The invention concerns prehensile, rotating and detachable bipolar electro-coagulating pliers for microsurgery and coeliosurgery. It concerns reusable pliers for microsurgery and coeliosurgery prehensile and ensuring bipolar coagulation without bonding the coagulated tissues, combining in a single instrument both functions, so as to save time and handling procedure during an operation. Said pliers consist of: a head called fixed part (1) internally and externally insulated except for the fixed coagulating jaw (1); a mobile jaw (2) articulated on a ceramic pin (3) provided like the fixed jaw (1) with a coating preventing the coagulated tissues from being bonded; an externally insulated tube (7) with its snake (6) likewise insulated, connected to the mobile blade (2) and the handle (12-11); a handle controlling (11-12) power supply electrode-holders (14-13) connected to the tube and snake assembly by a screw socket (9) and the movement controlling ball (10). The insulation between the various metal components is provided by the ceramic pin (3) and the hot-deposited insulating coating.
                 """,
-                "expected_output": [],
+                "expected_output": [
+                    "bipolar plier",
+                    "coeliosurgery",
+                    "detachable bipolar electro coagulating plier",
+                    "coeliosurgery",
+                    "reusable plier",
+                    "bipolar coagulation",
+                    "combining",
+                    "instrument",
+                    "instrument both",
+                    "operation",
+                    "insulated except",
+                    "except",
+                    "mobile jaw",
+                    "ceramic pin",
+                    "mobile blade",
+                    "snake",
+                    "ceramic pin",
+                ],
             },
-            # virus-induced antigen expressed on the plasma membrane of virus-infected cells, or; e) a receptor molecule or the fragment thereof with an affinity to an epitope of the viral structural proteins
-            # WARNING:core.ner.binder.utils:Overlap detected between sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor and [glucosylceramide synthesis inhibitors, (ii) sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor, sphingosine-1-phosphate synthesis inhibitors, and (iii) protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor, protein kinase C inhibitors. A preferred glucosyl ceramide synthesis inhibitor is 1-phenyl-2-palmitoylamino-3-morpholino-1-propanol. A preferred sphingosine-1-phosphate synthesis inhibitor]
-            # WARNING:core.ner.binder.utils:Overlap detected between schizophrenia and [disorders treatable and/or preventable with anti-convulsive agents, such as epilepsy including post-traumatic epilepsy, Parkinson's disease, psychosis, migraine, cerebral ischaemia, Alzheimer's disease and other degenerative diseases such as Huntingdon's chorea, schizophrenia, obsessive compulsive disorders (OCD)]
-            # WARNING:core.ner.binder.utils:Overlap detected between anti-inflammatory agents and [anti-inflammatory agents
-            # Bifunctional activation cascade antagonist]
-            # WARNING:core.ner.binder.utils:Overlap detected between π-bound ligand and [monoanionic ligand bound to the metal, B is a π-bound ligand]
+            {
+                "text": """
+                virus-induced antigen expressed on the plasma membrane of virus-infected cells, or; e) a receptor molecule or the fragment thereof with an affinity to an epitope of the viral structural proteins
+                """,
+                "expected_output": [
+                    "virus induced antigen",
+                    "virus infected cell",
+                    "receptor molecule",
+                    "fragment",
+                    "epitope",
+                    "viral structural protein",
+                ],
+            },
+            {
+                # TODO: if NerTagger didn't add a space to the beginning, binder wouldn't find it.
+                "text": "Smg-1-binding protein and method of screening substance controlling its activity",
+                "expected_output": ["smg1 binder protein", "method", "activity"],
+            },
         ]
 
         for condition in test_conditions:
