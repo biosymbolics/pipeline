@@ -6,7 +6,7 @@ from typing import Sequence
 from pydash import compact
 
 
-from ..types import CanonicalEntity, DocEntities, DocEntity
+from ..types import CanonicalEntity, DocEntity
 
 LinkedEntityMap = dict[str, CanonicalEntity]
 

@@ -6,7 +6,7 @@ from typing import Sequence
 from pydash import flatten
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
-from core.ner.types import CanonicalEntity, DocEntities, DocEntity
+from core.ner.types import CanonicalEntity, DocEntity
 
 
 class TermNormalizer:

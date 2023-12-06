@@ -1,7 +1,6 @@
 """
 NER types
 """
-from collections import namedtuple
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -16,8 +15,9 @@ from typing import (
     Union,
 )
 from spacy.language import Language
-from spacy.pipeline import Pipe
 from spacy.tokenizer import Tokenizer
+from spacy.tokens import Doc
+
 
 from typings.core import Dataclass
 
@@ -42,6 +42,7 @@ class DocEntity(Dataclass):
     end_char: int
     # embeddings of mention
     embeddings: Optional[List[float]] = None
+    spacy_doc: Optional[Doc] = None
     normalized_term: Optional[str] = None
     linked_entity: Optional[CanonicalEntity] = None
 

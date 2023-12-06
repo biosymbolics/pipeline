@@ -105,7 +105,7 @@ class NerTagger:
             # rules catch a few things the binder model misses
             rule_nlp = Spacy.get_instance(
                 model="en_core_sci_lg",
-                additional_pipelines={
+                enable={
                     "merge_entities": {"after": "ner"},
                     "entity_ruler": {
                         "config": {"validate": True, "overwrite_ents": True},
@@ -197,7 +197,7 @@ class NerTagger:
             if len(norm_entity.name) == 0:
                 return None
             return DocEntity(
-                *e[0:5],
+                *e[0:6],
                 normalized_term=norm_entity.name,
                 linked_entity=norm_entity,
             )

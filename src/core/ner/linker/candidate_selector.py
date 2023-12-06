@@ -60,12 +60,40 @@ class CandidateSelector(CandidateGenerator, object):
         *args,
         min_similarity: float = MIN_SIMILARITY,
         max_distance: float = MAX_DISTANCE,
+        vector_length: int = WORD_VECTOR_LENGTH,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.min_similarity = min_similarity
         self.max_distance = max_distance
-        self.nlp = Spacy.get_instance(disable=["ner", "parser", "tagger"])
+        self.vector_length = vector_length
+        self.nlp = Spacy.get_instance(
+            model="en_core_web_trf",
+            disable=["ner"],  # , "parser", "tagger"],
+            additional_pipelines={
+                "transformer": {
+                    "config": {
+                        "model": {
+                            "@architectures": "spacy-transformers.TransformerModel.v3",
+                            "name": "bert-base-cased",
+                            "tokenizer_config": {"use_fast": True},
+                            # "transformer_config": {},
+                            # "mixed_precision": True,
+                            # "grad_scaler_config": {"init_scale": 32768},
+                            "get_spans": {
+                                "@span_getters": "spacy-transformers.strided_spans.v1",
+                                "window": 512,
+                                "stride": 16,
+                            },
+                        },
+                    },
+                },
+                "tok2vec": {},
+            },
+        )
+        # self.nlp = Spacy.get_instance(
+        #     disable=["ner", "parser", "tagger"], model="en_core_sci_lg"
+        # )
 
     def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
@@ -113,9 +141,13 @@ class CandidateSelector(CandidateGenerator, object):
         """
         Create an Annoy index for a list of candidates
         """
-        umls_ann = AnnoyIndex(WORD_VECTOR_LENGTH, metric="angular")
+        umls_ann = AnnoyIndex(self.vector_length, metric="angular")
 
-        candidate_docs = self.nlp.pipe([c.aliases[0] for c in candidates])
+        canonical_names = [
+            self.kb.cui_to_entity[c.concept_id].canonical_name.lower()
+            for c in candidates
+        ]
+        candidate_docs = self.nlp.pipe(canonical_names)
         for i, doc in enumerate(candidate_docs):
             umls_ann.add_item(i, doc.vector)
 
@@ -123,39 +155,51 @@ class CandidateSelector(CandidateGenerator, object):
         return umls_ann
 
     def get_best_by_semantic_similarity(
-        self, mention_embeddings: list[float], candidates: Sequence[MentionCandidate]
+        self, embeddings: list[float], candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
         Get best candidate by semantic similarity
         """
         umls_ann = self.create_ann_index(candidates)
         cui, dist = umls_ann.get_nns_by_vector(
-            mention_embeddings, 10, search_k=10, include_distances=True
+            embeddings, 10, search_k=10, include_distances=True
         )
+
+        if len(cui) == 0:
+            return None
+
         top_candidate = candidates[cui[0]]
-        distance = dist[cui[0]]
-        logger.info([(candidates[c], d) for c, d in list(zip(cui, dist))])
+        distance = dist[0]
+        print([(candidates[c].aliases[0], d) for c, d in list(zip(cui, dist))])
 
         if distance > self.max_distance:
             logger.warning(
-                "Best candidate (%s) too distant (%s)", top_candidate, distance
+                "Best candidate (%s) too distant (%s)",
+                top_candidate,
+                distance,
             )
             return None
 
         return top_candidate
 
     def _get_best_canonical(
-        self, candidates: Sequence[MentionCandidate], entity: DocEntity
+        self,
+        candidates: Sequence[MentionCandidate],
+        mention_embeddings: list[float] | None = None,
     ) -> CanonicalEntity | None:
         """
         Get canonical candidate if suggestions exceed min similarity
+
+        Args:
+            candidates (Sequence[MentionCandidate]): list of candidates
+            mention_embeddings (list[float], Optional): embeddings for mention text
         """
 
-        if entity.embeddings is None:
+        if mention_embeddings is None:
             top_candidate = self.get_best_by_rules(candidates)
         else:
             top_candidate = self.get_best_by_semantic_similarity(
-                entity.embeddings,
+                mention_embeddings,
                 candidates,
             )
 
@@ -187,12 +231,18 @@ class CandidateSelector(CandidateGenerator, object):
             types=entity.types,
         )
 
+    def select_candidate(
+        self, term: str, embeddings: list[float] | None = None
+    ) -> CanonicalEntity | None:
+        """
+        Generate & select candidates for a list of mention texts
+        """
+        candidates = self._get_candidates(term)
+
+        return self._get_best_canonical(candidates, embeddings)
+
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
-        Generate candidates for a list of mention texts
-
-        If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
+        Generate & select candidates for a list of mention texts
         """
-        candidates = self._get_candidates(entity.term)
-
-        return self._get_best_canonical(candidates, entity)
+        return self.select_candidate(entity.term, entity.embeddings)

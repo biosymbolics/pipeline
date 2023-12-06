@@ -31,12 +31,11 @@ class Spacy:
         self,
         model: str = DEFAULT_MODEL,
         additional_pipelines: dict[str, dict] = {},
+        exclude: list[str] = [],
         **kwargs: Any,
     ):
         """
         Initialize Spacy instance
-
-        TODO: add disables!
 
         Using additions:
         rule_nlp = Spacy.get_instance(
@@ -55,9 +54,16 @@ class Spacy:
         spacy.prefer_gpu()  # type: ignore
 
         self.model = model
-        self._nlp: Language = spacy.load(self.model, **kwargs)
+
+        # disable additional_pipelines keys to we cana add them
+        _exclude = [*exclude, *additional_pipelines.keys()]
+        nlp: Language = spacy.load(self.model, exclude=_exclude, **kwargs)
+
         for name, args in additional_pipelines.items():
-            self._nlp.add_pipe(name, **args)
+            nlp.add_pipe(name, **args)
+
+        nlp.initialize()
+        self._nlp = nlp
 
     def __getattr__(self, name):
         # Delegate attribute access to the underlying Language instance

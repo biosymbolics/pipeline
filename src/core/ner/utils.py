@@ -3,7 +3,6 @@ Utils for the NER pipeline
 """
 from functools import partial, reduce
 import logging
-import time
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -18,7 +17,7 @@ from utils.re import (
 )
 
 from .spacy import Spacy
-from .types import DocEntities, DocEntity, SynonymRecord
+from .types import DocEntity, SynonymRecord
 
 
 logger = logging.getLogger(__name__)
@@ -469,16 +468,21 @@ def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
         yield __normalize_by_pos(doc)
 
 
-def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
+def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     """
     Converts a list of spacy spans to a list of DocEntity
 
     Args:
         spans: list of spacy spans
     """
-    entity_set: DocEntities = [
+    entity_set = [
         DocEntity(
-            span.text, span.label_, span.start_char, span.end_char, span.vector.tolist()
+            span.text,
+            span.label_,
+            span.start_char,
+            span.end_char,
+            span.vector.tolist(),
+            spacy_doc=span.as_doc(),
         )
         for span in spans
     ]

@@ -206,11 +206,11 @@ class EntityCleaner:
         return normalized
 
     @staticmethod
-    def __get_text(entity) -> str:
+    def _get_text(entity) -> str:
         return entity[0] if isinstance(entity, tuple) else entity
 
     @staticmethod
-    def __return_to_type(
+    def _return_to_type(
         modified_texts: Sequence[str],
         orig_ents: Sequence[T],
         remove_suppressed: bool = False,
@@ -224,7 +224,7 @@ class EntityCleaner:
         if is_entity_doc_list(orig_ents):
             doc_ents = [
                 DocEntity(
-                    *orig_ents[i][0:5],
+                    *orig_ents[i][0:6],
                     normalized_term=modified_texts[i],
                     linked_entity=orig_ents[i].linked_entity,
                 )
@@ -259,7 +259,7 @@ class EntityCleaner:
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
-        cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
+        cleaned = self.normalize_terms([self._get_text(ent) for ent in entities])
 
         # INFO:core.ner.cleaning:Cleaned 2268406 entities in 1957.85 seconds
         logger.info(
@@ -268,7 +268,7 @@ class EntityCleaner:
             round(time.time() - start, 2),
         )
 
-        return self.__return_to_type(
+        return self._return_to_type(
             cleaned, entities, remove_suppressed=remove_suppressed
         )
 

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DEFAULT_MAX_STRING_LEN = 100
-WORD_VECTOR_LENGTH = 300
+WORD_VECTOR_LENGTH = 200
 
 TextEncoderData: TypeAlias = pl.DataFrame | Sequence | npt.NDArray
 
