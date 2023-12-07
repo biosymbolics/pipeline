@@ -61,8 +61,9 @@ class Spacy:
 
         for name, args in additional_pipelines.items():
             nlp.add_pipe(name, **args)
+            if name == "tok2vec":
+                nlp.initialize()
 
-        nlp.initialize()
         self._nlp = nlp
 
     def __getattr__(self, name):

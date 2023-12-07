@@ -1,17 +1,30 @@
 from typing import Sequence
 from annoy import AnnoyIndex
-from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
+import joblib
+from numpy import mean
+from scispacy.candidate_generation import (
+    CandidateGenerator,
+    MentionCandidate,
+    cached_path,
+)
+from spacy.tokens import Doc
+from sklearn.feature_extraction.text import TfidfVectorizer
+import torch
 from core.ner.spacy import Spacy
 import logging
 
-from core.ner.types import CanonicalEntity, DocEntity
+from core.ner.types import CanonicalEntity
 from constants.umls import UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
 from utils.encoding.text_encoder import WORD_VECTOR_LENGTH
 
 DEFAULT_K = 25
-MIN_SIMILARITY = 0.85  # only used if entity.embeddings is None
-MAX_DISTANCE = 0.5
+MIN_SIMILARITY = 0
+UMLS_KB = None
+# BIOSYM_UMLS_TFIDF_PATH = "https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/data/linkers/2023-04-23/umls/tfidf_vectorizer.joblib"
+BIOSYM_UMLS_TFIDF_PATH = (
+    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
+)
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     **UMLS_CUI_SUPPRESSIONS,
@@ -59,31 +72,32 @@ class CandidateSelector(CandidateGenerator, object):
         self,
         *args,
         min_similarity: float = MIN_SIMILARITY,
-        max_distance: float = MAX_DISTANCE,
         vector_length: int = WORD_VECTOR_LENGTH,
         **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        global UMLS_KB
+
+        if UMLS_KB is None:
+            from scispacy.linking_utils import UmlsKnowledgeBase
+
+            UMLS_KB = UmlsKnowledgeBase()
+
+        super().__init__(*args, kb=UMLS_KB, **kwargs)
         self.min_similarity = min_similarity
-        self.max_distance = max_distance
         self.vector_length = vector_length
         self.nlp = Spacy.get_instance(
             model="en_core_web_trf",
-            disable=["ner"],  # , "parser", "tagger"],
+            disable=["ner"],  # "parser", "tagger"],
             additional_pipelines={
                 "transformer": {
                     "config": {
                         "model": {
                             "@architectures": "spacy-transformers.TransformerModel.v3",
-                            "name": "bert-base-cased",
-                            "tokenizer_config": {"use_fast": True},
-                            # "transformer_config": {},
-                            # "mixed_precision": True,
-                            # "grad_scaler_config": {"init_scale": 32768},
+                            "name": "kristinalindquist/binder-biomedical-patents",
                             "get_spans": {
                                 "@span_getters": "spacy-transformers.strided_spans.v1",
-                                "window": 512,
-                                "stride": 16,
+                                "window": 128,
+                                "stride": 96,
                             },
                         },
                     },
@@ -91,9 +105,32 @@ class CandidateSelector(CandidateGenerator, object):
                 "tok2vec": {},
             },
         )
-        # self.nlp = Spacy.get_instance(
-        #     disable=["ner", "parser", "tagger"], model="en_core_sci_lg"
-        # )
+        self.tfidf: TfidfVectorizer = joblib.load(cached_path(BIOSYM_UMLS_TFIDF_PATH))
+        self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), WORD_VECTOR_LENGTH)
+
+    def batch_vectorize(self, texts: Sequence[str]) -> list[tuple[torch.Tensor, Doc]]:
+        """
+        Vectorize a text
+        """
+        docs = list(self.nlp.pipe(texts))
+        bert_vecs = [torch.tensor(doc.vector) for doc in docs]
+        tfidf_vecs = self.tfidf.transform(texts).toarray()
+        projected = [self.tfidf_ll.forward(torch.tensor(vec)) for vec in tfidf_vecs]
+        return [
+            (torch.cat([bert_vec, tfidf_vec]), doc)
+            for bert_vec, tfidf_vec, doc in zip(bert_vecs, projected, docs)
+        ]
+
+    def vectorize(self, text: str) -> tuple[torch.Tensor, Doc]:
+        """
+        Vectorize a text
+        """
+        doc = self.nlp(text)
+        bert_vec = torch.tensor(doc.vector)
+        tfidf_vec = self.tfidf_ll.forward(
+            torch.tensor(self.tfidf.transform([text]).toarray()[0])
+        )
+        return torch.cat([bert_vec, tfidf_vec]), doc
 
     def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
@@ -147,9 +184,13 @@ class CandidateSelector(CandidateGenerator, object):
             self.kb.cui_to_entity[c.concept_id].canonical_name.lower()
             for c in candidates
         ]
-        candidate_docs = self.nlp.pipe(canonical_names)
-        for i, doc in enumerate(candidate_docs):
-            umls_ann.add_item(i, doc.vector)
+        cn_vectors = self.batch_vectorize(canonical_names)
+        alias_vectors = [self.batch_vectorize(c.aliases) for c in candidates]
+        for i in range(len(candidates)):
+            cn_vec = cn_vectors[i][0]
+            alias_vec = torch.mean(torch.concat([av[0] for av in alias_vectors[i]]))
+            combined_vec = 0.6 * cn_vec + 0.4 * alias_vec
+            umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
         return umls_ann
@@ -160,23 +201,39 @@ class CandidateSelector(CandidateGenerator, object):
         """
         Get best candidate by semantic similarity
         """
-        umls_ann = self.create_ann_index(candidates)
-        cui, dist = umls_ann.get_nns_by_vector(
-            embeddings, 10, search_k=10, include_distances=True
-        )
-
-        if len(cui) == 0:
+        if mean(embeddings) == 0:
+            logger.warning("No embeddings for %s", candidates[0].aliases[0])
             return None
 
-        top_candidate = candidates[cui[0]]
-        distance = dist[0]
-        print([(candidates[c].aliases[0], d) for c, d in list(zip(cui, dist))])
+        umls_ann = self.create_ann_index(candidates)
+        indexes, dist = umls_ann.get_nns_by_vector(
+            embeddings, 10, search_k=-1, include_distances=True
+        )
 
-        if distance > self.max_distance:
+        if len(indexes) == 0:
+            return None
+
+        mixed_score_candidates = sorted(
+            [
+                (
+                    candidates[i],
+                    (2 - dist[indexes.index(i)]) + candidates[i].similarities[0],
+                )
+                for i in indexes
+            ],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        top_candidate = mixed_score_candidates[0][0]
+        top_score = mixed_score_candidates[0][1]
+
+        print(mixed_score_candidates)
+
+        if top_score < self.min_similarity:
             logger.warning(
                 "Best candidate (%s) too distant (%s)",
                 top_candidate,
-                distance,
+                top_score,
             )
             return None
 
@@ -241,8 +298,10 @@ class CandidateSelector(CandidateGenerator, object):
 
         return self._get_best_canonical(candidates, embeddings)
 
-    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    def __call__(
+        self, term: str, embeddings: list[float] | None = None
+    ) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        return self.select_candidate(entity.term, entity.embeddings)
+        return self.select_candidate(term, embeddings)

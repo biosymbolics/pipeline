@@ -51,7 +51,7 @@ def create_tfidf_ann_index(
     # matrix representations in scipy: https://github.com/scipy/scipy/issues/7408
     logger.info("Fitting tfidf vectorizer on %s aliases", len(concept_aliases))
     tfidf_vectorizer = TfidfVectorizer(
-        analyzer="word", ngram_range=(1, 2), min_df=10, dtype=numpy.float32
+        analyzer="word", ngram_range=(1, 1), min_df=10, dtype=numpy.float32
     )
     start_time = datetime.datetime.now()
     concept_alias_tfidfs = tfidf_vectorizer.fit_transform(concept_aliases)
