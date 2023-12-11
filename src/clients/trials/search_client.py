@@ -21,6 +21,21 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 
 
+def _form_query(terms: Sequence[str], query_type: QueryType = "AND") -> str:
+    """
+    Form a query from terms
+
+    select '(aurora & kinase & inhibitor) | ( btk & inhibitor )'::tsquery;
+    """
+    # AND words within a given term
+    # e.g. ["btk inhibitor", "aurora kinase inhibitor"] -> ["(btk & inhibitor)", "(aurora & kinase & inhibitor)"]
+    anded_words = [f"({' & '.join(t.split(' '))})" for t in terms]
+
+    operand = "&" if query_type == "AND" else "|"
+    term_query = f" {operand} ".join(anded_words)
+    return f"({term_query})"
+
+
 def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
@@ -35,7 +50,7 @@ def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    term_query = " & ".join(terms) if query_type == "AND" else " | ".join(terms)
+    term_query = _form_query(terms, query_type)
 
     query = f"""
         SELECT *,
