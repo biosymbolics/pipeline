@@ -190,6 +190,7 @@ def ingest_trials():
         f"{BASE_DATABASE_URL}/patents",
         "trials",
         transform=lambda batch, _: transform_ct_records(batch),  # tagger),
+        transform_schema=lambda schema: {**schema, "text_search": "tsvector"},
     )
 
     client = PsqlDatabaseClient()
@@ -205,6 +206,20 @@ def ingest_trials():
         synonym_map sm where sm.synonym = lower(sponsor)
         """
     )
+
+    search_fields = {
+        "title": "title",
+        "acronym": "coalesce(acronym, '')",
+        "conditions": "array_to_string(conditions, ' ')",
+        "interventions": "array_to_string(interventions, ' ')",
+        "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
+        "normalized_sponsor": "coalesce(normalized_sponsor, '')",
+    }
+    search_sql = ("|| ' ' ||").join([sql for sql in search_fields.values()])
+    client.execute_query(
+        f"update trials SET text_search = to_tsvector('english', {search_sql})"
+    )
+
     client.create_indices(
         [
             {
@@ -219,6 +234,11 @@ def ingest_trials():
             {
                 "table": "trials",
                 "column": "normalized_sponsor",
+            },
+            {
+                "table": "trials",
+                "column": "text_search",
+                "is_gin": True,
             },
         ]
     )

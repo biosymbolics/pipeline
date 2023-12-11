@@ -445,13 +445,45 @@ def main(bootstrap: bool = False):
     #     and array_length(t.synonyms, 1) < 15;
 
     # update annotations set instance_rollup=lower(instance_rollup) where instance_rollup<>lower(instance_rollup);
-    # update annotations set instance_rollup=term where domain not in ('attributes', 'assignees') and lower(instance_rollup) in  ('inhibitor', '11-dehydrocorticosterone', 'peptides', 'disease', 'compound', 'base sequence','salts', 'bacteria', 'alleles', 'modulator', 'syndrome', 'antibodies', 'abnormality of digestive system morphology', 'antagonist', 'agonist', 'proteins', 'catalyst', 'agent', 'promoters', 'enhancer of transcription', 'laboratory chemicals', 'monomers', 'syndrome', 'disease', 'cells', 'chemical group', 'copolymer', 'polymers', 'plant-based natural product', 'degrader')'
+    # update annotations set instance_rollup=term where domain not in ('attributes', 'assignees') and lower(instance_rollup) in  ('pharmacologic substance', 'inhibitor', '11-dehydrocorticosterone', 'peptides', 'disease', 'compound', 'base sequence','salts', 'bacteria', 'alleles', 'modulator', 'syndrome', 'antibodies', 'abnormality of digestive system morphology', 'antagonist', 'agonist', 'proteins', 'catalyst', 'agent', 'promoters', 'enhancer of transcription', 'laboratory chemicals', 'monomers', 'syndrome', 'disease', 'cells', 'chemical group', 'copolymer', 'polymers', 'plant-based natural product', 'degrader')
     # delete from annotations where lower(term) in ('inhibitor', '11-dehydrocorticosterone', 'composition', 'composition comprising', 'peptides', 'disease', 'compound', 'base sequence','salts', 'bacteria', 'alleles', 'modulator', 'syndrome', 'antibodies', 'abnormality of digestive system morphology', 'antagonist', 'agonist', 'proteins', 'catalyst', 'agent', 'promoters', 'enhancer of transcription', 'laboratory chemicals', 'monomers', 'syndrome', 'disease', 'cells', 'chemical group', 'copolymer', 'polymers', 'plant-based natural product', 'degrader');
     # refresh materialized view aggregated_annotations;
 
     # update annotations set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
     # update biosym_annotations_source set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
     # update biosym_annotations set domain='diseases' where domain<>'diseases' and original_term ~* '^.* leukemias?$';
+
+
+#     update annotations set domain='biologics' where term in ('dna', )
+#     update annotations set domain='biologics' where term ilike '% channel' and domain='compounds';
+#     update annotations set domain='biologics' where term ilike '% cell line' and domain='devices';
+#     update annotations set domain='compounds' where term ilike '% fumarate' and domain<>'compounds';
+#     delete from annotations where term='negation efficacious';
+#     update annotations set domain='biologics' where term ilike '%oligonucleotides' and domain<>'biologics';
+
+#     update annotations set term=regexp_replace(term, '(?i)^(.*) combinations$', '\1', 'i') where term ~* '^.* combinations$';
+#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^(.*) combinations$', '\1', 'i') where instance_rollup ~* '^.* combinations$';
+# delete from annotations where term in ('dosage forms bead', 'dosage froms matrix', 'composition comprising said');
+
+#     update annotations set term=regexp_replace(term, '(?i)\ygene (agonist|antagonist|inhibitor)\y', '\1', 'i') where term ~* 'gene (agonist|antagonist|inhibitor)';
+#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)\ygene (agonist|antagonist|inhibitor)\y', '\1', 'i') where instance_rollup ~* 'gene (agonist|antagonist|inhibitor)';
+
+#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)qualitative form', 'form', 'i') where instance_rollup ~* 'qualitative form';
+#     update annotations set term=regexp_replace(term, 'group specimen', 'group', 'i') where term ~* 'group specimen';
+#     update annotations set instance_rollup=regexp_replace(instance_rollup, 'group specimen', 'group', 'i') where instance_rollup ~* 'group specimen';
+
+#     update annotations set term=regexp_replace(term, '\ygenerating\y', '', 'i') where term ~* '\ygenerating\y';
+
+#     update annotations set term=regexp_replace(term, '[ ]{2,}', ' ', 'g') where term ~* '[ ]{2,}';
+#     update annotations set term=trim(term) where trim(term) <> term;
+
+#  update annotations set term=regexp_replace(term, '^(activator|inhibitor|agonist|antagonist) (.*) receptor', '\2 \1', 'g') where term ~* '^(activator|inhibitor|agonist|antagonist) (.*) receptor'
+
+#  update annotations set instance_rollup=regexp_replace(instance_rollup, '^(activator|inhibitor|agonist|antagonist) (.*) receptor', '\2 \1', 'g') where instance_rollup ~* '^(activator|inhibitor|agonist|antagonist) (.*) receptor'
+
+
+#     update annotations set term=regexp_replace(term, 'social interaction', 'interaction', 'i') where term ~* 'social interaction';
+#     update annotations set instance_rollup=regexp_replace(instance_rollup, 'social interaction', 'interaction', 'i') where instance_rollup ~* 'social interaction';
 
 
 if __name__ == "__main__":

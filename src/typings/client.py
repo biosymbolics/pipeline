@@ -1,15 +1,21 @@
-"""
-Types used by patent handlers
-"""
+from typing import Literal
+
 from pydantic import BaseModel
 
-from clients.patents.types import QueryType, TermField
+
+QueryType = Literal["AND", "OR"]
 
 
-class BasePatentSearchParams(BaseModel):
-    min_patent_years: int = 10
-    limit: int = 800
+TermField = Literal["terms", "instance_rollup", "category_rollup"]
+
+
+class BaseSearchParams(BaseModel):
+    limit: int = 1000
     query_type: QueryType = "AND"
+
+
+class BasePatentSearchParams(BaseSearchParams):
+    min_patent_years: int = 10
 
 
 class OptionalRawPatentSearchParams(BasePatentSearchParams):
@@ -27,3 +33,8 @@ class PatentSearchParams(BasePatentSearchParams):
     skip_cache: bool = False
     terms: list[str]
     term_field: TermField = "terms"
+
+
+class TrialSearchParams(BaseSearchParams):
+    skip_cache: bool = False
+    terms: list[str]
