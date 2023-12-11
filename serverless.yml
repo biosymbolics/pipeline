@@ -190,6 +190,15 @@ functions:
     handler: src.handlers.clindev.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  search-trials:
+    events:
+      - http:
+          path: trials/search
+          method: get
+          cors: true
+    handler: src.handlers.clindev.search
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 
 plugins:
   - serverless-python-requirements

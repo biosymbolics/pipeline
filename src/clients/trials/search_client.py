@@ -1,5 +1,5 @@
 """
-Patent client
+Trials client
 """
 from functools import partial
 import logging

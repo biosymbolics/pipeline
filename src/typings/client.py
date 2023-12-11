@@ -12,6 +12,7 @@ TermField = Literal["terms", "instance_rollup", "category_rollup"]
 class BaseSearchParams(BaseModel):
     limit: int = 1000
     query_type: QueryType = "AND"
+    skip_cache: str | bool = False
 
 
 class BasePatentSearchParams(BaseSearchParams):
@@ -21,7 +22,6 @@ class BasePatentSearchParams(BaseSearchParams):
 class OptionalRawPatentSearchParams(BasePatentSearchParams):
     exemplar_patents: str | None = None
     term_field: TermField = "terms"
-    skip_cache: str | bool = False
 
 
 class RawPatentSearchParams(OptionalRawPatentSearchParams):
@@ -30,11 +30,13 @@ class RawPatentSearchParams(OptionalRawPatentSearchParams):
 
 class PatentSearchParams(BasePatentSearchParams):
     exemplar_patents: list[str] = []
-    skip_cache: bool = False
     terms: list[str]
     term_field: TermField = "terms"
 
 
+class RawTrialSearchParams(BaseSearchParams):
+    terms: str
+
+
 class TrialSearchParams(BaseSearchParams):
-    skip_cache: bool = False
     terms: list[str]

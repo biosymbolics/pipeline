@@ -7,9 +7,8 @@ from pydantic import BaseModel
 
 from clients import patents as patent_client
 from handlers.patents.utils import parse_params
+from typings.client import RawPatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
-
-from .types import RawPatentSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
