@@ -181,6 +181,7 @@ class ScoredPatentApplication(PatentApplication):
     availability_explanation: str
     exemplar_similarity: float
     probability_of_success: float
+    reformulation_score: float
     search_rank: float
     suitability_score: float
     suitability_score_explanation: str
