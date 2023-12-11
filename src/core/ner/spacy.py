@@ -7,6 +7,7 @@ from typing import Any, Iterator
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
+from thinc.api import set_gpu_allocator, require_gpu
 
 from utils.args import make_hashable
 
@@ -61,7 +62,7 @@ class Spacy:
 
         for name, args in additional_pipelines.items():
             nlp.add_pipe(name, **args)
-            if name == "tok2vec":
+            if name == "tok2vec" or name == "transformer":
                 nlp.initialize()
 
         self._nlp = nlp
@@ -83,6 +84,11 @@ class Spacy:
     @classmethod
     def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs) -> "Spacy":
         spacy.prefer_gpu()  # type: ignore
+
+        if model.endswith("_trf"):
+            set_gpu_allocator("pytorch")
+            require_gpu()
+
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
@@ -90,3 +96,25 @@ class Spacy:
             cls._instances[args_hash] = cls(model, **kwargs)
         logger.debug("Returning CACHED nlp model (%s)", model)
         return cls._instances[args_hash]
+
+
+TransformerNlp = Spacy.get_instance(
+    model="en_core_web_trf",
+    disable=["ner"],  # , "parser", "tagger"],
+    additional_pipelines={
+        "transformer": {
+            "config": {
+                "model": {
+                    "@architectures": "spacy-transformers.TransformerModel.v3",
+                    "name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
+                    "get_spans": {
+                        "@span_getters": "spacy-transformers.strided_spans.v1",
+                        "window": 128,
+                        "stride": 96,
+                    },
+                },
+            },
+        },
+        # "tok2vec": {},
+    },
+)

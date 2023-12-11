@@ -146,7 +146,7 @@ def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[flo
         list[tuple[tuple[str, str], list[float]]]: list of n-grams tuples and their vectors
     """
     index_sets: list[tuple[int, ...]] = reduce(
-        lambda acc, i: acc + [(i, *[i + _n + 1 for _n in range(n - 1)])],
+        lambda acc, i: acc + [(i, *[i + grm + 1 for grm in range(n - 1)])],
         range(len(tokens) + 1 - n),
         [],
     )

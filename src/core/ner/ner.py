@@ -175,6 +175,7 @@ class NerTagger:
             return [
                 self._combine_ents(d1, d2) for d1, d2 in zip(binder_docs, rule_docs)
             ]
+
         return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
     def _normalize(
@@ -197,7 +198,12 @@ class NerTagger:
             if len(norm_entity.name) == 0:
                 return None
             return DocEntity(
-                *e[0:6],
+                term=e.term,
+                type=e.type,
+                start_char=e.start_char,
+                end_char=e.end_char,
+                embeddings=e.embeddings,
+                spacy_doc=e.spacy_doc,
                 normalized_term=norm_entity.name,
                 linked_entity=norm_entity,
             )
@@ -286,7 +292,7 @@ class NerTagger:
 
         return map
 
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
+    def __call__(self, *args: Any, **kwds: Any) -> Sequence[DocEntities]:
         return self.extract(*args, **kwds)
 
     @classmethod

@@ -58,18 +58,19 @@ class CompositeCandidateSelector(CandidateSelector):
         if entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy_doc")
 
-        # TODO: bad for single char tokens like "-"
-        tokens = entity.spacy_doc
+        # only non-punct tokens
+        tokens = [t for t in entity.spacy_doc if t.pos_ != "PUNCT"]
+        doc = entity.spacy_doc
 
         # if fewer words than n, just return words
         # (this is expedient but probably confusing)
         if n == 1 or len(tokens) < n:
             return [
-                (token.text, list(tokens[i : i + 1].vector))
+                (token.text, list(doc[i : i + 1].vector))
                 for i, token in enumerate(tokens)
             ]
 
-        ngrams = generate_ngram_phrases(tokens, n)
+        ngrams = generate_ngram_phrases(doc, n)
         return ngrams
 
     def _form_composite_name(self, member_candidates: Sequence[CanonicalEntity]) -> str:

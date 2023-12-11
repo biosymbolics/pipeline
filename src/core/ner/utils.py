@@ -416,7 +416,7 @@ def __normalize_by_pos(doc: Doc) -> str:
     )
 
 
-def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
+def normalize_by_pos(terms: Sequence[str]) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -458,7 +458,7 @@ def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
         )
 
     sep_dash_terms = [sep_dash(term) for term in terms]
-    docs = nlp.pipe(sep_dash_terms, n_process=n_process)
+    docs = nlp.pipe(sep_dash_terms)
 
     for doc in docs:
         if is_iupac(doc.text):

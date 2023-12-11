@@ -87,7 +87,7 @@ class EntityCleaner:
         Normalize terms
         - remove certain characters
         - removes double+ spaces
-        - lemmatize?
+        - etc
 
         Args:
             terms (list[str]): terms
@@ -119,7 +119,7 @@ class EntityCleaner:
             for term in _terms:
                 yield term.lower()
 
-        def unwrap(_terms: Sequence[str]) -> Iterable[str]:
+        def unwrap_parens(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 if term.startswith("(") and term.endswith(")"):
                     yield term.strip("()")
@@ -184,7 +184,7 @@ class EntityCleaner:
         cleaning_steps = [
             decode_html,
             remove_after_newline,  # order matters (this before unwrap etc)
-            unwrap,
+            unwrap_parens,
             format_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
@@ -192,7 +192,7 @@ class EntityCleaner:
                 rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
             ),
             depluralize_tails,
-            normalize_by_pos,
+            # normalize_by_pos, # not important if linking
             normalize_phrases,  # order matters (after rearrange)
             *self.additional_cleaners,
             remove_extra_spaces,

@@ -1,7 +1,10 @@
+from functools import reduce
+import time
 from typing import Sequence
 from annoy import AnnoyIndex
 import joblib
 from numpy import mean
+from pydash import flatten
 from scispacy.candidate_generation import (
     CandidateGenerator,
     MentionCandidate,
@@ -10,21 +13,21 @@ from scispacy.candidate_generation import (
 from spacy.tokens import Doc
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
-from core.ner.spacy import Spacy
 import logging
 
+from core.ner.spacy import TransformerNlp
 from core.ner.types import CanonicalEntity
 from constants.umls import UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
-from utils.encoding.text_encoder import WORD_VECTOR_LENGTH
 
 DEFAULT_K = 25
-MIN_SIMILARITY = 0
+MIN_SIMILARITY = 1.21
 UMLS_KB = None
-# BIOSYM_UMLS_TFIDF_PATH = "https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/data/linkers/2023-04-23/umls/tfidf_vectorizer.joblib"
 BIOSYM_UMLS_TFIDF_PATH = (
     "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
 )
+
+WORD_EMBEDDING_LENGTH = 768
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     **UMLS_CUI_SUPPRESSIONS,
@@ -72,7 +75,7 @@ class CandidateSelector(CandidateGenerator, object):
         self,
         *args,
         min_similarity: float = MIN_SIMILARITY,
-        vector_length: int = WORD_VECTOR_LENGTH,
+        vector_length: int = WORD_EMBEDDING_LENGTH,
         **kwargs
     ):
         global UMLS_KB
@@ -85,52 +88,44 @@ class CandidateSelector(CandidateGenerator, object):
         super().__init__(*args, kb=UMLS_KB, **kwargs)
         self.min_similarity = min_similarity
         self.vector_length = vector_length
-        self.nlp = Spacy.get_instance(
-            model="en_core_web_trf",
-            disable=["ner"],  # "parser", "tagger"],
-            additional_pipelines={
-                "transformer": {
-                    "config": {
-                        "model": {
-                            "@architectures": "spacy-transformers.TransformerModel.v3",
-                            "name": "kristinalindquist/binder-biomedical-patents",
-                            "get_spans": {
-                                "@span_getters": "spacy-transformers.strided_spans.v1",
-                                "window": 128,
-                                "stride": 96,
-                            },
-                        },
-                    },
-                },
-                "tok2vec": {},
-            },
-        )
+        self.nlp = TransformerNlp
         self.tfidf: TfidfVectorizer = joblib.load(cached_path(BIOSYM_UMLS_TFIDF_PATH))
-        self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), WORD_VECTOR_LENGTH)
+        self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), self.vector_length)
 
-    def batch_vectorize(self, texts: Sequence[str]) -> list[tuple[torch.Tensor, Doc]]:
+    def batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
         """
         Vectorize a text
         """
         docs = list(self.nlp.pipe(texts))
-        bert_vecs = [torch.tensor(doc.vector) for doc in docs]
-        tfidf_vecs = self.tfidf.transform(texts).toarray()
-        projected = [self.tfidf_ll.forward(torch.tensor(vec)) for vec in tfidf_vecs]
-        return [
-            (torch.cat([bert_vec, tfidf_vec]), doc)
-            for bert_vec, tfidf_vec, doc in zip(bert_vecs, projected, docs)
+        bert_vecs = [
+            torch.tensor(doc._.trf_data.tensors[0]).squeeze(0).mean(dim=0).squeeze()
+            for doc in docs
         ]
+        tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
+        projected_tfidf = torch.tensor_split(
+            self.tfidf_ll.forward(tfidf_vecs), len(texts)
+        )
+        return [
+            bert_vec + tfidf_vec.squeeze()
+            for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
+        ]
+
+    def vectorize_doc(self, doc: Doc) -> tuple[torch.Tensor, Doc]:
+        """
+        Vectorize a text
+        """
+        bert_vec = torch.tensor(doc.vector)
+        tfidf_vec = self.tfidf_ll.forward(
+            torch.tensor(self.tfidf.transform([doc.text]).toarray()[0])
+        )
+        return torch.cat([bert_vec, tfidf_vec]), doc
 
     def vectorize(self, text: str) -> tuple[torch.Tensor, Doc]:
         """
         Vectorize a text
         """
         doc = self.nlp(text)
-        bert_vec = torch.tensor(doc.vector)
-        tfidf_vec = self.tfidf_ll.forward(
-            torch.tensor(self.tfidf.transform([text]).toarray()[0])
-        )
-        return torch.cat([bert_vec, tfidf_vec]), doc
+        return self.vectorize_doc(doc)
 
     def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
@@ -178,21 +173,26 @@ class CandidateSelector(CandidateGenerator, object):
         """
         Create an Annoy index for a list of candidates
         """
+        start = time.monotonic()
         umls_ann = AnnoyIndex(self.vector_length, metric="angular")
 
         canonical_names = [
             self.kb.cui_to_entity[c.concept_id].canonical_name.lower()
             for c in candidates
         ]
-        cn_vectors = self.batch_vectorize(canonical_names)
-        alias_vectors = [self.batch_vectorize(c.aliases) for c in candidates]
+        # only use the first alias, since that's the most syntactically similar to the mention
+        aliases = [c.aliases[0].lower() for c in candidates]
+
+        vectors = self.batch_vectorize(canonical_names + aliases)
+        cn_vectors = vectors[0 : len(canonical_names)]
+        alias_vectors = vectors[len(canonical_names) :]
+
         for i in range(len(candidates)):
-            cn_vec = cn_vectors[i][0]
-            alias_vec = torch.mean(torch.concat([av[0] for av in alias_vectors[i]]))
-            combined_vec = 0.6 * cn_vec + 0.4 * alias_vec
+            combined_vec = 0.6 * cn_vectors[i] + 0.4 * alias_vectors[i]
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
+        logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
         return umls_ann
 
     def get_best_by_semantic_similarity(
@@ -205,6 +205,7 @@ class CandidateSelector(CandidateGenerator, object):
             logger.warning("No embeddings for %s", candidates[0].aliases[0])
             return None
 
+        print("EME", embeddings)
         umls_ann = self.create_ann_index(candidates)
         indexes, dist = umls_ann.get_nns_by_vector(
             embeddings, 10, search_k=-1, include_distances=True
@@ -217,7 +218,7 @@ class CandidateSelector(CandidateGenerator, object):
             [
                 (
                     candidates[i],
-                    (2 - dist[indexes.index(i)]) + candidates[i].similarities[0],
+                    (2 - dist[indexes.index(i)]) + (candidates[i].similarities[0] / 2),
                 )
                 for i in indexes
             ],

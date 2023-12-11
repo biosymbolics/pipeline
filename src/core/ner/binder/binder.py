@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 import logging
 from spacy.tokens import Doc
 
-from core.ner.spacy import Spacy
+from core.ner.spacy import TransformerNlp
 from constants.core import (
     DEFAULT_BASE_NLP_MODEL,
     DEFAULT_TORCH_DEVICE,
@@ -39,8 +39,10 @@ class BinderNlp:
 
         logger.info("Loading torch model from: %s", model_file)
         self.model = torch.load(model_file, map_location=device)
-        self._tokenizer = AutoTokenizer.from_pretrained(base_model)
-        self.nlp = Spacy.get_instance()
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            base_model, use_fast=True, device=device
+        )
+        self.nlp = TransformerNlp
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)
@@ -89,7 +91,6 @@ class BinderNlp:
                 a.start_char,
                 a.end_char,
                 label=a.entity_type,
-                # alignment_mode="expand", # results in "," captured
             )
             for a in annotations
         ]

@@ -54,8 +54,9 @@ class TermNormalizer:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
         """
-        # removed_suppressed must be false to properly index against original terms
         terms: list[str] = [e.term for e in flatten(entity_sets)]
+
+        # removed_suppressed must be false to properly index against original terms
         normalized = self.cleaner.clean(terms, remove_suppressed=False)
 
         if self.term_linker is not None:
