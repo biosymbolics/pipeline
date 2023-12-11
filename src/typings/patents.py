@@ -5,13 +5,13 @@ Patent types
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
-
 from pydash import compact
-from typings.companies import Company
 
+from typings.companies import Company
 from utils.classes import ByDefinitionOrderEnum
 
 from .core import Dataclass
+
 
 STALE_YEARS = 5
 
@@ -114,7 +114,10 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         Find availability likelihood from record
         """
         is_active = cls.is_patent_active(record)
-        is_terminated = record["termination_reason"] is not None
+        is_terminated = (
+            record["termination_reason"] is not None
+            and record["termination_reason"] != "NA"
+        )
 
         return cls.find(
             record["assignees"],
