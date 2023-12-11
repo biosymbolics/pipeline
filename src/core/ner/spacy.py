@@ -88,7 +88,7 @@ class Spacy:
         if model.endswith("_trf"):
             set_gpu_allocator("pytorch")
             require_gpu()
-
+ 
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
