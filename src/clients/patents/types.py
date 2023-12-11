@@ -9,7 +9,6 @@ import typing
 from typings.core import Dataclass
 from utils.list import is_sequence
 
-TermField = Literal["terms", "instance_rollup", "category_rollup"]
 
 AutocompleteMode = Literal["id", "term"]
 AutocompleteResult = TypedDict("AutocompleteResult", {"id": str, "label": str})
@@ -46,9 +45,6 @@ PatentsReport = TypedDict(
     "PatentsReport",
     {"x": str, "y": str | None, "data": list[PatentsReportRecord] | None},
 )
-
-
-QueryType = Literal["AND", "OR"]
 
 
 def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThreshold]:

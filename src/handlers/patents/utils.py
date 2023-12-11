@@ -1,6 +1,6 @@
 import json
 
-from handlers.patents.types import (
+from typings.client import (
     OptionalRawPatentSearchParams as OptionalParams,
     PatentSearchParams,
     RawPatentSearchParams as RawParams,

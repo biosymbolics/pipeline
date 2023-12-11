@@ -660,6 +660,11 @@ class TrialSummary(BaseTrial):
     why_stopped: str | None
 
 
+@dataclass(frozen=True)
+class ScoredTrialSummary(TrialSummary):
+    score: float
+
+
 def is_trial_record(trial: dict | TrialRecord) -> TypeGuard[TrialRecord]:
     """
     Check if dict is a trial record

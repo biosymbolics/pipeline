@@ -9,11 +9,11 @@ from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
 from handlers.patents.utils import parse_params
-
-from ..types import (
+from typings.client import (
     RawPatentSearchParams,
     OptionalRawPatentSearchParams as OptionalParams,
 )
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

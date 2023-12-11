@@ -19,12 +19,12 @@ from constants.core import (
     PATENT_TO_TRIAL_TABLE,
     TRIALS_TABLE,
 )
-from handlers.patents.types import PatentSearchParams
 from typings.patents import ScoredPatentApplication as PatentApplication
+from typings import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
 
 from .enrich import enrich_search_result
-from .types import QueryPieces, QueryType, TermField
+from .types import QueryPieces
 from .utils import get_max_priority_date
 
 

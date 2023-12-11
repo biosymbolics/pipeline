@@ -8,8 +8,7 @@ from pydantic import BaseModel
 from clients import patents as patent_client
 from clients.patents.reports.graph import graph_patent_relationships
 from handlers.patents.utils import parse_params
-
-from ..types import RawPatentSearchParams
+from typings.client import RawPatentSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

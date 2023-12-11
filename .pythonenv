@@ -1,4 +1,4 @@
-PYTHONPATH=$(pwd)/src:$(pwd)/:../binder/src
+PYTHONPATH=$(pwd)/src:$(pwd)/:../binder/src:/opt/homebrew/lib/python3.11/site-packages/
 # PYTHONPATH=$(pwd)/src:$(pwd)/
 
 export PYTHONPATH
