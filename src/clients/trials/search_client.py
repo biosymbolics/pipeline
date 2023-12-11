@@ -42,6 +42,7 @@ def _search(
         ts_rank_cd(text_search, to_tsquery(%s)) AS score
         FROM {TRIALS_TABLE} as trials
         WHERE text_search @@ to_tsquery(%s)
+        ORDER BY score DESC
         LIMIT {limit}
     """
 
