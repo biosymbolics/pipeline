@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
+import random
 from typing import Sequence, TypeGuard
 import logging
 import re
@@ -623,6 +624,9 @@ class BaseTrial(Dataclass):
     time_frames: list[str]
     title: str
 
+    dropout_percent: float = field(init=False)
+    reformulation_score: float = field(init=False)
+
 
 @dataclass(frozen=True)
 class TrialRecord(BaseTrial):
@@ -663,6 +667,28 @@ class TrialSummary(BaseTrial):
 @dataclass(frozen=True)
 class ScoredTrialSummary(TrialSummary):
     score: float
+
+    @property  # type: ignore
+    def dropout_percent(self) -> float:
+        if not self.enrollment or not self.dropout_count:
+            return 0.0
+        return round(self.dropout_count / self.enrollment, 2)
+
+    @property  # type: ignore
+    def reformulation_score(self) -> float:
+        """
+        Score for reformulation potential
+
+        **FAKE**!!
+        """
+        if (
+            self.termination_reason is None
+            or self.termination_reason == TerminationReason.NA
+            or self.termination_reason == "NA"
+        ):
+            return 0.0
+
+        return random.betavariate(2, 8)
 
 
 def is_trial_record(trial: dict | TrialRecord) -> TypeGuard[TrialRecord]:

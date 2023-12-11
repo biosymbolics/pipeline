@@ -120,11 +120,15 @@ def score_patents(
                 name="probability_of_success",
                 values=[random.betavariate(2, 8) for _ in range(len(df))],
             ),
+            pl.Series(
+                name="reformulation_score",
+                values=[random.betavariate(2, 8) for _ in range(len(df))],
+            ),
         )
         .with_columns(
             pl.col("suitability_score")
             .mul(df[years_column] / MAX_PATENT_LIFE)
-            .add(pl.col("probability_of_success"))
+            # .add(pl.col("probability_of_success"))
             .mul(1 / 3)  # average
             .alias("score"),
         )
