@@ -7,7 +7,7 @@ from typing import Any, Iterator
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
-from thinc.api import set_gpu_allocator, require_gpu
+from thinc.api import set_gpu_allocator, prefer_gpu
 
 from utils.args import make_hashable
 
@@ -54,6 +54,10 @@ class Spacy:
         # details: https://github.com/explosion/spaCy/discussions/12713
         spacy.prefer_gpu()  # type: ignore
 
+        if model.endswith("_trf"):
+            set_gpu_allocator("pytorch")
+            prefer_gpu()
+
         self.model = model
 
         # disable additional_pipelines keys to we cana add them
@@ -83,12 +87,6 @@ class Spacy:
 
     @classmethod
     def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs) -> "Spacy":
-        spacy.prefer_gpu()  # type: ignore
-
-        if model.endswith("_trf"):
-            set_gpu_allocator("pytorch")
-            require_gpu()
- 
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
