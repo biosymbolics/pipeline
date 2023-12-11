@@ -4,7 +4,9 @@ String utilities
 
 
 from datetime import date
+from functools import reduce
 import regex as re
+from spacy.tokens import Doc
 from typing import Mapping, TypeGuard, Union
 
 
@@ -132,31 +134,36 @@ def byte_dict_to_string_dict(
     )
 
 
-def generate_ngrams(tokens: tuple[str, ...], n: int) -> list[tuple[str, str]]:
+def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[float]]]:
     """
-    Generate n-grams from a list of tokens
+    Generate n-grams (term & token) from a list of Spacy tokens
 
     Args:
-        tokens (tuple[str]): list of tokens
+        tokens (Doc): list of tokens
         n (int): n-gram size
 
-    Example:
-        >>> generate_ngrams(["a", "b", "c", "d"], 2)
-        [('a', 'b'), ('b', 'c'), ('c', 'd')]
+    Returns:
+        list[tuple[tuple[str, str], list[float]]]: list of n-grams tuples and their vectors
     """
-    return list(zip(*[tokens[i:] for i in range(n)]))  # type: ignore
+    index_sets: list[tuple[int, ...]] = reduce(
+        lambda acc, i: acc + [(i, *[i + grm + 1 for grm in range(n - 1)])],
+        range(len(tokens) + 1 - n),
+        [],
+    )
+    ngrams = [tuple(tokens[i].text for i in iset) for iset in index_sets]
+    vectors = [list(tokens[min(iset) : max(iset)].vector) for iset in index_sets]
+    return list(zip(ngrams, vectors))
 
 
-def generate_ngram_phrases(tokens: tuple[str, ...], n: int) -> list[str]:
+def generate_ngram_phrases(tokens: Doc, n: int) -> list[tuple[str, list[float]]]:
     """
-    Generate n-grams from a list of tokens
+    Generate n-grams (term & token) from a list of Spacy tokens
 
     Args:
-        tokens (tuple[str]): list of tokens
+        tokens (Doc): list of tokens
         n (int): n-gram size
 
-    Example:
-        >>> generate_ngram_phrases(["a", "b", "c", "d"], 2)
-        ['a b', 'b c', 'c d']
+    Returns:
+        list[tuple[str, list[float]]]: list of n-grams and their vectors
     """
-    return [" ".join(ng) for ng in generate_ngrams(tokens, n)]
+    return [(" ".join(ng[0]), ng[1]) for ng in generate_ngrams(tokens, n)]

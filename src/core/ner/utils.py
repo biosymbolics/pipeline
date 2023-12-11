@@ -3,7 +3,6 @@ Utils for the NER pipeline
 """
 from functools import partial, reduce
 import logging
-import time
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -18,7 +17,7 @@ from utils.re import (
 )
 
 from .spacy import Spacy
-from .types import DocEntities, DocEntity, SynonymRecord
+from .types import DocEntity, SynonymRecord
 
 
 logger = logging.getLogger(__name__)
@@ -417,7 +416,7 @@ def __normalize_by_pos(doc: Doc) -> str:
     )
 
 
-def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
+def normalize_by_pos(terms: Sequence[str]) -> Iterable[str]:
     """
     Normalizes entity by POS
 
@@ -459,7 +458,7 @@ def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
         )
 
     sep_dash_terms = [sep_dash(term) for term in terms]
-    docs = nlp.pipe(sep_dash_terms, n_process=n_process)
+    docs = nlp.pipe(sep_dash_terms)
 
     for doc in docs:
         if is_iupac(doc.text):
@@ -469,15 +468,22 @@ def normalize_by_pos(terms: Sequence[str], n_process: int = 1) -> Iterable[str]:
         yield __normalize_by_pos(doc)
 
 
-def spans_to_doc_entities(spans: Iterable[Span]) -> DocEntities:
+def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     """
     Converts a list of spacy spans to a list of DocEntity
 
     Args:
         spans: list of spacy spans
     """
-    entity_set: DocEntities = [
-        DocEntity(span.text, span.label_, span.start_char, span.end_char, None, None)
+    entity_set = [
+        DocEntity(
+            span.text,
+            span.label_,
+            span.start_char,
+            span.end_char,
+            span.vector.tolist(),
+            spacy_doc=span.as_doc(),
+        )
         for span in spans
     ]
     return entity_set

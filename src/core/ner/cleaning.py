@@ -87,7 +87,7 @@ class EntityCleaner:
         Normalize terms
         - remove certain characters
         - removes double+ spaces
-        - lemmatize?
+        - etc
 
         Args:
             terms (list[str]): terms
@@ -119,7 +119,7 @@ class EntityCleaner:
             for term in _terms:
                 yield term.lower()
 
-        def unwrap(_terms: Sequence[str]) -> Iterable[str]:
+        def unwrap_parens(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
                 if term.startswith("(") and term.endswith(")"):
                     yield term.strip("()")
@@ -184,7 +184,7 @@ class EntityCleaner:
         cleaning_steps = [
             decode_html,
             remove_after_newline,  # order matters (this before unwrap etc)
-            unwrap,
+            unwrap_parens,
             format_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
@@ -192,7 +192,7 @@ class EntityCleaner:
                 rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
             ),
             depluralize_tails,
-            normalize_by_pos,
+            # normalize_by_pos, # not important if linking
             normalize_phrases,  # order matters (after rearrange)
             *self.additional_cleaners,
             remove_extra_spaces,
@@ -206,11 +206,11 @@ class EntityCleaner:
         return normalized
 
     @staticmethod
-    def __get_text(entity) -> str:
+    def _get_text(entity) -> str:
         return entity[0] if isinstance(entity, tuple) else entity
 
     @staticmethod
-    def __return_to_type(
+    def _return_to_type(
         modified_texts: Sequence[str],
         orig_ents: Sequence[T],
         remove_suppressed: bool = False,
@@ -223,11 +223,15 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity(*orig_ents[i][0:4], modified_texts[i], orig_ents[i][5])
+                DocEntity(
+                    *orig_ents[i][0:6],
+                    normalized_term=modified_texts[i],
+                    linked_entity=orig_ents[i].linked_entity,
+                )
                 for i in range(len(orig_ents))
             ]
             if remove_suppressed:
-                doc_ents = [d for d in doc_ents if len(d.normalized_term) > 0]
+                doc_ents = [d for d in doc_ents if len(d.normalized_term or "") > 0]
             return cast(list[T], doc_ents)
 
         if is_string_list(orig_ents):
@@ -255,7 +259,7 @@ class EntityCleaner:
         if not isinstance(entities, list):
             raise ValueError("Entities must be a list")
 
-        cleaned = self.normalize_terms([self.__get_text(ent) for ent in entities])
+        cleaned = self.normalize_terms([self._get_text(ent) for ent in entities])
 
         # INFO:core.ner.cleaning:Cleaned 2268406 entities in 1957.85 seconds
         logger.info(
@@ -264,7 +268,7 @@ class EntityCleaner:
             round(time.time() - start, 2),
         )
 
-        return self.__return_to_type(
+        return self._return_to_type(
             cleaned, entities, remove_suppressed=remove_suppressed
         )
 

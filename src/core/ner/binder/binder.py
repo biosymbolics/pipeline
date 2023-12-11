@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 import logging
 from spacy.tokens import Doc
 
-from core.ner.spacy import Spacy
+from core.ner.spacy import TransformerNlp
 from constants.core import (
     DEFAULT_BASE_NLP_MODEL,
     DEFAULT_TORCH_DEVICE,
@@ -17,7 +17,11 @@ from constants.core import (
 
 from .constants import NER_TYPES
 from .types import Annotation
-from .utils import extract_predictions, remove_overlapping_spans, prepare_features
+from .utils import (
+    extract_predictions,
+    remove_overlapping_spans,
+    prepare_features,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -34,9 +38,11 @@ class BinderNlp:
         device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info("Loading torch model from: %s", model_file)
-        self.model = torch.load(model_file).to(device)
-        self.__tokenizer = AutoTokenizer.from_pretrained(base_model)
-        self.nlp = Spacy.get_instance()
+        self.model = torch.load(model_file, map_location=device)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            base_model, use_fast=True, device=device
+        )
+        self.nlp = TransformerNlp
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)
@@ -49,7 +55,7 @@ class BinderNlp:
         return dict([(i, t["name"]) for i, t in enumerate(NER_TYPES)])
 
     @property
-    def __type_descriptions(self):
+    def type_descriptions(self):
         """
         Get the type descriptions used by the Binder model
         """
@@ -66,7 +72,7 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def get_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
+    def create_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
         """
         Create a (pseudo) SpaCy Doc from a string and a list of annotations
 
@@ -82,10 +88,9 @@ class BinderNlp:
         new_ents = [
             Doc.char_span(
                 new_doc,
-                a["start_char"],
-                a["end_char"],
-                label=a["entity_type"],
-                # alignment_mode="expand", # results in "," captured
+                a.start_char,
+                a.end_char,
+                label=a.entity_type,
             )
             for a in annotations
         ]
@@ -127,7 +132,7 @@ class BinderNlp:
             text (Union[str, list[str]]): text or list of texts to tokenize
         """
         all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
-        return self.__tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
+        return self._tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
     def extract(self, doc: str | Doc) -> Doc:
         """
@@ -137,12 +142,11 @@ class BinderNlp:
             doc (str | Doc): The Spacy Docs (or strings) to annotate.
 
         ```
-        import system; system.initialize()
         from core.ner.binder.binder import BinderNlp
         b = BinderNlp("models/binder.pt")
         text="\n ".join([
-            "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
-            for i in range(2)
+        "Bioenhanced formulations comprising eprosartan in oral solid dosage form for the treatment of asthma, and hypertension."
+        for i in range(3)
         ]) + " and some melanoma."
         b.extract(text).ents
         ```
@@ -150,17 +154,18 @@ class BinderNlp:
         text = doc.text if isinstance(doc, Doc) else doc
         inputs = self.tokenize(text)
         features = prepare_features(text, inputs)
+
         inputs.pop("overflow_to_sample_mapping")
 
         predictions = self.model(
             **inputs,
-            **self.__type_descriptions,
+            **self.type_descriptions,
         )
 
         annotations = extract_predictions(
             features, predictions.span_scores, self.type_map
         )
-        return self.get_doc(doc, annotations)
+        return self.create_doc(doc, annotations)
 
     def pipe(
         self,

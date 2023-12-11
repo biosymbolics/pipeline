@@ -2,11 +2,9 @@
 Utils for transforming data into binder format
 """
 
-from functools import lru_cache
 import regex as re
 import sys
 import polars as pl
-from pydash import compact
 from transformers import AutoTokenizer
 import logging
 
@@ -33,7 +31,9 @@ def get_annotations():
     query = """
         SELECT
         (
-            CASE WHEN RANDOM() > 0.49
+            -- use the last number of the hashed publication number as pseudo-random
+            -- because order must be maintained for the same publication number
+            CASE WHEN mod(right(hashtext(s.publication_number)::text, 1)::int, 2) = 1
             THEN concat(title, '\n', substring(abstract from 0 for 2000))
             ELSE concat(substring(abstract from 0 for 2000), '\n', title)
             END
@@ -57,7 +57,6 @@ def get_annotations():
         and ARRAY['compounds', 'biologics'] && s.domains
         and 'diseases' = any(s.domains)
         and domain not in ('assignees', 'attributes', 'dosage_forms', 'roas', 'research_tools', 'behavioral_interventions')
-        order by RANDOM()
         limit 400000 -- 829,812
     """
     records = client.select(query)
@@ -79,37 +78,20 @@ def generate_word_indices(text: str, tokenizer) -> list[tuple[int, int]]:
     return sorted([(cs.start, cs.end) for cs in char_spans if cs is not None])
 
 
-@lru_cache
 def get_entity_indices(
     text: str,
     entity: str,
-    tokenizer,
-) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+) -> list[tuple[int, int]]:
     """
     Get the indices of an entity in a text
 
     Args:
-        text (str): text to searc
+        text (str): text to search
         entity (str): entity to search for
         tokenizer: tokenizer to use
-
-    Returns:
-        list[tuple[tuple[int, int], tuple[int, int]]]: list of indices of entity in text (word indices, char indices)
     """
-    all_tokens = tokenizer.tokenize(text)
-    entity_tokens = tokenizer.tokenize(entity)
-
-    def get_index(i):
-        if all_tokens[i : i + len(entity_tokens)] == entity_tokens:
-            return (i, i + len(entity_tokens) - 1)
-        return None
-
-    word_indices = compact(
-        [get_index(i) for i in range(len(all_tokens) - len(entity_tokens) + 1)]
-    )
     char_indices = [(m.start(), m.end()) for m in re.finditer(re.escape(entity), text)]
-
-    return list(zip(word_indices, char_indices))
+    return char_indices
 
 
 def format_into_binder(df: pl.DataFrame, tokenizer):
@@ -132,17 +114,16 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
     formatted = (
         (
             df.explode("indices")
-            .filter(pl.col("indices").is_not_null())
             .groupby("publication_number")
             .agg(
                 [
                     pl.col("publication_number").first().alias("id"),
                     pl.col("text").first(),
                     pl.col("indices")
-                    .apply(lambda indices: sorted([idx[1][0] for idx in indices]))
+                    .apply(lambda indices: sorted([idx[0] for idx in indices]))
                     .alias("entity_start_chars"),
                     pl.col("indices")
-                    .apply(lambda indices: sorted([idx[1][1] for idx in indices]))
+                    .apply(lambda indices: sorted([idx[1] for idx in indices]))
                     .alias("entity_end_chars"),
                     pl.struct(["domain", "indices"]).alias("entity_info"),
                 ]
@@ -157,7 +138,7 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
                     d
                     for _, d in sorted(
                         zip(
-                            [rec["indices"][1][0] for rec in recs],
+                            [rec["indices"][0] for rec in recs],
                             [rec["domain"] for rec in recs],
                         )
                     )
@@ -167,6 +148,8 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
         )
         .drop("entity_info")
     )
+
+    print(formatted)
 
     with_word_indices = formatted.with_columns(
         pl.col("text")
@@ -212,7 +195,7 @@ def create_binder_data():
     logger.info("Getting entity indices for %s annotations", annotations.shape[0])
     df = annotations.with_columns(
         pl.struct(["text", "term"])
-        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"], tokenizer))  # type: ignore
+        .apply(lambda rec: get_entity_indices(rec["text"], rec["term"]))  # type: ignore
         .alias("indices")
     )
     return format_into_binder(df, tokenizer)

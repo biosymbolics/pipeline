@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Sequence, TypeGuard
 import logging
-
-from pydash import uniq
 import re
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS

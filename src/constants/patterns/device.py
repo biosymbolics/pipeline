@@ -39,7 +39,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?receptacle",
     "(?:.* )?conductor.*",
     "(?:.* )?connector",
-    "(?:.* )?effector.*",
+    # "(?:.* )?effector.*",
     "(?:.* )?tape",
     "(?:.* )?inlet",
     "(?:.* )?outlet",
@@ -75,7 +75,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     "(?:.* )?holder",
     "(?:.* )?flanges?(?: |-|$).*",
     ".*circuit.*",
-    "(?:.* )?liner?",
+    "(?:.* )?liner",
     "(?:.* )?pole",
     "(?:.* )?paper",
     "(?:.* )?light",  # light chain? (bio)
@@ -118,7 +118,7 @@ HIGH_LIKELIHOOD_DEVICES = [
     # "(?:.* )?film",
     ".*(?: |^|-)hinge",
     ".*(?: |^|-)instrument",
-    "(?:.* )?vessel",  # ??
+    # "(?:.* )?vessel",  # ??
     ".*(?: |^|-)devices?.*",
     "(?:.* )?motor",  # motor disorders
     ".*(?: |^|-)electrode.*",

@@ -133,13 +133,13 @@ def remove_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
         r"' s(\b)": r"'s\1",  # alzheimer' s disease -> alzheimer's disease
     }
 
-    def __remove(term: str):
+    def _remove(term: str):
         for pattern, replacement in extra_space_patterns.items():
-            term = re.sub(pattern, replacement, term, flags=re.DOTALL)
+            term = re.sub(pattern, replacement, term, flags=RE_STANDARD_FLAGS)
         return term.strip()
 
     for term in terms:
-        yield __remove(term)
+        yield _remove(term)
 
 
 def expand_re(re_str: str, max_len: int = 1000) -> list[str]:

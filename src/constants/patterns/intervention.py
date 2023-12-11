@@ -3,7 +3,7 @@ Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
-from constants.patterns.iupac import IUPAC_RE, IUPAC_STRINGS
+from constants.patterns.iupac import IUPAC_STRINGS
 from utils.re import get_or_re
 
 
@@ -255,15 +255,14 @@ INTERVENTION_BASE_TERMS = [
 ]
 
 
-ALL_COMPOUND_BASE_TERMS = COMPOUND_BASE_TERMS
-ALL_COMPOUND_BASE_TERMS_RE = get_or_re(ALL_COMPOUND_BASE_TERMS, "+")
+ALL_COMPOUND_BASE_TERMS_RE = get_or_re(COMPOUND_BASE_TERMS, "+")
 ALL_BIOLOGIC_BASE_TERMS = BIOLOGIC_BASE_TERMS
 ALL_MECHANISM_BASE_TERMS = MECHANISM_BASE_TERMS
 
 ALL_BIOLOGIC_BASE_TERMS_RE = get_or_re(ALL_BIOLOGIC_BASE_TERMS, "+")
 ALL_MECHANISM_BASE_TERMS_RE = get_or_re(ALL_MECHANISM_BASE_TERMS, "+")
 ALL_INTERVENTION_BASE_TERMS = [
-    *ALL_COMPOUND_BASE_TERMS,
+    *COMPOUND_BASE_TERMS,
     *ALL_BIOLOGIC_BASE_TERMS,
     *ALL_MECHANISM_BASE_TERMS,
 ]
@@ -540,7 +539,7 @@ DOSAGE_FORM_RES = [
     "bolus",
     "(?:micro[ -]?|nano[ -]?|soft )?capsule",
     "cream",
-    "(?:dose|dosage)",
+    "(?:dose|dosage)(?: forms?.*)?",
     "drip",
     "(?:eye |nasal )?drop(?:let)",
     "emulsion",

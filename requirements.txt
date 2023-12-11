@@ -8,6 +8,7 @@ google.cloud.storage
 kneed
 langchain
 nmslib @ git+https://github.com/nmslib/nmslib.git@ade4bcdc9dd3719990de2503871450b8a62df4a5#subdirectory=python_bindings
+annoy
 openai
 polars
 psycopg[binary,pool]

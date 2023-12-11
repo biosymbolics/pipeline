@@ -2,9 +2,11 @@
 Linking/cleaning of terms
 """
 from typing import Sequence
+
+from pydash import flatten
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
-from core.ner.types import CanonicalEntity
+from core.ner.types import CanonicalEntity, DocEntity
 
 
 class TermNormalizer:
@@ -41,7 +43,7 @@ class TermNormalizer:
             additional_cleaners=additional_cleaners,
         )
 
-    def normalize(self, terms: Sequence[str]) -> list[tuple[str, CanonicalEntity]]:
+    def normalize(self, entity_sets: Sequence[DocEntity]) -> list[CanonicalEntity]:
         """
         Normalize and link terms to canonical entities
 
@@ -52,26 +54,25 @@ class TermNormalizer:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
         """
+        terms: list[str] = [e.term for e in flatten(entity_sets)]
+
         # removed_suppressed must be false to properly index against original terms
         normalized = self.cleaner.clean(terms, remove_suppressed=False)
 
         if self.term_linker is not None:
-            links = self.term_linker.link(normalized)
+            links = self.term_linker.link(entity_sets)
         else:
-            links = [None] * len(normalized)
+            links = [None] * len(entity_sets)
 
         def get_canonical(
-            entity: tuple[str, CanonicalEntity | None] | None, normalized: str
+            entity: CanonicalEntity | None, normalized: str
         ) -> CanonicalEntity:
             # create a pseudo-canonical entity if no canonical entity found
             if entity is None or entity[1] is None:
                 return CanonicalEntity(id="", name=normalized, aliases=[])
-            return entity[1]
+            return entity
 
-        tups = [
-            (t[0], get_canonical(t[1], t[2])) for t in zip(terms, links, normalized)
-        ]
-        return tups
+        return [get_canonical(t[1], t[2]) for t in zip(terms, links, normalized)]
 
-    def __call__(self, *args, **kwargs) -> list[tuple[str, CanonicalEntity]]:
+    def __call__(self, *args, **kwargs) -> list[CanonicalEntity]:
         return self.normalize(*args, **kwargs)

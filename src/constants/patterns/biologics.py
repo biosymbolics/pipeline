@@ -91,6 +91,7 @@ BIOLOGIC_BASE_TERMS: list[str] = [
     "(?:receptor |protein )?ligands?(?: binding| that bind)?",
     "(?:dna |nucleic acid |antibody )?(?:fragments?|sequences?)(?: binding| that bind)?",
     "aggregate",
+    "allele",
     "(?:amino |fatty |(?:poly|di|tri)?nucleic )acid",
     "(?:neo)?antigen",
     "antigen[ -]binding fragment",
