@@ -624,7 +624,9 @@ class BaseTrial(Dataclass):
     time_frames: list[str]
     title: str
 
+    condition: str | None = field(init=False)
     dropout_percent: float = field(init=False)
+    intervention: str | None = field(init=False)
     reformulation_score: float = field(init=False)
 
 
@@ -667,6 +669,18 @@ class TrialSummary(BaseTrial):
 @dataclass(frozen=True)
 class ScoredTrialSummary(TrialSummary):
     score: float
+
+    @property  # type: ignore
+    def condition(self):
+        if len(self.mesh_conditions or []) == 0:
+            return None
+        return self.mesh_conditions[0]
+
+    @property  # type: ignore
+    def intervention(self):
+        if len(self.interventions or []) == 0:
+            return None
+        return self.interventions[0]
 
     @property  # type: ignore
     def dropout_percent(self) -> float:
