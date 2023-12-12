@@ -22,6 +22,8 @@ spacy_llm
 spacy
 torch
 pytorch-ignite
+requests_cache
 transformers
 typing_extensions
 umap-learn
+yfinance
