@@ -53,7 +53,7 @@ def aggregate_over_time(raw_event: dict, context):
 
         summaries = group_by_xy(
             patents,
-            x_dimensions=[*DOMAINS_OF_INTEREST, "similar_patents"],
+            x_dimensions=DOMAINS_OF_INTEREST,
             y_dimensions=["priority_date"],
             y_transform=lambda y: y.year,
         )
