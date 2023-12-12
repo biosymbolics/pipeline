@@ -2,6 +2,7 @@
 Patent graph reports
 """
 
+import math
 from typing import Sequence
 import logging
 import networkx as nx
@@ -17,14 +18,15 @@ from .types import Node, NodePosition, Link, SerializableGraph
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_NODES = 100
+MAX_NODES = 50
+MIN_NODE_DEGREE = 5
 
 RELATIONSHIPS_OF_INTEREST = [
     "allelic_variant_of",
     "biological_process_involves_gene_product",
-    "chemical_or_drug_has_mechanism_of_action",
-    "chemical_or_drug_has_physiologic_effect",
-    "genetic_biomarker_related_to",
+    # "chemical_or_drug_has_mechanism_of_action",
+    # "chemical_or_drug_has_physiologic_effect",
+    # "genetic_biomarker_related_to",
     "gene_involved_in_molecular_abnormality",
     "gene_plays_role_in_process",
     "gene_product_encoded_by_gene",
@@ -37,34 +39,34 @@ RELATIONSHIPS_OF_INTEREST = [
     "gene_product_has_gene_product_variant",
     "has_allelic_variant",
     "has_phenotype",
-    "has_manifestation",
+    # "has_manifestation",
     "has_gene_product_element",
-    "has_therapeutic_class",
-    "has_mechanism_of_action",
-    "has_physiologic_effect",
+    # "has_therapeutic_class",
+    # "has_mechanism_of_action",
+    # "has_physiologic_effect",
     "has_target",
-    "is_mechanism_of_action_of_chemical_or_drug",
-    "is_physiologic_effect_of_chemical_or_drug",
+    # "is_mechanism_of_action_of_chemical_or_drug",
+    # "is_physiologic_effect_of_chemical_or_drug",
     "is_target",
     "is_target_of",
     "may_treat",
-    "may_be_treated_by",
+    # "may_be_treated_by",
     "manifestation_of",
-    "mechanism_of_action_of",
+    # "mechanism_of_action_of",
     "molecular_abnormality_involves_gene",
     "negatively_regulates",
     "negatively_regulated_by",
     "pathogenesis_of_disease_involves_gene",
     "pathway_has_gene_element",
     "phenotype_of",
-    "physiologic_effect_of",
+    # "physiologic_effect_of",
     "positively_regulates",
     "positively_regulated_by",
     "process_involves_gene",
-    "related_to_genetic_biomarker",
+    # "related_to_genetic_biomarker",
     "regulated_by",
     "regulates",
-    "therapeutic_class_of",
+    # "therapeutic_class_of",
 ]
 
 ENTITY_GROUP = "entity"
@@ -93,11 +95,21 @@ def generate_graph(
     degree_map = {n: d for (n, d) in g.degree}
     nx.set_node_attributes(g, degree_map, "size")
 
+    weights = {
+        (r["head"], r["tail"]): min(degree_map[r["tail"]] / 4, 20)
+        for r in relationships
+    }
+    nx.set_edge_attributes(g, values=weights, name="weight")
+
     top_nodes = [
         node
-        for (node, _) in sorted(g.degree, key=lambda x: x[1], reverse=True)[:max_nodes]
+        for (node, _) in sorted(
+            [(n, d) for (n, d) in g.degree if d >= MIN_NODE_DEGREE],
+            key=lambda x: x[1],
+            reverse=True,
+        )[:max_nodes]
     ]
-    return g.subgraph(
+    subgraph = g.subgraph(
         uniq(
             [
                 *[n[0] for n in list(g.nodes(data="group")) if n[1] == PATENT_GROUP],  # type: ignore
@@ -105,6 +117,8 @@ def generate_graph(
             ]
         )
     )
+
+    return subgraph
 
 
 def graph_patent_relationships(
@@ -177,14 +191,17 @@ def graph_patent_relationships(
     relationships = PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
-    layout = nx.circular_layout(g)
+    # layout = nx.circular_layout(g)
+    # layout = nx.kamada_kawai_layout(g)
+    layout = nx.kamada_kawai_layout(g)
 
     # create serialized link data
     link_data = nx.node_link_data(g)
 
     return SerializableGraph(
         edges=[
-            Link(source=l["source"], target=l["target"]) for l in link_data["links"]
+            Link(source=l["source"], target=l["target"], weight=l["weight"])
+            for l in link_data["links"]
         ],
         nodes=[
             Node(

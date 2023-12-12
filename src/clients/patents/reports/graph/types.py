@@ -6,7 +6,7 @@ import json
 class Link:
     source: str
     target: str
-    # weight: int
+    weight: int
 
 
 @dataclass(frozen=True)
