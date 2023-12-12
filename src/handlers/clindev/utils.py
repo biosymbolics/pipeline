@@ -1,4 +1,5 @@
 from typings.client import RawTrialSearchParams, TrialSearchParams
+from utils.args import parse_bool
 
 
 def parse_params(
@@ -21,6 +22,6 @@ def parse_params(
             "terms": terms_list,
             "query_type": p.query_type,
             "limit": limit,
-            "skip_cache": p.skip_cache,
+            "skip_cache": parse_bool(p.skip_cache),
         }
     )

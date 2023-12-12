@@ -1,16 +1,15 @@
 import json
+import logging
 
 from typings.client import (
     OptionalRawPatentSearchParams as OptionalParams,
     PatentSearchParams,
     RawPatentSearchParams as RawParams,
 )
+from utils.args import parse_bool
 
-
-def parse_bool(value: bool | str | None) -> bool:
-    if value is None:
-        return False
-    return json.loads(str(value).lower())
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def parse_params(
@@ -34,6 +33,7 @@ def parse_params(
 
     limit = p.limit or default_limit
 
+    logger.info("SKIP CACHE %s", parse_bool(p.skip_cache))
     return PatentSearchParams(
         **{
             "terms": terms_list,
@@ -41,7 +41,7 @@ def parse_params(
             "query_type": p.query_type,
             "min_patent_years": p.min_patent_years,
             "limit": limit,
-            "skip_cache": p.skip_cache,
+            "skip_cache": parse_bool(p.skip_cache),
             "term_field": p.term_field,
         }
     )

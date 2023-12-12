@@ -482,7 +482,7 @@ def main(bootstrap: bool = False):
 #  update annotations set instance_rollup=regexp_replace(instance_rollup, '^(activator|inhibitor|agonist|antagonist) (.*) receptor', '\2 \1', 'g') where instance_rollup ~* '^(activator|inhibitor|agonist|antagonist) (.*) receptor'
 
 
-#     update annotations set term=regexp_replace(term, 'social interaction', 'interaction', 'i') where term ~* 'social interaction';
+# update annotations set instance_rollup=regexp_replace(instance_rollup, 'aberranta', 'aberrant', 'i') where instance_rollup ~* 'aberranta';
 #     update annotations set instance_rollup=regexp_replace(instance_rollup, 'social interaction', 'interaction', 'i') where instance_rollup ~* 'social interaction';
 
 
