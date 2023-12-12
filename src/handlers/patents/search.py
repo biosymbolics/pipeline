@@ -34,8 +34,7 @@ def search(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
 
-    event = SearchEvent(**raw_event)
-    p = parse_params(event.queryStringParameters)
+    p = parse_params(raw_event["queryStringParameters"])
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)

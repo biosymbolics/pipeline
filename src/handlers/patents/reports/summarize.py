@@ -31,8 +31,7 @@ def summarize(raw_event: dict, context):
     - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
     """
-    event = ReportEvent(**raw_event)
-    p = parse_params(event.queryStringParameters, DEFAULT_REPORT_PARAMS, 10000)
+    p = parse_params(raw_event["queryStringParameters"], DEFAULT_REPORT_PARAMS)
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)

@@ -15,7 +15,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 import logging
 
-from core.ner.spacy import TransformerNlp
+from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity
 from constants.umls import UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
@@ -88,7 +88,7 @@ class CandidateSelector(CandidateGenerator, object):
         super().__init__(*args, kb=UMLS_KB, **kwargs)
         self.min_similarity = min_similarity
         self.vector_length = vector_length
-        self.nlp = TransformerNlp
+        self.nlp = get_transformer_nlp()
         self.tfidf: TfidfVectorizer = joblib.load(cached_path(BIOSYM_UMLS_TFIDF_PATH))
         self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), self.vector_length)
 
@@ -205,7 +205,6 @@ class CandidateSelector(CandidateGenerator, object):
             logger.warning("No embeddings for %s", candidates[0].aliases[0])
             return None
 
-        print("EME", embeddings)
         umls_ann = self.create_ann_index(candidates)
         indexes, dist = umls_ann.get_nns_by_vector(
             embeddings, 10, search_k=-1, include_distances=True

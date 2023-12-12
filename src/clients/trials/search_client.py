@@ -57,6 +57,8 @@ def _search(
         ts_rank_cd(text_search, to_tsquery(%s)) AS score
         FROM {TRIALS_TABLE} as trials
         WHERE text_search @@ to_tsquery(%s)
+        AND purpose in ('TREATMENT', 'BASIC_SCIENCE', 'PREVENTION')
+        AND intervention_type='PHARMACOLOGICAL'
         ORDER BY score DESC
         LIMIT {limit}
     """

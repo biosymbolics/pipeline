@@ -20,7 +20,7 @@ from constants.core import (
     TRIALS_TABLE,
 )
 from typings.patents import ScoredPatentApplication as PatentApplication
-from typings import PatentSearchParams, QueryType, TermField
+from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
 
 from .enrich import enrich_search_result

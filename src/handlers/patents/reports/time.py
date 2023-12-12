@@ -8,11 +8,9 @@ from pydantic import BaseModel
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
+from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
 from handlers.patents.utils import parse_params
-from typings.client import (
-    RawPatentSearchParams,
-    OptionalRawPatentSearchParams as OptionalParams,
-)
+from typings.client import RawPatentSearchParams
 
 
 logger = logging.getLogger(__name__)
@@ -32,11 +30,9 @@ def aggregate_over_time(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
-    event = ReportEvent(**raw_event)
     p = parse_params(
-        event.queryStringParameters,
-        OptionalParams(term_field="category_rollup"),
-        10000,
+        raw_event["queryStringParameters"],
+        DEFAULT_REPORT_PARAMS,
     )
 
     if not p or len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):

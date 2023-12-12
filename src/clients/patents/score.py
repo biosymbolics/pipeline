@@ -128,8 +128,7 @@ def score_patents(
         .with_columns(
             pl.col("suitability_score")
             .mul(df[years_column] / MAX_PATENT_LIFE)
-            # .add(pl.col("probability_of_success"))
-            .mul(1 / 3)  # average
+            .add(pl.col("availability_score"))
             .alias("score"),
         )
     )
@@ -169,4 +168,8 @@ def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.Da
         .map_dict(avail_likelihood_map)
         .apply(lambda x: x[1])
         .alias("availability_explanation"),
+        pl.col("publication_number")
+        .map_dict(avail_likelihood_map)
+        .apply(lambda x: x[0].score)
+        .alias("availability_score"),
     )

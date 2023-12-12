@@ -3,7 +3,7 @@ Boto3 client
 """
 import json
 import os
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, Sequence, TypeVar, cast
 import boto3
 from botocore.exceptions import ClientError
 import logging
@@ -14,7 +14,7 @@ from utils.encoding.json_encoder import DataclassJSONEncoder
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Sequence)
 
 DEFAULT_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")
 REGION = os.environ.get("AWS_REGION", "us-east-1")
@@ -117,6 +117,9 @@ def retrieve_with_cache_check(
         data = json.loads(
             response["Body"].read().decode("utf-8"), object_hook=date_deserialier
         )
+
+        if limit is not None and len(data) > limit:
+            return cast(T, data[0:limit])
         return data
     except ClientError as ex:
         if not ex.response["Error"]["Code"] == "NoSuchKey":
