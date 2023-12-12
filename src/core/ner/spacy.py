@@ -96,23 +96,27 @@ class Spacy:
         return cls._instances[args_hash]
 
 
-TransformerNlp = Spacy.get_instance(
-    model="en_core_web_trf",
-    disable=["ner"],  # , "parser", "tagger"],
-    additional_pipelines={
-        "transformer": {
-            "config": {
-                "model": {
-                    "@architectures": "spacy-transformers.TransformerModel.v3",
-                    "name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
-                    "get_spans": {
-                        "@span_getters": "spacy-transformers.strided_spans.v1",
-                        "window": 128,
-                        "stride": 96,
+def get_transformer_nlp() -> Spacy:
+    """
+    Get a Spacy NLP model that uses a transformer
+    """
+    return Spacy.get_instance(
+        model="en_core_web_trf",
+        disable=["ner"],  # , "parser", "tagger"],
+        additional_pipelines={
+            "transformer": {
+                "config": {
+                    "model": {
+                        "@architectures": "spacy-transformers.TransformerModel.v3",
+                        "name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
+                        "get_spans": {
+                            "@span_getters": "spacy-transformers.strided_spans.v1",
+                            "window": 128,
+                            "stride": 96,
+                        },
                     },
                 },
             },
+            # "tok2vec": {},
         },
-        # "tok2vec": {},
-    },
-)
+    )

@@ -34,10 +34,9 @@ def x_by_y(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
     - API: `curl 'https://api.biosymbolics.ai/patents/reports/x_by_y?terms=asthma&x=assignees&y=diseases'`
     """
-    event = XByYReportEvent(**raw_event)
-    p = parse_params(event.queryStringParameters, DEFAULT_REPORT_PARAMS, 10000)
-    x_dimension = event.queryStringParameters.x
-    y_dimension = event.queryStringParameters.y
+    p = parse_params(raw_event["queryStringParameters"], DEFAULT_REPORT_PARAMS)
+    x_dimension = raw_event["queryStringParameters"].x
+    y_dimension = raw_event["queryStringParameters"].y
 
     if (
         not p

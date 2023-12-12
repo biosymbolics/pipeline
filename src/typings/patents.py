@@ -2,7 +2,7 @@
 Patent types
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
@@ -14,6 +14,7 @@ from .core import Dataclass
 
 
 STALE_YEARS = 5
+MAX_PATENT_LIFE = 20
 
 PatentsTopicReport = TypedDict(
     "PatentsTopicReport",
@@ -77,6 +78,19 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     POSSIBLE = "POSSIBLE"
     UNLIKELY = "UNLIKELY"
     UNKNOWN = "UNKNOWN"
+
+    @property
+    def score(self) -> float:
+        if self == AvailabilityLikelihood.LIKELY:
+            return 0.25
+
+        if self == AvailabilityLikelihood.POSSIBLE:
+            return 0.15
+
+        if self == AvailabilityLikelihood.UNLIKELY:
+            return -0.5
+
+        return 0.0
 
     @classmethod
     def compose_financial_explanation(
@@ -179,6 +193,7 @@ class ScoredPatentApplication(PatentApplication):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
+    availability_score: float
     exemplar_similarity: float
     probability_of_success: float
     reformulation_score: float

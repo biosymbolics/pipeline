@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 import logging
 from spacy.tokens import Doc
 
-from core.ner.spacy import TransformerNlp
+from core.ner.spacy import get_transformer_nlp
 from constants.core import (
     DEFAULT_BASE_NLP_MODEL,
     DEFAULT_TORCH_DEVICE,
@@ -42,7 +42,7 @@ class BinderNlp:
         self._tokenizer = AutoTokenizer.from_pretrained(
             base_model, use_fast=True, device=device
         )
-        self.nlp = TransformerNlp
+        self.nlp = get_transformer_nlp()
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)

@@ -66,8 +66,8 @@ def enrich_search_result(
                 for d in DOMAINS_OF_INTEREST
             ],
         ).drop("terms", "domains"),
-        lambda _df: calculate_scores(_df).sort("score").reverse(),
         lambda _df: add_availability(_df, company_map),
+        lambda _df: calculate_scores(_df).sort("score").reverse(),
     ]
 
     enriched_df = reduce(lambda _df, step: step(_df), steps, df)
