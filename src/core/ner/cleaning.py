@@ -192,7 +192,7 @@ class EntityCleaner:
                 rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
             ),
             depluralize_tails,
-            # normalize_by_pos, # not important if linking
+            normalize_by_pos,  # not important if linking
             normalize_phrases,  # order matters (after rearrange)
             *self.additional_cleaners,
             remove_extra_spaces,
