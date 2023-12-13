@@ -43,7 +43,7 @@ class TermNormalizer:
             additional_cleaners=additional_cleaners,
         )
 
-    def normalize(self, entity_sets: Sequence[DocEntity]) -> list[CanonicalEntity]:
+    def normalize(self, entity_sets: Sequence[DocEntity]) -> list[DocEntity]:
         """
         Normalize and link terms to canonical entities
 
@@ -54,25 +54,13 @@ class TermNormalizer:
             - canonical linking is based on normalized term
             - if no linking is found, then normalized term is as canonical_name, with an empty id
         """
-        terms: list[str] = [e.term for e in flatten(entity_sets)]
-
         # removed_suppressed must be false to properly index against original terms
-        normalized = self.cleaner.clean(terms, remove_suppressed=False)
+        cleaned_entity_sets = self.cleaner.clean(entity_sets, remove_suppressed=False)
 
         if self.term_linker is not None:
-            links = self.term_linker.link(entity_sets)
-        else:
-            links = [None] * len(entity_sets)
+            return self.term_linker.link(cleaned_entity_sets)
 
-        def get_canonical(
-            entity: CanonicalEntity | None, normalized: str
-        ) -> CanonicalEntity:
-            # create a pseudo-canonical entity if no canonical entity found
-            if entity is None or entity[1] is None:
-                return CanonicalEntity(id="", name=normalized, aliases=[])
-            return entity
+        return cleaned_entity_sets
 
-        return [get_canonical(t[1], t[2]) for t in zip(terms, links, normalized)]
-
-    def __call__(self, *args, **kwargs) -> list[CanonicalEntity]:
+    def __call__(self, *args, **kwargs) -> list[DocEntity]:
         return self.normalize(*args, **kwargs)

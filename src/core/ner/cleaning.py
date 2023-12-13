@@ -214,7 +214,7 @@ class EntityCleaner:
         modified_texts: Sequence[str],
         orig_ents: Sequence[T],
         remove_suppressed: bool = False,
-    ) -> Sequence[T]:
+    ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             logger.info(
                 "Modified text: %s, original entities: %s", modified_texts, orig_ents
@@ -245,7 +245,7 @@ class EntityCleaner:
         self,
         entities: Sequence[T],
         remove_suppressed: bool = False,
-    ) -> Sequence[T]:
+    ) -> list[T]:
         """
         Sanitize entity list
         - filters out (some) excessively general entities

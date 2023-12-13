@@ -1,7 +1,7 @@
 """
 Binder NER model
 """
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Sequence
 from pydash import compact
 import torch
 from transformers import AutoTokenizer
@@ -72,22 +72,19 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def create_doc(self, doc: str | Doc, annotations: list[Annotation]) -> Doc:
+    def add_ents(self, doc: Doc, annotations: Sequence[Annotation]) -> Doc:
         """
-        Create a (pseudo) SpaCy Doc from a string and a list of annotations
+        Add entity annotations to a SpaCy Doc.
 
         In the case of overlapping entity spans, takes the largest.
 
         Args:
             doc (str | Doc): text or SpaCy Doc
-            annotations (list[Annotation]): list of annotations
+            annotations (Sequence[Annotation]): list of annotations
         """
-        # TODO: have this use tokenization identical to the model (biobert)
-        new_doc = self.nlp(doc) if not isinstance(doc, Doc) else doc
-
         new_ents = [
             Doc.char_span(
-                new_doc,
+                doc,
                 a.start_char,
                 a.end_char,
                 label=a.entity_type,
@@ -104,18 +101,18 @@ class BinderNlp:
         # re-create the existing ents, to reset ent start/end indexes
         existing_ents = [
             Doc.char_span(
-                new_doc,
+                doc,
                 e.start_char,
                 e.end_char,
                 label=e.label,
             )
-            for e in (doc.ents if isinstance(doc, Doc) else [])
+            for e in doc.ents
         ]
 
         all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
+        doc.set_ents(all_ents)
 
-        new_doc.set_ents(all_ents)
-        return new_doc
+        return doc
 
     def tokenize(
         self,
@@ -134,12 +131,12 @@ class BinderNlp:
         all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
         return self._tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
-    def extract(self, doc: str | Doc) -> Doc:
+    def extract(self, doc: Doc) -> Doc:
         """
         Extracts entity annotations for a given text.
 
         Args:
-            doc (str | Doc): The Spacy Docs (or strings) to annotate.
+            doc (Doc): The Spacy Docs to annotate.
 
         ```
         from core.ner.binder.binder import BinderNlp
@@ -151,34 +148,30 @@ class BinderNlp:
         b.extract(text).ents
         ```
         """
-        text = doc.text if isinstance(doc, Doc) else doc
-        inputs = self.tokenize(text)
-        features = prepare_features(text, inputs)
+        inputs = self.tokenize(doc.text)  # TODO: avoid re-tokenizing?
+        features = prepare_features(doc.text, inputs)
 
         inputs.pop("overflow_to_sample_mapping")
 
-        predictions = self.model(
-            **inputs,
-            **self.type_descriptions,
-        )
+        outputs = self.model(**inputs, **self.type_descriptions)
 
-        annotations = extract_predictions(
-            features, predictions.span_scores, self.type_map
-        )
-        return self.create_doc(doc, annotations)
+        annotations = extract_predictions(features, outputs.span_scores, self.type_map)
+        return self.add_ents(doc, annotations)
 
     def pipe(
         self,
-        texts: Iterable[str | Doc],
+        texts: Iterable[str],
     ) -> Iterator[Doc]:
         """
         Apply the pipeline to a batch of texts.
         Single threaded because GPU handles parallelism.
 
         Args:
-            texts (Iterable[str | Doc]): The texts to annotate.
+            texts (Iterable[str]): The texts to annotate.
         """
         logger.debug("Starting binder NER extraction")
 
-        for text in texts:
-            yield self.extract(text)
+        docs = self.nlp.pipe(texts)
+
+        for doc in docs:
+            yield self.extract(doc)

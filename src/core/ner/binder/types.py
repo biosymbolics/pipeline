@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Optional, TypedDict
-
 import torch
 
 from typings.core import Dataclass

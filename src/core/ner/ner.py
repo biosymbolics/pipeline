@@ -192,40 +192,17 @@ class NerTagger:
             logger.debug("Skipping normalization step")
             return entity_sets
 
-        def get_doc_entity(
-            e: DocEntity, norm_entity: CanonicalEntity
-        ) -> DocEntity | None:
-            if len(norm_entity.name) == 0:
-                return None
-            return DocEntity(
-                term=e.term,
-                type=e.type,
-                start_char=e.start_char,
-                end_char=e.end_char,
-                embeddings=e.embeddings,
-                spacy_doc=e.spacy_doc,
-                normalized_term=norm_entity.name,
-                linked_entity=norm_entity,
-            )
+        def normalize_set(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
+            normalizations = self.normalizer.normalize(entity_set)  # type: ignore
+            if self.entity_types is None:
+                return normalizations
 
-        def get_doc_entities(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-            if not self.normalizer:
-                return list(entity_set)
-            normalizations = self.normalizer.normalize(entity_set)
-            return compact(
-                [
-                    get_doc_entity(es, norm)
-                    for es, norm in zip(entity_set, normalizations)
-                    if len(es.term) > 0
-                    and ((self.entity_types is None) or (es.type in self.entity_types))
-                ]
-            )
+            # filter by entity types, if provided
+            return [ne for ne in normalizations if ne.type in self.entity_types]
 
-        # filter by entity types (if provided) and remove empty names
-        norm_entity_sets = [get_doc_entities(es) for es in entity_sets]
+        norm_entity_sets = [normalize_set(es) for es in entity_sets]
 
-        if len(norm_entity_sets) != len(entity_sets):
-            raise ValueError("Normalization changed number of entities")
+        assert len(norm_entity_sets) == len(entity_sets)
 
         return norm_entity_sets
 

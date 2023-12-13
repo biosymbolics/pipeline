@@ -1,10 +1,8 @@
-from functools import reduce
 import time
 from typing import Sequence
 from annoy import AnnoyIndex
 import joblib
 from numpy import mean
-from pydash import flatten
 from scispacy.candidate_generation import (
     CandidateGenerator,
     MentionCandidate,
@@ -17,17 +15,15 @@ import logging
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity
-from constants.umls import UMLS_CUI_SUPPRESSIONS
+from constants.umls import BIOSYM_UMLS_TFIDF_PATH, UMLS_CUI_SUPPRESSIONS
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
 
 DEFAULT_K = 25
-MIN_SIMILARITY = 1.21
+MIN_SIMILARITY = 1.3
 UMLS_KB = None
-BIOSYM_UMLS_TFIDF_PATH = (
-    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
-)
 
-WORD_EMBEDDING_LENGTH = 768
+
+WORD_EMBEDDING_LENGTH = 96
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     **UMLS_CUI_SUPPRESSIONS,
@@ -97,10 +93,7 @@ class CandidateSelector(CandidateGenerator, object):
         Vectorize a text
         """
         docs = list(self.nlp.pipe(texts))
-        bert_vecs = [
-            torch.tensor(doc._.trf_data.tensors[0]).squeeze(0).mean(dim=0).squeeze()
-            for doc in docs
-        ]
+        bert_vecs = [torch.tensor(doc.vector) for doc in docs]
         tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
         projected_tfidf = torch.tensor_split(
             self.tfidf_ll.forward(tfidf_vecs), len(texts)
@@ -109,23 +102,7 @@ class CandidateSelector(CandidateGenerator, object):
             bert_vec + tfidf_vec.squeeze()
             for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
         ]
-
-    def vectorize_doc(self, doc: Doc) -> tuple[torch.Tensor, Doc]:
-        """
-        Vectorize a text
-        """
-        bert_vec = torch.tensor(doc.vector)
-        tfidf_vec = self.tfidf_ll.forward(
-            torch.tensor(self.tfidf.transform([doc.text]).toarray()[0])
-        )
-        return torch.cat([bert_vec, tfidf_vec]), doc
-
-    def vectorize(self, text: str) -> tuple[torch.Tensor, Doc]:
-        """
-        Vectorize a text
-        """
-        doc = self.nlp(text)
-        return self.vectorize_doc(doc)
+        # return bert_vecs
 
     def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
@@ -196,18 +173,22 @@ class CandidateSelector(CandidateGenerator, object):
         return umls_ann
 
     def get_best_by_semantic_similarity(
-        self, embeddings: list[float], candidates: Sequence[MentionCandidate]
+        self, vector: list[float], candidates: Sequence[MentionCandidate]
     ) -> MentionCandidate | None:
         """
         Get best candidate by semantic similarity
         """
-        if mean(embeddings) == 0:
-            logger.warning("No embeddings for %s", candidates[0].aliases[0])
+        if mean(vector) == 0:
+            logger.warning(
+                "No vector for %s, probably OOD (%s)",
+                candidates[0].aliases[0],
+                vector,
+            )
             return None
 
         umls_ann = self.create_ann_index(candidates)
         indexes, dist = umls_ann.get_nns_by_vector(
-            embeddings, 10, search_k=-1, include_distances=True
+            vector, 10, search_k=-1, include_distances=True
         )
 
         if len(indexes) == 0:
@@ -231,9 +212,9 @@ class CandidateSelector(CandidateGenerator, object):
 
         if top_score < self.min_similarity:
             logger.warning(
-                "Best candidate (%s) too distant (%s)",
-                top_candidate,
+                "Best candidate too distant: %s (%s)",
                 top_score,
+                top_candidate,
             )
             return None
 
@@ -242,21 +223,24 @@ class CandidateSelector(CandidateGenerator, object):
     def _get_best_canonical(
         self,
         candidates: Sequence[MentionCandidate],
-        mention_embeddings: list[float] | None = None,
+        mention_vector: list[float] | None = None,
     ) -> CanonicalEntity | None:
         """
         Get canonical candidate if suggestions exceed min similarity
 
         Args:
             candidates (Sequence[MentionCandidate]): list of candidates
-            mention_embeddings (list[float], Optional): embeddings for mention text
+            vector (list[float], Optional): embeddings for mention text
         """
 
-        if mention_embeddings is None:
+        if mention_vector is None:
+            logger.warning(
+                "No vector for %s; getting meh matches", candidates[0].aliases[0]
+            )
             top_candidate = self.get_best_by_rules(candidates)
         else:
             top_candidate = self.get_best_by_semantic_similarity(
-                mention_embeddings,
+                mention_vector,
                 candidates,
             )
 
@@ -289,19 +273,19 @@ class CandidateSelector(CandidateGenerator, object):
         )
 
     def select_candidate(
-        self, term: str, embeddings: list[float] | None = None
+        self, term: str, vector: list[float] | None = None
     ) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
         candidates = self._get_candidates(term)
 
-        return self._get_best_canonical(candidates, embeddings)
+        return self._get_best_canonical(candidates, vector)
 
     def __call__(
-        self, term: str, embeddings: list[float] | None = None
+        self, term: str, vector: list[float] | None = None
     ) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        return self.select_candidate(term, embeddings)
+        return self.select_candidate(term, vector)

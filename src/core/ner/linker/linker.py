@@ -3,7 +3,6 @@ Term Normalizer
 """
 import logging
 from typing import Sequence
-from pydash import compact
 
 
 from ..types import CanonicalEntity, DocEntity
@@ -12,9 +11,6 @@ LinkedEntityMap = dict[str, CanonicalEntity]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-MIN_SIMILARITY = 0.85
 
 
 class TermLinker:
@@ -31,7 +27,7 @@ class TermLinker:
         >>> linker(["DNMT1 protein synthase inhibitor"])
     """
 
-    def __init__(self, min_similarity: float = MIN_SIMILARITY):
+    def __init__(self):
         """
         Initialize term normalizer using existing model
         """
@@ -39,11 +35,9 @@ class TermLinker:
         logger.info("Loading CompositeCandidateSelector (slow...)")
         from .composite_candidate_selector import CompositeCandidateSelector
 
-        self.candidate_generator = CompositeCandidateSelector(
-            min_similarity=min_similarity
-        )
+        self.candidate_generator = CompositeCandidateSelector()
 
-    def link(self, entity_set: Sequence[DocEntity]) -> list[CanonicalEntity]:
+    def link(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
         """
         Link term to canonical entity or synonym
 
@@ -54,11 +48,24 @@ class TermLinker:
             logging.warning("No entities to link")
             return []
 
-        linked_entities = compact([self.candidate_generator(e) for e in entity_set])
+        canonical_entities = [self.candidate_generator(e) for e in entity_set]
+
+        def get_canonical(ce: CanonicalEntity | None, de: DocEntity) -> CanonicalEntity:
+            # create a pseudo-canonical entity if no canonical entity found
+            if ce is None:
+                return CanonicalEntity(
+                    id="", name=de.normalized_term or de.term, aliases=[de.term]
+                )
+            return ce
+
+        linked_doc_ents = [
+            DocEntity(**{**e, "linked_entity": get_canonical(ce, e)})
+            for e, ce in zip(entity_set, canonical_entities)
+        ]
 
         logging.info("Completed linking batch of %s entity sets", len(entity_set))
 
-        return linked_entities
+        return linked_doc_ents
 
-    def __call__(self, entity_set: Sequence[DocEntity]) -> list[CanonicalEntity]:
+    def __call__(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
         return self.link(entity_set)

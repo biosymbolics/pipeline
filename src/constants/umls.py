@@ -313,3 +313,8 @@ MOST_PREFERRED_UMLS_TYPES = {
     **UMLS_PHARMACOLOGIC_INTERVENTION_TYPES,
     **UMLS_DISEASE_TYPES,
 }
+
+
+BIOSYM_UMLS_TFIDF_PATH = (
+    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
+)

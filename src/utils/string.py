@@ -150,7 +150,7 @@ def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[flo
         range(len(tokens) + 1 - n),
         [],
     )
-    ngrams = [tuple(tokens[i].text for i in iset) for iset in index_sets]
+    ngrams = [tuple(tokens[i].lower_ for i in iset) for iset in index_sets]
     vectors = [list(tokens[min(iset) : max(iset)].vector) for iset in index_sets]
     return list(zip(ngrams, vectors))
 

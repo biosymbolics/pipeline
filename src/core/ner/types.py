@@ -40,17 +40,17 @@ class DocEntity(Dataclass):
     type: str
     start_char: int
     end_char: int
+    normalized_term: str
     # embeddings of mention
-    embeddings: Optional[List[float]] = None
+    vector: Optional[List[float]] = None
     spacy_doc: Optional[Doc] = None
-    normalized_term: Optional[str] = None
     linked_entity: Optional[CanonicalEntity] = None
 
     def __str__(self):
         norm_term = (
             self.linked_entity.name if self.linked_entity else self.normalized_term
         )
-        return f"{self.term} ({self.type}, s: {self.start_char}, e: {self.end_char}, norm_term: {norm_term})"
+        return f"{self.term} ({self.type}, s: {self.start_char}, e: {self.end_char}, norm_term: {norm_term}, id: {self.linked_entity.id if self.linked_entity else None})"
 
     def __repr__(self):
         return self.__str__()
@@ -66,7 +66,7 @@ class DocEntity(Dataclass):
             "start_char": self.start_char,
             "end_char": self.end_char,
             "normalized_term": self.normalized_term,
-            "embeddings": self.embeddings,
+            "vector": self.vector,
         }
 
 

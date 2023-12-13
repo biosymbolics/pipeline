@@ -1,6 +1,7 @@
 from typing import Mapping, Sequence
 from pydash import flatten, uniq
 from spacy.tokens import Doc
+import logging
 
 from constants.patterns.iupac import is_iupac
 from core.ner.types import CanonicalEntity, DocEntity
@@ -9,8 +10,11 @@ from utils.string import generate_ngram_phrases
 
 from .candidate_selector import CandidateSelector
 
-NGRAMS_N = 2
+NGRAMS_N = 1
 MIN_WORD_LENGTH = 1
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class CompositeCandidateSelector(CandidateSelector):
@@ -46,7 +50,7 @@ class CompositeCandidateSelector(CandidateSelector):
         tokens = entity.spacy_doc or entity.term.split(" ")
         if is_iupac(entity.term):
             return False
-        if len(tokens) < MIN_WORD_LENGTH:
+        if len(tokens) <= MIN_WORD_LENGTH:
             return False
         return True
 
@@ -66,7 +70,7 @@ class CompositeCandidateSelector(CandidateSelector):
         # (this is expedient but probably confusing)
         if n == 1 or len(tokens) < n:
             return [
-                (token.text, list(doc[i : i + 1].vector))
+                (token.lower_, list(doc[i : i + 1].vector))
                 for i, token in enumerate(tokens)
             ]
 
@@ -233,14 +237,19 @@ class CompositeCandidateSelector(CandidateSelector):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = self._get_candidates(entity.term)
+        candidates = self._get_candidates(entity.normalized_term)
 
-        match = self._get_best_canonical(candidates, entity.embeddings)
+        match = self._get_best_canonical(candidates, entity.vector)
 
         if match is not None:
             return match
 
         if CompositeCandidateSelector._is_composite_eligible(entity):
             return self._generate_composite_entities(entity)
+        else:
+            logger.warning(
+                "Not generating composite candidate for ineligible entity: %s",
+                entity.term,
+            )
 
         return match
