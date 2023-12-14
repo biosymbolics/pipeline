@@ -20,8 +20,9 @@ from constants.umls import (
     PREFERRED_UMLS_TYPES,
     PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
+    UMLS_NAME_SUPPRESSIONS,
 )
-from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
 DEFAULT_K = 25
@@ -115,21 +116,6 @@ class CandidateSelector(CandidateGenerator, object):
             for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
         ]
 
-    def get_best_by_rules(
-        self, candidates: Sequence[MentionCandidate]
-    ) -> MentionCandidate | None:
-        """
-        Wrapper for get_best_umls_candidate
-        (legacy-ish, since semantic similarity is better)
-        """
-
-        return get_best_umls_candidate(
-            candidates,
-            self.min_similarity,
-            self.kb,
-            list(CANDIDATE_CUI_SUPPRESSIONS.keys()),
-        )
-
     @classmethod
     def _apply_word_overrides(
         cls, text: str, candidates: list[MentionCandidate]
@@ -213,6 +199,17 @@ class CandidateSelector(CandidateGenerator, object):
             return None
 
         def get_score(i):
+            if candidates[i].concept_id in CANDIDATE_CUI_SUPPRESSIONS:
+                return 0.0
+
+            if has_intersection(
+                UMLS_NAME_SUPPRESSIONS,
+                self.kb.cui_to_entity[candidates[i].concept_id].canonical_name.split(
+                    " "
+                ),
+            ):
+                return 0.0
+
             types = self.kb.cui_to_entity[candidates[i].concept_id].types
             is_preferred_type = has_intersection(
                 types, list(PREFERRED_UMLS_TYPES.keys())
@@ -261,10 +258,7 @@ class CandidateSelector(CandidateGenerator, object):
         """
 
         if mention_vector is None:
-            logger.warning(
-                "No vector for %s; getting meh matches", candidates[0].aliases[0]
-            )
-            top_candidate = self.get_best_by_rules(candidates)
+            raise ValueError("Must provide mention vector")
         else:
             top_candidate = self.get_best_by_semantic_similarity(
                 mention_vector,
