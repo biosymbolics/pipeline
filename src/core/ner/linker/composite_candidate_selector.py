@@ -1,6 +1,6 @@
 from typing import Mapping, Sequence
 from pydash import flatten, uniq
-from spacy.tokens import Doc
+from spacy.tokens import Doc, Token
 import logging
 
 from constants.patterns.iupac import is_iupac
@@ -55,33 +55,18 @@ class CompositeCandidateSelector(CandidateSelector):
         return True
 
     @classmethod
-    def _get_ngrams(cls, entity: DocEntity, n: int) -> list[tuple[str, list[float]]]:
+    def _get_ngrams(
+        cls, tokens: Sequence[Token], n: int
+    ) -> list[tuple[str, list[float]]]:
         """
         Get all ngrams in a text
         """
-        if entity.spacy_doc is None:
-            raise ValueError("Entity must have a spacy_doc")
-
-        # only non-punct tokens (TODO: get POS tagging working with transformer)
-        tokens = [t for t in entity.spacy_doc if (t.pos_ != "PUNCT" and t.text != "-")]
-        print("tokens", tokens, len(entity.spacy_doc), [t.pos_ for t in tokens])
-
-        # reform doc if we've removed tokens?
-        doc = (
-            entity.spacy_doc
-            if len(tokens) == len(entity.spacy_doc)
-            else Doc(entity.spacy_doc.vocab, words=[t.text for t in tokens])
-        )
-
         # if fewer words than n, just return words
         # (this is expedient but probably confusing)
         if n == 1 or len(tokens) < n:
-            return [
-                (token.text, list(doc[i : i + 1].vector))
-                for i, token in enumerate(tokens)
-            ]
+            return [(token.text, token.vector.tolist()) for token in tokens]
 
-        ngrams = generate_ngram_phrases(doc, n)
+        ngrams = generate_ngram_phrases(tokens, n)
         return ngrams
 
     def _form_composite_name(self, member_candidates: Sequence[CanonicalEntity]) -> str:
@@ -130,7 +115,7 @@ class CompositeCandidateSelector(CandidateSelector):
 
     def _generate_composite(
         self,
-        entity: DocEntity,
+        tokens: Sequence[Token],
         ngram_entity_map: Mapping[str, CanonicalEntity],
     ) -> CanonicalEntity | None:
         """
@@ -140,13 +125,8 @@ class CompositeCandidateSelector(CandidateSelector):
             mention_text (str): Mention text
             ngram_entity_map (dict[str, MentionCandidate]): word-to-candidate map
         """
-        if entity.spacy_doc is None:
-            raise ValueError("Entity must have a spacy_doc")
 
-        if entity.normalized_term.strip() == "":
-            return None
-
-        def get_composite_candidates(tokens: Doc) -> list[CanonicalEntity]:
+        def get_composite_candidates(tokens: Sequence[Token]) -> list[CanonicalEntity]:
             """
             Recursive function to see if the first ngram has a match, then the first n-1, etc.
             """
@@ -154,16 +134,16 @@ class CompositeCandidateSelector(CandidateSelector):
                 return []
 
             if len(tokens) >= NGRAMS_N:
-                ngram = tokens[0:NGRAMS_N].text
+                ngram = "".join([t.text_with_ws for t in tokens[0:NGRAMS_N]])
                 if ngram in ngram_entity_map:
-                    remaining_words = tokens[NGRAMS_N:].as_doc()
+                    remaining_words = tokens[NGRAMS_N:]
                     return [
                         ngram_entity_map[ngram],
                         *get_composite_candidates(remaining_words),
                     ]
 
             # otherwise, let's map only the first word
-            remaining_words = tokens[1:].as_doc()
+            remaining_words = tokens[1:]
             if tokens[0] in ngram_entity_map:
                 return [
                     ngram_entity_map[tokens[0].text],
@@ -181,7 +161,7 @@ class CompositeCandidateSelector(CandidateSelector):
                 *get_composite_candidates(remaining_words),
             ]
 
-        candidates = get_composite_candidates(entity.spacy_doc)
+        candidates = get_composite_candidates(tokens)
 
         return self._form_composite(candidates)
 
@@ -215,12 +195,19 @@ class CompositeCandidateSelector(CandidateSelector):
         Args:
             matchless_entity (DocEntity): a doc entity (NER span)
         """
+        if matchless_entity.spacy_doc is None:
+            raise ValueError("Entity must have a spacy_doc")
+
+        # only non-punct tokens (TODO: get POS tagging working with transformer)
+        tokens = [
+            t
+            for t in matchless_entity.spacy_doc
+            if (t.pos_ != "PUNCT" and t.text != "-")
+        ]
 
         # create 1 and 2grams
         matchless_ngrams = uniq(
-            flatten(
-                [self._get_ngrams(matchless_entity, i + 1) for i in range(NGRAMS_N)]
-            )
+            flatten([self._get_ngrams(tokens, i + 1) for i in range(NGRAMS_N)])
         )
 
         # get candidates for all ngrams
@@ -232,7 +219,7 @@ class CompositeCandidateSelector(CandidateSelector):
         }
 
         # generate the composites
-        composite_match = self._generate_composite(matchless_entity, ngram_map)
+        composite_match = self._generate_composite(tokens, ngram_map)
 
         # ???
         # optimized_matches = self._optimize_composites(composite_matches)

@@ -192,6 +192,11 @@ class CandidateSelector(CandidateGenerator, object):
             return None
 
         umls_ann = self.create_ann_index(candidates)
+
+        if len(vector) == 0:
+            logger.warning("No vector for %s", candidates[0].aliases[0])
+            return None
+
         indexes, dist = umls_ann.get_nns_by_vector(
             vector, 10, search_k=-1, include_distances=True
         )

@@ -6,8 +6,10 @@ String utilities
 from datetime import date
 from functools import reduce
 import regex as re
-from spacy.tokens import Doc
-from typing import Mapping, TypeGuard, Union
+from spacy.tokens import Token
+from typing import Mapping, Sequence, TypeGuard, Union
+
+import torch
 
 
 _Idable = str | list[str] | int | date
@@ -134,12 +136,14 @@ def byte_dict_to_string_dict(
     )
 
 
-def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[float]]]:
+def generate_ngrams(
+    tokens: Sequence[Token], n: int
+) -> list[tuple[tuple[str, ...], list[float]]]:
     """
     Generate n-grams (term & token) from a list of Spacy tokens
 
     Args:
-        tokens (Doc): list of tokens
+        tokens (Sequence[Token]): list of tokens
         n (int): n-gram size
 
     Returns:
@@ -151,16 +155,25 @@ def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[flo
         [],
     )
     ngrams = [tuple(tokens[i].text for i in iset) for iset in index_sets]
-    vectors = [list(tokens[min(iset) : max(iset)].vector) for iset in index_sets]
+    vectors = [
+        torch.mean(
+            torch.concat(
+                [torch.tensor(t.vector) for t in tokens[min(iset) : max(iset)]]
+            )
+        ).tolist()
+        for iset in index_sets
+    ]
     return list(zip(ngrams, vectors))
 
 
-def generate_ngram_phrases(tokens: Doc, n: int) -> list[tuple[str, list[float]]]:
+def generate_ngram_phrases(
+    tokens: Sequence[Token], n: int
+) -> list[tuple[str, list[float]]]:
     """
     Generate n-grams (term & token) from a list of Spacy tokens
 
     Args:
-        tokens (Doc): list of tokens
+        tokens (Sequence[Token]): list of tokens
         n (int): n-gram size
 
     Returns:
