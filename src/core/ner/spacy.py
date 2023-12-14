@@ -4,15 +4,11 @@ SpaCy client
 
 import logging
 from typing import Any, Iterator
-import joblib
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
 from thinc.api import set_gpu_allocator, prefer_gpu
-import torch
-from scispacy.candidate_generation import cached_path
 
-from constants.umls import BIOSYM_UMLS_TFIDF_PATH
 from utils.args import make_hashable
 
 logger = logging.getLogger(__name__)
@@ -100,50 +96,16 @@ class Spacy:
         return cls._instances[args_hash]
 
 
-# class TfidfSetter:
-#     def __init__(self):
-#         self.tfidf = joblib.load(cached_path(BIOSYM_UMLS_TFIDF_PATH))
-#         self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), 768)
-
-#     def tfidf_setter(self, docs, trf_data):
-#         texts = [doc.text for doc in docs]
-#         doc_data = list(trf_data.doc_data)
-#         print("docdata", len(doc_data[0].tensors))
-#         bert_vecs = [
-#             torch.tensor(
-#                 data.tensors[0].reshape(-1, max(doc._.trf_data.tensors[0].shape))
-#             )
-#             for doc, data in zip(docs, doc_data)
-#         ]
-#         tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
-#         projected = torch.tensor_split(self.tfidf_ll.forward(tfidf_vecs), len(texts))
-#         adj_vectors = [
-#             bert_vec + tfidf_vec.squeeze()
-#             for bert_vec, tfidf_vec in zip(bert_vecs, projected)
-#         ]
-
-#         for doc, vector in zip(docs, adj_vectors):
-#             doc._.tfidf_vector = vector
-
-#         return docs
-
-
-def set_vector(docs, trf_data):
-    for doc in docs:
-        doc.tensor = doc._.trf_data.tensors[0]
-
-    return docs
-
-
 def get_transformer_nlp() -> Spacy:
     """
     Get a Spacy NLP model that uses a transformer
     """
     nlp = Spacy.get_instance(
         model="en_core_web_trf",
-        disable=["ner"],  # , "parser", "tagger"],
+        disable=["ner"],  # "parser", "tagger"],
         additional_pipelines={
             "transformer": {
+                "before": "tagger",
                 "config": {
                     "model": {
                         "@architectures": "spacy-transformers.TransformerModel.v3",
@@ -153,32 +115,21 @@ def get_transformer_nlp() -> Spacy:
                             "window": 128,
                             "stride": 96,
                         },
+                        "tokenizer_config": {
+                            "use_fast": True,
+                        },
                     },
                 },
             },
             "tok2vec": {
                 "config": {
                     "model": {
-                        "@architectures": "spacy.Tok2Vec.v2",
-                        "embed": {
-                            "@architectures": "spacy.MultiHashEmbed.v2",
-                            "width": 96,
-                            "attrs": ["LOWER", "PREFIX", "SUFFIX", "SHAPE"],
-                            "rows": [5000, 2500, 2500, 2500],
-                            "include_static_vectors": True,
-                        },
-                        "encode": {
-                            "@architectures": "spacy.MaxoutWindowEncoder.v2",
-                            "width": 96,
-                            "depth": 4,
-                            "window_size": 1,
-                            "maxout_pieces": 3,
-                        },
+                        "@architectures": "spacy-transformers.TransformerListener.v1",
+                        "pooling": {"@layers": "reduce_mean.v1"},
                     }
-                }
+                },
             },
         },
     )
-    # nlp.get_pipe("transformer").set_extra_annotations = set_vector
 
     return nlp

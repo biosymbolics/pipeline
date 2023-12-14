@@ -26,11 +26,11 @@ from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
 DEFAULT_K = 25
-MIN_SIMILARITY = 2
+MIN_SIMILARITY = 1.2
 UMLS_KB = None
 
 
-WORD_EMBEDDING_LENGTH = 96
+WORD_EMBEDDING_LENGTH = 768
 
 CANDIDATE_CUI_SUPPRESSIONS = {
     **UMLS_CUI_SUPPRESSIONS,
@@ -106,15 +106,16 @@ class CandidateSelector(CandidateGenerator, object):
             else torch.zeros(self.vector_length)
             for doc in docs
         ]
-        tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
-        projected_tfidf = torch.tensor_split(
-            self.tfidf_ll.forward(tfidf_vecs), len(texts)
-        )
+        # tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
+        # projected_tfidf = torch.tensor_split(
+        #     self.tfidf_ll.forward(tfidf_vecs), len(texts)
+        # )
 
-        return [
-            bert_vec * 0.6 + tfidf_vec.squeeze() * 0.4
-            for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
-        ]
+        # return [
+        #     bert_vec * 0.6 + tfidf_vec.squeeze() * 0.4
+        #     for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
+        # ]
+        return bert_vecs
 
     @classmethod
     def _apply_word_overrides(

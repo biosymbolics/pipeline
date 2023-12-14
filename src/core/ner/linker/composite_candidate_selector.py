@@ -62,9 +62,16 @@ class CompositeCandidateSelector(CandidateSelector):
         if entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy_doc")
 
-        # only non-punct tokens
-        tokens = [t for t in entity.spacy_doc if t.pos_ != "PUNCT"]
-        doc = entity.spacy_doc
+        # only non-punct tokens (TODO: get POS tagging working with transformer)
+        tokens = [t for t in entity.spacy_doc if (t.pos_ != "PUNCT" and t.text != "-")]
+        print("tokens", tokens, len(entity.spacy_doc), [t.pos_ for t in tokens])
+
+        # reform doc if we've removed tokens?
+        doc = (
+            entity.spacy_doc
+            if len(tokens) == len(entity.spacy_doc)
+            else Doc(entity.spacy_doc.vocab, words=[t.text for t in tokens])
+        )
 
         # if fewer words than n, just return words
         # (this is expedient but probably confusing)
@@ -174,9 +181,7 @@ class CompositeCandidateSelector(CandidateSelector):
                 *get_composite_candidates(remaining_words),
             ]
 
-        print("NM", ngram_entity_map)
         candidates = get_composite_candidates(entity.spacy_doc)
-        print("CC", candidates)
 
         return self._form_composite(candidates)
 
@@ -229,6 +234,7 @@ class CompositeCandidateSelector(CandidateSelector):
         # generate the composites
         composite_match = self._generate_composite(matchless_entity, ngram_map)
 
+        # ???
         # optimized_matches = self._optimize_composites(composite_matches)
 
         return composite_match
