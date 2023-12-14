@@ -165,26 +165,6 @@ class CompositeCandidateSelector(CandidateSelector):
 
         return self._form_composite(candidates)
 
-    # def _optimize_composites(
-    #     self, composite_matches: dict[str, CanonicalEntity | None]
-    # ) -> dict[str, CanonicalEntity | None]:
-    #     """
-    #     Taking the new composite names, see if there is now a singular match
-    #     (e.g. a composite name might be "SGLT2 inhibitor", comprised of two candidates, for which a single match exists)
-    #     """
-    #     composite_names = uniq(
-    #         [cm.name for cm in composite_matches.values() if cm is not None]
-    #     )
-    #     direct_match_map = {
-    #         n: self._get_best_canonical(c)
-    #         for n, c in zip(composite_names, self._get_candidates(composite_names))
-    #     }
-    #     # combine composite and potential single matches
-    #     return {
-    #         t: (direct_match_map.get(cm.name) if cm is not None else cm) or cm
-    #         for t, cm in composite_matches.items()
-    #     }
-
     def _generate_composite_entities(
         self, matchless_entity: DocEntity
     ) -> CanonicalEntity | None:
@@ -221,9 +201,6 @@ class CompositeCandidateSelector(CandidateSelector):
 
         # generate the composites
         composite_match = self._generate_composite(tokens, ngram_map)
-
-        # ???
-        # optimized_matches = self._optimize_composites(composite_matches)
 
         return composite_match
 
