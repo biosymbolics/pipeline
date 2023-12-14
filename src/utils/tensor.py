@@ -7,14 +7,14 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from utils.list import BATCH_SIZE, batch, is_sequence
+import torch
 
 from typings.core import Primitive
 
 
-T = TypeVar("T", bound=torch.Tensor)
-
-
-def pad_or_truncate_to_size(tensor: T, shape: tuple[int, ...]) -> T:
+def pad_or_truncate_to_size(
+    tensor: torch.Tensor, shape: tuple[int, ...]
+) -> torch.Tensor:
     """
     Pad or truncate a tensor to a given size
 
@@ -26,7 +26,7 @@ def pad_or_truncate_to_size(tensor: T, shape: tuple[int, ...]) -> T:
         return tensor
 
     if len(tensor.size()) == 0:
-        return cast(T, torch.zeros(shape))
+        return torch.zeros(shape)
 
     dim_delta = len(shape) - len(tensor.size())
 

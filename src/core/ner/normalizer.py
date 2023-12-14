@@ -56,6 +56,7 @@ class TermNormalizer:
         """
         # removed_suppressed must be false to properly index against original terms
         cleaned_entity_sets = self.cleaner.clean(entity_sets, remove_suppressed=False)
+        print("CLEANED", cleaned_entity_sets)
 
         if self.term_linker is not None:
             return self.term_linker.link(cleaned_entity_sets)

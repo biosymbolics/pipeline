@@ -36,7 +36,7 @@ DB_CLUSTER = os.environ.get("DB_CLUSTER")
 DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 
 
-DEFAULT_BASE_NLP_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
+DEFAULT_BASE_TRANSFORMER_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_NLP_DOC_STRIDE = 16
 DEFAULT_NLP_MAX_LENGTH = 512  # same as with training
 DEFAULT_TORCH_DEVICE: str = "mps"

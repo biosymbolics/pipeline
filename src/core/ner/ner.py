@@ -11,7 +11,7 @@ import logging
 import html
 from spacy.tokens import Span, Doc
 
-from core.ner.cleaning import CleanFunction
+from core.ner.cleaning import CleanFunction, remove_parentheticals
 from core.ner.normalizer import TermNormalizer
 from core.ner.spacy import Spacy
 from utils.args import make_hashable
@@ -136,6 +136,7 @@ class NerTagger:
             # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
             lambda _content: [" " + c for c in _content],
             lambda _content: [c.lower() for c in _content],
+            remove_parentheticals,
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore

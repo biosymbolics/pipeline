@@ -177,61 +177,63 @@ class CandidateSelector(CandidateGenerator, object):
         logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
         return umls_ann
 
-    def get_best_by_semantic_similarity(
+    def calc_candidate_score(
+        self, candidate: MentionCandidate, distance: float
+    ) -> float:
+        """
+        Generate a score for a candidate
+        """
+        if candidate.concept_id in CANDIDATE_CUI_SUPPRESSIONS:
+            return 0.0
+
+        if has_intersection(
+            UMLS_NAME_SUPPRESSIONS,
+            self.kb.cui_to_entity[candidate.concept_id].canonical_name.split(" "),
+        ):
+            return 0.0
+
+        types = self.kb.cui_to_entity[candidate.concept_id].types
+        is_preferred_type = has_intersection(types, list(PREFERRED_UMLS_TYPES.keys()))
+        is_most_preferred_type = has_intersection(
+            types, list(MOST_PREFERRED_UMLS_TYPES.keys())
+        )
+        type_score = 0.75 if not is_preferred_type else 1.1**is_most_preferred_type
+        semantic_similarity = 2 - distance
+        syntactic_similarity = candidate.similarities[0]
+        return (semantic_similarity + syntactic_similarity) * type_score
+
+    def _get_best_canonical(
         self, vector: list[float], candidates: Sequence[MentionCandidate]
-    ) -> MentionCandidate | None:
+    ) -> tuple[CanonicalEntity | None, float]:
         """
         Get best candidate by semantic similarity
         """
-        if mean(vector) == 0:
+        if len(vector) == 0 or mean(vector) == 0:
             logger.warning(
                 "No vector for %s, probably OOD (%s)",
                 candidates[0].aliases[0],
                 vector,
             )
-            return None
+            return (None, 0.0)
 
         umls_ann = self.create_ann_index(candidates)
 
-        if len(vector) == 0:
-            logger.warning("No vector for %s", candidates[0].aliases[0])
-            return None
-
-        indexes, dist = umls_ann.get_nns_by_vector(
+        ids, distances = umls_ann.get_nns_by_vector(
             vector, 10, search_k=-1, include_distances=True
         )
 
-        if len(indexes) == 0:
-            return None
-
-        def get_score(i):
-            if candidates[i].concept_id in CANDIDATE_CUI_SUPPRESSIONS:
-                return 0.0
-
-            if has_intersection(
-                UMLS_NAME_SUPPRESSIONS,
-                self.kb.cui_to_entity[candidates[i].concept_id].canonical_name.split(
-                    " "
-                ),
-            ):
-                return 0.0
-
-            types = self.kb.cui_to_entity[candidates[i].concept_id].types
-            is_preferred_type = has_intersection(
-                types, list(PREFERRED_UMLS_TYPES.keys())
-            )
-            is_most_preferred_type = has_intersection(
-                types, list(MOST_PREFERRED_UMLS_TYPES.keys())
-            )
-            type_score = (
-                0.75 if not is_preferred_type else 1.1**is_most_preferred_type
-            )
-            semantic_similarity = 2 - dist[indexes.index(i)]
-            syntactic_similarity = candidates[i].similarities[0]
-            return (semantic_similarity + syntactic_similarity) * type_score
+        if len(ids) == 0:
+            logger.warning("No candidates for %s", candidates[0].aliases[0])
+            return (None, 0.0)
 
         mixed_score_candidates = sorted(
-            [(candidates[i], get_score(i)) for i in indexes],
+            [
+                (
+                    candidates[id],
+                    self.calc_candidate_score(candidates[id], distances[i]),
+                )
+                for i, id in enumerate(ids)
+            ],
             key=lambda x: x[1],
             reverse=True,
         )
@@ -246,35 +248,9 @@ class CandidateSelector(CandidateGenerator, object):
                 top_score,
                 top_candidate,
             )
-            return None
+            # return None
 
-        return top_candidate
-
-    def _get_best_canonical(
-        self,
-        candidates: Sequence[MentionCandidate],
-        mention_vector: list[float] | None = None,
-    ) -> CanonicalEntity | None:
-        """
-        Get canonical candidate if suggestions exceed min similarity
-
-        Args:
-            candidates (Sequence[MentionCandidate]): list of candidates
-            vector (list[float], Optional): embeddings for mention text
-        """
-
-        if mention_vector is None:
-            raise ValueError("Must provide mention vector")
-        else:
-            top_candidate = self.get_best_by_semantic_similarity(
-                mention_vector,
-                candidates,
-            )
-
-        if top_candidate is None:
-            return None
-
-        return self._candidate_to_canonical(top_candidate)
+        return (self._candidate_to_canonical(top_candidate), top_score)
 
     def _candidate_to_canonical(self, candidate: MentionCandidate) -> CanonicalEntity:
         """
@@ -300,18 +276,16 @@ class CandidateSelector(CandidateGenerator, object):
         )
 
     def select_candidate(
-        self, term: str, vector: list[float] | None = None
+        self, term: str, vector: list[float]
     ) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
         candidates = self._get_candidates(term)
+        best_canonical, score = self._get_best_canonical(vector, candidates)
+        return best_canonical
 
-        return self._get_best_canonical(candidates, vector)
-
-    def __call__(
-        self, term: str, vector: list[float] | None = None
-    ) -> CanonicalEntity | None:
+    def __call__(self, term: str, vector: list[float]) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """

@@ -10,7 +10,7 @@ from spacy.tokens import Doc
 
 from core.ner.spacy import get_transformer_nlp
 from constants.core import (
-    DEFAULT_BASE_NLP_MODEL,
+    DEFAULT_BASE_TRANSFORMER_MODEL,
     DEFAULT_TORCH_DEVICE,
     DEFAULT_NLP_MODEL_ARGS,
 )
@@ -34,7 +34,9 @@ class BinderNlp:
     To create the model, clone https://github.com/kristinlindquist/binder and from that directory, run the instructions in the readme.
     """
 
-    def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_NLP_MODEL):
+    def __init__(
+        self, model_file: str, base_model: str = DEFAULT_BASE_TRANSFORMER_MODEL
+    ):
         device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info("Loading torch model from: %s", model_file)

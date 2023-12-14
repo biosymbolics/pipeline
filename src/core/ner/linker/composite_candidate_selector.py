@@ -6,9 +6,9 @@ import logging
 from constants.patterns.iupac import is_iupac
 from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
-from utils.string import generate_ngram_phrases
 
 from .candidate_selector import CandidateSelector
+from .utils import generate_ngram_phrases
 
 NGRAMS_N = 1
 MIN_WORD_LENGTH = 1
@@ -198,12 +198,13 @@ class CompositeCandidateSelector(CandidateSelector):
         if matchless_entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy_doc")
 
-        # only non-punct tokens (TODO: get POS tagging working with transformer)
-        tokens = [
-            t
-            for t in matchless_entity.spacy_doc
-            if (t.pos_ != "PUNCT" and t.text != "-")
-        ]
+        # only non-punct tokens
+        def _is_composable(t: Token) -> bool:
+            # TODO: get POS tagging working with transformer
+            # TODO: non-competitive blah blah antagoinst - keep dashed terms together
+            return t.pos_ != "PUNCT" and t.text != "-"
+
+        tokens = [t for t in matchless_entity.spacy_doc if _is_composable(t)]
 
         # create 1 and 2grams
         matchless_ngrams = uniq(
@@ -232,12 +233,14 @@ class CompositeCandidateSelector(CandidateSelector):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        candidates = self._get_candidates(entity.normalized_term)
+        if not entity.vector:
+            raise ValueError("Entity must have a vector")
 
-        match = self._get_best_canonical(candidates, entity.vector)
+        candidates = self._get_candidates(entity.normalized_term)
+        match = self._get_best_canonical(entity.vector, candidates)
 
         if match is not None:
-            return match
+            return match[0]
 
         if CompositeCandidateSelector._is_composite_eligible(entity):
             return self._generate_composite_entities(entity)
