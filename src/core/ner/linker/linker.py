@@ -48,6 +48,7 @@ class TermLinker:
             logging.warning("No entities to link")
             return []
 
+        # generate the candidates (somewhat time consuming)
         canonical_entities = [self.candidate_generator(e) for e in entity_set]
 
         def get_canonical(ce: CanonicalEntity | None, de: DocEntity) -> CanonicalEntity:

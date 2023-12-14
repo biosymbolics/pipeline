@@ -8,18 +8,24 @@ from scispacy.candidate_generation import (
     MentionCandidate,
     cached_path,
 )
-from spacy.tokens import Doc
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 import logging
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity
-from constants.umls import BIOSYM_UMLS_TFIDF_PATH, UMLS_CUI_SUPPRESSIONS
+from constants.umls import (
+    BIOSYM_UMLS_TFIDF_PATH,
+    MOST_PREFERRED_UMLS_TYPES,
+    PREFERRED_UMLS_TYPES,
+    PREFERRED_UMLS_TYPES,
+    UMLS_CUI_SUPPRESSIONS,
+)
 from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from utils.list import has_intersection
 
 DEFAULT_K = 25
-MIN_SIMILARITY = 1.3
+MIN_SIMILARITY = 2
 UMLS_KB = None
 
 
@@ -93,16 +99,21 @@ class CandidateSelector(CandidateGenerator, object):
         Vectorize a text
         """
         docs = list(self.nlp.pipe(texts))
-        bert_vecs = [torch.tensor(doc.vector) for doc in docs]
+        bert_vecs = [
+            torch.tensor(doc.vector)
+            if len(doc.vector) > 0
+            else torch.zeros(self.vector_length)
+            for doc in docs
+        ]
         tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
         projected_tfidf = torch.tensor_split(
             self.tfidf_ll.forward(tfidf_vecs), len(texts)
         )
+
         return [
-            bert_vec + tfidf_vec.squeeze()
+            bert_vec * 0.6 + tfidf_vec.squeeze() * 0.4
             for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
         ]
-        # return bert_vecs
 
     def get_best_by_rules(
         self, candidates: Sequence[MentionCandidate]
@@ -159,13 +170,20 @@ class CandidateSelector(CandidateGenerator, object):
         ]
         # only use the first alias, since that's the most syntactically similar to the mention
         aliases = [c.aliases[0].lower() for c in candidates]
+        tuis = [self.kb.cui_to_entity[c.concept_id].types[0] for c in candidates]
+        types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        vectors = self.batch_vectorize(canonical_names + aliases)
+        vectors = self.batch_vectorize(canonical_names + aliases + types)
         cn_vectors = vectors[0 : len(canonical_names)]
-        alias_vectors = vectors[len(canonical_names) :]
+        alias_vectors = vectors[
+            len(canonical_names) : len(canonical_names) + len(aliases)
+        ]
+        type_vectors = vectors[len(canonical_names) + len(aliases) :]
 
         for i in range(len(candidates)):
-            combined_vec = 0.6 * cn_vectors[i] + 0.4 * alias_vectors[i]
+            combined_vec = (0.5 * cn_vectors[i]) + (0.2 * alias_vectors[i]) * (
+                0.3 * type_vectors[i]
+            )
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
@@ -194,14 +212,23 @@ class CandidateSelector(CandidateGenerator, object):
         if len(indexes) == 0:
             return None
 
+        def get_score(i):
+            types = self.kb.cui_to_entity[candidates[i].concept_id].types
+            is_preferred_type = has_intersection(
+                types, list(PREFERRED_UMLS_TYPES.keys())
+            )
+            is_most_preferred_type = has_intersection(
+                types, list(MOST_PREFERRED_UMLS_TYPES.keys())
+            )
+            type_score = (
+                0.75 if not is_preferred_type else 1.1**is_most_preferred_type
+            )
+            semantic_similarity = 2 - dist[indexes.index(i)]
+            syntactic_similarity = candidates[i].similarities[0]
+            return (semantic_similarity + syntactic_similarity) * type_score
+
         mixed_score_candidates = sorted(
-            [
-                (
-                    candidates[i],
-                    (2 - dist[indexes.index(i)]) + (candidates[i].similarities[0] / 2),
-                )
-                for i in indexes
-            ],
+            [(candidates[i], get_score(i)) for i in indexes],
             key=lambda x: x[1],
             reverse=True,
         )

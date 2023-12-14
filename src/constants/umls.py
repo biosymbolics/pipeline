@@ -293,7 +293,6 @@ UMLS_OTHER_TYPES = {
     "T049": "Cell or Molecular Dysfunction",  # e.g. DNA Strand Break
 }
 
-
 # TODO: all these names are lacking distinctness
 BIOMEDICAL_GRAPH_UMLS_TYPES = {
     **UMLS_INTERVENTION_TYPES,
@@ -302,6 +301,7 @@ BIOMEDICAL_GRAPH_UMLS_TYPES = {
     **UMLS_RESEARCH_TYPES,
     **UMLS_OTHER_TYPES,
 }
+
 
 PREFERRED_UMLS_TYPES = {
     **BIOMEDICAL_GRAPH_UMLS_TYPES,

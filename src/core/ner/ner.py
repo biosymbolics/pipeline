@@ -7,7 +7,6 @@ from functools import reduce
 from itertools import groupby
 import time
 from typing import Any, Literal, Optional, Sequence, TypeVar
-from pydash import compact
 import logging
 import html
 from spacy.tokens import Span, Doc
@@ -25,7 +24,7 @@ from .patterns import (
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
-from .types import CanonicalEntity, DocEntities, DocEntity, SpacyPatterns
+from .types import DocEntities, DocEntity, SpacyPatterns
 from .utils import spans_to_doc_entities
 
 T = TypeVar("T", bound=Span | str)
@@ -136,6 +135,7 @@ class NerTagger:
             remove_extra_spaces,
             # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
             lambda _content: [" " + c for c in _content],
+            lambda _content: [c.lower() for c in _content],
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore

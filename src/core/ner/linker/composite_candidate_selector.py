@@ -47,8 +47,8 @@ class CompositeCandidateSelector(CandidateSelector):
         - false if it's too short (a single token or word)
         - Otherwise true
         """
-        tokens = entity.spacy_doc or entity.term.split(" ")
-        if is_iupac(entity.term):
+        tokens = entity.spacy_doc or entity.normalized_term.split(" ")
+        if is_iupac(entity.normalized_term):
             return False
         if len(tokens) <= MIN_WORD_LENGTH:
             return False
@@ -70,7 +70,7 @@ class CompositeCandidateSelector(CandidateSelector):
         # (this is expedient but probably confusing)
         if n == 1 or len(tokens) < n:
             return [
-                (token.lower_, list(doc[i : i + 1].vector))
+                (token.text, list(doc[i : i + 1].vector))
                 for i, token in enumerate(tokens)
             ]
 
@@ -136,7 +136,7 @@ class CompositeCandidateSelector(CandidateSelector):
         if entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy_doc")
 
-        if entity.term.strip() == "":
+        if entity.normalized_term.strip() == "":
             return None
 
         def get_composite_candidates(tokens: Doc) -> list[CanonicalEntity]:
@@ -168,13 +168,15 @@ class CompositeCandidateSelector(CandidateSelector):
                 # concept_id is the word itself, so
                 # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
                 CanonicalEntity(
-                    name=tokens[0].text.lower(),
-                    id=tokens[0].text.lower(),
+                    name=tokens[0].lower_,
+                    id=tokens[0].lower_,
                 ),
                 *get_composite_candidates(remaining_words),
             ]
 
+        print("NM", ngram_entity_map)
         candidates = get_composite_candidates(entity.spacy_doc)
+        print("CC", candidates)
 
         return self._form_composite(candidates)
 
@@ -249,7 +251,7 @@ class CompositeCandidateSelector(CandidateSelector):
         else:
             logger.warning(
                 "Not generating composite candidate for ineligible entity: %s",
-                entity.term,
+                entity.normalized_term,
             )
 
         return match

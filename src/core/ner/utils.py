@@ -481,7 +481,8 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
             span.label_,
             span.start_char,
             span.end_char,
-            span.vector.tolist(),
+            normalized_term=span.text,  # just to init
+            vector=span.vector.tolist(),
             spacy_doc=span.as_doc(),
         )
         for span in spans
