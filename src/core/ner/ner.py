@@ -194,7 +194,8 @@ class NerTagger:
             return entity_sets
 
         def normalize_set(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-            normalizations = self.normalizer.normalize(entity_set)  # type: ignore
+            assert self.normalizer is not None
+            normalizations = self.normalizer.normalize(entity_set)
             if self.entity_types is None:
                 return normalizations
 

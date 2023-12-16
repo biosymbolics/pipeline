@@ -11,6 +11,7 @@ from scispacy.candidate_generation import (
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 import logging
+from core.ner.linker.utils import similarity_with_residual_penalty, l1_normalize
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity
@@ -101,11 +102,12 @@ class CandidateSelector(CandidateGenerator, object):
         """
         docs = list(self.nlp.pipe(texts))
         bert_vecs = [
-            torch.tensor(doc.vector)
+            l1_normalize(torch.tensor(doc.vector))
             if len(doc.vector) > 0
             else torch.zeros(self.vector_length)
             for doc in docs
         ]
+
         # tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
         # projected_tfidf = torch.tensor_split(
         #     self.tfidf_ll.forward(tfidf_vecs), len(texts)
@@ -156,21 +158,15 @@ class CandidateSelector(CandidateGenerator, object):
             for c in candidates
         ]
         # only use the first alias, since that's the most syntactically similar to the mention
-        aliases = [c.aliases[0].lower() for c in candidates]
         tuis = [self.kb.cui_to_entity[c.concept_id].types[0] for c in candidates]
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        vectors = self.batch_vectorize(canonical_names + aliases + types)
+        vectors = self.batch_vectorize(canonical_names + types)
         cn_vectors = vectors[0 : len(canonical_names)]
-        alias_vectors = vectors[
-            len(canonical_names) : len(canonical_names) + len(aliases)
-        ]
-        type_vectors = vectors[len(canonical_names) + len(aliases) :]
+        type_vectors = vectors[len(canonical_names) :]
 
         for i in range(len(candidates)):
-            combined_vec = (0.5 * cn_vectors[i]) + (0.2 * alias_vectors[i]) * (
-                0.3 * type_vectors[i]
-            )
+            combined_vec = (0.9 * cn_vectors[i]) + (0.1 * type_vectors[i])
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
@@ -178,11 +174,16 @@ class CandidateSelector(CandidateGenerator, object):
         return umls_ann
 
     def calc_candidate_score(
-        self, candidate: MentionCandidate, distance: float
+        self,
+        candidate: MentionCandidate,
+        original_vector: list[float],
+        matched_vector: list[float],
+        distance: float,
     ) -> float:
         """
         Generate a score for a candidate
         """
+
         if candidate.concept_id in CANDIDATE_CUI_SUPPRESSIONS:
             return 0.0
 
@@ -198,23 +199,25 @@ class CandidateSelector(CandidateGenerator, object):
             types, list(MOST_PREFERRED_UMLS_TYPES.keys())
         )
         type_score = 0.75 if not is_preferred_type else 1.1**is_most_preferred_type
-        semantic_similarity = 2 - distance
+        semantic_similarity = similarity_with_residual_penalty(
+            torch.tensor(original_vector), torch.tensor(matched_vector), distance
+        )
         syntactic_similarity = candidate.similarities[0]
         return (semantic_similarity + syntactic_similarity) * type_score
 
     def _get_best_canonical(
         self, vector: list[float], candidates: Sequence[MentionCandidate]
-    ) -> tuple[CanonicalEntity | None, float]:
+    ) -> tuple[CanonicalEntity | None, float, list[float]]:
         """
         Get best candidate by semantic similarity
         """
-        if len(vector) == 0 or mean(vector) == 0:
+        if len(vector) == 0:
             logger.warning(
                 "No vector for %s, probably OOD (%s)",
                 candidates[0].aliases[0],
                 vector,
             )
-            return (None, 0.0)
+            return (None, 0.0, [])
 
         umls_ann = self.create_ann_index(candidates)
 
@@ -224,13 +227,19 @@ class CandidateSelector(CandidateGenerator, object):
 
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
-            return (None, 0.0)
+            return (None, 0.0, [])
 
         mixed_score_candidates = sorted(
             [
                 (
                     candidates[id],
-                    self.calc_candidate_score(candidates[id], distances[i]),
+                    self.calc_candidate_score(
+                        candidates[id],
+                        vector,
+                        matched_vector=umls_ann.get_item_vector(id),
+                        distance=distances[i],
+                    ),
+                    umls_ann.get_item_vector(id),
                 )
                 for i, id in enumerate(ids)
             ],
@@ -239,18 +248,11 @@ class CandidateSelector(CandidateGenerator, object):
         )
         top_candidate = mixed_score_candidates[0][0]
         top_score = mixed_score_candidates[0][1]
+        top_vector = mixed_score_candidates[0][2]
 
-        print(mixed_score_candidates)
+        print([(c[0].aliases[0], c[1]) for c in mixed_score_candidates])
 
-        if top_score < self.min_similarity:
-            logger.warning(
-                "Best candidate too distant: %s (%s)",
-                top_score,
-                top_candidate,
-            )
-            # return None
-
-        return (self._candidate_to_canonical(top_candidate), top_score)
+        return (self._candidate_to_canonical(top_candidate), top_score, top_vector)
 
     def _candidate_to_canonical(self, candidate: MentionCandidate) -> CanonicalEntity:
         """
@@ -282,7 +284,7 @@ class CandidateSelector(CandidateGenerator, object):
         Generate & select candidates for a list of mention texts
         """
         candidates = self._get_candidates(term)
-        best_canonical, score = self._get_best_canonical(vector, candidates)
+        best_canonical, _, _ = self._get_best_canonical(vector, candidates)
         return best_canonical
 
     def __call__(self, term: str, vector: list[float]) -> CanonicalEntity | None:

@@ -1,7 +1,7 @@
 """
 NER types
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
@@ -25,13 +25,14 @@ from typings.core import Dataclass
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
 
-class CanonicalEntity(NamedTuple):
+@dataclass(frozen=True)
+class CanonicalEntity(Dataclass):
     id: str
     name: str
     ids: Optional[list[str]] = None
     description: Optional[str] = None
-    aliases: list[str] = []
-    types: list[str] = []
+    aliases: list[str] = field(default_factory=list)
+    types: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -46,11 +47,20 @@ class DocEntity(Dataclass):
     spacy_doc: Optional[Doc] = None
     linked_entity: Optional[CanonicalEntity] = None
 
+    @property
+    def id(self) -> Optional[str]:
+        if self.linked_entity is None:
+            return None
+        return self.linked_entity.id
+
+    @property
+    def canonical_name(self):
+        if self.linked_entity is None:
+            return None
+        return self.linked_entity.name
+
     def __str__(self):
-        norm_term = (
-            self.linked_entity.name if self.linked_entity else self.normalized_term
-        )
-        return f"{self.term} ({self.type}, s: {self.start_char}, e: {self.end_char}, norm_term: {norm_term}, id: {self.linked_entity.id if self.linked_entity else None})"
+        return f"{self.term} ({self.type}, s: {self.start_char}, e: {self.end_char}, norm_term: {self.canonical_name or self.normalized_term}, id: {self.id})"
 
     def __repr__(self):
         return self.__str__()

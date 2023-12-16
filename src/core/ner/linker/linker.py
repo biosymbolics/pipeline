@@ -60,7 +60,7 @@ class TermLinker:
             return ce
 
         linked_doc_ents = [
-            DocEntity(**{**e, "linked_entity": get_canonical(ce, e)})
+            DocEntity(**{**e, "linked_entity": get_canonical(ce[0], e)})
             for e, ce in zip(entity_set, canonical_entities)
         ]
 
