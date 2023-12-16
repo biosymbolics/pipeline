@@ -153,6 +153,8 @@ UMLS_CUI_SUPPRESSIONS = {
 # assumes closest matching alias would match the suppressed name (sketchy)
 # does not support re, and matches based on implicit (?:^|$|\s) (word in name.split(" "))
 UMLS_NAME_SUPPRESSIONS = [
+    "rat ",
+    "mouse ",
     ", rat",
     ", mouse",
     "categorized",  # tend to be generic categories, e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0729761

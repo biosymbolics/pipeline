@@ -10,7 +10,12 @@ from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
 
 from .candidate_selector import CandidateSelector
-from .utils import generate_ngram_phrases, get_orthogonal_members, l1_normalize
+from .utils import (
+    generate_ngram_phrases,
+    get_orthogonal_members,
+    l1_normalize,
+    score_candidate,
+)
 
 NGRAMS_N = 2
 MIN_WORD_LENGTH = 1
@@ -252,26 +257,28 @@ class CompositeCandidateSelector(CandidateSelector):
 
         norm_vector = l1_normalize(
             torch.tensor(
-                0.9 * torch.tensor(entity.vector)
-                + 0.1 * torch.tensor(entity.spacy_doc.vector)
+                0.7 * torch.tensor(entity.vector)
+                + 0.3 * torch.tensor(entity.spacy_doc.vector)
             )
         )
-        match, score, vector = self._get_best_canonical(
+        match, match_score, vector = self._get_best_canonical(
             norm_vector.tolist(), candidates
         )
 
-        if score >= self.min_similarity:
+        if match_score >= self.min_similarity:
             return (match, vector)
 
         composition_candidates = self._get_composite_candidates(entity)
-
-        matches = self.get_composite_pieces(
+        comp_matches = self.get_composite_pieces(
             norm_vector, composition_candidates + candidates
         )
 
         # vector of composite
-        match_vector = torch.mean(torch.stack([torch.tensor(m[1]) for m in matches]))
+        comp_match_vector = torch.mean(
+            torch.stack([torch.tensor(m[1]) for m in comp_matches])
+        )
+        comp_match = self._form_composite(comp_matches)
 
-        # loss = entity.vector - match_vector
+        # loss = cosine_dist(entity.vector, match_vector)
 
-        return (self._form_composite(matches), match_vector.tolist())
+        return (comp_match, comp_match_vector.tolist())

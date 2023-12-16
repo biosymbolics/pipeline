@@ -2,9 +2,17 @@ from typing import Sequence, cast
 from pydash import flatten, uniq
 from spacy.tokens import Token
 import torch
-import torch.nn.functional as F
 import networkx as nx
 from functools import reduce
+from scispacy.candidate_generation import KnowledgeBase, MentionCandidate
+
+from constants.umls import (
+    MOST_PREFERRED_UMLS_TYPES,
+    PREFERRED_UMLS_TYPES,
+    PREFERRED_UMLS_TYPES,
+    UMLS_NAME_SUPPRESSIONS,
+)
+from utils.list import has_intersection
 
 
 def generate_ngrams(
@@ -97,20 +105,22 @@ def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor
 def similarity_with_residual_penalty(
     mention_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
-    similarity: float,
-    alpha: float = 0.3,
+    distance: float,
+    alpha: float = 0.5,
 ) -> float:
     """
     Compute a weighted similarity score that penalizes a large residual.
     """
+    similarity = 2 - distance
+
     # Compute residual
-    residual = mention_vector - candidate_vector
+    residual = torch.subtract(mention_vector, candidate_vector)
 
     # Frobenius norm
     residual_norm = torch.norm(residual, p="fro")
 
     # Scale residual norm to [0,1] range
-    scaled_residual_norm = residual_norm / torch.norm(mention_vector)
+    scaled_residual_norm = torch.divide(residual_norm, torch.norm(mention_vector))
 
     # Weighted score
     score = alpha * similarity + (1 - alpha) * (1 - scaled_residual_norm)
@@ -162,3 +172,51 @@ def get_orthogonal_members(mem_vectors: torch.Tensor) -> list[int]:
     print("remove", removal_indicies)
 
     return [i for i in range(mem_vectors.size(0)) if i not in uniq(removal_indicies)]
+
+
+def score_candidate(
+    candidate_id: str,
+    candidate_canonical_name: str,
+    candidate_types: list[str],
+    syntactic_similarity: float,
+    original_vector: list[float],
+    candidate_vector: list[float],
+    semantic_distance: float,
+) -> float:
+    """
+    Generate a score for a candidate
+
+    Args:
+        candidate (MentionCandidate): candidate
+        original_vector (list[float]): original vector
+        matched_vector (list[float]): matched vector
+        distance (float): distance between vectors
+    """
+
+    if candidate_id in UMLS_NAME_SUPPRESSIONS:
+        return 0.0
+
+    if has_intersection(
+        UMLS_NAME_SUPPRESSIONS,
+        candidate_canonical_name.split(" "),
+    ):
+        return 0.0
+
+    def type_score():
+        is_preferred_type = has_intersection(
+            candidate_types, list(PREFERRED_UMLS_TYPES.keys())
+        )
+        is_most_preferred_type = has_intersection(
+            candidate_types, list(MOST_PREFERRED_UMLS_TYPES.keys())
+        )
+        if not is_preferred_type:
+            return 0.75
+        if not is_most_preferred_type:
+            return 0.9
+
+        return 1.0
+
+    semantic_similarity = similarity_with_residual_penalty(
+        torch.tensor(original_vector), torch.tensor(candidate_vector), semantic_distance
+    )
+    return (semantic_similarity + (syntactic_similarity / 2)) * type_score()

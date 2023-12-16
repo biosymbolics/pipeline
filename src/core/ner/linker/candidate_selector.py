@@ -2,7 +2,6 @@ import time
 from typing import Sequence
 from annoy import AnnoyIndex
 import joblib
-from numpy import mean
 from scispacy.candidate_generation import (
     CandidateGenerator,
     MentionCandidate,
@@ -11,20 +10,21 @@ from scispacy.candidate_generation import (
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 import logging
-from core.ner.linker.utils import similarity_with_residual_penalty, l1_normalize
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity
 from constants.umls import (
     BIOSYM_UMLS_TFIDF_PATH,
-    MOST_PREFERRED_UMLS_TYPES,
     PREFERRED_UMLS_TYPES,
     PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
-    UMLS_NAME_SUPPRESSIONS,
 )
 from data.domain.biomedical.umls import clean_umls_name
-from utils.list import has_intersection
+
+from .utils import (
+    score_candidate,
+    l1_normalize,
+)
 
 DEFAULT_K = 25
 MIN_SIMILARITY = 1.2
@@ -32,29 +32,6 @@ UMLS_KB = None
 
 
 WORD_EMBEDDING_LENGTH = 768
-
-CANDIDATE_CUI_SUPPRESSIONS = {
-    **UMLS_CUI_SUPPRESSIONS,
-    "C0432616": "Blood group antibody A",  # matches "anti", sigh
-    "C1704653": "cell device",  # matches "cell"
-    "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
-    "C0205263": "Induce (action)",
-    "C1709060": "Modulator device",
-    "C0179302": "Binder device",
-    "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
-    "C1179435": "Protein Component",  # sigh... matches "component"
-    "C0870814": "like",
-    "C0080151": "Simian Acquired Immunodeficiency Syndrome",  # matches "said"
-    "C0163712": "Relate - vinyl resin",
-    "C2827757": "Antimicrobial Resistance Result",  # ("result") ugh
-    "C1882953": "ring",
-    "C0457385": "seconds",  # s
-    "C0179636": "cart",  # car-t
-    "C0039552": "terminally ill",
-    "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
-    "C0243072": "derivative",
-    "C1744692": "NOS inhibitor",  # matches "inhibitor"
-}
 
 
 # map term to specified cui
@@ -173,37 +150,23 @@ class CandidateSelector(CandidateGenerator, object):
         logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
         return umls_ann
 
-    def calc_candidate_score(
+    def _score_candidate(
         self,
-        candidate: MentionCandidate,
-        original_vector: list[float],
-        matched_vector: list[float],
-        distance: float,
+        concept_id: str,
+        mention_vector: list[float],
+        candidate_vector: list[float],
+        syntactic_similarity: float,
+        semantic_distance: float,
     ) -> float:
-        """
-        Generate a score for a candidate
-        """
-
-        if candidate.concept_id in CANDIDATE_CUI_SUPPRESSIONS:
-            return 0.0
-
-        if has_intersection(
-            UMLS_NAME_SUPPRESSIONS,
-            self.kb.cui_to_entity[candidate.concept_id].canonical_name.split(" "),
-        ):
-            return 0.0
-
-        types = self.kb.cui_to_entity[candidate.concept_id].types
-        is_preferred_type = has_intersection(types, list(PREFERRED_UMLS_TYPES.keys()))
-        is_most_preferred_type = has_intersection(
-            types, list(MOST_PREFERRED_UMLS_TYPES.keys())
+        return score_candidate(
+            concept_id,
+            self.kb.cui_to_entity[concept_id].canonical_name,
+            self.kb.cui_to_entity[concept_id].types,
+            syntactic_similarity,
+            mention_vector,
+            candidate_vector=candidate_vector,
+            semantic_distance=semantic_distance,
         )
-        type_score = 0.75 if not is_preferred_type else 1.1**is_most_preferred_type
-        semantic_similarity = similarity_with_residual_penalty(
-            torch.tensor(original_vector), torch.tensor(matched_vector), distance
-        )
-        syntactic_similarity = candidate.similarities[0]
-        return (semantic_similarity + syntactic_similarity) * type_score
 
     def _get_best_canonical(
         self, vector: list[float], candidates: Sequence[MentionCandidate]
@@ -233,11 +196,12 @@ class CandidateSelector(CandidateGenerator, object):
             [
                 (
                     candidates[id],
-                    self.calc_candidate_score(
-                        candidates[id],
+                    self._score_candidate(
+                        candidates[id].concept_id,
                         vector,
-                        matched_vector=umls_ann.get_item_vector(id),
-                        distance=distances[i],
+                        candidate_vector=umls_ann.get_item_vector(id),
+                        syntactic_similarity=candidates[id].similarities[0],
+                        semantic_distance=distances[i],
                     ),
                     umls_ann.get_item_vector(id),
                 )
