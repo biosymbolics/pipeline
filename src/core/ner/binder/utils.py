@@ -21,7 +21,9 @@ MAX_SPAN_LENGTH = 15
 
 
 def extract_prediction(
-    span_logits: torch.Tensor, feature: Feature, type_map: dict[int, str]
+    span_logits: torch.Tensor,
+    feature: Feature,
+    type_map: dict[int, str],
 ) -> list[Annotation]:
     """
     Extracts predictions from the tensor
@@ -48,8 +50,10 @@ def extract_prediction(
         & span_preds
     )
 
+    scores = span_logits[mask].unsqueeze(1)
+
     # slow part - mask.nonzero() can take 1-2 seconds
-    scores = torch.concat([mask.nonzero(), span_logits[mask].unsqueeze(1)], dim=1)
+    scores = torch.concat([mask.nonzero(), scores], dim=1)
 
     if scores.size(0) == 0:
         logger.warning("No valid spans found")
@@ -82,8 +86,6 @@ def extract_prediction(
         .unique(("start", "end"), maintain_order=True)
     )
 
-    print(df)
-
     annotations = [
         Annotation(**r, id=f"{feature['id']}-{i}")
         for i, r in enumerate(df.drop(["type", "start", "end", "score"]).to_dicts())
@@ -106,7 +108,11 @@ def extract_predictions(
     """
     all_predictions = flatten(
         [
-            extract_prediction(predictions[i], feature, type_map)
+            extract_prediction(
+                predictions[i],
+                feature,
+                type_map,
+            )
             for i, feature in enumerate(features)
         ]
     )
@@ -125,7 +131,7 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
         tokenized: the tokenized text.
     """
     num_features = len(tokenized["input_ids"])  # type: ignore
-    offset_mapping = tokenized.pop("offset_mapping")  # ugh mutation
+    offset_mapping = tokenized.pop("offset_mapping")
 
     def process_feature(i: int):
         sequence_ids = tokenized.sequence_ids(i)

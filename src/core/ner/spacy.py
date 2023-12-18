@@ -8,6 +8,7 @@ import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
 from thinc.api import set_gpu_allocator, prefer_gpu
+from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL, DEFAULT_TORCH_DEVICE
 
 from utils.args import make_hashable
 
@@ -100,23 +101,38 @@ def get_transformer_nlp() -> Spacy:
     """
     Get a Spacy NLP model that uses a transformer
     """
-    return Spacy.get_instance(
+    nlp = Spacy.get_instance(
         model="en_core_web_trf",
-        disable=["ner"],  # , "parser", "tagger"],
+        # parser and tagger not currently "working" anyway. TODO: add back & make work!
+        disable=["ner"],  # "parser", "tagger"],
         additional_pipelines={
             "transformer": {
                 "config": {
                     "model": {
                         "@architectures": "spacy-transformers.TransformerModel.v3",
-                        "name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract",
+                        "name": DEFAULT_BASE_TRANSFORMER_MODEL,
                         "get_spans": {
                             "@span_getters": "spacy-transformers.strided_spans.v1",
                             "window": 128,
                             "stride": 96,
                         },
+                        "tokenizer_config": {
+                            "use_fast": True,
+                            "device": DEFAULT_TORCH_DEVICE,
+                            "mixed_precision": True,
+                        },
                     },
                 },
             },
-            # "tok2vec": {},
+            "tok2vec": {
+                "config": {
+                    "model": {
+                        "@architectures": "spacy-transformers.TransformerListener.v1",
+                        "pooling": {"@layers": "reduce_mean.v1"},
+                    }
+                },
+            },
         },
     )
+
+    return nlp

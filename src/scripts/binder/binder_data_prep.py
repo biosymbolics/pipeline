@@ -13,7 +13,7 @@ import system
 system.initialize()
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
-from constants.core import DEFAULT_BASE_NLP_MODEL
+from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL
 from utils.file import save_json_as_file
 
 logger = logging.getLogger(__name__)
@@ -191,7 +191,7 @@ def create_binder_data():
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
     annotations = get_annotations()
-    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_NLP_MODEL)
+    tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_TRANSFORMER_MODEL)
     logger.info("Getting entity indices for %s annotations", annotations.shape[0])
     df = annotations.with_columns(
         pl.struct(["text", "term"])

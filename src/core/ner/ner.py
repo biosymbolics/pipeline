@@ -7,12 +7,11 @@ from functools import reduce
 from itertools import groupby
 import time
 from typing import Any, Literal, Optional, Sequence, TypeVar
-from pydash import compact
 import logging
 import html
 from spacy.tokens import Span, Doc
 
-from core.ner.cleaning import CleanFunction
+from core.ner.cleaning import CleanFunction, remove_parentheticals
 from core.ner.normalizer import TermNormalizer
 from core.ner.spacy import Spacy
 from utils.args import make_hashable
@@ -25,7 +24,7 @@ from .patterns import (
     INTERVENTION_SPACY_PATTERNS,
     MECHANISM_SPACY_PATTERNS,
 )
-from .types import CanonicalEntity, DocEntities, DocEntity, SpacyPatterns
+from .types import DocEntities, DocEntity, SpacyPatterns
 from .utils import spans_to_doc_entities
 
 T = TypeVar("T", bound=Span | str)
@@ -136,6 +135,8 @@ class NerTagger:
             remove_extra_spaces,
             # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
             lambda _content: [" " + c for c in _content],
+            lambda _content: [c.lower() for c in _content],
+            remove_parentheticals,
         ]
 
         return list(reduce(lambda c, f: f(c), steps, content))  # type: ignore
@@ -192,40 +193,18 @@ class NerTagger:
             logger.debug("Skipping normalization step")
             return entity_sets
 
-        def get_doc_entity(
-            e: DocEntity, norm_entity: CanonicalEntity
-        ) -> DocEntity | None:
-            if len(norm_entity.name) == 0:
-                return None
-            return DocEntity(
-                term=e.term,
-                type=e.type,
-                start_char=e.start_char,
-                end_char=e.end_char,
-                embeddings=e.embeddings,
-                spacy_doc=e.spacy_doc,
-                normalized_term=norm_entity.name,
-                linked_entity=norm_entity,
-            )
-
-        def get_doc_entities(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-            if not self.normalizer:
-                return list(entity_set)
+        def normalize_set(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
+            assert self.normalizer is not None
             normalizations = self.normalizer.normalize(entity_set)
-            return compact(
-                [
-                    get_doc_entity(es, norm)
-                    for es, norm in zip(entity_set, normalizations)
-                    if len(es.term) > 0
-                    and ((self.entity_types is None) or (es.type in self.entity_types))
-                ]
-            )
+            if self.entity_types is None:
+                return normalizations
 
-        # filter by entity types (if provided) and remove empty names
-        norm_entity_sets = [get_doc_entities(es) for es in entity_sets]
+            # filter by entity types, if provided
+            return [ne for ne in normalizations if ne.type in self.entity_types]
 
-        if len(norm_entity_sets) != len(entity_sets):
-            raise ValueError("Normalization changed number of entities")
+        norm_entity_sets = [normalize_set(es) for es in entity_sets]
+
+        assert len(norm_entity_sets) == len(entity_sets)
 
         return norm_entity_sets
 

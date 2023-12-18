@@ -1,56 +1,28 @@
-from functools import reduce
 import time
 from typing import Sequence
 from annoy import AnnoyIndex
-import joblib
-from numpy import mean
-from pydash import flatten
 from scispacy.candidate_generation import (
     CandidateGenerator,
     MentionCandidate,
-    cached_path,
 )
-from spacy.tokens import Doc
-from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 import logging
 
 from core.ner.spacy import get_transformer_nlp
-from core.ner.types import CanonicalEntity
-from constants.umls import UMLS_CUI_SUPPRESSIONS
-from data.domain.biomedical.umls import clean_umls_name, get_best_umls_candidate
+from core.ner.types import CanonicalEntity, DocEntity
+from constants.umls import PREFERRED_UMLS_TYPES
+from data.domain.biomedical.umls import clean_umls_name
 
-DEFAULT_K = 25
-MIN_SIMILARITY = 1.21
-UMLS_KB = None
-BIOSYM_UMLS_TFIDF_PATH = (
-    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
+from .utils import (
+    score_candidate,
+    l1_regularize,
 )
 
+DEFAULT_K = 20
+MIN_SIMILARITY = 1.1
+UMLS_KB = None
+DOC_VECTOR_WEIGHT = 0.2
 WORD_EMBEDDING_LENGTH = 768
-
-CANDIDATE_CUI_SUPPRESSIONS = {
-    **UMLS_CUI_SUPPRESSIONS,
-    "C0432616": "Blood group antibody A",  # matches "anti", sigh
-    "C1704653": "cell device",  # matches "cell"
-    "C0231491": "antagonist muscle action",  # blocks better match (C4721408)
-    "C0205263": "Induce (action)",
-    "C1709060": "Modulator device",
-    "C0179302": "Binder device",
-    "C0280041": "Substituted Urea",  # matches all "substituted" terms, sigh
-    "C1179435": "Protein Component",  # sigh... matches "component"
-    "C0870814": "like",
-    "C0080151": "Simian Acquired Immunodeficiency Syndrome",  # matches "said"
-    "C0163712": "Relate - vinyl resin",
-    "C2827757": "Antimicrobial Resistance Result",  # ("result") ugh
-    "C1882953": "ring",
-    "C0457385": "seconds",  # s
-    "C0179636": "cart",  # car-t
-    "C0039552": "terminally ill",
-    "C0175816": "https://uts.nlm.nih.gov/uts/umls/concept/C0175816",
-    "C0243072": "derivative",
-    "C1744692": "NOS inhibitor",  # matches "inhibitor"
-}
 
 
 # map term to specified cui
@@ -89,8 +61,6 @@ class CandidateSelector(CandidateGenerator, object):
         self.min_similarity = min_similarity
         self.vector_length = vector_length
         self.nlp = get_transformer_nlp()
-        self.tfidf: TfidfVectorizer = joblib.load(cached_path(BIOSYM_UMLS_TFIDF_PATH))
-        self.tfidf_ll = torch.nn.Linear(len(self.tfidf.vocabulary_), self.vector_length)
 
     def batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
         """
@@ -98,49 +68,12 @@ class CandidateSelector(CandidateGenerator, object):
         """
         docs = list(self.nlp.pipe(texts))
         bert_vecs = [
-            torch.tensor(doc._.trf_data.tensors[0]).squeeze(0).mean(dim=0).squeeze()
+            l1_regularize(torch.tensor(doc.vector))
+            if len(doc.vector) > 0
+            else torch.zeros(self.vector_length)
             for doc in docs
         ]
-        tfidf_vecs = torch.tensor(self.tfidf.transform(texts).toarray())
-        projected_tfidf = torch.tensor_split(
-            self.tfidf_ll.forward(tfidf_vecs), len(texts)
-        )
-        return [
-            bert_vec + tfidf_vec.squeeze()
-            for bert_vec, tfidf_vec in zip(bert_vecs, projected_tfidf)
-        ]
-
-    def vectorize_doc(self, doc: Doc) -> tuple[torch.Tensor, Doc]:
-        """
-        Vectorize a text
-        """
-        bert_vec = torch.tensor(doc.vector)
-        tfidf_vec = self.tfidf_ll.forward(
-            torch.tensor(self.tfidf.transform([doc.text]).toarray()[0])
-        )
-        return torch.cat([bert_vec, tfidf_vec]), doc
-
-    def vectorize(self, text: str) -> tuple[torch.Tensor, Doc]:
-        """
-        Vectorize a text
-        """
-        doc = self.nlp(text)
-        return self.vectorize_doc(doc)
-
-    def get_best_by_rules(
-        self, candidates: Sequence[MentionCandidate]
-    ) -> MentionCandidate | None:
-        """
-        Wrapper for get_best_umls_candidate
-        (legacy-ish, since semantic similarity is better)
-        """
-
-        return get_best_umls_candidate(
-            candidates,
-            self.min_similarity,
-            self.kb,
-            list(CANDIDATE_CUI_SUPPRESSIONS.keys()),
-        )
+        return bert_vecs
 
     @classmethod
     def _apply_word_overrides(
@@ -169,11 +102,15 @@ class CandidateSelector(CandidateGenerator, object):
         with_overrides = self._apply_word_overrides(text, candidates)
         return with_overrides
 
-    def create_ann_index(self, candidates: Sequence[MentionCandidate]) -> AnnoyIndex:
+    def create_ann_index(
+        self,
+        candidates: Sequence[MentionCandidate],
+    ) -> AnnoyIndex:
         """
         Create an Annoy index for a list of candidates
         """
         start = time.monotonic()
+        # other metrics don't work well
         umls_ann = AnnoyIndex(self.vector_length, metric="angular")
 
         canonical_names = [
@@ -181,89 +118,92 @@ class CandidateSelector(CandidateGenerator, object):
             for c in candidates
         ]
         # only use the first alias, since that's the most syntactically similar to the mention
-        aliases = [c.aliases[0].lower() for c in candidates]
+        tuis = [self.kb.cui_to_entity[c.concept_id].types[0] for c in candidates]
+        types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        vectors = self.batch_vectorize(canonical_names + aliases)
+        vectors = self.batch_vectorize(canonical_names + types)
         cn_vectors = vectors[0 : len(canonical_names)]
-        alias_vectors = vectors[len(canonical_names) :]
+        type_vectors = vectors[len(canonical_names) :]
 
         for i in range(len(candidates)):
-            combined_vec = 0.6 * cn_vectors[i] + 0.4 * alias_vectors[i]
+            combined_vec = (0.8 * cn_vectors[i]) + (0.2 * type_vectors[i])
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
         logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
         return umls_ann
 
-    def get_best_by_semantic_similarity(
-        self, embeddings: list[float], candidates: Sequence[MentionCandidate]
-    ) -> MentionCandidate | None:
+    def _score_candidate(
+        self,
+        concept_id: str,
+        mention_vector: torch.Tensor,
+        candidate_vector: torch.Tensor,
+        syntactic_similarity: float,
+        semantic_distance: float,
+    ) -> float:
+        return score_candidate(
+            concept_id,
+            self.kb.cui_to_entity[concept_id].canonical_name,
+            self.kb.cui_to_entity[concept_id].types,
+            mention_vector,
+            candidate_vector=candidate_vector,
+            syntactic_similarity=syntactic_similarity,
+            semantic_distance=semantic_distance,
+        )
+
+    def _get_best_canonical(
+        self, vector: torch.Tensor, candidates: Sequence[MentionCandidate]
+    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
         """
         Get best candidate by semantic similarity
         """
-        if mean(embeddings) == 0:
-            logger.warning("No embeddings for %s", candidates[0].aliases[0])
-            return None
+        if len(vector) == 0:
+            logger.warning(
+                "No vector for %s, probably OOD (%s)",
+                candidates[0].aliases[0],
+                vector,
+            )
+            return (None, 0.0, torch.Tensor())
 
         umls_ann = self.create_ann_index(candidates)
-        indexes, dist = umls_ann.get_nns_by_vector(
-            embeddings, 10, search_k=-1, include_distances=True
+
+        ids, distances = umls_ann.get_nns_by_vector(
+            vector.tolist(), 10, search_k=-1, include_distances=True
         )
 
-        if len(indexes) == 0:
-            return None
+        if len(ids) == 0:
+            logger.warning("No candidates for %s", candidates[0].aliases[0])
+            return (None, 0.0, torch.Tensor())
 
         mixed_score_candidates = sorted(
             [
                 (
-                    candidates[i],
-                    (2 - dist[indexes.index(i)]) + (candidates[i].similarities[0] / 2),
+                    candidates[id],
+                    self._score_candidate(
+                        candidates[id].concept_id,
+                        vector,
+                        candidate_vector=torch.tensor(umls_ann.get_item_vector(id)),
+                        syntactic_similarity=candidates[id].similarities[0],
+                        semantic_distance=distances[i],
+                    ),
+                    umls_ann.get_item_vector(id),
                 )
-                for i in indexes
+                for i, id in enumerate(ids)
             ],
             key=lambda x: x[1],
             reverse=True,
         )
         top_candidate = mixed_score_candidates[0][0]
         top_score = mixed_score_candidates[0][1]
+        top_vector = mixed_score_candidates[0][2]
 
-        print(mixed_score_candidates)
+        print([(c[0].aliases[0], c[1]) for c in mixed_score_candidates])
 
-        if top_score < self.min_similarity:
-            logger.warning(
-                "Best candidate (%s) too distant (%s)",
-                top_candidate,
-                top_score,
-            )
-            return None
-
-        return top_candidate
-
-    def _get_best_canonical(
-        self,
-        candidates: Sequence[MentionCandidate],
-        mention_embeddings: list[float] | None = None,
-    ) -> CanonicalEntity | None:
-        """
-        Get canonical candidate if suggestions exceed min similarity
-
-        Args:
-            candidates (Sequence[MentionCandidate]): list of candidates
-            mention_embeddings (list[float], Optional): embeddings for mention text
-        """
-
-        if mention_embeddings is None:
-            top_candidate = self.get_best_by_rules(candidates)
-        else:
-            top_candidate = self.get_best_by_semantic_similarity(
-                mention_embeddings,
-                candidates,
-            )
-
-        if top_candidate is None:
-            return None
-
-        return self._candidate_to_canonical(top_candidate)
+        return (
+            self._candidate_to_canonical(top_candidate),
+            top_score,
+            torch.tensor(top_vector),
+        )
 
     def _candidate_to_canonical(self, candidate: MentionCandidate) -> CanonicalEntity:
         """
@@ -288,20 +228,46 @@ class CandidateSelector(CandidateGenerator, object):
             types=entity.types,
         )
 
+    def normalize_mention_vector(
+        self, mention_vector: torch.Tensor, doc_vector: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Standard normalization of mention vector
+        - weighted combination of entity and doc vector
+        - l1 normalize
+        """
+        vector = (
+            1 - DOC_VECTOR_WEIGHT
+        ) * mention_vector + DOC_VECTOR_WEIGHT * doc_vector
+
+        norm_vector = l1_regularize(vector)
+        return norm_vector
+
     def select_candidate(
-        self, term: str, embeddings: list[float] | None = None
-    ) -> CanonicalEntity | None:
+        self,
+        term: str,
+        mention_vector: torch.Tensor,
+        doc_vector: torch.Tensor,
+    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
         """
         Generate & select candidates for a list of mention texts
         """
+        norm_vector = self.normalize_mention_vector(mention_vector, doc_vector)
         candidates = self._get_candidates(term)
-
-        return self._get_best_canonical(candidates, embeddings)
+        return self._get_best_canonical(norm_vector, candidates)
 
     def __call__(
-        self, term: str, embeddings: list[float] | None = None
-    ) -> CanonicalEntity | None:
+        self, entity: DocEntity
+    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
         """
         Generate & select candidates for a list of mention texts
         """
-        return self.select_candidate(term, embeddings)
+        if not entity.vector or not entity.spacy_doc:
+            raise ValueError("Vector and spacy doc required")
+
+        norm_vector = self.normalize_mention_vector(
+            torch.tensor(entity.vector), torch.tensor(entity.spacy_doc.vector)
+        )
+        candidates = self._get_candidates(entity.normalized_term)
+
+        return self._get_best_canonical(norm_vector, candidates)

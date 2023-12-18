@@ -4,9 +4,7 @@ String utilities
 
 
 from datetime import date
-from functools import reduce
 import regex as re
-from spacy.tokens import Doc
 from typing import Mapping, TypeGuard, Union
 
 
@@ -132,38 +130,3 @@ def byte_dict_to_string_dict(
     raise ValueError(
         f"Expected a dictionary of bytes or strings, got {type(maybe_byte_dict)}"
     )
-
-
-def generate_ngrams(tokens: Doc, n: int) -> list[tuple[tuple[str, ...], list[float]]]:
-    """
-    Generate n-grams (term & token) from a list of Spacy tokens
-
-    Args:
-        tokens (Doc): list of tokens
-        n (int): n-gram size
-
-    Returns:
-        list[tuple[tuple[str, str], list[float]]]: list of n-grams tuples and their vectors
-    """
-    index_sets: list[tuple[int, ...]] = reduce(
-        lambda acc, i: acc + [(i, *[i + grm + 1 for grm in range(n - 1)])],
-        range(len(tokens) + 1 - n),
-        [],
-    )
-    ngrams = [tuple(tokens[i].text for i in iset) for iset in index_sets]
-    vectors = [list(tokens[min(iset) : max(iset)].vector) for iset in index_sets]
-    return list(zip(ngrams, vectors))
-
-
-def generate_ngram_phrases(tokens: Doc, n: int) -> list[tuple[str, list[float]]]:
-    """
-    Generate n-grams (term & token) from a list of Spacy tokens
-
-    Args:
-        tokens (Doc): list of tokens
-        n (int): n-gram size
-
-    Returns:
-        list[tuple[str, list[float]]]: list of n-grams and their vectors
-    """
-    return [(" ".join(ng[0]), ng[1]) for ng in generate_ngrams(tokens, n)]

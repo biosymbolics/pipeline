@@ -42,8 +42,32 @@ SUBSTITUTIONS = {
     r"[.,:;'\"]+$": "",  # trailing punct
     r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
-    INTERVENTION_PREFIXES_GENERIC_RE: " ",
+    # INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
+
+
+def remove_parentheticals(strings: Sequence[str]) -> Iterable[str]:
+    for string in strings:
+        # if iupac term, don't mess with its parens
+        if is_iupac(string):
+            yield string
+            continue
+
+        # removes `(IL-2)` from `Interleukin-2 (IL-2) inhibitor`
+        no_parenth = re.sub(
+            r"(?<=(?: |,|\^))\(([a-z-0-9-, ]+)\)(?=(?: |,|\$))",
+            r"\1",
+            string,
+            flags=RE_FLAGS,
+        )
+        # `poly(isoprene)` -> `polyisoprene``
+        no_parens = re.sub(
+            r"\(([a-z-0-9]+)\)",
+            r"\1",
+            no_parenth,
+            flags=RE_FLAGS,
+        )
+        yield no_parens
 
 
 class EntityCleaner:
@@ -126,30 +150,7 @@ class EntityCleaner:
                     continue
                 yield term
 
-        def format_parentheticals(_terms: Sequence[str]) -> Iterable[str]:
-            for term in _terms:
-                # if iupac term, don't mess with its parens
-                if is_iupac(term):
-                    yield term
-                    continue
-
-                # removes `(IL-2)` from `Interleukin-2 (IL-2) inhibitor`
-                no_parenth = re.sub(
-                    r"(?<=[ ,])(\([a-z-0-9 ]+\))(?=(?: |,|$))",
-                    "",
-                    term,
-                    flags=RE_FLAGS,
-                )
-                # `poly(isoprene)` -> `polyisoprene``
-                no_parens = re.sub(
-                    r"\(([a-z-0-9]+)\)",
-                    r"\1",
-                    no_parenth,
-                    flags=RE_FLAGS,
-                )
-                yield no_parens
-
-        def normalize_phrases(_terms: Sequence[str]) -> Iterable[str]:
+        def rewrite_phrases(_terms: Sequence[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
 
@@ -185,15 +186,15 @@ class EntityCleaner:
             decode_html,
             remove_after_newline,  # order matters (this before unwrap etc)
             unwrap_parens,
-            format_parentheticals,  # order matters (run after unwrap)
+            remove_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
             remove_extra_spaces,
-            partial(
-                rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
-            ),
-            depluralize_tails,
-            normalize_by_pos,  # not important if linking
-            normalize_phrases,  # order matters (after rearrange)
+            # partial(
+            #     rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
+            # ),
+            # depluralize_tails,
+            # normalize_by_pos,  # not important if linking
+            rewrite_phrases,  # order matters (after rearrange)
             *self.additional_cleaners,
             remove_extra_spaces,
             lower,
@@ -206,15 +207,15 @@ class EntityCleaner:
         return normalized
 
     @staticmethod
-    def _get_text(entity) -> str:
-        return entity[0] if isinstance(entity, tuple) else entity
+    def _get_text(entity: DocEntity | str) -> str:
+        return entity.term if isinstance(entity, DocEntity) else entity
 
     @staticmethod
     def _return_to_type(
         modified_texts: Sequence[str],
         orig_ents: Sequence[T],
         remove_suppressed: bool = False,
-    ) -> Sequence[T]:
+    ) -> list[T]:
         if len(modified_texts) != len(orig_ents):
             logger.info(
                 "Modified text: %s, original entities: %s", modified_texts, orig_ents
@@ -224,9 +225,11 @@ class EntityCleaner:
         if is_entity_doc_list(orig_ents):
             doc_ents = [
                 DocEntity(
-                    *orig_ents[i][0:6],
-                    normalized_term=modified_texts[i],
-                    linked_entity=orig_ents[i].linked_entity,
+                    **{  # type: ignore
+                        **orig_ents[i]._asdict(),
+                        "normalized_term": modified_texts[i],
+                        "linked_entity": orig_ents[i].linked_entity,
+                    }
                 )
                 for i in range(len(orig_ents))
             ]
@@ -245,7 +248,7 @@ class EntityCleaner:
         self,
         entities: Sequence[T],
         remove_suppressed: bool = False,
-    ) -> Sequence[T]:
+    ) -> list[T]:
         """
         Sanitize entity list
         - filters out (some) excessively general entities
