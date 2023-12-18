@@ -203,3 +203,6 @@ class ScoredPatentApplication(PatentApplication):
 
 
 SuitabilityScoreMap = dict[str, float]
+
+
+Patent = ScoredPatentApplication
