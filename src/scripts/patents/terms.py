@@ -5,9 +5,9 @@ import sys
 from typing import Sequence, TypeGuard, TypedDict
 import logging
 from pydash import compact, flatten, group_by, uniq
+from core.ner.utils import spans_to_doc_entities
 
 import system
-from utils.re import get_or_re
 
 system.initialize()
 
@@ -15,8 +15,10 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
 from constants.patents import COMPANY_INDICATORS
 from core.ner import TermNormalizer
+from core.ner.spacy import Spacy
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
+from utils.re import get_or_re
 
 from .constants import GPR_ANNOTATIONS_TABLE, TERMS_FILE
 from .process_biosym_annotations import populate_working_biosym_annotations
@@ -257,11 +259,11 @@ class TermAssembler:
                 group by term, domain
             """
         rows = self.client.select(terms_query)
-        terms: list[str] = [row["term"] for row in rows]
+        terms = [row["term"] for row in rows]
 
         logging.info("Normalizing/linking %s terms", len(rows))
         normalizer = TermNormalizer()
-        norm_map = dict(normalizer.normalize(terms))
+        norm_map = dict([(de.term, de) for de in normalizer.normalize_strings(terms)])
         logging.info("Finished creating normalization_map")
 
         def _normalize_term(term: str, domain: str) -> str:
@@ -271,7 +273,7 @@ class TermAssembler:
             entry = norm_map.get(term)
             if not entry:
                 return term
-            return entry.name
+            return entry.term
 
         term_records: list[TermRecord] = [
             {

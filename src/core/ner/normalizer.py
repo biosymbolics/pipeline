@@ -55,12 +55,24 @@ class TermNormalizer:
         """
         # removed_suppressed must be false to properly index against original terms
         cleaned_entity_sets = self.cleaner.clean(entity_sets, remove_suppressed=False)
-        print("CLEANED", cleaned_entity_sets)
 
         if self.term_linker is not None:
             return self.term_linker.link(cleaned_entity_sets)
 
         return cleaned_entity_sets
+
+    def normalize_strings(self, terms: Sequence[str]) -> list[DocEntity]:
+        doc_ents = [
+            DocEntity(
+                term=term,
+                type="unknown",
+                start_char=0,
+                end_char=0,
+                normalized_term=term,
+            )
+            for term in terms
+        ]
+        return self.normalize(doc_ents)
 
     def __call__(self, *args, **kwargs) -> list[DocEntity]:
         return self.normalize(*args, **kwargs)
