@@ -153,23 +153,26 @@ def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.Da
 
     df must already have assignees, publication_number, and is_active columns
     """
-    avail_likelihood_map: dict[str, tuple] = {
+    avail_likelihood_map: dict[str, tuple[AvailabilityLikelihood, str]] = {
         rec["publication_number"]: AvailabilityLikelihood.find_from_record(
             rec, company_map
         )
         for rec in df.to_dicts()
     }
+    avail_explanation_map: dict[str, str] = {
+        k: v[1] for k, v in avail_likelihood_map.items()
+    }
+    avail_cat_map = {k: v[0].value for k, v in avail_likelihood_map.items()}
+    avail_score_map = {k: v[0].score for k, v in avail_likelihood_map.items()}
+
     return df.with_columns(
         pl.col("publication_number")
-        .map_dict(avail_likelihood_map)
-        .apply(lambda x: x[0])
+        .map_dict(avail_cat_map)
         .alias("availability_likelihood"),
         pl.col("publication_number")
-        .map_dict(avail_likelihood_map)
-        .apply(lambda x: x[1])
+        .map_dict(avail_explanation_map)
         .alias("availability_explanation"),
         pl.col("publication_number")
-        .map_dict(avail_likelihood_map)
-        .apply(lambda x: x[0].score)
+        .map_dict(avail_score_map)
         .alias("availability_score"),
     )
