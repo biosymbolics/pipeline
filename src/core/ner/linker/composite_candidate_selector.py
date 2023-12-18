@@ -1,8 +1,7 @@
-from typing import Sequence
-from pydash import flatten, uniq
-from spacy.tokens import Token
+from typing import Mapping, Sequence
+from pydash import omit_by
+from spacy.tokens import Span, Token
 import logging
-from scispacy.candidate_generation import MentionCandidate
 import torch
 
 from constants.patterns.iupac import is_iupac
@@ -10,14 +9,9 @@ from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
 
 from .candidate_selector import CandidateSelector
-from .utils import (
-    generate_ngram_phrases,
-    get_orthogonal_members,
-    l1_normalize,
-    score_candidate,
-)
+from .utils import join_punctuated_tokens
 
-NGRAMS_N = 2
+NGRAMS_N = 1
 MIN_WORD_LENGTH = 1
 
 logger = logging.getLogger(__name__)
@@ -43,9 +37,15 @@ class CompositeCandidateSelector(CandidateSelector):
         "hyperproliferative disease cancer"
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        min_composite_similarity: float = MIN_COMPOSITE_SIMILARITY,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
-        self.select_candidate = super().select_candidate
+        # self.select_candidate = super().select_candidate
+        self.min_composite_similarity = min_composite_similarity
 
     @staticmethod
     def _is_composite_eligible(entity: DocEntity) -> bool:
@@ -62,21 +62,6 @@ class CompositeCandidateSelector(CandidateSelector):
         if len(tokens) <= MIN_WORD_LENGTH:
             return False
         return True
-
-    @classmethod
-    def _get_ngrams(
-        cls, tokens: Sequence[Token], n: int
-    ) -> list[tuple[str, list[float]]]:
-        """
-        Get all ngrams in a text
-        """
-        # if fewer words than n, just return words
-        # (this is expedient but probably confusing)
-        if n == 1 or len(tokens) < n:
-            return [(token.text, token.vector.tolist()) for token in tokens]
-
-        ngrams = generate_ngram_phrases(tokens, n)
-        return ngrams
 
     def _form_composite_name(self, member_candidates: Sequence[CanonicalEntity]) -> str:
         """
@@ -95,7 +80,7 @@ class CompositeCandidateSelector(CandidateSelector):
         return name
 
     def _form_composite(
-        self, members: Sequence[tuple[CanonicalEntity, list[float]]]
+        self, members: Sequence[tuple[CanonicalEntity, float, torch.Tensor]]
     ) -> CanonicalEntity | None:
         """
         Form a composite from a list of member entities
@@ -108,17 +93,15 @@ class CompositeCandidateSelector(CandidateSelector):
         if len(members) == 1:
             return members[0][0]
 
-        ortho_member_idx = get_orthogonal_members(
-            torch.stack([torch.tensor(m[1]) for m in members])
-        )
-
-        ortho_members = [members[i][0] for i in ortho_member_idx]
+        # hard to get this right... distances are unexpected.
+        # ortho_member_idx = get_orthogonal_members(torch.stack([m[2] for m in members]))
+        # ortho_members = [members[i][0] for i in ortho_member_idx]
 
         # sorted for the sake of consist composite ids
-        ids = sorted([c.id for c in ortho_members])
+        ids = sorted([m[0].id for m in members])
 
         # form name from comprising candidates
-        name = self._form_composite_name(ortho_members)
+        name = self._form_composite_name([m[0] for m in members])
 
         return CanonicalEntity(
             id="|".join(ids),
@@ -128,123 +111,69 @@ class CompositeCandidateSelector(CandidateSelector):
             # aliases=... # TODO: all permutations
         )
 
-    # def _generate_composite(
-    #     self,
-    #     tokens: Sequence[Token],
-    #     ngram_entity_map: Mapping[str, CanonicalEntity],
-    # ) -> CanonicalEntity | None:
-    #     """
-    #     Generate a composite candidate from a mention text
-
-    #     Args:
-    #         mention_text (str): Mention text
-    #         ngram_entity_map (dict[str, MentionCandidate]): word-to-candidate map
-    #     """
-
-    #     def get_composite_candidates(tokens: Sequence[Token]) -> list[CanonicalEntity]:
-    #         """
-    #         Recursive function to see if the first ngram has a match, then the first n-1, etc.
-    #         """
-    #         if len(tokens) == 0:
-    #             return []
-
-    #         if len(tokens) >= NGRAMS_N:
-    #             ngram = "".join([t.text_with_ws for t in tokens[0:NGRAMS_N]])
-    #             if ngram in ngram_entity_map:
-    #                 remaining_words = tokens[NGRAMS_N:]
-    #                 return [
-    #                     ngram_entity_map[ngram],
-    #                     *get_composite_candidates(remaining_words),
-    #                 ]
-
-    #         # otherwise, let's map only the first word
-    #         remaining_words = tokens[1:]
-    #         if tokens[0] in ngram_entity_map:
-    #             return [
-    #                 ngram_entity_map[tokens[0].text],
-    #                 *get_composite_candidates(remaining_words),
-    #             ]
-
-    #         # otherwise, no match. create a fake MentionCandidate.
-    #         return [
-    #             # concept_id is the word itself, so
-    #             # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
-    #             CanonicalEntity(
-    #                 name=tokens[0].lower_,
-    #                 id=tokens[0].lower_,
-    #             ),
-    #             *get_composite_candidates(remaining_words),
-    #         ]
-
-    #     candidates = get_composite_candidates(tokens)
-
-    #     return self._form_composite(candidates)
-
-    def _get_composite_candidates(
-        self, matchless_entity: DocEntity
-    ) -> list[MentionCandidate]:
+    def _generate_composite(
+        self,
+        tokens: Sequence[Token | Span],
+        ngram_entity_map: Mapping[str, tuple[CanonicalEntity, float, torch.Tensor]],
+    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
         """
-        For a list of mention text without a sufficiently similar direct match,
-        generate a composite match from the individual words
+        Generate a composite candidate from a mention text
 
         Args:
-            matchless_entity (DocEntity): a doc entity (NER span)
+            mention_text (str): Mention text
+            ngram_entity_map (dict[str, MentionCandidate]): word-to-candidate map
         """
-        if matchless_entity.spacy_doc is None:
-            raise ValueError("Entity must have a spacy_doc")
 
-        # only non-punct tokens
-        def _is_composable(t: Token) -> bool:
-            # TODO: get POS tagging working with transformer
-            # TODO: non-competitive blah blah antagoinst - keep dashed terms together
-            return t.pos_ != "PUNCT" and t.text != "-"
+        def get_composite_candidates(
+            tokens: Sequence[Token | Span],
+        ) -> list[tuple[CanonicalEntity, float, torch.Tensor]]:
+            """
+            Recursive function to see if the first ngram has a match, then the first n-1, etc.
+            """
+            if len(tokens) == 0:
+                return []
 
-        tokens = [t for t in matchless_entity.spacy_doc if _is_composable(t)]
+            if len(tokens) >= NGRAMS_N:
+                ngram = "".join([t.text_with_ws for t in tokens[0:NGRAMS_N]])
+                if ngram in ngram_entity_map:
+                    remaining_words = tokens[NGRAMS_N:]
+                    return [
+                        ngram_entity_map[ngram],
+                        *get_composite_candidates(remaining_words),
+                    ]
 
-        # create 1 and 2grams
-        matchless_ngrams = uniq(
-            flatten([self._get_ngrams(tokens, i + 1) for i in range(NGRAMS_N)])
-        )
+            # otherwise, let's map only the first word
+            remaining_words = tokens[1:]
+            if tokens[0].text in ngram_entity_map:
+                return [
+                    ngram_entity_map[tokens[0].text],
+                    *get_composite_candidates(remaining_words),
+                ]
 
-        # get candidates for all ngrams
-        cands = flatten([self._get_candidates(ngram[0]) for ngram in matchless_ngrams])
+            # otherwise, no match. create a fake MentionCandidate.
+            return [
+                # concept_id is the word itself, so
+                # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
+                (
+                    CanonicalEntity(
+                        name=tokens[0].text.lower(),
+                        id=tokens[0].text.lower(),
+                    ),
+                    MIN_COMPOSITE_SIMILARITY,  # TODO: should be the mean of all candidates, or something?
+                    torch.tensor(tokens[0].vector),
+                ),
+                *get_composite_candidates(remaining_words),
+            ]
 
-        return cands
+        composites = get_composite_candidates(tokens)
+        avg_score = sum([m[1] for m in composites]) / len(composites)
+        comp_match_vector = torch.mean(torch.stack([m[2] for m in composites]))
 
-    def get_composite_pieces(
-        self,
-        vector,
-        candidates,
-        matches: list[tuple[CanonicalEntity, list[float]]] = [],
-        last_score: float | None = None,
-    ):
-        norm_vector = l1_normalize(torch.tensor(vector))
+        return (self._form_composite(composites), avg_score, comp_match_vector)
 
-        match, score, top_vector = self._get_best_canonical(
-            norm_vector.tolist(), candidates
-        )
-
-        if not match or (len(matches) > 0 and match.id == matches[-1][0].id):
-            return matches
-
-        if (
-            last_score is not None
-            and last_score < MIN_COMPOSITE_SIMILARITY
-            and score < MIN_COMPOSITE_SIMILARITY
-        ):
-            return matches
-
-        residual = norm_vector - torch.tensor(top_vector)
-        new_matches = (
-            matches + [(match, top_vector)]
-            if score > MIN_COMPOSITE_SIMILARITY
-            else matches
-        )
-        return self.get_composite_pieces(
-            residual.tolist(), candidates, new_matches, score
-        )
-
-    def __call__(self, entity: DocEntity) -> tuple[CanonicalEntity | None, list[float]]:
+    def __call__(
+        self, entity: DocEntity
+    ) -> tuple[CanonicalEntity | None, torch.Tensor]:
         """
         Generate candidates for a list of mention texts
 
@@ -253,32 +182,44 @@ class CompositeCandidateSelector(CandidateSelector):
         if not entity.vector or not entity.spacy_doc:
             raise ValueError("Entity must have a vector")
 
-        candidates = self._get_candidates(entity.normalized_term)
+        match, match_score, vector = super().__call__(entity)
 
-        norm_vector = l1_normalize(
-            torch.tensor(
-                0.7 * torch.tensor(entity.vector)
-                + 0.3 * torch.tensor(entity.spacy_doc.vector)
-            )
-        )
-        match, match_score, vector = self._get_best_canonical(
-            norm_vector.tolist(), candidates
-        )
-
-        if match_score >= self.min_similarity:
+        if match_score >= self.min_similarity or not self._is_composite_eligible(
+            entity
+        ):
             return (match, vector)
 
-        composition_candidates = self._get_composite_candidates(entity)
-        comp_matches = self.get_composite_pieces(
-            norm_vector, composition_candidates + candidates
-        )
+        # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
+        tokens = join_punctuated_tokens(entity.spacy_doc)
 
-        # vector of composite
-        comp_match_vector = torch.mean(
-            torch.stack([torch.tensor(m[1]) for m in comp_matches])
+        ngram_entity_map = {
+            t.text: self.select_candidate(
+                t.text, torch.tensor(t.vector), torch.tensor(entity.spacy_doc.vector)
+            )
+            for t in tokens
+            if len(t) > 1  # avoid weird matches for single characters/nums
+        }
+        comp_match, comp_score, comp_vector = self._generate_composite(
+            tokens,
+            omit_by(
+                ngram_entity_map,
+                lambda v: v[0] is None or v[1] < self.min_composite_similarity,
+            ),
         )
-        comp_match = self._form_composite(comp_matches)
 
         # loss = cosine_dist(entity.vector, match_vector)
 
-        return (comp_match, comp_match_vector.tolist())
+        if comp_score > match_score:
+            logger.info(
+                "Returning composite match with higher score (%s vs %s)",
+                comp_score,
+                match_score,
+            )
+            return (comp_match, comp_vector)
+
+        logger.info(
+            "Returning non-composite match with higher score (%s vs %s)",
+            match_score,
+            comp_score,
+        )
+        return (match, vector)

@@ -111,8 +111,8 @@ class BinderNlp:
             for e in doc.ents
         ]
 
-        all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
-        doc.set_ents(all_ents)
+        # all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
+        doc.set_ents(compact(new_ents + existing_ents))
 
         return doc
 
@@ -133,12 +133,12 @@ class BinderNlp:
         all_args = {**DEFAULT_NLP_MODEL_ARGS, **tokenize_args}
         return self._tokenizer(text, **all_args).to(DEFAULT_TORCH_DEVICE)
 
-    def extract(self, doc: Doc) -> Doc:
+    def extract(self, input: Doc | str) -> Doc:
         """
         Extracts entity annotations for a given text.
 
         Args:
-            doc (Doc): The Spacy Docs to annotate.
+            input (Doc): the string or SpaCy Doc to extract entities from
 
         ```
         from core.ner.binder.binder import BinderNlp
@@ -150,6 +150,11 @@ class BinderNlp:
         b.extract(text).ents
         ```
         """
+        if isinstance(input, str):
+            doc = self.nlp(input)
+        else:
+            doc = input
+
         inputs = self.tokenize(doc.text)  # TODO: avoid re-tokenizing?
         features = prepare_features(doc.text, inputs)
 
