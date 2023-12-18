@@ -27,7 +27,6 @@ class CompositeCandidateSelector(CandidateSelector):
     Look up in UMLS here and use 'type' for standard ordering on composite candidate names (e.g. gene first)
     select  s.term, array_agg(type_name), array_agg(type_id), ids from (select term, regexp_split_to_array(id, '\\|') ids from terms) s, umls_lookup, unnest(s.ids) as idd  where idd=umls_lookup.id and array_length(ids, 1) > 1 group by s.term, ids;
 
-    - Certain gene names are matched naively (e.g. "cell" -> CEL gene, tho that one in particular is suppressed)
 
     TODO:
         pde-v inhibitor  - works of pde-v but not pde v or pdev
@@ -44,7 +43,6 @@ class CompositeCandidateSelector(CandidateSelector):
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        # self.select_candidate = super().select_candidate
         self.min_composite_similarity = min_composite_similarity
 
     @staticmethod

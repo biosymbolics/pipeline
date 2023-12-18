@@ -78,12 +78,12 @@ def generate_ngram_phrases(
     return [(" ".join(ng[0]), ng[1]) for ng in generate_ngrams(tokens, n)]
 
 
-def l1_regularize(vector: torch.Tensor, lmbda=0.05) -> torch.Tensor:
-    return torch.clamp(torch.abs(vector) - lmbda, min=0)
+def l1_regularize(vector: torch.Tensor) -> torch.Tensor:
+    # sparsify
+    vector[vector.abs() < 0.3] = 0  # sparsify
 
-
-def l2_regularize(vector: torch.Tensor, lmbda=0.1) -> torch.Tensor:
-    return torch.clamp(torch.pow(vector, 2) - lmbda, min=0)
+    # l1 normalize
+    return F.normalize(vector, p=1, dim=0)
 
 
 def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
@@ -95,7 +95,7 @@ def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor
     if vector.ndim == 1:
         vector = vector.unsqueeze(1)
 
-    # l1 normalization
+    # l1 reg
     v_sparse = l1_regularize(vector)
 
     # SVD
