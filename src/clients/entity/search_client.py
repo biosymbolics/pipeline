@@ -23,7 +23,7 @@ def search(params: EntitySearchParams) -> list[Entity]:
         raise NotImplementedError
 
     interventions = uniq(
-        flatten([p.interventions for p in trials] + [t.interventions for t in trials])
+        flatten([p.interventions for p in patents] + [t.interventions for t in trials])
     )
 
     int_with_recs = [

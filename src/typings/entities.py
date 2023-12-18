@@ -38,9 +38,9 @@ class Entity(Dataclass):
         return patents[-1]
 
     @property
-    def last_priority_year(self) -> int | None:
+    def last_priority_year(self) -> int | str:
         if not self.most_recent_patent:
-            return None
+            return "??"
         return self.most_recent_patent.priority_date.year
 
     @property
@@ -51,9 +51,9 @@ class Entity(Dataclass):
         return trials[-1]
 
     @property
-    def last_status(self) -> TrialStatus | None:
+    def last_status(self) -> TrialStatus | str:
         if not self.most_recent_trial:
-            return None
+            return "??"
         return TrialStatus(self.most_recent_trial.status)
 
     @property
@@ -63,10 +63,10 @@ class Entity(Dataclass):
         return self.most_recent_trial.last_updated_date
 
     @property
-    def max_phase(self) -> TrialPhase:
-        return sorted(
-            [TrialPhase(t.phase) for t in self.trials], key=lambda x: x._order
-        )[-1]
+    def max_phase(self) -> TrialPhase | str:
+        if not self.most_recent_trial:
+            return "??"
+        return TrialPhase(self.most_recent_trial.phase)
 
     @property
     def trial_count(self) -> int:
