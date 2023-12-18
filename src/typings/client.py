@@ -15,25 +15,21 @@ class BaseSearchParams(BaseModel):
     skip_cache: str | bool = False
 
 
-class CommonSearchParams(BaseSearchParams):
-    terms: list[str]
-
-
 class CommonRawSearchParams(BaseSearchParams):
     terms: str
 
 
-class BasePatentSearchParams(CommonSearchParams):
+class BasePatentSearchParams(BaseSearchParams):
     min_patent_years: int = 10
-
-
-class OptionalRawPatentSearchParams(BasePatentSearchParams):
-    exemplar_patents: str | None = None
     term_field: TermField = "terms"
 
 
-class RawPatentSearchParams(CommonRawSearchParams):
-    pass
+class OptionalPatentSearchParams(BasePatentSearchParams):
+    exemplar_patents: list[str] = []
+
+
+class RawPatentSearchParams(BasePatentSearchParams, CommonRawSearchParams):
+    exemplar_patents: str | None = None
 
 
 class RawTrialSearchParams(CommonRawSearchParams):
@@ -44,9 +40,12 @@ class RawEntitySearchParams(CommonRawSearchParams):
     pass
 
 
-class PatentSearchParams(BasePatentSearchParams):
+class CommonSearchParams(BaseSearchParams):
+    terms: list[str]
+
+
+class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
     exemplar_patents: list[str] = []
-    term_field: TermField = "terms"
 
 
 class TrialSearchParams(CommonSearchParams):

@@ -3,6 +3,8 @@ import decimal
 from enum import Enum
 from datetime import date
 
+from typings.core import Dataclass
+
 
 class DataclassJSONEncoder(json.JSONEncoder):
     """
@@ -14,6 +16,8 @@ class DataclassJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, o):
+        if isinstance(o, Dataclass):
+            return o.asdict()
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
         if isinstance(o, date):

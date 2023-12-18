@@ -29,7 +29,7 @@ def search(params: EntitySearchParams) -> list[Entity]:
     int_with_recs = [
         Entity(
             name=i,
-            patents=[p for p in patents if i in p.compounds or i in p.mechanisms],
+            patents=[p for p in patents if i in p.interventions],
             trials=[t for t in trials if i in t.interventions],
         )
         for i in interventions

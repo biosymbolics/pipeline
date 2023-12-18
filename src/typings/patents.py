@@ -48,6 +48,10 @@ class PatentApplication(PatentBasicInfo):
     Patent application object as per Google Patents API / local modifications
     """
 
+    @property
+    def interventions(self) -> list[str]:
+        return self.compounds + self.biologics + self.mechanisms
+
     biologics: list[str]
     compounds: list[str]
     country: str
