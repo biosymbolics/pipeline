@@ -7,8 +7,7 @@ from pydantic import BaseModel
 
 from clients import patents as patent_client
 from clients.patents.reports.reports import group_by_xy
-from handlers.patents.utils import parse_params
-from typings.client import RawPatentSearchParams
+from typings.client import PatentSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
 
@@ -16,13 +15,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class XByYReportParams(RawPatentSearchParams):
+class XByYReportParams(PatentSearchParams):
     x: str
     y: str
-
-
-class XByYReportEvent(BaseModel):
-    queryStringParameters: XByYReportParams
 
 
 def x_by_y(raw_event: dict, context):
@@ -34,9 +29,12 @@ def x_by_y(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
     - API: `curl 'https://api.biosymbolics.ai/patents/reports/x_by_y?terms=asthma&x=assignees&y=diseases'`
     """
-    p = parse_params(raw_event["queryStringParameters"], DEFAULT_REPORT_PARAMS)
-    x_dimension = raw_event["queryStringParameters"].x
-    y_dimension = raw_event["queryStringParameters"].y
+    p = XByYReportParams(
+        **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
+    )
+
+    x_dimension = p.x
+    y_dimension = p.y
 
     if (
         not p

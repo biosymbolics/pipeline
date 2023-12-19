@@ -1,6 +1,6 @@
-from typing import Literal, Sequence
+from typing import Annotated, Literal, Sequence
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 
 
 QueryType = Literal["AND", "OR"]
@@ -10,48 +10,51 @@ TermField = Literal["terms", "instance_rollup", "category_rollup"]
 
 
 class BaseSearchParams(BaseModel):
-    limit: int = 1000
-    query_type: QueryType = "AND"
-    skip_cache: str | bool = False
-
-
-class CommonRawSearchParams(BaseSearchParams):
-    terms: str
+    limit: Annotated[int, Field(validate_default=True)] = 1000
+    query_type: Annotated[QueryType, Field(validate_default=True)] = "AND"
+    skip_cache: Annotated[bool, Field(validate_default=True)] = False
+    term_field: Annotated[TermField, Field(validate_default=True)] = "terms"
 
 
 class BasePatentSearchParams(BaseSearchParams):
-    min_patent_years: int = 10
-    term_field: TermField = "terms"
-
-
-class OptionalPatentSearchParams(BasePatentSearchParams):
-    exemplar_patents: list[str] = []
-
-
-class RawPatentSearchParams(BasePatentSearchParams, CommonRawSearchParams):
-    exemplar_patents: str | None = None
-
-
-class RawTrialSearchParams(CommonRawSearchParams):
-    pass
-
-
-class RawEntitySearchParams(CommonRawSearchParams):
-    pass
+    min_patent_years: Annotated[int, Field(validate_default=True)] = 10
 
 
 class CommonSearchParams(BaseSearchParams):
-    terms: list[str]
+    terms: Annotated[list[str], Field(validate_default=True)] = []
+
+    @validator("terms", pre=True)
+    def terms_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        terms = [t.strip() for t in (v.split(";") if v else [])]
+        return terms
 
 
 class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
-    exemplar_patents: list[str] = []
+    exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
+
+    @validator("exemplar_patents", pre=True)
+    def exemplar_patents_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        patents = [t.strip() for t in (v.split(";") if v else [])]
+        return patents
 
 
 class TrialSearchParams(CommonSearchParams):
     pass
 
 
-class EntitySearchParams(CommonSearchParams):
+class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_types: Sequence[Literal["pharmaceutical"]] = ["pharmaceutical"]
+    entity_types: Annotated[
+        Sequence[Literal["pharmaceutical"]], Field(validate_default=True)
+    ] = ["pharmaceutical"]
+
+    @validator("entity_types", pre=True)
+    def entity_types_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        entity_types = [t.strip() for t in (v.split(";") if v else [])]
+        return entity_types

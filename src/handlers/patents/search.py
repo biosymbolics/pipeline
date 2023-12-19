@@ -3,19 +3,13 @@ Handler for patents search
 """
 import json
 import logging
-from pydantic import BaseModel
 
 from clients import patents as patent_client
-from handlers.patents.utils import parse_params
-from typings.client import RawPatentSearchParams
+from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class SearchEvent(BaseModel):
-    queryStringParameters: RawPatentSearchParams
 
 
 def search(raw_event: dict, context):
@@ -34,7 +28,7 @@ def search(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
 
-    p = parse_params(raw_event["queryStringParameters"])
+    p = PatentSearchParams(**raw_event["queryStringParameters"])
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)

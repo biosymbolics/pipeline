@@ -9,16 +9,11 @@ from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
 from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
-from handlers.patents.utils import parse_params
-from typings.client import RawPatentSearchParams
+from typings.client import PatentSearchParams
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class ReportEvent(BaseModel):
-    queryStringParameters: RawPatentSearchParams
 
 
 def aggregate_over_time(raw_event: dict, context):
@@ -30,9 +25,8 @@ def aggregate_over_time(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
-    p = parse_params(
-        raw_event["queryStringParameters"],
-        DEFAULT_REPORT_PARAMS,
+    p = PatentSearchParams(
+        **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
 
     if not p or len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):

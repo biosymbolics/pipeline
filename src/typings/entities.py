@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Sequence
 
+from pydash import compact
+
 from .core import Dataclass
 from .patents import Patent
 from .trials import Trial, TrialPhase, TrialStatus
@@ -38,9 +40,9 @@ class Entity(Dataclass):
         return patents[-1]
 
     @property
-    def last_priority_year(self) -> int | str:
+    def last_priority_year(self) -> int | None:
         if not self.most_recent_patent:
-            return "??"
+            return None
         return self.most_recent_patent.priority_date.year
 
     @property
@@ -57,10 +59,20 @@ class Entity(Dataclass):
         return TrialStatus(self.most_recent_trial.status)
 
     @property
-    def last_updated(self) -> date | None:
+    def last_trial_updated_year(self) -> int | None:
         if not self.most_recent_trial:
             return None
-        return self.most_recent_trial.last_updated_date
+        return self.most_recent_trial.last_updated_date.year
+
+    @property
+    def last_updated(self) -> int | None:
+        p_updated = self.last_priority_year
+        t_updated = self.last_trial_updated_year
+
+        if not p_updated and not t_updated:
+            return None
+
+        return max(compact([p_updated, t_updated]))
 
     @property
     def max_phase(self) -> TrialPhase | str:
