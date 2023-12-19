@@ -46,7 +46,8 @@ def enrich_search_result(
     start = time.time()
 
     if len(results) == 0:
-        raise ValueError("No results returned. Try adjusting parameters.")
+        logger.info("No results to enrich")
+        return []
 
     pl.Config.activate_decimals()  # otherwise butchers decimal values
     df = pl.from_dicts(results, infer_schema_length=None)

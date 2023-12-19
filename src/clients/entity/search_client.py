@@ -35,4 +35,4 @@ def search(params: EntitySearchParams) -> list[Entity]:
         for i in interventions
     ]
 
-    return int_with_recs
+    return sorted(int_with_recs, key=lambda e: e.record_count, reverse=True)

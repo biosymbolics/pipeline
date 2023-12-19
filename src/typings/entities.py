@@ -1,11 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
-from typing import Sequence
 
 from pydash import compact
 
 from .core import Dataclass
-from .patents import Patent
+from .patents import MAX_PATENT_LIFE, Patent
 from .trials import Trial, TrialPhase, TrialStatus
 
 
@@ -25,7 +24,8 @@ class Entity(Dataclass):
         ]
 
         return [
-            dates.count(y) for y in range(date.today().year - 20, date.today().year)
+            dates.count(y)
+            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year)
         ]
 
     @property
