@@ -1,12 +1,17 @@
 """
 Entity client
 """
-import polars as pl
 from pydash import flatten, uniq
 
+from clients.approvals import search as approval_search_client
 from clients.patents import search as patent_search_client
 from clients.trials import search as trial_search_client
-from typings.client import EntitySearchParams, PatentSearchParams, TrialSearchParams
+from typings.client import (
+    ApprovalSearchParams,
+    EntitySearchParams,
+    PatentSearchParams,
+    TrialSearchParams,
+)
 from typings.entities import Entity
 
 
@@ -16,6 +21,7 @@ def search(params: EntitySearchParams) -> list[Entity]:
 
     HACK: need to refactor data model such that this is shared between patents & trials
     """
+    approvals = approval_search_client(ApprovalSearchParams(**params.__dict__))
     patents = patent_search_client(PatentSearchParams(**params.__dict__))
     trials = trial_search_client(TrialSearchParams(**params.__dict__))
 
@@ -23,12 +29,17 @@ def search(params: EntitySearchParams) -> list[Entity]:
         raise NotImplementedError
 
     interventions = uniq(
-        flatten([p.interventions for p in patents] + [t.interventions for t in trials])
+        flatten(
+            [p.interventions for p in patents]
+            + [t.interventions for t in trials]
+            + [a.generic_name for a in approvals]
+        )
     )
 
     int_with_recs = [
         Entity(
             name=i,
+            approvals=[a for a in approvals if i == a.generic_name],
             patents=[p for p in patents if i in p.interventions],
             trials=[t for t in trials if i in t.interventions],
         )

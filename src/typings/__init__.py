@@ -1,4 +1,10 @@
-from .client import QueryType, PatentSearchParams, TermField, TrialSearchParams
+from .client import (
+    ApprovalSearchParams,
+    QueryType,
+    PatentSearchParams,
+    TermField,
+    TrialSearchParams,
+)
 from .core import JsonSerializable, Primitive
 from .patents import (
     PatentBasicInfo,
@@ -8,6 +14,7 @@ from .patents import (
 )
 
 __all__ = [
+    "ApprovalSearchParams",
     "Primitive",
     "JsonSerializable",
     "PatentBasicInfo",

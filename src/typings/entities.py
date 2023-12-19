@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import date
+from pydash import compact, flatten
 
-from pydash import compact
+from typings.approvals import RegulatoryApproval
 
 from .core import Dataclass
 from .patents import MAX_PATENT_LIFE, Patent
@@ -11,6 +12,7 @@ from .trials import Trial, TrialPhase, TrialStatus
 @dataclass(frozen=True)
 class Entity(Dataclass):
     name: str
+    approvals: list[RegulatoryApproval]
     patents: list[Patent]
     trials: list[Trial]
 
@@ -19,13 +21,23 @@ class Entity(Dataclass):
         """
         Simple line chart of activity over time
         """
-        dates = [p.priority_date.year for p in self.patents] + [
-            t.last_updated_date.year for t in self.trials
-        ]
+        dates = (
+            [p.priority_date.year for p in self.patents]
+            + [t.last_updated_date.year for t in self.trials]
+            + flatten([[ad.year for ad in a.approval_dates] for a in self.approvals])
+        )
         return [
             dates.count(y)
             for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
         ]
+
+    @property
+    def approval_count(self) -> int:
+        return len(self.approvals)
+
+    @property
+    def is_approved(self) -> int:
+        return self.approval_count > 0
 
     @property
     def patent_count(self) -> int:
