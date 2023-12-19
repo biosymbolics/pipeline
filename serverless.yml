@@ -107,6 +107,15 @@ functions:
     handler: src.handlers.system.rds_control
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  search-entities:
+    events:
+      - http:
+          path: entities/search
+          method: get
+          cors: true
+    handler: src.handlers.entity.search
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
   search-patents:
     events:
       - http:

@@ -1,4 +1,4 @@
-from typings.client import OptionalRawPatentSearchParams
+from typings.client import OptionalPatentSearchParams
 
 # TODO
-DEFAULT_REPORT_PARAMS = OptionalRawPatentSearchParams(term_field="terms", limit=10000)
+DEFAULT_REPORT_PARAMS = OptionalPatentSearchParams(term_field="terms", limit=10000)

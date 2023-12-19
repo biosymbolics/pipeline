@@ -2,7 +2,7 @@ import json
 import logging
 
 from typings.client import (
-    OptionalRawPatentSearchParams as OptionalParams,
+    OptionalPatentSearchParams as OptionalParams,
     PatentSearchParams,
     RawPatentSearchParams as RawParams,
 )
@@ -13,14 +13,14 @@ logger.setLevel(logging.INFO)
 
 
 def parse_params(
-    _params: dict,
+    params: dict,
     default_params: OptionalParams = OptionalParams(),
 ) -> PatentSearchParams:
     """
     Parse patent params
     """
     # combine default and provided params
-    p = RawParams(**{**default_params.__dict__, **_params})
+    p = RawParams(**params)
 
     # parse ";"-delimited terms
     terms_list = [t.strip() for t in (p.terms.split(";") if p.terms else [])]
@@ -32,6 +32,7 @@ def parse_params(
 
     return PatentSearchParams(
         **{
+            **default_params.__dict__,
             "terms": terms_list,
             "exemplar_patents": exemplar_patents_list,
             "query_type": p.query_type,

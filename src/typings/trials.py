@@ -16,6 +16,50 @@ from utils.re import get_or_re
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
+@dataclass(frozen=True)
+class BaseTrial(Dataclass):
+    """
+    Base trial info
+    """
+
+    nct_id: str
+    arm_count: int
+    arm_types: list[str]
+    conditions: list[str]
+    dropout_count: int
+    dropout_reasons: list[str]
+    end_date: date
+    enrollment: int
+    hypothesis_types: list[str]
+    interventions: list[str]
+    intervention_types: list[str]
+    last_updated_date: date
+    mesh_conditions: list[str]
+    normalized_sponsor: str
+    primary_outcomes: list[str]
+    sponsor: str
+    start_date: date
+    time_frames: list[str]
+    title: str
+
+    condition: str | None = field(init=False)
+    dropout_percent: float = field(init=False)
+    intervention: str | None = field(init=False)
+    reformulation_score: float = field(init=False)
+
+
+@dataclass(frozen=True)
+class TrialRecord(BaseTrial):
+    design: str
+    masking: str
+    phase: str
+    purpose: str
+    randomization: str
+    status: str
+    termination_reason: str
+
+
 DOSE_TERMS = [
     "dose",
     "doses",
@@ -43,13 +87,13 @@ class TrialDesign(ByDefinitionOrderEnum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def find(cls, record: "TrialRecord"):
+    def find(cls, record: TrialRecord):
         """
         Find trial design from record
         """
 
         if TrialPhase(record["phase"]).is_phase_1():
-            if has_intersection(re.split("[ -]", record["title"].lower()), DOSE_TERMS):
+            if has_intersection(re.split("[ -]", record.title.lower()), DOSE_TERMS):
                 return TrialDesign.DOSING
 
         provisional_design = TrialDesign(record["design"])
@@ -58,12 +102,12 @@ class TrialDesign(ByDefinitionOrderEnum):
             # if more than one arm or has control, it's not single group.
             # same if trial is blinded or randomized (these fields tend to be more accurate than design)
             # we'll just assume it is parallel, but it could be crossover, dosing, etc.
-            randomization = TrialRandomization.find(record["randomization"])
+            randomization = TrialRandomization.find(record.randomization)
             comparison = ComparisonType.find_from_record(record)
-            blinding = TrialBlinding.find(record["masking"])
+            blinding = TrialBlinding.find(TrialMasking(record.masking))
             if (
                 not comparison in [ComparisonType.UNKNOWN, ComparisonType.NO_CONTROL]
-                or (record["arm_count"] or 0) > 1
+                or (record.arm_count or 0) > 1
                 or blinding == TrialBlinding.BLINDED
                 or randomization == TrialRandomization.RANDOMIZED
             ):
@@ -187,7 +231,7 @@ class TrialBlinding(ByDefinitionOrderEnum):
 
     @classmethod
     def find(cls, value: TrialMasking):
-        if TrialMasking(value).is_blinded():
+        if value.is_blinded():
             return cls.BLINDED
         return cls.UNBLINDED
 
@@ -600,55 +644,12 @@ class ComparisonType(ByDefinitionOrderEnum):
 
 
 @dataclass(frozen=True)
-class BaseTrial(Dataclass):
-    """
-    Base trial info
-    """
-
-    nct_id: str
-    arm_types: list[str]
-    conditions: list[str]
-    dropout_count: int
-    dropout_reasons: list[str]
-    end_date: date
-    enrollment: int
-    hypothesis_types: list[str]
-    interventions: list[str]
-    intervention_types: list[str]
-    last_updated_date: date
-    mesh_conditions: list[str]
-    normalized_sponsor: str
-    primary_outcomes: list[str]
-    sponsor: str
-    start_date: date
-    time_frames: list[str]
-    title: str
-
-    condition: str | None = field(init=False)
-    dropout_percent: float = field(init=False)
-    intervention: str | None = field(init=False)
-    reformulation_score: float = field(init=False)
-
-
-@dataclass(frozen=True)
-class TrialRecord(BaseTrial):
-    design: str
-    masking: str
-    phase: str
-    purpose: str
-    randomization: str
-    status: str
-    termination_reason: str
-
-
-@dataclass(frozen=True)
 class TrialSummary(BaseTrial):
     """
     Patent trial info
     """
 
     acronym: str | None
-    arm_count: int | None
     blinding: TrialBlinding
     comparison_type: ComparisonType
     design: TrialDesign
@@ -796,16 +797,19 @@ def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
                 trial["arm_types"] or [], trial["interventions"], design
             ),
             "design": design,
-            "duration": calc_duration(trial["start_date"], trial["end_date"]),
+            "duration": calc_duration(trial["start_date"], trial["end_date"]),  # type: ignore
             "max_timeframe": extract_max_timeframe(trial["time_frames"]),
             "hypothesis_type": HypothesisType(trial["hypothesis_types"]),
             "intervention_type": InterventionType(trial["intervention_types"]),
             "masking": masking,
             "phase": TrialPhase(trial["phase"]),
             "purpose": TrialPurpose(trial["purpose"]),
-            "randomization": TrialRandomization.find(trial["randomization"], design),
+            "randomization": TrialRandomization.find(trial["randomization"], design),  # type: ignore
             "sponsor_type": SponsorType(trial["sponsor"]),
             "status": TrialStatus(trial["status"]),
             "termination_reason": TerminationReason(trial["why_stopped"]),
         },
     )
+
+
+Trial = ScoredTrialSummary

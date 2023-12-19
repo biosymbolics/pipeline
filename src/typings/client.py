@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Sequence
 
 from pydantic import BaseModel
 
@@ -15,28 +15,43 @@ class BaseSearchParams(BaseModel):
     skip_cache: str | bool = False
 
 
+class CommonRawSearchParams(BaseSearchParams):
+    terms: str
+
+
 class BasePatentSearchParams(BaseSearchParams):
     min_patent_years: int = 10
-
-
-class OptionalRawPatentSearchParams(BasePatentSearchParams):
-    exemplar_patents: str | None = None
     term_field: TermField = "terms"
 
 
-class RawPatentSearchParams(OptionalRawPatentSearchParams):
-    terms: str
-
-
-class PatentSearchParams(BasePatentSearchParams):
+class OptionalPatentSearchParams(BasePatentSearchParams):
     exemplar_patents: list[str] = []
+
+
+class RawPatentSearchParams(BasePatentSearchParams, CommonRawSearchParams):
+    exemplar_patents: str | None = None
+
+
+class RawTrialSearchParams(CommonRawSearchParams):
+    pass
+
+
+class RawEntitySearchParams(CommonRawSearchParams):
+    pass
+
+
+class CommonSearchParams(BaseSearchParams):
     terms: list[str]
-    term_field: TermField = "terms"
 
 
-class RawTrialSearchParams(BaseSearchParams):
-    terms: str
+class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
+    exemplar_patents: list[str] = []
 
 
-class TrialSearchParams(BaseSearchParams):
-    terms: list[str]
+class TrialSearchParams(CommonSearchParams):
+    pass
+
+
+class EntitySearchParams(CommonSearchParams):
+    # device, diagnostic, etc. not compound because it can be moa
+    entity_types: Sequence[Literal["pharmaceutical"]] = ["pharmaceutical"]
