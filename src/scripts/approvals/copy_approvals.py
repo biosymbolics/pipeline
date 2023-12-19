@@ -36,7 +36,7 @@ def copy_all_approvals():
         "max(prod_approval.appl_no) as application_number",
         "max(prod.ndc_product_code) as ndc_code",
         "max(prod.product_name) as brand_name",
-        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), '+')) as generic_name",  # or product.generic_name
+        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",  # or product.generic_name
         "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
         "max(prod_approval.applicant) as applicant",
         "max(prod.marketing_status) as application_type",
