@@ -23,7 +23,7 @@ def search(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/trials/search?terms=asthma`
     """
 
-    p = TrialSearchParams(*raw_event["queryStringParameters"])
+    p = TrialSearchParams(**raw_event["queryStringParameters"])
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)

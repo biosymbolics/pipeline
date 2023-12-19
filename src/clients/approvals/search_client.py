@@ -1,5 +1,5 @@
 """
-Trials client
+Regulatory approvals client
 """
 from functools import partial
 import logging
@@ -9,9 +9,9 @@ from pydash import omit
 
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import TRIALS_TABLE
-from typings.trials import ScoredTrialSummary
-from typings import QueryType, TrialSearchParams
+from constants.core import REGULATORY_APPROVAL_TABLE
+from typings.approvals import RegulatoryApproval
+from typings import QueryType, ApprovalSearchParams
 from utils.sql import get_term_sql_query
 from utils.string import get_id
 
@@ -21,14 +21,26 @@ logger.setLevel(logging.INFO)
 
 MAX_SEARCH_RESULTS = 2000
 
+FIELDS = [
+    "applicant",
+    "application_types",
+    "approval_dates",
+    "application_number",
+    "brand_name",
+    "generic_name",
+    # "indications", # verbose label junk. needs NER.
+    "label_url",
+    "routes",
+]
+
 
 def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     limit: int = MAX_SEARCH_RESULTS,
-) -> list[ScoredTrialSummary]:
+) -> list[RegulatoryApproval]:
     """
-    Search patents by terms
+    Search regulatory approvals by terms
     """
     start = time.monotonic()
 
@@ -39,12 +51,10 @@ def _search(
     term_query = get_term_sql_query(terms, query_type)
 
     query = f"""
-        SELECT *,
+        SELECT {", ".join(FIELDS)},
         ts_rank_cd(text_search, to_tsquery(%s)) AS score
-        FROM {TRIALS_TABLE} as trials
+        FROM {REGULATORY_APPROVAL_TABLE} as approvals
         WHERE text_search @@ to_tsquery(%s)
-        AND purpose in ('TREATMENT', 'BASIC_SCIENCE', 'PREVENTION')
-        AND intervention_type='PHARMACOLOGICAL'
         ORDER BY score DESC
         LIMIT {limit}
     """
@@ -55,22 +65,14 @@ def _search(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
     )
 
-    trials = [ScoredTrialSummary(**omit(r, ["text_search"])) for r in results]
+    trials = [RegulatoryApproval(**omit(r, ["text_search"])) for r in results]
 
     return trials
 
 
-def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
+def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
     """
-    Search trials by terms
-    Filters on lowered, stemmed terms
-
-    Usage:
-    ```
-    from clients.trials.search_client import search
-    from typings import QueryType, TrialSearchParams
-    search(TrialSearchParams(terms= ["asthma"], skip_cache=True))
-    ```
+    Search regulatory approvals by terms
     """
     args = {
         "terms": p.terms,

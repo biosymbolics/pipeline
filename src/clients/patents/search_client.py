@@ -48,7 +48,7 @@ SEARCH_RETURN_FIELDS = {
     "apps.publication_number": "publication_number",
     "apps.title": "title",
     "abstract": "abstract",
-    "application_number": "application_number",
+    "apps.application_number": "application_number",
     "country": "country",
     "domains": "domains",
     "embeddings::real[]": "embeddings",
@@ -60,7 +60,7 @@ SEARCH_RETURN_FIELDS = {
 }
 
 APPROVED_SEARCH_RETURN_FIELDS = {
-    "max(approval_indications)": "approval_indications",
+    "max(indications)": "approval_indications",
     "max(brand_name)": "brand_name",
     "max(generic_name)": "generic_name",
 }
@@ -195,7 +195,7 @@ def _search(
         JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         JOIN {PUBLICATION_NUMBER_MAP_TABLE} as pub_map ON pub_map.publication_number = apps.publication_number
         LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = pub_map.other_publication_number
-        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.regulatory_application_number = p2a.regulatory_application_number
+        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["cosine_source"]}

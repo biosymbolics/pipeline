@@ -58,3 +58,7 @@ class EntitySearchParams(PatentSearchParams):
             return v
         entity_types = [t.strip() for t in (v.split(";") if v else [])]
         return entity_types
+
+
+class ApprovalSearchParams(CommonSearchParams):
+    pass

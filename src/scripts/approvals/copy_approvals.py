@@ -15,6 +15,13 @@ from constants.core import (
 
 SOURCE_DB = "drugcentral"
 DEST_DB = "patents"
+SEARCH_FIELDS = {
+    "applicant": "coalesce(applicant, '')",
+    "active_ingredients": "ARRAY_TO_STRING(active_ingredients, '|| " " ||')",
+    "brand_name": "coalesce(brand_name, '')",
+    "generic_name": "coalesce(generic_name, '')",
+    "indications": "ARRAY_TO_STRING(indications, '|| " " ||')",
+}
 
 
 def copy_all_approvals():
@@ -26,25 +33,21 @@ def copy_all_approvals():
     and 1772 in `ob_product`?
     """
     PATENT_FIELDS = [
-        "max(prod_approval.appl_no) as regulatory_application_number",
+        "max(prod_approval.appl_no) as application_number",
         "max(prod.ndc_product_code) as ndc_code",
         "max(prod.product_name) as brand_name",
-        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), '+')) as generic_name",  # or product.generic_name
+        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",  # or product.generic_name
         "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
-        "max(struct.stem) as stem",
         "max(prod_approval.applicant) as applicant",
         "max(prod.marketing_status) as application_type",
+        "ARRAY_AGG(distinct prod.marketing_status) as application_types",
         "ARRAY_AGG(distinct approval.approval) as approval_dates",
-        "ARRAY_AGG(distinct approval.type) as regulatory_agency",
-        "ARRAY_AGG(distinct label_section.text) as approval_indications",
-        "ARRAY_AGG(distinct struct.cd_formula) as formulas",
-        "max(distinct struct.smiles) as smiles",
-        "ARRAY_AGG(distinct struct.lipinski) as lipinskis",
+        "ARRAY_AGG(distinct approval.type) as regulatory_agencies",
+        "ARRAY_AGG(distinct label_section.text) as indications",
         "ARRAY_AGG(distinct prod_approval.route) as routes",
         "max(label.pdf_url) as label_url",
         "'' as normalized_applicant",
     ]
-    # faers? ddi?
     source_sql = f"""
         select {", ".join(PATENT_FIELDS)}
         from
@@ -72,28 +75,28 @@ def copy_all_approvals():
         dest_db=DEST_DB,
         dest_table_name=REGULATORY_APPROVAL_TABLE,
         truncate_if_exists=True,
+        transform_schema=lambda schema: {**schema, "text_search": "tsvector"},
     )
     client = PsqlDatabaseClient()
+    vector_sql = ("|| ' ' ||").join(SEARCH_FIELDS.values())
     client.execute_query(
         f"""
         update {REGULATORY_APPROVAL_TABLE} set normalized_applicant=sm.term from
-        synonym_map sm where sm.synonym = lower(applicant)
+        synonym_map sm where sm.synonym = lower(applicant);
+
+        UPDATE {REGULATORY_APPROVAL_TABLE} SET text_search = to_tsvector('english', {vector_sql});
         """
     )
     client.create_indices(
         [
             {
                 "table": REGULATORY_APPROVAL_TABLE,
-                "column": "regulatory_application_number",
+                "column": "application_number",
             },
             {
                 "table": REGULATORY_APPROVAL_TABLE,
-                "column": "active_ingredients",
+                "column": "text_search",
                 "is_gin": True,
-            },
-            {
-                "table": REGULATORY_APPROVAL_TABLE,
-                "column": "normalized_applicant",
             },
         ]
     )
@@ -106,7 +109,7 @@ def copy_direct_patent_to_approval():
     source_sql = f"""
         select
         concat('US-', patent_no) as publication_number,
-        prod_approval.appl_no as regulatory_application_number
+        prod_approval.appl_no as application_number
         from
         product prod,
         ob_product prod_approval,
@@ -134,7 +137,7 @@ def copy_indirect_patent_to_approval():
     query = f"""
         select
         patent_app.publication_number as publication_number,
-        approvals.regulatory_application_number as regulatory_application_number
+        approvals.application_number as regulatory_application_number
         from
         applications as patent_app,
         aggregated_annotations as a,
@@ -173,14 +176,14 @@ def copy_approvals():
     Copy data from Postgres (drugcentral) to Postgres (patents)
     """
     copy_all_approvals()
-    copy_patent_to_approval()
+    # copy_patent_to_approval()
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.patents.psql.copy_approvals
+            Usage: python3 -m scripts.approvals.copy_approvals
             Copies approvals data to postgres
         """
         )
