@@ -22,10 +22,9 @@ class Entity(Dataclass):
         dates = [p.priority_date.year for p in self.patents] + [
             t.last_updated_date.year for t in self.trials
         ]
-
         return [
             dates.count(y)
-            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year)
+            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
         ]
 
     @property
