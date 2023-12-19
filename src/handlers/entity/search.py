@@ -3,20 +3,15 @@ Handler for entities search
 """
 import json
 import logging
-from pydantic import BaseModel
 
 from clients import entity as entity_client
-from typings.client import RawEntitySearchParams
+from typings.client import EntitySearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
-from .utils import parse_params
+from .constants import DEFAULT_SEARCH_PARAMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class EntitySearchEvent(BaseModel):
-    queryStringParameters: RawEntitySearchParams
 
 
 def search(raw_event: dict, context):
@@ -28,9 +23,12 @@ def search(raw_event: dict, context):
     - Remote: `serverless invoke --function search-entities --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension" }}'`
     - API: `curl https://api.biosymbolics.ai/entities/search?terms=asthma`
     """
-
-    event = EntitySearchEvent(**raw_event)
-    p = parse_params(event.queryStringParameters)
+    p = EntitySearchParams(
+        **{
+            **raw_event.get("queryStringParameters", {}),
+            **DEFAULT_SEARCH_PARAMS,
+        },
+    )
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)

@@ -3,20 +3,14 @@ Handler for trials search
 """
 import json
 import logging
-from pydantic import BaseModel
 
 from clients import trials as trial_client
-from typings.client import RawTrialSearchParams
+from typings.client import TrialSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
-from .utils import parse_params
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class TrialsSearchEvent(BaseModel):
-    queryStringParameters: RawTrialSearchParams
 
 
 def search(raw_event: dict, context):
@@ -29,8 +23,7 @@ def search(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/trials/search?terms=asthma`
     """
 
-    event = TrialsSearchEvent(**raw_event)
-    p = parse_params(event.queryStringParameters)
+    p = TrialSearchParams(*raw_event["queryStringParameters"])
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)
