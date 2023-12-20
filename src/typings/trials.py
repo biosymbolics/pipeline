@@ -367,7 +367,6 @@ class TrialStatus(ByDefinitionOrderEnum):
             "Terminated": cls.TERMINATED,
             "Completed": cls.COMPLETED,
             "Not Applicable": cls.NA,
-            "Approved": cls.APPROVED,
         }
         if value in status_term_map:
             return status_term_map[value]
