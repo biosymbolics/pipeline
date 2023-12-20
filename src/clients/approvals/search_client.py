@@ -30,6 +30,7 @@ FIELDS = [
     "generic_name",
     # "indications", # verbose label junk. needs NER.
     "label_url",
+    "pharmacologic_class",
     "ndc_code",
 ]
 

@@ -20,7 +20,7 @@ from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
-from typings.trials import TrialSummary, raw_to_trial_summary
+from typings.trials import TrialRecord, TrialSummary, raw_to_trial_summary
 from utils.list import dedup
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ SINGLE_FIELDS = {
     "drop_withdrawals.dropout_count": "dropout_count",
     "drop_withdrawals.reasons": "dropout_reasons",
     "outcome_analyses.non_inferiority_types": "hypothesis_types",
+    "mesh_interventions.mesh_term": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
 }
 
 MULTI_FIELDS = {
@@ -119,12 +120,12 @@ def transform_ct_records(
 
     # return [
     #     raw_to_trial_summary(
-    #         {**rec, "interventions": normalize_interventions(rec["interventions"])}
+    #         TrialRecord(**{**rec, "interventions": normalize_interventions(rec["interventions"])})
     #     )
     #     for rec in ctgov_records
     # ]
 
-    return [raw_to_trial_summary(rec) for rec in ctgov_records]
+    return [raw_to_trial_summary(TrialRecord(**rec)) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -137,24 +138,18 @@ def ingest_trials():
     # subqueries to avoid combinatorial explosion
     source_sql = f"""
         select {", ".join(FIELDS)},
-        0 as duration,
-        '' as blinding,
-        '' as comparison_type,
-        '' as hypothesis_type,
-        '' as intervention_type,
-        -1 as max_timeframe,
         '' as normalized_sponsor,
-        '' as sponsor_type,
-        '' as termination_reason
+        '' as pharmacologic_class
         from designs, studies
         JOIN conditions on conditions.nct_id = studies.nct_id
+        LEFT JOIN browse_interventions as mesh_interventions on mesh_interventions.nct_id = studies.nct_id AND mesh_interventions.mesh_type = 'mesh-list'
         JOIN interventions on interventions.nct_id = studies.nct_id
             AND intervention_type in (
                 'Biological', 'Combination Product', 'Drug',
                 'Dietary Supplement', 'Genetic', 'Other', 'Procedure'
             )
         LEFT JOIN design_groups on design_groups.nct_id = studies.nct_id
-        LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id AND mesh_type='mesh-list'
+        LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id AND mesh_conditions.mesh_type='mesh-list'
         LEFT JOIN outcomes on outcomes.nct_id = studies.nct_id AND outcomes.outcome_type = 'Primary'
         LEFT JOIN (
             select nct_id, sum(count) as dropout_count, array_agg(distinct reason) as reasons
@@ -190,7 +185,18 @@ def ingest_trials():
         f"{BASE_DATABASE_URL}/patents",
         "trials",
         transform=lambda batch, _: transform_ct_records(batch),  # tagger),
-        transform_schema=lambda schema: {**schema, "text_search": "tsvector"},
+        transform_schema=lambda schema: {
+            **schema,
+            "text_search": "tsvector",
+            "duration": "integer",
+            "max_timeframe": "integer",
+            "blinding": "text",
+            "comparison_type": "text",
+            "hypothesis_type": "text",
+            "intervention_type": "text",
+            "sponsor_type": "text",
+            "termination_reason": "text",
+        },
     )
 
     client = PsqlDatabaseClient()
@@ -214,11 +220,21 @@ def ingest_trials():
         "interventions": "array_to_string(interventions, ' ')",
         "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
         "normalized_sponsor": "coalesce(normalized_sponsor, '')",
+        "intervention": "coalesce(intervention, '')",
+        # "pharmacologic_class": "coalesce(pharmacologic_class, '')",
     }
     search_sql = ("|| ' ' ||").join([sql for sql in search_fields.values()])
     client.execute_query(
         f"update trials SET text_search = to_tsvector('english', {search_sql})"
     )
+
+    pc_sql = """
+    UPDATE trials SET pharmacologic_class=lower(ra.pharmacologic_class)
+    FROM regulatory_approvals ra
+    WHERE lower(ra.generic_name)=lower(intervention)
+    AND ra.pharmacologic_class IS NOT null
+    AND trials.intervention IS NOT null;
+    """
 
     client.create_indices(
         [
@@ -289,7 +305,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.ctgov.copy_ctgov
+            Usage: python3 -m scripts.trials.copy_trials
             Copies ctgov to patents
         """
         )

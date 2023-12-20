@@ -15,6 +15,10 @@ class RegulatoryApproval(Dataclass):
     def count(self) -> int:
         return len(self.approval_dates)
 
+    @property
+    def instance_rollup(self) -> str:
+        return (self.pharmacologic_class or self.generic_name).lower()
+
     # applicant: str
     application_types: list[str]
     approval_dates: list[date]
@@ -24,5 +28,6 @@ class RegulatoryApproval(Dataclass):
     ndc_code: str
     # indications: list[str]
     label_url: str
+    pharmacologic_class: str | None
     # routes: list[str]
     score: float = 0.0

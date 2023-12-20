@@ -87,6 +87,8 @@ class Entity(Dataclass):
 
     @property
     def max_phase(self) -> TrialPhase | str:
+        if self.approval_count > 0:
+            return TrialPhase.APPROVED
         if not self.most_recent_trial:
             return "??"
         return TrialPhase(self.most_recent_trial.phase)

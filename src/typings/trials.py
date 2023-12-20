@@ -7,7 +7,7 @@ import re
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
-from scripts.ctgov.utils import extract_max_timeframe
+from data.domain.trials import extract_max_timeframe
 from typings.core import Dataclass
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
@@ -24,6 +24,7 @@ class BaseTrial(Dataclass):
     """
 
     nct_id: str
+    acronym: str | None
     arm_count: int
     arm_types: list[str]
     conditions: list[str]
@@ -32,16 +33,19 @@ class BaseTrial(Dataclass):
     end_date: date
     enrollment: int
     hypothesis_types: list[str]
+    intervention: str | None
     interventions: list[str]
     intervention_types: list[str]
     last_updated_date: date
     mesh_conditions: list[str]
     normalized_sponsor: str
+    pharmacologic_class: str | None
     primary_outcomes: list[str]
     sponsor: str
     start_date: date
     time_frames: list[str]
     title: str
+    why_stopped: str | None
 
 
 @dataclass(frozen=True)
@@ -52,7 +56,6 @@ class TrialRecord(BaseTrial):
     purpose: str
     randomization: str
     status: str
-    termination_reason: str
 
 
 DOSE_TERMS = [
@@ -364,6 +367,7 @@ class TrialStatus(ByDefinitionOrderEnum):
             "Terminated": cls.TERMINATED,
             "Completed": cls.COMPLETED,
             "Not Applicable": cls.NA,
+            "Approved": cls.APPROVED,
         }
         if value in status_term_map:
             return status_term_map[value]
@@ -380,6 +384,7 @@ class TrialPhase(ByDefinitionOrderEnum):
     PHASE_4 = "PHASE_4"  # Phase 4
     NA = "N/A"  # Not Applicable
     UNKNOWN = "UNKNOWN"  # Unknown status
+    APPROVED = "APPROVED"
 
     def is_phase_1(self) -> bool:
         return self in [self.EARLY_PHASE_1, self.PHASE_1, self.PHASE_1_2]
@@ -399,6 +404,7 @@ class TrialPhase(ByDefinitionOrderEnum):
             "Phase 3": cls.PHASE_3,
             "Phase 4": cls.PHASE_4,
             "Not Applicable": cls.NA,
+            "Approved": cls.APPROVED,
         }
         if value in phase_term_map:
             return phase_term_map[value]
@@ -598,7 +604,7 @@ class ComparisonType(ByDefinitionOrderEnum):
         return default
 
     @classmethod
-    def find_from_record(cls, record: "TrialRecord"):
+    def find_from_record(cls, record: TrialRecord):
         """
         Find comparison type from record
         NOTE: does not use trial design (avoid recursive loop)
@@ -644,7 +650,6 @@ class TrialSummary(BaseTrial):
     Patent trial info
     """
 
-    acronym: str | None
     blinding: TrialBlinding
     comparison_type: ComparisonType
     design: TrialDesign
@@ -659,7 +664,6 @@ class TrialSummary(BaseTrial):
     sponsor_type: SponsorType
     termination_reason: TerminationReason
     status: TrialStatus
-    why_stopped: str | None
 
 
 @dataclass(frozen=True)
@@ -673,10 +677,11 @@ class ScoredTrialSummary(TrialSummary):
         return self.mesh_conditions[0]
 
     @property
-    def intervention(self) -> str | None:
-        if len(self.interventions or []) == 0:
+    def instance_rollup(self) -> str | None:
+        ir = self.pharmacologic_class or self.intervention
+        if ir is None:
             return None
-        return self.interventions[0]
+        return ir.lower()
 
     @property
     def dropout_percent(self) -> float:
@@ -701,63 +706,6 @@ class ScoredTrialSummary(TrialSummary):
         return random.betavariate(2, 8)
 
 
-def is_trial_record(trial: dict | TrialRecord) -> TypeGuard[TrialRecord]:
-    """
-    Check if dict is a trial record
-    """
-    return (
-        "nct_id" in trial
-        and "arm_types" in trial
-        and "end_date" in trial
-        and "start_date" in trial
-        and "last_updated_date" in trial
-        and "status" in trial
-        and "title" in trial
-        and "phase" in trial
-        and "conditions" in trial
-        and "mesh_conditions" in trial
-        and "intervention_types" in trial
-        and "enrollment" in trial
-        and "interventions" in trial
-        and "sponsor" in trial
-    )
-
-
-def is_trial_summary(trial: dict) -> TypeGuard[TrialSummary]:
-    """
-    Check if dict is a trial record
-    """
-    _is_trial_record = is_trial_record(trial)
-    return (
-        _is_trial_record
-        and "comparison_type" in trial
-        and "duration" in trial
-        and "design" in trial
-        and "hypothesis_type" in trial
-        and "intervention_type" in trial
-        and "masking" in trial
-        and "max_timeframe" in trial
-        and "purpose" in trial
-        and "randomization" in trial
-        and "termination_reason" in trial
-        and "sponsor_type" in trial
-    )
-
-
-def is_trial_record_list(trials: Sequence[dict]) -> TypeGuard[Sequence[TrialRecord]]:
-    """
-    Check if list of trial records
-    """
-    return all(is_trial_record(trial) for trial in trials)
-
-
-def is_trial_summary_list(trials: Sequence[dict]) -> TypeGuard[Sequence[TrialSummary]]:
-    """
-    Check if list of trial records
-    """
-    return all(is_trial_record(trial) for trial in trials)
-
-
 def calc_duration(start_date: date | None, end_date: date | None) -> int:
     """
     Calculate duration in days
@@ -770,7 +718,7 @@ def calc_duration(start_date: date | None, end_date: date | None) -> int:
     return (end_date - start_date).days
 
 
-def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
+def raw_to_trial_summary(trial: TrialRecord) -> TrialSummary:
     """
     Get trial summary from db record
 
@@ -778,9 +726,6 @@ def raw_to_trial_summary(trial: dict | TrialRecord) -> TrialSummary:
     - calculates duration
     - etc
     """
-    if not is_trial_record(trial):
-        raise ValueError("Invalid trial record")
-
     design = TrialDesign.find(trial)
     masking = TrialMasking(trial["masking"])
 
