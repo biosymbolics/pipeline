@@ -9,13 +9,14 @@ class RegulatoryApproval(Dataclass):
     Base approval info
     """
 
-    applicant: str
+    # applicant: str
     application_types: list[str]
     approval_dates: list[date]
-    application_number: str
+    # application_number: str
     brand_name: str
     generic_name: str
+    ndc_code: str
     # indications: list[str]
     label_url: str
-    routes: list[str]
+    # routes: list[str]
     score: float = 0.0

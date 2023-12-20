@@ -22,15 +22,15 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 
 FIELDS = [
-    "applicant",
+    # "applicant",
     "application_types",
     "approval_dates",
-    "application_number",
+    # "application_number",
     "brand_name",
     "generic_name",
     # "indications", # verbose label junk. needs NER.
     "label_url",
-    "routes",
+    "ndc_code",
 ]
 
 
@@ -81,7 +81,7 @@ def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
     key = get_id(args)
     search_partial = partial(_search, **args)
 
-    if p.skip_cache == False:
+    if p.skip_cache == True:
         return search_partial(limit=p.limit)
 
     return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)

@@ -69,13 +69,6 @@ class PatentApplication(PatentBasicInfo):
     similar_patents: list[str]
     termination_reason: str
 
-    # approved patent fields
-    is_approved: str
-    brand_name: str
-    generic_name: str
-    approval_date: date
-    approval_indications: list[str]
-
 
 class AvailabilityLikelihood(ByDefinitionOrderEnum):
     LIKELY = "LIKELY"
@@ -191,9 +184,6 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
 
 @dataclass(frozen=True)
 class ScoredPatentApplication(PatentApplication):
-    def __getattribute__(self, __name: str) -> Any:
-        return super().__getattribute__(__name)
-
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
