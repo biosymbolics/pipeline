@@ -10,6 +10,19 @@ Primitive = bool | str | int | float | None
 
 @dataclass(frozen=True)
 class Dataclass:
+    def _get_properties(self):
+        return {
+            key: getattr(self, key)
+            for key, value in self.__class__.__dict__.items()
+            if isinstance(value, property)
+        }
+
+    def __init__(self, **kwargs):
+        properties = self._get_properties()
+        for key, value in kwargs.items():
+            if key not in properties:
+                setattr(self, key, value)
+
     def __getitem__(self, item):
         # e.g. e[0], *e[0:6]
         if isinstance(item, int) or isinstance(item, slice):

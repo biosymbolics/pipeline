@@ -237,7 +237,12 @@ def search(p: PatentSearchParams) -> list[PatentApplication]:
         "min_patent_years": p.min_patent_years,
         "term_field": p.term_field,
     }
-    key = get_id(args)
+    key = get_id(
+        {
+            **args,
+            "api": "patents",
+        }
+    )
     search_partial = partial(_search, **args)
 
     if p.skip_cache == True:

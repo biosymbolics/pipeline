@@ -120,7 +120,7 @@ def retrieve_with_cache_check(
         data = decode(response["Body"].read().decode("utf-8"))
 
         if limit is not None and len(data) > limit:
-            return cast(T, data[0:limit])
+            return data[0:limit]  # type: ignore
         return data
     except ClientError as ex:
         if not ex.response["Error"]["Code"] == "NoSuchKey":

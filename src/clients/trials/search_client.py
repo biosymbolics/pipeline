@@ -2,6 +2,7 @@
 Trials client
 """
 from functools import partial
+import json
 import logging
 import time
 from typing import Sequence
@@ -76,10 +77,20 @@ def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
         "terms": p.terms,
         "query_type": p.query_type,
     }
-    key = get_id(args)
+    key = get_id(
+        {
+            **args,
+            "api": "trials",
+        }
+    )
     search_partial = partial(_search, **args)
 
     if p.skip_cache == True:
         return search_partial(limit=p.limit)
 
-    return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)
+    return retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        limit=p.limit,
+        decode=lambda str_data: [ScoredTrialSummary(**t) for t in json.loads(str_data)],
+    )
