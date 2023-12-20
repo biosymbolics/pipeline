@@ -11,7 +11,7 @@ DEFAULT_FORMATTER = "%Y-%m-%d"
 T = TypeVar("T", bound=dict[str, Any])
 
 
-def date_deserialier(_object: T) -> T:
+def date_deserializer(_object: T) -> T:
     """
     Deserializes date strings into date objects
     """
