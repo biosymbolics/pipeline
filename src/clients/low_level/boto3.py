@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 import logging
 
 from utils.date import date_deserializer
-from utils.encoding.json_encoder import DataclassJSONEncoder
+from utils.encoding.json_encoder import StorageDataclassJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -86,15 +86,17 @@ def get_cache_with_all_check(
         return s3.get_object(Bucket=cache_name, Key=limit_cache_key)
 
 
+def storage_decoder(obj: Any) -> Any:
+    return json.loads(obj, object_hook=date_deserializer)
+
+
 def retrieve_with_cache_check(
     operation: Callable[[int], T] | Callable[[], T],
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
-    encode: Callable[[T], str | bytes] = DataclassJSONEncoder().encode,
-    decode: Callable[[str | bytes], T] = lambda x: json.loads(
-        x, object_hook=date_deserializer
-    ),
+    encode: Callable[[T], str | bytes] = StorageDataclassJSONEncoder().encode,
+    decode: Callable[[str | bytes], T] = storage_decoder,
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.

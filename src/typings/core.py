@@ -1,5 +1,7 @@
 from dataclasses import asdict, dataclass, replace
+import json
 from typing import Any, TypeGuard, Union, List, Dict
+import inspect
 
 JsonSerializable = Union[
     Dict[str, "JsonSerializable"], List["JsonSerializable"], str, int, float, bool, None
@@ -10,19 +12,6 @@ Primitive = bool | str | int | float | None
 
 @dataclass(frozen=True)
 class Dataclass:
-    def _get_properties(self):
-        return {
-            key: getattr(self, key)
-            for key, value in self.__class__.__dict__.items()
-            if isinstance(value, property)
-        }
-
-    def __init__(self, **kwargs):
-        properties = self._get_properties()
-        for key, value in kwargs.items():
-            if key not in properties:
-                setattr(self, key, value)
-
     def __getitem__(self, item):
         # e.g. e[0], *e[0:6]
         if isinstance(item, int) or isinstance(item, slice):
@@ -33,14 +22,8 @@ class Dataclass:
         return getattr(self, item, default)
 
     def asdict(self) -> dict[str, Any]:
-        properties = {
-            key: getattr(self, key)
-            for key, value in self.__class__.__dict__.items()
-            if isinstance(value, property)
-        }
-
         o = asdict(self)
-        return {**o, **properties}
+        return o
 
     def _asdict(self) -> dict[str, Any]:
         return self.asdict()
@@ -59,6 +42,25 @@ class Dataclass:
 
     def replace(self, **kwargs):
         return replace(self, **kwargs)
+
+    def serialize(self) -> dict[str, Any]:
+        """
+        Prep for JSON serialization of the object, including properties
+        """
+        properties = {
+            key: getattr(self, key)
+            for key, value in self.__class__.__dict__.items()
+            if isinstance(value, property)
+        }
+
+        o = self.asdict()
+        return {**o, **properties}
+
+    def storage_serialize(self) -> dict[str, Any]:
+        """
+        Prep for JSON serialization of the object, WITHOUT properties (ie expects to be reconstituted into dataclass)
+        """
+        return self.asdict()
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:

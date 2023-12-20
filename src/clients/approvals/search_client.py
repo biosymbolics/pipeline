@@ -2,13 +2,12 @@
 Regulatory approvals client
 """
 from functools import partial
-import json
 import logging
 import time
 from typing import Sequence
 from pydash import omit
 
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import REGULATORY_APPROVAL_TABLE
 from typings.approvals import RegulatoryApproval
@@ -94,5 +93,7 @@ def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
         search_partial,
         key=key,
         limit=p.limit,
-        decode=lambda str_data: [RegulatoryApproval(**a) for a in json.loads(str_data)],
+        decode=lambda str_data: [
+            RegulatoryApproval(**a) for a in storage_decoder(str_data)
+        ],
     )

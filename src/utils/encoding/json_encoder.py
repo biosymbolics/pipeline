@@ -17,7 +17,7 @@ class DataclassJSONEncoder(json.JSONEncoder):
 
     def default(self, o):
         if isinstance(o, Dataclass):
-            return o.asdict()
+            return o.serialize()
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
         if isinstance(o, date):
@@ -28,4 +28,16 @@ class DataclassJSONEncoder(json.JSONEncoder):
             return o.name
         if isinstance(o, decimal.Decimal):
             return float(o)
+        return super().default(o)
+
+
+class StorageDataclassJSONEncoder(DataclassJSONEncoder):
+    """
+    JSON encoder that supports dataclasses
+    (for purposes of storage, which persists dataclasses without properties, expecting the result to be reconstituted with the constructor)
+    """
+
+    def default(self, o):
+        if isinstance(o, Dataclass):
+            return o.storage_serialize()
         return super().default(o)

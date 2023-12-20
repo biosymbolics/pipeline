@@ -1,13 +1,19 @@
 from dataclasses import dataclass
+from pydantic import validate_arguments
 from datetime import date
 from typings.core import Dataclass
 
 
+@validate_arguments  # type: ignore
 @dataclass(frozen=True)
 class RegulatoryApproval(Dataclass):
     """
     Base approval info
     """
+
+    @property
+    def count(self) -> int:
+        return len(self.approval_dates)
 
     # applicant: str
     application_types: list[str]

@@ -2,13 +2,12 @@
 Trials client
 """
 from functools import partial
-import json
 import logging
 import time
 from typing import Sequence
 from pydash import omit
 
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TRIALS_TABLE
 from typings.trials import ScoredTrialSummary
@@ -92,5 +91,7 @@ def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
         search_partial,
         key=key,
         limit=p.limit,
-        decode=lambda str_data: [ScoredTrialSummary(**t) for t in json.loads(str_data)],
+        decode=lambda str_data: [
+            ScoredTrialSummary(**t) for t in storage_decoder(str_data)
+        ],
     )

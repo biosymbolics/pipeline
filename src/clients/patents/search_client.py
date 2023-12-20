@@ -2,23 +2,18 @@
 Patent client
 """
 from functools import partial
-import json
 import logging
 import time
 from typing import Sequence
 
-from pydash import omit
 from clients.companies.companies import get_company_map
-
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     AGGREGATED_ANNOTATIONS_TABLE,
     ANNOTATIONS_TABLE,
     APPLICATIONS_TABLE,
-    PATENT_TO_REGULATORY_APPROVAL_TABLE,
     PUBLICATION_NUMBER_MAP_TABLE,
-    REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
     TRIALS_TABLE,
 )
@@ -253,8 +248,6 @@ def search(p: PatentSearchParams) -> list[PatentApplication]:
         key=key,
         limit=p.limit,
         decode=lambda str_data: [
-            # TODO: Dataclass init to ignore passed in properties
-            PatentApplication(**omit(p, "interventions"))
-            for p in json.loads(str_data)
+            PatentApplication(**p) for p in storage_decoder(str_data)
         ],
     )

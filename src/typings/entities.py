@@ -33,7 +33,7 @@ class Entity(Dataclass):
 
     @property
     def approval_count(self) -> int:
-        return len(self.approvals)
+        return sum(a.count for a in self.approvals)
 
     @property
     def is_approved(self) -> int:

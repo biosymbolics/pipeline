@@ -43,11 +43,6 @@ class BaseTrial(Dataclass):
     time_frames: list[str]
     title: str
 
-    condition: str | None = field(init=False)
-    dropout_percent: float = field(init=False)
-    intervention: str | None = field(init=False)
-    reformulation_score: float = field(init=False)
-
 
 @dataclass(frozen=True)
 class TrialRecord(BaseTrial):
@@ -671,25 +666,25 @@ class TrialSummary(BaseTrial):
 class ScoredTrialSummary(TrialSummary):
     score: float
 
-    @property  # type: ignore
-    def condition(self):
+    @property
+    def condition(self) -> str | None:
         if len(self.mesh_conditions or []) == 0:
             return None
         return self.mesh_conditions[0]
 
-    @property  # type: ignore
-    def intervention(self):
+    @property
+    def intervention(self) -> str | None:
         if len(self.interventions or []) == 0:
             return None
         return self.interventions[0]
 
-    @property  # type: ignore
+    @property
     def dropout_percent(self) -> float:
         if not self.enrollment or not self.dropout_count:
             return 0.0
         return round(self.dropout_count / self.enrollment, 2)
 
-    @property  # type: ignore
+    @property
     def reformulation_score(self) -> float:
         """
         Score for reformulation potential

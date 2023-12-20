@@ -2,7 +2,7 @@
 Patent types
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
