@@ -25,7 +25,7 @@ def search(raw_event: dict, context):
     """
     p = EntitySearchParams(
         **{
-            **raw_event.get("queryStringParameters", {}),
+            **(raw_event.get("queryStringParameters") or {}),
             **DEFAULT_SEARCH_PARAMS,
         },
     )

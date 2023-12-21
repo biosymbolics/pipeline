@@ -66,9 +66,9 @@ def _search(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
     )
 
-    trials = [RegulatoryApproval(**omit(r, ["text_search"])) for r in results]
+    approvals = [RegulatoryApproval(**omit(r, ["text_search"])) for r in results]
 
-    return trials
+    return approvals
 
 
 def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:

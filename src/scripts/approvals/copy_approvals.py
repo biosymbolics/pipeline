@@ -35,18 +35,18 @@ def copy_all_approvals():
     """
     # 4722;
     PATENT_FIELDS = [
-        "max(prod.ndc_product_code) as ndc_code",
-        "max(prod.product_name) as brand_name",
+        "MAX(prod.ndc_product_code) as ndc_code",
+        "MAX(prod.product_name) as brand_name",
         "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",  # or product.generic_name
         "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
-        # "max(prod_approval.applicant) as applicant",
-        "max(prod.marketing_status) as application_type",
+        # "MAX(prod_approval.applicant) as applicant",
+        "MAX(prod.marketing_status) as application_type",
         "ARRAY_AGG(distinct prod.marketing_status) as application_types",
-        "ARRAY_AGG(distinct approval.approval) as approval_dates",
+        "array_remove(ARRAY_AGG(distinct approval.approval), NULL) as approval_dates",
         "ARRAY_AGG(distinct approval.type) as regulatory_agencies",
         "ARRAY_AGG(distinct label_section.text) as indications",
         "MAX(distinct pharma_class.name) as pharmacologic_class",
-        "max(label.pdf_url) as label_url",
+        "MAX(label.pdf_url) as label_url",
     ]
     source_sql = f"""
         select {", ".join(PATENT_FIELDS)}

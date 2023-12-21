@@ -125,3 +125,7 @@ class Entity(Dataclass):
     @property
     def owner_count(self) -> int:
         return len(self.owners)
+
+    # TODO - average dropout rate
+    # TODO - average trial duration
+    # TODO - chart with more info
