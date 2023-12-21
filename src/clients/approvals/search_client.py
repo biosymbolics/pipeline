@@ -7,7 +7,7 @@ import time
 from typing import Sequence
 from pydash import omit
 
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import REGULATORY_APPROVAL_TABLE
 from typings.approvals import RegulatoryApproval
@@ -22,15 +22,16 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 
 FIELDS = [
-    "applicant",
+    # "applicant",
     "application_types",
     "approval_dates",
-    "application_number",
+    # "application_number",
     "brand_name",
     "generic_name",
     # "indications", # verbose label junk. needs NER.
     "label_url",
-    "routes",
+    "pharmacologic_class",
+    "ndc_code",
 ]
 
 
@@ -78,10 +79,22 @@ def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
         "terms": p.terms,
         "query_type": p.query_type,
     }
-    key = get_id(args)
+    key = get_id(
+        {
+            **args,
+            "api": "approvals",
+        }
+    )
     search_partial = partial(_search, **args)
 
-    if p.skip_cache == False:
+    if p.skip_cache == True:
         return search_partial(limit=p.limit)
 
-    return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)
+    return retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        limit=p.limit,
+        decode=lambda str_data: [
+            RegulatoryApproval(**a) for a in storage_decoder(str_data)
+        ],
+    )

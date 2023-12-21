@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from datetime import date
-from pydash import compact, flatten
+from pydash import compact, flatten, uniq
 
 from typings.approvals import RegulatoryApproval
 
 from .core import Dataclass
-from .patents import MAX_PATENT_LIFE, Patent
+from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
 from .trials import Trial, TrialPhase, TrialStatus
 
 
@@ -33,10 +33,10 @@ class Entity(Dataclass):
 
     @property
     def approval_count(self) -> int:
-        return len(self.approvals)
+        return sum(a.count for a in self.approvals)
 
     @property
-    def is_approved(self) -> int:
+    def is_approved(self) -> bool:
         return self.approval_count > 0
 
     @property
@@ -87,6 +87,8 @@ class Entity(Dataclass):
 
     @property
     def max_phase(self) -> TrialPhase | str:
+        if self.approval_count > 0:
+            return TrialPhase.APPROVED
         if not self.most_recent_trial:
             return "??"
         return TrialPhase(self.most_recent_trial.phase)
@@ -98,3 +100,28 @@ class Entity(Dataclass):
     @property
     def record_count(self) -> int:
         return self.trial_count + self.patent_count
+
+    @property
+    def maybe_available_count(self) -> int:
+        return [
+            # TODO: why isn't p.availability_likelihood the enum?
+            p.availability_likelihood
+            in [
+                AvailabilityLikelihood.POSSIBLE,
+                AvailabilityLikelihood.LIKELY,
+                "POSSIBLE",
+                "LIKELY",
+            ]
+            for p in self.patents
+        ].count(True)
+
+    @property
+    def owners(self) -> list[str]:
+        return uniq(
+            flatten([p.assignees for p in self.patents])
+            + [t.normalized_sponsor for t in self.trials]
+        )
+
+    @property
+    def owner_count(self) -> int:
+        return len(self.owners)

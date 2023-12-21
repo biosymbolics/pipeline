@@ -5,17 +5,15 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from clients.companies.companies import get_company_map
 
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.companies.companies import get_company_map
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
     AGGREGATED_ANNOTATIONS_TABLE,
     ANNOTATIONS_TABLE,
     APPLICATIONS_TABLE,
-    PATENT_TO_REGULATORY_APPROVAL_TABLE,
     PUBLICATION_NUMBER_MAP_TABLE,
-    REGULATORY_APPROVAL_TABLE,
     PATENT_TO_TRIAL_TABLE,
     TRIALS_TABLE,
 )
@@ -59,11 +57,6 @@ SEARCH_RETURN_FIELDS = {
     "url": "url",
 }
 
-APPROVED_SEARCH_RETURN_FIELDS = {
-    "max(indications)": "approval_indications",
-    "max(brand_name)": "brand_name",
-    "max(generic_name)": "generic_name",
-}
 
 TRIAL_RETURN_FIELDS = {
     "array_agg(distinct trials.nct_id)": "nct_ids",
@@ -74,13 +67,7 @@ TRIAL_RETURN_FIELDS = {
 }
 
 FIELDS: list[str] = [
-    *[
-        f"{field} as {new_field}"
-        for field, new_field in {
-            **SEARCH_RETURN_FIELDS,
-            **APPROVED_SEARCH_RETURN_FIELDS,
-        }.items()
-    ],
+    *[f"{field} as {new_field}" for field, new_field in SEARCH_RETURN_FIELDS.items()],
     *[f"{field} as {new_field}" for field, new_field in TRIAL_RETURN_FIELDS.items()],
 ]
 
@@ -183,19 +170,11 @@ def _search(
 
     query = f"""
         SELECT {", ".join(qp["fields"])},
-        max(agg_annotations.{term_field}) as terms,
-        (CASE
-            WHEN max(approval_dates) IS NOT NULL AND ARRAY_LENGTH(max(approval_dates), 1) > 0
-            THEN (max(approval_dates))[1]
-            ELSE NULL END
-        ) as approval_date,
-        (CASE WHEN max(approval_dates) IS NOT NULL THEN True ELSE False END) as is_approved
+        max(agg_annotations.{term_field}) as terms
         FROM {APPLICATIONS_TABLE} AS apps
         JOIN {AGGREGATED_ANNOTATIONS_TABLE} as agg_annotations ON (agg_annotations.publication_number = apps.publication_number)
         JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
         JOIN {PUBLICATION_NUMBER_MAP_TABLE} as pub_map ON pub_map.publication_number = apps.publication_number
-        LEFT JOIN {PATENT_TO_REGULATORY_APPROVAL_TABLE} p2a ON p2a.publication_number = pub_map.other_publication_number
-        LEFT JOIN {REGULATORY_APPROVAL_TABLE} approvals ON approvals.application_number = p2a.regulatory_application_number
         LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
         LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
         {qp["cosine_source"]}
@@ -253,10 +232,22 @@ def search(p: PatentSearchParams) -> list[PatentApplication]:
         "min_patent_years": p.min_patent_years,
         "term_field": p.term_field,
     }
-    key = get_id(args)
+    key = get_id(
+        {
+            **args,
+            "api": "patents",
+        }
+    )
     search_partial = partial(_search, **args)
 
-    if p.skip_cache == False:
+    if p.skip_cache == True:
         return search_partial(limit=p.limit)
 
-    return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)
+    return retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        limit=p.limit,
+        decode=lambda str_data: [
+            PatentApplication(**p) for p in storage_decoder(str_data)
+        ],
+    )

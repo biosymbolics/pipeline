@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.ctgov.utils import extract_timeframe
+from scripts.trials.utils import extract_timeframe
 
 
 class TestTrialUtils(unittest.TestCase):

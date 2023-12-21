@@ -8,8 +8,8 @@ import boto3
 from botocore.exceptions import ClientError
 import logging
 
-from utils.date import date_deserialier
-from utils.encoding.json_encoder import DataclassJSONEncoder
+from utils.date import date_deserializer
+from utils.encoding.json_encoder import StorageDataclassJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -86,12 +86,17 @@ def get_cache_with_all_check(
         return s3.get_object(Bucket=cache_name, Key=limit_cache_key)
 
 
+def storage_decoder(obj: Any) -> Any:
+    return json.loads(obj, object_hook=date_deserializer)
+
+
 def retrieve_with_cache_check(
     operation: Callable[[int], T] | Callable[[], T],
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
-    encode: Callable[[T], str | bytes] = DataclassJSONEncoder().encode,
+    encode: Callable[[T], str | bytes] = StorageDataclassJSONEncoder().encode,
+    decode: Callable[[str | bytes], T] = storage_decoder,
 ) -> T:
     """
     Retrieve data from S3 cache if it exists, otherwise perform the operation and save the result to S3.
@@ -114,12 +119,10 @@ def retrieve_with_cache_check(
         else:
             response = s3.get_object(Bucket=cache_name, Key=get_cache_key(key))
 
-        data = json.loads(
-            response["Body"].read().decode("utf-8"), object_hook=date_deserialier
-        )
+        data = decode(response["Body"].read().decode("utf-8"))
 
         if limit is not None and len(data) > limit:
-            return cast(T, data[0:limit])
+            return data[0:limit]  # type: ignore
         return data
     except ClientError as ex:
         if not ex.response["Error"]["Code"] == "NoSuchKey":

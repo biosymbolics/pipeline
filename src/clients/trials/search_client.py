@@ -7,7 +7,7 @@ import time
 from typing import Sequence
 from pydash import omit
 
-from clients.low_level.boto3 import retrieve_with_cache_check
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TRIALS_TABLE
 from typings.trials import ScoredTrialSummary
@@ -76,10 +76,22 @@ def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
         "terms": p.terms,
         "query_type": p.query_type,
     }
-    key = get_id(args)
+    key = get_id(
+        {
+            **args,
+            "api": "trials",
+        }
+    )
     search_partial = partial(_search, **args)
 
-    if p.skip_cache == False:
+    if p.skip_cache == True:
         return search_partial(limit=p.limit)
 
-    return retrieve_with_cache_check(search_partial, key=key, limit=p.limit)
+    return retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        limit=p.limit,
+        decode=lambda str_data: [
+            ScoredTrialSummary(**t) for t in storage_decoder(str_data)
+        ],
+    )
