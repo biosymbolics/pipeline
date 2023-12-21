@@ -21,10 +21,20 @@ class Entity(Dataclass):
     def activity(self) -> list[int]:
         """
         Simple line chart of activity over time
+
+        - patent filing priority dates
+        - trial operational dates (start through end)
+        - approval dates
         """
         dates = (
             [p.priority_date.year for p in self.patents]
-            + [t.last_updated_date.year for t in self.trials]
+            + flatten(
+                [
+                    list(range(t.start_date.year, t.end_date.year))
+                    for t in self.trials
+                    if t.end_date is not None and t.start_date is not None
+                ]
+            )
             + flatten([[ad.year for ad in a.approval_dates] for a in self.approvals])
         )
         return [
@@ -35,6 +45,10 @@ class Entity(Dataclass):
     @property
     def approval_count(self) -> int:
         return sum(a.count for a in self.approvals)
+
+    @property
+    def total_enrollment(self) -> int:
+        return sum([t.enrollment for t in self.trials if t.enrollment is not None]) or 0
 
     @property
     def is_approved(self) -> bool:
