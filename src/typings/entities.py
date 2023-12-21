@@ -35,7 +35,7 @@ class Entity(Dataclass):
                     if t.end_date is not None and t.start_date is not None
                 ]
             )
-            + flatten([[ad.year for ad in a.approval_dates] for a in self.approvals])
+            + [a.approval_date for a in self.approvals]
         )
         return [
             dates.count(y)

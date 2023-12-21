@@ -1,20 +1,23 @@
 """
 Utils for copying approvals data
 """
-import json
+import re
 import sys
 
-from pydash import compact
+from pydash import compact, uniq
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from constants.core import (
     REGULATORY_APPROVAL_TABLE,
     PATENT_TO_REGULATORY_APPROVAL_TABLE,
 )
+from utils.re import get_or_re
+
 
 SOURCE_DB = "drugcentral"
 DEST_DB = "patents"
@@ -24,7 +27,7 @@ SEARCH_FIELDS = {
     "brand_name": "coalesce(brand_name, '')",
     "generic_name": "coalesce(generic_name, '')",
     "indications": "ARRAY_TO_STRING(indications, '|| " " ||')",
-    "pharmacologic_class": "coalesce(pharmacologic_class, '')",
+    "pharmacologic_classes": "ARRAY_TO_STRING(pharmacologic_classes, '|| " " ||')",
 }
 
 
@@ -34,11 +37,24 @@ def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str 
     """
 
     def get_priority(pc: dict) -> int:
-        if pc["type"] == "EPC":
-            return 2
-        elif pc["type"] == "MESH":
-            return 1
-        return 0
+        score = 0
+        if (
+            re.match(
+                f".*{get_or_re(list(PRIMARY_MECHANISM_BASE_TERMS.values()))}.*",
+                pc["name"],
+                flags=re.IGNORECASE,
+            )
+            is not None
+        ):
+            score += 10
+        if pc["source"] == "MoA":
+            score += 3
+        elif pc["source"] == "EPC":
+            score += 2
+        elif pc["source"] == "MESH":
+            score += 1
+
+        return score
 
     if len(pharmacologic_classes) == 0:
         return None
@@ -53,15 +69,14 @@ def copy_all_approvals():
     """
     PATENT_FIELDS = [
         "MAX(prod.ndc_product_code) as ndc_code",
-        "MAX(prod.product_name) as brand_name",
+        "prod.product_name as brand_name",
         "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",  # or product.generic_name
         "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
         # "MAX(prod_approval.applicant) as applicant",
         "MAX(prod.marketing_status) as application_type",
-        "ARRAY_AGG(distinct prod.marketing_status) as application_types",
-        "array_remove(ARRAY_AGG(distinct approval.approval), NULL) as approval_dates",
-        "ARRAY_AGG(distinct approval.type) as regulatory_agencies",
-        "ARRAY_AGG(distinct label_section.text) as indications",
+        "MAX(approval.approval) as approval_date",
+        "MAX(approval.type) as regulatory_agency",
+        "array_remove(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
         "JSON_AGG(pharma_class.*) as pharmacologic_classes",
         "MAX(label.pdf_url) as label_url",
     ]
@@ -76,6 +91,7 @@ def copy_all_approvals():
         section label_section,
         structures struct
         LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
+        LEFT JOIN omop_relationship metadata on metadata.struct_id = struct.id and metadata.relationship_name = 'indication'
         where approval.struct_id = struct.id -- TODO: combo drugs??
         AND active_ingredient.struct_id = struct.id
         AND active_ingredient.ndc_product_code = prod.ndc_product_code
@@ -83,7 +99,7 @@ def copy_all_approvals():
         AND p2l.label_id = label.id
         AND label_section.label_id = p2l.label_id
         AND label_section.title = 'INDICATIONS & USAGE SECTION'
-        group by prod.product_name;
+        group by prod.product_name
     """
     PsqlDatabaseClient.copy_between_db(
         source_db=SOURCE_DB,
@@ -103,11 +119,13 @@ def copy_all_approvals():
                 "pharmacologic_class": get_preferred_pharmacologic_class(
                     compact(row["pharmacologic_classes"])
                 ),
-                "pharmacologic_classes": [
-                    pc["name"].lower()
-                    for pc in row["pharmacologic_classes"]
-                    if pc is not None
-                ],
+                "pharmacologic_classes": uniq(
+                    [
+                        pc["name"].lower()
+                        for pc in row["pharmacologic_classes"]
+                        if pc is not None
+                    ]
+                ),
             }
             for row in batch
         ],
@@ -137,31 +155,6 @@ def copy_all_approvals():
     )
 
 
-def copy_direct_patent_to_approval():
-    """
-    Copy data from Postgres (drugcentral) to Postgres (patents)
-    """
-    source_sql = f"""
-        select
-        concat('US-', patent_no) as publication_number,
-        prod_approval.appl_no as application_number
-        from
-        product prod,
-        ob_product prod_approval,
-        ob_patent_view patents
-        where prod_approval.trade_name = prod.product_name
-        AND lower(patents.trade_name) = lower(prod.product_name)
-        group by concat('US-', patent_no), prod_approval.appl_no
-    """
-    PsqlDatabaseClient.copy_between_db(
-        source_db=SOURCE_DB,
-        source_sql=source_sql,
-        dest_db=DEST_DB,
-        dest_table_name=PATENT_TO_REGULATORY_APPROVAL_TABLE,
-        truncate_if_exists=True,
-    )
-
-
 def copy_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
@@ -173,8 +166,11 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.approvals.copy_approvals
-            Copies approvals data to postgres
+        Usage: python3 -m scripts.approvals.copy_approvals
+        Copies approvals data to postgres
+
+        update trials set pharmacologic_class=a.pharmacologic_class from regulatory_approvals a where lower(a.generic_name)=lower(trials.intervention);
+        update annotations set instance_rollup=a.pharmacologic_class from regulatory_approvals a where lower(term)=lower(a.generic_name);
         """
         )
         sys.exit()

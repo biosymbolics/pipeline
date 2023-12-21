@@ -23,14 +23,15 @@ MAX_SEARCH_RESULTS = 2000
 
 FIELDS = [
     # "applicant",
-    "application_types",
-    "approval_dates",
+    "application_type",
+    "approval_date",
     # "application_number",
     "brand_name",
     "generic_name",
-    # "indications", # verbose label junk. needs NER.
+    "indications",
     "label_url",
     "pharmacologic_class",
+    "pharmacologic_classes",
     "ndc_code",
 ]
 
@@ -56,6 +57,7 @@ def _search(
         ts_rank_cd(text_search, to_tsquery(%s)) AS score
         FROM {REGULATORY_APPROVAL_TABLE} as approvals
         WHERE text_search @@ to_tsquery(%s)
+        AND lower(application_type) not in  ('otc monograph not final', 'otc monograph final')
         ORDER BY score DESC
         LIMIT {limit}
     """

@@ -40,7 +40,6 @@ PRIMARY_MECHANISM_BASE_TERMS: dict[str, str] = {
     "suppress(?:or|ion|ing|ant|ed)?": "suppressor",
     "stimulat(?:or|ion|ing|ant|ed?)": "stimulator",
     "sensiti[sz](?:ation|ing|ed?|er)": "sensitizer",
-    "strip(?:per|ping|ped|ping)": "stripper",
     "stabili[sz](?:er|ing|ed?|ation)": "stabilizer",
     "thicken(?:er|ing|ed)": "thickener",
     "transport(?:er|ing|ation|ed)?": "transporter",
