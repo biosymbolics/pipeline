@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 from pydash import compact, flatten, uniq
 
 from typings.approvals import RegulatoryApproval
@@ -125,6 +126,18 @@ class Entity(Dataclass):
     @property
     def owner_count(self) -> int:
         return len(self.owners)
+
+    def serialize(self) -> dict[str, Any]:
+        """
+        Custom serialization for entity
+        TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
+        """
+        trials = [t.serialize() for t in self.trials]
+        patents = [p.serialize() for p in self.patents]
+        approvals = [a.serialize() for a in self.approvals]
+
+        o = super().serialize()
+        return {**o, "approvals": approvals, "patents": patents, "trials": trials}
 
     # TODO - average dropout rate
     # TODO - average trial duration

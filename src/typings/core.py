@@ -49,7 +49,7 @@ class Dataclass:
         """
         properties = {
             key: getattr(self, key)
-            for key, value in self.__class__.__dict__.items()
+            for key, value in inspect.getmembers(self.__class__)
             if isinstance(value, property)
         }
 

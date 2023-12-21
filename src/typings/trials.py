@@ -672,7 +672,8 @@ class ScoredTrialSummary(TrialSummary):
     @property
     def condition(self) -> str | None:
         if len(self.mesh_conditions or []) == 0:
-            return None
+            if len(self.conditions or []) > 0:
+                return self.conditions[0]
         return self.mesh_conditions[0]
 
     @property
