@@ -1,7 +1,10 @@
 """
 Utils for copying approvals data
 """
+import json
 import sys
+
+from pydash import compact
 
 from system import initialize
 
@@ -25,15 +28,29 @@ SEARCH_FIELDS = {
 }
 
 
+def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str | None:
+    """
+    Temporary/hack solution for getting the preferred pharmacologic class
+    """
+
+    def get_priority(pc: dict) -> int:
+        if pc["type"] == "EPC":
+            return 2
+        elif pc["type"] == "MESH":
+            return 1
+        return 0
+
+    if len(pharmacologic_classes) == 0:
+        return None
+
+    prioritized = sorted(pharmacologic_classes, key=get_priority, reverse=True)
+    return prioritized[0]["name"].lower()
+
+
 def copy_all_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
-
-    NOTE: drugcentral is a bit if a sh*tshow. there is lots of partly duplicated data
-    and it doesn't really add up, e.g. why are there 1136 distinct applicants in `approval`
-    and 1772 in `ob_product`?
     """
-    # 4722;
     PATENT_FIELDS = [
         "MAX(prod.ndc_product_code) as ndc_code",
         "MAX(prod.product_name) as brand_name",
@@ -45,7 +62,7 @@ def copy_all_approvals():
         "array_remove(ARRAY_AGG(distinct approval.approval), NULL) as approval_dates",
         "ARRAY_AGG(distinct approval.type) as regulatory_agencies",
         "ARRAY_AGG(distinct label_section.text) as indications",
-        "MAX(distinct pharma_class.name) as pharmacologic_class",
+        "JSON_AGG(pharma_class.*) as pharmacologic_classes",
         "MAX(label.pdf_url) as label_url",
     ]
     source_sql = f"""
@@ -58,7 +75,7 @@ def copy_all_approvals():
         label,
         section label_section,
         structures struct
-        LEFT JOIN pharma_class on pharma_class.struct_id = struct.id AND type='EPC' -- todo: grab all, sort later.
+        LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
         where approval.struct_id = struct.id -- TODO: combo drugs??
         AND active_ingredient.struct_id = struct.id
         AND active_ingredient.ndc_product_code = prod.ndc_product_code
@@ -74,7 +91,26 @@ def copy_all_approvals():
         dest_db=DEST_DB,
         dest_table_name=REGULATORY_APPROVAL_TABLE,
         truncate_if_exists=True,
-        transform_schema=lambda schema: {**schema, "text_search": "tsvector"},
+        transform_schema=lambda schema: {
+            **schema,
+            "pharmacologic_classes": "text[]",
+            "pharmacologic_class": "text",
+            "text_search": "tsvector",
+        },
+        transform=lambda batch, _: [
+            {
+                **row,
+                "pharmacologic_class": get_preferred_pharmacologic_class(
+                    compact(row["pharmacologic_classes"])
+                ),
+                "pharmacologic_classes": [
+                    pc["name"].lower()
+                    for pc in row["pharmacologic_classes"]
+                    if pc is not None
+                ],
+            }
+            for row in batch
+        ],
     )
     client = PsqlDatabaseClient()
     vector_sql = ("|| ' ' ||").join(SEARCH_FIELDS.values())
