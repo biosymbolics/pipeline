@@ -30,9 +30,10 @@ FIELDS = [
     "generic_name",
     "indications",
     "label_url",
+    "ndc_code",
     "pharmacologic_class",
     "pharmacologic_classes",
-    "ndc_code",
+    "regulatory_agency",
 ]
 
 
@@ -57,7 +58,7 @@ def _search(
         ts_rank_cd(text_search, to_tsquery(%s)) AS score
         FROM {REGULATORY_APPROVAL_TABLE} as approvals
         WHERE text_search @@ to_tsquery(%s)
-        AND lower(application_type) not in  ('otc monograph not final', 'otc monograph final')
+        AND lower(application_type) not in  ('otc monograph not final', 'otc monograph final', 'unapproved drug other')
         ORDER BY score DESC
         LIMIT {limit}
     """
