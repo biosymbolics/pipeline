@@ -202,17 +202,31 @@ def graph_patent_relationships(
         ],
         nodes=[
             Node(
-                id="Root",
-                label="Root",
+                id="root",
+                label="root",
                 parent="",
                 size=1,
-                group=ENTITY_GROUP,
+                group="",
+            ),
+            Node(
+                id="entity",
+                label="entity",
+                parent="root",
+                size=1,
+                group="root",
+            ),
+            Node(
+                id="patent",
+                label="patent",
+                parent="root",
+                size=1,
+                group="root",
             ),
             *[
                 Node(
                     id=n["id"],
                     label=n["id"],
-                    parent="Root",
+                    parent=n["group"],
                     size=n["size"],
                     group=n["group"],
                 )
