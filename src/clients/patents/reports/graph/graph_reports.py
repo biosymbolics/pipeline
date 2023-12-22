@@ -9,7 +9,7 @@ from pydash import uniq
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
-from constants.core import ANNOTATIONS_TABLE, TERM_IDS_TABLE
+from constants.core import ANNOTATIONS_TABLE, APPLICATIONS_TABLE, TERM_IDS_TABLE
 from typings.patents import PatentApplication
 
 from .types import Node, Link, SerializableGraph
@@ -17,7 +17,7 @@ from .types import Node, Link, SerializableGraph
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_NODES = 5000000
+MAX_NODES = 100
 MIN_NODE_DEGREE = 2
 
 RELATIONSHIPS_OF_INTEREST = [
@@ -57,7 +57,7 @@ RELATIONSHIPS_OF_INTEREST = [
     "negatively_regulated_by",
     "pathogenesis_of_disease_involves_gene",
     "pathway_has_gene_element",
-    "phenotype_of",
+    # "phenotype_of",
     # "physiologic_effect_of",
     "positively_regulates",
     "positively_regulated_by",
@@ -139,56 +139,24 @@ def graph_patent_relationships(
     sql = f"""
         -- patent-node to entity relationships
         SELECT
-            publication_number as head,
+            TO_CHAR(app.priority_date, 'YYYY') as head,
             umls.canonical_name as tail,
             count(*) as weight,
             '{PATENT_GROUP}' as group
-        FROM {ANNOTATIONS_TABLE} a, {TERM_IDS_TABLE} t, umls_lookup umls
+        FROM
+            {ANNOTATIONS_TABLE} a,
+            {APPLICATIONS_TABLE} app,
+            {TERM_IDS_TABLE} t,
+            umls_lookup umls
         WHERE a.publication_number = ANY(ARRAY{patent_ids})
+        AND app.publication_number = a.publication_number
         AND a.domain in {tuple(ENTITY_DOMAINS)}
         AND t.id = a.id
         AND umls.id = t.cid
-        GROUP BY publication_number, umls.canonical_name
-
-        UNION ALL
-
-        -- entity to entity relationships
-        SELECT
-            head_name as head,
-            tail_name as tail,
-            count(*) as weight,
-            '{ENTITY_GROUP}' as group
-        FROM {ANNOTATIONS_TABLE} a, {TERM_IDS_TABLE} t, umls_graph g
-        WHERE a.publication_number = ANY(ARRAY{patent_ids})
-        AND a.domain in {tuple(ENTITY_DOMAINS)}
-        AND t.id = a.id
-        AND g.head_id = t.cid
-        AND head_id<>tail_id
-        AND g.relationship in {tuple(RELATIONSHIPS_OF_INTEREST)}
-        GROUP BY head_name, tail_name -- g.relationship
+        GROUP BY TO_CHAR(app.priority_date, 'YYYY'), umls.canonical_name
+        ORDER BY weight DESC LIMIT 1000
     """
 
-    # UNION ALL
-    # """
-    # -- ancestor relationships (but only category_rollup for now)
-    # SELECT
-    #     head_umls.canonical_name as head,
-    #     tail_umls.canonical_name as tail,
-    #     count(*) as weight,
-    #     array_agg(publication_number) as patent_ids
-    # FROM
-    # {ANNOTATIONS_TABLE} a,
-    # {TERM_IDS_TABLE} t,
-    # umls_lookup head_umls,
-    # umls_lookup tail_umls
-    # WHERE a.publication_number = ANY(ARRAY{patent_ids})
-    # AND a.domain in {tuple(ENTITY_DOMAINS)}
-    # AND t.id = a.id
-    # AND head_umls.id = t.cid
-    # AND head_umls.category_rollup <> t.cid -- no self-loops
-    # AND tail_umls.id = head_umls.category_rollup
-    # GROUP BY head, tail
-    # """
     relationships = PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
@@ -198,7 +166,7 @@ def graph_patent_relationships(
     return SerializableGraph(
         edges=[
             Link(source=l["source"], target=l["target"], weight=l["weight"])
-            for l in link_data["links"]
+            for l in sorted(link_data["links"], key=lambda x: x["weight"], reverse=True)
         ],
         nodes=[
             Node(
@@ -222,15 +190,19 @@ def graph_patent_relationships(
                 size=1,
                 group="root",
             ),
-            *[
-                Node(
-                    id=n["id"],
-                    label=n["id"],
-                    parent=n["group"],
-                    size=n["size"],
-                    group=n["group"],
-                )
-                for n in link_data["nodes"]
-            ],
+            *sorted(
+                [
+                    Node(
+                        id=n["id"],
+                        label=n["id"],
+                        parent=n["group"],
+                        size=n["size"],
+                        group=n["group"],
+                    )
+                    for n in link_data["nodes"]
+                ],
+                key=lambda x: x.size,
+                reverse=True,
+            ),
         ],
     )
