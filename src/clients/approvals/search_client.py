@@ -59,6 +59,7 @@ def _search(
         FROM {REGULATORY_APPROVAL_TABLE} as approvals
         WHERE text_search @@ to_tsquery(%s)
         AND lower(application_type) not in  ('otc monograph not final', 'otc monograph final', 'unapproved drug other')
+        AND approval_date is not null
         ORDER BY score DESC
         LIMIT {limit}
     """

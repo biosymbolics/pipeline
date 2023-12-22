@@ -30,5 +30,6 @@ class RegulatoryApproval(Dataclass):
     label_url: str
     pharmacologic_class: str | None
     pharmacologic_classes: list[str]
+    regulatory_agency: str | None
     # routes: list[str]
     score: float = 0.0
