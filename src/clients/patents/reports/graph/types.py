@@ -10,17 +10,11 @@ class Link:
 
 
 @dataclass(frozen=True)
-class NodePosition:
-    x: float
-    y: float
-
-
-@dataclass(frozen=True)
 class Node:
     id: str
     group: str
+    parent: str | None
     label: str
-    position: NodePosition
     size: int
 
 

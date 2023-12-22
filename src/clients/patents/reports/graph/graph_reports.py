@@ -2,7 +2,6 @@
 Patent graph reports
 """
 
-import math
 from typing import Sequence
 import logging
 import networkx as nx
@@ -13,13 +12,13 @@ from clients.patents.constants import ENTITY_DOMAINS
 from constants.core import ANNOTATIONS_TABLE, TERM_IDS_TABLE
 from typings.patents import PatentApplication
 
-from .types import Node, NodePosition, Link, SerializableGraph
+from .types import Node, Link, SerializableGraph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_NODES = 50
-MIN_NODE_DEGREE = 5
+MAX_NODES = 5000000
+MIN_NODE_DEGREE = 2
 
 RELATIONSHIPS_OF_INTEREST = [
     "allelic_variant_of",
@@ -48,10 +47,10 @@ RELATIONSHIPS_OF_INTEREST = [
     # "is_mechanism_of_action_of_chemical_or_drug",
     # "is_physiologic_effect_of_chemical_or_drug",
     "is_target",
-    "is_target_of",
-    "may_treat",
+    # "is_target_of",
+    # "may_treat",
     # "may_be_treated_by",
-    "manifestation_of",
+    # "manifestation_of",
     # "mechanism_of_action_of",
     "molecular_abnormality_involves_gene",
     "negatively_regulates",
@@ -166,8 +165,10 @@ def graph_patent_relationships(
         AND g.head_id = t.cid
         AND head_id<>tail_id
         AND g.relationship in {tuple(RELATIONSHIPS_OF_INTEREST)}
-        GROUP BY head_name, tail_name, g.relationship
+        GROUP BY head_name, tail_name -- g.relationship
     """
+
+    # UNION ALL
     # """
     # -- ancestor relationships (but only category_rollup for now)
     # SELECT
@@ -191,10 +192,6 @@ def graph_patent_relationships(
     relationships = PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
-    # layout = nx.circular_layout(g)
-    # layout = nx.kamada_kawai_layout(g)
-    layout = nx.kamada_kawai_layout(g)
-
     # create serialized link data
     link_data = nx.node_link_data(g)
 
@@ -205,15 +202,21 @@ def graph_patent_relationships(
         ],
         nodes=[
             Node(
-                id=n["id"],
-                label=n["id"],
-                size=n["size"],
-                group=n["group"],
-                position=NodePosition(
-                    x=layout[n["id"]][0],
-                    y=layout[n["id"]][1],
-                ),
-            )
-            for n in link_data["nodes"]
+                id="Root",
+                label="Root",
+                parent="",
+                size=1,
+                group=ENTITY_GROUP,
+            ),
+            *[
+                Node(
+                    id=n["id"],
+                    label=n["id"],
+                    parent="Root",
+                    size=n["size"],
+                    group=n["group"],
+                )
+                for n in link_data["nodes"]
+            ],
         ],
     )

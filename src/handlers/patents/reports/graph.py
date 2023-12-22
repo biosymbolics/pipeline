@@ -3,7 +3,6 @@ Handler for patent graph reports
 """
 import json
 import logging
-from pydantic import BaseModel
 
 from clients import patents as patent_client
 from clients.patents.reports.graph import graph_patent_relationships
