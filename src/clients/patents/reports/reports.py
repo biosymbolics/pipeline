@@ -51,9 +51,9 @@ def group_by_xy(
     """
 
     def _aggregate(
-        df: pl.DataFrame, x_dim: str, y_dim: str, LIMIT: int = 100
+        df: pl.DataFrame, x_dim: str, y_dim: str | None, LIMIT: int = 100
     ) -> list[PatentsReportRecord]:
-        if len(y_dim) > 0:
+        if y_dim is not None:
             # explode y_dim if list
             if df.select(pl.col(y_dim)).dtypes == pl.List:
                 df = df.explode(y_dim)
@@ -82,7 +82,7 @@ def group_by_xy(
             return []
 
         grouped = (
-            col_df.groupby(["x", "y"] if len(y_dim) > 0 else ["x"])
+            col_df.groupby(["x", "y"] if y_dim is not None else ["x"])
             .agg(pl.count())
             .sort("count")
             .reverse()
@@ -94,7 +94,7 @@ def group_by_xy(
     summaries = [
         {"x": x_dim, "y": y_dim, "data": _aggregate(patent_df, x_dim, y_dim)}
         for x_dim in x_dimensions
-        for y_dim in (y_dimensions or [""])
+        for y_dim in (y_dimensions or [])
     ]
 
     return cast(list[PatentsReport], summaries)

@@ -365,17 +365,6 @@ def main(bootstrap: bool = False):
     # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
     # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where instance_rollup ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
 
-    # UPDATE trials
-    # SET interventions = sub.new_interventions
-    # FROM (
-    #   SELECT nct_id, array_agg(i), array_agg(
-    #       regexp_replace(i, '\y[0-9]{1,}\.?[0-9]*[ ]?(?:mg|mcg|ug|µg|ml|gm?)(?:[ /](?:kgs?|lbs?|m2|m^2|day|mg))*\y', '', 'ig')
-    #   ) AS new_interventions
-    #   FROM trials, unnest(interventions) i
-    #   group by nct_id
-    # ) sub
-    # where sub.nct_id=trials.nct_id
-
     # select t.term, ul.type_names, array_agg(distinct domain), array_agg(distinct original_term), count(*) from biosym_annotations, terms t, umls_lookup ul
     #     where ul.id=t.id
     #     and domain<>'mechanisms'

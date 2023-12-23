@@ -12,10 +12,7 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
-from constants.core import (
-    REGULATORY_APPROVAL_TABLE,
-    PATENT_TO_REGULATORY_APPROVAL_TABLE,
-)
+from constants.core import REGULATORY_APPROVAL_TABLE
 from utils.re import get_or_re
 
 
@@ -47,11 +44,11 @@ def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str 
             is not None
         ):
             score += 10
-        if pc["source"] == "MoA":
+        if pc["type"] == "MoA":
             score += 3
-        elif pc["source"] == "EPC":
+        elif pc["type"] == "EPC":
             score += 2
-        elif pc["source"] == "MESH":
+        elif pc["type"] == "MESH":
             score += 1
 
         return score
@@ -60,6 +57,8 @@ def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str 
         return None
 
     prioritized = sorted(pharmacologic_classes, key=get_priority, reverse=True)
+
+    print("HIHI", prioritized)
     return prioritized[0]["name"].lower()
 
 
@@ -117,7 +116,7 @@ def copy_all_approvals():
             {
                 **row,
                 "pharmacologic_class": get_preferred_pharmacologic_class(
-                    compact(row["pharmacologic_classes"])
+                    compact(uniq(row["pharmacologic_classes"]))
                 ),
                 "pharmacologic_classes": uniq(
                     [

@@ -1,13 +1,15 @@
 from dataclasses import dataclass
 from datetime import date
+from functools import cached_property
+from itertools import groupby
 from typing import Any
-from pydash import compact, flatten, uniq
+from pydash import compact, flatten, group_by, uniq
 
 from typings.approvals import RegulatoryApproval
 
 from .core import Dataclass
 from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
-from .trials import Trial, TrialPhase, TrialStatus
+from .trials import Trial, TrialPhase, TrialStatus, TrialStatusGroup
 
 
 @dataclass(frozen=True)
@@ -44,11 +46,21 @@ class Entity(Dataclass):
 
     @property
     def approval_count(self) -> int:
-        return sum(a.count for a in self.approvals)
+        return len(self.approvals)
 
     @property
     def total_enrollment(self) -> int:
         return sum([t.enrollment for t in self.trials if t.enrollment is not None]) or 0
+
+    @property
+    def investment_level(self) -> str:
+        if self.total_enrollment > 5000:
+            return "very high"
+        if self.total_enrollment > 1000:
+            return "high"
+        if self.total_enrollment > 500:
+            return "medium"
+        return "low"
 
     @property
     def is_approved(self) -> bool:
@@ -58,7 +70,7 @@ class Entity(Dataclass):
     def patent_count(self) -> int:
         return len(self.patents)
 
-    @property
+    @cached_property
     def most_recent_patent(self) -> Patent | None:
         if len(self.patents) == 0:
             return None
@@ -71,7 +83,7 @@ class Entity(Dataclass):
             return None
         return self.most_recent_patent.priority_date.year
 
-    @property
+    @cached_property
     def most_recent_trial(self) -> Trial | None:
         if len(self.trials) == 0:
             return None
@@ -105,7 +117,7 @@ class Entity(Dataclass):
         if self.approval_count > 0:
             return TrialPhase.APPROVED
         if not self.most_recent_trial:
-            return "??"
+            return TrialPhase.PRECLINICAL
         return TrialPhase(self.most_recent_trial.phase)
 
     @property
@@ -140,6 +152,13 @@ class Entity(Dataclass):
     @property
     def owner_count(self) -> int:
         return len(self.owners)
+
+    @property
+    def percent_stopped(self) -> float:
+        if self.trial_count == 0:
+            return 0.0
+        trial_statuses = [TrialStatus(t.status).parent for t in self.trials]
+        return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
 
     def serialize(self) -> dict[str, Any]:
         """

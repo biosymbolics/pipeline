@@ -341,6 +341,13 @@ SPONSOR_KEYWORD_MAP = create_lookup_map(
 )
 
 
+class TrialStatusGroup(ByDefinitionOrderEnum):
+    ONGOING = "ONGOING"
+    COMPLETED = "COMPLETED"
+    STOPPED = "STOPPED"
+    UNKNOWN = "UNKNOWN"
+
+
 class TrialStatus(ByDefinitionOrderEnum):
     PRE_ENROLLMENT = "PRE_ENROLLMENT"  # Active, not recruiting, Not yet recruiting
     ENROLLMENT = "ENROLLMENT"  # Recruiting, Enrolling by invitation
@@ -372,8 +379,19 @@ class TrialStatus(ByDefinitionOrderEnum):
             return status_term_map[value]
         return cls.UNKNOWN
 
+    @property
+    def parent(self) -> TrialStatusGroup | str:
+        if self in (self.PRE_ENROLLMENT, self.ENROLLMENT):
+            return TrialStatusGroup.ONGOING
+        if self in (self.WITHDRAWN, self.SUSPENDED, self.TERMINATED):
+            return TrialStatusGroup.STOPPED
+        if self == self.COMPLETED:
+            return TrialStatusGroup.COMPLETED
+        return TrialStatusGroup.UNKNOWN
+
 
 class TrialPhase(ByDefinitionOrderEnum):
+    PRECLINICAL = "PRECLINICAL"  # Early Phase 1
     EARLY_PHASE_1 = "EARLY_PHASE_1"  # Early Phase 1
     PHASE_1 = "PHASE_1"  # Phase 1
     PHASE_1_2 = "PHASE_1_2"  # Phase 1/Phase 2
