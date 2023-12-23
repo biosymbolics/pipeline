@@ -2,7 +2,6 @@
 Patent types
 """
 from dataclasses import dataclass
-from typing_extensions import NotRequired
 from typing import Any, Literal, TypeGuard, TypedDict, Union
 import typing
 
@@ -37,14 +36,19 @@ def is_term_results(obj: Any) -> TypeGuard[list[TermResult]]:
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
 
-PatentsReportRecord = TypedDict(
-    "PatentsReportRecord",
-    {"count": int, "x": str, "y": NotRequired[int | str]},
-)
-PatentsReport = TypedDict(
-    "PatentsReport",
-    {"x": str, "y": str | None, "data": list[PatentsReportRecord] | None},
-)
+
+@dataclass(frozen=True)
+class PatentsReportRecord(Dataclass):
+    count: int
+    x: str
+    y: int | str | None = None
+
+
+@dataclass(frozen=True)
+class PatentsReport(Dataclass):
+    x: str
+    y: str | None
+    data: list[PatentsReportRecord] | None
 
 
 def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThreshold]:
