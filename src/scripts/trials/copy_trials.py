@@ -46,7 +46,9 @@ SINGLE_FIELDS = {
     "drop_withdrawals.dropout_count": "dropout_count",
     "drop_withdrawals.reasons": "dropout_reasons",
     "outcome_analyses.non_inferiority_types": "hypothesis_types",
-    "mesh_interventions.mesh_term": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
+    # TODO this will break; just a placeholder.
+    # update trials set intervention=lower(interventions[0]) where array_length(interventions, 1) > 0 and intervention is null;
+    "COALESCE(mesh_interventions[0].mesh_term, interventions[0].name)": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
 }
 
 MULTI_FIELDS = {
@@ -66,6 +68,17 @@ MULI_FIELDS_SQL = [
 ]
 
 FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
+
+SEARCH_FIELDS = {
+    "title": "title",
+    "acronym": "coalesce(acronym, '')",
+    "conditions": "array_to_string(conditions, ' ')",
+    "interventions": "array_to_string(interventions, ' ')",
+    "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
+    "normalized_sponsor": "coalesce(normalized_sponsor, '')",
+    "sponsor": "coalesce(sponsor, '')",
+    "pharmacologic_class": "coalesce(pharmacologic_class, '')",
+}
 
 
 def is_control(intervention_str: str) -> bool:
@@ -213,17 +226,7 @@ def ingest_trials():
         """
     )
 
-    search_fields = {
-        "title": "title",
-        "acronym": "coalesce(acronym, '')",
-        "conditions": "array_to_string(conditions, ' ')",
-        "interventions": "array_to_string(interventions, ' ')",
-        "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
-        "normalized_sponsor": "coalesce(normalized_sponsor, '')",
-        "intervention": "coalesce(intervention, '')",
-        # "pharmacologic_class": "coalesce(pharmacologic_class, '')",
-    }
-    search_sql = ("|| ' ' ||").join([sql for sql in search_fields.values()])
+    search_sql = ("|| ' ' ||").join([sql for sql in SEARCH_FIELDS.values()])
     client.execute_query(
         f"update trials SET text_search = to_tsvector('english', {search_sql})"
     )
