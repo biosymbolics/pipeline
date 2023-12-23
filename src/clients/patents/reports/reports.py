@@ -88,13 +88,17 @@ def group_by_xy(
             .reverse()
             .limit(LIMIT)
         )
-        return cast(list[PatentsReportRecord], grouped.to_dicts())
+        return [PatentsReportRecord(**prr) for prr in grouped.to_dicts()]
 
-    patent_df = pl.DataFrame(patents, infer_schema_length=None)  # slow
+    patent_df = pl.from_dicts(
+        [p.asdict() for p in patents],
+        schema=[*x_dimensions, *(y_dimensions or [])],
+        infer_schema_length=None,
+    )
     summaries = [
-        {"x": x_dim, "y": y_dim, "data": _aggregate(patent_df, x_dim, y_dim)}
+        PatentsReport(x=x_dim, y=y_dim, data=_aggregate(patent_df, x_dim, y_dim))
         for x_dim in x_dimensions
-        for y_dim in (y_dimensions or [])
+        for y_dim in (y_dimensions or [None])  # type: ignore
     ]
 
-    return cast(list[PatentsReport], summaries)
+    return summaries

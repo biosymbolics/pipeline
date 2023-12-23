@@ -3,13 +3,13 @@ Handler for patent timewise reports
 """
 import json
 import logging
-from pydantic import BaseModel
 
 from clients import patents as patent_client
 from clients.patents.constants import DOMAINS_OF_INTEREST
 from clients.patents.reports import group_by_xy
 from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
 from typings.client import PatentSearchParams
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 
 logger = logging.getLogger(__name__)
@@ -52,4 +52,4 @@ def aggregate_over_time(raw_event: dict, context):
         logger.error(message)
         return {"statusCode": 500, "body": message}
 
-    return {"statusCode": 200, "body": json.dumps(summaries, default=str)}
+    return {"statusCode": 200, "body": json.dumps(summaries, cls=DataclassJSONEncoder)}
