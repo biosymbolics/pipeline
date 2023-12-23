@@ -5,7 +5,7 @@ import json
 import logging
 
 from clients import patents as patent_client
-from clients.patents.reports.graph import graph_patent_relationships
+from clients.patents.reports.graph import aggregate_patent_relationships
 from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
 from typings.client import PatentSearchParams
 
@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def graph_patent_characteristics(raw_event: dict, context):
+def patent_characteristics(raw_event: dict, context):
     """
     Return a graph of patent characteristics
 
     Invocation:
-    - Local: `serverless invoke local --function patents-graph --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
-    - Remote: `serverless invoke --function patents-graph --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - Local: `serverless invoke local --function patents-characteristics --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - Remote: `serverless invoke --function patents-characteristics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
     """
     p = PatentSearchParams(
@@ -37,10 +37,13 @@ def graph_patent_characteristics(raw_event: dict, context):
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
 
-        graph = graph_patent_relationships(patents)
+        report = aggregate_patent_relationships(patents)
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)
         return {"statusCode": 500, "body": message}
 
-    return {"statusCode": 200, "body": graph.to_json()}
+    return {
+        "statusCode": 200,
+        "body": json.dumps(report, default=str),
+    }

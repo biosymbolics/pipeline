@@ -2,10 +2,11 @@
 Patent graph reports
 """
 
-from typing import Sequence
+from typing import Literal, Sequence
 import logging
 import networkx as nx
 from pydash import uniq
+import polars as pl
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
@@ -19,12 +20,13 @@ logger.setLevel(logging.INFO)
 
 MAX_NODES = 100
 MIN_NODE_DEGREE = 2
+MAX_TAILS = 50
 
 RELATIONSHIPS_OF_INTEREST = [
     "allelic_variant_of",
     "biological_process_involves_gene_product",
-    # "chemical_or_drug_has_mechanism_of_action",
-    # "chemical_or_drug_has_physiologic_effect",
+    "chemical_or_drug_has_mechanism_of_action",
+    "chemical_or_drug_has_physiologic_effect",
     # "genetic_biomarker_related_to",
     "gene_involved_in_molecular_abnormality",
     "gene_plays_role_in_process",
@@ -37,12 +39,12 @@ RELATIONSHIPS_OF_INTEREST = [
     "gene_product_variant_of_gene_product",
     "gene_product_has_gene_product_variant",
     "has_allelic_variant",
-    "has_phenotype",
+    # "has_phenotype",
     # "has_manifestation",
     "has_gene_product_element",
-    # "has_therapeutic_class",
-    # "has_mechanism_of_action",
-    # "has_physiologic_effect",
+    "has_therapeutic_class",
+    "has_mechanism_of_action",
+    "has_physiologic_effect",
     "has_target",
     # "is_mechanism_of_action_of_chemical_or_drug",
     # "is_physiologic_effect_of_chemical_or_drug",
@@ -52,7 +54,7 @@ RELATIONSHIPS_OF_INTEREST = [
     # "may_be_treated_by",
     # "manifestation_of",
     # "mechanism_of_action_of",
-    "molecular_abnormality_involves_gene",
+    # "molecular_abnormality_involves_gene",
     "negatively_regulates",
     "negatively_regulated_by",
     "pathogenesis_of_disease_involves_gene",
@@ -62,10 +64,10 @@ RELATIONSHIPS_OF_INTEREST = [
     "positively_regulates",
     "positively_regulated_by",
     "process_involves_gene",
-    # "related_to_genetic_biomarker",
+    "related_to_genetic_biomarker",
     "regulated_by",
     "regulates",
-    # "therapeutic_class_of",
+    "therapeutic_class_of",
 ]
 
 ENTITY_GROUP = "entity"
@@ -206,3 +208,79 @@ def graph_patent_relationships(
             ),
         ],
     )
+
+
+def aggregate_patent_relationships(
+    patents: Sequence[PatentApplication],
+    head_field: Literal[
+        "priority_year", "assignee", "publication_number"
+    ] = "priority_year",
+    domains: Sequence[str] = ENTITY_DOMAINS,
+    relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
+) -> list[dict]:
+    """
+    Aggregated UMLS ancestory report for a set of patents
+    """
+    patent_ids = [p["publication_number"] for p in patents]
+
+    if head_field == "priority_year":
+        head_sql = "TO_CHAR(app.priority_date, 'YYYY')"
+    elif head_field == "assignee":
+        head_sql = "app.assignee[0]"  # TODO: all?
+    elif head_field == "publication_number":
+        head_sql = "app.publication_number"
+    else:
+        raise Exception(f"Invalid head field: {head_field}")
+
+    sql = f"""
+        -- patent to entity relationships
+        SELECT
+            {head_sql} as head,
+            umls.canonical_name as tail,
+            count(*) as size
+        FROM
+            {ANNOTATIONS_TABLE} a,
+            {APPLICATIONS_TABLE} app,
+            {TERM_IDS_TABLE} t,
+            umls_lookup umls
+        WHERE a.publication_number = ANY(ARRAY{patent_ids})
+        AND app.publication_number = a.publication_number
+        AND a.domain in {tuple(domains)}
+        AND t.id = a.id
+        AND umls.id = t.cid
+        GROUP BY {head_sql}, umls.canonical_name
+
+        UNION ALL
+
+        -- entity to entity relationships
+        SELECT
+            {head_sql} as head,
+            tail_name as tail,
+            count(*) as size
+        FROM
+            {ANNOTATIONS_TABLE} a,
+            {APPLICATIONS_TABLE} app,
+            {TERM_IDS_TABLE} t,
+            umls_graph g
+        WHERE a.publication_number = ANY(ARRAY{patent_ids})
+        AND app.publication_number = a.publication_number
+        AND a.domain in {tuple(domains)}
+        AND t.id = a.id
+        AND g.head_id = t.cid
+        AND head_id<>tail_id
+        AND g.relationship in {tuple(relationships)}
+        GROUP BY {head_sql}, tail_name
+    """
+
+    df = pl.DataFrame(PsqlDatabaseClient().select(sql))
+
+    # get top tails (i.e. UMLS terms represented across as many of the head dimension as possible)
+    top_tails = (
+        df.group_by("tail")
+        .agg(pl.count("head").alias("head_count"))
+        .sort(pl.col("head_count"), descending=True)
+        .limit(MAX_TAILS)
+    )
+    top_records = df.join(top_tails, on="tail", how="inner").to_dicts()
+
+    return top_records

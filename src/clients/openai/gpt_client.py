@@ -102,8 +102,8 @@ class GptApiClient:
         )
         multiple_query = " , focusing on how they relate" if len(terms) > 1 else ""
         query = f"""
-            Provide 1-2 paragraphs of scientific and technical information about
-            the following{context_query}{multiple_query},
+            Provide 1-2 paragraphs of scientific and technical information, avoiding self-reference,
+            about the following{context_query}{multiple_query},
             in markdown:
             {", ".join(terms)}
         """

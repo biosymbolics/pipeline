@@ -23,7 +23,7 @@ class RegulatoryApproval(Dataclass):
     application_type: str
     approval_date: date
     # application_number: str
-    brand_name: str
+    brand_name: str | None
     generic_name: str
     ndc_code: str
     indications: list[str]
