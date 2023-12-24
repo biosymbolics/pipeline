@@ -2,6 +2,7 @@
 Patent graph reports
 """
 
+from dataclasses import dataclass
 from typing import Literal, Sequence
 import logging
 import networkx as nx
@@ -11,6 +12,7 @@ import polars as pl
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
 from constants.core import ANNOTATIONS_TABLE, APPLICATIONS_TABLE, TERM_IDS_TABLE
+from typings.core import Dataclass
 from typings.patents import PatentApplication
 
 from .types import Node, Link, SerializableGraph
@@ -210,6 +212,14 @@ def graph_patent_relationships(
     )
 
 
+@dataclass(frozen=True)
+class AggregatePatentRelationship(Dataclass):
+    head: str
+    concept: str
+    count: int
+    patents: list[str]
+
+
 def aggregate_patent_relationships(
     patents: Sequence[PatentApplication],
     head_field: Literal[
@@ -217,7 +227,7 @@ def aggregate_patent_relationships(
     ] = "priority_year",
     domains: Sequence[str] = ENTITY_DOMAINS,
     relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
-) -> list[dict]:
+) -> list[AggregatePatentRelationship]:
     """
     Aggregated UMLS ancestory report for a set of patents
     """
@@ -236,8 +246,9 @@ def aggregate_patent_relationships(
         -- patent to entity relationships
         SELECT
             {head_sql} as head,
-            umls.canonical_name as tail,
-            count(*) as size
+            umls.canonical_name as concept,
+            count(*) as count,
+            array_agg(distinct app.publication_number) as patents
         FROM
             {ANNOTATIONS_TABLE} a,
             {APPLICATIONS_TABLE} app,
@@ -248,15 +259,16 @@ def aggregate_patent_relationships(
         AND a.domain in {tuple(domains)}
         AND t.id = a.id
         AND umls.id = t.cid
-        GROUP BY {head_sql}, umls.canonical_name
+        GROUP BY {head_sql}, concept
 
         UNION ALL
 
         -- entity to entity relationships
         SELECT
             {head_sql} as head,
-            tail_name as tail,
-            count(*) as size
+            tail_name as concept,
+            count(*) as count,
+            array_agg(distinct app.publication_number) as patents
         FROM
             {ANNOTATIONS_TABLE} a,
             {APPLICATIONS_TABLE} app,
@@ -269,18 +281,20 @@ def aggregate_patent_relationships(
         AND g.head_id = t.cid
         AND head_id<>tail_id
         AND g.relationship in {tuple(relationships)}
-        GROUP BY {head_sql}, tail_name
+        GROUP BY {head_sql}, concept
     """
 
     df = pl.DataFrame(PsqlDatabaseClient().select(sql))
 
-    # get top tails (i.e. UMLS terms represented across as many of the head dimension as possible)
-    top_tails = (
-        df.group_by("tail")
+    # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
+    top_concepts = (
+        df.group_by("concept")
         .agg(pl.count("head").alias("head_count"))
         .sort(pl.col("head_count"), descending=True)
         .limit(MAX_TAILS)
     )
-    top_records = df.join(top_tails, on="tail", how="inner").to_dicts()
+    top_records = (
+        df.join(top_concepts, on="concept", how="inner").drop("head_count").to_dicts()
+    )
 
-    return top_records
+    return [AggregatePatentRelationship(**tr) for tr in top_records]

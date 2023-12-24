@@ -8,6 +8,7 @@ from clients import patents as patent_client
 from clients.patents.reports.graph import aggregate_patent_relationships
 from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
 from typings.client import PatentSearchParams
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -45,5 +46,5 @@ def patent_characteristics(raw_event: dict, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps(report, default=str),
+        "body": json.dumps(report, cls=DataclassJSONEncoder),
     }
