@@ -277,7 +277,6 @@ def aggregate_patent_relationships(
         AND head_id<>tail_id
         AND g.relationship in {tuple(relationships)}
         GROUP BY {head_sql}, concept
-        limit 5000
     """
 
     df = pl.DataFrame(PsqlDatabaseClient().select(sql))
