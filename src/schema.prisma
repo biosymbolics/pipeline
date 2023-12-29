@@ -1,0 +1,205 @@
+// database
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// generator
+generator client {
+    provider             = "prisma-client-js"
+    recursive_type_depth = 5
+    previewFeatures      = ["fullTextSearch"]
+}
+
+model Entity {
+    id            String                   @id @unique
+    children      Entity[]                 @relation("TermToParent")
+    comprised_of  Entity[]                 @relation("TermToComprisedOf")
+    comprises     Entity[]                 @relation("TermToComprisedOf")
+    domain        EntityType
+    parents       Entity[]                 @relation("TermToParent")
+    indications   Indication[]
+    interventions Intervention[]
+    owners        Owner[]
+    search        Unsupported("tsvector")?
+    source        Source[]
+    synonyms      String[]
+    tags          Tag[]
+    term          String                   @unique
+}
+
+model Patent {
+    id                      String                   @id @unique // publication_number
+    application_number      String
+    abstract                String
+    assignees               Owner[]
+    claims                  String
+    country_code            String
+    description             String
+    embeddings              Float[]
+    interventions           Intervention[]
+    indications             Indication[]
+    inventors               String[]
+    inverse_similar_patents Patent[]                 @relation("SimilarPatents")
+    ipc_codes               String[]
+    other_ids               PatentIdMap[]
+    patent_id               String?
+    priority_date           DateTime
+    search                  Unsupported("tsvector")?
+    similar_patents         Patent[]                 @relation("SimilarPatents")
+    tags                    Tag[]
+    title                   String
+    url                     String
+}
+
+model PatentIdMap {
+    id        String   @id @unique
+    other_ids String[]
+    patent    Patent?  @relation(fields: [patent_id], references: [id])
+    patent_id String?
+}
+
+model RegulatoryApproval {
+    id                  String                   @id @unique
+    agency              String
+    application_type    String
+    approval_date       DateTime
+    indications         Indication[]
+    interventions       Intervention[]
+    owner               Owner[]
+    pharmacologic_class String
+    search              Unsupported("tsvector")?
+    tags                Tag[]
+    url                 String
+}
+
+model Trial {
+    trial_id                String                   @id @unique
+    abstract                String?
+    acronym                 String?
+    arm_types               String[]
+    comparison_type         String?
+    dropout_count           Int?
+    dropout_reasons         String[]
+    duration                Int?
+    end_date                DateTime
+    enrollment              Int?
+    indication              String
+    intervention            String
+    last_updated_date       DateTime
+    masking                 String
+    max_timeframe           Int?
+    pharmacologic_class     String
+    phase                   String
+    purpose                 String
+    search                  Unsupported("tsvector")?
+    sponsor                 Owner?
+    start_date              DateTime
+    status                  String
+    termination_description String?
+    termination_reason      String?
+    title                   String
+    indications             Indication[]
+    interventions           Intervention[]
+    trial_outcomes          TrialOutcome[]
+    url                     String
+    Tag                     Tag?
+}
+
+model TrialOutcome {
+    id              Int     @id @default(autoincrement())
+    description     String?
+    hypothesis_type String?
+    name            String
+    trial_id        String
+    trial           Trial?  @relation(fields: [trial_id], references: [trial_id])
+    timeframe       String?
+}
+
+model Owner {
+    id                     String              @id @unique
+    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity_id              String
+    owner_type             EntityType
+    is_primary             Boolean
+    mention_index          Int
+    raw                    String?
+    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    trial_id               String?
+    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+}
+
+model Intervention {
+    id                     String              @id @unique
+    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity_id              String
+    is_primary             Boolean
+    intervention_type      String
+    mention_index          Int
+    raw                    String?
+    trial_id               String?
+    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+}
+
+model Indication {
+    id                     String              @id @unique
+    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity_id              String
+    indication_type        EntityType
+    is_primary             Boolean
+    mention_index          Int
+    raw                    String?
+    trial_id               String?
+    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+}
+
+model Tag {
+    id                     String              @id @unique
+    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity_id              String
+    mention_index          Int
+    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    raw                    String?
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    tag_type               EntityType
+    trial_id               String?
+    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+}
+
+enum EntityType {
+    attributes
+    behavioral_interventions
+    biologics
+    companies
+    compounds
+    devices
+    diagnostics
+    diseases
+    dosage_forms
+    mechanisms
+    people
+    procedures
+    processes
+    research_tools
+    roas
+}
+
+enum Source {
+    biosym
+    ctgov
+    fda
+    umls
+}
