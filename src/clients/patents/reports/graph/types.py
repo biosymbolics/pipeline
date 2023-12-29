@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 import json
+from typing import Literal
+
+from typings.core import Dataclass
 
 
 @dataclass(frozen=True)
@@ -25,3 +28,14 @@ class SerializableGraph:
 
     nodes: list[Node]
     edges: list[Link]
+
+
+@dataclass(frozen=True)
+class AggregatePatentRelationship(Dataclass):
+    head: str
+    concept: str
+    count: int
+    patents: list[str]
+
+
+CharacteristicHeadField = Literal["priority_year", "assignee", "publication_number"]

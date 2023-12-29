@@ -6,12 +6,22 @@ import logging
 
 from clients import patents as patent_client
 from clients.patents.reports.graph import aggregate_patent_relationships
-from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
+from clients.patents.reports.graph.types import CharacteristicHeadField
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
+from .constants import DEFAULT_REPORT_PARAMS
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+class PatentCharacteristicParams(PatentSearchParams):
+    """
+    Parameters for patent characteristics
+    """
+
+    head_field: CharacteristicHeadField = "priority_year"
 
 
 def patent_characteristics(raw_event: dict, context):
@@ -23,7 +33,7 @@ def patent_characteristics(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-characteristics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
     """
-    p = PatentSearchParams(
+    p = PatentCharacteristicParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
@@ -38,7 +48,7 @@ def patent_characteristics(raw_event: dict, context):
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
 
-        report = aggregate_patent_relationships(patents)
+        report = aggregate_patent_relationships(patents, p.head_field)
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)

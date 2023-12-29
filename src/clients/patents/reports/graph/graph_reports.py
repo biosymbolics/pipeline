@@ -2,8 +2,7 @@
 Patent graph reports
 """
 
-from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Sequence
 import logging
 import networkx as nx
 from pydash import uniq
@@ -12,10 +11,15 @@ import polars as pl
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.patents.constants import ENTITY_DOMAINS
 from constants.core import ANNOTATIONS_TABLE, APPLICATIONS_TABLE, TERM_IDS_TABLE
-from typings.core import Dataclass
 from typings.patents import PatentApplication
 
-from .types import Node, Link, SerializableGraph
+from .types import (
+    AggregatePatentRelationship,
+    CharacteristicHeadField,
+    Node,
+    Link,
+    SerializableGraph,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -23,6 +27,7 @@ logger.setLevel(logging.INFO)
 MAX_NODES = 100
 MIN_NODE_DEGREE = 2
 MAX_TAILS = 50
+MAX_HEADS = 20
 
 RELATIONSHIPS_OF_INTEREST = [
     "allelic_variant_of",
@@ -212,19 +217,9 @@ def graph_patent_relationships(
     )
 
 
-@dataclass(frozen=True)
-class AggregatePatentRelationship(Dataclass):
-    head: str
-    concept: str
-    count: int
-    patents: list[str]
-
-
 def aggregate_patent_relationships(
     patents: Sequence[PatentApplication],
-    head_field: Literal[
-        "priority_year", "assignee", "publication_number"
-    ] = "priority_year",
+    head_field: CharacteristicHeadField = "priority_year",
     domains: Sequence[str] = ENTITY_DOMAINS,
     relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
 ) -> list[AggregatePatentRelationship]:
@@ -236,7 +231,7 @@ def aggregate_patent_relationships(
     if head_field == "priority_year":
         head_sql = "TO_CHAR(app.priority_date, 'YYYY')"
     elif head_field == "assignee":
-        head_sql = "app.assignee[0]"  # TODO: all?
+        head_sql = "app.assignees[1]"  # TODO: all?
     elif head_field == "publication_number":
         head_sql = "app.publication_number"
     else:
@@ -254,8 +249,8 @@ def aggregate_patent_relationships(
             {APPLICATIONS_TABLE} app,
             {TERM_IDS_TABLE} t,
             umls_lookup umls
-        WHERE a.publication_number = ANY(ARRAY{patent_ids})
-        AND app.publication_number = a.publication_number
+        WHERE app.publication_number = ANY(ARRAY{patent_ids})
+        AND a.publication_number = app.publication_number
         AND a.domain in {tuple(domains)}
         AND t.id = a.id
         AND umls.id = t.cid
@@ -274,14 +269,15 @@ def aggregate_patent_relationships(
             {APPLICATIONS_TABLE} app,
             {TERM_IDS_TABLE} t,
             umls_graph g
-        WHERE a.publication_number = ANY(ARRAY{patent_ids})
-        AND app.publication_number = a.publication_number
+        WHERE app.publication_number = ANY(ARRAY{patent_ids})
+        AND a.publication_number = app.publication_number
         AND a.domain in {tuple(domains)}
         AND t.id = a.id
         AND g.head_id = t.cid
         AND head_id<>tail_id
         AND g.relationship in {tuple(relationships)}
         GROUP BY {head_sql}, concept
+        limit 5000
     """
 
     df = pl.DataFrame(PsqlDatabaseClient().select(sql))
@@ -293,8 +289,17 @@ def aggregate_patent_relationships(
         .sort(pl.col("head_count"), descending=True)
         .limit(MAX_TAILS)
     )
+    top_heads = (
+        df.group_by("head")
+        .agg(pl.count("concept").alias("concept_count"))
+        .sort(pl.col("concept_count"), descending=True)
+        .limit(MAX_HEADS)
+    )
     top_records = (
-        df.join(top_concepts, on="concept", how="inner").drop("head_count").to_dicts()
+        df.join(top_concepts, on="concept", how="inner")
+        .join(top_heads, on="head", how="inner")
+        .drop(["head_count", "concept_count"])
+        .to_dicts()
     )
 
     return [AggregatePatentRelationship(**tr) for tr in top_records]
