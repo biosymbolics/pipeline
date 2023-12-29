@@ -147,6 +147,11 @@ importlib.reload(common.ner.ner)
 - `keys *`
 - `HGETALL "term:PD-1 inhibitors"`
 
+#### Database
+```
+create role biosym with password '';
+alter role biosym with superuser;
+```
 
 #### Random
 ```

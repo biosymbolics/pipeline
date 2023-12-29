@@ -13,11 +13,11 @@ generator client {
 
 model Entity {
     id            String                   @id @unique
-    children      Entity[]                 @relation("TermToParent")
-    comprised_of  Entity[]                 @relation("TermToComprisedOf")
-    comprises     Entity[]                 @relation("TermToComprisedOf")
+    children      Entity[]                 @relation("term_to_parent")
+    comprised_of  Entity[]                 @relation("term_to_comprised_of")
+    comprises     Entity[]                 @relation("term_to_comprised_of")
     domain        EntityType
-    parents       Entity[]                 @relation("TermToParent")
+    parents       Entity[]                 @relation("term_to_parent")
     indications   Indication[]
     interventions Intervention[]
     owners        Owner[]
@@ -26,6 +26,8 @@ model Entity {
     synonyms      String[]
     tags          Tag[]
     term          String                   @unique
+
+    @@map("entity")
 }
 
 model Patent {
@@ -40,16 +42,18 @@ model Patent {
     interventions           Intervention[]
     indications             Indication[]
     inventors               String[]
-    inverse_similar_patents Patent[]                 @relation("SimilarPatents")
+    inverse_similar_patents Patent[]                 @relation("similar_patents")
     ipc_codes               String[]
     other_ids               PatentIdMap[]
     patent_id               String?
     priority_date           DateTime
     search                  Unsupported("tsvector")?
-    similar_patents         Patent[]                 @relation("SimilarPatents")
+    similar_patents         Patent[]                 @relation("similar_patents")
     tags                    Tag[]
     title                   String
     url                     String
+
+    @@map("patent")
 }
 
 model PatentIdMap {
@@ -57,6 +61,8 @@ model PatentIdMap {
     other_ids String[]
     patent    Patent?  @relation(fields: [patent_id], references: [id])
     patent_id String?
+
+    @@map("patent_id_map")
 }
 
 model RegulatoryApproval {
@@ -71,6 +77,8 @@ model RegulatoryApproval {
     search              Unsupported("tsvector")?
     tags                Tag[]
     url                 String
+
+    @@map("regulatory_approval")
 }
 
 model Trial {
@@ -103,7 +111,9 @@ model Trial {
     interventions           Intervention[]
     trial_outcomes          TrialOutcome[]
     url                     String
-    Tag                     Tag?
+    tag                     Tag?
+
+    @@map("trial")
 }
 
 model TrialOutcome {
@@ -114,6 +124,8 @@ model TrialOutcome {
     trial_id        String
     trial           Trial?  @relation(fields: [trial_id], references: [trial_id])
     timeframe       String?
+
+    @@map("trial_outcome")
 }
 
 model Owner {
@@ -130,6 +142,8 @@ model Owner {
     regulatory_approval_id String?
     trial_id               String?
     trial                  Trial?              @relation(fields: [id], references: [trial_id])
+
+    @@map("owner")
 }
 
 model Intervention {
@@ -139,13 +153,15 @@ model Intervention {
     is_primary             Boolean
     intervention_type      String
     mention_index          Int
-    raw                    String?
-    trial_id               String?
-    trial                  Trial?              @relation(fields: [id], references: [trial_id])
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
     patent_id              String?
+    raw                    String?
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
+    trial_id               String?
+    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+
+    @@map("intervention")
 }
 
 model Indication {
@@ -162,6 +178,8 @@ model Indication {
     patent_id              String?
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
+
+    @@map("indication")
 }
 
 model Tag {
@@ -177,6 +195,8 @@ model Tag {
     tag_type               EntityType
     trial_id               String?
     trial                  Trial?              @relation(fields: [id], references: [trial_id])
+
+    @@map("tag")
 }
 
 enum EntityType {
