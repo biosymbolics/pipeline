@@ -1,6 +1,6 @@
 from typing import Annotated, Literal, Sequence
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 QueryType = Literal["AND", "OR"]
@@ -23,7 +23,7 @@ class BasePatentSearchParams(BaseSearchParams):
 class CommonSearchParams(BaseSearchParams):
     terms: Annotated[list[str], Field(validate_default=True)] = []
 
-    @validator("terms", pre=True)
+    @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
         if isinstance(v, list):
             return v
@@ -34,7 +34,7 @@ class CommonSearchParams(BaseSearchParams):
 class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
 
-    @validator("exemplar_patents", pre=True)
+    @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
         if isinstance(v, list):
             return v
@@ -52,7 +52,7 @@ class EntitySearchParams(PatentSearchParams):
         Sequence[Literal["pharmaceutical"]], Field(validate_default=True)
     ] = ["pharmaceutical"]
 
-    @validator("entity_types", pre=True)
+    @field_validator("entity_types", mode="before")
     def entity_types_from_string(cls, v):
         if isinstance(v, list):
             return v
