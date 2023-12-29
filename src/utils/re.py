@@ -163,7 +163,7 @@ def expand_re(re_str: str, max_len: int = 1000) -> list[str]:
         else:
             raise Exception("Regex too complex to expand")
     except Exception as e:
-        logger.error("Failed to expand regex %s: %s. Returning raw str.", re_str, e)
+        logger.warning("Failed to expand regex %s: %s. Returning raw str.", re_str, e)
         return [re_str]
 
 
