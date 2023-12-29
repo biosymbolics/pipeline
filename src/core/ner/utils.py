@@ -516,7 +516,7 @@ def cluster_terms(
     df = pl.DataFrame({"cluster_id": labels, "name": terms})
     terms_by_cluster_id = (
         df.filter(pl.col("cluster_id") > 0)
-        .groupby("cluster_id")
+        .group_by("cluster_id")
         .agg(pl.col("name"))
         # hack fix for big-ass catchall that shouldn't happen
         # .filter(pl.col("name").arr.lengths() < 100000)

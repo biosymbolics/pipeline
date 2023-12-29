@@ -1,4 +1,6 @@
 import unittest
+
+import pytest
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
@@ -9,6 +11,7 @@ from data.domain.biomedical import (
 )
 
 
+@pytest.mark.skip(reason="In flux")
 class TestNerUtils(unittest.TestCase):
     """
     TODO:

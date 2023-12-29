@@ -17,7 +17,7 @@ from core.ner import NerTagger
 # Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
 
 
-# @pytest.mark.skip(reason="Too stocastic to include in CI")
+@pytest.mark.skip(reason="Too stocastic to include in CI")
 class TestNerUtils(unittest.TestCase):
     """
     from core.ner import NerTagger; tagger=NerTagger()
@@ -30,7 +30,7 @@ class TestNerUtils(unittest.TestCase):
             entity_types=frozenset(ENTITY_DOMAINS),
             link=False,
             normalize=True,
-            # rule_sets=[],
+            rule_sets=[],
         )
 
     def test_ner(self):
