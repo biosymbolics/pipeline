@@ -17,13 +17,13 @@ model BiomedicalEntity {
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
     entity_type   BiomedicalEntityType
-    parents       BiomedicalEntity[]       @relation("entity_to_parent")
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
+    name          String                   @unique
+    parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      String[]
-    name          String                   @unique
 
     @@map("biomedical_entity")
 }
@@ -43,7 +43,7 @@ model Patent {
     inventors               Ownable[]                @relation("inventor_to_patent")
     inverse_similar_patents Patent[]                 @relation("similar_patents")
     ipc_codes               String[]
-    other_ids               PatentIdMap[]
+    other_ids               PatentToIds[]
     patent_id               String?
     priority_date           DateTime
     search                  Unsupported("tsvector")?
@@ -54,13 +54,13 @@ model Patent {
     @@map("patent")
 }
 
-model PatentIdMap {
+model PatentToIds {
     id        String   @id @unique
     other_ids String[]
     patent    Patent?  @relation(fields: [patent_id], references: [id])
     patent_id String?
 
-    @@map("patent_id_map")
+    @@map("patent_to_ids")
 }
 
 model RegulatoryApproval {
@@ -89,11 +89,12 @@ model Trial {
     duration                Int?
     end_date                DateTime
     enrollment              Int?
-    indication              String
-    intervention            String
+    indications             Indicatable[]
+    interventions           Intervenable[]
     last_updated_date       DateTime
     masking                 String
     max_timeframe           Int?
+    outcomes                TrialOutcome[]
     pharmacologic_class     String
     phase                   String
     purpose                 String
@@ -105,9 +106,6 @@ model Trial {
     termination_description String?
     termination_reason      String?
     title                   String
-    indications             Indicatable[]
-    interventions           Intervenable[]
-    trial_outcomes          TrialOutcome[]
     url                     String
 
     @@map("trial")
