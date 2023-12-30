@@ -11,37 +11,36 @@ generator client {
     previewFeatures      = ["fullTextSearch"]
 }
 
-model Entity {
+model BiomedicalEntity {
     id            String                   @id @unique
-    children      Entity[]                 @relation("term_to_parent")
-    comprised_of  Entity[]                 @relation("term_to_comprised_of")
-    comprises     Entity[]                 @relation("term_to_comprised_of")
-    domain        EntityType
-    parents       Entity[]                 @relation("term_to_parent")
-    indications   Indication[]
-    interventions Intervention[]
-    owners        Owner[]
+    children      BiomedicalEntity[]       @relation("entity_to_parent")
+    comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
+    comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
+    entity_type   BiomedicalEntityType
+    parents       BiomedicalEntity[]       @relation("entity_to_parent")
+    indications   Indicatable[] // backref
+    interventions Intervenable[] // backref
     search        Unsupported("tsvector")?
-    source        Source[]
+    sources       Source[]
     synonyms      String[]
-    tags          Tag[]
-    term          String                   @unique
+    name          String                   @unique
 
-    @@map("entity")
+    @@map("biomedical_entity")
 }
 
 model Patent {
     id                      String                   @id @unique // publication_number
     application_number      String
     abstract                String
-    assignees               Owner[]
+    assignees               Ownable[]                @relation("assignee_to_patent")
+    attributes              String[]
     claims                  String
     country_code            String
     description             String
     embeddings              Float[]
-    interventions           Intervention[]
-    indications             Indication[]
-    inventors               String[]
+    interventions           Intervenable[]
+    indications             Indicatable[]
+    inventors               Ownable[]                @relation("inventor_to_patent")
     inverse_similar_patents Patent[]                 @relation("similar_patents")
     ipc_codes               String[]
     other_ids               PatentIdMap[]
@@ -49,7 +48,6 @@ model Patent {
     priority_date           DateTime
     search                  Unsupported("tsvector")?
     similar_patents         Patent[]                 @relation("similar_patents")
-    tags                    Tag[]
     title                   String
     url                     String
 
@@ -70,19 +68,18 @@ model RegulatoryApproval {
     agency              String
     application_type    String
     approval_date       DateTime
-    indications         Indication[]
-    interventions       Intervention[]
-    owner               Owner[]
+    indications         Indicatable[]
+    interventions       Intervenable[]
+    owner               Ownable[]
     pharmacologic_class String
     search              Unsupported("tsvector")?
-    tags                Tag[]
     url                 String
 
     @@map("regulatory_approval")
 }
 
 model Trial {
-    trial_id                String                   @id @unique
+    id                      String                   @id @unique
     abstract                String?
     acronym                 String?
     arm_types               String[]
@@ -101,17 +98,17 @@ model Trial {
     phase                   String
     purpose                 String
     search                  Unsupported("tsvector")?
-    sponsor                 Owner?
+    sponsor_id              Int?                     @unique
+    sponsor                 Ownable?
     start_date              DateTime
     status                  String
     termination_description String?
     termination_reason      String?
     title                   String
-    indications             Indication[]
-    interventions           Intervention[]
+    indications             Indicatable[]
+    interventions           Intervenable[]
     trial_outcomes          TrialOutcome[]
     url                     String
-    tag                     Tag?
 
     @@map("trial")
 }
@@ -122,33 +119,68 @@ model TrialOutcome {
     hypothesis_type String?
     name            String
     trial_id        String
-    trial           Trial?  @relation(fields: [trial_id], references: [trial_id])
+    trial           Trial?  @relation(fields: [trial_id], references: [id])
     timeframe       String?
 
     @@map("trial_outcome")
 }
 
 model Owner {
-    id                     String              @id @unique
-    entity                 Entity              @relation(fields: [entity_id], references: [id])
-    entity_id              String
-    owner_type             EntityType
-    is_primary             Boolean
-    mention_index          Int
-    raw                    String?
-    patent                 Patent?             @relation(fields: [patent_id], references: [id])
-    patent_id              String?
-    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?
-    trial_id               String?
-    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+    id         Int                      @id @default(autoincrement())
+    children   Owner[]                  @relation("owner_to_parent")
+    owner_type OwnerType
+    parents    Owner[]                  @relation("owner_to_parent")
+    name       String                   @unique
+    search     Unsupported("tsvector")?
+    symbols    String
+    synonyms   String[]
+
+    financial_snapshot_id Int                @unique
+    financial_snapshot    FinancialSnapshot?
+    ownables              Ownable[] // backref
 
     @@map("owner")
 }
 
-model Intervention {
+model FinancialSnapshot {
+    id                         Int      @id @default(autoincrement())
+    owner_id                   Int      @unique
+    owner                      Owner    @relation(fields: [owner_id], references: [id])
+    market_cap                 Float?
+    total_debt                 Float?
+    net_debt                   Float?
+    current_ratio              Float?
+    debt_equity_ratio          Float?
+    ebitda                     Float?
+    gross_profit               Float?
+    return_on_equity           Float?
+    return_on_research_capital Float?
+    snapshot_date              DateTime
+
+    @@map("financials")
+}
+
+model Ownable {
+    id                     Int                 @id @default(autoincrement())
+    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [assignee_patent_id], references: [id])
+    assignee_patent_id     String?
+    inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
+    inventor_patent_id     String?
+    is_primary             Boolean
+    owner                  Owner               @relation(fields: [owner_id], references: [id])
+    owner_id               Int
+    raw                    String?
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    trial                  Trial?              @relation(fields: [trial_id], references: [id])
+    trial_id               String?             @unique
+
+    @@map("ownable")
+}
+
+model Intervenable {
     id                     String              @id @unique
-    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity                 BiomedicalEntity    @relation(fields: [entity_id], references: [id])
     entity_id              String
     is_primary             Boolean
     intervention_type      String
@@ -159,62 +191,56 @@ model Intervention {
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
-    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+    trial                  Trial?              @relation(fields: [trial_id], references: [id])
 
-    @@map("intervention")
+    @@map("intervention_map")
 }
 
-model Indication {
+model Indicatable {
     id                     String              @id @unique
-    entity                 Entity              @relation(fields: [entity_id], references: [id])
+    entity                 BiomedicalEntity    @relation(fields: [entity_id], references: [id])
     entity_id              String
-    indication_type        EntityType
     is_primary             Boolean
     mention_index          Int
     raw                    String?
     trial_id               String?
-    trial                  Trial?              @relation(fields: [id], references: [trial_id])
+    trial                  Trial?              @relation(fields: [trial_id], references: [id])
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
     patent_id              String?
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
 
-    @@map("indication")
+    @@map("indication_map")
 }
 
-model Tag {
-    id                     String              @id @unique
-    entity                 Entity              @relation(fields: [entity_id], references: [id])
-    entity_id              String
-    mention_index          Int
-    patent                 Patent?             @relation(fields: [patent_id], references: [id])
-    patent_id              String?
-    raw                    String?
-    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?
-    tag_type               EntityType
-    trial_id               String?
-    trial                  Trial?              @relation(fields: [id], references: [trial_id])
-
-    @@map("tag")
+enum OwnerType {
+    company
+    person
 }
 
-enum EntityType {
-    attributes
-    behavioral_interventions
-    biologics
-    companies
-    compounds
-    devices
-    diagnostics
-    diseases
-    dosage_forms
-    mechanisms
-    people
-    procedures
-    processes
-    research_tools
-    roas
+enum BiomedicalEntityType {
+    // indication
+    condition
+    disease
+    phenotype
+
+    // intervention
+    behavioral
+    biologic
+    class
+    compound
+    device
+    diagnostic
+    dosage_form
+    mechanism
+    procedure
+    process
+    research_tool
+    roa
+
+    // both
+    pathway
+    target
 }
 
 enum Source {
