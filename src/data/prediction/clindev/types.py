@@ -112,6 +112,5 @@ class PatentTrialPrediction(Dataclass):
     # sponsor_type: str
     start_date: str
     starting_phase: Optional[str]
-
     max_timeframe: Optional[float]
     sponsor: Optional[str]

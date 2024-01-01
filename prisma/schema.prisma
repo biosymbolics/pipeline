@@ -83,28 +83,30 @@ model Trial {
     abstract                String?
     acronym                 String?
     arm_types               String[]
-    comparison_type         String?
+    comparison_type         ComparisonType
+    design                  TrialDesign
     dropout_count           Int?
     dropout_reasons         String[]
     duration                Int?
     end_date                DateTime
     enrollment              Int?
+    hypothesis_type         HypothesisType // calc field??
     indications             Indicatable[]
     interventions           Intervenable[]
     last_updated_date       DateTime
-    masking                 String
+    masking                 TrialMasking
     max_timeframe           Int?
     outcomes                TrialOutcome[]
     pharmacologic_class     String
-    phase                   String
+    phase                   TrialPhase
     purpose                 String
     search                  Unsupported("tsvector")?
     sponsor_id              Int?                     @unique
     sponsor                 Ownable?
     start_date              DateTime
-    status                  String
+    status                  TrialStatus
     termination_description String?
-    termination_reason      String?
+    termination_reason      TerminationReason
     title                   String
     url                     String
 
@@ -112,12 +114,12 @@ model Trial {
 }
 
 model TrialOutcome {
-    id              Int     @id @default(autoincrement())
+    id              Int            @id @default(autoincrement())
     description     String?
-    hypothesis_type String?
+    hypothesis_type HypothesisType
     name            String
     trial_id        String
-    trial           Trial?  @relation(fields: [trial_id], references: [id])
+    trial           Trial?         @relation(fields: [trial_id], references: [id])
     timeframe       String?
 
     @@map("trial_outcome")
@@ -211,34 +213,136 @@ model Indicatable {
     @@map("indication_map")
 }
 
+enum ComparisonType {
+    ACTIVE
+    PLACEBO
+    NO_INTERVENTION
+    NO_CONTROL
+    DOSE
+    OTHER
+    NA
+    UNKNOWN
+}
+
+enum HypothesisType {
+    SUPERIORITY
+    NON_INFERIORITY
+    EQUIVALENCE
+    MULTIPLE
+    NON_SUPERIORITY
+    OTHER
+    UNKNOWN
+}
+
 enum OwnerType {
-    company
-    person
+    INDUSTRY_LARGE
+    INDUSTRY
+    UNIVERSITY
+    GOVERNMENTAL
+    HEALTH_SYSTEM
+    FOUNDATION
+    OTHER_ORGANIZATION
+    INDIVIDUAL
+    OTHER
+}
+
+enum TrialDesign {
+    PARALLEL
+    CROSSOVER
+    FACTORIAL
+    SEQUENTIAL
+    SINGLE_GROUP
+    DOSING
+    NA
+    UNKNOWN
+}
+
+enum TrialPhase {
+    PRECLINICAL
+    EARLY_PHASE_1
+    PHASE_1
+    PHASE_1_2
+    PHASE_2
+    PHASE_2_3
+    PHASE_3
+    APPROVED
+    PHASE_4
+    NA
+    UNKNOWN
+}
+
+enum TrialRandomization {
+    RANDOMIZED
+    NON_RANDOMIZED
+    NA
+    UNKNOWN
+}
+
+enum TrialStatus {
+    PRE_ENROLLMENT
+    ENROLLMENT
+    WITHDRAWN
+    SUSPENDED
+    TERMINATED
+    COMPLETED
+    UNKNOWN
+    NA
+}
+
+enum TrialMasking {
+    NONE
+    SINGLE
+    DOUBLE
+    TRIPLE
+    QUADRUPLE
+    UNKNOWN
+}
+
+enum TerminationReason {
+    FUTILITY
+    SAFETY
+    NOT_SAFETY
+    NOT_FUTILITY
+    BUSINESS
+    SUPPLY_CHAIN
+    LOGISTICS
+    ENROLLMENT
+    FEASIBILITY
+    INVESTIGATOR
+    FUNDING
+    COVID
+    OVERSIGHT
+    PROTOCOL_REVISION
+    OTHER
+    NA
 }
 
 enum BiomedicalEntityType {
     // indication
-    condition
-    disease
-    phenotype
+    CONDITION
+    DISEASE
+    PHENOTYPE
 
     // intervention
-    behavioral
-    biologic
-    class
-    compound
-    device
-    diagnostic
-    dosage_form
-    mechanism
-    procedure
-    process
-    research_tool
-    roa
+    BEHAVIORAL
+    BIOLOGIC
+    CLASS
+    COMBINATION
+    COMPOUND
+    DEVICE
+    DIAGNOSTIC
+    DIETARY
+    DOSAGE_FORM
+    MECHANISM
+    PHARMACOLOGICAL
+    PROCEDURE
+    PROCESS
+    RESEARCH
+    ROA
 
     // both
-    pathway
-    target
+    PATHWAY
+    TARGET
 }
 
 enum Source {
