@@ -33,7 +33,6 @@ DATABASE_URL = (
     else "postgres://biosym:ok@localhost:5432/biosym"
 )
 DB_CLUSTER = os.environ.get("DB_CLUSTER")
-DEFAULT_ENTITY_TYPES = frozenset(["compounds", "diseases", "mechanisms"])
 
 
 DEFAULT_BASE_TRANSFORMER_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"

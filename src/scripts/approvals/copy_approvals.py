@@ -16,16 +16,21 @@ from prisma.models import (
 from prisma.types import BiomedicalEntityCreateInput
 from prisma.enums import BiomedicalEntityType
 import asyncio
+import logging
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from core.ner import TermNormalizer
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from constants.core import REGULATORY_APPROVAL_TABLE
 from typings.core import Dataclass
 from utils.re import get_or_re
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 SOURCE_DB = "drugcentral"
@@ -120,6 +125,7 @@ class InterventionIntermediate(Dataclass):
 
 
 async def copy_interventions():
+    normalizer = TermNormalizer()
     fields = [
         "lower(prod.product_name) as brand_name",
         "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
@@ -132,10 +138,18 @@ async def copy_interventions():
     db = Prisma(auto_register=True)
     await db.connect()
 
-    constituents = [
-        r["active_ingredients"] for r in records if len(r["active_ingredients"]) > 1
-    ]
-    pharma_classes = [r["pharmacologic_classes"] for r in records]
+    constituents = flatten(
+        [r["active_ingredients"] for r in records if len(r["active_ingredients"]) > 1]
+    )
+    pharma_classes = flatten([r["pharmacologic_classes"] for r in records])
+    generic_names = flatten([r["generic_name"] for r in records])
+
+    # slow
+    all_ints = uniq([*generic_names, *constituents, *pharma_classes])
+    linked_ents = normalizer.normalize(all_ints)
+
+    # TODO: link only? or link only and if no match, NER?
+    link_map = {k: v.linked_entity for k, v in zip(all_ints, linked_ents)}
 
     await BiomedicalEntity.prisma().create_many(
         data=[
@@ -155,37 +169,16 @@ async def copy_interventions():
         crud: BiomedicalEntityCreateInput = {
             "name": ii.generic_name,
             "comprised_of": {
-                "connect": [
-                    {
-                        "name_entity_type": {
-                            "name": i,
-                            "entity_type": BiomedicalEntityType.COMPOUND,
-                        }
-                    }
-                    for i in ii.active_ingredients
-                ],
+                "connect": [{"name": i} for i in ii.active_ingredients],
             },
             "parents": {
-                "connect": [
-                    {
-                        "name_entity_type": {
-                            "name": i,
-                            "entity_type": BiomedicalEntityType.MECHANISM,
-                        }
-                    }
-                    for i in ii.pharmacologic_classes
-                ],
+                "connect": [{"name": i} for i in ii.pharmacologic_classes],
             },
             "entity_type": BiomedicalEntityType.COMPOUND,
             "synonyms": [ii.brand_name],
         }
         await BiomedicalEntity.prisma().upsert(
-            where={
-                "name_entity_type": {
-                    "name": ii.generic_name,
-                    "entity_type": BiomedicalEntityType.COMPOUND,
-                }
-            },
+            where={"name": ii.generic_name},
             data={
                 "create": crud,
                 "update": crud,  # type: ignore

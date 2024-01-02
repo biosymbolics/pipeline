@@ -18,7 +18,7 @@ EST_MAX_CLINDEV = 10
 MAX_PATENT_LIFE = 20
 
 
-ENTITY_DOMAINS = [
+ENTITY_TYPES = [
     "biologics",
     "compounds",
     "devices",
@@ -27,6 +27,8 @@ ENTITY_DOMAINS = [
     "procedures",
     "diagnostics",
 ]
+
+ENTITY_DOMAINS = ENTITY_TYPES
 
 DOMAINS_OF_INTEREST = [
     *ENTITY_DOMAINS,

@@ -220,3 +220,15 @@ MOST_PREFERRED_UMLS_TYPES = {
 BIOSYM_UMLS_TFIDF_PATH = (
     "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
 )
+
+# ENTITY_TYPES
+ENTITY_TO_UMLS_TYPE = {
+    "compounds": UMLS_COMPOUND_TYPES,
+    "biologics": UMLS_BIOLOGIC_TYPES,
+    "mechanisms": UMLS_MECHANISM_TYPES,
+    "devices": UMLS_DEVICE_TYPES,
+    "procedures": UMLS_PROCEDURE_TYPES,
+    "diseases": UMLS_DISEASE_TYPES,
+}
+
+UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}

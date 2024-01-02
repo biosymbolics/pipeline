@@ -20,13 +20,12 @@ model BiomedicalEntity {
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
-    name          String
+    name          String                   @unique
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      String[]
 
-    @@unique([name, entity_type])
     @@map("biomedical_entity")
 }
 
