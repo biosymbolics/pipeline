@@ -17,6 +17,7 @@ from typing import (
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
+from constants.umls import UMLS_TO_ENTITY_TYPE
 
 
 from typings.core import Dataclass
@@ -33,6 +34,11 @@ class CanonicalEntity(Dataclass):
     description: Optional[str] = None
     aliases: list[str] = field(default_factory=list)
     types: list[str] = field(default_factory=list)
+
+    def type(self) -> Optional[str]:
+        if len(self.types) == 0 or self.types[0] not in UMLS_TO_ENTITY_TYPE:
+            return None
+        return UMLS_TO_ENTITY_TYPE[self.types[0]]
 
 
 @dataclass(frozen=True)
