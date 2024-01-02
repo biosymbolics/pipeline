@@ -151,6 +151,7 @@ importlib.reload(common.ner.ner)
 ```
 create role biosym with password '';
 alter role biosym with superuser;
+prisma db push
 ```
 
 #### Random

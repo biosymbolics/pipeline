@@ -1,6 +1,7 @@
 """
 Functions to initialize the patents database
 """
+import asyncio
 import logging
 import sys
 
@@ -17,17 +18,18 @@ from constants.core import (
     APPLICATIONS_TABLE,
     ANNOTATIONS_TABLE,
 )
-from scripts.ctgov.copy_ctgov import copy_ctgov
+from scripts.trials.copy_trials import copy_ctgov
 from scripts.umls.copy_umls import copy_umls
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
     TEXT_FIELDS,
 )
-from .copy_approvals import copy_approvals
 from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
 from .terms import create_patent_terms
+
+from ..approvals.copy_approvals import copy_approvals
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -237,6 +239,12 @@ def create_funcs():
         $func$
         SELECT regexp_replace($1, '([!$()*+.:<=>?[\\\]^{|}-])', '\\\1', 'g')
         $func$;
+
+        CREATE OR REPLACE FUNCTION zip(anyarray, anyarray)
+        RETURNS SETOF anyarray LANGUAGE SQL AS
+        $func$
+        SELECT ARRAY[a,b] FROM (SELECT unnest($1) AS a, unnest($2) AS b) x;
+        $func$;
     """
     PsqlDatabaseClient().execute_query(re_escape_sql)
 
@@ -261,7 +269,7 @@ def add_application_search():
     )
 
 
-def main(bootstrap: bool = False):
+async def main(bootstrap: bool = False):
     """
     Copy tables from patents-public-data to a local dataset.
     Order matters.
@@ -333,7 +341,7 @@ def main(bootstrap: bool = False):
         # create patent applications etc in postgres
         copy_bq_to_psql()
         # copy data about approvals
-        copy_approvals()
+        await copy_approvals()
         # adds column & index for application search
         add_application_search()
         # UMLS records (slow due to betweenness centrality calc)
@@ -516,4 +524,4 @@ if __name__ == "__main__":
         sys.exit()
 
     bootstrap: bool = "bootstrap" in sys.argv
-    main(bootstrap)
+    asyncio.run(main(bootstrap))

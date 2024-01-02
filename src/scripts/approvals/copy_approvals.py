@@ -1,10 +1,21 @@
 """
 Utils for copying approvals data
 """
+from dataclasses import dataclass
+from datetime import datetime
 import re
 import sys
-
-from pydash import compact, uniq
+from pydash import flatten, uniq
+from prisma import Prisma
+from prisma.models import (
+    BiomedicalEntity,
+    Indicatable,
+    Intervenable,
+    RegulatoryApproval,
+)
+from prisma.types import BiomedicalEntityCreateInput
+from prisma.enums import BiomedicalEntityType
+import asyncio
 
 from system import initialize
 
@@ -13,19 +24,32 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from constants.core import REGULATORY_APPROVAL_TABLE
+from typings.core import Dataclass
 from utils.re import get_or_re
 
 
 SOURCE_DB = "drugcentral"
 DEST_DB = "patents"
-SEARCH_FIELDS = {
-    # "applicant": "coalesce(applicant, '')",
-    "active_ingredients": "ARRAY_TO_STRING(active_ingredients, '|| " " ||')",
-    "brand_name": "coalesce(brand_name, '')",
-    "generic_name": "coalesce(generic_name, '')",
-    "indications": "ARRAY_TO_STRING(indications, '|| " " ||')",
-    "pharmacologic_classes": "ARRAY_TO_STRING(pharmacologic_classes, '|| " " ||')",
-}
+SOURCE_FIELDS = [
+    "MAX(prod.ndc_product_code) as id",
+    "prod.product_name as brand_name",
+    "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
+    "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
+    # "MAX(prod_approval.applicant) as applicant",
+    "MAX(prod.marketing_status) as application_type",
+    "MAX(approval.approval) as approval_date",
+    "MAX(approval.type) as agency",
+    "array_remove(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
+    "JSON_AGG(pharma_class.*) as pharmacologic_classes",
+    "MAX(label.pdf_url) as url",
+]
+SUPPRESSION_APPROVAL_TYPES = tuple(
+    [
+        "otc monograph not final",
+        "otc monograph final",
+        "unapproved drug other",
+    ]
+)
 
 
 def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str | None:
@@ -53,112 +77,205 @@ def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str 
 
         return score
 
-    if len(pharmacologic_classes) == 0:
+    prioritized = sorted(
+        [pa for pa in pharmacologic_classes if (pa or {}).get("name") is not None],
+        key=get_priority,
+        reverse=True,
+    )
+    if len(prioritized) == 0:
         return None
-
-    prioritized = sorted(pharmacologic_classes, key=get_priority, reverse=True)
-
-    print("HIHI", prioritized)
     return prioritized[0]["name"].lower()
 
 
-def copy_all_approvals():
-    """
-    Copy data from Postgres (drugcentral) to Postgres (patents)
-    """
-    PATENT_FIELDS = [
-        "MAX(prod.ndc_product_code) as ndc_code",
-        "prod.product_name as brand_name",
-        "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",  # or product.generic_name
-        "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
-        # "MAX(prod_approval.applicant) as applicant",
-        "MAX(prod.marketing_status) as application_type",
-        "MAX(approval.approval) as approval_date",
-        "MAX(approval.type) as regulatory_agency",
-        "array_remove(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
-        "JSON_AGG(pharma_class.*) as pharmacologic_classes",
-        "MAX(label.pdf_url) as label_url",
-    ]
-    source_sql = f"""
-        select {", ".join(PATENT_FIELDS)}
-        from
+def get_source_sql(fields=SOURCE_FIELDS):
+    return f"""
+    SELECT {", ".join(fields)}
+    FROM
         approval,
         active_ingredient,
         product prod,
         prd2label p2l,
         label,
-        section label_section,
         structures struct
-        LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
-        LEFT JOIN omop_relationship metadata on metadata.struct_id = struct.id and metadata.relationship_name = 'indication'
-        where approval.struct_id = struct.id -- TODO: combo drugs??
-        AND active_ingredient.struct_id = struct.id
-        AND active_ingredient.ndc_product_code = prod.ndc_product_code
-        AND p2l.ndc_product_code = prod.ndc_product_code
-        AND p2l.label_id = label.id
-        AND label_section.label_id = p2l.label_id
-        AND label_section.title = 'INDICATIONS & USAGE SECTION'
-        group by prod.product_name
+    LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
+    LEFT JOIN omop_relationship metadata on metadata.struct_id = struct.id and metadata.relationship_name = 'indication'
+    WHERE approval.struct_id = struct.id -- TODO: combo drugs??
+    AND active_ingredient.struct_id = struct.id
+    AND active_ingredient.ndc_product_code = prod.ndc_product_code
+    AND p2l.ndc_product_code = prod.ndc_product_code
+    AND p2l.label_id = label.id
+    AND lower(prod.marketing_status) not in {SUPPRESSION_APPROVAL_TYPES}
+    AND approval.approval is not null
+    AND prod.product_name is not null
+    GROUP BY prod.product_name
+"""
+
+
+@dataclass(frozen=True)
+class InterventionIntermediate(Dataclass):
+    generic_name: str
+    brand_name: str
+    active_ingredients: list[str]
+    pharmacologic_classes: list[str]
+
+
+async def copy_interventions():
+    fields = [
+        "lower(prod.product_name) as brand_name",
+        "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
+        "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
+        "ARRAY_REMOVE(ARRAY_AGG(distinct lower(pharma_class.name)), NULL)::text[] as pharmacologic_classes",
+    ]
+    records = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql(fields))
+    iis = [InterventionIntermediate(**r) for r in records]
+
+    db = Prisma(auto_register=True)
+    await db.connect()
+
+    constituents = [
+        r["active_ingredients"] for r in records if len(r["active_ingredients"]) > 1
+    ]
+    pharma_classes = [r["pharmacologic_classes"] for r in records]
+
+    await BiomedicalEntity.prisma().create_many(
+        data=[
+            *[
+                {"name": c, "entity_type": BiomedicalEntityType.COMPOUND}
+                for c in uniq(flatten(constituents))
+            ],
+            *[
+                {"name": pc, "entity_type": BiomedicalEntityType.MECHANISM}
+                for pc in uniq(flatten(pharma_classes))
+            ],
+        ],
+        skip_duplicates=True,
+    )
+
+    for ii in iis:
+        crud: BiomedicalEntityCreateInput = {
+            "name": ii.generic_name,
+            "comprised_of": {
+                "connect": [
+                    {
+                        "name_entity_type": {
+                            "name": i,
+                            "entity_type": BiomedicalEntityType.COMPOUND,
+                        }
+                    }
+                    for i in ii.active_ingredients
+                ],
+            },
+            "parents": {
+                "connect": [
+                    {
+                        "name_entity_type": {
+                            "name": i,
+                            "entity_type": BiomedicalEntityType.MECHANISM,
+                        }
+                    }
+                    for i in ii.pharmacologic_classes
+                ],
+            },
+            "entity_type": BiomedicalEntityType.COMPOUND,
+            "synonyms": [ii.brand_name],
+        }
+        await BiomedicalEntity.prisma().upsert(
+            where={
+                "name_entity_type": {
+                    "name": ii.generic_name,
+                    "entity_type": BiomedicalEntityType.COMPOUND,
+                }
+            },
+            data={
+                "create": crud,
+                "update": crud,  # type: ignore
+            },
+        )
+
+
+async def copy_all_approvals():
     """
-    PsqlDatabaseClient.copy_between_db(
-        source_db=SOURCE_DB,
-        source_sql=source_sql,
-        dest_db=DEST_DB,
-        dest_table_name=REGULATORY_APPROVAL_TABLE,
-        truncate_if_exists=True,
-        transform_schema=lambda schema: {
-            **schema,
-            "pharmacologic_classes": "text[]",
-            "pharmacologic_class": "text",
-            "text_search": "tsvector",
-        },
-        transform=lambda batch, _: [
+    Copy data from Postgres (drugcentral) to Postgres (patents)
+    """
+    approvals = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql())
+    db = Prisma(auto_register=True)
+    await db.connect()
+
+    # create approval records
+    await RegulatoryApproval.prisma().create_many(
+        data=[
             {
-                **row,
-                "pharmacologic_class": get_preferred_pharmacologic_class(
-                    compact(uniq(row["pharmacologic_classes"]))
-                ),
-                "pharmacologic_classes": uniq(
+                "id": a["id"],
+                "agency": a["agency"],
+                "approval_date": datetime(*a["approval_date"].timetuple()[:6]),
+                "application_type": a["application_type"],
+                "url": a["url"],
+                "text_for_search": " ".join(
                     [
-                        pc["name"].lower()
-                        for pc in row["pharmacologic_classes"]
-                        if pc is not None
+                        a["brand_name"],
+                        *a["active_ingredients"],
+                        *a["indications"],
+                        *[
+                            _a["name"]
+                            for _a in a["pharmacologic_classes"]
+                            if _a is not None and _a["name"] is not None
+                        ],
                     ]
                 ),
             }
-            for row in batch
+            for a in approvals
         ],
+        skip_duplicates=True,
     )
-    client = PsqlDatabaseClient()
-    vector_sql = ("|| ' ' ||").join(SEARCH_FIELDS.values())
-    client.execute_query(
-        f"""
-        -- update {REGULATORY_APPROVAL_TABLE} set normalized_applicant=sm.term from
-        -- synonym_map sm where sm.synonym = lower(applicant);
 
-        UPDATE {REGULATORY_APPROVAL_TABLE} SET text_search = to_tsvector('english', {vector_sql});
-        """
+    await Indicatable.prisma().create_many(
+        data=[
+            {"name": i, "regulatory_approval_id": a["id"]}
+            for a in approvals
+            for i in a["indications"]
+        ],
+        skip_duplicates=True,
     )
-    client.create_indices(
+
+    await Intervenable.prisma().create_many(
+        data=[
+            {
+                "name": a["generic_name"] or a["brand_name"],
+                "instance_rollup": get_preferred_pharmacologic_class(
+                    a["pharmacologic_classes"]
+                ),
+                "is_primary": True,
+                "regulatory_approval_id": a["id"],
+            }
+            for a in approvals
+        ],
+        skip_duplicates=True,
+    )
+
+    await db.disconnect()
+    raw_client = PsqlDatabaseClient()
+    raw_client.execute_query(
+        f"""
+        UPDATE {REGULATORY_APPROVAL_TABLE} SET search = to_tsvector('english', text_for_search)
+        """,
+    )
+    raw_client.create_indices(
         [
             {
                 "table": REGULATORY_APPROVAL_TABLE,
-                "column": "ndc_code",
-            },
-            {
-                "table": REGULATORY_APPROVAL_TABLE,
-                "column": "text_search",
+                "column": "search",
                 "is_gin": True,
             },
         ]
     )
 
 
-def copy_approvals():
+async def copy_approvals():
     """
     Copy data from Postgres (drugcentral) to Postgres (patents)
     """
-    copy_all_approvals()
+    # await copy_all_approvals()
+    await copy_interventions()
 
 
 if __name__ == "__main__":
@@ -174,4 +291,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    copy_approvals()
+    asyncio.run(copy_approvals())

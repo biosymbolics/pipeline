@@ -6,25 +6,27 @@ datasource db {
 
 // generator
 generator client {
-    provider             = "prisma-client-js"
+    provider             = "prisma-client-py"
     recursive_type_depth = 5
     previewFeatures      = ["fullTextSearch"]
 }
 
 model BiomedicalEntity {
-    id            String                   @id @unique
+    id            Int                      @id @default(autoincrement())
+    canonical_id  String?                  @unique
     children      BiomedicalEntity[]       @relation("entity_to_parent")
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
-    name          String                   @unique
+    name          String
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      String[]
 
+    @@unique([name, entity_type])
     @@map("biomedical_entity")
 }
 
@@ -64,16 +66,16 @@ model PatentToIds {
 }
 
 model RegulatoryApproval {
-    id                  String                   @id @unique
-    agency              String
-    application_type    String
-    approval_date       DateTime
-    indications         Indicatable[]
-    interventions       Intervenable[]
-    owner               Ownable[]
-    pharmacologic_class String
-    search              Unsupported("tsvector")?
-    url                 String
+    id               String                   @id @unique
+    agency           String
+    application_type String
+    approval_date    DateTime
+    indications      Indicatable[]
+    interventions    Intervenable[]
+    owners           Ownable[]
+    search           Unsupported("tsvector")?
+    text_for_search  String
+    url              String
 
     @@map("regulatory_approval")
 }
@@ -166,43 +168,51 @@ model Ownable {
     assignee_patent_id     String?
     inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
     inventor_patent_id     String?
-    is_primary             Boolean
-    owner                  Owner               @relation(fields: [owner_id], references: [id])
-    owner_id               Int
-    raw                    String?
+    is_primary             Boolean             @default(false)
+    owner                  Owner?              @relation(fields: [owner_id], references: [id])
+    owner_id               Int?
+    name                   String
+    instance_rollup        String?
+    category_rollup        String?
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     trial_id               String?             @unique
 
+    @@unique([owner_id, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@map("ownable")
 }
 
 model Intervenable {
-    id                     String              @id @unique
-    entity                 BiomedicalEntity    @relation(fields: [entity_id], references: [id])
-    entity_id              String
-    is_primary             Boolean
-    intervention_type      String
-    mention_index          Int
+    id                     Int                 @id @default(autoincrement())
+    entity                 BiomedicalEntity?   @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    context_of_use         ContextOfUse        @default(NA)
+    is_primary             Boolean             @default(false)
+    mention_index          Int                 @default(-1)
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
     patent_id              String?
-    raw                    String?
+    name                   String
+    instance_rollup        String?
+    category_rollup        String?
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
 
-    @@map("intervention_map")
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@map("intervenable")
 }
 
 model Indicatable {
-    id                     String              @id @unique
-    entity                 BiomedicalEntity    @relation(fields: [entity_id], references: [id])
-    entity_id              String
-    is_primary             Boolean
-    mention_index          Int
-    raw                    String?
+    id                     Int                 @id @default(autoincrement())
+    entity                 BiomedicalEntity?   @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    is_primary             Boolean             @default(false)
+    mention_index          Int                 @default(-1)
+    name                   String
+    instance_rollup        String?
+    category_rollup        String?
     trial_id               String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
@@ -210,7 +220,8 @@ model Indicatable {
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
 
-    @@map("indication_map")
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@map("indicatable")
 }
 
 enum ComparisonType {
@@ -334,15 +345,27 @@ enum BiomedicalEntityType {
     DIETARY
     DOSAGE_FORM
     MECHANISM
-    PHARMACOLOGICAL
     PROCEDURE
     PROCESS
     RESEARCH
     ROA
 
+    // group intervention
+    PHARMACOLOGICAL
+
     // both
     PATHWAY
     TARGET
+}
+
+enum ContextOfUse {
+    COMBINATION
+    COMPARATOR
+    MENTION
+    TREATMENT
+    NONE
+    NA
+    UNKNOWN
 }
 
 enum Source {

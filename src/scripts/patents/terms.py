@@ -1,11 +1,11 @@
 """
 Functions to initialize the terms and synonym tables
 """
+from dataclasses import dataclass
 import sys
-from typing import Sequence, TypeGuard, TypedDict
+from typing import Sequence
 import logging
 from pydash import compact, flatten, group_by, uniq
-from core.ner.utils import spans_to_doc_entities
 
 import system
 
@@ -15,7 +15,9 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
 from constants.patents import COMPANY_INDICATORS
 from core.ner import TermNormalizer
+from core.ner.utils import spans_to_doc_entities
 from core.ner.spacy import Spacy
+from typings.core import Dataclass
 from utils.file import load_json_from_file, save_json_as_file
 from utils.list import dedup
 from utils.re import get_or_re
@@ -30,39 +32,20 @@ from .utils import clean_owners
 MIN_CANONICAL_NAME_COUNT = 4
 ASSIGNEE_PATENT_THRESHOLD = 20
 
-CanonicalRecord = TypedDict(
-    "CanonicalRecord",
-    {
-        "id": str,
-        "canonical_name": str,
-        "preferred_name": str,
-        "instance_rollup": str,
-        "category_rollup": str,
-    },
-)
+
+@dataclass(frozen=True)
+class CanonicalRecord(Dataclass):
+    id: str
+    canonical_name: str
+    preferred_name: str
+    instance_rollup: str
+    category_rollup: str
+
+
 CanonicalMap = dict[str, CanonicalRecord]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-def is_canonical_record(record: dict) -> TypeGuard[CanonicalRecord]:
-    """
-    Check if record is a CanonicalRecord
-    """
-    return (
-        isinstance(record, dict)
-        and "id" in record
-        and "canonical_name" in record
-        and "instance_rollup" in record
-        and "category_rollup" in record
-    )
-
-
-def is_canonical_records(
-    records: Sequence[dict],
-) -> TypeGuard[Sequence[CanonicalRecord]]:
-    return all([is_canonical_record(r) for r in records])
 
 
 class TermAssembler:
@@ -85,11 +68,7 @@ class TermAssembler:
         canonical_records = self.client.select(
             "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
         )
-        if not is_canonical_records(canonical_records):
-            raise ValueError(
-                f"Records are not CanonicalRecords: {canonical_records[:10]}"
-            )
-        return {row["id"]: row for row in canonical_records}
+        return {row["id"]: CanonicalRecord(**row) for row in canonical_records}
 
     @staticmethod
     def _get_preferred_name(term_records: Sequence[TermRecord]) -> str:
@@ -332,7 +311,7 @@ class TermAssembler:
                 if ai in self.canonical_map and ai != record["id"]
             ]
             if len(names) > 0:
-                return names[0]
+                return names[0]  # type: ignore
             return None
 
         ids = record["ids"] or []
