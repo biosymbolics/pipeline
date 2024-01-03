@@ -1,6 +1,7 @@
 """
 Constants for the patents client.
 """
+from prisma.enums import BiomedicalEntityType
 
 from constants.patents import ATTRIBUTE_FIELD
 from .types import RelevancyThreshold
@@ -18,16 +19,8 @@ EST_MAX_CLINDEV = 10
 MAX_PATENT_LIFE = 20
 
 
-ENTITY_TYPES = [
-    "biologics",
-    "compounds",
-    "devices",
-    "diseases",
-    "mechanisms",
-    "procedures",
-    "diagnostics",
-]
-
+ENTITY_TYPE_MAP = BiomedicalEntityType.__members__
+ENTITY_TYPES = ENTITY_TYPE_MAP.values()
 ENTITY_DOMAINS = ENTITY_TYPES
 
 DOMAINS_OF_INTEREST = [

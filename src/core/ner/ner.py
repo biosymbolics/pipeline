@@ -262,8 +262,8 @@ class NerTagger:
             """
             Get the string representation of an entity
             """
-            if entity.linked_entity:
-                return entity.linked_entity.name
+            if entity.canonical_entity:
+                return entity.canonical_entity.name
             return entity.normalized_term or entity.term
 
         ents_by_doc = self.extract(content, **kwargs)

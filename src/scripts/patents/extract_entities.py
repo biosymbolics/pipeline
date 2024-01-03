@@ -173,7 +173,7 @@ class BaseEnricher:
                     "end_char": "character_offset_end",
                 }
             )
-            .drop(["normalized_term", "linked_entity"])
+            .drop(["normalized_term", "canonical_entity"])
             .with_columns(
                 pl.lit("title+abstract").alias("source"),
             )

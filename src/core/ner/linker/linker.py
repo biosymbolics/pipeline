@@ -2,8 +2,10 @@
 Term Normalizer
 """
 import logging
+import time
 from typing import Sequence
 
+from .types import AbstractCandidateSelector, CandidateSelectorType
 
 from ..types import CanonicalEntity, DocEntity
 
@@ -27,15 +29,21 @@ class TermLinker:
         >>> linker(["DNMT1 protein synthase inhibitor"])
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        candidate_selector_class: CandidateSelectorType = "SemanticCandidateSelector",
+        *args,
+        **kwargs,
+    ):
         """
         Initialize term normalizer using existing model
         """
-        # lazy (Umls is big)
-        logger.info("Loading CompositeCandidateSelector (slow...)")
-        from .composite_candidate_selector import CompositeCandidateSelector
-
-        self.candidate_generator = CompositeCandidateSelector()
+        # lazy (UMLS is large)
+        logger.info("Loading CompositeCandidateSelector (might be slow...)")
+        modules = __import__("core.ner.linker", fromlist=[candidate_selector_class])
+        self.candidate_selector: AbstractCandidateSelector = getattr(
+            modules, candidate_selector_class
+        )(*args, **kwargs)
 
     def link(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
         """
@@ -48,8 +56,10 @@ class TermLinker:
             logging.warning("No entities to link")
             return []
 
+        start = time.monotonic()
+
         # generate the candidates (somewhat time consuming)
-        canonical_entities = [self.candidate_generator(e) for e in entity_set]
+        canonical_entities = [self.candidate_selector(e) for e in entity_set]
 
         def get_canonical(ce: CanonicalEntity | None, de: DocEntity) -> CanonicalEntity:
             # create a pseudo-canonical entity if no canonical entity found
@@ -60,11 +70,15 @@ class TermLinker:
             return ce
 
         linked_doc_ents = [
-            DocEntity(**{**e, "linked_entity": get_canonical(ce[0], e)})
+            DocEntity(**{**e, "canonical_entity": get_canonical(ce, e)})
             for e, ce in zip(entity_set, canonical_entities)
         ]
 
-        logging.info("Completed linking batch of %s entity sets", len(entity_set))
+        logging.info(
+            "Completed linking batch of %s entity sets, took %ss",
+            len(entity_set),
+            round(time.monotonic() - start),
+        )
 
         return linked_doc_ents
 

@@ -8,7 +8,7 @@ from constants.patterns.iupac import is_iupac
 from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
 
-from .candidate_selector import CandidateSelector
+from .semantic_candidate_selector import SemanticCandidateSelector
 from .utils import join_punctuated_tokens
 
 NGRAMS_N = 1
@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 MIN_COMPOSITE_SIMILARITY = 1.0
 
 
-class CompositeCandidateSelector(CandidateSelector):
+class CompositeCandidateSelector(SemanticCandidateSelector):
     """
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
 
@@ -96,7 +96,7 @@ class CompositeCandidateSelector(CandidateSelector):
         # ortho_members = [members[i][0] for i in ortho_member_idx]
 
         # sorted for the sake of consist composite ids
-        ids = sorted([m[0].id for m in members])
+        ids = sorted([m[0].id for m in members if m[0].id is not None])
 
         # form name from comprising candidates
         name = self._form_composite_name([m[0] for m in members])
@@ -177,10 +177,10 @@ class CompositeCandidateSelector(CandidateSelector):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        if not entity.vector or not entity.spacy_doc:
+        if not entity.spacy_doc:
             raise ValueError("Entity must have a vector")
 
-        match, match_score, vector = super().__call__(entity)
+        match, match_score, vector = super().select_candidate_from_entity(entity)
 
         if match_score >= self.min_similarity or not self._is_composite_eligible(
             entity

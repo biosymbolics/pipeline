@@ -6,6 +6,7 @@ from torch.nn import functional as F
 import networkx as nx
 from functools import reduce
 import logging
+from scispacy.candidate_generation import MentionCandidate, KnowledgeBase
 
 from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
@@ -14,6 +15,8 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
+from core.ner.types import CanonicalEntity
+from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
 
@@ -134,7 +137,7 @@ def similarity_with_residual_penalty(
     if distance is None:
         _distance = F.cosine_similarity(mention_vector, candidate_vector, dim=0)
     else:
-        _distance = distance
+        _distance = torch.tensor(distance)
 
     similarity = 2 - _distance
 
@@ -262,7 +265,7 @@ def join_punctuated_tokens(doc: Doc) -> list[Token | Span]:
     join_tuples = [(pi - 1, pi, pi + 1) for pi in punct_indices]
     join_indices = flatten(join_tuples)
     join_starts = [j[0] for j in join_tuples]
-    tokens = []
+    tokens: list[Token | Span] = []
     for i in range(len(doc)):
         if i in join_indices:
             if i in join_starts:
@@ -273,3 +276,56 @@ def join_punctuated_tokens(doc: Doc) -> list[Token | Span]:
             tokens.append(doc[i])
 
     return tokens
+
+
+def candidate_to_canonical(
+    candidate: MentionCandidate, kb: KnowledgeBase
+) -> CanonicalEntity:
+    """
+    Convert a MentionCandidate to a CanonicalEntity
+    """
+    # go to kb to get canonical name
+    entity = kb.cui_to_entity[candidate.concept_id]
+    name = clean_umls_name(
+        entity.concept_id,
+        entity.canonical_name,
+        entity.aliases,
+        entity.types,
+        False,
+    )
+
+    return CanonicalEntity(
+        id=entity.concept_id,
+        ids=[entity.concept_id],
+        name=name,
+        aliases=entity.aliases,
+        description=entity.definition,
+        types=entity.types,
+    )
+
+
+COMPOSITE_WORD_OVERRIDES = {
+    "modulator": "C0005525",  # "Biological Response Modifiers"
+    "modulators": "C0005525",
+    "binder": "C1145667",  # "Binding action"
+    "binders": "C1145667",
+}
+
+
+def apply_umls_word_overrides(
+    text: str, candidates: list[MentionCandidate]
+) -> list[MentionCandidate]:
+    """
+    Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
+    """
+    # look for any overrides (terms -> candidate)
+    has_override = text.lower() in COMPOSITE_WORD_OVERRIDES
+    if has_override:
+        return [
+            MentionCandidate(
+                concept_id=COMPOSITE_WORD_OVERRIDES[text.lower()],
+                aliases=[text],
+                similarities=[1],
+            )
+        ]
+    return candidates

@@ -228,7 +228,7 @@ class EntityCleaner:
                     **{  # type: ignore
                         **orig_ents[i]._asdict(),
                         "normalized_term": modified_texts[i],
-                        "linked_entity": orig_ents[i].linked_entity,
+                        "canonical_entity": orig_ents[i].canonical_entity,
                     }
                 )
                 for i in range(len(orig_ents))

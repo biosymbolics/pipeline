@@ -13,7 +13,7 @@ from system import initialize
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from core.ner import NerTagger
+from core.ner.normalizer import TermNormalizer
 from constants.core import BASE_DATABASE_URL
 from core.ner.cleaning import RE_FLAGS
 from data.domain.biomedical import (
@@ -97,7 +97,7 @@ def is_intervention(intervention_str: str) -> bool:
 
 
 def transform_ct_records(
-    ctgov_records: Sequence[dict],  # tagger: NerTagger
+    ctgov_records: Sequence[dict], normalizer: TermNormalizer
 ) -> Sequence[TrialSummary]:
     """
     Transform ctgov records
@@ -111,34 +111,44 @@ def transform_ct_records(
     select intervention, count(*) from trials, unnest(interventions) intervention, patent_to_trial ptt where ptt.nct_id=trials.nct_id group by intervention order by count(*) desc;
     """
 
-    # intervention_sets = [rec["interventions"] for rec in ctgov_records]
+    intervention_sets = [rec["interventions"] for rec in ctgov_records]
 
-    # cleaners: list[Callable[[list[str]], list[str]]] = [
-    #     lambda interventions: dedup(interventions),
-    #     lambda interventions: list(filter(is_intervention, interventions)),
-    # ]
-    # interventions = reduce(
-    #     lambda x, cleaner: cleaner(x), cleaners, flatten(intervention_sets)
-    # )
-    # logger.info(
-    #     "Extracting intervention names for %s strings (e.g. %s)",
-    #     len(interventions),
-    #     interventions[0:10],
-    # )
-    # norm_map = tagger.extract_string_map(interventions)
+    cleaners: list[Callable[[list[str]], list[str]]] = [
+        lambda interventions: dedup(interventions),
+        lambda interventions: list(filter(is_intervention, interventions)),
+    ]
+    interventions = reduce(
+        lambda x, cleaner: cleaner(x), cleaners, flatten(intervention_sets)
+    )
+    logger.info(
+        "Extracting intervention names for %s strings (e.g. %s)",
+        len(interventions),
+        interventions[0:10],
+    )
+    linked_ents = normalizer.normalize_strings(interventions)
+    norm_map = {
+        t: de.canonical_entity.name
+        for t, de in zip(interventions, linked_ents)
+        if de.canonical_entity is not None
+    }
 
-    # # normalize interventions, dropping those without a normalized mapping
-    # def normalize_interventions(interventions: list[str]):
-    #     return compact(flatten([norm_map.get(i) for i in interventions]))
+    # normalize interventions, dropping those without a normalized mapping
+    def normalize_interventions(interventions: list[str]):
+        return compact(flatten([norm_map.get(i) for i in interventions]))
 
-    # return [
-    #     raw_to_trial_summary(
-    #         TrialRecord(**{**rec, "interventions": normalize_interventions(rec["interventions"])})
-    #     )
-    #     for rec in ctgov_records
-    # ]
+    return [
+        raw_to_trial_summary(
+            TrialRecord(
+                **{
+                    **rec,
+                    "interventions": normalize_interventions(rec["interventions"]),
+                }
+            )
+        )
+        for rec in ctgov_records
+    ]
 
-    return [raw_to_trial_summary(TrialRecord(**rec)) for rec in ctgov_records]
+    # return [raw_to_trial_summary(TrialRecord(**rec)) for rec in ctgov_records]
 
 
 def ingest_trials():
@@ -181,14 +191,11 @@ def ingest_trials():
         group by studies.nct_id
     """
 
-    # tagger = NerTagger(
-    #     # TODO: biologics, devices, maybe dosage_forms
-    #     entity_types=frozenset(["compounds", "mechanisms"]),
-    #     link=True,
-    #     additional_cleaners=[
-    #         lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
-    #     ],
-    # )
+    normalizer = TermNormalizer(
+        additional_cleaners=[
+            lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
+        ],
+    )
     trial_db = f"{BASE_DATABASE_URL}/aact"
     PsqlDatabaseClient(trial_db).truncate_table("trials")
 
@@ -197,7 +204,7 @@ def ingest_trials():
         source_sql,
         f"{BASE_DATABASE_URL}/patents",
         "trials",
-        transform=lambda batch, _: transform_ct_records(batch),  # tagger),
+        transform=lambda batch, _: transform_ct_records(batch, normalizer),
         transform_schema=lambda schema: {
             **schema,
             "text_search": "tsvector",

@@ -355,6 +355,9 @@ enum BiomedicalEntityType {
     // both
     PATHWAY
     TARGET
+
+    // other
+    UNKNOWN
 }
 
 enum ContextOfUse {
@@ -368,8 +371,8 @@ enum ContextOfUse {
 }
 
 enum Source {
-    biosym
-    ctgov
-    fda
-    umls
+    BIOSYM
+    CTGOV
+    FDA
+    UMLS
 }

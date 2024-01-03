@@ -1,11 +1,9 @@
 """
 Utils for copying approvals data
 """
-from dataclasses import dataclass
 from datetime import datetime
 import re
 import sys
-from pydash import flatten, uniq
 from prisma import Prisma
 from prisma.models import (
     BiomedicalEntity,
@@ -13,10 +11,14 @@ from prisma.models import (
     Intervenable,
     RegulatoryApproval,
 )
-from prisma.types import BiomedicalEntityCreateInput
-from prisma.enums import BiomedicalEntityType
+from prisma.enums import BiomedicalEntityType, Source
+from prisma.types import (
+    BiomedicalEntityCreateInput,
+    BiomedicalEntityCreateWithoutRelationsInput,
+)
 import asyncio
 import logging
+from pydash import compact, group_by, omit, uniq
 
 from system import initialize
 
@@ -24,10 +26,12 @@ initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.ner import TermNormalizer
+from core.ner.types import CanonicalEntity
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from constants.core import REGULATORY_APPROVAL_TABLE
-from typings.core import Dataclass
 from utils.re import get_or_re
+
+from .types import InterventionIntermediate
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -116,73 +120,183 @@ def get_source_sql(fields=SOURCE_FIELDS):
 """
 
 
-@dataclass(frozen=True)
-class InterventionIntermediate(Dataclass):
-    generic_name: str
-    brand_name: str
-    active_ingredients: list[str]
-    pharmacologic_classes: list[str]
+def merge_insert_records(
+    groups: list[BiomedicalEntityCreateInput],
+) -> BiomedicalEntityCreateInput:
+    """
+    Merge records with same canonical id
+    """
+    return {
+        "canonical_id": groups[0].get("canonical_id"),
+        "name": groups[0]["name"],
+        "entity_type": groups[0]["entity_type"],
+        "synonyms": uniq(compact([s for g in groups for s in g.get("synonyms") or []])),
+        "sources": groups[0].get("sources") or [],
+    }
+
+
+def create_intervention_records(
+    iis: list[InterventionIntermediate],
+    canonical_map: dict[str, CanonicalEntity],
+    intervention_type_map: dict[str, BiomedicalEntityType],
+) -> list[BiomedicalEntityCreateInput]:
+    """
+    Create records for intervention insert
+    """
+
+    def get_insert_record(ii: InterventionIntermediate) -> BiomedicalEntityCreateInput:
+        canonical = canonical_map.get(ii.generic_name)
+
+        active_ingredient_ids = [
+            canonical_map[i].id if id in canonical_map else None
+            for i in ii.active_ingredients
+        ]
+
+        pharmacologic_class_ids = [
+            canonical_map[i].id if i in canonical_map else None
+            for i in ii.pharmacologic_classes
+        ]
+
+        if canonical is not None:
+            conditional_fields = {
+                "canonical_id": canonical.id,
+                "name": canonical.name.lower(),
+                "entity_type": canonical.type,
+                "sources": [Source.UMLS],
+            }
+        else:
+            conditional_fields = {
+                "canonical_id": None,
+                "name": ii.generic_name,
+                "entity_type": intervention_type_map[ii.generic_name],
+                "sources": [Source.FDA],
+            }
+
+        return BiomedicalEntityCreateInput(
+            **{
+                **conditional_fields,  # type: ignore
+                "synonyms": [ii.generic_name, ii.brand_name],  # TODO: include UMLS syns
+                "comprised_of": {
+                    "connect": [
+                        {"canonical_id": ai_id}
+                        for ai_id in uniq(compact(active_ingredient_ids))
+                    ],
+                },
+                "parents": {
+                    "connect": [
+                        {"canonical_id": pc_id}
+                        for pc_id in uniq(compact(pharmacologic_class_ids))
+                    ],
+                },
+            }
+        )
+
+    # merge records with same canonical id
+    irs = [get_insert_record(ii) for ii in iis]
+    irs_grouped = group_by(
+        [ir for ir in irs if ir.get("canonical_id") is not None], "canonical_id"
+    )
+    all_intervention_records = [
+        *[
+            merge_insert_records(groups)
+            for id, groups in irs_grouped.items()
+            if id is not None
+        ],
+        *[ir for ir in irs if ir.get("canonical_id") is None],
+    ]
+    return all_intervention_records
+
+
+def get_intervention_canonical_map(
+    intervention_type_map: dict[str, BiomedicalEntityType], normalizer: TermNormalizer
+):
+    """
+    Get canonical map for interventions
+    """
+    non_combination_type_map = {
+        k: v
+        for k, v in intervention_type_map.items()
+        if v != BiomedicalEntityType.COMBINATION
+    }
+
+    # normalize all intervention names, except if combos
+    canonical_docs = normalizer.normalize_strings(list(non_combination_type_map.keys()))
+
+    # map for quick lookup of links
+    canonical_map = {
+        nt[0]: de.canonical_entity
+        for nt, de in zip(non_combination_type_map.items(), canonical_docs)
+        if de.canonical_entity is not None
+    }
+    return canonical_map
 
 
 async def copy_interventions():
-    normalizer = TermNormalizer()
+    normalizer = TermNormalizer(candidate_selector="CandidateSelector")
     fields = [
         "lower(prod.product_name) as brand_name",
         "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
         "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
         "ARRAY_REMOVE(ARRAY_AGG(distinct lower(pharma_class.name)), NULL)::text[] as pharmacologic_classes",
     ]
-    records = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql(fields))
-    iis = [InterventionIntermediate(**r) for r in records]
+    source_records = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql(fields))
+    source_interventions = [InterventionIntermediate(**r) for r in source_records]
 
     db = Prisma(auto_register=True)
     await db.connect()
 
-    constituents = flatten(
-        [r["active_ingredients"] for r in records if len(r["active_ingredients"]) > 1]
+    intervention_type_map = {
+        # drugs broken out by combo (more than one active ingredient) or single/compound
+        **{
+            i.generic_name: BiomedicalEntityType.COMBINATION
+            if len(i.active_ingredients) > 1
+            else BiomedicalEntityType.COMPOUND
+            for i in source_interventions
+        },
+        # active ingredients for combination drugs
+        **{
+            ai: BiomedicalEntityType.COMPOUND
+            for i in source_interventions
+            for ai in i.active_ingredients
+            if len(i.active_ingredients) > 1
+        },
+        # mechanisms / pharmacologic classes
+        **{
+            pc: BiomedicalEntityType.MECHANISM
+            for i in source_interventions
+            for pc in i.pharmacologic_classes
+        },
+    }
+
+    canonical_map = get_intervention_canonical_map(intervention_type_map, normalizer)
+    intervention_recs = create_intervention_records(
+        source_interventions, canonical_map, intervention_type_map
     )
-    pharma_classes = flatten([r["pharmacologic_classes"] for r in records])
-    generic_names = flatten([r["generic_name"] for r in records])
 
-    # slow
-    all_ints = uniq([*generic_names, *constituents, *pharma_classes])
-    linked_ents = normalizer.normalize(all_ints)
-
-    # TODO: link only? or link only and if no match, NER?
-    link_map = {k: v.linked_entity for k, v in zip(all_ints, linked_ents)}
-
+    # create flat records
     await BiomedicalEntity.prisma().create_many(
         data=[
-            *[
-                {"name": c, "entity_type": BiomedicalEntityType.COMPOUND}
-                for c in uniq(flatten(constituents))
-            ],
-            *[
-                {"name": pc, "entity_type": BiomedicalEntityType.MECHANISM}
-                for pc in uniq(flatten(pharma_classes))
-            ],
+            BiomedicalEntityCreateWithoutRelationsInput(
+                **omit(dict(ir), "comprised_of", "parents")  # type: ignore
+            )
+            for ir in intervention_recs
         ],
         skip_duplicates=True,
     )
 
-    for ii in iis:
-        crud: BiomedicalEntityCreateInput = {
-            "name": ii.generic_name,
-            "comprised_of": {
-                "connect": [{"name": i} for i in ii.active_ingredients],
-            },
-            "parents": {
-                "connect": [{"name": i} for i in ii.pharmacologic_classes],
-            },
-            "entity_type": BiomedicalEntityType.COMPOUND,
-            "synonyms": [ii.brand_name],
+    # update records with relationships
+    intervention_recs_nested = [
+        ir
+        for ir in intervention_recs
+        if (ir.get("comprised_of") or ir.get("parents")) is not None
+    ]
+    for irn in intervention_recs_nested:
+        update = {
+            "comprised_of": irn.get("comprised_of"),
+            "parents": irn.get("parents"),
         }
-        await BiomedicalEntity.prisma().upsert(
-            where={"name": ii.generic_name},
-            data={
-                "create": crud,
-                "update": crud,  # type: ignore
-            },
+        await BiomedicalEntity.prisma().update(
+            where={"name": irn["name"]}, data=update  # type: ignore
         )
 
 
@@ -221,6 +335,7 @@ async def copy_all_approvals():
         skip_duplicates=True,
     )
 
+    # create "indicatable" records, those that map approval to a canonical indication
     await Indicatable.prisma().create_many(
         data=[
             {"name": i, "regulatory_approval_id": a["id"]}
@@ -230,6 +345,7 @@ async def copy_all_approvals():
         skip_duplicates=True,
     )
 
+    # create "intervenable" records, those that map approval to a canonical intervention
     await Intervenable.prisma().create_many(
         data=[
             {
@@ -246,6 +362,8 @@ async def copy_all_approvals():
     )
 
     await db.disconnect()
+
+    # create search index (unsupported by Prisma)
     raw_client = PsqlDatabaseClient()
     raw_client.execute_query(
         f"""
