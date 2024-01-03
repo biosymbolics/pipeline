@@ -1,44 +1,71 @@
 """
 Utils for copying approvals data
 """
+import asyncio
+import datetime
 from functools import reduce
 import re
 import sys
 import logging
 from typing import Callable, Sequence
-from pydash import compact, flatten
+from prisma import Prisma
+from pydash import compact, flatten, omit
+from prisma.models import (
+    Indicatable,
+    Intervenable,
+    Trial,
+)
+from prisma.types import TrialCreateWithoutRelationsInput
+
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from core.ner.normalizer import TermNormalizer
-from constants.core import BASE_DATABASE_URL
+from constants.core import ETL_BASE_DATABASE_URL, TRIALS_TABLE
 from core.ner.cleaning import RE_FLAGS
 from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
-from typings.trials import TrialRecord, TrialSummary, raw_to_trial_summary
-from utils.list import dedup
+from data.domain.trials import extract_max_timeframe
+from scripts.approvals.copy_approvals import get_preferred_pharmacologic_class
+
+from .enums import (
+    ComparisonTypeParser,
+    HypothesisTypeParser,
+    InterventionTypeParser,
+    SponsorTypeParser,
+    TerminationReasonParser,
+    TrialDesignParser,
+    TrialMasking,
+    TrialMaskingParser,
+    TrialPhaseParser,
+    TrialPurposeParser,
+    TrialRandomizationParser,
+    TrialRecord,
+    TrialStatusParser,
+    TrialSummary,
+    calc_duration,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SINGLE_FIELDS = {
-    "studies.nct_id": "nct_id",
+    "studies.nct_id": "id",
     "studies.acronym": "acronym",
     "coalesce(studies.official_title, studies.brief_title)": "title",
     "studies.enrollment": "enrollment",  # Actual or est, by enrollment_type
-    "studies.last_update_posted_date": "last_updated_date",
+    "studies.last_update_posted_date::TIMESTAMP": "last_updated_date",
     "studies.overall_status": "status",  # vs last_known_status
     "studies.phase": "phase",
     "studies.number_of_arms": "arm_count",
-    "studies.primary_completion_date": "end_date",  # Actual or est.
+    "studies.primary_completion_date::TIMESTAMP": "end_date",  # Actual or est.
     "studies.source": "sponsor",  # lead sponsor
-    "studies.start_date": "start_date",
-    "studies.why_stopped": "why_stopped",
+    "studies.start_date::TIMESTAMP": "start_date",
+    "studies.why_stopped": "termination_description",
     "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
     "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
     "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
@@ -48,12 +75,10 @@ SINGLE_FIELDS = {
     "outcome_analyses.non_inferiority_types": "hypothesis_types",
     # TODO this will break; just a placeholder.
     # update trials set intervention=lower(interventions[0]) where array_length(interventions, 1) > 0 and intervention is null;
-    "COALESCE(mesh_interventions[0].mesh_term, interventions[0].name)": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
+    # "COALESCE(mesh_interventions[1].mesh_term, interventions[1].name)": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
 }
 
 MULTI_FIELDS = {
-    "conditions.name": "conditions",
-    "mesh_conditions.mesh_term": "mesh_conditions",
     "design_groups.group_type": "arm_types",
     "interventions.name": "interventions",
     "interventions.intervention_type": "intervention_types",
@@ -67,102 +92,23 @@ MULI_FIELDS_SQL = [
     for f, new_f in MULTI_FIELDS.items()
 ]
 
-FIELDS = SINGLE_FIELDS_SQL + MULI_FIELDS_SQL
-
-SEARCH_FIELDS = {
-    "title": "title",
-    "acronym": "coalesce(acronym, '')",
-    "conditions": "array_to_string(conditions, ' ')",
-    "interventions": "array_to_string(interventions, ' ')",
-    "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
-    "normalized_sponsor": "coalesce(normalized_sponsor, '')",
-    "sponsor": "coalesce(sponsor, '')",
-    "pharmacologic_class": "coalesce(pharmacologic_class, '')",
-}
-
-
-def is_control(intervention_str: str) -> bool:
-    return (
-        re.match(
-            r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Normal saline|Therapeutic procedure|Quality-of-Life Assessment|Questionnaire Administration|Dosage)s?\b.*",
-            intervention_str,
-            flags=RE_FLAGS,
-        )
-        is not None
-    )
-
-
-def is_intervention(intervention_str: str) -> bool:
-    return not is_control(intervention_str)
-
-
-def transform_ct_records(
-    ctgov_records: Sequence[dict], normalizer: TermNormalizer
-) -> Sequence[TrialSummary]:
-    """
-    Transform ctgov records
-    Slow due to intervention mapping!!
-
-    - normalizes/extracts intervention names
-    - normalizes status etc.
-
-    good checks:
-    select intervention, count(*) from trials, unnest(interventions) intervention group by intervention order by count(*) desc;
-    select intervention, count(*) from trials, unnest(interventions) intervention, patent_to_trial ptt where ptt.nct_id=trials.nct_id group by intervention order by count(*) desc;
-    """
-
-    intervention_sets = [rec["interventions"] for rec in ctgov_records]
-
-    cleaners: list[Callable[[list[str]], list[str]]] = [
-        lambda interventions: dedup(interventions),
-        lambda interventions: list(filter(is_intervention, interventions)),
+SOURCE_FIELDS = (
+    SINGLE_FIELDS_SQL
+    + MULI_FIELDS_SQL
+    + [
+        """
+        array_remove(array_cat(
+            array_agg(distinct conditions.name),
+            array_agg(distinct mesh_conditions.mesh_term)
+        ), NULL) as indications
+        """
     ]
-    interventions = reduce(
-        lambda x, cleaner: cleaner(x), cleaners, flatten(intervention_sets)
-    )
-    logger.info(
-        "Extracting intervention names for %s strings (e.g. %s)",
-        len(interventions),
-        interventions[0:10],
-    )
-    linked_ents = normalizer.normalize_strings(interventions)
-    norm_map = {
-        t: de.canonical_entity.name
-        for t, de in zip(interventions, linked_ents)
-        if de.canonical_entity is not None
-    }
-
-    # normalize interventions, dropping those without a normalized mapping
-    def normalize_interventions(interventions: list[str]):
-        return compact(flatten([norm_map.get(i) for i in interventions]))
-
-    return [
-        raw_to_trial_summary(
-            TrialRecord(
-                **{
-                    **rec,
-                    "interventions": normalize_interventions(rec["interventions"]),
-                }
-            )
-        )
-        for rec in ctgov_records
-    ]
-
-    # return [raw_to_trial_summary(TrialRecord(**rec)) for rec in ctgov_records]
+)
 
 
-def ingest_trials():
-    """
-    Copy patent clinical trials from ctgov to patents
-    TODO: use sponsors table to get agency_class
-    """
-
-    # reported_events (event_type == 'serious', adverse_event_term, subjects_affected)
-    # subqueries to avoid combinatorial explosion
+def get_source_sql(fields=SOURCE_FIELDS):
     source_sql = f"""
-        select {", ".join(FIELDS)},
-        '' as normalized_sponsor,
-        '' as pharmacologic_class
+        select {", ".join(fields)}
         from designs, studies
         JOIN conditions on conditions.nct_id = studies.nct_id
         LEFT JOIN browse_interventions as mesh_interventions on mesh_interventions.nct_id = studies.nct_id AND mesh_interventions.mesh_type = 'mesh-list'
@@ -189,126 +135,165 @@ def ingest_trials():
         where study_type = 'Interventional'
         AND designs.nct_id = studies.nct_id
         group by studies.nct_id
+        limit 100
     """
+    return source_sql
 
-    normalizer = TermNormalizer(
-        additional_cleaners=[
-            lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS)
-        ],
-    )
-    trial_db = f"{BASE_DATABASE_URL}/aact"
-    PsqlDatabaseClient(trial_db).truncate_table("trials")
 
-    PsqlDatabaseClient.copy_between_db(
-        trial_db,
-        source_sql,
-        f"{BASE_DATABASE_URL}/patents",
-        "trials",
-        transform=lambda batch, _: transform_ct_records(batch, normalizer),
-        transform_schema=lambda schema: {
-            **schema,
-            "text_search": "tsvector",
-            "duration": "integer",
-            "max_timeframe": "integer",
-            "blinding": "text",
-            "comparison_type": "text",
-            "hypothesis_type": "text",
-            "intervention_type": "text",
-            "sponsor_type": "text",
-            "termination_reason": "text",
+SEARCH_FIELDS = {
+    "title": "title",
+    "acronym": "coalesce(acronym, '')",
+    "conditions": "array_to_string(conditions, ' ')",
+    "interventions": "array_to_string(interventions, ' ')",
+    "mesh_conditions": "array_to_string(mesh_conditions, ' ')",
+    "normalized_sponsor": "coalesce(normalized_sponsor, '')",
+    "sponsor": "coalesce(sponsor, '')",
+    "pharmacologic_class": "coalesce(pharmacologic_class, '')",
+}
+
+
+def is_intervention(intervention_str: str) -> bool:
+    def is_control(intervention_str: str) -> bool:
+        return (
+            re.match(
+                r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Normal saline|Therapeutic procedure|Quality-of-Life Assessment|Questionnaire Administration|Dosage)s?\b.*",
+                intervention_str,
+                flags=RE_FLAGS,
+            )
+            is not None
+        )
+
+    return not is_control(intervention_str)
+
+
+def raw_to_trial_summary(record: dict) -> TrialCreateWithoutRelationsInput:
+    """
+    Get trial summary from db record
+
+    - formats start and end date
+    - calculates duration
+    - etc
+    """
+    trial = TrialRecord(**record)
+    design = TrialDesignParser.find_from_record(trial)
+    masking = TrialMaskingParser.find(trial.masking)
+
+    return TrialCreateWithoutRelationsInput(
+        **{
+            **omit(
+                trial,
+                "hypothesis_types",
+                "interventions",
+                "indications",
+                "intervention_types",
+                "primary_outcomes",
+                "sponsor",
+                "time_frames",
+            ),  # type: ignore
+            # "blinding": TrialBlinding.find(masking),
+            "comparison_type": ComparisonTypeParser.find(
+                trial["arm_types"] or [], trial["interventions"], design
+            ),
+            "design": design,
+            "dropout_reasons": trial.dropout_reasons or [],
+            "duration": calc_duration(trial["start_date"], trial["end_date"]),  # type: ignore
+            "max_timeframe": extract_max_timeframe(trial["time_frames"]),
+            "hypothesis_type": HypothesisTypeParser.find(trial["hypothesis_types"]),
+            "intervention_type": InterventionTypeParser.find(
+                trial["intervention_types"]
+            ),
+            "masking": masking,
+            "phase": TrialPhaseParser.find(trial.phase),
+            "purpose": TrialPurposeParser.find(trial.purpose),
+            "randomization": TrialRandomizationParser.find(trial.randomization, design),
+            # "sponsor_type": SponsorTypeParser.find(trial.sponsor),
+            "status": TrialStatusParser.find(trial.status),
+            "termination_reason": TerminationReasonParser.find(
+                trial.termination_description
+            ),
+            "url": f"https://clinicaltrials.gov/study/{trial.id}",
         },
     )
 
-    client = PsqlDatabaseClient()
 
-    # NOTE: this is a flaw. synonym_map is populated with trial sponsors,
-    # so this will only work if we're loading trials for a subsequent time.
-    # TODO: this isn't working as expected; maybe some sponsors are missing from synonym_map?
-    # e.g. "respirion pharmaceuticals pty ltd" -> "respirion"
-    # "british university in egypt" -> "british university"
-    client.execute_query(
-        """
-        update trials set normalized_sponsor=sm.term from
-        synonym_map sm where sm.synonym = lower(sponsor)
-        """
-    )
+SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/aact"
 
-    search_sql = ("|| ' ' ||").join([sql for sql in SEARCH_FIELDS.values()])
-    client.execute_query(
-        f"update trials SET text_search = to_tsvector('english', {search_sql})"
-    )
 
-    pc_sql = """
-    UPDATE trials SET pharmacologic_class=lower(ra.pharmacologic_class)
-    FROM regulatory_approvals ra
-    WHERE lower(ra.generic_name)=lower(intervention)
-    AND ra.pharmacologic_class IS NOT null
-    AND trials.intervention IS NOT null;
+async def ingest_trials():
+    """
+    Copy data from Postgres (drugcentral) to Postgres (patents)
     """
 
-    client.create_indices(
+    additional_cleaners = [
+        lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS),
+        lambda interventions: list(filter(is_intervention, interventions)),
+    ]
+    source_records = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql())
+    db = Prisma(auto_register=True)
+    await db.connect()
+
+    # create approval records
+    await Trial.prisma().create_many(
+        data=[
+            {
+                **raw_to_trial_summary(t),
+                "text_for_search": "",
+            }
+            for t in source_records
+        ],
+        skip_duplicates=True,
+    )
+
+    # create "indicatable" records, those that map approval to a canonical indication
+    await Indicatable.prisma().create_many(
+        data=[
+            {"name": i.lower(), "trial_id": t["id"]}
+            for t in source_records
+            for i in t["indications"]
+        ],
+        skip_duplicates=True,
+    )
+
+    # create "intervenable" records, those that map approval to a canonical intervention
+    await Intervenable.prisma().create_many(
+        data=[
+            {
+                "name": i.lower(),
+                "instance_rollup": i.lower(),
+                "is_primary": True,
+                "trial_id": t["id"],
+            }
+            for t in source_records
+            for i in t["interventions"]
+        ],
+        skip_duplicates=True,
+    )
+
+    await db.disconnect()
+
+    # create search index (unsupported by Prisma)
+    raw_client = PsqlDatabaseClient()
+    raw_client.execute_query(
+        f"""
+        UPDATE {TRIALS_TABLE} SET search = to_tsvector('english', text_for_search)
+        """,
+    )
+    raw_client.create_indices(
         [
             {
-                "table": "trials",
-                "column": "nct_id",
-            },
-            {
-                "table": "trials",
-                "column": "interventions",
-                "is_gin": True,
-            },
-            {
-                "table": "trials",
-                "column": "normalized_sponsor",
-            },
-            {
-                "table": "trials",
-                "column": "text_search",
+                "table": TRIALS_TABLE,
+                "column": "search",
                 "is_gin": True,
             },
         ]
     )
 
 
-def create_patent_to_trial():
-    """
-    Create table that maps patent applications to trials
-
-    NOTE: we're currently doing some post-hoc term adjustments on annotations,
-    and this must be run before.
-    """
-    client = PsqlDatabaseClient()
-    att_query = """
-        select a.publication_number, nct_id
-        from trials t,
-        aggregated_annotations a,
-        applications p
-        where p.publication_number=a.publication_number
-        AND t.normalized_sponsor = any(a.terms) -- sponsor match
-        AND t.interventions::text[] && a.terms -- intervention match
-        AND t.start_date >= p.priority_date -- seemingly the trial starts after the patent was filed
-    """
-    client.create_from_select(att_query, "patent_to_trial")
-    client.create_indices(
-        [
-            {
-                "table": "patent_to_trial",
-                "column": "publication_number",
-            },
-            {
-                "table": "patent_to_trial",
-                "column": "nct_id",
-            },
-        ]
-    )
-
-
-def copy_ctgov():
+async def copy_ctgov():
     """
     Copy data from ctgov to patents
     """
-    ingest_trials()
-    # create_patent_to_trial()
+    await ingest_trials()
 
 
 if __name__ == "__main__":
@@ -321,4 +306,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    copy_ctgov()
+    asyncio.run(copy_ctgov())

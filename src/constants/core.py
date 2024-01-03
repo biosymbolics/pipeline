@@ -11,7 +11,7 @@ AGGREGATED_ANNOTATIONS_TABLE = "aggregated_annotations"  # a mat view
 REGULATORY_APPROVAL_TABLE = "regulatory_approval"
 PATENT_TO_REGULATORY_APPROVAL_TABLE = "patent_to_regulatory_approval"
 PATENT_TO_TRIAL_TABLE = "patent_to_trial"
-TRIALS_TABLE = "trials"
+TRIALS_TABLE = "trial"
 APPLICATIONS_TABLE = "applications"
 PUBLICATION_NUMBER_MAP_TABLE = "publication_number_map"
 
@@ -26,6 +26,7 @@ logger.info("Environment is: %s", os.environ.get("ENV", "local"))
 
 IS_LOCAL = not os.environ.get("ENV") or os.environ.get("ENV") == "local"
 IS_DEPLOYED = not IS_LOCAL
+ETL_BASE_DATABASE_URL = "postgres://localhost:5432"
 BASE_DATABASE_URL = "postgres://biosym:ok@localhost:5432"
 DATABASE_URL = (
     os.environ.get("DATABASE_URL")

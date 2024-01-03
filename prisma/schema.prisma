@@ -83,31 +83,34 @@ model Trial {
     id                      String                   @id @unique
     abstract                String?
     acronym                 String?
+    arm_count               Int?                     @default(-1)
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
     dropout_count           Int?
     dropout_reasons         String[]
     duration                Int?
-    end_date                DateTime
+    end_date                DateTime?
     enrollment              Int?
     hypothesis_type         HypothesisType // calc field??
     indications             Indicatable[]
     interventions           Intervenable[]
+    intervention_type       BiomedicalEntityType
     last_updated_date       DateTime
     masking                 TrialMasking
     max_timeframe           Int?
     outcomes                TrialOutcome[]
-    pharmacologic_class     String
     phase                   TrialPhase
     purpose                 String
+    randomization           TrialRandomization
     search                  Unsupported("tsvector")?
     sponsor_id              Int?                     @unique
     sponsor                 Ownable?
-    start_date              DateTime
+    start_date              DateTime?
     status                  TrialStatus
     termination_description String?
     termination_reason      TerminationReason
+    text_for_search         String
     title                   String
     url                     String
 
@@ -281,6 +284,17 @@ enum TrialPhase {
     UNKNOWN
 }
 
+enum TrialPurpose {
+    TREATMENT
+    PREVENTION
+    DIAGNOSTIC
+    BASIC_SCIENCE
+    SUPPORTIVE_CARE
+    DEVICE
+    OTHER
+    UNKNOWN
+}
+
 enum TrialRandomization {
     RANDOMIZED
     NON_RANDOMIZED
@@ -357,6 +371,7 @@ enum BiomedicalEntityType {
     TARGET
 
     // other
+    OTHER
     UNKNOWN
 }
 
