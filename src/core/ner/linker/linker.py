@@ -14,6 +14,8 @@ LinkedEntityMap = dict[str, CanonicalEntity]
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+CANDIDATE_SELECTOR_MODULE = "core.ner.linker"
+
 
 class TermLinker:
     """
@@ -40,7 +42,9 @@ class TermLinker:
         """
         # lazy (UMLS is large)
         logger.info("Loading CompositeCandidateSelector (might be slow...)")
-        modules = __import__("core.ner.linker", fromlist=[candidate_selector_class])
+        modules = __import__(
+            CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_class]
+        )
         self.candidate_selector: AbstractCandidateSelector = getattr(
             modules, candidate_selector_class
         )(*args, **kwargs)
