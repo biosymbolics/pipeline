@@ -1,6 +1,7 @@
 """
 Utils for copying approvals data
 """
+from dataclasses import dataclass
 from datetime import datetime
 import re
 import sys
@@ -13,12 +14,12 @@ from prisma.models import (
 )
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
-    BiomedicalEntityCreateInput,
+    BiomedicalEntityUpdateInput,
     BiomedicalEntityCreateWithoutRelationsInput,
 )
 import asyncio
 import logging
-from pydash import compact, group_by, omit, uniq
+from pydash import compact, flatten, group_by, omit, uniq
 
 from system import initialize
 
@@ -31,7 +32,11 @@ from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from constants.core import REGULATORY_APPROVAL_TABLE
 from utils.re import get_or_re
 
-from .types import InterventionIntermediate
+from .types import (
+    BiomedicalEntityCreateInputWithRelationIds,
+    InterventionIntermediate,
+    RelationIdFieldMap,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -120,118 +125,136 @@ def get_source_sql(fields=SOURCE_FIELDS):
 """
 
 
-def merge_insert_records(
-    groups: list[BiomedicalEntityCreateInput],
-) -> BiomedicalEntityCreateInput:
+def maybe_merge_insert_records(
+    groups: list[BiomedicalEntityCreateInputWithRelationIds],
+    canonical_id: str,
+) -> list[BiomedicalEntityCreateInputWithRelationIds]:
     """
     Merge records with same canonical id
     """
-    return {
-        "canonical_id": groups[0].get("canonical_id"),
-        "name": groups[0]["name"],
-        "entity_type": groups[0]["entity_type"],
-        "synonyms": uniq(compact([s for g in groups for s in g.get("synonyms") or []])),
-        "sources": groups[0].get("sources") or [],
-    }
+    # if no canonical id, then no merging
+    if canonical_id is None:
+        return groups
+
+    return [
+        {
+            "canonical_id": groups[0].get("canonical_id"),
+            "name": groups[0]["name"],
+            "entity_type": groups[0]["entity_type"],
+            "synonyms": uniq(
+                compact([s for g in groups for s in g.get("synonyms") or []])
+            ),
+            "sources": groups[0].get("sources") or [],
+            "comprised_of": uniq(
+                flatten([g.get("comprised_of") or [] for g in groups])
+            ),
+            "parents": uniq(flatten([g.get("parents") or [] for g in groups])),
+        }
+    ]
 
 
-def create_intervention_records(
-    iis: list[InterventionIntermediate],
+def create_entity_records(
+    insert_map: dict[str, BiomedicalEntityType],
+    source_map: dict[str, InterventionIntermediate],
     canonical_map: dict[str, CanonicalEntity],
-    intervention_type_map: dict[str, BiomedicalEntityType],
-) -> list[BiomedicalEntityCreateInput]:
+    relation_id_map: RelationIdFieldMap,
+    non_canonical_source: Source = Source.FDA,
+    synonym_fields: list[str] = ["brand_name"],
+) -> list[BiomedicalEntityCreateInputWithRelationIds]:
     """
-    Create records for intervention insert
+    Create records for entity insert
     """
 
-    def get_insert_record(ii: InterventionIntermediate) -> BiomedicalEntityCreateInput:
-        canonical = canonical_map.get(ii.generic_name)
+    def get_insert_record(orig_name: str) -> BiomedicalEntityCreateInputWithRelationIds:
+        source_rec = source_map.get(orig_name)
+        canonical = canonical_map.get(orig_name)
 
-        active_ingredient_ids = [
-            canonical_map[i].id if id in canonical_map else None
-            for i in ii.active_ingredients
-        ]
-
-        pharmacologic_class_ids = [
-            canonical_map[i].id if i in canonical_map else None
-            for i in ii.pharmacologic_classes
-        ]
+        if source_rec is not None:
+            rel_fields: dict[str, list[str]] = {
+                rel_field: uniq(
+                    compact(
+                        [
+                            canonical_map[i].id if i in canonical_map else None
+                            for i in source_rec[source_field]
+                        ]
+                    )
+                )
+                for rel_field, source_field in relation_id_map.items()
+            }
+            source_dependent_fields = {
+                "synonyms": [
+                    orig_name,
+                    *[str(source_rec[sf]) for sf in synonym_fields],
+                ],
+                **rel_fields,
+            }
+        else:
+            source_dependent_fields = {
+                "synonyms": [orig_name],
+            }
 
         if canonical is not None:
-            conditional_fields = {
+            canonical_dependent_fields = {
                 "canonical_id": canonical.id,
                 "name": canonical.name.lower(),
                 "entity_type": canonical.type,
                 "sources": [Source.UMLS],
             }
         else:
-            conditional_fields = {
+            canonical_dependent_fields = {
                 "canonical_id": None,
-                "name": ii.generic_name,
-                "entity_type": intervention_type_map[ii.generic_name],
-                "sources": [Source.FDA],
+                "name": orig_name,
+                "entity_type": insert_map[orig_name],
+                "sources": [non_canonical_source],
             }
 
-        return BiomedicalEntityCreateInput(
+        return BiomedicalEntityCreateInputWithRelationIds(
             **{
-                **conditional_fields,  # type: ignore
-                "synonyms": [ii.generic_name, ii.brand_name],  # TODO: include UMLS syns
-                "comprised_of": {
-                    "connect": [
-                        {"canonical_id": ai_id}
-                        for ai_id in uniq(compact(active_ingredient_ids))
-                    ],
-                },
-                "parents": {
-                    "connect": [
-                        {"canonical_id": pc_id}
-                        for pc_id in uniq(compact(pharmacologic_class_ids))
-                    ],
-                },
+                **canonical_dependent_fields,  # type: ignore
+                **source_dependent_fields,
             }
         )
 
     # merge records with same canonical id
-    irs = [get_insert_record(ii) for ii in iis]
-    irs_grouped = group_by(
-        [ir for ir in irs if ir.get("canonical_id") is not None], "canonical_id"
-    )
-    all_intervention_records = [
-        *[
-            merge_insert_records(groups)
-            for id, groups in irs_grouped.items()
-            if id is not None
-        ],
-        *[ir for ir in irs if ir.get("canonical_id") is None],
-    ]
-    return all_intervention_records
+    def merge_records():
+        flat_recs = [get_insert_record(name) for name in insert_map.keys()]
+        grouped_recs = group_by(flat_recs, "canonical_id")
+        merged_recs = flatten(
+            [
+                maybe_merge_insert_records(groups, cid)
+                for cid, groups in grouped_recs.items()
+            ]
+        )
+
+        return merged_recs
+
+    insert_records = merge_records()
+    return insert_records
 
 
-def get_intervention_canonical_map(
-    intervention_type_map: dict[str, BiomedicalEntityType], normalizer: TermNormalizer
+def get_canonical_map(
+    entity_type_map: dict[str, BiomedicalEntityType], normalizer: TermNormalizer
 ):
     """
     Get canonical map for interventions
     """
-    non_combination_type_map = {
-        k: v
-        for k, v in intervention_type_map.items()
-        if v != BiomedicalEntityType.COMBINATION
-    }
-
     # normalize all intervention names, except if combos
-    canonical_docs = normalizer.normalize_strings(list(non_combination_type_map.keys()))
+    canonical_docs = normalizer.normalize_strings(list(entity_type_map.keys()))
 
-    # map for quick lookup of links
+    # map for quick lookup of canonical entities
     canonical_map = {
         nt[0]: de.canonical_entity
-        for nt, de in zip(non_combination_type_map.items(), canonical_docs)
+        for nt, de in zip(entity_type_map.items(), canonical_docs)
         if de.canonical_entity is not None
     }
     return canonical_map
 
 
 async def copy_interventions():
+    relation_id_map = RelationIdFieldMap(
+        comprised_of="active_ingredients",
+        parents="pharmacologic_classes",
+    )
     normalizer = TermNormalizer(candidate_selector="CandidateSelector")
     fields = [
         "lower(prod.product_name) as brand_name",
@@ -241,11 +264,12 @@ async def copy_interventions():
     ]
     source_records = PsqlDatabaseClient(SOURCE_DB).select(query=get_source_sql(fields))
     source_interventions = [InterventionIntermediate(**r) for r in source_records]
+    source_map = {i.generic_name: i for i in source_interventions}
 
     db = Prisma(auto_register=True)
     await db.connect()
 
-    intervention_type_map = {
+    insert_map = {
         # drugs broken out by combo (more than one active ingredient) or single/compound
         **{
             i.generic_name: BiomedicalEntityType.COMBINATION
@@ -268,36 +292,40 @@ async def copy_interventions():
         },
     }
 
-    canonical_map = get_intervention_canonical_map(intervention_type_map, normalizer)
-    intervention_recs = create_intervention_records(
-        source_interventions, canonical_map, intervention_type_map
+    normalize_type_map = {
+        k: v for k, v in insert_map.items() if v != BiomedicalEntityType.COMBINATION
+    }
+    canonical_map = get_canonical_map(normalize_type_map, normalizer)
+    entity_recs = create_entity_records(
+        insert_map, source_map, canonical_map, relation_id_map
     )
 
     # create flat records
     await BiomedicalEntity.prisma().create_many(
         data=[
             BiomedicalEntityCreateWithoutRelationsInput(
-                **omit(dict(ir), "comprised_of", "parents")  # type: ignore
+                **omit(er, *relation_id_map.keys())  # type: ignore
             )
-            for ir in intervention_recs
+            for er in entity_recs
         ],
         skip_duplicates=True,
     )
 
-    # update records with relationships
-    intervention_recs_nested = [
-        ir
-        for ir in intervention_recs
-        if (ir.get("comprised_of") or ir.get("parents")) is not None
+    # update records with relationships with connection info
+    recs_with_relations = [
+        er
+        for er in entity_recs
+        if (any([er.get(k) is not None for k in relation_id_map.keys()])) is not None
     ]
-    for irn in intervention_recs_nested:
-        update = {
-            "comprised_of": irn.get("comprised_of"),
-            "parents": irn.get("parents"),
-        }
-        await BiomedicalEntity.prisma().update(
-            where={"name": irn["name"]}, data=update  # type: ignore
+    for rwr in recs_with_relations:
+        update = BiomedicalEntityUpdateInput(
+            **{  # type: ignore
+                k: {"connect": [{"canonical_id": co} for co in rwr.get(k) or []]}
+                for k in relation_id_map.keys()
+            },
         )
+        # print("updating", irn["name"], update)
+        await BiomedicalEntity.prisma().update(where={"name": rwr["name"]}, data=update)
 
 
 async def copy_all_approvals():
