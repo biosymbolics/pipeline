@@ -50,7 +50,7 @@ class BaseTrial(Dataclass):
     last_updated_date: datetime
     # normalized_sponsor: str
     # pharmacologic_class: str | None
-    primary_outcomes: list[str]
+    outcomes: list[str]
     sponsor: str
     start_date: datetime
     time_frames: list[str]

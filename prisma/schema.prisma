@@ -118,12 +118,12 @@ model Trial {
 }
 
 model TrialOutcome {
-    id              Int            @id @default(autoincrement())
+    id              Int             @id @default(autoincrement())
     description     String?
-    hypothesis_type HypothesisType
+    hypothesis_type HypothesisType?
     name            String
     trial_id        String
-    trial           Trial?         @relation(fields: [trial_id], references: [id])
+    trial           Trial?          @relation(fields: [trial_id], references: [id])
     timeframe       String?
 
     @@map("trial_outcome")
@@ -170,7 +170,7 @@ model Ownable {
     assignee_patent_id     String?
     inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
     inventor_patent_id     String?
-    is_primary             Boolean             @default(false)
+    is_primary             Boolean?            @default(false)
     owner                  Owner?              @relation(fields: [owner_id], references: [id])
     owner_id               Int?
     name                   String
@@ -182,6 +182,7 @@ model Ownable {
     trial_id               String?             @unique
 
     @@unique([owner_id, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@unique([name, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@map("ownable")
 }
 

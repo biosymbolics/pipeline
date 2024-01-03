@@ -13,7 +13,9 @@ from pydash import compact, flatten, omit
 from prisma.models import (
     Indicatable,
     Intervenable,
+    Ownable,
     Trial,
+    TrialOutcome,
 )
 from prisma.types import TrialCreateWithoutRelationsInput
 
@@ -82,8 +84,7 @@ MULTI_FIELDS = {
     "design_groups.group_type": "arm_types",
     "interventions.name": "interventions",
     "interventions.intervention_type": "intervention_types",
-    "outcomes.title": "primary_outcomes",
-    "outcomes.time_frame": "time_frames",
+    "outcomes.time_frame": "time_frames",  # needed for max_timeframe calc
 }
 
 SINGLE_FIELDS_SQL = [f"max({f}) as {new_f}" for f, new_f in SINGLE_FIELDS.items()]
@@ -101,7 +102,10 @@ SOURCE_FIELDS = (
             array_agg(distinct conditions.name),
             array_agg(distinct mesh_conditions.mesh_term)
         ), NULL) as indications
+        """,
         """
+        JSON_AGG(outcomes.*) as outcomes
+        """,
     ]
 )
 
@@ -186,7 +190,7 @@ def raw_to_trial_summary(record: dict) -> TrialCreateWithoutRelationsInput:
                 "interventions",
                 "indications",
                 "intervention_types",
-                "primary_outcomes",
+                "outcomes",
                 "sponsor",
                 "time_frames",
             ),  # type: ignore
@@ -232,12 +236,25 @@ async def ingest_trials():
     db = Prisma(auto_register=True)
     await db.connect()
 
-    # create approval records
+    # create main trial records
     await Trial.prisma().create_many(
         data=[
             {
                 **raw_to_trial_summary(t),
                 "text_for_search": "",
+            }
+            for t in source_records
+        ],
+        skip_duplicates=True,
+    )
+
+    # create owner records (aka sponsors)
+    await Ownable.prisma().create_many(
+        data=[
+            {
+                "name": t["sponsor"] or "unknown",
+                "is_primary": True,
+                "trial_id": t["id"],
             }
             for t in source_records
         ],
@@ -265,6 +282,21 @@ async def ingest_trials():
             }
             for t in source_records
             for i in t["interventions"]
+        ],
+        skip_duplicates=True,
+    )
+
+    await TrialOutcome.prisma().create_many(
+        data=[
+            {
+                "name": o["title"],
+                # "hypothesis_type": o["hypothesis_type"],
+                "timeframe": o["time_frame"],
+                "trial_id": t["id"],
+            }
+            for t in source_records
+            for o in t["outcomes"]
+            if o is not None
         ],
         skip_duplicates=True,
     )
