@@ -210,7 +210,7 @@ def raw_to_trial_summary(record: dict) -> TrialCreateWithoutRelationsInput:
             "phase": TrialPhaseParser.find(trial.phase),
             "purpose": TrialPurposeParser.find(trial.purpose),
             "randomization": TrialRandomizationParser.find(trial.randomization, design),
-            # "sponsor_type": SponsorTypeParser.find(trial.sponsor),
+            "text_for_search": f"{trial.title} {' '.join(trial.interventions)} {' '.join(trial.indications)}",
             "status": TrialStatusParser.find(trial.status),
             "termination_reason": TerminationReasonParser.find(
                 trial.termination_description
@@ -238,13 +238,7 @@ async def ingest_trials():
 
     # create main trial records
     await Trial.prisma().create_many(
-        data=[
-            {
-                **raw_to_trial_summary(t),
-                "text_for_search": "",
-            }
-            for t in source_records
-        ],
+        data=[raw_to_trial_summary(t) for t in source_records],
         skip_duplicates=True,
     )
 
@@ -255,6 +249,7 @@ async def ingest_trials():
                 "name": t["sponsor"] or "unknown",
                 "is_primary": True,
                 "trial_id": t["id"],
+                # SponsorTypeParser.find(trial.sponsor)
             }
             for t in source_records
         ],
