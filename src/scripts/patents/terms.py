@@ -1,6 +1,7 @@
 """
 Functions to initialize the terms and synonym tables
 """
+import asyncio
 from dataclasses import dataclass
 import sys
 from typing import Sequence
@@ -59,13 +60,13 @@ class TermAssembler:
 
     def __init__(self):
         self.client = PsqlDatabaseClient()
-        self.canonical_map = self._load_canonical()
+        self.canonical_map = asyncio.run(self._load_canonical())
 
-    def _load_canonical(self) -> CanonicalMap:
+    async def _load_canonical(self) -> CanonicalMap:
         """
         Load some UMLs data for canonical names
         """
-        canonical_records = self.client.select(
+        canonical_records = await self.client.select(
             "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
         )
         return {row["id"]: CanonicalRecord(**row) for row in canonical_records}
@@ -131,7 +132,7 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
         return agg_terms
 
-    def _generate_owner_terms(self) -> list[AggregatedTermRecord]:
+    async def _generate_owner_terms(self) -> list[AggregatedTermRecord]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
@@ -194,7 +195,7 @@ class TermAssembler:
         }
         rows = flatten(
             [
-                PsqlDatabaseClient(db).select(query)
+                await PsqlDatabaseClient(db).select(query)
                 for db, query in db_owner_query_map.items()
             ]
         )
@@ -216,7 +217,7 @@ class TermAssembler:
         terms = TermAssembler._group_terms(normalized)
         return terms
 
-    def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
+    async def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations and gpr annotations tables
         Normalizes terms and associates to canonical ids
@@ -237,7 +238,7 @@ class TermAssembler:
 
                 group by term, domain
             """
-        rows = self.client.select(terms_query)
+        rows = await self.client.select(terms_query)
         terms = [row["term"] for row in rows]
 
         logging.info("Normalizing/linking %s terms", len(rows))
@@ -271,7 +272,7 @@ class TermAssembler:
 
         return TermAssembler._group_terms(filtered)
 
-    def generate_terms(self) -> list[AggregatedTermRecord]:
+    async def generate_terms(self) -> list[AggregatedTermRecord]:
         """
         Collects and forms terms for the terms table; persists to TERMS_FILE
         From
@@ -279,10 +280,10 @@ class TermAssembler:
         - applications (assignees + inventors)
         """
         logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = self._generate_owner_terms()
+        assignee_terms = await self._generate_owner_terms()
 
         logging.info("Generating entity terms")
-        entity_terms = self._generate_entity_terms()
+        entity_terms = await self._generate_entity_terms()
 
         terms = assignee_terms + entity_terms
 
@@ -323,7 +324,7 @@ class TermAssembler:
             "category_rollup": category_rollup,
         }
 
-    def _create_term_id_map(self):
+    async def _create_term_id_map(self):
         """
         Creates a materialized view of the term ids, for efficient querying
         """
@@ -332,9 +333,9 @@ class TermAssembler:
             CREATE MATERIALIZED VIEW {TERM_IDS_TABLE} AS
             select distinct id, cid from {TERMS_TABLE}, unnest(terms.ids) cid
         """
-        self.client.execute_query(mat_view_query)
+        await self.client.execute_query(mat_view_query)
 
-        self.client.create_indices(
+        await self.client.create_indices(
             [
                 {
                     "table": TERM_IDS_TABLE,
@@ -350,7 +351,7 @@ class TermAssembler:
             ]
         )
 
-    def persist_terms(self):
+    async def persist_terms(self):
         """
         Persists terms (TERMS_FILE) to a table
         Applies a transformation (get_ancestors -> adding ancestor fields)
@@ -368,8 +369,8 @@ class TermAssembler:
             "instance_rollup": "TEXT",
             "category_rollup": "TEXT",
         }
-        self.client.delete_table(TERMS_TABLE, is_cascade=True)
-        self.client.create_and_insert(
+        await self.client.delete_table(TERMS_TABLE, is_cascade=True)
+        await self.client.create_and_insert(
             TERMS_TABLE,
             terms,
             schema,
@@ -377,13 +378,13 @@ class TermAssembler:
             transform=lambda batch, _: [{**r, **self.get_ancestors(r)} for r in batch],
         )
         logging.info(f"Inserted %s rows into terms table", len(terms))
-        self._create_term_id_map()
+        await self._create_term_id_map()
 
-    def index_terms(self):
+    async def index_terms(self):
         """
         Create search column / index on terms table
         """
-        self.client.execute_query(
+        await self.client.execute_query(
             f"""
             UPDATE {TERMS_TABLE}
             SET text_search = to_tsvector('english', ARRAY_TO_STRING(synonyms, '|| " " ||'))
@@ -391,7 +392,7 @@ class TermAssembler:
             """
         )
 
-        self.client.create_indices(
+        await self.client.create_indices(
             [
                 {
                     "table": TERMS_TABLE,
@@ -412,25 +413,25 @@ class TermAssembler:
             ]
         )
 
-    def generate_and_persist_terms(self):
+    async def generate_and_persist_terms(self):
         """
         Generate and persist terms
         """
-        self.generate_terms()
-        self.persist_terms()
-        self.index_terms()
+        await self.generate_terms()
+        await self.persist_terms()
+        await self.index_terms()
 
     @staticmethod
-    def run():
+    async def run():
         """
         Create the terms and synonym map tables
 
         Idempotent (all tables are dropped and recreated)
         """
-        TermAssembler().generate_and_persist_terms()
+        await TermAssembler().generate_and_persist_terms()
         sm = SynonymMapper()
-        sm.add_synonyms()
-        sm.index()
+        await sm.add_synonyms()
+        await sm.index()
 
 
 def create_patent_terms():
@@ -443,7 +444,7 @@ def create_patent_terms():
     """
     # populate_working_biosym_annotations()
 
-    TermAssembler.run()
+    asyncio.run(TermAssembler.run())
 
 
 if __name__ == "__main__":

@@ -32,10 +32,7 @@ CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
     attr_map = get_patent_attribute_map()
     return [
-        [
-            DocEntity(a_set, ATTRIBUTE_FIELD, 0, 0, None, a_set, None)
-            for a_set in attribute_set
-        ]
+        [DocEntity(term, ATTRIBUTE_FIELD, 0, 0, term) for term in attribute_set]
         for attribute_set in classify_by_keywords(patent_docs, attr_map)
     ]
 

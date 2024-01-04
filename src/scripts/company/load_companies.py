@@ -1,3 +1,4 @@
+import asyncio
 import re
 import sys
 import polars as pl
@@ -56,7 +57,7 @@ def transform_companies(rows, synonym_map) -> list[Company]:
     return [transform_company(row) for row in rows]
 
 
-def load_companies():
+async def load_companies():
     """
     Data from https://www.nasdaq.com/market-activity/stocks/screener?exchange=NYSE
     """
@@ -81,10 +82,9 @@ def load_companies():
     )
 
     client = PsqlDatabaseClient()
-
-    synonyms = client.select("SELECT * FROM synonym_map")
+    synonyms = await client.select("SELECT * FROM synonym_map")
     synonym_map = {synonym["synonym"]: synonym["term"] for synonym in synonyms}
-    client.create_and_insert(
+    await client.create_and_insert(
         COMPANIES_TABLE_NAME,
         pharmas.to_dicts(),
         transform=lambda batch, _: transform_companies(batch, synonym_map),
@@ -92,7 +92,7 @@ def load_companies():
 
 
 def main():
-    load_companies()
+    asyncio.run(load_companies())
 
 
 if __name__ == "__main__":

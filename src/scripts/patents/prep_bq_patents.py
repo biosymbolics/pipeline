@@ -7,13 +7,13 @@ from constants.patents import BIOMEDICAL_IPC_CODE_PREFIX_RE
 from .constants import GPR_ANNOTATIONS_TABLE, GPR_PUBLICATIONS_TABLE
 
 
-def __copy_publications():
+async def __copy_publications():
     """
     Copy publications from patents-public-data to a local table
     """
     table_id = "publications"
     client = BQDatabaseClient()
-    client.delete_table(table_id)
+    await client.delete_table(table_id)
 
     # adds all publication_numbers with the same family_id
     query = f"""
@@ -33,16 +33,16 @@ def __copy_publications():
         FROM numbered_rows
         WHERE row_number = 1
     """
-    client.create_from_select(query, table_id)
+    await client.create_from_select(query, table_id)
 
 
-def __copy_gpr_annotations():
+async def __copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
     (ONLY diseases, and only the first instance of the term for a given publication_number)
     """
     client = BQDatabaseClient()
-    client.delete_table(GPR_ANNOTATIONS_TABLE)
+    await client.delete_table(GPR_ANNOTATIONS_TABLE)
 
     # 3.7TB query
     # NOTE: mixed mins/maxes
@@ -66,15 +66,15 @@ def __copy_gpr_annotations():
         AND character_offset_start < 10000 -- otherwise, probably not the main indication?
         group by a.publication_number, a.preferred_name
     """
-    client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
+    await client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
 
 
-def __copy_gpr_publications():
+async def __copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
     client = BQDatabaseClient()
-    client.delete_table(GPR_PUBLICATIONS_TABLE)
+    await client.delete_table(GPR_PUBLICATIONS_TABLE)
 
     query = f"""
         SELECT gpr_pubs.* FROM
@@ -82,18 +82,18 @@ def __copy_gpr_publications():
         `{BQ_DATASET_ID}.publications` p
         WHERE p.publication_number = gpr_pubs.publication_number
     """
-    client.create_from_select(query, GPR_PUBLICATIONS_TABLE)
+    await client.create_from_select(query, GPR_PUBLICATIONS_TABLE)
 
 
-def copy_patent_tables():
+async def copy_patent_tables():
     """
     Copy tables from patents-public-data to a local BQ dataset
 
     Idempotent (as in, tables are deleted and recreated) but not atomic, and also expensive (from a BigQuery standpoint)
     """
     # copy gpr_annotations table
-    __copy_gpr_annotations()
+    await __copy_gpr_annotations()
 
     # copy publications and gpr publications table (order matters)
-    __copy_publications()
-    __copy_gpr_publications()
+    await __copy_publications()
+    await __copy_gpr_publications()

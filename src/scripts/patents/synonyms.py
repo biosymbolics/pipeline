@@ -1,6 +1,7 @@
 """
 Functions to initialize the terms and synonym tables
 """
+import asyncio
 from typing import Optional
 import logging
 
@@ -27,14 +28,17 @@ class SynonymMapper:
         self.client = PsqlDatabaseClient()
 
         logging.info("Creating synonym map (truncating if exists)")
-        self.client.create_table(
-            SYNONYM_TABLE_NAME,
-            {"synonym": "TEXT", "term": "TEXT", "id": "TEXT"},
-            exists_ok=True,
-            truncate_if_exists=True,
+        # sketchy
+        asyncio.run(
+            self.client.create_table(
+                SYNONYM_TABLE_NAME,
+                {"synonym": "TEXT", "term": "TEXT", "id": "TEXT"},
+                exists_ok=True,
+                truncate_if_exists=True,
+            )
         )
 
-    def add_synonyms(
+    async def add_synonyms(
         self,
         existing_terms: Optional[list[AggregatedTermRecord]] = None,
     ):
@@ -55,9 +59,9 @@ class SynonymMapper:
         }
 
         logging.info("Adding %s terms to synonym map", len(synonym_map))
-        self.add_map(synonym_map)
+        await self.add_map(synonym_map)
 
-    def add_map(self, synonym_map: dict[str, dict]):
+    async def add_map(self, synonym_map: dict[str, dict]):
         """
         Add common entity names to the synonym map, taking in a map of form {synonym: term}
 
@@ -74,15 +78,15 @@ class SynonymMapper:
             if len(syn) > 0 and syn != entry["term"]
         ]
 
-        self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
+        await self.client.insert_into_table(records, SYNONYM_TABLE_NAME)
         logging.info(
             "Inserted %s rows into synonym_map (%s)",
             len(records),
             len(list(synonym_map.keys())),
         )
 
-    def index(self):
-        self.client.create_indices(
+    async def index(self):
+        await self.client.create_indices(
             [
                 {"table": "synonym_map", "column": "synonym"},
                 {"table": "synonym_map", "column": "id"},

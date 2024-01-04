@@ -18,8 +18,9 @@ from constants.core import (
     APPLICATIONS_TABLE,
     ANNOTATIONS_TABLE,
 )
-from scripts.trials.copy_trials import copy_ctgov
+from scripts.trials.copy_trials import TrialEtl
 from scripts.umls.copy_umls import copy_umls
+from scripts.approvals.copy_approvals import ApprovalEtl
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -29,13 +30,12 @@ from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
 from .terms import create_patent_terms
 
-from ..approvals.copy_approvals import copy_approvals
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-def __create_annotations_table():
+async def __create_annotations_table():
     """
     Create a table of annotations for use in app queries
     """
@@ -43,7 +43,7 @@ def __create_annotations_table():
 
     client = PsqlDatabaseClient()
     # to delete materialized view
-    client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
+    await client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
 
     annotations_query = f"""
         --- assignees as annotations
@@ -78,10 +78,10 @@ def __create_annotations_table():
         unnest(a.inventors) as inventor
         LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
     """
-    client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
+    await client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
 
     # add biosym annotations
-    client.select_insert_into_table(
+    await client.select_insert_into_table(
         f"""
         SELECT publication_number,
             s.term as term,
@@ -111,7 +111,7 @@ def __create_annotations_table():
     )
 
     # add gpr annotations
-    client.select_insert_into_table(
+    await client.select_insert_into_table(
         f"""
         SELECT publication_number,
             s.term as term,
@@ -141,7 +141,7 @@ def __create_annotations_table():
     )
 
     # add attributes at the last moment
-    client.select_insert_into_table(
+    await client.select_insert_into_table(
         f"""
             SELECT
                 publication_number,
@@ -158,7 +158,7 @@ def __create_annotations_table():
         """,
         ANNOTATIONS_TABLE,
     )
-    client.create_indices(
+    await client.create_indices(
         [
             {
                 "table": ANNOTATIONS_TABLE,
@@ -189,8 +189,8 @@ def __create_annotations_table():
         FROM {ANNOTATIONS_TABLE} a
         GROUP BY publication_number;
     """
-    client.execute_query(mat_view_query)
-    client.create_indices(
+    await client.execute_query(mat_view_query)
+    await client.create_indices(
         [
             {
                 "table": AGGREGATED_ANNOTATIONS_TABLE,
@@ -205,7 +205,7 @@ def __create_annotations_table():
     )
 
 
-def __create_biosym_annotations_source_table():
+async def __create_biosym_annotations_source_table():
     """
     Creates biosym annotations table if need be
     (NOTE: does not check schema)
@@ -222,7 +222,7 @@ def __create_biosym_annotations_source_table():
         "character_offset_start": "INTEGER",
         "character_offset_end": "INTEGER",
     }
-    client.create_table(
+    await client.create_table(
         SOURCE_BIOSYM_ANNOTATIONS_TABLE,
         schema,
         exists_ok=True,
@@ -231,7 +231,7 @@ def __create_biosym_annotations_source_table():
     logger.info(f"(Maybe) created table {SOURCE_BIOSYM_ANNOTATIONS_TABLE}")
 
 
-def create_funcs():
+async def create_funcs():
     re_escape_sql = r"""
         CREATE OR REPLACE FUNCTION escape_regex_chars(text)
         RETURNS text
@@ -246,20 +246,20 @@ def create_funcs():
         SELECT ARRAY[a,b] FROM (SELECT unnest($1) AS a, unnest($2) AS b) x;
         $func$;
     """
-    PsqlDatabaseClient().execute_query(re_escape_sql)
+    await PsqlDatabaseClient().execute_query(re_escape_sql)
 
 
-def add_application_search():
+async def add_application_search():
     client = PsqlDatabaseClient()
     vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
-    client.execute_query(
+    await client.execute_query(
         f"""
             ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
             UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
         """,
         ignore_error=True,
     )
-    client.create_index(
+    await client.create_index(
         {
             "table": APPLICATIONS_TABLE,
             "column": "text_search",
@@ -335,15 +335,15 @@ async def main(bootstrap: bool = False):
         # bigquery
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
-        create_funcs()
-        __create_biosym_annotations_source_table()
-        copy_patent_tables()
+        await create_funcs()
+        await __create_biosym_annotations_source_table()
+        await copy_patent_tables()
         # create patent applications etc in postgres
-        copy_bq_to_psql()
+        await copy_bq_to_psql()
         # copy data about approvals
-        await copy_approvals()
+        await ApprovalEtl(document_type="regulatory_approval").copy_all()
         # adds column & index for application search
-        add_application_search()
+        await add_application_search()
         # UMLS records (slow due to betweenness centrality calc)
         copy_umls()
 
@@ -351,10 +351,10 @@ async def main(bootstrap: bool = False):
     create_patent_terms()
 
     # create annotations (psql)
-    __create_annotations_table()
+    await __create_annotations_table()
 
     # copy trial data
-    copy_ctgov()
+    await TrialEtl(document_type="trial").copy_all()
 
     # post
     # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping

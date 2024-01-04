@@ -364,8 +364,8 @@ class TrialEtl(DocumentEtl):
         )
 
 
-async def main():
-    await TrialEtl(document_type="trial").copy_all()
+def main():
+    asyncio.run(TrialEtl(document_type="trial").copy_all())
 
 
 if __name__ == "__main__":
@@ -378,4 +378,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    asyncio.run(main())
+    main()

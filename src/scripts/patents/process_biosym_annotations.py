@@ -1,6 +1,7 @@
 """
 To run after NER is complete
 """
+import asyncio
 import sys
 import logging
 from typing_extensions import NotRequired
@@ -59,7 +60,7 @@ TextField = Literal["title", "abstract"]
 TEXT_FIELDS: list[TextField] = ["title", "abstract"]
 
 
-def remove_substrings():
+async def remove_substrings():
     """
     Removes substrings from annotations
     (annotations that are substrings of other annotations for that publication_number)
@@ -90,9 +91,9 @@ def remove_substrings():
     logger.info("Removing substrings")
     client = DatabaseClient()
 
-    client.create_from_select(query, temp_table)
-    client.execute_query(delete_query)
-    client.delete_table(temp_table)
+    await client.create_from_select(query, temp_table)
+    await client.execute_query(delete_query)
+    await client.delete_table(temp_table)
 
 
 TermMap = TypedDict(
@@ -101,7 +102,7 @@ TermMap = TypedDict(
 )
 
 
-def expand_annotations(
+async def expand_annotations(
     base_terms_to_expand: list[str] = INTERVENTION_BASE_TERMS,
     prefix_terms: list[str] = INTERVENTION_PREFIXES,
 ):
@@ -113,7 +114,7 @@ def expand_annotations(
         prefix_terms, "*", enforce_word_boundaries=True, word_boundary_char=r"\y"
     )
     terms_re = get_or_re(base_terms_to_expand)
-    records = client.select(
+    records = await client.select(
         rf"""
         SELECT original_term, concat(title, '. ', abstract) as text, app.publication_number
         FROM biosym_annotations ann, applications app
@@ -134,7 +135,7 @@ def expand_annotations(
     return _expand_annotations(batched)
 
 
-def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
+async def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
@@ -175,12 +176,12 @@ def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
         fixed_terms = compact([fix_term(r, doc_map) for r in records])
 
         if len(fixed_terms) > 0:
-            _update_annotation_values(fixed_terms)
+            await _update_annotation_values(fixed_terms)
         else:
             logger.warning("No terms to fix for batch %s", i)
 
 
-def _update_annotation_values(term_to_fixed_term: list[TermMap]):
+async def _update_annotation_values(term_to_fixed_term: list[TermMap]):
     client = DatabaseClient()
 
     # check publication_number if we have it
@@ -190,7 +191,7 @@ def _update_annotation_values(term_to_fixed_term: list[TermMap]):
     )
 
     temp_table_name = "temp_annotations"
-    client.create_and_insert(temp_table_name, term_to_fixed_term)
+    await client.create_and_insert(temp_table_name, term_to_fixed_term)
 
     sql = f"""
         UPDATE {WORKING_TABLE}
@@ -200,19 +201,19 @@ def _update_annotation_values(term_to_fixed_term: list[TermMap]):
         {f"AND {WORKING_TABLE}.publication_number = tt.publication_number" if check_id else ""}
     """
 
-    client.execute_query(sql)
-    client.delete_table(temp_table_name)
+    await client.execute_query(sql)
+    await client.delete_table(temp_table_name)
 
 
-def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
+async def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
     client = DatabaseClient()
-    records = client.select(
+    records = await client.select(
         f"SELECT distinct original_term FROM {WORKING_TABLE} where length(original_term) > 1"
     )
     terms: list[str] = [r["original_term"] for r in records]
     cleaned_term = _remove_trailing_leading(terms, removal_terms)
 
-    _update_annotation_values(
+    await _update_annotation_values(
         [
             {
                 "original_term": original_term,
@@ -224,7 +225,7 @@ def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
     )
 
 
-def clean_up_junk():
+async def clean_up_junk():
     """
     Remove trailing junk and silly matches
     """
@@ -245,10 +246,10 @@ def clean_up_junk():
     ]
     client = DatabaseClient()
     for sql in queries:
-        client.execute_query(sql)
+        await client.execute_query(sql)
 
 
-def fix_unmatched():
+async def fix_unmatched():
     """
     Example: 3 -d]pyrimidine derivatives -> Pyrrolo [2, 3 -d]pyrimidine derivatives
     """
@@ -273,10 +274,10 @@ def fix_unmatched():
     for field in TEXT_FIELDS:
         for char_set in [(r"\[", r"\]"), (r"\(", r"\)")]:
             sql = get_query(field, char_set)
-            client.execute_query(sql)
+            await client.execute_query(sql)
 
 
-def remove_common_terms():
+async def remove_common_terms():
     """
     Remove common original terms
     """
@@ -289,7 +290,7 @@ def remove_common_terms():
     ]
 
     del_term_re = get_hacky_stem_re(common_terms)
-    result = client.select(f"select distinct original_term from {WORKING_TABLE}")
+    result = await client.select(f"select distinct original_term from {WORKING_TABLE}")
     terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
 
     delete_terms = terms.filter(terms.str.contains(del_term_re)).to_list()
@@ -305,10 +306,10 @@ def remove_common_terms():
         or (length(original_term) > 150 and original_term ~* '\y(?:and|or)\y') -- del if sentence
         or (length(original_term) > 150 and original_term ~* '.*[.;] .*') -- del if sentence
     """
-    DatabaseClient().execute_query(del_query, (delete_terms,))
+    await DatabaseClient().execute_query(del_query, (delete_terms,))
 
 
-def normalize_domains():
+async def normalize_domains():
     """
     Normalizes domains
         - by rules
@@ -344,7 +345,7 @@ def normalize_domains():
     ]
 
     for sql in queries:
-        client.execute_query(sql)
+        await client.execute_query(sql)
 
     normalize_sql = f"""
         WITH ranked_domains AS (
@@ -368,10 +369,10 @@ def normalize_domains():
         WHERE lower(ut.original_term) = md.lot and ut.domain <> md.new_domain;
     """
 
-    client.execute_query(normalize_sql)
+    await client.execute_query(normalize_sql)
 
 
-def populate_working_biosym_annotations():
+async def populate_working_biosym_annotations():
     """
     - Copies biosym annotations from source table
     - Performs various cleanups and deletions
@@ -380,13 +381,13 @@ def populate_working_biosym_annotations():
     logger.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    client.create_from_select(
+    await client.create_from_select(
         f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
         WORKING_TABLE,
     )
 
     # add indices after initial load
-    client.create_indices(
+    await client.create_indices(
         [
             {"table": WORKING_TABLE, "column": "publication_number"},
             {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
@@ -394,25 +395,25 @@ def populate_working_biosym_annotations():
         ]
     )
 
-    fix_unmatched()
-    clean_up_junk()
+    await fix_unmatched()
+    await clean_up_junk()
 
     # round 1 (leaves in stuff used by for/of)
-    remove_trailing_leading(REMOVAL_WORDS_PRE)
+    await remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
+    await remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
     # after remove_substrings to avoid expanding substrings into something (potentially) mangled
-    expand_annotations()
+    await expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
-    remove_trailing_leading(REMOVAL_WORDS_POST)
+    await remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
     # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
-    clean_up_junk()
+    await clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    client.execute_query(
+    await client.execute_query(
         """
         drop index trgm_index_biosym_annotations_original_term;
         drop index index_biosym_annotations_domain;
@@ -420,10 +421,10 @@ def populate_working_biosym_annotations():
         ignore_error=True,
     )
 
-    remove_common_terms()  # remove one-off generic terms
-    normalize_domains()
+    await remove_common_terms()  # remove one-off generic terms
+    await normalize_domains()
 
-    client.create_index(
+    await client.create_index(
         {
             "table": WORKING_TABLE,
             "column": "original_term",
@@ -471,4 +472,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    populate_working_biosym_annotations()
+    asyncio.run(populate_working_biosym_annotations())
