@@ -105,7 +105,7 @@ class ApprovalEtl(DocumentEtl):
         fields = [
             "array_remove(ARRAY_AGG(distinct lower(metadata.concept_name)), NULL) as indications"
         ]
-        source_records = PsqlDatabaseClient(SOURCE_DB).select(
+        source_records = await PsqlDatabaseClient(SOURCE_DB).select(
             query=ApprovalEtl.get_source_sql(fields)
         )
 
@@ -137,7 +137,7 @@ class ApprovalEtl(DocumentEtl):
             "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
             "ARRAY_REMOVE(ARRAY_AGG(distinct lower(pharma_class.name)), NULL)::text[] as pharmacologic_classes",
         ]
-        source_records = PsqlDatabaseClient(SOURCE_DB).select(
+        source_records = await PsqlDatabaseClient(SOURCE_DB).select(
             query=ApprovalEtl.get_source_sql(fields)
         )
         source_interventions = [InterventionIntermediate(**r) for r in source_records]
@@ -213,7 +213,7 @@ class ApprovalEtl(DocumentEtl):
             "JSON_AGG(pharma_class.*) as pharmacologic_classes",
             "MAX(label.pdf_url) as url",
         ]
-        approvals = PsqlDatabaseClient(SOURCE_DB).select(
+        approvals = await PsqlDatabaseClient(SOURCE_DB).select(
             query=ApprovalEtl.get_source_sql(fields)
         )
 

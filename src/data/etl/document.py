@@ -58,7 +58,7 @@ class DocumentEtl:
                 UPDATE {self.document_type} SET search = to_tsvector('english', text_for_search)
                 """
             )
-        PsqlDatabaseClient().create_indices(
+        await PsqlDatabaseClient().create_indices(
             [
                 {
                     "table": self.document_type,

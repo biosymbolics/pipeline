@@ -28,6 +28,7 @@ from data.etl.biomedical_entity import BiomedicalEntityEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
 from data.domain.trials import extract_max_timeframe
+from utils.re import get_or_re
 
 from .enums import (
     ComparisonTypeParser,
@@ -49,22 +50,27 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def is_intervention(intervention_str: str) -> bool:
-    """
-    Returns True if intervention_str is not a control
-    """
-
-    def is_control(intervention_str: str) -> bool:
-        return (
-            re.match(
-                r".*\b(?:placebo|sham|best supportive care|standard|usual care|comparator|no treatment|saline solution|conventional|aspirin|control|Tablet Dosage Form|Laboratory Biomarker Analysis|Drug vehicle|pharmacological study|Normal saline|Therapeutic procedure|Quality-of-Life Assessment|Questionnaire Administration|Dosage)s?\b.*",
-                intervention_str,
-                flags=RE_FLAGS,
-            )
-            is not None
-        )
-
-    return not is_control(intervention_str)
+CONTROL_TERMS = [
+    "placebo",
+    "sham",
+    "best supportive care",
+    "standard",
+    "usual care",
+    "comparator",
+    "no treatment",
+    "saline solution",
+    "conventional",
+    "aspirin",
+    "control",
+    "tablet dosage form",
+    "laboratory biomarker analysis",
+    "drug vehicle",
+    "pharmacological study",
+    "normal saline",
+    "therapeutic procedure",
+    "quality.?of.?life",
+    "questionnaire",
+]
 
 
 SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/aact"
@@ -158,7 +164,6 @@ class TrialEtl(DocumentEtl):
             where study_type = 'Interventional'
             AND designs.nct_id = studies.nct_id
             group by studies.nct_id
-            limit 100
         """
         return source_sql
 
@@ -166,25 +171,22 @@ class TrialEtl(DocumentEtl):
         """
         Create indication records
         """
-        fields = [
-            """
-            array_remove(array_cat(
-                array_agg(distinct lower(conditions.name)),
-                array_agg(distinct lower(mesh_conditions.mesh_term))
-            ), NULL) as indications
-            """
-        ]
-        source_records = PsqlDatabaseClient(SOURCE_DB).select(
-            query=TrialEtl.get_source_sql(fields)
-        )
+        source_sql = f"""
+            select distinct name as indication from (
+                SELECT DISTINCT lower(mesh_term) as name FROM browse_conditions
+                    WHERE mesh_type = 'mesh-list' AND mesh_term is not null
+                UNION ALL
+                SELECT DISTINCT lower(name) FROM conditions WHERE name is not null'
+            ) s
+        """
+        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
         insert_map = {
-            i: {
-                "synonyms": [i],
+            ir["indication"]: {
+                "synonyms": [ir["indication"]],
                 "default_type": BiomedicalEntityType.DISEASE,
             }
-            for sr in source_records
-            for i in sr["indications"]
+            for ir in records
         }
 
         terms_to_insert = list(insert_map.keys())
@@ -200,21 +202,25 @@ class TrialEtl(DocumentEtl):
         ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
 
     async def copy_interventions(self):
-        fields = ["JSON_AGG(interventions.*) as interventions"]
-        source_records = PsqlDatabaseClient(SOURCE_DB).select(
-            query=TrialEtl.get_source_sql(fields)
-        )
+        source_sql = f"""
+            select distinct name as intervention from (
+                SELECT DISTINCT lower(mesh_term) as name FROM browse_interventions
+                    WHERE mesh_type = 'mesh-list' AND mesh_term is not null
+                UNION ALL
+                SELECT DISTINCT lower(name) FROM interventions WHERE name is not null AND name ~* '{get_or_re(CONTROL_TERMS)}'
+            ) s
+        """
+        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
         insert_map = {
-            i["name"].lower(): {
-                "synonyms": [i["name"].lower()],
+            ir["intervention"]: {
+                "synonyms": [ir["intervention"]],
                 "default_type": BiomedicalEntityType.PHARMACOLOGICAL,  # CONTROL?
             }
-            for sr in source_records
-            for i in sr["interventions"]
+            for ir in records
         }
 
-        terms_to_insert = [i for i in insert_map.keys() if is_intervention(i)]
+        terms_to_insert = [i for i in insert_map.keys()]
         terms_to_canonicalize = terms_to_insert
 
         await BiomedicalEntityEtl(
@@ -287,68 +293,74 @@ class TrialEtl(DocumentEtl):
         """
         Copy data from Postgres (drugcentral) to Postgres (patents)
         """
-        source_records = PsqlDatabaseClient(SOURCE_DB).select(
-            query=self.get_source_sql()
-        )
 
-        # create main trial records
-        await Trial.prisma().create_many(
-            data=[TrialEtl.transform(t) for t in source_records],
-            skip_duplicates=True,
-        )
+        async def handle_batch(rows: list[dict]) -> bool:
+            # create main trial records
+            await Trial.prisma().create_many(
+                data=[TrialEtl.transform(t) for t in rows],
+                skip_duplicates=True,
+            )
 
-        # create owner records (aka sponsors)
-        await Ownable.prisma().create_many(
-            data=[
-                {
-                    "name": t["sponsor"] or "unknown",
-                    "is_primary": True,
-                    "trial_id": t["id"],
-                    # SponsorTypeParser.find(trial.sponsor)
-                }
-                for t in source_records
-            ],
-            skip_duplicates=True,
-        )
+            # create owner records (aka sponsors)
+            await Ownable.prisma().create_many(
+                data=[
+                    {
+                        "name": t["sponsor"] or "unknown",
+                        "is_primary": True,
+                        "trial_id": t["id"],
+                        # SponsorTypeParser.find(trial.sponsor)
+                    }
+                    for t in rows
+                ],
+                skip_duplicates=True,
+            )
 
-        # create "indicatable" records, those that map approval to a canonical indication
-        await Indicatable.prisma().create_many(
-            data=[
-                {"name": i.lower(), "trial_id": t["id"]}
-                for t in source_records
-                for i in t["indications"]
-            ],
-            skip_duplicates=True,
-        )
+            # create "indicatable" records, those that map approval to a canonical indication
+            await Indicatable.prisma().create_many(
+                data=[
+                    {"name": i.lower(), "trial_id": t["id"]}
+                    for t in rows
+                    for i in t["indications"]
+                ],
+                skip_duplicates=True,
+            )
 
-        # create "intervenable" records, those that map approval to a canonical intervention
-        await Intervenable.prisma().create_many(
-            data=[
-                {
-                    "name": i.lower(),
-                    "is_primary": True,
-                    "trial_id": t["id"],
-                }
-                for t in source_records
-                for i in t["interventions"]
-            ],
-            skip_duplicates=True,
-        )
+            # create "intervenable" records, those that map approval to a canonical intervention
+            await Intervenable.prisma().create_many(
+                data=[
+                    {
+                        "name": i.lower(),
+                        "is_primary": True,
+                        "trial_id": t["id"],
+                    }
+                    for t in rows
+                    for i in t["interventions"]
+                ],
+                skip_duplicates=True,
+            )
 
-        # create "outcome" records
-        await TrialOutcome.prisma().create_many(
-            data=[
-                {
-                    "name": o["title"],
-                    # "hypothesis_type": o["hypothesis_type"],
-                    "timeframe": o["time_frame"],
-                    "trial_id": t["id"],
-                }
-                for t in source_records
-                for o in t["outcomes"]
-                if o is not None
-            ],
-            skip_duplicates=True,
+            # create "outcome" records
+            await TrialOutcome.prisma().create_many(
+                data=[
+                    {
+                        "name": o["title"],
+                        # "hypothesis_type": o["hypothesis_type"],
+                        "timeframe": o["time_frame"],
+                        "trial_id": t["id"],
+                    }
+                    for t in rows
+                    for o in t["outcomes"]
+                    if o is not None
+                ],
+                skip_duplicates=True,
+            )
+
+            return True
+
+        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+            query=self.get_source_sql(),
+            batch_size=1000,
+            handle_result_batch=handle_batch,  # type: ignore
         )
 
 
