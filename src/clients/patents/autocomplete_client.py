@@ -34,7 +34,7 @@ def _format_term(entity: TermResult) -> AutocompleteResult:
     return {"id": entity["term"], "label": f"{entity['term']} ({entity['count']})"}
 
 
-def _autocomplete(
+async def _autocomplete(
     string: str, query: str = TERM_SEARCH, limit: int = 25
 ) -> list[AutocompleteResult]:
     """
@@ -52,7 +52,7 @@ def _autocomplete(
     search_sql = f"{' & '.join(string.split(' '))}:*"
     query = f"{query} limit {limit}"
 
-    results = PsqlDatabaseClient().select(query, [search_sql])
+    results = await PsqlDatabaseClient().select(query, [search_sql])
 
     if not is_term_results(results):
         raise ValueError(f"Expected term results, got {results}")
@@ -68,27 +68,27 @@ def _autocomplete(
     return formatted
 
 
-def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteResult]:
+async def autocomplete_terms(string: str, limit: int = 25) -> list[AutocompleteResult]:
     """
     Autocomplete terms
     """
-    return _autocomplete(string, TERM_SEARCH, limit)
+    return await _autocomplete(string, TERM_SEARCH, limit)
 
 
-def autocomplete_id(string: str, limit: int = 25) -> list[AutocompleteResult]:
+async def autocomplete_id(string: str, limit: int = 25) -> list[AutocompleteResult]:
     """
     Autocomplete publication numbers
     """
-    return _autocomplete(string, ID_SEARCH, limit)
+    return await _autocomplete(string, ID_SEARCH, limit)
 
 
-def autocomplete(
+async def autocomplete(
     string: str, mode: AutocompleteMode, limit: int = 25
 ) -> list[AutocompleteResult]:
     """
     Autocomplete terms or ids for patents
     """
     if mode == "id":
-        return autocomplete_id(string, limit)
+        return await autocomplete_id(string, limit)
 
-    return autocomplete_terms(string, limit)
+    return await autocomplete_terms(string, limit)

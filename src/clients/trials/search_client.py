@@ -10,7 +10,7 @@ from pydash import omit
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TRIALS_TABLE
-from typings.trials import ScoredTrialSummary
+from typings.trials import Trial
 from typings import QueryType, TrialSearchParams
 from utils.sql import get_term_sql_query
 from utils.string import get_id
@@ -22,11 +22,11 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 
 
-def _search(
+async def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     limit: int = MAX_SEARCH_RESULTS,
-) -> list[ScoredTrialSummary]:
+) -> list[Trial]:
     """
     Search patents by terms
     """
@@ -49,18 +49,18 @@ def _search(
         LIMIT {limit}
     """
 
-    results = PsqlDatabaseClient().select(query, [term_query, term_query])
+    results = await PsqlDatabaseClient().select(query, [term_query, term_query])
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
     )
 
-    trials = [ScoredTrialSummary(**omit(r, ["text_search"])) for r in results]
+    trials = [Trial(**omit(r, ["text_search"])) for r in results]
 
     return trials
 
 
-def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
+async def search(p: TrialSearchParams) -> list[Trial]:
     """
     Search trials by terms
     Filters on lowered, stemmed terms
@@ -85,13 +85,12 @@ def search(p: TrialSearchParams) -> list[ScoredTrialSummary]:
     search_partial = partial(_search, **args)
 
     if p.skip_cache == True:
-        return search_partial(limit=p.limit)
+        trials = await search_partial(limit=p.limit)
+        return trials
 
     return retrieve_with_cache_check(
         search_partial,
         key=key,
         limit=p.limit,
-        decode=lambda str_data: [
-            ScoredTrialSummary(**t) for t in storage_decoder(str_data)
-        ],
+        decode=lambda str_data: [Trial(**t) for t in storage_decoder(str_data)],
     )

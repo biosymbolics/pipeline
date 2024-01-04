@@ -3,7 +3,7 @@ Boto3 client
 """
 import json
 import os
-from typing import Any, Callable, Sequence, TypeVar, cast
+from typing import Any, Awaitable, Callable, Sequence, TypeVar, cast
 import boto3
 from botocore.exceptions import ClientError
 import logging
@@ -91,7 +91,7 @@ def storage_decoder(obj: Any) -> Any:
 
 
 def retrieve_with_cache_check(
-    operation: Callable[[int], T] | Callable[[], T],
+    operation: Callable[[int], Awaitable[T]] | Callable[[], Awaitable[T]],
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,

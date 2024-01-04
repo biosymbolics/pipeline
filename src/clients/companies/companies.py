@@ -5,7 +5,7 @@ from typings.companies import Company
 
 
 @lru_cache(maxsize=None)
-def get_company_map() -> dict[str, Company]:
+async def get_company_map() -> dict[str, Company]:
     """
     Fetch companies matching names.
     Return a map between company name and Company object.
@@ -16,6 +16,6 @@ def get_company_map() -> dict[str, Company]:
     """
 
     query = f"SELECT * FROM {COMPANIES_TABLE_NAME}"
-    results = PsqlDatabaseClient().select(query)
+    results = await PsqlDatabaseClient().select(query)
 
     return {result["name"]: Company(**result) for result in results}

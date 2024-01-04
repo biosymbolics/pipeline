@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def search(params: EntitySearchParams) -> list[Entity]:
+async def search(params: EntitySearchParams) -> list[Entity]:
     """
     Search for entities
 
     HACK: need to refactor data model such that this is shared between patents & trials
     """
-    approvals = approval_search_client(ApprovalSearchParams(**params.__dict__))
-    patents = patent_search_client(PatentSearchParams(**params.__dict__))
-    trials = trial_search_client(TrialSearchParams(**params.__dict__))
+    approvals = await approval_search_client(ApprovalSearchParams(**params.__dict__))
+    patents = await patent_search_client(PatentSearchParams(**params.__dict__))
+    trials = await trial_search_client(TrialSearchParams(**params.__dict__))
 
     if params.entity_types[0] != "pharmaceutical":
         raise NotImplementedError
@@ -35,8 +35,8 @@ def search(params: EntitySearchParams) -> list[Entity]:
     assets: set[str] = set(
         compact(
             flatten([p.interventions for p in patents])
-            + [t.instance_rollup for t in trials]
-            + [a.instance_rollup for a in approvals]
+            # + [t.instance_rollup for t in trials]
+            # + [a.instance_rollup for a in approvals]
         )
     )
 
@@ -47,7 +47,7 @@ def search(params: EntitySearchParams) -> list[Entity]:
             name=a,
             approvals=[app for app in approvals if app.instance_rollup == a],
             patents=[p for p in patents if a in p.interventions],
-            trials=[t for t in trials if t.instance_rollup == a],
+            trials=[t for t in trials],  # if t.instance_rollup == a
         )
         for a in assets
     ]

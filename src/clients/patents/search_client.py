@@ -133,20 +133,20 @@ def __get_query_pieces(
     )
 
 
-def _get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
+async def _get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     """
     Get embeddings for exemplar patents
     """
     return [
         rec["embeddings"]
-        for rec in PsqlDatabaseClient().select(
+        for rec in await PsqlDatabaseClient().select(
             "SELECT embeddings FROM applications WHERE publication_number = ANY(%s)",
             [exemplar_patents],
         )
     ]
 
 
-def _search(
+async def _search(
     terms: Sequence[str],
     exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "AND",
@@ -164,7 +164,9 @@ def _search(
         raise ValueError("Terms must be a list")
 
     exemplar_embeddings = (
-        _get_exemplar_embeddings(exemplar_patents) if len(exemplar_patents) > 0 else []
+        await _get_exemplar_embeddings(exemplar_patents)
+        if len(exemplar_patents) > 0
+        else []
     )
     qp = __get_query_pieces(terms, exemplar_embeddings, query_type, min_patent_years)
 
@@ -184,9 +186,9 @@ def _search(
         LIMIT {limit}
     """
 
-    results = PsqlDatabaseClient().select(query, qp["params"])
+    results = await PsqlDatabaseClient().select(query, qp["params"])
 
-    company_map = get_company_map()
+    company_map = await get_company_map()
     enriched_results = enrich_search_result(results, company_map)
 
     logger.info(
@@ -196,7 +198,7 @@ def _search(
     return enriched_results
 
 
-def search(p: PatentSearchParams) -> list[PatentApplication]:
+async def search(p: PatentSearchParams) -> list[PatentApplication]:
     """
     Search patents by terms
     Filters on
@@ -241,7 +243,8 @@ def search(p: PatentSearchParams) -> list[PatentApplication]:
     search_partial = partial(_search, **args)
 
     if p.skip_cache == True:
-        return search_partial(limit=p.limit)
+        patents = await search_partial(limit=p.limit)
+        return patents
 
     return retrieve_with_cache_check(
         search_partial,

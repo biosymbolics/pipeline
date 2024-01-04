@@ -37,7 +37,7 @@ FIELDS = [
 ]
 
 
-def _search(
+async def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     limit: int = MAX_SEARCH_RESULTS,
@@ -63,7 +63,7 @@ def _search(
         LIMIT {limit}
     """
 
-    results = PsqlDatabaseClient().select(query, [term_query, term_query])
+    results = await PsqlDatabaseClient().select(query, [term_query, term_query])
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
@@ -74,7 +74,7 @@ def _search(
     return approvals
 
 
-def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
+async def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
     """
     Search regulatory approvals by terms
     """
@@ -91,7 +91,8 @@ def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
     search_partial = partial(_search, **args)
 
     if p.skip_cache == True:
-        return search_partial(limit=p.limit)
+        approvals = await search_partial(limit=p.limit)
+        return approvals
 
     return retrieve_with_cache_check(
         search_partial,
