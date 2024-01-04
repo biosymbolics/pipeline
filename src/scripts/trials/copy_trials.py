@@ -24,6 +24,7 @@ from data.domain.biomedical import (
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 from data.etl.biomedical_entity import BiomedicalEntityEtl
+from data.etl.owner import OwnerEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
 from data.domain.trials import extract_max_timeframe
@@ -149,20 +150,8 @@ class TrialEtl(DocumentEtl):
         """
         source_sql = "select distinct lower(source) as owner from studies"
         records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
-
-        insert_map = {ir["owner"]: {"synonyms": [ir["owner"]]} for ir in records}
-
-        terms_to_insert = list(insert_map.keys())
-        terms_to_canonicalize = terms_to_insert
-
-        await BiomedicalEntityEtl(
-            "CandidateSelector",
-            relation_id_field_map=RelationIdFieldMap(
-                synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
-                ),
-            ),
-        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
+        names = [ir["owner"] for ir in records]
+        await OwnerEtl().create_records(names)
 
     async def copy_indications(self):
         """

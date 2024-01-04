@@ -1,19 +1,3 @@
-from functools import reduce
-from typing import Iterable
-import regex as re
-import logging
-
-from constants.patents import (
-    COMPANY_MAP,
-    OWNER_SUPPRESSIONS,
-    OWNER_TERM_MAP,
-)
-from core.ner.utils import cluster_terms
-from utils.re import get_or_re, remove_extra_spaces, RE_STANDARD_FLAGS
-
-RE_FLAGS = RE_STANDARD_FLAGS
-
-
 # alter table applications alter column priority_date type date USING priority_date::date;
 BQ_TYPE_OVERRIDES = {
     "character_offset_start": "INTEGER",
