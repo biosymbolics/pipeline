@@ -3,17 +3,14 @@ Class for biomedical entity etl
 """
 from functools import reduce
 import re
-from typing import Iterable, Literal, Sequence, TypeVar, cast
+from typing import Iterable, Sequence, cast
 from prisma.enums import OwnerType
-from prisma.models import BiomedicalEntity, Owner
-from prisma.types import (
-    OwnerUpdateInput,
-    OwnerCreateWithoutRelationsInput,
-)
+from prisma.models import Owner
+from prisma.types import OwnerUpdateInput
 from pydash import flatten, group_by, omit, uniq
 import logging
-from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 
+from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from constants.patents import (
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
@@ -23,7 +20,7 @@ from core.ner.classifier import create_lookup_map
 from core.ner.cleaning import RE_FLAGS, CleanFunction
 from core.ner.normalizer import TermNormalizer
 from core.ner.utils import cluster_terms
-from scripts.trials.enums import SponsorTypeParser
+from data.etl.types import OwnerCreateWithSynonymsInput
 from utils.re import get_or_re, remove_extra_spaces
 
 
@@ -31,10 +28,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DEFAULT_TYPE_FIELD = "default_type"
-
-
-class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):
-    synonyms: list[str]
 
 
 def clean_owners(owners: Sequence[str]) -> dict[str, str]:

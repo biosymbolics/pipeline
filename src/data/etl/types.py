@@ -4,6 +4,7 @@ from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from prisma.types import (
     BiomedicalEntityCreateWithoutRelationsInput,
+    OwnerCreateWithoutRelationsInput,
 )
 
 
@@ -17,6 +18,10 @@ class BiomedicalEntityCreateInputWithRelationIds(
     BiomedicalEntityCreateWithoutRelationsInput, EntityWithRelationIds
 ):
     pass
+
+
+class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):
+    synonyms: list[str]
 
 
 @dataclass(frozen=True)
