@@ -144,15 +144,6 @@ class TrialEtl(DocumentEtl):
         """
         return source_sql
 
-    async def copy_owners(self):
-        """
-        Create owner (aka sponsor) records
-        """
-        source_sql = "select distinct lower(source) as owner from studies"
-        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
-        names = [ir["owner"] for ir in records]
-        await OwnerEtl().create_records(names)
-
     async def copy_indications(self):
         """
         Create indication records

@@ -161,16 +161,17 @@ model FinancialSnapshot {
     id                         Int      @id @default(autoincrement())
     owner_id                   Int      @unique
     owner                      Owner    @relation(fields: [owner_id], references: [id])
-    market_cap                 Float?
-    total_debt                 Float?
-    net_debt                   Float?
     current_ratio              Float?
     debt_equity_ratio          Float?
     ebitda                     Float?
     gross_profit               Float?
+    market_cap                 Float?
+    net_debt                   Float?
     return_on_equity           Float?
     return_on_research_capital Float?
     snapshot_date              DateTime
+    symbol                     String   @unique
+    total_debt                 Float?
 
     @@map("financials")
 }

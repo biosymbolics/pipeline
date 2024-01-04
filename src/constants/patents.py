@@ -72,6 +72,8 @@ OWNER_SUPPRESSIONS = [
     *COMPANY_STRINGS,
     # no country names unless at start of string or preceded by "of"
     *[f"(?<!^)(?<!of ){c}" for c in COUNTRIES],
+    # remove stock words from company names
+    r"(?:class [a-z]? )?(?:(?:[0-9](?:\.[0-9]*)% )?(?:convertible |american )?(?:common|ordinary|preferred|voting|deposit[ao]ry) (?:stock|share|sh)s?|warrants?).*",
 ]
 
 

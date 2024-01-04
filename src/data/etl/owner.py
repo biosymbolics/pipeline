@@ -39,10 +39,6 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
     - normalizes terms (e.g. "lab" -> "laboratory", "univ" -> "university")
     - applies overrides (e.g. "biogen ma" -> "biogen")
     - then does clustering
-
-
-    Args:
-        owners (list[tuple[str, str]]): List of owner names
     """
 
     def remove_suppressions(terms: list[str]) -> Iterable[str]:
@@ -105,7 +101,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
     def apply_overrides(
         assignees: list[str], cleaned_orig_map: dict[str, str]
     ) -> Iterable[str]:
-        def __map(cleaned: str):
+        def _map(cleaned: str):
             og_assignee = cleaned_orig_map[cleaned]
             mappings = [
                 key
@@ -120,7 +116,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
             return assignee
 
         for assignee in assignees:
-            yield __map(assignee)
+            yield _map(assignee)
 
     def title(assignees: list[str]) -> Iterable[str]:
         for assignee in assignees:
@@ -208,6 +204,8 @@ OWNER_KEYWORD_MAP = create_lookup_map(
     }
 )
 
+ASSIGNEE_PATENT_THRESHOLD = 20
+
 
 class OwnerEtl:
     """
@@ -261,10 +259,7 @@ class OwnerEtl:
         """
         return clean_owners(names)
 
-    async def create_records(
-        self,
-        names: Sequence[str],
-    ):
+    async def create_records(self, names: Sequence[str]):
         """
         Create records for entities and relationships
 

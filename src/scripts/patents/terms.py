@@ -6,8 +6,7 @@ from dataclasses import dataclass
 import sys
 from typing import Sequence
 import logging
-from pydash import compact, flatten, group_by, uniq
-from data.etl.owner import clean_owners
+from pydash import compact, group_by, uniq
 
 import system
 
@@ -15,7 +14,6 @@ system.initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TERMS_TABLE, TERM_IDS_TABLE, WORKING_BIOSYM_ANNOTATIONS_TABLE
-from constants.patents import COMPANY_INDICATORS
 from core.ner import TermNormalizer
 from core.ner.utils import spans_to_doc_entities
 from core.ner.spacy import Spacy
@@ -31,7 +29,6 @@ from .types import AggregatedTermRecord, Ancestors, TermRecord
 
 
 MIN_CANONICAL_NAME_COUNT = 4
-ASSIGNEE_PATENT_THRESHOLD = 20
 
 
 @dataclass(frozen=True)
@@ -132,92 +129,6 @@ class TermAssembler:
         agg_terms = [__get_term_record(group) for _, group in grouped_terms.items()]
         return agg_terms
 
-    async def _generate_owner_terms(self) -> list[AggregatedTermRecord]:
-        """
-        Generates owner terms (assignee/inventor) from:
-        - patent applications table
-        - aact (ctgov)
-        - drugcentral approvals
-        """
-        company_re = get_or_re(
-            COMPANY_INDICATORS,
-            enforce_word_boundaries=True,
-            permit_plural=False,
-            word_boundary_char="\\y",
-        )
-
-        # attempts to select for companies & universities over individuals
-        # (because the clustering makes a mess of individuals)
-        db_owner_query_map = {
-            # patents db
-            "patents": f"""
-                SELECT lower(unnest(assignees)) as name, 'assignees' as domain, count(*) as count
-                FROM applications a
-                GROUP BY name
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
-
-                UNION ALL
-
-                -- if fewer than 20 patents, BUT the name looks like a company, include it.
-                SELECT max(name) as name, 'assignees' as domain, count(*) as count
-                FROM applications a, unnest(assignees) as name
-                where name ~* '{company_re}\\.?'
-                GROUP BY lower(name)
-                HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
-
-                UNION ALL
-
-                SELECT lower(unnest(inventors)) as name, 'inventors' as domain, count(*) as count
-                FROM applications a
-                GROUP BY name
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
-
-                UNION ALL
-
-                SELECT lower(name) as name, 'companies' as domain, count(*) as count
-                FROM companies
-                GROUP BY lower(name)
-            """,
-            # ctgov db
-            "aact": """
-                select lower(name) as name, 'sponsors' as domain, count(*) as count
-                from sponsors
-                group by lower(name)
-            """,
-            # drugcentral db, with approvals
-            # `ob_product`` has 1772 distinct applicants vs `approval` at 1136
-            "drugcentral": """
-                select lower(applicant) as name, 'applicants' as domain, count(*) as count
-                from ob_product
-                where applicant is not null
-                group by lower(applicant)
-            """,
-        }
-        rows = flatten(
-            [
-                await PsqlDatabaseClient(db).select(query)
-                for db, query in db_owner_query_map.items()
-            ]
-        )
-        owner_map = clean_owners([row["name"] for row in rows])
-        owners = [owner_map.get(row["name"], row["name"]) for row in rows]
-
-        normalized: list[TermRecord] = [
-            {
-                "term": owner,
-                "count": row["count"] or 0,
-                "domain": row["domain"],
-                "id": None,
-                "ids": [],
-                "original_term": row["name"],
-            }
-            for row, owner in zip(rows, owners)
-            if len(owner) > 0
-        ]
-
-        terms = TermAssembler._group_terms(normalized)
-        return terms
-
     async def _generate_entity_terms(self) -> list[AggregatedTermRecord]:
         """
         Creates entity terms from the annotations and gpr annotations tables
@@ -278,15 +189,10 @@ class TermAssembler:
         Collects and forms terms for the terms table; persists to TERMS_FILE
         From
         - biosym_annotations
-        - applications (assignees + inventors)
         """
-        logging.info("Getting owner (assignee, inventor) terms")
-        assignee_terms = await self._generate_owner_terms()
 
         logging.info("Generating entity terms")
-        entity_terms = await self._generate_entity_terms()
-
-        terms = assignee_terms + entity_terms
+        terms = await self._generate_entity_terms()
 
         # persisting to json (easy to replay if it borks on db ingest)
         save_json_as_file(terms, TERMS_FILE)

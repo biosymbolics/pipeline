@@ -1,55 +1,68 @@
-from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from dataclasses import dataclass
+from prisma.models import FinancialSnapshot
+import logging
 
-from typings.core import Dataclass
-
-COMPANY_STR_KEYS = [
-    "symbol",
-    "market_cap",
-    "total_debt",
-    "net_debt",
-    "current_ratio",
-    "debt_equity_ratio",
-    "ebitda",
-    "gross_profit",
-    "return_on_equity",
-    "return_on_research_capital",
-    "is_bad_current_ratio",
-    "is_low_return_on_equity",
-    "is_trading_below_cash",
-    "is_bad_debt_equity_ratio",
-    "is_troubled",
-]
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
-@dataclass(frozen=True)
-class Company(Dataclass):
-    """
-    Company dataclass
-    """
+@dataclass
+class CompanyFinancials(FinancialSnapshot):
+    @property
+    def is_bad_current_ratio(self) -> bool:
+        """
+        Current ratio should be > 1
+        """
+        if self.current_ratio is None:
+            logger.warning("Unable to fetch current ratio for %s", self.symbol)
+            return False
+        return self.current_ratio < 1
 
-    id: str
-    name: str
-    symbol: str
-    current_ratio: float | None
-    debt_equity_ratio: float | None
-    ebitda: float | None
-    gross_profit: float | None
-    is_trading_below_cash: bool
-    is_bad_current_ratio: bool
-    is_bad_debt_equity_ratio: bool
-    is_low_return_on_equity: bool
-    is_troubled: bool
-    market_cap: float | None
-    return_on_equity: float | None
-    return_on_research_capital: float | None
-    net_debt: float | None
-    total_debt: float | None
-    parent_company_id: Optional[str]  # id
-    synonyms: Optional[list[str]]
+    @property
+    def is_bad_debt_equity_ratio(self, max_ratio: float = 1.5) -> bool:
+        """
+        Debt equity ratio should be < 1.5
+        """
+        if self.debt_equity_ratio is None:
+            logger.warning("Unable to fetch d/e ratio for %s", self.symbol)
+            return False
+        return self.debt_equity_ratio > max_ratio
 
-    def __str__(self):
-        return ", ".join([f"{k}={getattr(self, k)}" for k in COMPANY_STR_KEYS])
+    @property
+    def is_low_return_on_equity(self, min_roe: float = 0.15) -> bool:
+        """
+        Return on equity should be > 15%
+        """
+        if self.return_on_equity is None:
+            return False
+        return self.return_on_equity < min_roe
 
-    def __repr__(self):
-        return self.__str__()
+    @property
+    def is_trading_below_cash(self) -> bool:
+        if self.market_cap is None or self.net_debt is None:
+            logger.warning(
+                "Unable to fetch market cap and/or net debt for %s", self.symbol
+            )
+            return False
+        return self.market_cap < self.net_debt
+
+    @property
+    def is_troubled(self) -> bool:
+        """
+        Returns true if any of the following are true:
+
+        - is trading below cash
+        - has a bad current ratio
+        - has a bad debt equity ratio
+
+        This indicates a company may be at risk of bankruptcy, being scrapped,
+        or interested in liquidation or buyout.
+
+        TODO: include change over time
+        """
+        return (
+            self.is_trading_below_cash
+            or self.is_bad_current_ratio
+            or self.is_bad_debt_equity_ratio
+            or self.is_low_return_on_equity
+        )
