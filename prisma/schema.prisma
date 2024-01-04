@@ -24,9 +24,18 @@ model BiomedicalEntity {
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
-    synonyms      String[]
+    synonyms      Synonym[]
 
     @@map("biomedical_entity")
+}
+
+model Synonym {
+    id        Int              @id @default(autoincrement())
+    entity    BiomedicalEntity @relation(fields: [entity_id], references: [id])
+    entity_id Int
+    term      String
+
+    @@map("synonym")
 }
 
 model Patent {

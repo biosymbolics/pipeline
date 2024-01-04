@@ -21,7 +21,7 @@ class Dataclass:
     def get(self, item, default=None):
         return getattr(self, item, default)
 
-    def asdict(self) -> dict[str, Any]:
+    def asdict(self):
         o = asdict(self)
         return o
 

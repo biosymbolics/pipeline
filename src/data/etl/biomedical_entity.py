@@ -10,11 +10,17 @@ from prisma.types import (
 )
 from pydash import compact, flatten, group_by, omit, uniq
 
+from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
 
-from .types import BiomedicalEntityCreateInputWithRelationIds, RelationIdFieldMap
+from .types import (
+    BiomedicalEntityCreateInputWithRelationIds,
+    RelationIdFieldMap,
+)
+
+DEFAULT_TYPE_FIELD = "default_type"
 
 
 class BiomedicalEntityEtl:
@@ -29,12 +35,16 @@ class BiomedicalEntityEtl:
         self,
         candidate_selector: CandidateSelectorType,
         relation_id_field_map: RelationIdFieldMap,
+        additional_cleaners: Sequence[CleanFunction] = [],
     ):
-        self.normalizer = TermNormalizer(candidate_selector=candidate_selector)
+        self.normalizer = TermNormalizer(
+            candidate_selector=candidate_selector,
+            additional_cleaners=additional_cleaners,
+        )
         self.relation_id_field_map = relation_id_field_map
 
-    @staticmethod
     def maybe_merge_insert_records(
+        self,
         groups: list[BiomedicalEntityCreateInputWithRelationIds],
         canonical_id: str,
     ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
@@ -46,19 +56,18 @@ class BiomedicalEntityEtl:
             return groups
 
         return [
-            {
-                "canonical_id": groups[0].get("canonical_id"),
-                "name": groups[0]["name"],
-                "entity_type": groups[0]["entity_type"],
-                "synonyms": uniq(
-                    compact([s for g in groups for s in g.get("synonyms") or []])
-                ),
-                "sources": groups[0].get("sources") or [],
-                "comprised_of": uniq(
-                    flatten([g.get("comprised_of") or [] for g in groups])
-                ),
-                "parents": uniq(flatten([g.get("parents") or [] for g in groups])),
-            }
+            BiomedicalEntityCreateInputWithRelationIds(
+                **{
+                    "canonical_id": groups[0].get("canonical_id"),
+                    "name": groups[0]["name"],
+                    "entity_type": groups[0]["entity_type"],
+                    "sources": groups[0].get("sources") or [],
+                    **{
+                        k: uniq(flatten([g.get(k) or [] for g in groups]))
+                        for k in self.relation_id_field_map.keys()
+                    },
+                }
+            )
         ]
 
     def _generate_insert_records(
@@ -66,43 +75,31 @@ class BiomedicalEntityEtl:
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-        default_type_map: dict[str, BiomedicalEntityType] = {},
         non_canonical_source: Source = Source.FDA,
-        synonym_fields: list[str] = ["brand_name"],
     ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
         """
-        Create records for entity insert
+        Create record dicts for entity insert
         """
 
         def get_insert_record(
             orig_name: str,
         ) -> BiomedicalEntityCreateInputWithRelationIds:
-            source_rec = source_map.get(orig_name)
+            source_rec = source_map[orig_name]
             canonical = canonical_map.get(orig_name)
 
-            if source_rec is not None:
-                rel_fields: dict[str, list[str]] = {
-                    rel_field: uniq(
-                        compact(
-                            [
-                                canonical_map[i].id if i in canonical_map else None
-                                for i in source_rec[source_field]
-                            ]
-                        )
+            # fields for N-to-N relationships (synonyms, comprised_of, parents)
+            relation_fields: dict[str, list[str]] = {
+                rel_field: uniq(
+                    compact(
+                        [
+                            connect_info.get_value(val, canonical_map)
+                            for val in source_rec.get(connect_info.source_field) or []
+                        ]
                     )
-                    for rel_field, source_field in self.relation_id_field_map.items()
-                }
-                source_dependent_fields = {
-                    "synonyms": [
-                        orig_name,
-                        *[str(source_rec[sf]) for sf in synonym_fields],
-                    ],
-                    **rel_fields,
-                }
-            else:
-                source_dependent_fields = {
-                    "synonyms": [orig_name],
-                }
+                )
+                for rel_field, connect_info in self.relation_id_field_map.items()
+                if connect_info is not None
+            }
 
             if canonical is not None:
                 canonical_dependent_fields = {
@@ -112,18 +109,20 @@ class BiomedicalEntityEtl:
                     "sources": [Source.UMLS],
                 }
             else:
+                entity_type = (
+                    source_rec.get(DEFAULT_TYPE_FIELD) or BiomedicalEntityType.UNKNOWN
+                )
                 canonical_dependent_fields = {
                     "canonical_id": None,
                     "name": orig_name,
-                    "entity_type": default_type_map.get(orig_name)
-                    or BiomedicalEntityType.UNKNOWN,
+                    "entity_type": entity_type,
                     "sources": [non_canonical_source],
                 }
 
             return BiomedicalEntityCreateInputWithRelationIds(
                 **{
                     **canonical_dependent_fields,  # type: ignore
-                    **source_dependent_fields,
+                    **relation_fields,
                 }
             )
 
@@ -133,7 +132,7 @@ class BiomedicalEntityEtl:
             grouped_recs = group_by(flat_recs, "canonical_id")
             merged_recs = flatten(
                 [
-                    BiomedicalEntityEtl.maybe_merge_insert_records(groups, cid)
+                    self.maybe_merge_insert_records(groups, cid)
                     for cid, groups in grouped_recs.items()
                 ]
             )
@@ -165,8 +164,7 @@ class BiomedicalEntityEtl:
         self,
         terms_to_canonicalize: Sequence[str],
         terms_to_insert: Sequence[str],
-        source_map: dict,
-        default_type_map: dict[str, BiomedicalEntityType] = {},
+        source_map: dict[str, dict],
     ):
         """
         Create records for entities and relationships
@@ -175,14 +173,13 @@ class BiomedicalEntityEtl:
             terms_to_canonicalize (Sequence[str]): terms to canonicalize
             terms_to_insert (Sequence[str]): terms to insert
             source_map (dict): map of "original_term" to source record
-            default_type_map (dict): map of terms to default entity types
+                               for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
         canonical_map = self.generate_canonical_map(terms_to_canonicalize)
         entity_recs = self._generate_insert_records(
             terms_to_insert,
             source_map,
             canonical_map,
-            default_type_map=default_type_map,
         )
 
         # create flat records
@@ -200,15 +197,15 @@ class BiomedicalEntityEtl:
         recs_with_relations = [
             er
             for er in entity_recs
-            if (any([er.get(k) is not None for k in self.relation_id_field_map.keys()]))
-            is not None
+            if any([k in er for k in self.relation_id_field_map.keys()])
         ]
         for rwr in recs_with_relations:
             update = BiomedicalEntityUpdateInput(
-                **{  # type: ignore
-                    k: {"connect": [{"canonical_id": co} for co in rwr.get(k) or []]}  # type: ignore
-                    for k in self.relation_id_field_map.keys()
-                },
+                **{
+                    k: connect_info.form_prisma_relation(rwr)
+                    for k, connect_info in self.relation_id_field_map.items()
+                    if connect_info is not None
+                },  # type: ignore
             )
             await BiomedicalEntity.prisma().update(
                 where={"name": rwr["name"]}, data=update

@@ -44,12 +44,9 @@ class BaseTrial(Dataclass):
     end_date: datetime
     enrollment: int
     hypothesis_types: list[str]
-    # intervention: str | None
     interventions: list[str]
     intervention_types: list[str]
     last_updated_date: datetime
-    # normalized_sponsor: str
-    # pharmacologic_class: str | None
     outcomes: list[str]
     sponsor: str
     start_date: datetime
