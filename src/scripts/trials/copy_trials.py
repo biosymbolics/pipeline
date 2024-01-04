@@ -204,7 +204,8 @@ class TrialEtl(DocumentEtl):
                 SELECT DISTINCT lower(mesh_term) as name FROM browse_interventions
                     WHERE mesh_type = 'mesh-list' AND mesh_term is not null
                 UNION ALL
-                SELECT DISTINCT lower(name) FROM interventions WHERE name is not null AND name ~* '{get_or_re(CONTROL_TERMS)}'
+                SELECT DISTINCT lower(name) FROM interventions
+                    WHERE name is not null AND name ~* '{get_or_re(CONTROL_TERMS)}'
             ) s
         """
         records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
@@ -305,7 +306,6 @@ class TrialEtl(DocumentEtl):
                         "name": t["sponsor"] or "unknown",
                         "is_primary": True,
                         "trial_id": t["id"],
-                        # SponsorTypeParser.find(trial.sponsor)
                     }
                     for t in rows
                 ],
