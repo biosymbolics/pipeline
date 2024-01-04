@@ -7,6 +7,7 @@ import sys
 from typing import Sequence
 import logging
 from pydash import compact, flatten, group_by, uniq
+from data.etl.owner import clean_owners
 
 import system
 
@@ -27,7 +28,6 @@ from .constants import GPR_ANNOTATIONS_TABLE, TERMS_FILE
 from .process_biosym_annotations import populate_working_biosym_annotations
 from .synonyms import SynonymMapper
 from .types import AggregatedTermRecord, Ancestors, TermRecord
-from .utils import clean_owners
 
 
 MIN_CANONICAL_NAME_COUNT = 4
@@ -199,7 +199,8 @@ class TermAssembler:
                 for db, query in db_owner_query_map.items()
             ]
         )
-        owners = clean_owners([row["name"] for row in rows])
+        owner_map = clean_owners([row["name"] for row in rows])
+        owners = [owner_map.get(row["name"], row["name"]) for row in rows]
 
         normalized: list[TermRecord] = [
             {

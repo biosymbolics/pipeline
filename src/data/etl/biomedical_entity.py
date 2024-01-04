@@ -142,23 +142,20 @@ class BiomedicalEntityEtl:
         insert_records = merge_records()
         return insert_records
 
-    def generate_canonical_map(
-        self, terms_to_canonicalize: Sequence[str]
-    ) -> dict[str, CanonicalEntity]:
+    def generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
         """
         Generate canonical map for source terms
         """
 
-        # normalize all intervention names, except if combos
-        canonical_docs = self.normalizer.normalize_strings(terms_to_canonicalize)
+        lookup_docs = self.normalizer.normalize_strings(terms)
 
         # map for quick lookup of canonical entities
-        canonical_map = {
+        lookup_map = {
             on: de.canonical_entity
-            for on, de in zip(terms_to_canonicalize, canonical_docs)
+            for on, de in zip(terms, lookup_docs)
             if de.canonical_entity is not None
         }
-        return canonical_map
+        return lookup_map
 
     async def create_records(
         self,
@@ -175,7 +172,7 @@ class BiomedicalEntityEtl:
             source_map (dict): map of "original_term" to source record
                                for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
-        canonical_map = self.generate_canonical_map(terms_to_canonicalize)
+        canonical_map = self.generate_lookup_map(terms_to_canonicalize)
         entity_recs = self._generate_insert_records(
             terms_to_insert,
             source_map,
@@ -194,19 +191,14 @@ class BiomedicalEntityEtl:
         )
 
         # update records with relationships with connection info
-        recs_with_relations = [
-            er
-            for er in entity_recs
-            if any([k in er for k in self.relation_id_field_map.keys()])
-        ]
-        for rwr in recs_with_relations:
+        for entity_rec in entity_recs:
             update = BiomedicalEntityUpdateInput(
                 **{
-                    k: connect_info.form_prisma_relation(rwr)
+                    k: connect_info.form_prisma_relation(entity_rec)
                     for k, connect_info in self.relation_id_field_map.items()
                     if connect_info is not None
                 },  # type: ignore
             )
             await BiomedicalEntity.prisma().update(
-                where={"name": rwr["name"]}, data=update
+                where={"name": entity_rec["name"]}, data=update
             )

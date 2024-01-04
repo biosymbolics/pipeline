@@ -1,5 +1,5 @@
 from dataclasses import dataclass, fields
-from typing import Literal
+from typing import Literal, TypedDict
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from prisma.types import (
@@ -7,12 +7,16 @@ from prisma.types import (
 )
 
 
-class BiomedicalEntityCreateInputWithRelationIds(
-    BiomedicalEntityCreateWithoutRelationsInput
-):
+class EntityWithRelationIds(TypedDict):
     comprised_of: list[str]
     parents: list[str]
     synonyms: list[str]
+
+
+class BiomedicalEntityCreateInputWithRelationIds(
+    BiomedicalEntityCreateWithoutRelationsInput, EntityWithRelationIds
+):
+    pass
 
 
 @dataclass(frozen=True)

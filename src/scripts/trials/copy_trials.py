@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from pydash import omit
-from prisma.enums import BiomedicalEntityType
+from prisma.enums import BiomedicalEntityType, OwnerType
 from prisma.models import (
     Indicatable,
     Intervenable,
@@ -19,7 +19,6 @@ from prisma.types import TrialCreateWithoutRelationsInput
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
 from constants.patterns.intervention import DOSAGE_UOM_RE
-from core.ner.cleaning import RE_FLAGS
 from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
@@ -34,7 +33,6 @@ from .enums import (
     ComparisonTypeParser,
     HypothesisTypeParser,
     InterventionTypeParser,
-    SponsorTypeParser,
     TerminationReasonParser,
     TrialDesignParser,
     TrialMaskingParser,
@@ -166,6 +164,27 @@ class TrialEtl(DocumentEtl):
             group by studies.nct_id
         """
         return source_sql
+
+    async def copy_owners(self):
+        """
+        Create owner (aka sponsor) records
+        """
+        source_sql = "select distinct lower(source) as owner from studies"
+        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
+
+        insert_map = {ir["owner"]: {"synonyms": [ir["owner"]]} for ir in records}
+
+        terms_to_insert = list(insert_map.keys())
+        terms_to_canonicalize = terms_to_insert
+
+        await BiomedicalEntityEtl(
+            "CandidateSelector",
+            relation_id_field_map=RelationIdFieldMap(
+                synonyms=RelationConnectInfo(
+                    source_field="synonyms", dest_field="term", input_type="create"
+                ),
+            ),
+        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
 
     async def copy_indications(self):
         """
