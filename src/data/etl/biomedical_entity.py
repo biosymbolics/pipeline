@@ -65,7 +65,7 @@ class BiomedicalEntityEtl:
                     **{
                         k: uniq(flatten([g.get(k) or [] for g in groups]))
                         for k in self.relation_id_field_map.keys()
-                    },
+                    },  # type: ignore
                 }
             )
         ]

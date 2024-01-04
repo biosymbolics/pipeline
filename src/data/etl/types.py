@@ -36,7 +36,7 @@ class RelationConnectInfo(Dataclass):
             return {}
         return {
             self.input_type: [
-                {self.dest_field: v} for v in rec[self.source_field] or []
+                {self.dest_field: str(v)} for v in rec[self.source_field] or []  # type: ignore
             ]
         }
 
