@@ -27,6 +27,7 @@ from data.etl.biomedical_entity import BiomedicalEntityEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
 from data.domain.trials import extract_max_timeframe
+from scripts.trials.constants import CONTROL_TERMS
 from utils.re import get_or_re
 
 from .enums import (
@@ -46,29 +47,6 @@ from .enums import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-CONTROL_TERMS = [
-    "placebo",
-    "sham",
-    "best supportive care",
-    "standard",
-    "usual care",
-    "comparator",
-    "no treatment",
-    "saline solution",
-    "conventional",
-    "aspirin",
-    "control",
-    "tablet dosage form",
-    "laboratory biomarker analysis",
-    "drug vehicle",
-    "pharmacological study",
-    "normal saline",
-    "therapeutic procedure",
-    "quality.?of.?life",
-    "questionnaire",
-]
 
 
 SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/aact"
