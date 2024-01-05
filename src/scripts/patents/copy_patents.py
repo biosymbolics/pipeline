@@ -102,13 +102,10 @@ def get_patent_entity_sql(domains: tuple[str, ...]) -> str:
     Get entities from biosym annotations table for creation of biomedical entities
     """
     return f"""
-        SELECT
-            lower(original_term) as term,
-            domain,
-            min(character_offset_start) as character_offset_start
+        SELECT lower(original_term) as term
         FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
         WHERE domain in {domains}
-        GROUP BY term
+        GROUP BY lower(original_term)
     """
 
 
@@ -139,9 +136,8 @@ class PatentEtl(DocumentEtl):
         source_records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
         source_map = {
-            sr["original_term"]: {
-                "mention_index": [sr["character_offset_start"]],
-                "synonyms": [sr["original_term"]],
+            sr["term"]: {
+                "synonyms": [sr["term"]],
                 "type" if type_type == "override" else "default": type,
             }
             for sr in source_records
@@ -172,7 +168,15 @@ class PatentEtl(DocumentEtl):
         Create intervention entity records
         """
         await self._copy_entities(
-            tuple(["biologics", "compounds", "devices", "procedures", "mechanisms"]),
+            tuple(
+                [
+                    "biologics",
+                    "compounds",
+                    "devices",
+                    "procedures",
+                    "mechanisms",
+                ]
+            ),
             BiomedicalEntityType.OTHER,  # TODO: "INTERVENTION"?
             type_type="default",
         )

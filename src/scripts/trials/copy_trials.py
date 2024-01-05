@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from pydash import omit
-from prisma.enums import BiomedicalEntityType, OwnerType
+from prisma.enums import BiomedicalEntityType
 from prisma.models import (
     Indicatable,
     Intervenable,
@@ -24,7 +24,6 @@ from data.domain.biomedical import (
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 from data.etl.biomedical_entity import BiomedicalEntityEtl
-from data.etl.owner import OwnerEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
 from data.domain.trials import extract_max_timeframe
