@@ -1,5 +1,5 @@
 """
-Regulatory patents ETL script
+Patents ETL script
 """
 import sys
 import asyncio
@@ -25,18 +25,16 @@ class PatentEtl(DocumentEtl):
     @staticmethod
     def get_source_sql(fields: list[str]):
         return f"""
-        SELECT {", ".join(fields)}
-        FROM
-        applications
-    """
+            SELECT {", ".join(fields)}
+            FROM
+            applications
+        """
 
     async def copy_indications(self):
         """
         Create indication records
         """
-        fields = [
-            "array_remove(ARRAY_AGG(distinct lower(metadata.concept_name)), NULL) as indications"
-        ]
+        fields = []
         source_records = await PsqlDatabaseClient(SOURCE_DB).select(
             query=PatentEtl.get_source_sql(fields)
         )
@@ -63,12 +61,7 @@ class PatentEtl(DocumentEtl):
         """
         Create intervention records
         """
-        fields = [
-            "lower(prod.product_name) as brand_name",
-            "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
-            "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
-            "ARRAY_REMOVE(ARRAY_AGG(distinct lower(pharma_class.name)), NULL)::text[] as pharmacologic_classes",
-        ]
+        fields = []
         source_records = await PsqlDatabaseClient(SOURCE_DB).select(
             query=PatentEtl.get_source_sql(fields)
         )
@@ -81,7 +74,7 @@ class PatentEtl(DocumentEtl):
         ]
 
         await BiomedicalEntityEtl(
-            "CandidateSelector",
+            "CompositeCandidateSelector",
             relation_id_field_map=RelationIdFieldMap(
                 synonyms=RelationConnectInfo(
                     source_field="synonyms", dest_field="term", input_type="create"
