@@ -84,7 +84,7 @@ class AllOwnersEtl:
                 UNION ALL
 
                 -- if fewer than 20 patents, BUT the name looks like a company, include it.
-                SELECT max(name) as name, count(*) as count
+                SELECT max(lower(name)) as name, count(*) as count
                 FROM applications a, unnest(assignees) as name
                 where name ~* '{company_re}\\.?'
                 GROUP BY lower(name)
@@ -94,7 +94,7 @@ class AllOwnersEtl:
 
                 SELECT lower(unnest(inventors)) as name, count(*) as count
                 FROM applications a
-                GROUP BY name
+                GROUP BY lower(name)
                 HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
 
                 UNION ALL
@@ -158,7 +158,7 @@ class AllOwnersEtl:
             where={
                 "AND": [
                     {"term": {"in": [record["name"] for record in pharma_cos]}},
-                    {"owner_id": {"gt": 0}},  # returns non-null owner_id?
+                    {"owner_id": {"gt": 0}},  # filters out null owner_id
                 ]
             },
         )
@@ -172,25 +172,13 @@ class AllOwnersEtl:
             data=transform_financials(pharma_cos, owner_map),
         )
 
-    async def link_snapshots(self):
-        """
-        Link financial snapshots to owners
-        """
-        async with Prisma() as db:
-            await db.execute_raw(
-                f"""
-                UPDATE owner
-                SET financial_snapshot_id=synonym.owner_id
-                FROM synonym
-                WHERE owner.name=synonym.term
-                AND synonym.owner_id IS NOT NULL;
-                """
-            )
-
     async def copy_all(self):
+        db = Prisma(auto_register=True, http={"timeout": None})
+        await db.connect()
         names = await self.get_owner_names()
         await OwnerEtl().copy_all(names)
-        await self.link_snapshots()
+        await self.load_financials()
+        await db.disconnect()
 
 
 def main():

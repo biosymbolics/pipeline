@@ -134,7 +134,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
 
     with_overiddes = list(apply_overrides(cleaned, cleaned_orig_map))
 
-    return cast(dict[str, str], cluster_terms(with_overiddes, return_dict=True))
+    return cluster_terms(with_overiddes)
 
 
 class OwnerTypeParser:

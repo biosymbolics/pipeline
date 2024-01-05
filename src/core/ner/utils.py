@@ -17,7 +17,7 @@ from utils.re import (
 )
 
 from .spacy import Spacy
-from .types import DocEntity, SynonymRecord
+from .types import DocEntity
 
 
 logger = logging.getLogger(__name__)
@@ -490,9 +490,7 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     return entity_set
 
 
-def cluster_terms(
-    terms: Sequence[str], return_dict: bool = False
-) -> list[SynonymRecord] | dict[str, str]:
+def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
     """
     Clusters terms using TF-IDF and DBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair)
@@ -525,15 +523,8 @@ def cluster_terms(
         .to_list()
     )
 
-    if return_dict:
-        return {
-            members_terms[0]: m
-            for members_terms in terms_by_cluster_id
-            for m in members_terms[1:]
-        }
-
-    return [
-        SynonymRecord({"term": members_terms[0], "synonym": m})
+    return {
+        members_terms[0]: m
         for members_terms in terms_by_cluster_id
         for m in members_terms[1:]
-    ]
+    }
