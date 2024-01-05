@@ -32,21 +32,30 @@ class DocumentEtl:
     async def copy_documents(self):
         raise NotImplementedError
 
-    async def link_maps(self):
+    async def link_mapping_tables(self):
         """
-        Link mapping tables like "intervenable" and "indicatable" to canonical entities
+        Link mapping tables "intervenable", "indicatable" and "ownable" to canonical entities
         """
         async with Prisma() as db:
-            mapping_tables = ["intervenable", "indicatable"]
-            for mt in mapping_tables:
+            bioent_tables = ["intervenable", "indicatable"]
+            for bet in bioent_tables:
                 await db.execute_raw(
                     f"""
-                    UPDATE {mt}
-                    SET entity_id=synonym.entity_id
-                    FROM synonym
-                    WHERE {mt}.name=synonym.term;
+                    UPDATE {bet}
+                    SET entity_id=entity_synonym.entity_id
+                    FROM entity_synonym
+                    WHERE {bet}.name=entity_synonym.term;
                     """
                 )
+
+            await db.execute_raw(
+                f"""
+                UPDATE ownable
+                SET owner_id=synonym.owner_id
+                FROM owner_synonym
+                WHERE owner.name=owner_synonym.term;
+                """
+            )
 
     async def create_search_index(self):
         """
@@ -74,7 +83,7 @@ class DocumentEtl:
         await self.copy_interventions()
         await self.copy_indications()
         await self.copy_documents()
-        await self.link_maps()
+        await self.link_mapping_tables()
         await self.copy_indications()
         await self.create_search_index()
         await db.disconnect()
