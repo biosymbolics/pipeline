@@ -7,7 +7,7 @@ import logging
 from typing import Literal, Sequence
 from prisma.enums import BiomedicalEntityType
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
-
+from prisma.types import PatentCreateInput, PatentUpdateInput
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
@@ -29,7 +29,6 @@ logging.basicConfig(level=logging.INFO)
 SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/patents"
 
 
-# save_json_as_file(terms, TERMS_FILE)
 # if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
 canonical_sql = "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
 
@@ -84,20 +83,6 @@ def get_patent_mapping_entities_from_gpr():
     """
 
 
-patents_select_attributes_sql = f"""
-    SELECT
-        publication_number,
-        original_term as term,
-        original_term as id,
-        domain,
-        character_offset_start,
-        original_term as instance_rollup,
-        original_term as category_rollup
-    from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
-    where domain='attributes'
-"""
-
-
 def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
     """
     Get entities from biosym annotations table for creation of biomedical entities
@@ -134,11 +119,18 @@ def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
 
 class PatentEtl(DocumentEtl):
     @staticmethod
-    def get_source_sql(fields: list[str]):
+    def get_source_sql():
         return f"""
-            SELECT {", ".join(fields)}
-            FROM
-            applications
+            SELECT *
+            FROM applications
+            LEFT JOIN (
+                SELECT
+                    publication_number,
+                    array_agg(original_term) as attributes
+                from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
+                where domain='attributes'
+                group by publication_number
+            ) attributes ON applications.publication_number = attributes.publication_number
         """
 
     async def _copy_entities(
@@ -206,16 +198,38 @@ class PatentEtl(DocumentEtl):
         """
         Create regulatory approval records
         """
-        fields = []
-        patents = await PsqlDatabaseClient(SOURCE_DB).select(
-            query=PatentEtl.get_source_sql(fields)
+        records = await PsqlDatabaseClient(SOURCE_DB).select(
+            query=PatentEtl.get_source_sql()
         )
 
         # create patent records
-        await Patent.prisma().create_many(
-            data=[],
-            skip_duplicates=True,
-        )
+        for p in records:
+            data = {
+                "id": p["publication_number"],
+                "abstract": p["abstract"],
+                "application_number": p["application_number"],
+                "attributes": p["attributes"],
+                # assignees (relation)
+                "claims": p["claims"],
+                "country_code": p["country"],
+                "embeddings": p["embeddings"],
+                "ipc_codes": p["ipc_codes"],
+                # indications (relation)
+                # interventions (relation)
+                # inventors (relation)
+                "other_ids": p["all_publication_numbers"],
+                "priority_date": p["priority_date"],
+                "similar_patents": {"set": [{"id": sp} for sp in p["similar_patents"]]},
+                "title": p["title"],
+                "url": p["url"],
+            }
+            await Patent.prisma().upsert(
+                where={"id": p["publication_number"]},
+                data={
+                    "create": PatentCreateInput(**data),
+                    "update": PatentUpdateInput(**data),
+                },
+            )
 
         # create assignee owner records
         await Ownable.prisma().create_many(
@@ -225,7 +239,7 @@ class PatentEtl(DocumentEtl):
                     "is_primary": True,
                     "assignee_patent_id": p["id"],
                 }
-                for p in patents
+                for p in records
                 for a in p["assignees"]
             ],
             skip_duplicates=True,
@@ -239,15 +253,15 @@ class PatentEtl(DocumentEtl):
                     "is_primary": True,
                     "inventor_patent_id": p["id"],
                 }
-                for p in patents
-                for i in p["invetors"]
+                for p in records
+                for i in p["inventors"]
             ],
             skip_duplicates=True,
         )
 
         # create "indicatable" records, those that map approval to a canonical indication
         await Indicatable.prisma().create_many(
-            data=[{"name": "", "patent_id": p["id"]} for p in patents]
+            data=[{"name": "", "patent_id": p["id"]} for p in records]
         )
 
         # create "intervenable" records, those that map approval to a canonical intervention
@@ -258,7 +272,7 @@ class PatentEtl(DocumentEtl):
                     "is_primary": True,
                     "regulatory_approval_id": p["id"],
                 }
-                for p in patents
+                for p in records
             ]
         )
 

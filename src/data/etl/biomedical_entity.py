@@ -21,6 +21,7 @@ from .types import (
 )
 
 DEFAULT_TYPE_FIELD = "default_type"
+OVERRIDE_TYPE_FIELD = "type"
 
 
 class BiomedicalEntityEtl:
@@ -102,17 +103,13 @@ class BiomedicalEntityEtl:
             }
 
             if canonical is not None:
-                try:
-                    canonical_dependent_fields = {
-                        "canonical_id": canonical.id,
-                        "name": canonical.name.lower(),
-                        "entity_type": canonical.type,
-                        "sources": [Source.UMLS],
-                    }
-                except Exception as e:
-                    print(e)
-                    print(canonical)
-                    raise e
+                entity_type = source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type
+                canonical_dependent_fields = {
+                    "canonical_id": canonical.id,
+                    "name": canonical.name.lower(),
+                    "entity_type": entity_type,
+                    "sources": [Source.UMLS],
+                }
             else:
                 entity_type = (
                     source_rec.get(DEFAULT_TYPE_FIELD) or BiomedicalEntityType.UNKNOWN

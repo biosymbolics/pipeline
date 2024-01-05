@@ -69,17 +69,15 @@ model Patent {
     abstract                String
     assignees               Ownable[]                @relation("assignee_to_patent")
     attributes              String[]
-    claims                  String
+    claims                  String?
     country_code            String
-    description             String
     embeddings              Float[]
     interventions           Intervenable[]
     indications             Indicatable[]
     inventors               Ownable[]                @relation("inventor_to_patent")
     inverse_similar_patents Patent[]                 @relation("similar_patents")
     ipc_codes               String[]
-    other_ids               PatentToIds[]
-    patent_id               String?
+    other_ids               String[]
     priority_date           DateTime
     search                  Unsupported("tsvector")?
     similar_patents         Patent[]                 @relation("similar_patents")
@@ -87,15 +85,6 @@ model Patent {
     url                     String
 
     @@map("patent")
-}
-
-model PatentToIds {
-    id        String   @id @unique
-    other_ids String[]
-    patent    Patent?  @relation(fields: [patent_id], references: [id])
-    patent_id String?
-
-    @@map("patent_to_ids")
 }
 
 model RegulatoryApproval {
