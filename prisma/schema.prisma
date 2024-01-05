@@ -42,14 +42,13 @@ model EntitySynonym {
 model Owner {
     id                 Int                      @id @default(autoincrement())
     children           Owner[]                  @relation("owner_to_parent")
+    financial_snapshot FinancialSnapshot?
     ownables           Ownable[] // backref
     owner_type         OwnerType
     parents            Owner[]                  @relation("owner_to_parent")
     name               String                   @unique
     search             Unsupported("tsvector")?
-    symbol             String?
     synonyms           OwnerSynonym[]
-    financial_snapshot FinancialSnapshot?
 
     @@map("owner")
 }

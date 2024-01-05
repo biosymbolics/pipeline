@@ -244,7 +244,7 @@ OWNER_KEYWORD_MAP = create_lookup_map(
             "group$",
             "research cent(?:er|re)s?",
         ],
-        OwnerType.INDIVIDUAL: [r"M\.?D\.?"],
+        OwnerType.INDIVIDUAL: [r"m\.?d\.?", "dr\\.?", "ph\\.?d\\.?"],
     }
 )
 
@@ -327,7 +327,7 @@ class OwnerEtl:
             await Owner.prisma().update(
                 where={"name": ir["name"]},
                 data=OwnerUpdateInput(
-                    synonyms={"create": [{"term": s} for s in ir["synonyms"]]},
+                    synonyms={"create": [{"term": s} for s in uniq(ir["synonyms"])]},
                 ),
             )
 
@@ -352,6 +352,7 @@ class OwnerEtl:
 
         await FinancialSnapshot.prisma().create_many(
             data=transform_financials(public_companies, owner_map),
+            skip_duplicates=True,
         )
 
     async def copy_all(
