@@ -215,9 +215,10 @@ class PatentEtl(DocumentEtl):
                     },
                 )
 
-                # TODO: do in bulk for perf
-                async with Prisma(http={"timeout": None}) as db:
-                    # sigh https://github.com/prisma/prisma/issues/18442
+            # TODO: do in bulk for perf
+            async with Prisma(http={"timeout": None}) as db:
+                # sigh https://github.com/prisma/prisma/issues/18442
+                for p in batch:
                     await db.execute_raw(
                         f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
                     )

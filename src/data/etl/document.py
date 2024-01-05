@@ -80,9 +80,9 @@ class DocumentEtl:
     async def copy_all(self):
         db = Prisma(auto_register=True, http={"timeout": None})
         await db.connect()
+        await self.copy_documents()
         await self.copy_interventions()
         await self.copy_indications()
-        await self.copy_documents()
         await self.link_mapping_tables()
         await self.create_search_index()
         await db.disconnect()
