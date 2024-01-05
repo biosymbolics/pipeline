@@ -27,60 +27,50 @@ logging.basicConfig(level=logging.INFO)
 
 
 SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/patents"
-
+INTERVENTION_DOMAINS: list[LegacyDomainType] = [
+    "biologics",
+    "compounds",
+    "devices",
+    "procedures",
+    "mechanisms",
+]
 
 # if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
 canonical_sql = "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
 
 
-def get_patent_mapping_entities(domains: Sequence[str]) -> str:
-    return f"""
-        SELECT publication_number,
-            s.term as term,
-            s.id as id,
-            domain,
-            max(source) as source,
-            min(character_offset_start) as character_offset_start,
-            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
-            coalesce(max(t.category_rollup), s.term) as category_rollup
-        from (
-            SELECT
-                publication_number,
-                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term end) as term,
-                (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id end) as id,
-                domain,
-                source,
-                character_offset_start,
-                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
-            ) s
-            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
-            group by publication_number, s.term, s.id, domain
-        """
-
-
-def get_patent_mapping_entities_from_gpr():
-    return f"""
-        SELECT publication_number,
-            s.term as term,
-            s.id as id,
-            domain,
-            min(character_offset_start) as character_offset_start,
-            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
-            coalesce(max(t.category_rollup), s.term) as category_rollup
-        from (
-            SELECT
-                publication_number,
-                (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term end) as term,
-                (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id end) as id,
-                domain,
-                character_offset_start
-                FROM {GPR_ANNOTATIONS_TABLE}
-                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
-            ) s
-            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
-            group by publication_number, s.term, s.id, domain
+def get_patent_mapping_entities_sql(domains: Sequence[str]) -> str:
     """
+    Get sql for mapping entities (i.e. intervenable, indicatable)
+    """
+    biosym_sql = f"""
+            SELECT
+                publication_number as id,
+                lower(original_term) as term,
+                min(character_offset_start) as mention_index
+            FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+            WHERE domain in ('{"','".join(domains)}')
+            GROUP BY publication_number, lower(original_term)
+        """
+    if "diseases" in domains:
+        sql = f"""
+            SELECT term, id, min(mention_index) FROM (
+                SELECT
+                    publication_number as id,
+                    lower(preferred_name) as term,
+                    min(character_offset_start) as mention_index
+                FROM {GPR_ANNOTATIONS_TABLE}
+                WHERE domain='diseases'
+                GROUP BY publication_number, lower(preferred_name)
+
+                UNION ALL
+
+                {biosym_sql}
+            ) t GROUP BY term, id
+        """
+        return sql
+
+    return biosym_sql
 
 
 def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
@@ -90,11 +80,10 @@ def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
     Args:
         domains: domains to copy
     """
-    sql_domain_tuple = "(" + ",".join([f"'{d}'" for d in domains]) + ")"
     biosym_sql = f"""
         SELECT lower(original_term) as term
         FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-        WHERE domain in {sql_domain_tuple}
+        WHERE domain in ('{"','".join(domains)}')
         GROUP BY lower(original_term)
     """
 
@@ -153,7 +142,7 @@ class PatentEtl(DocumentEtl):
         source_map = {
             sr["term"]: {
                 "synonyms": [sr["term"]],
-                "type" if type_type == "override" else "default": type,
+                "type" if type_type == "override" else "default_type": type,
             }
             for sr in source_records[0:10]
         }
@@ -183,13 +172,7 @@ class PatentEtl(DocumentEtl):
         Create intervention entity records
         """
         await self._copy_entities(
-            [
-                "biologics",
-                "compounds",
-                "devices",
-                "procedures",
-                "mechanisms",
-            ],
+            INTERVENTION_DOMAINS,
             BiomedicalEntityType.OTHER,  # TODO: "INTERVENTION"?
             type_type="default",
         )
@@ -198,81 +181,102 @@ class PatentEtl(DocumentEtl):
         """
         Create regulatory approval records
         """
-        records = await PsqlDatabaseClient(SOURCE_DB).select(
-            query=PatentEtl.get_source_sql()
-        )
 
-        # create patent records
-        for p in records:
-            data = {
-                "id": p["publication_number"],
-                "abstract": p["abstract"],
-                "application_number": p["application_number"],
-                "attributes": p["attributes"],
-                # assignees (relation)
-                "claims": p["claims"],
-                "country_code": p["country"],
-                "embeddings": p["embeddings"],
-                "ipc_codes": p["ipc_codes"],
-                # indications (relation)
-                # interventions (relation)
-                # inventors (relation)
-                "other_ids": p["all_publication_numbers"],
-                "priority_date": p["priority_date"],
-                "similar_patents": {"set": [{"id": sp} for sp in p["similar_patents"]]},
-                "title": p["title"],
-                "url": p["url"],
-            }
-            await Patent.prisma().upsert(
-                where={"id": p["publication_number"]},
-                data={
-                    "create": PatentCreateInput(**data),
-                    "update": PatentUpdateInput(**data),
-                },
+        async def handle_batch(batch: list[dict]) -> bool:
+            # create patent records
+            for p in batch:
+                data = {
+                    "id": p["publication_number"],
+                    "abstract": p["abstract"],
+                    "application_number": p["application_number"],
+                    "attributes": p["attributes"],
+                    # assignees (relation)
+                    "claims": p["claims"],
+                    "country_code": p["country"],
+                    "embeddings": p["embeddings"],
+                    "ipc_codes": p["ipc_codes"],
+                    # indications (relation)
+                    # interventions (relation)
+                    # inventors (relation)
+                    "other_ids": p["all_publication_numbers"],
+                    "priority_date": p["priority_date"],
+                    "similar_patents": {
+                        "set": [{"id": sp} for sp in p["similar_patents"]]
+                    },
+                    "title": p["title"],
+                    "url": p["url"],
+                }
+                await Patent.prisma().upsert(
+                    where={"id": p["publication_number"]},
+                    data={
+                        "create": PatentCreateInput(**data),
+                        "update": PatentUpdateInput(**data),
+                    },
+                )
+
+            # create assignee owner records
+            await Ownable.prisma().create_many(
+                data=[
+                    {
+                        "name": a,
+                        "is_primary": True,
+                        "assignee_patent_id": p["id"],
+                    }
+                    for p in batch
+                    for a in p["assignees"]
+                ],
+                skip_duplicates=True,
             )
 
-        # create assignee owner records
-        await Ownable.prisma().create_many(
-            data=[
-                {
-                    "name": a,
-                    "is_primary": True,
-                    "assignee_patent_id": p["id"],
-                }
-                for p in records
-                for a in p["assignees"]
-            ],
-            skip_duplicates=True,
-        )
+            # create inventor owner records
+            await Ownable.prisma().create_many(
+                data=[
+                    {
+                        "name": i,
+                        "is_primary": True,
+                        "inventor_patent_id": p["id"],
+                    }
+                    for p in batch
+                    for i in p["inventors"]
+                ],
+                skip_duplicates=True,
+            )
+            return True
 
-        # create inventor owner records
-        await Ownable.prisma().create_many(
-            data=[
-                {
-                    "name": i,
-                    "is_primary": True,
-                    "inventor_patent_id": p["id"],
-                }
-                for p in records
-                for i in p["inventors"]
-            ],
-            skip_duplicates=True,
+        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+            query=self.get_source_sql(),
+            batch_size=10000,
+            handle_result_batch=handle_batch,  # type: ignore
         )
 
         # create "indicatable" records, those that map approval to a canonical indication
+        indicatable_records = await PsqlDatabaseClient(SOURCE_DB).select(
+            query=get_patent_mapping_entities_sql(["diseases"])
+        )
         await Indicatable.prisma().create_many(
-            data=[{"name": "", "patent_id": p["id"]} for p in records]
+            data=[
+                {
+                    "name": ir["term"],
+                    "patent_id": ir["id"],
+                    "mention_index": ir["mention_index"],
+                }
+                for ir in indicatable_records
+            ]
         )
 
         # create "intervenable" records, those that map approval to a canonical intervention
+        intervenable_records = await PsqlDatabaseClient(SOURCE_DB).select(
+            query=get_patent_mapping_entities_sql(INTERVENTION_DOMAINS)
+        )
         await Intervenable.prisma().create_many(
             data=[
                 {
-                    "name": "",
-                    "is_primary": True,
-                    "regulatory_approval_id": p["id"],
+                    "name": ir["term"],
+                    "is_primary": False,  # TODO
+                    "mention_index": ir["mention_index"],
+                    "patent_id": ir["id"],
                 }
-                for p in records
+                for ir in intervenable_records
             ]
         )
 
