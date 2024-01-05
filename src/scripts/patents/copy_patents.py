@@ -15,6 +15,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from constants.umls import LegacyDomainType
 from data.etl.biomedical_entity import BiomedicalEntityEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
@@ -97,16 +98,38 @@ patents_select_attributes_sql = f"""
 """
 
 
-def get_patent_entity_sql(domains: tuple[str, ...]) -> str:
+def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
     """
     Get entities from biosym annotations table for creation of biomedical entities
+
+    Args:
+        domains: domains to copy
     """
-    return f"""
+    sql_domain_tuple = "(" + ",".join([f"'{d}'" for d in domains]) + ")"
+    biosym_sql = f"""
         SELECT lower(original_term) as term
         FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-        WHERE domain in {domains}
+        WHERE domain in {sql_domain_tuple}
         GROUP BY lower(original_term)
     """
+
+    if "diseases" in domains:
+        # add in gpr annotations (that is, annotations from google; we only kept diseases)
+        sql = f"""
+            SELECT distinct term from (
+                SELECT lower(preferred_name) as term
+                FROM {GPR_ANNOTATIONS_TABLE}
+                WHERE domain='diseases'
+                GROUP BY lower(preferred_name)
+
+                UNION ALL
+
+                {biosym_sql}
+            ) t
+        """
+        return sql
+
+    return biosym_sql
 
 
 class PatentEtl(DocumentEtl):
@@ -120,7 +143,7 @@ class PatentEtl(DocumentEtl):
 
     async def _copy_entities(
         self,
-        domains: tuple[str, ...],
+        domains: list[LegacyDomainType],
         type: BiomedicalEntityType,
         type_type: Literal["override", "default"] = "default",
     ):
@@ -140,7 +163,7 @@ class PatentEtl(DocumentEtl):
                 "synonyms": [sr["term"]],
                 "type" if type_type == "override" else "default": type,
             }
-            for sr in source_records
+            for sr in source_records[0:10]
         }
 
         terms_to_insert = list(source_map.keys())
@@ -160,7 +183,7 @@ class PatentEtl(DocumentEtl):
         Create indication entity records
         """
         await self._copy_entities(
-            tuple(["diseases"]), BiomedicalEntityType.DISEASE, type_type="override"
+            ["diseases"], BiomedicalEntityType.DISEASE, type_type="override"
         )
 
     async def copy_interventions(self):
@@ -168,15 +191,13 @@ class PatentEtl(DocumentEtl):
         Create intervention entity records
         """
         await self._copy_entities(
-            tuple(
-                [
-                    "biologics",
-                    "compounds",
-                    "devices",
-                    "procedures",
-                    "mechanisms",
-                ]
-            ),
+            [
+                "biologics",
+                "compounds",
+                "devices",
+                "procedures",
+                "mechanisms",
+            ],
             BiomedicalEntityType.OTHER,  # TODO: "INTERVENTION"?
             type_type="default",
         )

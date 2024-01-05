@@ -20,6 +20,10 @@ logger.setLevel(logging.INFO)
 MIN_COMPOSITE_SIMILARITY = 1.0
 
 
+SelectedEntityScoreVector = tuple[CanonicalEntity | None, float, torch.Tensor]
+EntityScoreVector = tuple[CanonicalEntity, float, torch.Tensor]
+
+
 class CompositeCandidateSelector(SemanticCandidateSelector):
     """
     A candidate generator that if not finding a suitable candidate, returns a composite candidate
@@ -78,7 +82,7 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
         return name
 
     def _form_composite(
-        self, members: Sequence[tuple[CanonicalEntity, float, torch.Tensor]]
+        self, members: Sequence[EntityScoreVector]
     ) -> CanonicalEntity | None:
         """
         Form a composite from a list of member entities
@@ -113,13 +117,15 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
         self,
         tokens: Sequence[Token | Span],
         ngram_entity_map: Mapping[str, tuple[CanonicalEntity, float, torch.Tensor]],
-    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
+    ) -> SelectedEntityScoreVector:
         """
         Generate a composite candidate from a mention text
 
         Args:
             mention_text (str): Mention text
             ngram_entity_map (dict[str, MentionCandidate]): word-to-candidate map
+
+        TODO: remove ngram if ultimately only using N of 1
         """
 
         def get_composite_candidates(
@@ -154,8 +160,8 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
                 # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
                 (
                     CanonicalEntity(
-                        name=tokens[0].text.lower(),
                         id=tokens[0].text.lower(),
+                        name=tokens[0].text.lower(),
                     ),
                     MIN_COMPOSITE_SIMILARITY,  # TODO: should be the mean of all candidates, or something?
                     torch.tensor(tokens[0].vector),
@@ -169,9 +175,34 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
 
         return (self._form_composite(composites), avg_score, comp_match_vector)
 
-    def __call__(
+    def select_composite_candidate(
         self, entity: DocEntity
-    ) -> tuple[CanonicalEntity | None, torch.Tensor]:
+    ) -> SelectedEntityScoreVector:
+        """
+        Select compsosite candidate for a mention text (i.e. analog to select_candidate_from_entity)
+        """
+        if not entity.spacy_doc:
+            raise ValueError("Entity must have a vector")
+
+        # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
+        tokens = join_punctuated_tokens(entity.spacy_doc)
+
+        ngram_entity_map = {
+            t.text: self.select_candidate(
+                t.text, torch.tensor(t.vector), torch.tensor(entity.spacy_doc.vector)
+            )
+            for t in tokens
+            if len(t) > 1  # avoid weird matches for single characters/nums
+        }
+        return self._generate_composite(
+            tokens,
+            omit_by(
+                ngram_entity_map,
+                lambda v: v[0] is None or v[1] < self.min_composite_similarity,
+            ),
+        )
+
+    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate candidates for a list of mention texts
 
@@ -180,12 +211,14 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
         if not entity.spacy_doc:
             raise ValueError("Entity must have a vector")
 
+        # get initial non-composite match
         match, match_score, vector = super().select_candidate_from_entity(entity)
 
+        # if score is sufficient, or if it's not a composite candidate, return
         if match_score >= self.min_similarity or not self._is_composite_eligible(
             entity
         ):
-            return (match, vector)
+            return match
 
         # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
         tokens = join_punctuated_tokens(entity.spacy_doc)
@@ -213,11 +246,11 @@ class CompositeCandidateSelector(SemanticCandidateSelector):
                 comp_score,
                 match_score,
             )
-            return (comp_match, comp_vector)
+            return comp_match
 
         logger.info(
             "Returning non-composite match with higher score (%s vs %s)",
             match_score,
             comp_score,
         )
-        return (match, vector)
+        return match

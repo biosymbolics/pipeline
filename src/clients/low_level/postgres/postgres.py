@@ -4,7 +4,6 @@ Low-level Postgres client
 import time
 from typing import Any, Awaitable, Callable, Sequence, cast
 import logging
-import uuid
 import psycopg
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row

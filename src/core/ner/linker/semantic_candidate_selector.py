@@ -133,6 +133,10 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         """
         Get best candidate by semantic similarity
         """
+        if len(candidates) == 0:
+            logger.warning("get_best_canoical called with no candidates")
+            return (None, 0.0, torch.Tensor())
+
         if len(vector) == 0:
             logger.warning(
                 "No vector for %s, probably OOD (%s)",

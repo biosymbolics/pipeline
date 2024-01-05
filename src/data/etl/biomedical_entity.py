@@ -102,12 +102,17 @@ class BiomedicalEntityEtl:
             }
 
             if canonical is not None:
-                canonical_dependent_fields = {
-                    "canonical_id": canonical.id,
-                    "name": canonical.name.lower(),
-                    "entity_type": canonical.type,
-                    "sources": [Source.UMLS],
-                }
+                try:
+                    canonical_dependent_fields = {
+                        "canonical_id": canonical.id,
+                        "name": canonical.name.lower(),
+                        "entity_type": canonical.type,
+                        "sources": [Source.UMLS],
+                    }
+                except Exception as e:
+                    print(e)
+                    print(canonical)
+                    raise e
             else:
                 entity_type = (
                     source_rec.get(DEFAULT_TYPE_FIELD) or BiomedicalEntityType.UNKNOWN

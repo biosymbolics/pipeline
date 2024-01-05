@@ -1,6 +1,7 @@
 """
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
+from typing import Literal
 from prisma.enums import BiomedicalEntityType
 
 # TODO: maybe choose NCI as canonical name
@@ -232,3 +233,12 @@ ENTITY_TO_UMLS_TYPE = {
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
+
+LegacyDomainType = Literal[
+    "compounds",
+    "biologics",
+    "devices",
+    "diseases",
+    "procedures",
+    "mechanisms",
+]

@@ -33,7 +33,7 @@ model EntitySynonym {
     id        Int              @id @default(autoincrement())
     entity    BiomedicalEntity @relation(fields: [entity_id], references: [id])
     entity_id Int
-    term      String           @unique
+    term      String
 
     @@unique([term, entity_id]) // TODO: should be on term
     @@map("entity_synonym")
