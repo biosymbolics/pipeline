@@ -36,6 +36,7 @@ class BiomedicalEntityEtl:
         self,
         candidate_selector: CandidateSelectorType,
         relation_id_field_map: RelationIdFieldMap,
+        non_canonical_source: Source,
         additional_cleaners: Sequence[CleanFunction] = [],
     ):
         self.normalizer = TermNormalizer(
@@ -43,6 +44,7 @@ class BiomedicalEntityEtl:
             additional_cleaners=additional_cleaners,
         )
         self.relation_id_field_map = relation_id_field_map
+        self.non_canonical_source = non_canonical_source
 
     def maybe_merge_insert_records(
         self,
@@ -76,7 +78,6 @@ class BiomedicalEntityEtl:
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-        non_canonical_source: Source = Source.FDA,
     ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
         """
         Create record dicts for entity insert
@@ -118,7 +119,7 @@ class BiomedicalEntityEtl:
                     "canonical_id": None,
                     "name": orig_name,
                     "entity_type": entity_type,
-                    "sources": [non_canonical_source],
+                    "sources": [self.non_canonical_source],
                 }
 
             return BiomedicalEntityCreateInputWithRelationIds(

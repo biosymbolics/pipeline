@@ -5,7 +5,8 @@ import sys
 import asyncio
 import logging
 from typing import Literal, Sequence
-from prisma.enums import BiomedicalEntityType
+from prisma import Prisma
+from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput, PatentUpdateInput
 
@@ -54,7 +55,7 @@ def get_patent_mapping_entities_sql(domains: Sequence[str]) -> str:
         """
     if "diseases" in domains:
         sql = f"""
-            SELECT term, id, min(mention_index) FROM (
+            SELECT term, id, min(mention_index) as mention_index FROM (
                 SELECT
                     publication_number as id,
                     lower(preferred_name) as term,
@@ -108,9 +109,9 @@ def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
 
 class PatentEtl(DocumentEtl):
     @staticmethod
-    def get_source_sql():
+    def get_source_sql(fields: list[str]):
         return f"""
-            SELECT *
+            SELECT {','.join(fields)}
             FROM applications
             LEFT JOIN (
                 SELECT
@@ -144,7 +145,7 @@ class PatentEtl(DocumentEtl):
                 "synonyms": [sr["term"]],
                 "type" if type_type == "override" else "default_type": type,
             }
-            for sr in source_records[0:10]
+            for sr in source_records
         }
 
         terms_to_insert = list(source_map.keys())
@@ -157,6 +158,7 @@ class PatentEtl(DocumentEtl):
                     source_field="synonyms", dest_field="term", input_type="create"
                 ),
             ),
+            non_canonical_source=Source.BIOSYM,
         ).create_records(terms_to_canonicalize, terms_to_insert, source_map=source_map)
 
     async def copy_indications(self):
@@ -186,33 +188,39 @@ class PatentEtl(DocumentEtl):
             # create patent records
             for p in batch:
                 data = {
-                    "id": p["publication_number"],
+                    "id": p["id"],
                     "abstract": p["abstract"],
                     "application_number": p["application_number"],
-                    "attributes": p["attributes"],
+                    "attributes": p["attributes"] or [],
                     # assignees (relation)
                     "claims": p["claims"],
                     "country_code": p["country"],
-                    "embeddings": p["embeddings"],
+                    # "embeddings": p["embeddings"], # updated below (https://github.com/prisma/prisma/issues/18442)
                     "ipc_codes": p["ipc_codes"],
                     # indications (relation)
                     # interventions (relation)
                     # inventors (relation)
                     "other_ids": p["all_publication_numbers"],
                     "priority_date": p["priority_date"],
-                    "similar_patents": {
-                        "set": [{"id": sp} for sp in p["similar_patents"]]
-                    },
+                    "similar_patents": p["similar_patents"] or [],
+                    "text_for_search": f"{p['title']} {p['abstract']}",
                     "title": p["title"],
                     "url": p["url"],
                 }
                 await Patent.prisma().upsert(
-                    where={"id": p["publication_number"]},
+                    where={"id": p["id"]},
                     data={
-                        "create": PatentCreateInput(**data),
-                        "update": PatentUpdateInput(**data),
+                        "create": PatentCreateInput(**data),  # type: ignore
+                        "update": PatentUpdateInput(**data),  # type: ignore
                     },
                 )
+
+                # TODO: do in bulk for perf
+                async with Prisma(http={"timeout": None}) as db:
+                    # sigh https://github.com/prisma/prisma/issues/18442
+                    await db.execute_raw(
+                        f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
+                    )
 
             # create assignee owner records
             await Ownable.prisma().create_many(
@@ -241,10 +249,28 @@ class PatentEtl(DocumentEtl):
                 ],
                 skip_duplicates=True,
             )
+
             return True
 
+        source_fields = [
+            "applications.publication_number as id",
+            "abstract",
+            "all_publication_numbers",
+            "application_number",
+            "assignees",
+            "attributes",
+            "claims",
+            "country",
+            "embeddings",
+            "ipc_codes",
+            "inventors",
+            "priority_date::TIMESTAMP as priority_date",
+            "similar_patents",
+            "title",
+            "url",
+        ]
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
-            query=self.get_source_sql(),
+            query=self.get_source_sql(source_fields),
             batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore
         )
@@ -256,12 +282,14 @@ class PatentEtl(DocumentEtl):
         await Indicatable.prisma().create_many(
             data=[
                 {
+                    "is_primary": False,  # TODO
+                    "mention_index": ir["mention_index"],
                     "name": ir["term"],
                     "patent_id": ir["id"],
-                    "mention_index": ir["mention_index"],
                 }
                 for ir in indicatable_records
-            ]
+            ],
+            skip_duplicates=True,
         )
 
         # create "intervenable" records, those that map approval to a canonical intervention
@@ -271,13 +299,14 @@ class PatentEtl(DocumentEtl):
         await Intervenable.prisma().create_many(
             data=[
                 {
-                    "name": ir["term"],
                     "is_primary": False,  # TODO
                     "mention_index": ir["mention_index"],
+                    "name": ir["term"],
                     "patent_id": ir["id"],
                 }
                 for ir in intervenable_records
-            ]
+            ],
+            skip_duplicates=True,
         )
 
 

@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from pydash import omit
-from prisma.enums import BiomedicalEntityType
+from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
     Indicatable,
     Intervenable,
@@ -175,6 +175,7 @@ class TrialEtl(DocumentEtl):
                     source_field="synonyms", dest_field="term", input_type="create"
                 ),
             ),
+            non_canonical_source=Source.CTGOV,
         ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
 
     async def copy_interventions(self):
@@ -212,6 +213,7 @@ class TrialEtl(DocumentEtl):
                 # remove dosage uoms
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
+            non_canonical_source=Source.CTGOV,
         ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
 
     @staticmethod

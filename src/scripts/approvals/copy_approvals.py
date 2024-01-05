@@ -7,7 +7,7 @@ import sys
 import asyncio
 import logging
 from pydash import compact
-from prisma.enums import BiomedicalEntityType
+from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
     Indicatable,
     Intervenable,
@@ -125,6 +125,7 @@ class ApprovalEtl(DocumentEtl):
                     source_field="synonyms", dest_field="term", input_type="create"
                 ),
             ),
+            non_canonical_source=Source.FDA,
         ).create_records(terms_to_canonicalize, terms_to_insert, source_map=source_map)
 
     async def copy_interventions(self):
@@ -180,17 +181,18 @@ class ApprovalEtl(DocumentEtl):
                 comprised_of=RelationConnectInfo(
                     source_field="active_ingredients",
                     dest_field="canonical_id",
-                    input_type="connect",
+                    input_type="set",
                 ),
                 parents=RelationConnectInfo(
                     source_field="pharmacologic_classes",
                     dest_field="canonical_id",
-                    input_type="connect",
+                    input_type="set",
                 ),
                 synonyms=RelationConnectInfo(
                     source_field="synonyms", dest_field="term", input_type="create"
                 ),
             ),
+            non_canonical_source=Source.FDA,
         ).create_records(
             terms_to_canonicalize,
             terms_to_insert,

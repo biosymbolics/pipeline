@@ -84,6 +84,5 @@ class DocumentEtl:
         await self.copy_indications()
         await self.copy_documents()
         await self.link_mapping_tables()
-        await self.copy_indications()
         await self.create_search_index()
         await db.disconnect()

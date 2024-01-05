@@ -24,7 +24,7 @@ class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):
 class RelationConnectInfo(Dataclass):
     source_field: str
     dest_field: str
-    input_type: Literal["connect", "create"]
+    input_type: Literal["set", "create"]
 
     def get_value(self, value: str, canonical_map: dict[str, CanonicalEntity]):
         # helper to get value appropriate for dest_field - canonical mapping if dest is canonical_id
