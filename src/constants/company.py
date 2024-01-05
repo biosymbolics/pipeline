@@ -59,7 +59,7 @@ COMPANY_STRINGS = [
     "AG",
     "AGENCY",
     "APS",
-    "A[/]?S",
+    r"A\/?S",
     "ASSETS",
     "ASD",
     "AVG",
@@ -145,4 +145,143 @@ COMPANY_STRINGS = [
     "TECHNOLOGY SERVICES?",
     "THERAPEUTICS?",
     "therap(?:eutics|ie)s?",
+]
+
+
+COMPANY_SUPPRESSIONS = [
+    "»",
+    "«",
+    "eeig",
+    "THE",
+    r"^\s*-",
+    r"^\s*&",
+]
+
+UNIVERSITY_SUPPRESSIONS = [
+    "REGENTS?",
+    "School Of Medicine",
+    "alumni",
+]
+
+HEALTH_SYSTEM_SUPPRESSIONS = [
+    "h(?:ea)?lth[ ]?care",  # e.g 'Viiv Hlthcare'
+    "health[ ]?system",
+]
+
+COMPANY_INDICATORS = [
+    "inc",
+    "llc",
+    "ltd",
+    "corp",
+    "corporation",
+    "co",
+    "gmbh",
+]
+
+
+COUNTRIES = [
+    "CALISTOGA",
+    "CANADA",
+    "CHINA",
+    "COLORADO",
+    "DE",
+    "DEUTSCHLAND",
+    "EU",
+    "FRANCE",
+    "NETHERLANDS",
+    "NORTH AMERICA",
+    "NA",
+    "INDIA",
+    "IRELAND",
+    "JAPAN",
+    "(?:de )?M[ée]xico",
+    "MA",
+    "PALO ALTO",
+    "SAN DIEGO",
+    "SHANGHAI",
+    "TAIWAN",
+    "UK",
+    "US",
+    "USA",
+]
+
+COMPANY_MAP = {
+    "abbott": "Abbott",
+    "abbvie": "Abbvie",
+    "allergan": "Allergan",
+    "california inst of techn": "CalTech",
+    "massachusetts inst technology": "Massachusetts Institute of Technology",
+    "roche": "Roche",
+    "biogen": "Biogen",
+    "boston scient": "Boston Scientific",
+    "boston scimed": "Boston Scientific",
+    "lilly co eli": "Eli Lilly",
+    "lilly": "Eli Lilly",
+    "glaxo": "GlaxoSmithKline",
+    "merck sharp & dohme": "Merck",
+    "merck frosst": "Merck",
+    "sinai": "Mount Sinai",
+    "medtronic": "Medtronic",
+    "sloan kettering": "Sloan Kettering",
+    "sanofis?": "Sanofi",
+    "basf": "Basf",
+    "3m": "3M",
+    "medical res council": "Medical Research Council",
+    "mayo": "Mayo Clinic",  # FPs
+    "unilever": "Unilever",
+    "gen eletric": "GE",
+    "ge": "GE",
+    "lg": "LG",
+    "nat cancer ct": "National Cancer Center",
+    "samsung": "Samsung",
+    "verily": "Verily",
+    "isis": "Isis",
+    "broad": "Broad Institute",
+    "childrens medical center": "Childrens Medical Center",
+    "us gov": "US Government",
+    "us health": "US Government",
+    "koninkl philips": "Philips",
+    "koninklijke philips": "Philips",
+    "max planck": "Max Planck",
+    "novartis": "Novartis",
+    "pfizer": "Pfizer",
+    "gilead": "Gilead",
+    "merck": "Merck",
+    "dow": "Dow",
+    "regeneron": "Regeneron",
+    "takeda": "Takeda",
+    "johnson & johnson": "JnJ",
+    "janssen": "Janssen",
+    "Johns? Hopkins?": "Johns Hopkins",
+    "Mitsubishi": "Mitsubishi",
+    "Dana[- ]?Farber": "Dana Farber",
+    "Novo Nordisk": "Novo Nordisk",
+    "Astrazeneca": "AstraZeneca",
+    "Alexion": "AstraZeneca",
+    "bristol[- ]?myers squibb": "Bristol-Myers Squibb",
+    "Celgene": "Bristol-Myers Squibb",
+    "Samsung": "Samsung",
+    "ucb": "UCB",
+    "r and s": "R&S Northeast",  # mostly to avoid this over-matching other assignee terms
+}
+
+OWNER_TERM_MAP = {
+    "lab": "laboratory",
+    "labs": "laboratories",
+    "univ": "university",
+    "inst": "institute",
+    "govt": "government",
+    "gov": "government",
+    "dept": "department",
+}
+
+
+OWNER_SUPPRESSIONS = [
+    *COMPANY_SUPPRESSIONS,
+    *UNIVERSITY_SUPPRESSIONS,
+    *COMPANY_STRINGS,
+    # no country names unless at start of string or preceded by "of"
+    *[f"(?<!^)(?<!of ){c}" for c in COUNTRIES],
+    # remove stock words from company names
+    r"(?:class [a-z]? )?(?:(?:[0-9](?:\.[0-9]*)% )?(?:convertible |american )?(?:common|ordinary|preferred|voting|deposit[ao]ry) (?:stock|share|sh)s?|warrants?).*",
 ]

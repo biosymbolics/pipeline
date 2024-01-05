@@ -8,16 +8,12 @@ from prisma.types import (
 )
 
 
-class EntityWithRelationIds(TypedDict):
+class BiomedicalEntityCreateInputWithRelationIds(
+    BiomedicalEntityCreateWithoutRelationsInput
+):
     comprised_of: list[str]
     parents: list[str]
     synonyms: list[str]
-
-
-class BiomedicalEntityCreateInputWithRelationIds(
-    BiomedicalEntityCreateWithoutRelationsInput, EntityWithRelationIds
-):
-    pass
 
 
 class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):

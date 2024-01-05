@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
 
-from typings.companies import Company
+from typings.companies import CompanyFinancials
 from utils.classes import ByDefinitionOrderEnum
 
 from .core import Dataclass
@@ -93,7 +93,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def compose_financial_explanation(
         cls,
         troubled_assignees: Sequence[str],
-        financials_map: dict[str, Company],
+        financials_map: dict[str, CompanyFinancials],
     ) -> list[str]:
         """
         Compose explanation for availability likelihood
@@ -119,7 +119,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def find_from_record(
         cls,
         record: dict[str, Any],
-        financials_map: dict[str, Company],
+        financials_map: dict[str, CompanyFinancials],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood from record
@@ -145,7 +145,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         is_active: bool | None,
         is_terminated: bool,
         termination_reason: str | None,
-        financials_map: dict[str, Company],
+        financials_map: dict[str, CompanyFinancials],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood

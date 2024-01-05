@@ -2,7 +2,8 @@
 Class for biomedical entity etl
 """
 from functools import reduce
-import re
+from prisma import Prisma
+import regex as re
 from typing import Iterable, Sequence, cast
 from prisma.enums import OwnerType
 from prisma.models import Owner
@@ -11,12 +12,12 @@ from pydash import flatten, group_by, omit, uniq
 import logging
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
-from constants.patents import (
+from constants.company import (
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
     OWNER_TERM_MAP,
 )
-from core.ner.classifier import create_lookup_map
+from core.ner.classifier import classify_string, create_lookup_map
 from core.ner.cleaning import RE_FLAGS, CleanFunction
 from core.ner.normalizer import TermNormalizer
 from core.ner.utils import cluster_terms
@@ -63,7 +64,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
         """
         term_map_set = set(OWNER_TERM_MAP.keys())
 
-        def __normalize(cleaned: str):
+        def _normalize(cleaned: str):
             terms_to_rewrite = list(term_map_set.intersection(cleaned.lower().split()))
             if len(terms_to_rewrite) > 0:
                 _assignee = assignee
@@ -79,7 +80,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
             return assignee
 
         for assignee in assignees:
-            yield __normalize(assignee)
+            yield _normalize(assignee)
 
     def get_lookup_mapping(
         clean_assignee: str, og_assignee: str, key: str
@@ -139,7 +140,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
 class OwnerTypeParser:
     @staticmethod
     def find(value: str) -> OwnerType:
-        reason = classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER)  # type: ignore
+        reason = classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER)
         res = reason[0]
         return res
 
@@ -286,3 +287,9 @@ class OwnerEtl:
                     synonyms={"create": [{"term": s} for s in er["synonyms"]]},
                 ),
             )
+
+    async def copy_all(self, names: Sequence[str]):
+        db = Prisma(auto_register=True, http={"timeout": None})
+        await db.connect()
+        await self.create_records(names)
+        await db.disconnect()
