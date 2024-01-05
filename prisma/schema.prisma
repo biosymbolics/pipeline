@@ -24,9 +24,18 @@ model BiomedicalEntity {
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
-    synonyms      Synonym[]
+    synonyms      EntitySynonym[]
 
     @@map("biomedical_entity")
+}
+
+model EntitySynonym {
+    id        Int              @id @default(autoincrement())
+    entity    BiomedicalEntity @relation(fields: [entity_id], references: [id])
+    entity_id Int
+    term      String           @unique
+
+    @@map("entity_synonym")
 }
 
 model Owner {
@@ -38,21 +47,19 @@ model Owner {
     name              String                   @unique
     search            Unsupported("tsvector")?
     symbol            String?
-    synonyms          Synonym[]
+    synonyms          OwnerSynonym[]
     FinancialSnapshot FinancialSnapshot?
 
     @@map("owner")
 }
 
-model Synonym {
-    id        Int               @id @default(autoincrement())
-    entity    BiomedicalEntity? @relation(fields: [entity_id], references: [id])
-    entity_id Int?
-    term      String
-    owner     Owner?            @relation(fields: [owner_id], references: [id])
-    owner_id  Int?
+model OwnerSynonym {
+    id       Int    @id @default(autoincrement())
+    term     String @unique
+    owner    Owner  @relation(fields: [owner_id], references: [id])
+    owner_id Int
 
-    @@map("synonym")
+    @@map("owner_synonym")
 }
 
 model Patent {

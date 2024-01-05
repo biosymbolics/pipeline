@@ -16,7 +16,7 @@ from core.ner.normalizer import TermNormalizer
 from core.ner.spacy import Spacy
 from utils.args import make_hashable
 from utils.model import get_model_path
-from utils.re import remove_extra_spaces
+from utils.re import sub_extra_spaces
 
 from .binder import BinderNlp
 from .patterns import (
@@ -132,7 +132,7 @@ class NerTagger:
         """
         steps = [
             lambda _content: [html.unescape(c) for c in _content],
-            remove_extra_spaces,
+            sub_extra_spaces,
             # TODO: doing this for binder, which due to some off-by-one can't find ents at the start of a string
             lambda _content: [" " + c for c in _content],
             lambda _content: [c.lower() for c in _content],

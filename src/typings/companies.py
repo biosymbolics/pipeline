@@ -1,9 +1,12 @@
 from dataclasses import dataclass
+from typing import TypedDict
 from prisma.models import FinancialSnapshot
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+CompanyInfo = TypedDict("CompanyInfo", {"name": str, "symbol": str})
 
 
 @dataclass

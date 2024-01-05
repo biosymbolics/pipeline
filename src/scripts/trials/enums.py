@@ -18,7 +18,6 @@ from prisma.enums import (
     TrialStatus,
 )
 
-from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from core.ner.classifier import classify_string, create_lookup_map
 from typings.core import Dataclass
 from utils.classes import ByDefinitionOrderEnum

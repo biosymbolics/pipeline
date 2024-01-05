@@ -506,25 +506,23 @@ def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.cluster import DBSCAN
 
-    vectorizer = TfidfVectorizer(stop_words="english", strip_accents="unicode")
+    vectorizer = TfidfVectorizer(
+        stop_words="english", ngram_range=(1, 2), strip_accents="unicode"
+    )
     X = vectorizer.fit_transform(terms)
     clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)  # HDBSCAN ?
     labels = clustering.labels_
 
-    df = pl.DataFrame({"cluster_id": labels, "name": terms})
-    terms_by_cluster_id = (
-        df.filter(pl.col("cluster_id") > 0)
+    df = (
+        pl.DataFrame({"cluster_id": labels, "name": terms})
         .group_by("cluster_id")
         .agg(pl.col("name"))
-        # hack fix for big-ass catchall that shouldn't happen
-        # .filter(pl.col("name").arr.lengths() < 100000)
-        .drop("cluster_id")
-        .to_series()
-        .to_list()
     )
 
+    term_clusters = df.drop("cluster_id").to_series().to_list()
+
     return {
-        members_terms[0]: m
-        for members_terms in terms_by_cluster_id
+        m: members_terms[0]  # syn to (arbitrarily picked) canonical
+        for members_terms in term_clusters
         for m in members_terms[1:]
     }

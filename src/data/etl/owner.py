@@ -1,16 +1,22 @@
 """
 Class for biomedical entity etl
 """
+from datetime import datetime
 from functools import reduce
 from prisma import Prisma
 import regex as re
-from typing import Iterable, Sequence, cast
+from typing import Iterable, Sequence
 from prisma.enums import OwnerType
-from prisma.models import Owner
-from prisma.types import OwnerUpdateInput
-from pydash import flatten, group_by, omit, uniq
+from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
+from prisma.types import (
+    OwnerUpdateInput,
+    FinancialSnapshotCreateWithoutRelationsInput as FinancialSnapshotCreateInput,
+)
+
+from pydash import compact, flatten, group_by, omit, uniq
 import logging
 
+from clients.finance.financials import CompanyFinancialExtractor
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
 from constants.company import (
     COMPANY_MAP,
@@ -22,7 +28,8 @@ from core.ner.cleaning import RE_FLAGS, CleanFunction
 from core.ner.normalizer import TermNormalizer
 from core.ner.utils import cluster_terms
 from data.etl.types import OwnerCreateWithSynonymsInput
-from utils.re import get_or_re, remove_extra_spaces
+from typings.companies import CompanyInfo
+from utils.re import get_or_re, sub_extra_spaces
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +38,11 @@ logger.setLevel(logging.INFO)
 DEFAULT_TYPE_FIELD = "default_type"
 
 
-def clean_owners(owners: Sequence[str]) -> dict[str, str]:
+def clean_owners(
+    owners: Sequence[str],
+    owner_normalization_map: dict[str, str] = OWNER_TERM_MAP,
+    owner_suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
+) -> dict[str, str]:
     """
     Clean owner names
     - removes suppressions
@@ -42,7 +53,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
     - then does clustering
     """
 
-    def remove_suppressions(terms: list[str]) -> Iterable[str]:
+    def sub_suppressions(terms: list[str]) -> Iterable[str]:
         """
         Remove term suppressions (generic terms like LLC, country, etc)
         Examples:
@@ -51,7 +62,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
             - University Of Alabama At Birmingham  -> University Of Alabama
             - University of Colorado, Denver -> University of Colorado
         """
-        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(OWNER_SUPPRESSIONS)}\b)"
+        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(owner_suppressions)}\b)"
         pre_suppress_re = "^the"
         suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$)|\(.+\))"
 
@@ -61,6 +72,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
     def normalize_terms(assignees: list[str]) -> Iterable[str]:
         """
         Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
+        No deduplication, becaues the last step is tfidf + clustering
         """
         term_map_set = set(OWNER_TERM_MAP.keys())
 
@@ -71,7 +83,7 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
                 for term in terms_to_rewrite:
                     _assignee = re.sub(
                         rf"\b{term}\b",
-                        f" {OWNER_TERM_MAP[term.lower()]} ",
+                        f" {owner_normalization_map[term.lower()]} ",
                         cleaned,
                         flags=RE_FLAGS,
                     ).strip()
@@ -82,59 +94,90 @@ def clean_owners(owners: Sequence[str]) -> dict[str, str]:
         for assignee in assignees:
             yield _normalize(assignee)
 
-    def get_lookup_mapping(
-        clean_assignee: str, og_assignee: str, key: str
-    ) -> str | None:
+    def find_override(owner_str: str, key: str) -> str | None:
         """
-        See if there is an explicit name mapping on cleaned or original assignee
+        See if there is an explicit name mapping
         """
-        to_check = [clean_assignee, og_assignee]
-        has_mapping = any(
-            [
-                re.match(rf"\b{key}\b", check, flags=RE_FLAGS) is not None
-                for check in to_check
-            ]
-        )
+        has_mapping = re.match(rf"\b{key}\b", owner_str, flags=RE_FLAGS) is not None
         if has_mapping:
             return key
         return None
 
-    def apply_overrides(
-        assignees: list[str], cleaned_orig_map: dict[str, str]
-    ) -> Iterable[str]:
-        def _map(cleaned: str):
-            og_assignee = cleaned_orig_map[cleaned]
-            mappings = [
-                key
-                for key in COMPANY_MAP.keys()
-                if get_lookup_mapping(cleaned, og_assignee, key)
-            ]
-            if len(mappings) > 0:
-                logging.debug(
-                    "Found mapping for assignee: %s -> %s", assignee, mappings[0]
-                )
-                return COMPANY_MAP[mappings[0]]
-            return assignee
+    def generate_override_map(
+        orig_names: Sequence[str], override_map: dict[str, str] = COMPANY_MAP
+    ) -> dict[str, str]:
+        """
+        Apply overrides to owner strings, a mapping between original_name and overridden name
+        e.g. {"pfizer inc": "pfizer"}
+        """
 
-        for assignee in assignees:
-            yield _map(assignee)
+        def _map(orig_name: str):
+            # find (first) key of match (e.g. "johns? hopkins?"), if exists
+            override_key = next(
+                filter(
+                    lambda matching_str: find_override(orig_name, matching_str),
+                    override_map.keys(),
+                ),
+                None,
+            )
+            return (orig_name, override_map[override_key]) if override_key else None
 
-    def title(assignees: list[str]) -> Iterable[str]:
-        for assignee in assignees:
-            yield assignee.title()
+        return dict(compact([_map(on) for on in orig_names]))
 
+    # apply overrides first
+    override_map = generate_override_map(owners)
+
+    # clean the remainder
     cleaning_steps = [
-        remove_suppressions,
+        sub_suppressions,
         normalize_terms,  # order matters
-        remove_extra_spaces,
-        title,
+        sub_extra_spaces,
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
-    cleaned_orig_map = dict(zip(cleaned, owners))
 
-    with_overiddes = list(apply_overrides(cleaned, cleaned_orig_map))
+    # maps orig to cleaned
+    orig_to_cleaned = {
+        **{orig: clean for orig, clean in zip(owners, cleaned)},
+        **override_map,
+    }
 
-    return cluster_terms(with_overiddes)
+    # maps cleaned to clustered
+    cleaned_to_cluster = cluster_terms(list(orig_to_cleaned.values()))
+
+    return {
+        orig: cleaned_to_cluster.get(clean) or clean
+        for orig, clean in orig_to_cleaned.items()
+    }
+
+
+def transform_financials(
+    records: Sequence[CompanyInfo], owner_map: dict[str, int]
+) -> list[FinancialSnapshotCreateInput]:
+    """
+    Transform company rows
+
+    - clean company name and attempts to match a synonym
+    - looks up financial info
+    """
+
+    def fetch_financials(record: CompanyInfo):
+        financials = CompanyFinancialExtractor(record["symbol"])
+        return FinancialSnapshotCreateInput(
+            owner_id=owner_map[record["name"].lower()],
+            current_ratio=financials.current_ratio,
+            debt_equity_ratio=financials.debt_equity_ratio,
+            ebitda=financials.ebitda,
+            gross_profit=financials.gross_profit,
+            market_cap=financials.market_cap,
+            net_debt=financials.net_debt,
+            return_on_equity=financials.return_on_equity,
+            return_on_research_capital=financials.return_on_research_capital,
+            total_debt=financials.total_debt,
+            snapshot_date=datetime.now(),
+            symbol=record["symbol"],
+        )
+
+    return [fetch_financials(record) for record in records]
 
 
 class OwnerTypeParser:
@@ -153,21 +196,21 @@ OWNER_KEYWORD_MAP = create_lookup_map(
             "research hospitals?",
             "institute?s?",
             "schools?",
-            "NYU",
-            "Universitaire?s?",
+            "nyu",
+            "universitaire?s?",
             # "l'Université",
             # "Université",
-            "Universita(?:ri)?",
+            "universita(?:ri)?",
             "education",
-            "Universidad",
+            "universidad",
         ],
         OwnerType.INDUSTRY_LARGE: LARGE_PHARMA_KEYWORDS,
         OwnerType.INDUSTRY: [
             *COMPANY_STRINGS,
             "laboratories",
-            "Procter and Gamble",
-            "3M",
-            "Neuroscience$",
+            "procter and gamble",
+            "3m",
+            "neuroscience$",
             "associates",
             "medical$",
         ],
@@ -179,14 +222,14 @@ OWNER_KEYWORD_MAP = create_lookup_map(
             "state",
             "us health",
             "veterans affairs",
-            "NIH",
-            "VA",
-            "European Organisation",
-            "EORTC",
-            "Assistance Publique",
-            "FDA",
-            "Bureau",
-            "Authority",
+            "nih",
+            "va",
+            "european organisation",
+            "eortc",
+            "assistance publique",
+            "fda",
+            "bureau",
+            "authority",
         ],
         OwnerType.HEALTH_SYSTEM: [
             "healthcare",
@@ -196,9 +239,9 @@ OWNER_KEYWORD_MAP = create_lookup_map(
         ],
         OwnerType.FOUNDATION: ["foundatations?", "trusts?"],
         OwnerType.OTHER_ORGANIZATION: [
-            "Research Network",
-            "Alliance",
-            "Group$",
+            "research network",
+            "alliance",
+            "group$",
             "research cent(?:er|re)s?",
         ],
         OwnerType.INDIVIDUAL: [r"M\.?D\.?"],
@@ -268,28 +311,54 @@ class OwnerEtl:
             names: list of names to insert
         """
         lookup_map = self.generate_lookup_map(names)
-        entity_recs = self._generate_insert_records(names, lookup_map)
+        insert_recs = self._generate_insert_records(names, lookup_map)
 
         # create flat records
         await Owner.prisma().create_many(
             data=[
-                OwnerCreateWithSynonymsInput(**omit(er, "synonyms"))  # type: ignore
-                for er in entity_recs
+                OwnerCreateWithSynonymsInput(**omit(ir, "synonyms"))  # type: ignore
+                for ir in insert_recs
             ],
             skip_duplicates=True,
         )
 
         # update with synonym records
-        for er in entity_recs:
+        for ir in insert_recs:
             await Owner.prisma().update(
-                where={"name": er["name"]},
+                where={"name": ir["name"]},
                 data=OwnerUpdateInput(
-                    synonyms={"create": [{"term": s} for s in er["synonyms"]]},
+                    synonyms={"create": [{"term": s} for s in ir["synonyms"]]},
                 ),
             )
 
-    async def copy_all(self, names: Sequence[str]):
+    @staticmethod
+    async def load_financials(public_companies: Sequence[CompanyInfo]):
+        """
+        Data from https://www.nasdaq.com/market-activity/stocks/screener?exchange=NYSE
+        """
+        owner_recs = await OwnerSynonym.prisma().find_many(
+            where={
+                "AND": [
+                    {"term": {"in": [co["name"] for co in public_companies]}},
+                    {"owner_id": {"gt": 0}},  # filters out null owner_id
+                ]
+            },
+        )
+        owner_map = {
+            record.term: record.owner_id
+            for record in owner_recs
+            if record.owner_id is not None
+        }
+
+        await FinancialSnapshot.prisma().create_many(
+            data=transform_financials(public_companies, owner_map),
+        )
+
+    async def copy_all(
+        self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
+    ):
         db = Prisma(auto_register=True, http={"timeout": None})
         await db.connect()
         await self.create_records(names)
+        await self.load_financials(public_companies)
         await db.disconnect()

@@ -116,7 +116,7 @@ def wrap(core_re: str) -> str:
     return "(?:" + core_re + ")"
 
 
-def remove_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
+def sub_extra_spaces(terms: list[str] | Iterable[str]) -> Iterable[str]:
     """
     Removes extra spaces from terms
     (also strips)

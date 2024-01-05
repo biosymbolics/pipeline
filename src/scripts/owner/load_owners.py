@@ -6,53 +6,17 @@ from typing import Sequence, TypedDict, cast
 import polars as pl
 from prisma import Prisma
 from pydash import flatten, uniq
-from prisma.models import FinancialSnapshot, Synonym
-from prisma.types import (
-    FinancialSnapshotCreateWithoutRelationsInput as FinancialSnapshotCreateInput,
-)
+from prisma.models import FinancialSnapshot
 
-from clients.finance.financials import CompanyFinancialExtractor
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
 from constants.company import COMPANY_INDICATORS
 from data.etl.owner import OwnerEtl
+from typings.companies import CompanyInfo
 from utils.re import get_or_re
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
 ASSIGNEE_PATENT_THRESHOLD = 20
-
-
-CompanyInfo = TypedDict("CompanyInfo", {"name": str, "symbol": str})
-
-
-def transform_financials(
-    records: Sequence[CompanyInfo], owner_map: dict[str, int]
-) -> list[FinancialSnapshotCreateInput]:
-    """
-    Transform company rows
-
-    - clean company name and attempts to match a synonym
-    - looks up financial info
-    """
-
-    def fetch_financials(record: CompanyInfo):
-        financials = CompanyFinancialExtractor(record["symbol"])
-        return FinancialSnapshotCreateInput(
-            owner_id=owner_map[record["name"].lower()],
-            current_ratio=financials.current_ratio,
-            debt_equity_ratio=financials.debt_equity_ratio,
-            ebitda=financials.ebitda,
-            gross_profit=financials.gross_profit,
-            market_cap=financials.market_cap,
-            net_debt=financials.net_debt,
-            return_on_equity=financials.return_on_equity,
-            return_on_research_capital=financials.return_on_research_capital,
-            total_debt=financials.total_debt,
-            snapshot_date=datetime.now(),
-            symbol=record["symbol"],
-        )
-
-    return [fetch_financials(record) for record in records]
 
 
 class AllOwnersEtl:
@@ -75,44 +39,38 @@ class AllOwnersEtl:
         # (because the clustering makes a mess of individuals)
         db_owner_query_map = {
             # patents db
-            "patents": f"""
-                SELECT lower(unnest(assignees)) as name, count(*) as count
-                FROM applications a
-                GROUP BY name
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
-
-                UNION ALL
-
-                -- if fewer than 20 patents, BUT the name looks like a company, include it.
-                SELECT max(lower(name)) as name, count(*) as count
-                FROM applications a, unnest(assignees) as name
-                where name ~* '{company_re}\\.?'
-                GROUP BY lower(name)
-                HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
-
-                UNION ALL
-
-                SELECT lower(unnest(inventors)) as name, count(*) as count
-                FROM applications a
-                GROUP BY lower(name)
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
-
-                UNION ALL
-
-                SELECT lower(name) as name, count(*) as count
-                FROM companies
-                GROUP BY lower(name)
-            """,
+            # "patents": f"""
+            #     SELECT lower(unnest(assignees)) as name
+            #     FROM applications a
+            #     GROUP BY lower(name)
+            #     HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
+            #     UNION ALL
+            #     -- if fewer than 20 patents, BUT the name looks like a company, include it.
+            #     SELECT lower(max(name)) as name
+            #     FROM applications a, unnest(assignees) as name
+            #     WHERE name ~* '{company_re}\\.?'
+            #     GROUP BY lower(name)
+            #     HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
+            #     UNION ALL
+            #     SELECT lower(unnest(inventors)) as name
+            #     FROM applications a
+            #     GROUP BY lower(name)
+            #     HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+            #     UNION ALL
+            #     SELECT lower(name) as name
+            #     FROM companies
+            #     GROUP BY lower(name)
+            # """,
             # ctgov db
             "aact": """
-                select lower(name) as name, count(*) as count
+                select lower(name) as name
                 from sponsors
                 group by lower(name)
             """,
             # drugcentral db, with approvals
             # `ob_product`` has 1772 distinct applicants vs `approval` at 1136
             "drugcentral": """
-                select lower(applicant) as name, count(*) as count
+                select lower(applicant) as name
                 from ob_product
                 where applicant is not null
                 group by lower(applicant)
@@ -125,60 +83,33 @@ class AllOwnersEtl:
             ]
         )
         stock_names = [
-            record["name"] for record in AllOwnersEtl.load_financial_company_info()
+            record["name"] for record in AllOwnersEtl.load_public_companies()
         ]
         names = uniq([row["name"] for row in rows]) + stock_names
         return names
 
     @staticmethod
-    def load_financial_company_info() -> list[CompanyInfo]:
+    def load_public_companies() -> list[CompanyInfo]:
         nasdaq = pl.read_csv("data/NASDAQ.csv")
         nyse = pl.read_csv("data/NYSE.csv")
         all = nasdaq.vstack(nyse)
         pharmas = (
-            all.filter(pl.col("Sector") == "Health Care")
-            .with_columns(
-                pl.col("Symbol").str.to_lowercase(),
-                pl.col("Name").str.to_lowercase(),
-            )
+            all.filter(pl.col("Sector").str.to_lowercase() == "health care")
             .rename({"Symbol": "symbol", "Name": "name"})
+            .with_columns(
+                pl.col("symbol").str.to_lowercase(),
+                pl.col("name").str.to_lowercase(),
+            )
         )
-        return cast(
-            list[CompanyInfo], pharmas.select(pl.col(["name", "symbol"])).to_dicts()
-        )
-
-    @staticmethod
-    async def load_financials():
-        """
-        Data from https://www.nasdaq.com/market-activity/stocks/screener?exchange=NYSE
-        """
-        pharma_cos = AllOwnersEtl.load_financial_company_info()
-
-        owner_recs = await Synonym.prisma().find_many(
-            where={
-                "AND": [
-                    {"term": {"in": [record["name"] for record in pharma_cos]}},
-                    {"owner_id": {"gt": 0}},  # filters out null owner_id
-                ]
-            },
-        )
-        owner_map = {
-            record.term: record.owner_id
-            for record in owner_recs
-            if record.owner_id is not None
-        }
-
-        await FinancialSnapshot.prisma().create_many(
-            data=transform_financials(pharma_cos, owner_map),
-        )
+        return [
+            CompanyInfo(**d)
+            for d in pharmas.select(pl.col(["name", "symbol"])).to_dicts()
+        ]
 
     async def copy_all(self):
-        db = Prisma(auto_register=True, http={"timeout": None})
-        await db.connect()
         names = await self.get_owner_names()
-        await OwnerEtl().copy_all(names)
-        await self.load_financials()
-        await db.disconnect()
+        public_companies = self.load_public_companies()
+        await OwnerEtl().copy_all(names, public_companies)
 
 
 def main():
