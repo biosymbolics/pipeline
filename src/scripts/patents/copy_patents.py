@@ -9,9 +9,14 @@ from prisma.models import Indicatable, Intervenable, Ownable, Patent
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import (
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE,
+    WORKING_BIOSYM_ANNOTATIONS_TABLE,
+)
 from data.etl.biomedical_entity import BiomedicalEntityEtl
 from data.etl.document import DocumentEtl
 from data.etl.types import RelationConnectInfo, RelationIdFieldMap
+from scripts.patents.constants import GPR_ANNOTATIONS_TABLE
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +24,94 @@ logging.basicConfig(level=logging.INFO)
 
 
 SOURCE_DB = "patents"
+
+# save_json_as_file(terms, TERMS_FILE)
+# domain == "attributes":
+# if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
+canonical_sql = "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
+patents_annotation_sql = f"""
+    SELECT term, domain, sum(count) as count FROM (
+        -- TODO: can we prevent these from being matched to anything but diseases?
+        SELECT lower(preferred_name) as term, domain, COUNT(*) as count
+        from annotations
+        group by preferred_name, domain
+
+        UNION ALL
+
+        SELECT lower(original_term) as term, domain, COUNT(*) as count
+        FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+        group by original_term, domain
+    ) s
+
+    group by term, domain
+"""
+
+patents_annotations_2_sql = f"""
+        SELECT publication_number,
+            s.term as term,
+            s.id as id,
+            domain,
+            max(source) as source,
+            min(character_offset_start) as character_offset_start,
+            min(character_offset_end) as character_offset_end,
+            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
+            coalesce(max(t.category_rollup), s.term) as category_rollup
+        from (
+            SELECT
+                publication_number,
+                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term end) as term,
+                (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id end) as id,
+                domain,
+                source,
+                character_offset_start,
+                character_offset_end
+                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+                LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
+            ) s
+            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+            group by publication_number, s.term, s.id, domain
+        """
+
+patents_from_gpr_sql = f"""
+    SELECT publication_number,
+        s.term as term,
+        s.id as id,
+        domain,
+        max(source) as source,
+        min(character_offset_start) as character_offset_start,
+        min(character_offset_end) as character_offset_end,
+        coalesce(max(t.instance_rollup), s.term) as instance_rollup,
+        coalesce(max(t.category_rollup), s.term) as category_rollup
+    from (
+        SELECT
+            publication_number,
+            (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term end) as term,
+            (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id end) as id,
+            domain,
+            source,
+            character_offset_start,
+            character_offset_end
+            FROM {GPR_ANNOTATIONS_TABLE}
+            LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
+        ) s
+        LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
+        group by publication_number, s.term, s.id, domain
+    """
+
+patents_select_attributes_sql = f"""
+    SELECT
+        publication_number,
+        original_term as term,
+        original_term as id,
+        domain,
+        source,
+        character_offset_start,
+        character_offset_end,
+        original_term as instance_rollup,
+        original_term as category_rollup
+    from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
+    where domain='attributes'
+"""
 
 
 class PatentEtl(DocumentEtl):

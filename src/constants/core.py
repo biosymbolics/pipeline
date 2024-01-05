@@ -7,18 +7,10 @@ logger.setLevel(logging.INFO)
 
 SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
-AGGREGATED_ANNOTATIONS_TABLE = "aggregated_annotations"  # a mat view
 REGULATORY_APPROVAL_TABLE = "regulatory_approval"
-PATENT_TO_REGULATORY_APPROVAL_TABLE = "patent_to_regulatory_approval"
-PATENT_TO_TRIAL_TABLE = "patent_to_trial"
 TRIALS_TABLE = "trial"
 APPLICATIONS_TABLE = "applications"
 PUBLICATION_NUMBER_MAP_TABLE = "publication_number_map"
-
-ANNOTATIONS_TABLE = "annotations"
-TERMS_TABLE = "terms"
-TERM_IDS_TABLE = "term_ids"
-SYNONYM_TABLE_NAME = "synonym_map"
 
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))

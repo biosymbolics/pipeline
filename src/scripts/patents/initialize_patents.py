@@ -4,6 +4,7 @@ Functions to initialize the patents database
 import asyncio
 import logging
 import sys
+from scripts.patents.copy_patents import PatentEtl
 
 from system import initialize
 
@@ -12,197 +13,20 @@ initialize()
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
-    AGGREGATED_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
-    APPLICATIONS_TABLE,
-    ANNOTATIONS_TABLE,
 )
 from scripts.trials.copy_trials import TrialEtl
 from scripts.umls.copy_umls import copy_umls
 from scripts.approvals.copy_approvals import ApprovalEtl
 
-from .constants import (
-    GPR_ANNOTATIONS_TABLE,
-    TEXT_FIELDS,
-)
+from .constants import GPR_ANNOTATIONS_TABLE
 from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
-from .terms import create_patent_terms
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
-
-async def __create_annotations_table():
-    """
-    Create a table of annotations for use in app queries
-    """
-    logger.info("Create a table of annotations for use in app queries")
-
-    client = PsqlDatabaseClient()
-    # to delete materialized view
-    await client.delete_table(ANNOTATIONS_TABLE, is_cascade=True)
-
-    annotations_query = f"""
-        --- assignees as annotations
-        SELECT
-            publication_number,
-            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as term,
-            null as id,
-            'assignees' as domain,
-            'record' as source,
-            1 as character_offset_start,
-            1 as character_offset_end,
-            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as instance_rollup,
-            (CASE WHEN map.term is null THEN LOWER(assignee) ELSE map.term end) as category_rollup
-        FROM applications a,
-        unnest(a.assignees) as assignee
-        LEFT JOIN synonym_map map ON LOWER(assignee) = map.synonym
-
-        UNION ALL
-
-        --- inventors as annotations
-        SELECT
-            publication_number,
-            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as term,
-            null as id,
-            'inventors' as domain,
-            'record' as source,
-            1 as character_offset_start,
-            1 as character_offset_end,
-            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as instance_rollup,
-            (CASE WHEN map.term is null THEN lower(inventor) ELSE map.term end) as category_rollup
-        FROM applications a,
-        unnest(a.inventors) as inventor
-        LEFT JOIN synonym_map map ON LOWER(inventor) = map.synonym
-    """
-    await client.create_from_select(annotations_query, ANNOTATIONS_TABLE)
-
-    # add biosym annotations
-    await client.select_insert_into_table(
-        f"""
-        SELECT publication_number,
-            s.term as term,
-            s.id as id,
-            domain,
-            max(source) as source,
-            min(character_offset_start) as character_offset_start,
-            min(character_offset_end) as character_offset_end,
-            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
-            coalesce(max(t.category_rollup), s.term) as category_rollup
-        from (
-            SELECT
-                publication_number,
-                (CASE WHEN map.term is null THEN lower(original_term) ELSE map.term end) as term,
-                (CASE WHEN map.id is null THEN lower(original_term) ELSE map.id end) as id,
-                domain,
-                source,
-                character_offset_start,
-                character_offset_end
-                FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-                LEFT JOIN synonym_map map ON LOWER(original_term) = map.synonym
-            ) s
-            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
-            group by publication_number, s.term, s.id, domain
-        """,
-        ANNOTATIONS_TABLE,
-    )
-
-    # add gpr annotations
-    await client.select_insert_into_table(
-        f"""
-        SELECT publication_number,
-            s.term as term,
-            s.id as id,
-            domain,
-            max(source) as source,
-            min(character_offset_start) as character_offset_start,
-            min(character_offset_end) as character_offset_end,
-            coalesce(max(t.instance_rollup), s.term) as instance_rollup,
-            coalesce(max(t.category_rollup), s.term) as category_rollup
-        from (
-            SELECT
-                publication_number,
-                (CASE WHEN map.term is null THEN lower(preferred_name) ELSE map.term end) as term,
-                (CASE WHEN map.id is null THEN lower(preferred_name) ELSE map.id end) as id,
-                domain,
-                source,
-                character_offset_start,
-                character_offset_end
-                FROM {GPR_ANNOTATIONS_TABLE}
-                LEFT JOIN synonym_map map ON LOWER(preferred_name) = map.synonym
-            ) s
-            LEFT JOIN terms t ON s.id = t.id AND t.id <> ''
-            group by publication_number, s.term, s.id, domain
-        """,
-        ANNOTATIONS_TABLE,
-    )
-
-    # add attributes at the last moment
-    await client.select_insert_into_table(
-        f"""
-            SELECT
-                publication_number,
-                original_term as term,
-                original_term as id,
-                domain,
-                source,
-                character_offset_start,
-                character_offset_end,
-                original_term as instance_rollup,
-                original_term as category_rollup
-            from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
-            where domain='attributes'
-        """,
-        ANNOTATIONS_TABLE,
-    )
-    await client.create_indices(
-        [
-            {
-                "table": ANNOTATIONS_TABLE,
-                "column": "publication_number",
-            },
-            {
-                "table": ANNOTATIONS_TABLE,
-                "column": "term",
-            },
-            {
-                "table": ANNOTATIONS_TABLE,
-                "column": "id",
-            },
-        ]
-    )
-
-    # non-distinct because order matters
-    mat_view_query = f"""
-        DROP MATERIALIZED VIEW IF EXISTS {AGGREGATED_ANNOTATIONS_TABLE};
-        CREATE MATERIALIZED VIEW {AGGREGATED_ANNOTATIONS_TABLE} AS
-        SELECT
-            publication_number,
-            ARRAY_AGG(a.term) AS terms,
-            ARRAY_AGG(domain) AS domains,
-            ARRAY_AGG(instance_rollup) as instance_rollup,
-            ARRAY_AGG(category_rollup) as category_rollup,
-            ARRAY_CAT(ARRAY_AGG(instance_rollup), ARRAY_AGG(a.term)) as search_terms
-        FROM {ANNOTATIONS_TABLE} a
-        GROUP BY publication_number;
-    """
-    await client.execute_query(mat_view_query)
-    await client.create_indices(
-        [
-            {
-                "table": AGGREGATED_ANNOTATIONS_TABLE,
-                "column": "publication_number",
-            },
-            {
-                "table": AGGREGATED_ANNOTATIONS_TABLE,
-                "column": "search_terms",
-                "is_gin": True,
-            },
-        ]
-    )
 
 
 async def __create_biosym_annotations_source_table():
@@ -247,26 +71,6 @@ async def create_funcs():
         $func$;
     """
     await PsqlDatabaseClient().execute_query(re_escape_sql)
-
-
-async def add_application_search():
-    client = PsqlDatabaseClient()
-    vector_sql = ("|| ' ' ||").join([f"coalesce({tf}, '')" for tf in TEXT_FIELDS])
-    await client.execute_query(
-        f"""
-            ALTER TABLE {APPLICATIONS_TABLE} ADD COLUMN text_search tsvector;
-            UPDATE applications SET text_search = to_tsvector('english', {vector_sql});
-        """,
-        ignore_error=True,
-    )
-    await client.create_index(
-        {
-            "table": APPLICATIONS_TABLE,
-            "column": "text_search",
-            "is_gin": True,
-            "is_lower": False,
-        }
-    )
 
 
 async def main(bootstrap: bool = False):
@@ -332,7 +136,6 @@ async def main(bootstrap: bool = False):
     - yum install postgresql15
     """
     if bootstrap:
-        # bigquery
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
         await create_funcs()
@@ -340,18 +143,14 @@ async def main(bootstrap: bool = False):
         await copy_patent_tables()
         # create patent applications etc in postgres
         await copy_bq_to_psql()
-        # copy data about approvals
-        await ApprovalEtl(document_type="regulatory_approval").copy_all()
-        # adds column & index for application search
-        await add_application_search()
         # UMLS records (slow due to betweenness centrality calc)
         copy_umls()
 
-    # create patent terms (psql)
-    create_patent_terms()
+    # copy patent data
+    await PatentEtl(document_type="patent").copy_all()
 
-    # create annotations (psql)
-    await __create_annotations_table()
+    # copy data about approvals
+    await ApprovalEtl(document_type="regulatory_approval").copy_all()
 
     # copy trial data
     await TrialEtl(document_type="trial").copy_all()
@@ -482,38 +281,6 @@ async def main(bootstrap: bool = False):
     # update annotations set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
     # update biosym_annotations_source set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
     # update biosym_annotations set domain='diseases' where domain<>'diseases' and original_term ~* '^.* leukemias?$';
-
-
-#     update annotations set domain='biologics' where term in ('dna', )
-#     update annotations set domain='biologics' where term ilike '% channel' and domain='compounds';
-#     update annotations set domain='biologics' where term ilike '% cell line' and domain='devices';
-#     update annotations set domain='compounds' where term ilike '% fumarate' and domain<>'compounds';
-#     delete from annotations where term='negation efficacious';
-#     update annotations set domain='biologics' where term ilike '%oligonucleotides' and domain<>'biologics';
-
-#     update annotations set term=regexp_replace(term, '(?i)^(.*) combinations$', '\1', 'i') where term ~* '^.* combinations$';
-#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^(.*) combinations$', '\1', 'i') where instance_rollup ~* '^.* combinations$';
-# delete from annotations where term in ('dosage forms bead', 'dosage froms matrix', 'composition comprising said');
-
-#     update annotations set term=regexp_replace(term, '(?i)\ygene (agonist|antagonist|inhibitor)\y', '\1', 'i') where term ~* 'gene (agonist|antagonist|inhibitor)';
-#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)\ygene (agonist|antagonist|inhibitor)\y', '\1', 'i') where instance_rollup ~* 'gene (agonist|antagonist|inhibitor)';
-
-#     update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)qualitative form', 'form', 'i') where instance_rollup ~* 'qualitative form';
-#     update annotations set term=regexp_replace(term, 'group specimen', 'group', 'i') where term ~* 'group specimen';
-#     update annotations set instance_rollup=regexp_replace(instance_rollup, 'group specimen', 'group', 'i') where instance_rollup ~* 'group specimen';
-
-#     update annotations set term=regexp_replace(term, '\ygenerating\y', '', 'i') where term ~* '\ygenerating\y';
-
-#     update annotations set term=regexp_replace(term, '[ ]{2,}', ' ', 'g') where term ~* '[ ]{2,}';
-#     update annotations set term=trim(term) where trim(term) <> term;
-
-#  update annotations set term=regexp_replace(term, '^(activator|inhibitor|agonist|antagonist) (.*) receptor', '\2 \1', 'g') where term ~* '^(activator|inhibitor|agonist|antagonist) (.*) receptor'
-
-#  update annotations set instance_rollup=regexp_replace(instance_rollup, '^(activator|inhibitor|agonist|antagonist) (.*) receptor', '\2 \1', 'g') where instance_rollup ~* '^(activator|inhibitor|agonist|antagonist) (.*) receptor'
-
-
-# update annotations set instance_rollup=regexp_replace(instance_rollup, 'aberranta', 'aberrant', 'i') where instance_rollup ~* 'aberranta';
-#     update annotations set instance_rollup=regexp_replace(instance_rollup, 'social interaction', 'interaction', 'i') where instance_rollup ~* 'social interaction';
 
 
 if __name__ == "__main__":

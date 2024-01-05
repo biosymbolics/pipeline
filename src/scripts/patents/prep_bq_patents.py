@@ -7,7 +7,7 @@ from constants.patents import BIOMEDICAL_IPC_CODE_PREFIX_RE
 from .constants import GPR_ANNOTATIONS_TABLE, GPR_PUBLICATIONS_TABLE
 
 
-async def __copy_publications():
+async def _copy_publications():
     """
     Copy publications from patents-public-data to a local table
     """
@@ -36,7 +36,7 @@ async def __copy_publications():
     await client.create_from_select(query, table_id)
 
 
-async def __copy_gpr_annotations():
+async def _copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
     (ONLY diseases, and only the first instance of the term for a given publication_number)
@@ -69,7 +69,7 @@ async def __copy_gpr_annotations():
     await client.create_from_select(query, GPR_ANNOTATIONS_TABLE)
 
 
-async def __copy_gpr_publications():
+async def _copy_gpr_publications():
     """
     Copy publications from GPR to a local table
     """
@@ -92,8 +92,8 @@ async def copy_patent_tables():
     Idempotent (as in, tables are deleted and recreated) but not atomic, and also expensive (from a BigQuery standpoint)
     """
     # copy gpr_annotations table
-    await __copy_gpr_annotations()
+    await _copy_gpr_annotations()
 
     # copy publications and gpr publications table (order matters)
-    await __copy_publications()
-    await __copy_gpr_publications()
+    await _copy_publications()
+    await _copy_gpr_publications()
