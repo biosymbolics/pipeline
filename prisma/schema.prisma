@@ -35,6 +35,7 @@ model EntitySynonym {
     entity_id Int
     term      String           @unique
 
+    @@unique([term, entity_id]) // TODO: should be on term
     @@map("entity_synonym")
 }
 
@@ -55,10 +56,11 @@ model Owner {
 
 model OwnerSynonym {
     id       Int    @id @default(autoincrement())
-    term     String @unique
     owner    Owner  @relation(fields: [owner_id], references: [id])
     owner_id Int
+    term     String
 
+    @@unique([term, owner_id]) // TODO: should be on term
     @@map("owner_synonym")
 }
 
