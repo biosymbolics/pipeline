@@ -65,6 +65,7 @@ class CandidateSelector(AbstractCandidateSelector):
             logger.warning(f"No candidates found for {text}")
             return None
 
+        # filter out candidates with low similarity
         similiar_candidates = [
             candidate
             for candidate in candidates
@@ -78,7 +79,7 @@ class CandidateSelector(AbstractCandidateSelector):
             return None
 
         # sort candidate by score (similarity + type match)
-        scored_candidates = sorted(
+        sorted_candidates = sorted(
             similiar_candidates,
             key=lambda candidate: self._score_candidate(
                 candidate.concept_id,
@@ -86,7 +87,7 @@ class CandidateSelector(AbstractCandidateSelector):
             ),
             reverse=True,
         )
-        candidate = scored_candidates[0]
+        candidate = sorted_candidates[0]
 
         with_overrides = apply_umls_word_overrides(text, [candidate])
         return with_overrides[0]
