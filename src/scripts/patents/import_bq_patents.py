@@ -88,11 +88,11 @@ async def create_patent_applications_table():
     client = BQDatabaseClient()
     await client.delete_table(APPLICATIONS_TABLE)
 
+    # NOTE: as of 01/08, left join has not been tested (might cause errors down the line)
     applications = f"""
         SELECT {','.join(PATENT_APPLICATION_FIELDS)}
-        FROM `{BQ_DATASET_ID}.publications` pubs,
-        `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
-        WHERE pubs.publication_number = gpr_pubs.publication_number
+        FROM `{BQ_DATASET_ID}.publications` pubs
+        LEFT JOIN `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs on pubs.publication_number = gpr_pubs.publication_number
     """
     await client.create_from_select(applications, APPLICATIONS_TABLE)
 
