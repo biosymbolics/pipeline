@@ -5,12 +5,15 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
+from prisma import Prisma
 from pydash import omit
+from prisma.models import Trial
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import TRIALS_TABLE
-from typings.trials import Trial
+
+# from typings.trials import Trial
 from typings import QueryType, TrialSearchParams
 from utils.sql import get_term_sql_query
 from utils.string import get_id
@@ -40,22 +43,21 @@ async def _search(
 
     query = f"""
         SELECT *,
-        ts_rank_cd(text_search, to_tsquery(%s)) AS score
+        ts_rank_cd(text_search, to_tsquery($1)) AS score
         FROM {TRIALS_TABLE} as trials
-        WHERE text_search @@ to_tsquery(%s)
+        WHERE search @@ to_tsquery($2)
         AND purpose in ('TREATMENT', 'BASIC_SCIENCE', 'PREVENTION')
         AND intervention_type='PHARMACOLOGICAL'
         ORDER BY score DESC
         LIMIT {limit}
     """
 
-    results = await PsqlDatabaseClient().select(query, [term_query, term_query])
+    async with Prisma(auto_register=True, http={"timeout": 300}):
+        trials = await Trial.prisma().query_raw(query, term_query, term_query)
 
     logger.info(
-        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
+        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(trials)
     )
-
-    trials = [Trial(**omit(r, ["text_search"])) for r in results]
 
     return trials
 

@@ -5,16 +5,15 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
+from prisma import Prisma
+from prisma.models import Patent
 
 from clients.companies.companies import get_company_map
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
-    AGGREGATED_ANNOTATIONS_TABLE,
-    ANNOTATIONS_TABLE,
     APPLICATIONS_TABLE,
     PUBLICATION_NUMBER_MAP_TABLE,
-    PATENT_TO_TRIAL_TABLE,
     TRIALS_TABLE,
 )
 from typings.patents import ScoredPatentApplication as PatentApplication
@@ -43,10 +42,10 @@ DECAY_RATE = 1 / 2000
 
 
 SEARCH_RETURN_FIELDS = {
-    "apps.publication_number": "publication_number",
-    "apps.title": "title",
+    "patent.id": "publication_number",
+    "patent.title": "title",
     "abstract": "abstract",
-    "apps.application_number": "application_number",
+    "patent.application_number": "application_number",
     "country": "country",
     "domains": "domains",
     "embeddings::real[]": "embeddings",
@@ -58,17 +57,8 @@ SEARCH_RETURN_FIELDS = {
 }
 
 
-TRIAL_RETURN_FIELDS = {
-    "array_agg(distinct trials.nct_id)": "nct_ids",
-    "(array_agg(trials.phase ORDER BY trials.start_date desc))[1]": "max_trial_phase",
-    "(array_agg(trials.status ORDER BY trials.start_date desc))[1]": "last_trial_status",
-    "(array_agg(trials.last_updated_date ORDER BY trials.start_date desc))[1]": "last_trial_update",
-    "(array_agg(trials.termination_reason ORDER BY trials.start_date desc))[1]": "termination_reason",
-}
-
 FIELDS: list[str] = [
-    *[f"{field} as {new_field}" for field, new_field in SEARCH_RETURN_FIELDS.items()],
-    *[f"{field} as {new_field}" for field, new_field in TRIAL_RETURN_FIELDS.items()],
+    f"{field} as {new_field}" for field, new_field in SEARCH_RETURN_FIELDS.items()
 ]
 
 
@@ -94,7 +84,7 @@ def __get_query_pieces(
 
         return QueryPieces(
             fields=[*FIELDS, "1 as search_rank", "0 as exemplar_similarity"],
-            where=f"WHERE apps.publication_number = ANY(%s)",
+            where=f"WHERE patents.id = ANY($1)",
             params=[terms],
             cosine_source="",
         )
@@ -137,13 +127,11 @@ async def _get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]
     """
     Get embeddings for exemplar patents
     """
-    return [
-        rec["embeddings"]
-        for rec in await PsqlDatabaseClient().select(
-            "SELECT embeddings FROM applications WHERE publication_number = ANY(%s)",
-            [exemplar_patents],
+    async with Prisma(auto_register=True, http={"timeout": 300}) as db:
+        results = await Prisma.query_raw(
+            db, "SELECT embeddings FROM patents WHERE id = ANY($1)", exemplar_patents
         )
-    ]
+        return [r["embeddings"] for r in results]
 
 
 async def _search(
@@ -173,12 +161,7 @@ async def _search(
     query = f"""
         SELECT {", ".join(qp["fields"])},
         max(agg_annotations.{term_field}) as terms
-        FROM {APPLICATIONS_TABLE} AS apps
-        JOIN {AGGREGATED_ANNOTATIONS_TABLE} as agg_annotations ON (agg_annotations.publication_number = apps.publication_number)
-        JOIN {ANNOTATIONS_TABLE} as annotation ON annotation.publication_number = apps.publication_number -- for search_rank
-        JOIN {PUBLICATION_NUMBER_MAP_TABLE} as pub_map ON pub_map.publication_number = apps.publication_number
-        LEFT JOIN {PATENT_TO_TRIAL_TABLE} a2t ON a2t.publication_number = apps.publication_number
-        LEFT JOIN {TRIALS_TABLE} ON trials.nct_id = a2t.nct_id
+        FROM patents
         {qp["cosine_source"]}
         {qp["where"]}
         GROUP BY {",".join(SEARCH_RETURN_FIELDS.keys())}
@@ -186,13 +169,14 @@ async def _search(
         LIMIT {limit}
     """
 
-    results = await PsqlDatabaseClient().select(query, qp["params"])
+    async with Prisma(auto_register=True, http={"timeout": 300}):
+        patents = await Patent.prisma().query_raw(query, "")
 
     company_map = await get_company_map()
-    enriched_results = enrich_search_result(results, company_map)
+    enriched_results = enrich_search_result(patents, company_map)
 
     logger.info(
-        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
+        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
     )
 
     return enriched_results

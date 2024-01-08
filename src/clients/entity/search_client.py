@@ -45,7 +45,7 @@ async def search(params: EntitySearchParams) -> list[Entity]:
     int_with_recs = [
         Entity(
             name=a,
-            approvals=[app for app in approvals if app.instance_rollup == a],
+            approvals=[app for app in approvals],  # if app.instance_rollup == a],
             patents=[p for p in patents if a in p.interventions],
             trials=[t for t in trials],  # if t.instance_rollup == a
         )

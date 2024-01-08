@@ -3,14 +3,15 @@ Regulatory approvals client
 """
 from functools import partial
 import logging
+import os
 import time
 from typing import Sequence
-from pydash import omit
+from prisma import Prisma
+from prisma.models import RegulatoryApproval
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import REGULATORY_APPROVAL_TABLE
-from typings.approvals import RegulatoryApproval
+from constants.core import DATABASE_URL, REGULATORY_APPROVAL_TABLE
+
 from typings import QueryType, ApprovalSearchParams
 from utils.sql import get_term_sql_query
 from utils.string import get_id
@@ -18,6 +19,8 @@ from utils.string import get_id
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+os.environ["DATABASE_URL"] = DATABASE_URL or ""
 
 MAX_SEARCH_RESULTS = 2000
 
@@ -44,6 +47,13 @@ async def _search(
 ) -> list[RegulatoryApproval]:
     """
     Search regulatory approvals by terms
+
+    REPL:
+    ```
+    import asyncio
+    from clients.approvals.search_client import _search
+    asyncio.run(_search(["asthma"]))
+    ```
     """
     start = time.monotonic()
 
@@ -53,23 +63,27 @@ async def _search(
 
     term_query = get_term_sql_query(terms, query_type)
 
+    # prisma py doesn't yet support to_tsquery
     query = f"""
-        SELECT {", ".join(FIELDS)},
-        ts_rank_cd(text_search, to_tsquery(%s)) AS score
+        SELECT *,
+        ts_rank_cd(search, to_tsquery($1)) AS score
         FROM {REGULATORY_APPROVAL_TABLE} as approvals
-        WHERE text_search @@ to_tsquery(%s)
+        WHERE search @@ to_tsquery($2)
         AND approval_date is not null
         ORDER BY score DESC
         LIMIT {limit}
     """
 
-    results = await PsqlDatabaseClient().select(query, [term_query, term_query])
+    async with Prisma(auto_register=True, http={"timeout": 300}):
+        approvals = await RegulatoryApproval.prisma().query_raw(
+            query, term_query, term_query
+        )
 
     logger.info(
-        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(results)
+        "Search took %s seconds (%s)",
+        round(time.monotonic() - start, 2),
+        len(approvals),
     )
-
-    approvals = [RegulatoryApproval(**omit(r, ["text_search"])) for r in results]
 
     return approvals
 
