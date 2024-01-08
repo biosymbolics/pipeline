@@ -230,6 +230,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
                     )
 
 
+# TODO: add non-semantic composite logic here.
 @pytest.mark.skip(reason="Too slow to include in CI")
 class TestCompositeSemanticCandidateSelector(unittest.TestCase):
     """
