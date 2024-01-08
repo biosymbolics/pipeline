@@ -4,7 +4,6 @@ import polars as pl
 import logging
 
 from constants.patents import SUITABILITY_SCORE_MAP
-from typings.companies import Company
 from typings.patents import AvailabilityLikelihood, SuitabilityScoreMap
 
 from .constants import EST_MAX_CLINDEV, MAX_PATENT_LIFE
@@ -147,17 +146,14 @@ def calculate_scores(df: pl.DataFrame) -> pl.DataFrame:
     return score_patents(df, "attributes", "patent_years", SUITABILITY_SCORE_MAP)
 
 
-def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.DataFrame:
+def availability_exprs(df: pl.DataFrame) -> list[pl.Expr]:
     """
     Add availability likelihood to patents
 
     df must already have assignees, publication_number, and is_active columns
     """
     avail_likelihood_map: dict[str, tuple[AvailabilityLikelihood, str]] = {
-        rec["publication_number"]: AvailabilityLikelihood.find_from_record(
-            rec, company_map
-        )
-        for rec in df.to_dicts()
+        rec["id"]: AvailabilityLikelihood.find_from_record(rec) for rec in df.to_dicts()
     }
     avail_explanation_map: dict[str, str] = {
         k: v[1] for k, v in avail_likelihood_map.items()
@@ -165,14 +161,8 @@ def add_availability(df: pl.DataFrame, company_map: dict[str, Company]) -> pl.Da
     avail_cat_map = {k: v[0].value for k, v in avail_likelihood_map.items()}
     avail_score_map = {k: v[0].score for k, v in avail_likelihood_map.items()}
 
-    return df.with_columns(
-        pl.col("publication_number")
-        .map_dict(avail_cat_map)
-        .alias("availability_likelihood"),
-        pl.col("publication_number")
-        .map_dict(avail_explanation_map)
-        .alias("availability_explanation"),
-        pl.col("publication_number")
-        .map_dict(avail_score_map)
-        .alias("availability_score"),
-    )
+    return [
+        pl.col("rec").map_dict(avail_cat_map).alias("availability_likelihood"),
+        pl.col("rec").map_dict(avail_explanation_map).alias("availability_explanation"),
+        pl.col("rec").map_dict(avail_score_map).alias("availability_score"),
+    ]

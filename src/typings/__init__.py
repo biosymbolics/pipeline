@@ -7,22 +7,18 @@ from .client import (
 )
 from .core import JsonSerializable, Primitive
 from .patents import (
-    PatentBasicInfo,
-    PatentApplication,
     PatentsTopicReport,
-    ScoredPatentApplication,
+    ScoredPatent,
 )
 
 __all__ = [
     "ApprovalSearchParams",
     "Primitive",
     "JsonSerializable",
-    "PatentBasicInfo",
-    "PatentApplication",
     "PatentsTopicReport",
     "PatentSearchParams",
     "QueryType",
-    "ScoredPatentApplication",
+    "ScoredPatent",
     "TermField",
     "TrialSearchParams",
 ]

@@ -6,14 +6,13 @@ import time
 from typing import Any, Sequence, TypedDict
 import polars as pl
 import logging
+from prisma.models import Patent
 
-from typings import ScoredPatentApplication
-from typings.companies import Company
+from typings import ScoredPatent
 from utils.list import dedup
 
-from .constants import DOMAINS_OF_INTEREST
-from .score import add_availability, calculate_scores
-from .utils import get_patent_years
+from .score import availability_exprs, calculate_scores
+from .utils import filter_similar_patents, get_patent_years
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -30,18 +29,15 @@ def filter_terms_by_domain(rec: TermDict, domain: str) -> list[str]:
     return dedup(terms)
 
 
-def enrich_search_result(
-    results: Sequence[dict[str, Any]], company_map: dict[str, Company]
-) -> list[ScoredPatentApplication]:
+def enrich_search_result(results: Sequence[Patent]) -> list[ScoredPatent]:
     """
     Enrich patent with scores, patent years, etc.
 
-    Adds:
-    - patent_years
-    - *DOMAINS_OF_INTEREST
+    - Adds patent_years, availability info and scores
+    - Filters similar_patents
 
     Args:
-        results (list[PatentApplication]): patents search results & summaries
+        results (list[Patent]): patents search results & summaries
     """
     start = time.time()
 
@@ -50,24 +46,14 @@ def enrich_search_result(
         return []
 
     pl.Config.activate_decimals()  # otherwise butchers decimal values
-    df = pl.from_dicts(results, infer_schema_length=None)
+    df = pl.from_dicts(results, infer_schema_length=None)  # type: ignore
 
     steps = [
         lambda _df: _df.with_columns(
             get_patent_years().alias("patent_years"),
-            pl.col("similar_patents")
-            .apply(lambda l: [item for item in l if item.startswith("WO")])
-            .alias("similar_patents"),
-            *[
-                df.select(
-                    pl.struct(["terms", "domains"])
-                    .apply(lambda rec: filter_terms_by_domain(rec, d))  # type: ignore
-                    .alias(d)
-                ).to_series()
-                for d in DOMAINS_OF_INTEREST
-            ],
-        ).drop("terms", "domains"),
-        lambda _df: add_availability(_df, company_map),
+            filter_similar_patents().alias("similar_patents"),
+            *availability_exprs(_df),
+        ),
         lambda _df: calculate_scores(_df).sort("score").reverse(),
     ]
 
@@ -77,4 +63,4 @@ def enrich_search_result(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
     )
 
-    return [ScoredPatentApplication(**p) for p in enriched_df.to_dicts()]
+    return [ScoredPatent(**p) for p in enriched_df.to_dicts()]

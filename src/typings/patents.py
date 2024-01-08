@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
+from prisma.models import Patent
 
 from typings.companies import CompanyFinancials
 from utils.classes import ByDefinitionOrderEnum
@@ -20,54 +21,6 @@ PatentsTopicReport = TypedDict(
     "PatentsTopicReport",
     {"x": float, "y": float, "publication_number": str},
 )
-
-
-@dataclass(frozen=True)
-class PatentBasicInfo(Dataclass):
-    """
-    Patent basic info object as per Google Patents API / local modifications
-    """
-
-    abstract: str
-    application_number: str
-    assignees: list[str]
-    attributes: list[str]  # keyof typeof get_patent_attribute_map()
-    family_id: str
-    ipc_codes: list[str]
-    patent_years: int
-    priority_date: date
-    publication_number: str
-    score: float
-    title: str
-    url: str
-
-
-@dataclass(frozen=True)
-class PatentApplication(PatentBasicInfo):
-    """
-    Patent application object as per Google Patents API / local modifications
-    """
-
-    @property
-    def interventions(self) -> list[str]:
-        return self.compounds + self.biologics + self.mechanisms
-
-    biologics: list[str]
-    compounds: list[str]
-    country: str
-    devices: list[str]
-    diagnostics: list[str]
-    diseases: list[str]
-    embeddings: list[float]
-    inventors: list[str]
-    last_trial_status: str
-    last_trial_update: date
-    max_trial_phase: str
-    mechanisms: list[str]
-    nct_ids: list[str]
-    procedures: list[str]
-    similar_patents: list[str]
-    termination_reason: str
 
 
 class AvailabilityLikelihood(ByDefinitionOrderEnum):
@@ -182,8 +135,8 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
-@dataclass(frozen=True)
-class ScoredPatentApplication(PatentApplication):
+@dataclass
+class ScoredPatent(Patent):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
@@ -197,6 +150,3 @@ class ScoredPatentApplication(PatentApplication):
 
 
 SuitabilityScoreMap = dict[str, float]
-
-
-Patent = ScoredPatentApplication

@@ -31,3 +31,12 @@ def get_patent_years() -> pl.Expr:
         - (pl.lit(current_year) - pl.col("priority_date").dt.year())
     ).clip(lower_bound=0, upper_bound=MAX_PATENT_LIFE)
     return expr
+
+
+def filter_similar_patents() -> pl.Expr:
+    """
+    Filter similar patents to only those that are WO
+    """
+    return pl.col("similar_patents").apply(
+        lambda l: [item for item in l if item.startswith("WO")]
+    )

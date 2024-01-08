@@ -5,7 +5,7 @@ import logging
 import time
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import APPLICATIONS_TABLE, TERMS_TABLE
+from constants.core import APPLICATIONS_TABLE
 
 
 from .types import is_term_results, AutocompleteMode, AutocompleteResult, TermResult
@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 TERM_SEARCH = f"""
         SELECT DISTINCT ON (count, term) terms.term, count
-        FROM {TERMS_TABLE}
+        FROM biosym_entities
         WHERE text_search @@ to_tsquery('english', %s)
         ORDER BY count DESC
     """

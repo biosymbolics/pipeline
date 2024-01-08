@@ -64,6 +64,6 @@ def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThres
 @dataclass(frozen=True)
 class QueryPieces(Dataclass):
     fields: list[str]
-    where: str
+    froms: list[str]
+    wheres: list[str]
     params: list
-    cosine_source: str

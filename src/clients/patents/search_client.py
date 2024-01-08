@@ -8,16 +8,10 @@ from typing import Sequence
 from prisma import Prisma
 from prisma.models import Patent
 
-from clients.companies.companies import get_company_map
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import (
-    APPLICATIONS_TABLE,
-    PUBLICATION_NUMBER_MAP_TABLE,
-    TRIALS_TABLE,
-)
-from typings.patents import ScoredPatentApplication as PatentApplication
+from typings.patents import ScoredPatent as PatentApplication
 from typings.client import PatentSearchParams, QueryType, TermField
+from utils.sql import get_term_sql_query
 from utils.string import get_id
 
 from .enrich import enrich_search_result
@@ -41,28 +35,7 @@ Usage:
 DECAY_RATE = 1 / 2000
 
 
-SEARCH_RETURN_FIELDS = {
-    "patent.id": "publication_number",
-    "patent.title": "title",
-    "abstract": "abstract",
-    "patent.application_number": "application_number",
-    "country": "country",
-    "domains": "domains",
-    "embeddings::real[]": "embeddings",
-    "family_id": "family_id",
-    "ipc_codes": "ipc_codes",
-    "priority_date": "priority_date",
-    "similar_patents": "similar_patents",
-    "url": "url",
-}
-
-
-FIELDS: list[str] = [
-    f"{field} as {new_field}" for field, new_field in SEARCH_RETURN_FIELDS.items()
-]
-
-
-def __get_query_pieces(
+def _get_query_pieces(
     terms: Sequence[str],
     exemplar_embeddings: Sequence[str],
     query_type: QueryType,
@@ -72,7 +45,6 @@ def __get_query_pieces(
     Helper to generate pieces of patent search query
     """
     is_id_search = any([t.startswith("WO-") for t in terms])
-    lower_terms = [t.lower() for t in terms]
 
     # if ids, ignore most of the standard criteria
     if is_id_search:
@@ -83,47 +55,47 @@ def __get_query_pieces(
             raise ValueError("Cannot mix id and (term or exemplar patent) search")
 
         return QueryPieces(
-            fields=[*FIELDS, "1 as search_rank", "0 as exemplar_similarity"],
-            where=f"WHERE patents.id = ANY($1)",
+            fields=["*", "1 as search_rank", "0 as exemplar_similarity"],
+            froms=[],
+            wheres=[f"patents.id = ANY($1)"],
             params=[terms],
-            cosine_source="",
         )
+
+    lower_terms = [t.lower() for t in terms]
+    max_priority_date = get_max_priority_date(int(min_patent_years))
 
     # exp decay scaling for search terms; higher is better
     fields = [
-        *FIELDS,
-        f"AVG(EXP(-annotation.character_offset_start * {DECAY_RATE})) as search_rank",
+        "*",
+        f"ts_rank_cd(text_search, to_tsquery($1)) AS search_rank",
     ]
-    max_priority_date = get_max_priority_date(int(min_patent_years))
-    date_criteria = f"priority_date > '{max_priority_date}'::date"
-
-    # search term comparison
-    comparison = "&&" if query_type == "OR" else "@>"
-    term_criteria = f"search_terms {comparison} %s"
+    froms = []
+    wheres = [
+        f"priority_date > '{max_priority_date}'::date",
+        "search @@ to_tsquery($1)",
+    ]
 
     if len(exemplar_embeddings) > 0:
         exemplar_criterion = [
             f"(1 - (embeddings <=> '{e}')) > {EXEMPLAR_SIMILARITY_THRESHOLD}"
             for e in exemplar_embeddings
         ]
-        exemplar_criteria = f"AND ({f' {query_type} '.join(exemplar_criterion)})"
+        wheres.append(f"AND ({f' {query_type} '.join(exemplar_criterion)})")
         cosine_scores = [f"(1 - (embeddings <=> '{e}'))" for e in exemplar_embeddings]
-        cosine_source = f", unnest (ARRAY[{','.join(cosine_scores)}]) cosine_scores"
+        froms.append(f", unnest (ARRAY[{','.join(cosine_scores)}]) cosine_scores")
         fields.append("AVG(cosine_scores) as exemplar_similarity")
     else:
-        exemplar_criteria = ""
-        cosine_source = ""
         fields.append("0 as exemplar_similarity")
 
     return QueryPieces(
         fields=fields,
-        where=f"WHERE {date_criteria} AND {term_criteria} {exemplar_criteria}",
-        params=[lower_terms],
-        cosine_source=cosine_source,
+        froms=froms,
+        wheres=wheres,
+        params=[get_term_sql_query(terms, query_type)],
     )
 
 
-async def _get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
+async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     """
     Get embeddings for exemplar patents
     """
@@ -143,7 +115,14 @@ async def _search(
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[PatentApplication]:
     """
-    Search patents by terms
+        Search patents by terms
+
+        REPL:
+        ```
+    import asyncio
+    from clients.patents.search_client import _search
+    asyncio.run(_search(["asthma"]))
+        ```
     """
     start = time.monotonic()
 
@@ -152,28 +131,25 @@ async def _search(
         raise ValueError("Terms must be a list")
 
     exemplar_embeddings = (
-        await _get_exemplar_embeddings(exemplar_patents)
+        await get_exemplar_embeddings(exemplar_patents)
         if len(exemplar_patents) > 0
         else []
     )
-    qp = __get_query_pieces(terms, exemplar_embeddings, query_type, min_patent_years)
+    qp = _get_query_pieces(terms, exemplar_embeddings, query_type, min_patent_years)
 
     query = f"""
-        SELECT {", ".join(qp["fields"])},
-        max(agg_annotations.{term_field}) as terms
-        FROM patents
-        {qp["cosine_source"]}
-        {qp["where"]}
-        GROUP BY {",".join(SEARCH_RETURN_FIELDS.keys())}
+        SELECT {", ".join(qp["fields"])}
+        FROM patents {", ".join(qp["froms"])}
+        WHERE {" AND ".join(qp["wheres"])}
         ORDER BY priority_date desc
         LIMIT {limit}
     """
+    print(query)
 
     async with Prisma(auto_register=True, http={"timeout": 300}):
-        patents = await Patent.prisma().query_raw(query, "")
+        patents = await Patent.prisma().query_raw(query, qp["params"])
 
-    company_map = await get_company_map()
-    enriched_results = enrich_search_result(patents, company_map)
+    enriched_results = enrich_search_result(patents)
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
