@@ -14,7 +14,7 @@ from constants.umls import PREFERRED_UMLS_TYPES
 
 from .types import AbstractCandidateSelector
 from .utils import (
-    score_candidate,
+    score_semantic_candidate as score_candidate,
     l1_regularize,
     apply_umls_word_overrides,
     candidate_to_canonical,

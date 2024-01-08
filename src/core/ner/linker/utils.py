@@ -188,22 +188,23 @@ def score_candidate(
     candidate_id: str,
     candidate_canonical_name: str,
     candidate_types: list[str],
-    original_vector: torch.Tensor,
-    candidate_vector: torch.Tensor,
-    syntactic_similarity: float,
-    semantic_distance: float,
+    syntactic_similarity: float | None = None,
 ) -> float:
     """
-    Generate a score for a candidate
+    Generate a score for a candidate (semantic or not)
+
+    - suppresses certain CUIs
+    - suppresses certain names
+    - scores based on
+        1. UMLS type (tui)
+        2. syntactic similarity (if supplied)
 
     Args:
         candidate_id (str): candidate ID
         candidate_canonical_name (str): candidate canonical name
         candidate_types (list[str]): candidate types
-        syntactic_similarity (float): syntactic similarity score
-        original_vector (torch.Tensor): original mention vector
-        candidate_vector (torch.Tensor): candidate vector
-        semantic_distance (float): semantic distance
+        syntactic_similarity (float): syntactic similarity score from tfidf vectorizer
+            if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
 
     if candidate_id in UMLS_CUI_SUPPRESSIONS:
@@ -229,13 +230,52 @@ def score_candidate(
 
         return 1.0
 
+    if syntactic_similarity is not None:
+        return type_score() * syntactic_similarity
+
+    return type_score()
+
+
+def score_semantic_candidate(
+    candidate_id: str,
+    candidate_canonical_name: str,
+    candidate_types: list[str],
+    original_vector: torch.Tensor,
+    candidate_vector: torch.Tensor,
+    syntactic_similarity: float,
+    semantic_distance: float,
+) -> float:
+    """
+    Generate a score for a semantic candidate
+
+    Score based on
+    - "score_candidate" rules
+    - syntactic similarity
+
+
+    Args:
+        candidate_id (str): candidate ID
+        candidate_canonical_name (str): candidate canonical name
+        candidate_types (list[str]): candidate types
+        syntactic_similarity (float): syntactic similarity score
+        original_vector (torch.Tensor): original mention vector
+        candidate_vector (torch.Tensor): candidate vector
+        semantic_distance (float): semantic distance
+    """
+    type_score = score_candidate(
+        candidate_id, candidate_canonical_name, candidate_types
+    )
+
+    if type_score == 0:
+        return 0.0
+
     semantic_similarity = similarity_with_residual_penalty(
         original_vector, candidate_vector, semantic_distance
     )
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
         + SYNTACTIC_SIMILARITY_WEIGHT * syntactic_similarity
-    ) * type_score()
+    ) * type_score
 
 
 JOIN_PUNCT = ["-", "/", "'"]
