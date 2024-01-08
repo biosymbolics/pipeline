@@ -186,34 +186,34 @@ class PatentEtl(DocumentEtl):
 
         async def handle_batch(batch: list[dict]) -> bool:
             # create patent records
-            for p in batch:
-                data = {
-                    "id": p["id"],
-                    "abstract": p["abstract"],
-                    "application_number": p["application_number"],
-                    "attributes": p["attributes"] or [],
-                    # assignees (relation)
-                    "claims": p["claims"],
-                    "country_code": p["country"],
-                    # "embeddings": p["embeddings"], # updated below (https://github.com/prisma/prisma/issues/18442)
-                    "ipc_codes": p["ipc_codes"],
-                    # indications (relation)
-                    # interventions (relation)
-                    # inventors (relation)
-                    "other_ids": p["all_publication_numbers"],
-                    "priority_date": p["priority_date"],
-                    "similar_patents": p["similar_patents"] or [],
-                    "text_for_search": f"{p['title']} {p['abstract']}",
-                    "title": p["title"],
-                    "url": p["url"],
-                }
-                await Patent.prisma().upsert(
-                    where={"id": p["id"]},
-                    data={
-                        "create": PatentCreateInput(**data),  # type: ignore
-                        "update": PatentUpdateInput(**data),  # type: ignore
-                    },
-                )
+            await Patent.prisma().create_many(
+                data=[
+                    PatentCreateInput(
+                        **{
+                            "id": p["id"],
+                            "abstract": p["abstract"],
+                            "application_number": p["application_number"],
+                            "attributes": p["attributes"] or [],
+                            # assignees (relation)
+                            "claims": p["claims"],
+                            "country_code": p["country"],
+                            # "embeddings": p["embeddings"], # updated below (https://github.com/prisma/prisma/issues/18442)
+                            "ipc_codes": p["ipc_codes"],
+                            # indications (relation)
+                            # interventions (relation)
+                            # inventors (relation)
+                            "other_ids": p["all_publication_numbers"],
+                            "priority_date": p["priority_date"],
+                            "similar_patents": p["similar_patents"] or [],
+                            "text_for_search": f"{p['title']} {p['abstract']}",
+                            "title": p["title"],
+                            "url": p["url"],
+                        }
+                    )
+                    for p in batch
+                ],
+                skip_duplicates=True,
+            )
 
             # TODO: do in bulk for perf
             async with Prisma(http={"timeout": None}) as db:

@@ -193,7 +193,7 @@ class BiomedicalEntityEtl:
             skip_duplicates=True,
         )
 
-        # update records with relationships with connection info
+        # update records with relationships (parents, comprised_of, synonyms)
         for entity_rec in entity_recs:
             update = BiomedicalEntityUpdateInput(
                 **{
