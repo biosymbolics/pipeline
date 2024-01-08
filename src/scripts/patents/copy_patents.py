@@ -147,8 +147,7 @@ class PatentEtl(DocumentEtl):
                 for sr in batch
             }
 
-            terms_to_insert = list(source_map.keys())
-            terms_to_canonicalize = terms_to_insert
+            terms = list(source_map.keys())
 
             await BiomedicalEntityEtl(
                 "CompositeCandidateSelector",
@@ -158,13 +157,11 @@ class PatentEtl(DocumentEtl):
                     ),
                 ),
                 non_canonical_source=Source.BIOSYM,
-            ).create_records(
-                terms_to_canonicalize, terms_to_insert, source_map=source_map
-            )
+            ).create_records(terms, source_map=source_map)
 
         source_sql = get_patent_entity_sql(domains)
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
-            query=source_sql, handle_result_batch=handle_batch, batch_size=100000
+            query=source_sql, handle_result_batch=handle_batch, batch_size=50000
         )
 
     async def copy_indications(self):

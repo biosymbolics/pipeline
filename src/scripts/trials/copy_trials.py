@@ -165,8 +165,7 @@ class TrialEtl(DocumentEtl):
             for ir in records
         }
 
-        terms_to_insert = list(insert_map.keys())
-        terms_to_canonicalize = terms_to_insert
+        terms = list(insert_map.keys())
 
         await BiomedicalEntityEtl(
             "CandidateSelector",
@@ -176,7 +175,7 @@ class TrialEtl(DocumentEtl):
                 ),
             ),
             non_canonical_source=Source.CTGOV,
-        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
+        ).create_records(terms, source_map=insert_map)
 
     async def copy_interventions(self):
         source_sql = f"""
@@ -198,8 +197,7 @@ class TrialEtl(DocumentEtl):
             for ir in records
         }
 
-        terms_to_insert = [i for i in insert_map.keys()]
-        terms_to_canonicalize = terms_to_insert
+        terms = list(insert_map.keys())
 
         await BiomedicalEntityEtl(
             "CandidateSelector",
@@ -214,7 +212,7 @@ class TrialEtl(DocumentEtl):
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
             non_canonical_source=Source.CTGOV,
-        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=insert_map)
+        ).create_records(terms, source_map=insert_map)
 
     @staticmethod
     def transform(record: dict) -> TrialCreateWithoutRelationsInput:

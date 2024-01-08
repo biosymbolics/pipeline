@@ -115,8 +115,7 @@ class ApprovalEtl(DocumentEtl):
             for i in sr["indications"]
         }
 
-        terms_to_insert = list(source_map.keys())
-        terms_to_canonicalize = terms_to_insert
+        terms = list(source_map.keys())
 
         await BiomedicalEntityEtl(
             "CandidateSelector",
@@ -126,7 +125,7 @@ class ApprovalEtl(DocumentEtl):
                 ),
             ),
             non_canonical_source=Source.FDA,
-        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=source_map)
+        ).create_records(terms, source_map=source_map)
 
     async def copy_interventions(self):
         """
@@ -170,7 +169,7 @@ class ApprovalEtl(DocumentEtl):
             },
         }
 
-        terms_to_insert = list(insert_map.keys())
+        terms = list(insert_map.keys())
         terms_to_canonicalize = [
             k for k, v in insert_map.items() if v != BiomedicalEntityType.COMBINATION
         ]
@@ -193,11 +192,7 @@ class ApprovalEtl(DocumentEtl):
                 ),
             ),
             non_canonical_source=Source.FDA,
-        ).create_records(
-            terms_to_canonicalize,
-            terms_to_insert,
-            insert_map,
-        )
+        ).create_records(terms, insert_map, terms_to_canonicalize)
 
     async def copy_documents(self):
         """

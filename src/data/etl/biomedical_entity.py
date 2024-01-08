@@ -162,22 +162,22 @@ class BiomedicalEntityEtl:
 
     async def create_records(
         self,
-        terms_to_canonicalize: Sequence[str],
-        terms_to_insert: Sequence[str],
+        terms: Sequence[str],
         source_map: dict[str, dict],
+        terms_to_canonicalize: Sequence[str] | None = None,
     ):
         """
         Create records for entities and relationships
 
         Args:
-            terms_to_canonicalize (Sequence[str]): terms to canonicalize
-            terms_to_insert (Sequence[str]): terms to insert
+            terms (Sequence[str]): terms to insert
             source_map (dict): map of "original_term" to source record
                                for additional fields, e.g. synonyms, "active_ingredients", etc.
+            terms_to_canonicalize (Sequence[str]): terms to canonicalize, if different than terms
         """
-        canonical_map = self.generate_lookup_map(terms_to_canonicalize)
+        canonical_map = self.generate_lookup_map(terms_to_canonicalize or terms)
         entity_recs = self._generate_insert_records(
-            terms_to_insert,
+            terms,
             source_map,
             canonical_map,
         )
