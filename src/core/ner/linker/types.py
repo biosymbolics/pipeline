@@ -1,5 +1,7 @@
 from abc import abstractmethod
-from typing import Literal
+from typing import Literal, TypeVar
+from scispacy.candidate_generation import MentionCandidate
+import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
 
@@ -10,6 +12,14 @@ CandidateSelectorType = Literal[
     "CandidateSelector",
 ]
 
+EntityScore = tuple[CanonicalEntity, float]
+CandidateScore = tuple[MentionCandidate, float]
+
+EntityScoreVector = tuple[CanonicalEntity, float, torch.Tensor]
+
+
+ST = TypeVar("ST", bound=EntityScore)
+
 
 class AbstractCandidateSelector(object):
     """
@@ -19,6 +29,13 @@ class AbstractCandidateSelector(object):
     @abstractmethod
     def __init__(self, *args, **kwargs):
         pass
+
+    @abstractmethod
+    def select_candidate(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
+        """
+        Generate & select candidates for a mention text, returning best candidate & score
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:

@@ -1,7 +1,8 @@
 import unittest
 import pytest
 
-from core.ner.linker import CompositeCandidateSelector
+from core.ner.linker import CompositeSemanticCandidateSelector
+from core.ner.types import CanonicalEntity
 
 
 @pytest.mark.skip(reason="Too slow to include in CI")
@@ -11,7 +12,9 @@ class TestCandidateGenerator(unittest.TestCase):
     """
 
     def setUp(self):
-        self.candidate_generator = CompositeCandidateSelector(min_similarity=0.85)
+        self.candidate_generator = CompositeSemanticCandidateSelector(
+            min_similarity=0.85
+        )
 
     def test_candidate_generator(self):
         test_cases = [
@@ -158,15 +161,15 @@ class TestCandidateGenerator(unittest.TestCase):
         for test in test_cases:
             text = test["text"]
 
-            result = self.candidate_generator(text)[0]
+            result = self.candidate_generator(text)
             print("RESULT", result)
 
-            for field in fields_to_test:
-                if test["expected"][0] is None:
-                    self.assertEqual(result, None)
-                elif result is None:
-                    self.assertEqual(result, test["expected"][0])
-                else:
+            if result is None:
+                self.assertEqual(result, test["expected"][0])
+            elif test["expected"][0] is None:
+                self.assertEqual(result, None)
+            else:
+                for field in fields_to_test:
                     self.assertEqual(
                         result._asdict()[field], test["expected"][0][field]
                     )

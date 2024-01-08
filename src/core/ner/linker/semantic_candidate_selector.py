@@ -11,8 +11,9 @@ import logging
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity, DocEntity
 from constants.umls import PREFERRED_UMLS_TYPES
+from utils.classes import overrides
 
-from .types import AbstractCandidateSelector
+from .types import AbstractCandidateSelector, EntityScoreVector
 from .utils import (
     score_semantic_candidate as score_candidate,
     l1_regularize,
@@ -129,13 +130,13 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
     def _get_best_canonical(
         self, vector: torch.Tensor, candidates: Sequence[MentionCandidate]
-    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
+    ) -> EntityScoreVector | None:
         """
         Get best candidate by semantic similarity
         """
         if len(candidates) == 0:
             logger.warning("get_best_canoical called with no candidates")
-            return (None, 0.0, torch.Tensor())
+            return None
 
         if len(vector) == 0:
             logger.warning(
@@ -143,7 +144,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
                 candidates[0].aliases[0],
                 vector,
             )
-            return (None, 0.0, torch.Tensor())
+            return None
 
         umls_ann = self.create_ann_index(candidates)
 
@@ -153,9 +154,9 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
-            return (None, 0.0, torch.Tensor())
+            return None
 
-        mixed_score_candidates = sorted(
+        scored_candidates = sorted(
             [
                 (
                     candidates[id],
@@ -173,11 +174,11 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             key=lambda x: x[1],
             reverse=True,
         )
-        top_candidate = mixed_score_candidates[0][0]
-        top_score = mixed_score_candidates[0][1]
-        top_vector = mixed_score_candidates[0][2]
+        top_candidate = scored_candidates[0][0]
+        top_score = scored_candidates[0][1]
+        top_vector = scored_candidates[0][2]
 
-        print([(c[0].aliases[0], c[1]) for c in mixed_score_candidates])
+        print([(c[0].aliases[0], c[1]) for c in scored_candidates])
 
         return (
             candidate_to_canonical(top_candidate, self.kb),
@@ -200,12 +201,13 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         norm_vector = l1_regularize(vector)
         return norm_vector
 
+    @overrides(AbstractCandidateSelector)
     def select_candidate(
         self,
         term: str,
         mention_vector: torch.Tensor,
         doc_vector: torch.Tensor,
-    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
+    ) -> EntityScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """
@@ -215,7 +217,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
     def select_candidate_from_entity(
         self, entity: DocEntity
-    ) -> tuple[CanonicalEntity | None, float, torch.Tensor]:
+    ) -> EntityScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """
@@ -236,4 +238,9 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         """
         Generate & select candidates for a list of mention texts
         """
-        return self.select_candidate_from_entity(entity)[0]
+        res = self.select_candidate_from_entity(entity)
+
+        if res is None:
+            return None
+
+        return res[0]

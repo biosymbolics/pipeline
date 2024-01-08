@@ -344,7 +344,7 @@ def candidate_to_canonical(
     )
 
 
-COMPOSITE_WORD_OVERRIDES = {
+UMLS_WORD_OVERRIDES = {
     "modulator": "C0005525",  # "Biological Response Modifiers"
     "modulators": "C0005525",
     "binder": "C1145667",  # "Binding action"
@@ -353,17 +353,19 @@ COMPOSITE_WORD_OVERRIDES = {
 
 
 def apply_umls_word_overrides(
-    text: str, candidates: list[MentionCandidate]
+    text: str,
+    candidates: list[MentionCandidate],
+    overrides: dict[str, str] = UMLS_WORD_OVERRIDES,
 ) -> list[MentionCandidate]:
     """
     Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
     """
     # look for any overrides (terms -> candidate)
-    has_override = text.lower() in COMPOSITE_WORD_OVERRIDES
+    has_override = text.lower() in overrides
     if has_override:
         return [
             MentionCandidate(
-                concept_id=COMPOSITE_WORD_OVERRIDES[text.lower()],
+                concept_id=overrides[text.lower()],
                 aliases=[text],
                 similarities=[1],
             )

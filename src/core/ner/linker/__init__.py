@@ -1,4 +1,6 @@
-from .composite_candidate_selector import CompositeCandidateSelector
+from .composite.composite_semantic_candidate_selector import (
+    CompositeSemanticCandidateSelector,
+)
 from .semantic_candidate_selector import SemanticCandidateSelector
 from .candidate_selector import CandidateSelector
 from .linker import TermLinker
@@ -6,6 +8,6 @@ from .linker import TermLinker
 __all__ = [
     "CandidateSelector",
     "SemanticCandidateSelector",
-    "CompositeCandidateSelector",
+    "CompositeSemanticCandidateSelector",
     "TermLinker",
 ]

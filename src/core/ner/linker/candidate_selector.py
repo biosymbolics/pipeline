@@ -5,8 +5,9 @@ from scispacy.candidate_generation import (
 import logging
 
 from core.ner.types import CanonicalEntity, DocEntity
+from utils.classes import overrides
 
-from .types import AbstractCandidateSelector
+from .types import AbstractCandidateSelector, EntityScore
 from .utils import candidate_to_canonical, apply_umls_word_overrides, score_candidate
 
 MIN_SIMILARITY = 0.85
@@ -24,6 +25,7 @@ class CandidateSelector(AbstractCandidateSelector):
     Returns the candidate with the highest similarity score
     """
 
+    @overrides(AbstractCandidateSelector)
     def __init__(self, *args, min_similarity: float = MIN_SIMILARITY, **kwargs):
         global UMLS_KB
 
@@ -56,9 +58,9 @@ class CandidateSelector(AbstractCandidateSelector):
             syntactic_similarity=syntactic_similarity,
         )
 
-    def _get_best_candidate(self, text: str) -> MentionCandidate | None:
+    def _get_best_candidate(self, text: str) -> tuple[MentionCandidate, float] | None:
         """
-        Wrapper around super().__call__ that handles word overrides
+        Select the best candidate for a mention
         """
         candidates = self.candidate_generator([text], k=K)[0]
         if len(candidates) == 0:
@@ -66,39 +68,63 @@ class CandidateSelector(AbstractCandidateSelector):
             return None
 
         # filter out candidates with low similarity
-        similiar_candidates = [
+        sufficiently_similiar_candidates = [
             candidate
             for candidate in candidates
             if candidate.similarities[0] >= self.min_similarity
         ]
 
-        if len(similiar_candidates) == 0:
+        if len(sufficiently_similiar_candidates) == 0:
             logger.warning(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
             return None
 
-        # sort candidate by score (similarity + type match)
+        # score candidates
+        scored_candidates = [
+            (
+                candidate,
+                self._score_candidate(
+                    candidate.concept_id,
+                    candidate.similarities[0],
+                ),
+            )
+            for candidate in sufficiently_similiar_candidates
+        ]
+        # sort byscore
         sorted_candidates = sorted(
-            similiar_candidates,
-            key=lambda candidate: self._score_candidate(
-                candidate.concept_id,
-                candidate.similarities[0],
-            ),
-            reverse=True,
+            scored_candidates, key=lambda sc: sc[1], reverse=True
         )
-        candidate = sorted_candidates[0]
+        top_score = sorted_candidates[0][1]
+        top_candidate = sorted_candidates[0][0]
 
-        with_overrides = apply_umls_word_overrides(text, [candidate])
-        return with_overrides[0]
+        # apply word overrides
+        with_overrides = apply_umls_word_overrides(text, [top_candidate])
 
+        return with_overrides[0], top_score
+
+    @overrides(AbstractCandidateSelector)
+    def select_candidate(self, text: str) -> EntityScore | None:
+        """
+        Select the best candidate for a mention
+        """
+        res = self._get_best_candidate(text)
+
+        if res is None:
+            return None
+
+        candidate, score = res
+        top_canonical = candidate_to_canonical(candidate, self.kb)
+        return top_canonical, score
+
+    @overrides(AbstractCandidateSelector)
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        candidate = self._get_best_candidate(entity.term)
+        candidate = self.select_candidate(entity.term)
 
         if candidate is None:
             return None
 
-        return candidate_to_canonical(candidate, self.kb)
+        return candidate[0]

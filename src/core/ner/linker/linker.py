@@ -41,7 +41,7 @@ class TermLinker:
         Initialize term normalizer using existing model
         """
         # lazy (UMLS is large)
-        logger.info("Loading CompositeCandidateSelector (might be slow...)")
+        logger.info("Loading %s (might be slow...)", candidate_selector_class)
         modules = __import__(
             CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_class]
         )
