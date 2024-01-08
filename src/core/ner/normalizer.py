@@ -2,12 +2,16 @@
 Linking/cleaning of terms
 """
 from typing import Sequence
+import logging
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import DocEntity
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class TermNormalizer:
@@ -74,13 +78,17 @@ class TermNormalizer:
         return cleaned_entity_sets
 
     def normalize_strings(self, terms: Sequence[str]) -> list[DocEntity]:
-        if self.candidate_selector != "CandidateSelector":
+        if self.candidate_selector not in [
+            "CandidateSelector",
+            "CompositeCandidateSelector",
+        ]:
             if self.nlp is None:
                 raise ValueError(
                     "nlp model required for vectorization-based candidate selection"
                 )
             docs = self.nlp.pipe(terms)
         else:
+            logger.info("No nlp model required for CandidateSelector")
             docs = [None for _ in terms]
 
         doc_ents = [

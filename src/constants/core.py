@@ -20,9 +20,7 @@ IS_DEPLOYED = not IS_LOCAL
 ETL_BASE_DATABASE_URL = "postgres://localhost:5432"
 BASE_DATABASE_URL = "postgres://biosym:ok@localhost:5432"
 DATABASE_URL = (
-    os.environ.get("DATABASE_URL")
-    if IS_DEPLOYED
-    else "postgres://biosym:ok@localhost:5432/biosym"
+    os.environ.get("DATABASE_URL") if IS_DEPLOYED else f"{BASE_DATABASE_URL}/biosym"
 )
 DB_CLUSTER = os.environ.get("DB_CLUSTER")
 

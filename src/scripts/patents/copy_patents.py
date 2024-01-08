@@ -8,7 +8,7 @@ from typing import Literal, Sequence
 from prisma import Prisma
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
-from prisma.types import PatentCreateInput, PatentUpdateInput
+from prisma.types import PatentCreateInput
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import (
@@ -139,6 +139,7 @@ class PatentEtl(DocumentEtl):
         """
 
         async def handle_batch(batch: list[dict]):
+            # dedup and map to source
             source_map = {
                 sr["term"]: {
                     "synonyms": [sr["term"]],
@@ -161,7 +162,7 @@ class PatentEtl(DocumentEtl):
 
         source_sql = get_patent_entity_sql(domains)
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
-            query=source_sql, handle_result_batch=handle_batch, batch_size=50000
+            query=source_sql, handle_result_batch=handle_batch, batch_size=200000
         )
 
     async def copy_indications(self):
