@@ -51,48 +51,27 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         TODO: remove ngram if ultimately only using N of 1
         """
 
-        def get_composite_candidates(tokens: Sequence[str]) -> list[EntityScore]:
+        def get_composite_candidate(token: str) -> EntityScore:
             """
             Recursive function to see if the first ngram has a match, then the first n-1, etc.
             """
-            if len(tokens) == 0:
-                return []
-
-            if len(tokens) >= self.ngrams_n:
-                ngram = "".join([t for t in tokens[0 : self.ngrams_n]])
-                if ngram in ngram_entity_map:
-                    remaining_words = tokens[self.ngrams_n :]
-                    return [
-                        ngram_entity_map[ngram],
-                        *get_composite_candidates(remaining_words),
-                    ]
-
-            # otherwise, let's map only the first word
-            remaining_words = tokens[1:]
-            if tokens[0] in ngram_entity_map:
-                return [
-                    ngram_entity_map[tokens[0]],
-                    *get_composite_candidates(remaining_words),
-                ]
+            if token in ngram_entity_map:
+                return ngram_entity_map[token]
 
             # otherwise, no match. create a fake CanonicalEntity.
-            return [
-                # concept_id is the word itself, so
-                # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
-                (
-                    CanonicalEntity(
-                        id=tokens[0].lower(),
-                        name=tokens[0].lower(),
-                    ),
-                    self.min_composite_similarity,  # TODO: should be the mean of all candidates, or something?
+            return (
+                CanonicalEntity(
+                    # concept_id is the word itself, so composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
+                    id=tokens[0].lower(),
+                    name=tokens[0].lower(),
                 ),
-                *get_composite_candidates(remaining_words),
-            ]
+                self.min_composite_similarity,  # TODO: should be the mean of all candidates, or something?
+            )
 
-        composites = get_composite_candidates(tokens)
-
-        if len(composites) == 0:
+        if len(tokens) == 0:
             return None
+
+        composites = [get_composite_candidate(t) for t in tokens]
 
         composite_members = [c[0] for c in composites]
         composite_canonical = form_composite_entity(composite_members, self.kb)

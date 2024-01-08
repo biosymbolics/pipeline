@@ -91,7 +91,7 @@ class CandidateSelector(AbstractCandidateSelector):
             )
             for candidate in sufficiently_similiar_candidates
         ]
-        # sort byscore
+        # sort by score
         sorted_candidates = sorted(
             scored_candidates, key=lambda sc: sc[1], reverse=True
         )
