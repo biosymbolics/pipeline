@@ -137,29 +137,35 @@ class PatentEtl(DocumentEtl):
             type: entity type
             type_type: type of type - either "override" (forcing) or "default" (only if no type found via canonicalization)
         """
-        source_sql = get_patent_entity_sql(domains)
-        source_records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
-        source_map = {
-            sr["term"]: {
-                "synonyms": [sr["term"]],
-                "type" if type_type == "override" else "default_type": type,
+        async def handle_batch(batch: list[dict]):
+            source_map = {
+                sr["term"]: {
+                    "synonyms": [sr["term"]],
+                    "type" if type_type == "override" else "default_type": type,
+                }
+                for sr in batch
             }
-            for sr in source_records
-        }
 
-        terms_to_insert = list(source_map.keys())
-        terms_to_canonicalize = terms_to_insert
+            terms_to_insert = list(source_map.keys())
+            terms_to_canonicalize = terms_to_insert
 
-        await BiomedicalEntityEtl(
-            "CompositeCandidateSelector",
-            relation_id_field_map=RelationIdFieldMap(
-                synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
+            await BiomedicalEntityEtl(
+                "CompositeCandidateSelector",
+                relation_id_field_map=RelationIdFieldMap(
+                    synonyms=RelationConnectInfo(
+                        source_field="synonyms", dest_field="term", input_type="create"
+                    ),
                 ),
-            ),
-            non_canonical_source=Source.BIOSYM,
-        ).create_records(terms_to_canonicalize, terms_to_insert, source_map=source_map)
+                non_canonical_source=Source.BIOSYM,
+            ).create_records(
+                terms_to_canonicalize, terms_to_insert, source_map=source_map
+            )
+
+        source_sql = get_patent_entity_sql(domains)
+        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+            query=source_sql, handle_result_batch=handle_batch, batch_size=100000
+        )
 
     async def copy_indications(self):
         """
