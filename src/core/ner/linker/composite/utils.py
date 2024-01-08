@@ -1,14 +1,10 @@
-from typing import Mapping, Sequence
-from pydash import omit_by
-import logging
+from typing import Sequence
 from spacy.kb import KnowledgeBase
 
 from constants.patterns.iupac import is_iupac
 from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
 
-from ..candidate_selector import CandidateSelector
-from ..types import EntityScore
 
 MIN_WORD_LENGTH = 1
 

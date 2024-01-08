@@ -13,7 +13,7 @@ from core.ner.types import CanonicalEntity, DocEntity
 from constants.umls import PREFERRED_UMLS_TYPES
 from utils.classes import overrides
 
-from .types import AbstractCandidateSelector, EntityScoreVector
+from .types import AbstractCandidateSelector, EntityWithScoreVector
 from .utils import (
     score_semantic_candidate as score_candidate,
     l1_regularize,
@@ -130,7 +130,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
     def _get_best_canonical(
         self, vector: torch.Tensor, candidates: Sequence[MentionCandidate]
-    ) -> EntityScoreVector | None:
+    ) -> EntityWithScoreVector | None:
         """
         Get best candidate by semantic similarity
         """
@@ -207,7 +207,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         term: str,
         mention_vector: torch.Tensor,
         doc_vector: torch.Tensor,
-    ) -> EntityScoreVector | None:
+    ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """
@@ -217,7 +217,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
     def select_candidate_from_entity(
         self, entity: DocEntity
-    ) -> EntityScoreVector | None:
+    ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """

@@ -35,6 +35,11 @@ class CanonicalEntity(Dataclass):
     types: list[str] = field(default_factory=list)
 
     @property
+    def is_fake(self):
+        # cheesy; we set id to name if it's a fake entity
+        return self.name == self.id
+
+    @property
     def type(self) -> BiomedicalEntityType:
         if len(self.types) == 0 or self.types[0] not in UMLS_TO_ENTITY_TYPE:
             return BiomedicalEntityType.UNKNOWN
@@ -50,13 +55,17 @@ class CanonicalEntity(Dataclass):
 @dataclass(frozen=True)
 class DocEntity(Dataclass):
     term: str
-    type: str
     start_char: int
     end_char: int
     normalized_term: str
-    _vector: Optional[list[float]] = None
+    type: str | None = None
+    vector: Optional[list[float]] = None
     spacy_doc: Optional[Doc] = None
     canonical_entity: Optional[CanonicalEntity] = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "type", self.get_type())
+        object.__setattr__(self, "vector", self.get_vector())
 
     @property
     def id(self) -> Optional[str]:
@@ -76,17 +85,19 @@ class DocEntity(Dataclass):
     def __repr__(self):
         return self.__str__()
 
-    @property
-    def vector(self):
-        if self._vector is not None:
-            return self._vector
+    def get_vector(self):
+        if self.vector is not None:
+            return self.vector
         if self.spacy_doc is not None:
             return self.spacy_doc.vector.tolist()
         return None
 
-    @vector.setter  # type: ignore
-    def set_vector(self, vector: list[float]):
-        object.__setattr__(self, "_vector", vector)
+    def get_type(self):
+        if self.type is not None:
+            return self.type
+        if self.canonical_entity is not None:
+            return self.canonical_entity.type
+        return None
 
     def to_flat_dict(self):
         """

@@ -7,18 +7,19 @@ from core.ner.types import CanonicalEntity, DocEntity
 
 
 CandidateSelectorType = Literal[
-    "SemanticCandidateSelector",
-    "CompositeCandidateSelector",
     "CandidateSelector",
+    "CompositeCandidateSelector",
+    "SemanticCandidateSelector",
+    "CompositeSemanticCandidateSelector",
 ]
 
-EntityScore = tuple[CanonicalEntity, float]
+EntityWithScore = tuple[CanonicalEntity, float]
 CandidateScore = tuple[MentionCandidate, float]
 
-EntityScoreVector = tuple[CanonicalEntity, float, torch.Tensor]
+EntityWithScoreVector = tuple[CanonicalEntity, float, torch.Tensor]
 
 
-ST = TypeVar("ST", bound=EntityScore)
+ST = TypeVar("ST", bound=EntityWithScore)
 
 
 class AbstractCandidateSelector(object):

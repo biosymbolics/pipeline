@@ -3,9 +3,9 @@ from typing import TypeVar
 
 from core.ner.types import DocEntity
 
-from ..types import EntityScore
+from ..types import EntityWithScore
 
-ES = TypeVar("ES", bound=EntityScore)
+ES = TypeVar("ES", bound=EntityWithScore)
 
 
 class AbstractCompositeCandidateSelector(object):

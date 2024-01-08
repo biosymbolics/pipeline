@@ -7,7 +7,7 @@ import logging
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 
-from .types import AbstractCandidateSelector, EntityScore
+from .types import AbstractCandidateSelector, EntityWithScore
 from .utils import candidate_to_canonical, apply_umls_word_overrides, score_candidate
 
 MIN_SIMILARITY = 0.85
@@ -62,10 +62,14 @@ class CandidateSelector(AbstractCandidateSelector):
         """
         Select the best candidate for a mention
         """
-        candidates = self.candidate_generator([text], k=K)[0]
-        if len(candidates) == 0:
+        _candidates = self.candidate_generator([text], k=K)[0]
+        if len(_candidates) == 0:
             logger.warning(f"No candidates found for {text}")
             return None
+
+        # apply word overrides (e.g. if term is "modulator", give explicit UMLS match)
+        # (because the best-fit UMLS term is "Biological Response Modifiers", which is low syntactic similarity)
+        candidates = apply_umls_word_overrides(text, _candidates)
 
         # filter out candidates with low similarity
         sufficiently_similiar_candidates = [
@@ -95,16 +99,10 @@ class CandidateSelector(AbstractCandidateSelector):
         sorted_candidates = sorted(
             scored_candidates, key=lambda sc: sc[1], reverse=True
         )
-        top_score = sorted_candidates[0][1]
-        top_candidate = sorted_candidates[0][0]
-
-        # apply word overrides
-        with_overrides = apply_umls_word_overrides(text, [top_candidate])
-
-        return with_overrides[0], top_score
+        return sorted_candidates[0]
 
     @overrides(AbstractCandidateSelector)
-    def select_candidate(self, text: str) -> EntityScore | None:
+    def select_candidate(self, text: str) -> EntityWithScore | None:
         """
         Select the best candidate for a mention
         """

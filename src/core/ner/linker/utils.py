@@ -224,11 +224,11 @@ def score_candidate(
             candidate_types, list(MOST_PREFERRED_UMLS_TYPES.keys())
         )
         if not is_preferred_type:
-            return 0.75
+            return 0.8
         if not is_most_preferred_type:
-            return 0.9
+            return 1.0
 
-        return 1.0
+        return 1.1
 
     if syntactic_similarity is not None:
         return type_score() * syntactic_similarity

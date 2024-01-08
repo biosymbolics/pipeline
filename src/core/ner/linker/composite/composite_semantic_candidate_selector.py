@@ -5,7 +5,7 @@ import logging
 import torch
 
 from core.ner.linker.semantic_candidate_selector import SemanticCandidateSelector
-from core.ner.linker.types import EntityScoreVector
+from core.ner.linker.types import EntityWithScoreVector
 from core.ner.linker.utils import join_punctuated_tokens
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
@@ -35,21 +35,21 @@ class CompositeSemanticCandidateSelector(
     def _generate_composite_from_ngrams(
         self,
         tokens: Sequence[Token | Span],
-        ngram_entity_map: Mapping[str, EntityScoreVector],
-    ) -> EntityScoreVector:
+        ngram_entity_map: Mapping[str, EntityWithScoreVector],
+    ) -> EntityWithScoreVector:
         """
         Generate a composite candidate from tokens & ngram map
 
         Args:
             mention_text (str): Mention text
-            ngram_entity_map (dict[str, EntityScoreVector]): word-to-candidate map
+            ngram_entity_map (dict[str, EntityWithScoreVector]): word-to-candidate map
 
         TODO: remove ngram if ultimately only using N of 1
         """
 
         def get_composite_candidates(
             tokens: Sequence[Token | Span],
-        ) -> list[EntityScoreVector]:
+        ) -> list[EntityWithScoreVector]:
             """
             Recursive function to see if the first ngram has a match, then the first n-1, etc.
             """
@@ -100,7 +100,7 @@ class CompositeSemanticCandidateSelector(
         )
 
     @overrides(AbstractCompositeCandidateSelector)
-    def generate_candidate(self, entity: DocEntity) -> EntityScoreVector | None:
+    def generate_candidate(self, entity: DocEntity) -> EntityWithScoreVector | None:
         """
         Generate a composite candidate from a doc entity
         """
