@@ -5,17 +5,13 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma import Prisma
-from pydash import omit
 from prisma.models import Trial
+from prisma.types import TrialWhereInput
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import TRIALS_TABLE
+from clients.low_level.prisma import get_prisma_client
 
-# from typings.trials import Trial
 from typings import QueryType, TrialSearchParams
-from utils.sql import get_term_sql_query
 from utils.string import get_id
 
 
@@ -23,6 +19,22 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 MAX_SEARCH_RESULTS = 2000
+
+
+def get_where_clause(
+    terms: Sequence[str],
+    query_type: QueryType,
+) -> TrialWhereInput:
+    lower_terms = [t.lower() for t in terms]
+    where: TrialWhereInput = {
+        "OR": [
+            {"interventions": {"some": {"canonical_name": {"in": lower_terms}}}},
+            {"indications": {"some": {"canonical_name": {"in": lower_terms}}}},
+            {"sponsor": {"is": {"canonical_name": {"in": lower_terms}}}},
+        ]
+    }
+
+    return where
 
 
 async def _search(
@@ -39,21 +51,18 @@ async def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    term_query = get_term_sql_query(terms, query_type)
+    where = get_where_clause(terms, query_type)
 
-    query = f"""
-        SELECT *,
-        ts_rank_cd(text_search, to_tsquery($1)) AS score
-        FROM {TRIALS_TABLE} as trials
-        WHERE search @@ to_tsquery($2)
-        AND purpose in ('TREATMENT', 'BASIC_SCIENCE', 'PREVENTION')
-        AND intervention_type='PHARMACOLOGICAL'
-        ORDER BY score DESC
-        LIMIT {limit}
-    """
-
-    async with Prisma(auto_register=True, http={"timeout": 300}):
-        trials = await Trial.prisma().query_raw(query, term_query, term_query)
+    async with get_prisma_client(300):
+        trials = await Trial.prisma().find_many(
+            where=where,
+            include={
+                "interventions": True,
+                "indications": True,
+                "sponsor": True,
+            },
+            take=limit,
+        )
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(trials)

@@ -4,7 +4,7 @@ Handler for trials search
 import json
 import logging
 
-from clients.documents import trial_client
+from clients.documents import trial_search
 from typings.client import TrialSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -32,7 +32,7 @@ def search(raw_event: dict, context):
     logger.info("Fetching trials for params: %s", p)
 
     try:
-        results = trial_client.search(p)
+        results = trial_search(p)
     except Exception as e:
         message = f"Error searching trials: {e}"
         logger.error(message)

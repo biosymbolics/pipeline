@@ -63,23 +63,23 @@ def get_term_clause(
         return [
             {
                 "AND": [
-                    {"interventions": {"some": {"name": {"in": terms}}}},
-                    {"indications": {"some": {"name": {"in": terms}}}},
+                    {"interventions": {"some": {"canonical_name": {"in": terms}}}},
+                    {"indications": {"some": {"canonical_name": {"in": terms}}}},
                 ],
                 "AND": [
-                    {"interventions": {"some": {"name": {"in": terms}}}},
-                    {"assignees": {"some": {"name": {"in": terms}}}},
+                    {"interventions": {"some": {"canonical_name": {"in": terms}}}},
+                    {"assignees": {"some": {"canonical_name": {"in": terms}}}},
                 ],
                 "AND": [
-                    {"indications": {"some": {"name": {"in": terms}}}},
-                    {"assignees": {"some": {"name": {"in": terms}}}},
+                    {"indications": {"some": {"canonical_name": {"in": terms}}}},
+                    {"assignees": {"some": {"canonical_name": {"in": terms}}}},
                 ],
             }
         ]
 
     return [
-        {"interventions": {"some": {"name": {"in": terms}}}},
-        {"indications": {"some": {"name": {"in": terms}}}},
+        {"interventions": {"some": {"canonical_name": {"in": terms}}}},
+        {"indications": {"some": {"canonical_name": {"in": terms}}}},
     ]
 
 

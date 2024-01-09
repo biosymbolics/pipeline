@@ -6,38 +6,36 @@ import logging
 import os
 import time
 from typing import Sequence
-from prisma import Prisma
 from prisma.models import RegulatoryApproval
+from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from constants.core import DATABASE_URL, REGULATORY_APPROVAL_TABLE
+from clients.low_level.prisma import get_prisma_client
 
 from typings import QueryType, ApprovalSearchParams
-from utils.sql import get_term_sql_query
 from utils.string import get_id
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-os.environ["DATABASE_URL"] = DATABASE_URL or ""
 
 MAX_SEARCH_RESULTS = 2000
 
-FIELDS = [
-    # "applicant",
-    "application_type",
-    "approval_date",
-    # "application_number",
-    "brand_name",
-    "generic_name",
-    "indications",
-    "label_url",
-    "ndc_code",
-    "pharmacologic_class",
-    "pharmacologic_classes",
-    "regulatory_agency",
-]
+
+def get_where_clause(
+    terms: Sequence[str],
+    query_type: QueryType,
+) -> RegulatoryApprovalWhereInput:
+    lower_terms = [t.lower() for t in terms]
+    where: RegulatoryApprovalWhereInput = {
+        "OR": [
+            {"interventions": {"some": {"canonical_name": {"in": lower_terms}}}},
+            {"indications": {"some": {"canonical_name": {"in": lower_terms}}}},
+        ]
+    }
+
+    return where
 
 
 async def _search(
@@ -61,22 +59,16 @@ async def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    term_query = get_term_sql_query(terms, query_type)
+    where = get_where_clause(terms, query_type)
 
-    # prisma py doesn't yet support to_tsquery
-    query = f"""
-        SELECT *,
-        ts_rank_cd(search, to_tsquery($1)) AS score
-        FROM {REGULATORY_APPROVAL_TABLE} as approvals
-        WHERE search @@ to_tsquery($2)
-        AND approval_date is not null
-        ORDER BY score DESC
-        LIMIT {limit}
-    """
-
-    async with Prisma(auto_register=True, http={"timeout": 300}):
-        approvals = await RegulatoryApproval.prisma().query_raw(
-            query, term_query, term_query
+    async with get_prisma_client(300):
+        approvals = await RegulatoryApproval.prisma().find_many(
+            where=where,
+            include={
+                "interventions": True,
+                "indications": True,
+            },
+            take=limit,
         )
 
     logger.info(

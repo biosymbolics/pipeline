@@ -4,7 +4,7 @@ Handler for patents search
 import json
 import logging
 
-from clients.documents import patent_client
+from clients.documents import patent_search
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -37,7 +37,7 @@ def search(raw_event: dict, context):
     logger.info("Fetching patents for params: %s", p)
 
     try:
-        results = patent_client.search(p)
+        results = patent_search(p)
     except Exception as e:
         message = f"Error searching patents: {e}"
         logger.error(message)
