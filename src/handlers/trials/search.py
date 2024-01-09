@@ -4,7 +4,7 @@ Handler for trials search
 import json
 import logging
 
-from clients import trials as trial_client
+from clients.documents import trial_client
 from typings.client import TrialSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 

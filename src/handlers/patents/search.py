@@ -4,7 +4,7 @@ Handler for patents search
 import json
 import logging
 
-from clients import patents as patent_client
+from clients.documents import patent_client
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
