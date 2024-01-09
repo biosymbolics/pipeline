@@ -29,11 +29,10 @@ async def get_owner_map(
 
     where = {id_field: StringFilter({"in": list(ids)})}
 
-    async with get_prisma_client(300):
-        ownables = await Ownable.prisma().find_many(
-            where=OwnableWhereInput(**where),  # type: ignore
-            include=OwnableInclude(owner={"include": {"financial_snapshot": True}}),
-        )
+    ownables = await Ownable.prisma().find_many(
+        where=OwnableWhereInput(**where),  # type: ignore
+        include=OwnableInclude(owner={"include": {"financial_snapshot": True}}),
+    )
 
     owners = uniq_by([o.owner for o in ownables if o.owner is not None], lambda o: o.id)
 

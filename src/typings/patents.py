@@ -2,13 +2,12 @@
 Patent types
 """
 
-from dataclasses import dataclass
 from typing import Any, Sequence, TypedDict
+from pydantic import BaseModel
 from pydash import compact
 from prisma.models import Patent
 
 from typings.companies import CompanyFinancials
-from typings.core import Dataclass, inject_fields
 from utils.classes import ByDefinitionOrderEnum
 
 
@@ -106,19 +105,17 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
-@dataclass
-@inject_fields(Patent, Dataclass)
-class ScoredPatent(Patent):
+class ScoredPatent(Patent, BaseModel):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
     availability_score: float
-    exemplar_similarity: float
+    exemplar_similarity: float | None = None
     patent_years: int
     probability_of_success: float
     reformulation_score: float
     score: float
-    search_rank: float
+    search_rank: float | None = None
     suitability_score: float
     suitability_score_explanation: str
 

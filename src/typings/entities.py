@@ -15,9 +15,10 @@ from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
 
 @dataclass(frozen=True)
 class Entity(Dataclass):
+    id: int
     name: str
-    approvals: list[RegulatoryApproval]
     patents: list[ScoredPatent]
+    regulatory_approvals: list[RegulatoryApproval]
     trials: list[Trial]
 
     @property
@@ -38,7 +39,7 @@ class Entity(Dataclass):
                     if t.end_date is not None and t.start_date is not None
                 ]
             )
-            + [a.approval_date for a in self.approvals]
+            + [a.approval_date for a in self.regulatory_approvals]
         )
         return [
             dates.count(y)
@@ -47,7 +48,7 @@ class Entity(Dataclass):
 
     @property
     def approval_count(self) -> int:
-        return len(self.approvals)
+        return len(self.regulatory_approvals)
 
     @property
     def total_enrollment(self) -> int:
@@ -176,7 +177,7 @@ class Entity(Dataclass):
         """
         trials = self.trials  # [t.serialize() for t in self.trials]
         patents = self.patents  # [p.serialize() for p in self.patents]
-        approvals = self.approvals  # [a.serialize() for a in self.approvals]
+        approvals = self.regulatory_approvals  # [a.serialize() for a in self.approvals]
 
         o = super().serialize()
         return {**o, "approvals": approvals, "patents": patents, "trials": trials}

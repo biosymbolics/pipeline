@@ -1,5 +1,11 @@
 from dataclasses import asdict, dataclass, replace
-from typing import Any, TypeGuard, TypedDict, Union, List, Dict
+from typing import (
+    Any,
+    TypeGuard,
+    Union,
+    List,
+    Dict,
+)
 import inspect
 
 JsonSerializable = Union[
@@ -73,37 +79,6 @@ def is_string_list(obj: Any) -> TypeGuard[list[str]]:
         bool: True if the object is a list of strings
     """
     return isinstance(obj, list) and all(isinstance(x, str) for x in obj)
-
-
-def inject_fields(parent1, parent2):
-    """
-    Annotation to inject fields from a parent class into a dataclass
-
-    TODO: typing (sigh)
-
-    Usage
-    ```
-    @dataclass
-    @inject_fields(Patent)
-    class ScoredPatent(Patent):
-        score: int
-    ```
-    """
-
-    def _inject(cls):
-        # TODO: iteratively or
-        parent_annotations = {
-            k: v
-            for k, v in {
-                **parent1.__annotations__,
-                **(parent2.__annotations__ if parent2 else {}),
-            }.items()
-            if "__" not in str(v)
-        }
-        cls.__annotations__ = parent_annotations | cls.__annotations__
-        return cls
-
-    return _inject
 
 
 def is_string_list_list(obj: Any) -> TypeGuard[list[list[str]]]:
