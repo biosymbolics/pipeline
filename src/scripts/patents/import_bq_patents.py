@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import sys
-from typing import Sequence
+from typing import Any, Sequence, TypeGuard
 from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
@@ -16,7 +16,6 @@ system.initialize()
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import APPLICATIONS_TABLE, PUBLICATION_NUMBER_MAP_TABLE
-from typings.core import is_dict_list
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -30,6 +29,19 @@ db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
+    """
+    Checks if an object is a list of dicts
+
+    Args:
+        obj (Any): object to check
+
+    Returns:
+        bool: True if the object is a list of dicts
+    """
+    return isinstance(obj, list) and all(isinstance(x, dict) for x in obj)
 
 
 PATENT_APPLICATION_FIELDS = [
