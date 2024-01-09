@@ -4,9 +4,8 @@ from functools import cached_property
 from typing import Any
 from pydash import compact, flatten, uniq
 from prisma.enums import TrialPhase, TrialStatus
-from prisma.models import Patent, RegulatoryApproval, Trial
 
-from typings.patents import ScoredPatent
+from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass
@@ -18,8 +17,8 @@ class Entity(Dataclass):
     id: int
     name: str
     patents: list[ScoredPatent]
-    regulatory_approvals: list[RegulatoryApproval]
-    trials: list[Trial]
+    regulatory_approvals: list[ScoredRegulatoryApproval]
+    trials: list[ScoredTrial]
 
     @property
     def activity(self) -> list[int]:
@@ -73,7 +72,7 @@ class Entity(Dataclass):
         return len(self.patents)
 
     @cached_property
-    def most_recent_patent(self) -> Patent | None:
+    def most_recent_patent(self) -> ScoredPatent | None:
         if len(self.patents) == 0:
             return None
         patents = sorted(self.patents, key=lambda x: x.priority_date)
@@ -86,7 +85,7 @@ class Entity(Dataclass):
         return self.most_recent_patent.priority_date.year
 
     @cached_property
-    def most_recent_trial(self) -> Trial | None:
+    def most_recent_trial(self) -> ScoredTrial | None:
         if len(self.trials) == 0:
             return None
         trials = sorted(self.trials, key=lambda x: x.last_updated_date)
@@ -175,12 +174,17 @@ class Entity(Dataclass):
         Custom serialization for entity
         TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
         """
-        trials = self.trials  # [t.serialize() for t in self.trials]
-        patents = self.patents  # [p.serialize() for p in self.patents]
-        approvals = self.regulatory_approvals  # [a.serialize() for a in self.approvals]
+        trials = [t.serialize() for t in self.trials]
+        patents = [p.serialize() for p in self.patents]
+        regulatory_approvals = [a.serialize() for a in self.regulatory_approvals]
 
         o = super().serialize()
-        return {**o, "approvals": approvals, "patents": patents, "trials": trials}
+        return {
+            **o,
+            "regulatory_approvals": regulatory_approvals,
+            "patents": patents,
+            "trials": trials,
+        }
 
     # TODO - average dropout rate
     # TODO - average trial duration

@@ -81,7 +81,7 @@ async def get_docs_by_entity_id(
             array_remove(array_agg(trial_id), NULL) as trials
         FROM intervenable
         WHERE COALESCE(patent_id, regulatory_approval_id, trial_id) = ANY($1)
-        -- AND entity_id is not NULL
+        AND entity_id is not NULL
         GROUP BY canonical_name, entity_id
         """,
         doc_ids,
@@ -126,7 +126,7 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
         # doc ids that match the suppied terms
         docs_ids = await get_doc_ids(terms, client)
 
-        # full docs (TODO: do in one step, OR handle expansion)
+        # full docs (if pulled in the prior query, might pull duplicates)
         doc_by_type = await get_matching_docs(docs_ids)
 
         # entity/doc matching for ents in first order docs

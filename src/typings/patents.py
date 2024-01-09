@@ -3,11 +3,11 @@ Patent types
 """
 
 from typing import Any, Sequence, TypedDict
-from pydantic import BaseModel
 from pydash import compact
 from prisma.models import Patent
 
 from typings.companies import CompanyFinancials
+from typings.core import EntityBase
 from utils.classes import ByDefinitionOrderEnum
 
 
@@ -105,7 +105,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
-class ScoredPatent(Patent, BaseModel):
+class ScoredPatent(Patent, EntityBase):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str

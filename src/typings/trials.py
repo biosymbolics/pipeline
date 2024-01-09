@@ -1,9 +1,12 @@
-from prisma.models import Trial as DbTrial
+from prisma.models import Trial
 from prisma.enums import TrialStatus
 
+from typings.core import EntityBase
 from utils.classes import ByDefinitionOrderEnum
 
-Trial = DbTrial
+
+class ScoredTrial(Trial, EntityBase):
+    pass
 
 
 class TrialStatusGroup(ByDefinitionOrderEnum):

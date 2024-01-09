@@ -8,6 +8,8 @@ from typing import (
 )
 import inspect
 
+from pydantic import BaseModel
+
 JsonSerializable = Union[
     Dict[str, "JsonSerializable"], List["JsonSerializable"], str, int, float, bool, None
 ]
@@ -66,6 +68,31 @@ class Dataclass:
         Prep for JSON serialization of the object, WITHOUT properties (ie expects to be reconstituted into dataclass)
         """
         return self.asdict()
+
+
+class EntityBase(BaseModel):
+    """
+    Base class to add to Prisma entities
+    """
+
+    def serialize(self) -> dict[str, Any]:
+        """
+        Prep for JSON serialization of the object, including properties
+        """
+        properties = {
+            key: getattr(self, key)
+            for key, value in inspect.getmembers(self.__class__)
+            if isinstance(value, property)
+        }
+
+        o = self.__dict__
+        return {**o, **properties}
+
+    def storage_serialize(self) -> dict[str, Any]:
+        """
+        Prep for JSON serialization of the object, WITHOUT properties (ie expects to be reconstituted into dataclass)
+        """
+        return self.__dict__
 
 
 def is_string_list(obj: Any) -> TypeGuard[list[str]]:

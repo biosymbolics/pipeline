@@ -1,3 +1,4 @@
+from .approvals import ScoredRegulatoryApproval
 from .client import (
     ApprovalSearchParams,
     QueryType,
@@ -10,6 +11,7 @@ from .patents import (
     PatentsTopicReport,
     ScoredPatent,
 )
+from .trials import ScoredTrial
 
 __all__ = [
     "ApprovalSearchParams",
@@ -19,6 +21,8 @@ __all__ = [
     "PatentSearchParams",
     "QueryType",
     "ScoredPatent",
+    "ScoredRegulatoryApproval",
+    "ScoredTrial",
     "TermField",
     "TrialSearchParams",
 ]

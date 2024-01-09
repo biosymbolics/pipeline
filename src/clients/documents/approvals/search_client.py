@@ -6,14 +6,15 @@ import logging
 import os
 import time
 from typing import Sequence
-from prisma.models import RegulatoryApproval
 from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import get_prisma_client
 
-from typings import QueryType, ApprovalSearchParams
+from typings import QueryType, ApprovalSearchParams, ScoredRegulatoryApproval
 from utils.string import get_id
+
+from .client import find_many
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ async def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     limit: int = MAX_SEARCH_RESULTS,
-) -> list[RegulatoryApproval]:
+) -> list[ScoredRegulatoryApproval]:
     """
     Search regulatory approvals by terms
 
@@ -62,7 +63,7 @@ async def _search(
     where = get_where_clause(terms, query_type)
 
     async with get_prisma_client(300):
-        approvals = await RegulatoryApproval.prisma().find_many(
+        approvals = await find_many(
             where=where,
             include={
                 "interventions": True,
@@ -80,7 +81,7 @@ async def _search(
     return approvals
 
 
-async def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
+async def search(p: ApprovalSearchParams) -> list[ScoredRegulatoryApproval]:
     """
     Search regulatory approvals by terms
     """
@@ -105,6 +106,6 @@ async def search(p: ApprovalSearchParams) -> list[RegulatoryApproval]:
         key=key,
         limit=p.limit,
         decode=lambda str_data: [
-            RegulatoryApproval(**a) for a in storage_decoder(str_data)
+            ScoredRegulatoryApproval(**a) for a in storage_decoder(str_data)
         ],
     )

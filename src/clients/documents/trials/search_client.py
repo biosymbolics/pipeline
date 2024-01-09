@@ -12,8 +12,10 @@ from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import get_prisma_client
 
 from typings import QueryType, TrialSearchParams
+from typings.trials import ScoredTrial
 from utils.string import get_id
 
+from .client import find_many
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -41,7 +43,7 @@ async def _search(
     terms: Sequence[str],
     query_type: QueryType = "AND",
     limit: int = MAX_SEARCH_RESULTS,
-) -> list[Trial]:
+) -> list[ScoredTrial]:
     """
     Search patents by terms
     """
@@ -54,7 +56,7 @@ async def _search(
     where = get_where_clause(terms, query_type)
 
     async with get_prisma_client(300):
-        trials = await Trial.prisma().find_many(
+        trials = await find_many(
             where=where,
             include={
                 "interventions": True,
@@ -71,17 +73,9 @@ async def _search(
     return trials
 
 
-async def search(p: TrialSearchParams) -> list[Trial]:
+async def search(p: TrialSearchParams) -> list[ScoredTrial]:
     """
     Search trials by terms
-    Filters on lowered, stemmed terms
-
-    Usage:
-    ```
-    from clients.trials.search_client import search
-    from typings import QueryType, TrialSearchParams
-    search(TrialSearchParams(terms= ["asthma"], skip_cache=True))
-    ```
     """
     args = {
         "terms": p.terms,
@@ -103,5 +97,5 @@ async def search(p: TrialSearchParams) -> list[Trial]:
         search_partial,
         key=key,
         limit=p.limit,
-        decode=lambda str_data: [Trial(**t) for t in storage_decoder(str_data)],
+        decode=lambda str_data: [ScoredTrial(**t) for t in storage_decoder(str_data)],
     )
