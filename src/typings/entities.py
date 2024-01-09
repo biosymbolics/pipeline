@@ -1,22 +1,23 @@
 from dataclasses import dataclass
 from datetime import date
 from functools import cached_property
-from itertools import groupby
 from typing import Any
-from pydash import compact, flatten, group_by, uniq
+from pydash import compact, flatten, uniq
+from prisma.enums import TrialPhase, TrialStatus
+from prisma.models import Patent, RegulatoryApproval, Trial
 
-from typings.approvals import RegulatoryApproval
+from typings.patents import ScoredPatent
+from typings.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass
 from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
-from .trials import Trial, TrialPhase, TrialStatus, TrialStatusGroup
 
 
 @dataclass(frozen=True)
 class Entity(Dataclass):
     name: str
     approvals: list[RegulatoryApproval]
-    patents: list[Patent]
+    patents: list[ScoredPatent]
     trials: list[Trial]
 
     @property
@@ -145,8 +146,16 @@ class Entity(Dataclass):
     @property
     def owners(self) -> list[str]:
         return uniq(
-            flatten([p.assignees for p in self.patents])
-            + [t.normalized_sponsor for t in self.trials]
+            compact(
+                flatten(
+                    [a.canonical_name for p in self.patents for a in p.assignees or []]
+                )
+                + [
+                    t.sponsor.canonical_name
+                    for t in self.trials
+                    if t.sponsor is not None
+                ]
+            )
         )
 
     @property
@@ -157,7 +166,7 @@ class Entity(Dataclass):
     def percent_stopped(self) -> float:
         if self.trial_count == 0:
             return 0.0
-        trial_statuses = [TrialStatus(t.status).parent for t in self.trials]
+        trial_statuses = [get_trial_status_parent(t.status) for t in self.trials]
         return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
 
     def serialize(self) -> dict[str, Any]:
@@ -165,9 +174,9 @@ class Entity(Dataclass):
         Custom serialization for entity
         TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
         """
-        trials = [t.serialize() for t in self.trials]
-        patents = [p.serialize() for p in self.patents]
-        approvals = [a.serialize() for a in self.approvals]
+        trials = self.trials  # [t.serialize() for t in self.trials]
+        patents = self.patents  # [p.serialize() for p in self.patents]
+        approvals = self.approvals  # [a.serialize() for a in self.approvals]
 
         o = super().serialize()
         return {**o, "approvals": approvals, "patents": patents, "trials": trials}

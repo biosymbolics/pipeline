@@ -46,11 +46,14 @@ class TrialSearchParams(CommonSearchParams):
     pass
 
 
-class EntitySearchParams(PatentSearchParams):
+EntityType = Literal["intervention", "indication"]
+
+
+class AssetSearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_types: Annotated[
-        Sequence[Literal["pharmaceutical"]], Field(validate_default=True)
-    ] = ["pharmaceutical"]
+    entity_types: Annotated[Sequence[EntityType], Field(validate_default=True)] = [
+        "intervention"
+    ]
 
     @field_validator("entity_types", mode="before")
     def entity_types_from_string(cls, v):

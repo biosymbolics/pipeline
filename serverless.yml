@@ -107,13 +107,13 @@ functions:
     handler: src.handlers.system.rds_control
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  search-entities:
+  search-assets:
     events:
       - http:
-          path: entities/search
+          path: assets/search
           method: get
           cors: true
-    handler: src.handlers.entity.search
+    handler: src.handlers.asset.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
   search-patents:
@@ -196,7 +196,7 @@ functions:
           path: clindev/predict/timelines
           method: get
           cors: true
-    handler: src.handlers.clindev.predict_timelines
+    handler: src.handlers.trials.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer
   search-trials:
@@ -205,7 +205,7 @@ functions:
           path: trials/search
           method: get
           cors: true
-    handler: src.handlers.clindev.search
+    handler: src.handlers.trials.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
 

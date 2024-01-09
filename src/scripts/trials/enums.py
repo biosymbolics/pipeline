@@ -20,6 +20,7 @@ from prisma.enums import (
 
 from core.ner.classifier import classify_string, create_lookup_map
 from typings.core import Dataclass
+from typings.trials import TrialStatusGroup
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
 from utils.re import get_or_re
@@ -226,13 +227,6 @@ class TrialPurposeParser:
         if value in purpose_term_map:
             return purpose_term_map[value]
         return TrialPurpose.UNKNOWN
-
-
-class TrialStatusGroup(ByDefinitionOrderEnum):
-    ONGOING = "ONGOING"
-    COMPLETED = "COMPLETED"
-    STOPPED = "STOPPED"
-    UNKNOWN = "UNKNOWN"
 
 
 class TrialStatusParser:

@@ -108,7 +108,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
 
 @dataclass
 @inject_fields(Patent, Dataclass)
-class ScoredPatent:
+class ScoredPatent(Patent):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
