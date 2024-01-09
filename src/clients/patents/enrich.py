@@ -6,9 +6,10 @@ import time
 from typing import Any, Sequence, TypedDict
 import polars as pl
 import logging
-from prisma.models import Patent
+from prisma.models import Patent, Owner
 
 from typings import ScoredPatent
+from typings.companies import CompanyFinancials
 from utils.list import dedup
 
 from .score import availability_exprs, calculate_scores
@@ -29,7 +30,9 @@ def filter_terms_by_domain(rec: TermDict, domain: str) -> list[str]:
     return dedup(terms)
 
 
-def enrich_search_result(results: Sequence[Patent]) -> list[ScoredPatent]:
+def enrich_search_result(
+    results: Sequence[Patent], financial_map: dict[str, CompanyFinancials]
+) -> list[ScoredPatent]:
     """
     Enrich patent with scores, patent years, etc.
 
@@ -52,7 +55,7 @@ def enrich_search_result(results: Sequence[Patent]) -> list[ScoredPatent]:
         lambda _df: _df.with_columns(
             get_patent_years().alias("patent_years"),
             filter_similar_patents().alias("similar_patents"),
-            *availability_exprs(_df),
+            *availability_exprs(_df, financial_map),
         ),
         lambda _df: calculate_scores(_df).sort("score").reverse(),
     ]

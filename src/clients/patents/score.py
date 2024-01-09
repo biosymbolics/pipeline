@@ -2,8 +2,10 @@ import random
 from typing import Sequence, TypedDict
 import polars as pl
 import logging
+from prisma.models import Owner
 
 from constants.patents import SUITABILITY_SCORE_MAP
+from typings.companies import CompanyFinancials
 from typings.patents import AvailabilityLikelihood, SuitabilityScoreMap
 
 from .constants import EST_MAX_CLINDEV, MAX_PATENT_LIFE
@@ -146,14 +148,17 @@ def calculate_scores(df: pl.DataFrame) -> pl.DataFrame:
     return score_patents(df, "attributes", "patent_years", SUITABILITY_SCORE_MAP)
 
 
-def availability_exprs(df: pl.DataFrame) -> list[pl.Expr]:
+def availability_exprs(
+    df: pl.DataFrame, financial_map: dict[str, CompanyFinancials]
+) -> list[pl.Expr]:
     """
     Add availability likelihood to patents
 
     df must already have assignees, publication_number, and is_active columns
     """
     avail_likelihood_map: dict[str, tuple[AvailabilityLikelihood, str]] = {
-        rec["id"]: AvailabilityLikelihood.find_from_record(rec) for rec in df.to_dicts()
+        rec["id"]: AvailabilityLikelihood.find_from_record(rec, financial_map)
+        for rec in df.to_dicts()
     }
     avail_explanation_map: dict[str, str] = {
         k: v[1] for k, v in avail_likelihood_map.items()

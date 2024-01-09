@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
-from prisma.models import Patent
+from prisma.models import Owner, Patent
 
 from typings.companies import CompanyFinancials
 from utils.classes import ByDefinitionOrderEnum
@@ -46,14 +46,14 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def compose_financial_explanation(
         cls,
         troubled_assignees: Sequence[str],
-        financials_map: dict[str, CompanyFinancials],
+        financial_map: dict[str, CompanyFinancials],
     ) -> list[str]:
         """
         Compose explanation for availability likelihood
         """
         explanations = compact(
             [
-                f"{company} has some financial signal ({financials_map[company]})."
+                f"{company} has some financial signal ({financial_map[company]})."
                 for company in troubled_assignees
             ]
         )
@@ -72,7 +72,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
     def find_from_record(
         cls,
         record: dict[str, Any],
-        financials_map: dict[str, CompanyFinancials],
+        financial_map: dict[str, CompanyFinancials],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood from record
@@ -88,7 +88,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
             is_active,
             is_terminated,
             record["termination_reason"],
-            financials_map,
+            financial_map,
         )
 
     @classmethod
@@ -98,24 +98,24 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         is_active: bool | None,
         is_terminated: bool,
         termination_reason: str | None,
-        financials_map: dict[str, CompanyFinancials],
+        financial_map: dict[str, CompanyFinancials],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
         Find availability likelihood
         """
-        if len(financials_map) == 0:
+        if len(financial_map) == 0:
             return (AvailabilityLikelihood.UNKNOWN, "No financials provided.")  # type: ignore
 
         # mark all patents of troubled companies as "possibly" available
         troubled_assignees = [
             company
             for company in assignees
-            if company in financials_map and financials_map[company].is_troubled
+            if company in financial_map and financial_map[company].is_troubled
         ]
         is_troubled = len(troubled_assignees) > 0
 
         troubled_detail = cls.compose_financial_explanation(
-            troubled_assignees, financials_map
+            troubled_assignees, financial_map
         )
 
         if is_terminated:

@@ -5,10 +5,12 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma import Prisma
+from prisma.client import Prisma
 from prisma.models import Patent
 
+from clients.companies import get_financial_map
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
+from clients.low_level.prisma import get_prisma_client
 from typings.patents import ScoredPatent as PatentApplication
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.sql import get_term_sql_query
@@ -25,14 +27,6 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 MAX_ARRAY_LENGTH = 50
 EXEMPLAR_SIMILARITY_THRESHOLD = 0.7
-
-"""
-Larger decay rates will result in more matches
-
-Usage:
-    EXP(-annotation.character_offset_start * {DECAY_RATE}) > {threshold})
-"""
-DECAY_RATE = 1 / 2000
 
 
 def _get_query_pieces(
@@ -67,7 +61,7 @@ def _get_query_pieces(
     # exp decay scaling for search terms; higher is better
     fields = [
         "*",
-        f"ts_rank_cd(text_search, to_tsquery($1)) AS search_rank",
+        f"ts_rank_cd(search, to_tsquery($1)) AS search_rank",
     ]
     froms = []
     wheres = [
@@ -99,11 +93,13 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     """
     Get embeddings for exemplar patents
     """
-    async with Prisma(auto_register=True, http={"timeout": 300}) as db:
+    async with get_prisma_client(300) as client:
         results = await Prisma.query_raw(
-            db, "SELECT embeddings FROM patents WHERE id = ANY($1)", exemplar_patents
+            client,
+            "SELECT embeddings FROM patents WHERE id = ANY($1)",
+            exemplar_patents,
         )
-        return [r["embeddings"] for r in results]
+    return [r["embeddings"] for r in results]
 
 
 async def _search(
@@ -115,14 +111,15 @@ async def _search(
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[PatentApplication]:
     """
-        Search patents by terms
+    Search patents by terms
 
-        REPL:
-        ```
+    REPL:
+    ```
     import asyncio
     from clients.patents.search_client import _search
-    asyncio.run(_search(["asthma"]))
-        ```
+    with asyncio.Runner() as runner:
+        runner.run(_search(["asthma"]))
+    ```
     """
     start = time.monotonic()
 
@@ -139,17 +136,19 @@ async def _search(
 
     query = f"""
         SELECT {", ".join(qp["fields"])}
-        FROM patents {", ".join(qp["froms"])}
+        FROM patent {", ".join(qp["froms"])}
         WHERE {" AND ".join(qp["wheres"])}
         ORDER BY priority_date desc
         LIMIT {limit}
     """
     print(query)
 
-    async with Prisma(auto_register=True, http={"timeout": 300}):
-        patents = await Patent.prisma().query_raw(query, qp["params"])
+    async with get_prisma_client(300):
+        patents = await Patent.prisma().query_raw(query, *qp["params"])
 
-    enriched_results = enrich_search_result(patents)
+    ids = [p.id for p in patents]
+    financial_map = await get_financial_map(ids, "assignee_patent_id")
+    enriched_results = enrich_search_result(patents, financial_map)
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
