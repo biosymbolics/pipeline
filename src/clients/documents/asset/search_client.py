@@ -2,6 +2,7 @@
 Entity client
 """
 from dataclasses import dataclass
+import json
 from typing import Literal, Sequence, TypedDict
 from prisma import Prisma
 from pydash import compact, flatten
@@ -42,70 +43,71 @@ class DocResults(BaseModel):
 
 
 class EntWithDocResult(DocResults):
-    id: int | None = None
-    name: str = ""
+    id: int
+    name: str
 
 
-async def get_docs_by_entity_id(
-    terms: Sequence[str], client: Prisma
-) -> tuple[list[EntWithDocResult], list[str]]:
-    """
-    Gets documents by entity
-    """
-
-    def get_query(table) -> str:
+async def get_doc_ids(terms: Sequence[str], client: Prisma) -> list[str]:
+    def get_doc_query(table) -> str:
         return f"""
-            SELECT
-                entity_id, canonical_name,
-                patent_id, regulatory_approval_id, trial_id
+            SELECT COALESCE(patent_id, regulatory_approval_id, trial_id) as id
             FROM {table}
             WHERE canonical_name = ANY($1)
         """
 
-    result = await client.query_raw(
+    doc_result = await client.query_raw(
         f"""
-        SELECT
-            entity_id as id,
-            canonical_name,
-            array_remove(array_agg(patent_id), NULL) as patents,
-            array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
-            array_remove(array_agg(trial_id), NULL) as trials
-        FROM ({' UNION ALL '.join([get_query(table) for table in MAP_TABLES])}) s
-        GROUP BY canonical_name, id
+        SELECT distinct id
+        FROM ({' UNION ALL '.join([get_doc_query(table) for table in MAP_TABLES])}) s
         """,
         terms,
     )
-    ents_with_docs = [EntWithDocResult(**r) for r in result]
-    doc_ids: list[str] = flatten(
-        [
-            v
-            for res in ents_with_docs
-            for k, v in res.__dict__.items()
-            if k in DocResults.__annotations__.keys()
-        ]
+
+    return [r["id"] for r in doc_result]
+
+
+async def get_docs_by_entity_id(
+    doc_ids: Sequence[str], client: Prisma
+) -> list[EntWithDocResult]:
+    """
+    Gets documents by entity
+    """
+    result = await client.query_raw(
+        f"""
+        SELECT
+            entity_id as id, canonical_name as name,
+            array_remove(array_agg(patent_id), NULL) as patents,
+            array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
+            array_remove(array_agg(trial_id), NULL) as trials
+        FROM intervenable
+        WHERE COALESCE(patent_id, regulatory_approval_id, trial_id) = ANY($1)
+        -- AND entity_id is not NULL
+        GROUP BY canonical_name, entity_id
+        """,
+        doc_ids,
     )
 
-    return ents_with_docs, doc_ids
+    ents_with_docs = [EntWithDocResult(**r) for r in result]
+
+    return ents_with_docs
 
 
 async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     """
     Gets docs by type, matching doc_ids
     """
+
     regulatory_approvals = await RegulatoryApproval.prisma().find_many(
         where={"id": {"in": doc_ids}},
         include={"interventions": True, "indications": True},
-        take=1000,
     )
     patents = await find_patents(
         where={"id": {"in": doc_ids}},
         include={"interventions": True, "indications": True},
-        take=1000,
     )
     trials = await Trial.prisma().find_many(
         where={"id": {"in": doc_ids}},
         include={"interventions": True, "indications": True},
-        take=1000,
     )
 
     # TODO: centralize the prisma client + transform (e.g. to ScoredPatent)
@@ -121,15 +123,23 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
     Internal search for documents grouped by entity
     """
     async with get_prisma_client(300) as client:
-        ent_with_docs, doc_ids = await get_docs_by_entity_id(terms, client)
-        doc_by_type = await get_matching_docs(doc_ids)
+        # doc ids that match the suppied terms
+        docs_ids = await get_doc_ids(terms, client)
+
+        # full docs (TODO: do in one step, OR handle expansion)
+        doc_by_type = await get_matching_docs(docs_ids)
+
+        # entity/doc matching for ents in first order docs
+        ent_with_docs = await get_docs_by_entity_id(docs_ids, client)
 
     documents_by_entity = [
         Entity(
-            id=ent_with_doc.id or 0,
+            id=ent_with_doc.id,
             name=ent_with_doc.name,
             **{
-                k: compact([doc_by_type[k][id] for id in ent_with_doc.__dict__[k]])
+                k: compact(
+                    [doc_by_type.__dict__[k].get(id) for id in ent_with_doc.__dict__[k]]
+                )
                 for k in DocResults.__annotations__.keys()
             },
         )
