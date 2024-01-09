@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 PRISMA_CLIENT = None
-os.environ["DATABASE_URL"] = DATABASE_URL or ""
+
+if DATABASE_URL is None:
+    raise ValueError("DATABASE_URL is not set")
+
+os.environ["DATABASE_URL"] = DATABASE_URL
 
 
 def get_prisma_client(timeout: int | None) -> Prisma:

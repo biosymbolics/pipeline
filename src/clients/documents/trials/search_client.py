@@ -93,7 +93,7 @@ async def search(p: TrialSearchParams) -> list[ScoredTrial]:
         trials = await search_partial(limit=p.limit)
         return trials
 
-    return retrieve_with_cache_check(
+    return await retrieve_with_cache_check(
         search_partial,
         key=key,
         limit=p.limit,

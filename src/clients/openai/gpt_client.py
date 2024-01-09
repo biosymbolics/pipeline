@@ -87,7 +87,7 @@ class GptApiClient:
             logging.warning("Error formatting answer: %s", e)
             return output
 
-    def describe_terms(
+    async def describe_terms(
         self, terms: list[str], context_terms: Optional[list[str]] = None
     ) -> str:
         """

@@ -9,7 +9,6 @@ SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
 REGULATORY_APPROVAL_TABLE = "regulatory_approval"
 TRIALS_TABLE = "trial"
-APPLICATIONS_TABLE = "applications"
 PUBLICATION_NUMBER_MAP_TABLE = "publication_number_map"
 
 

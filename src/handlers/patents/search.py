@@ -5,6 +5,7 @@ import json
 import logging
 
 from clients.documents import patent_search
+from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def search(raw_event: dict, context):
+async def _search(raw_event: dict, context):
     """
     Search patents by terms
 
@@ -37,7 +38,7 @@ def search(raw_event: dict, context):
     logger.info("Fetching patents for params: %s", p)
 
     try:
-        results = patent_search(p)
+        results = await patent_search(p)
     except Exception as e:
         message = f"Error searching patents: {e}"
         logger.error(message)
@@ -47,3 +48,6 @@ def search(raw_event: dict, context):
         "statusCode": 200,
         "body": json.dumps(results, cls=DataclassJSONEncoder),
     }
+
+
+search = handle_async(_search)

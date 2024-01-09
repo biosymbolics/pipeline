@@ -101,7 +101,7 @@ async def search(p: ApprovalSearchParams) -> list[ScoredRegulatoryApproval]:
         approvals = await search_partial(limit=p.limit)
         return approvals
 
-    return retrieve_with_cache_check(
+    return await retrieve_with_cache_check(
         search_partial,
         key=key,
         limit=p.limit,

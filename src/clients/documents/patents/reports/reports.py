@@ -7,18 +7,18 @@ import polars as pl
 import logging
 
 
-from clients.patents.types import (
+from clients.documents.patents.types import (
     PatentsReport,
     PatentsReportRecord,
 )
-from typings.patents import PatentApplication
+from typings import ScoredPatent
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
 def group_by_xy(
-    patents: Sequence[PatentApplication],
+    patents: Sequence[ScoredPatent],
     x_dimensions: list[str],
     y_dimensions: list[str] | None = None,
     x_transform: Callable[[Any], Any] = lambda x: x,
@@ -91,7 +91,7 @@ def group_by_xy(
         return [PatentsReportRecord(**prr) for prr in grouped.to_dicts()]
 
     patent_df = pl.from_dicts(
-        [p.asdict() for p in patents],
+        [p.__dict__ for p in patents],
         schema=[*x_dimensions, *(y_dimensions or [])],
         infer_schema_length=None,
     )

@@ -4,8 +4,9 @@ Handler for patent topic reports
 import json
 import logging
 
-from clients import patents as patent_client
-from clients.patents.reports.topic import model_patent_topics
+from clients.documents import patents as patent_client
+from clients.documents.patents.reports.topic import model_patent_topics
+from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def analyze_topics(raw_event: dict, context):
+async def _analyze_topics(raw_event: dict, context):
     """
     Analyize patent topics
 
@@ -34,7 +35,7 @@ def analyze_topics(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        results = patent_client.search(p)
+        results = await patent_client.search(p)
         topics = model_patent_topics(results)
     except Exception as e:
         message = f"Error reporting on patents: {e}"
@@ -42,3 +43,6 @@ def analyze_topics(raw_event: dict, context):
         return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(topics, default=str)}
+
+
+analyze_topics = handle_async(_analyze_topics)

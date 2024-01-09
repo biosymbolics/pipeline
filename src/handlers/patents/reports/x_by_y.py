@@ -3,10 +3,10 @@ Handler for patent timewise reports
 """
 import json
 import logging
-from pydantic import BaseModel
 
-from clients import patents as patent_client
-from clients.patents.reports.reports import group_by_xy
+from clients.documents import patents as patent_client
+from clients.documents.patents.reports.reports import group_by_xy
+from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -20,7 +20,7 @@ class XByYReportParams(PatentSearchParams):
     y: str
 
 
-def x_by_y(raw_event: dict, context):
+async def _x_by_y(raw_event: dict, context):
     """
     Get an x by y report
 
@@ -49,7 +49,7 @@ def x_by_y(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        patents = patent_client.search(p)
+        patents = await patent_client.search(p)
         if len(patents) == 0:
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps([])}
@@ -67,3 +67,6 @@ def x_by_y(raw_event: dict, context):
         return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(report, default=str)}
+
+
+x_by_y = handle_async(_x_by_y)

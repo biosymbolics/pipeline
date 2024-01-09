@@ -4,6 +4,7 @@ import logging
 
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.openai.gpt_client import GptApiClient
+from handlers.utils import handle_async
 from utils.string import get_id
 
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def describe(event: DescribeEvent, context):
+async def _describe(event: DescribeEvent, context):
     """
     Get GPT description of terms
 
@@ -52,8 +53,11 @@ def describe(event: DescribeEvent, context):
         description = gpt_client.describe_terms(terms_list)
     else:
         key = f"gpt-description-{get_id(terms_list)}"
-        description = retrieve_with_cache_check(
+        description = await retrieve_with_cache_check(
             lambda: gpt_client.describe_terms(terms_list), key=key
         )
 
     return {"statusCode": 200, "body": description}
+
+
+describe = handle_async(_describe)

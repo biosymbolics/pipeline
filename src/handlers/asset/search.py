@@ -5,6 +5,7 @@ import json
 import logging
 
 from clients.documents import asset_search
+from handlers.utils import handle_async
 from typings.client import AssetSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def search(raw_event: dict, context):
+async def _search(raw_event: dict, context):
     """
     Search assets by terms
 
@@ -37,7 +38,7 @@ def search(raw_event: dict, context):
     logger.info("Fetching assets for params: %s", p)
 
     try:
-        results = asset_search(p)
+        results = await asset_search(p)
     except Exception as e:
         message = f"Error searching entities: {e}"
         logger.error(message)
@@ -47,3 +48,6 @@ def search(raw_event: dict, context):
         "statusCode": 200,
         "body": json.dumps(results, cls=DataclassJSONEncoder),
     }
+
+
+search = handle_async(_search)

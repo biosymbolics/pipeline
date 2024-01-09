@@ -130,16 +130,17 @@ async def _search(
 
     where = get_where_clause(terms, query_type, min_patent_years)
 
-    patents = await find_many(
-        where=where,
-        include={
-            "assignees": True,
-            "inventors": True,
-            "interventions": True,
-            "indications": True,
-        },
-        take=limit,
-    )
+    async with get_prisma_client(300):
+        patents = await find_many(
+            where=where,
+            include={
+                "assignees": True,
+                "inventors": True,
+                "interventions": True,
+                "indications": True,
+            },
+            take=limit,
+        )
 
     return patents
 
@@ -192,7 +193,7 @@ async def search(p: PatentSearchParams) -> list[PatentApplication]:
         patents = await search_partial(limit=p.limit)
         return patents
 
-    return retrieve_with_cache_check(
+    return await retrieve_with_cache_check(
         search_partial,
         key=key,
         limit=p.limit,

@@ -9,9 +9,8 @@ from pydash import uniq
 import polars as pl
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
-from clients.patents.constants import ENTITY_DOMAINS
-from constants.core import ANNOTATIONS_TABLE, APPLICATIONS_TABLE, TERM_IDS_TABLE
-from typings.patents import PatentApplication
+from clients.documents.patents.constants import ENTITY_DOMAINS
+from typings.patents import ScoredPatent
 
 from .types import (
     AggregatePatentRelationship,
@@ -129,8 +128,8 @@ def generate_graph(
     return subgraph
 
 
-def graph_patent_relationships(
-    patents: Sequence[PatentApplication],
+async def graph_patent_relationships(
+    patents: Sequence[ScoredPatent],
     max_nodes: int = MAX_NODES,
 ) -> SerializableGraph:
     """
@@ -142,7 +141,7 @@ def graph_patent_relationships(
 
     Note: perhaps inefficient to load patents just for ids, but patent call is cached (+ used by other queries)
     """
-    patent_ids = [p["publication_number"] for p in patents]
+    patent_ids = [p.id for p in patents]
 
     # TODO: save relationship type, ancestors
     sql = f"""
@@ -153,9 +152,9 @@ def graph_patent_relationships(
             count(*) as weight,
             '{PATENT_GROUP}' as group
         FROM
-            {ANNOTATIONS_TABLE} a,
-            {APPLICATIONS_TABLE} app,
-            {TERM_IDS_TABLE} t,
+            ann a,
+            app app,
+            tids t,
             umls_lookup umls
         WHERE a.publication_number = ANY(ARRAY{patent_ids})
         AND app.publication_number = a.publication_number
@@ -166,7 +165,7 @@ def graph_patent_relationships(
         ORDER BY weight DESC LIMIT 1000
     """
 
-    relationships = PsqlDatabaseClient().select(sql)
+    relationships = await PsqlDatabaseClient().select(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
     # create serialized link data
@@ -217,16 +216,16 @@ def graph_patent_relationships(
     )
 
 
-def aggregate_patent_relationships(
-    patents: Sequence[PatentApplication],
+async def aggregate_patent_relationships(
+    patents: Sequence[ScoredPatent],
     head_field: CharacteristicHeadField = "priority_year",
-    domains: Sequence[str] = ENTITY_DOMAINS,
+    domains: Sequence[str] = [],
     relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
 ) -> list[AggregatePatentRelationship]:
     """
     Aggregated UMLS ancestory report for a set of patents
     """
-    patent_ids = [p["publication_number"] for p in patents]
+    patent_ids = [p.id for p in patents]
 
     if head_field == "priority_year":
         head_sql = "TO_CHAR(app.priority_date, 'YYYY')"
@@ -245,9 +244,9 @@ def aggregate_patent_relationships(
             count(*) as count,
             array_agg(distinct app.publication_number) as patents
         FROM
-            {ANNOTATIONS_TABLE} a,
-            {APPLICATIONS_TABLE} app,
-            {TERM_IDS_TABLE} t,
+            ann a,
+            apps app,
+            tids t,
             umls_lookup umls
         WHERE app.publication_number = ANY(ARRAY{patent_ids})
         AND a.publication_number = app.publication_number
@@ -265,9 +264,9 @@ def aggregate_patent_relationships(
             count(*) as count,
             array_agg(distinct app.publication_number) as patents
         FROM
-            {ANNOTATIONS_TABLE} a,
-            {APPLICATIONS_TABLE} app,
-            {TERM_IDS_TABLE} t,
+            ann a,
+            apps app,
+            tids t,
             umls_graph g
         WHERE app.publication_number = ANY(ARRAY{patent_ids})
         AND a.publication_number = app.publication_number
@@ -279,7 +278,8 @@ def aggregate_patent_relationships(
         GROUP BY {head_sql}, concept
     """
 
-    df = pl.DataFrame(PsqlDatabaseClient().select(sql))
+    results = await PsqlDatabaseClient().select(sql)
+    df = pl.DataFrame(results)
 
     # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
     top_concepts = (

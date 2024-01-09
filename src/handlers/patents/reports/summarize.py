@@ -4,9 +4,10 @@ Handler for patent summarization reports
 import json
 import logging
 
-from clients import patents as patent_client
-from clients.patents.constants import DOMAINS_OF_INTEREST
-from clients.patents.reports.reports import group_by_xy
+from clients.documents import patents as patent_client
+from clients.documents.patents.constants import DOMAINS_OF_INTEREST
+from clients.documents.patents.reports.reports import group_by_xy
+from handlers.utils import handle_async
 from utils.encoding.json_encoder import DataclassJSONEncoder
 from typings.client import PatentSearchParams
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def summarize(raw_event: dict, context):
+async def _summarize(raw_event: dict, context):
     """
     Summarize patents by terms (diseases, compounds, etc)
 
@@ -37,7 +38,7 @@ def summarize(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        results = patent_client.search(p)
+        results = await patent_client.search(p)
         summaries = group_by_xy(results, [*DOMAINS_OF_INTEREST, "similar_patents"])
     except Exception as e:
         message = f"Error reporting on patents: {e}"
@@ -45,3 +46,6 @@ def summarize(raw_event: dict, context):
         return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(summaries, cls=DataclassJSONEncoder)}
+
+
+summarize = handle_async(_summarize)

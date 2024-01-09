@@ -4,9 +4,10 @@ Handler for patent graph reports
 import json
 import logging
 
-from clients import patents as patent_client
-from clients.patents.reports.graph import aggregate_patent_relationships
-from clients.patents.reports.graph.types import CharacteristicHeadField
+from clients.documents import patents as patent_client
+from clients.documents.patents.reports.graph import aggregate_patent_relationships
+from clients.documents.patents.reports.graph.types import CharacteristicHeadField
+from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -24,7 +25,7 @@ class PatentCharacteristicParams(PatentSearchParams):
     head_field: CharacteristicHeadField = "priority_year"
 
 
-def patent_characteristics(raw_event: dict, context):
+async def _patent_characteristics(raw_event: dict, context):
     """
     Return a graph of patent characteristics
 
@@ -43,7 +44,7 @@ def patent_characteristics(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        patents = patent_client.search(p)
+        patents = await patent_client.search(p)
         if len(patents) == 0:
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
@@ -58,3 +59,6 @@ def patent_characteristics(raw_event: dict, context):
         "statusCode": 200,
         "body": json.dumps(report, cls=DataclassJSONEncoder),
     }
+
+
+patent_characteristics = handle_async(_patent_characteristics)
