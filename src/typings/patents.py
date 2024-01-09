@@ -3,15 +3,13 @@ Patent types
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
 from typing import Any, Sequence, TypedDict
 from pydash import compact
-from prisma.models import Owner, Patent
+from prisma.models import Patent
 
 from typings.companies import CompanyFinancials
+from typings.core import Dataclass, inject_fields
 from utils.classes import ByDefinitionOrderEnum
-
-from .core import Dataclass
 
 
 STALE_YEARS = 5
@@ -61,14 +59,6 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return explanations
 
     @classmethod
-    def is_patent_active(cls, record: dict[str, Any]) -> bool | None:
-        if record["last_trial_update"] is None:
-            return None
-        return date.today() - record["last_trial_update"] < timedelta(
-            days=STALE_YEARS * 365
-        )
-
-    @classmethod
     def find_from_record(
         cls,
         record: dict[str, Any],
@@ -77,27 +67,18 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         """
         Find availability likelihood from record
         """
-        is_active = cls.is_patent_active(record)
-        is_terminated = (
-            record["termination_reason"] is not None
-            and record["termination_reason"] != "NA"
-        )
+
+        names = [o["name"] for o in record.get("assignees") or []]
 
         return cls.find(
-            record["assignees"],
-            is_active,
-            is_terminated,
-            record["termination_reason"],
+            names,
             financial_map,
         )
 
     @classmethod
     def find(
         cls,
-        assignees: list[str],
-        is_active: bool | None,
-        is_terminated: bool,
-        termination_reason: str | None,
+        assignee_names: list[str],
         financial_map: dict[str, CompanyFinancials],
     ) -> tuple["AvailabilityLikelihood", str]:
         """
@@ -108,9 +89,9 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
 
         # mark all patents of troubled companies as "possibly" available
         troubled_assignees = [
-            company
-            for company in assignees
-            if company in financial_map and financial_map[company].is_troubled
+            owner
+            for owner in assignee_names
+            if owner in financial_map and financial_map[owner].is_troubled
         ]
         is_troubled = len(troubled_assignees) > 0
 
@@ -118,32 +99,25 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
             troubled_assignees, financial_map
         )
 
-        if is_terminated:
-            explanation = "\n".join(
-                [*troubled_detail, f"Trial terminated: {termination_reason}"]
-            )
-            return (AvailabilityLikelihood.POSSIBLE, explanation)  # type: ignore
-
-        if is_active == True:
-            explanation = "\n".join([*troubled_detail, f"Trial is active"])
-            return (AvailabilityLikelihood.UNLIKELY, explanation)  # type: ignore
-
-        if is_troubled or is_active == False:
-            explanation = "\n".join([*troubled_detail, f"Trial is active: {is_active}"])
+        if is_troubled:
+            explanation = "\n".join(troubled_detail)
             return (AvailabilityLikelihood.POSSIBLE, explanation)  # type: ignore
 
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
 @dataclass
-class ScoredPatent(Patent):
+@inject_fields(Patent, Dataclass)
+class ScoredPatent:
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
     availability_score: float
     exemplar_similarity: float
+    patent_years: int
     probability_of_success: float
     reformulation_score: float
+    score: float
     search_rank: float
     suitability_score: float
     suitability_score_explanation: str

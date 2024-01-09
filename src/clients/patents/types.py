@@ -59,11 +59,3 @@ def is_relevancy_threshold(value: Union[str, tuple]) -> TypeGuard[RelevancyThres
         value (Union[str, tuple]): value to check
     """
     return isinstance(value, str) and value in typing.get_args(RelevancyThreshold)
-
-
-@dataclass(frozen=True)
-class QueryPieces(Dataclass):
-    fields: list[str]
-    froms: list[str]
-    wheres: list[str]
-    params: list

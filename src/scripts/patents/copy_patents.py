@@ -121,6 +121,14 @@ class PatentEtl(DocumentEtl):
                 where domain='attributes'
                 group by publication_number
             ) attributes ON applications.publication_number = attributes.publication_number
+            LEFT JOIN (
+                SELECT
+                    publication_number,
+                    array_agg(original_term) as annotations
+                from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
+                where domain<>'attributes'
+                group by publication_number
+            ) annotations ON applications.publication_number = annotations.publication_number
         """
 
     async def _copy_entities(
@@ -209,7 +217,7 @@ class PatentEtl(DocumentEtl):
                             "other_ids": p["all_publication_numbers"],
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
-                            "text_for_search": f"{p['title']} {p['abstract']}",
+                            "text_for_search": f"{p['title']} {p['abstract']} {' '.join(p['assignees'])} {' '.join(p['annotations'])}",  # TODO: add canonicalized annotations!!!
                             "title": p["title"],
                             "url": p["url"],
                         }
@@ -290,6 +298,7 @@ class PatentEtl(DocumentEtl):
                     "is_primary": False,  # TODO
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
+                    "canonical_name": ir["term"],  # overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in indicatable_records
@@ -307,6 +316,7 @@ class PatentEtl(DocumentEtl):
                     "is_primary": False,  # TODO
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
+                    "canonical_name": ir["term"],  # overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in intervenable_records

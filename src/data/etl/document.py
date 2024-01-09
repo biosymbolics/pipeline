@@ -36,24 +36,30 @@ class DocumentEtl:
         """
         Link mapping tables "intervenable", "indicatable" and "ownable" to canonical entities
         """
-        async with Prisma() as db:
+        async with Prisma(http={"timeout": None}) as db:
             bioent_tables = ["intervenable", "indicatable"]
             for bet in bioent_tables:
                 await db.execute_raw(
                     f"""
                     UPDATE {bet}
-                    SET entity_id=entity_synonym.entity_id
-                    FROM entity_synonym
-                    WHERE {bet}.name=entity_synonym.term;
+                    SET
+                        entity_id=entity_synonym.entity_id,
+                        canonical_name=biomedical_entity.name
+                    FROM entity_synonym, biomedical_entity
+                    WHERE {bet}.name=entity_synonym.term
+                    AND entity_synonym.entity_id=biomedical_entity.id;
                     """
                 )
 
             await db.execute_raw(
                 f"""
                 UPDATE ownable
-                SET owner_id=synonym.owner_id
-                FROM owner_synonym
-                WHERE owner.name=owner_synonym.term;
+                SET
+                    owner_id=owner_synonym.owner_id,
+                    canonical_name=owner.name
+                FROM owner_synonym, owner
+                WHERE ownable.name=owner_synonym.term
+                AND owner_synonym.owner_id=owner.id;
                 """
             )
 

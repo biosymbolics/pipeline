@@ -6,7 +6,7 @@ import time
 from typing import Any, Sequence, TypedDict
 import polars as pl
 import logging
-from prisma.models import Patent, Owner
+from prisma.models import Patent
 
 from typings import ScoredPatent
 from typings.companies import CompanyFinancials
@@ -50,6 +50,7 @@ def enrich_search_result(
 
     pl.Config.activate_decimals()  # otherwise butchers decimal values
     df = pl.from_dicts(results, infer_schema_length=None)  # type: ignore
+    print(df)
 
     steps = [
         lambda _df: _df.with_columns(
@@ -65,5 +66,7 @@ def enrich_search_result(
     logging.info(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
     )
+
+    print(enriched_df.to_dicts()[0])
 
     return [ScoredPatent(**p) for p in enriched_df.to_dicts()]

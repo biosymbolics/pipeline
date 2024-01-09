@@ -283,6 +283,7 @@ class TrialEtl(DocumentEtl):
                 data=[
                     {
                         "name": t["sponsor"] or "unknown",
+                        "canonical_name": t["sponsor"],  # overwritten later
                         "is_primary": True,
                         "trial_id": t["id"],
                     }
@@ -294,7 +295,11 @@ class TrialEtl(DocumentEtl):
             # create "indicatable" records, those that map approval to a canonical indication
             await Indicatable.prisma().create_many(
                 data=[
-                    {"name": i.lower(), "trial_id": t["id"]}
+                    {
+                        "name": i.lower(),
+                        "canonical_name": i.lower(),  # overwritten later
+                        "trial_id": t["id"],
+                    }
                     for t in rows
                     for i in t["indications"]
                 ],
@@ -306,6 +311,7 @@ class TrialEtl(DocumentEtl):
                 data=[
                     {
                         "name": i.lower(),
+                        "canonical_name": i.lower(),  # overwritten later
                         "is_primary": True,
                         "trial_id": t["id"],
                     }

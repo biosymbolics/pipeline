@@ -167,7 +167,7 @@ def availability_exprs(
     avail_score_map = {k: v[0].score for k, v in avail_likelihood_map.items()}
 
     return [
-        pl.col("rec").map_dict(avail_cat_map).alias("availability_likelihood"),
-        pl.col("rec").map_dict(avail_explanation_map).alias("availability_explanation"),
-        pl.col("rec").map_dict(avail_score_map).alias("availability_score"),
+        pl.col("id").map_dict(avail_cat_map).alias("availability_likelihood"),
+        pl.col("id").map_dict(avail_explanation_map).alias("availability_explanation"),
+        pl.col("id").map_dict(avail_score_map).alias("availability_score"),
     ]

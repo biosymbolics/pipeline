@@ -206,7 +206,7 @@ class ApprovalEtl(DocumentEtl):
             "MAX(prod.marketing_status) as application_type",
             "MAX(approval.approval) as approval_date",
             "MAX(approval.type) as agency",
-            "array_remove(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
+            "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
             "JSON_AGG(pharma_class.*) as pharmacologic_classes",
             "MAX(label.pdf_url) as url",
         ]
@@ -244,7 +244,7 @@ class ApprovalEtl(DocumentEtl):
         # create "indicatable" records, those that map approval to a canonical indication
         await Indicatable.prisma().create_many(
             data=[
-                {"name": i, "regulatory_approval_id": a["id"]}
+                {"name": i, "canonical_name": i, "regulatory_approval_id": a["id"]}
                 for a in approvals
                 for i in a["indications"]
             ]
@@ -255,6 +255,9 @@ class ApprovalEtl(DocumentEtl):
             data=[
                 {
                     "name": a["generic_name"] or a["brand_name"],
+                    "canonical_name": get_preferred_pharmacologic_class(
+                        a["pharmacologic_classes"]
+                    ),
                     "instance_rollup": get_preferred_pharmacologic_class(
                         a["pharmacologic_classes"]
                     ),

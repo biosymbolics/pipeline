@@ -22,19 +22,13 @@ def get_prisma_client(timeout: int | None) -> Prisma:
 
     if PRISMA_CLIENT is None:
         logger.info("Registering Prisma client")
-        print("Registering Prisma client")
         client = Prisma(http={"timeout": timeout})
         PRISMA_CLIENT = client
     else:
         client = PRISMA_CLIENT
 
     if not client.is_registered():
-        logger.debug("Prisma client is not registered")
-        print("Prisma client is not registered")
+        logger.debug("Registering prisma client")
         register(client)
-
-    # if not client.is_connected():
-    #     print("CONNECTING CLIENT")
-    #     await client.connect()
 
     return client

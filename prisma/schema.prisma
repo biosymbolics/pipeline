@@ -65,25 +65,27 @@ model OwnerSynonym {
 }
 
 model Patent {
-    id                 String                     @id @unique // publication_number
-    application_number String
-    abstract           String
-    assignees          Ownable[]                  @relation("assignee_to_patent")
-    attributes         String[]
-    claims             String?
-    country_code       String
-    embeddings         Unsupported("vector(64)")?
-    interventions      Intervenable[]
-    indications        Indicatable[]
-    inventors          Ownable[]                  @relation("inventor_to_patent")
-    ipc_codes          String[]
-    other_ids          String[]
-    priority_date      DateTime
-    search             Unsupported("tsvector")?
-    similar_patents    String[]
-    text_for_search    String
-    title              String
-    url                String
+    id                  String                     @id @unique // publication_number
+    application_number  String
+    abstract            String
+    assignees           Ownable[]                  @relation("assignee_to_patent")
+    attributes          String[]
+    claims              String?
+    country_code        String
+    embeddings          Unsupported("vector(64)")?
+    exemplar_similarity Float? // not stored in db. hack to represent this in the py classes
+    interventions       Intervenable[]
+    indications         Indicatable[]
+    inventors           Ownable[]                  @relation("inventor_to_patent")
+    ipc_codes           String[]
+    other_ids           String[]
+    priority_date       DateTime
+    search              Unsupported("tsvector")?
+    search_rank         Float? // not stored in db. hack to represent this in the py classes
+    similar_patents     String[]
+    text_for_search     String
+    title               String
+    url                 String
 
     @@map("patent")
 }
@@ -182,8 +184,9 @@ model Ownable {
     owner                  Owner?              @relation(fields: [owner_id], references: [id])
     owner_id               Int?
     name                   String
-    instance_rollup        String?
-    category_rollup        String?
+    canonical_name         String // denormalized from biomedical entity
+    instance_rollup        String? // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
@@ -191,6 +194,8 @@ model Ownable {
 
     @@unique([owner_id, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@unique([name, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "ownable_name")
+    @@index([canonical_name], name: "ownable_canonical_name")
     @@map("ownable")
 }
 
@@ -204,14 +209,17 @@ model Intervenable {
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
     patent_id              String?
     name                   String
-    instance_rollup        String?
-    category_rollup        String?
+    canonical_name         String // denormalized from biomedical entity
+    instance_rollup        String? // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
 
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "intervenable_name")
+    @@index([canonical_name], name: "intervenable_canonical_name")
     @@map("intervenable")
 }
 
@@ -222,8 +230,9 @@ model Indicatable {
     is_primary             Boolean             @default(false)
     mention_index          Int                 @default(-1)
     name                   String
-    instance_rollup        String?
-    category_rollup        String?
+    canonical_name         String // denormalized from biomedical entity
+    instance_rollup        String? // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
     trial_id               String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     patent                 Patent?             @relation(fields: [patent_id], references: [id])
@@ -232,6 +241,8 @@ model Indicatable {
     regulatory_approval_id String?
 
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "indicatable_name")
+    @@index([canonical_name], name: "indicatable_canonical_name")
     @@map("indicatable")
 }
 
