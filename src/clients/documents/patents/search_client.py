@@ -6,18 +6,15 @@ import logging
 import time
 from typing import Sequence
 from prisma.client import Prisma
-from prisma.models import Patent
 from prisma.types import PatentWhereInput, PatentWhereInputRecursive2
 
-from clients.companies import get_financial_map
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import get_prisma_client
 from typings.patents import ScoredPatent as PatentApplication
 from typings.client import PatentSearchParams, QueryType, TermField
-from utils.sql import get_term_sql_query
 from utils.string import get_id
 
-from .enrich import enrich_search_result
+from .client import find_many
 from .utils import get_max_priority_date
 
 
@@ -127,35 +124,24 @@ async def _search(
         runner.run(_search(["asthma"]))
     ```
     """
-    start = time.monotonic()
-
     if not isinstance(terms, list):
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
     where = get_where_clause(terms, query_type, min_patent_years)
 
-    async with get_prisma_client(300):
-        patents = await Patent.prisma().find_many(
-            where=where,
-            include={
-                "assignees": True,
-                "inventors": True,
-                "interventions": True,
-                "indications": True,
-            },
-            take=limit,
-        )
-
-    ids = [p.id for p in patents]
-    financial_map = await get_financial_map(ids, "assignee_patent_id")
-    enriched_results = enrich_search_result(patents, financial_map)
-
-    logger.info(
-        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
+    patents = await find_many(
+        where=where,
+        include={
+            "assignees": True,
+            "inventors": True,
+            "interventions": True,
+            "indications": True,
+        },
+        take=limit,
     )
 
-    return enriched_results
+    return patents
 
 
 async def search(p: PatentSearchParams) -> list[PatentApplication]:
