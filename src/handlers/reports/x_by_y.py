@@ -4,7 +4,6 @@ Handler for patent timewise reports
 import json
 import logging
 
-from clients.documents import patents as patent_client
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
 from typings.client import CommonSearchParams, PatentSearchParams
@@ -25,9 +24,9 @@ async def _x_by_y(raw_event: dict, context):
     Get an x by y report
 
     Invocation:
-    - Local: `serverless invoke local --function patents-x-by-y --param='ENV=local' --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
-    - Remote: `serverless invoke --function patents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
-    - API: `curl 'https://api.biosymbolics.ai/patents/reports/x_by_y?terms=asthma&x=assignees&y=diseases'`
+    - Local: `serverless invoke local --function documents-x-by-y --param='ENV=local' --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
+    - Remote: `serverless invoke --function documents-x-by-y --data='{"queryStringParameters": { "x": "assignees", "y": "diseases", "terms":"asthma" }}'`
+    - API: `curl 'https://api.biosymbolics.ai/reports/x_by_y?terms=asthma&x=assignees&y=diseases'`
     """
     p = XByYReportParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
@@ -49,12 +48,7 @@ async def _x_by_y(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        patents = await patent_client.search(p)
-        if len(patents) == 0:
-            logging.info("No patents found for terms: %s", p.terms)
-            return {"statusCode": 200, "body": json.dumps([])}
-
-        report = XYReport.group_by_xy(
+        report = await XYReport.group_by_xy(
             search_params=CommonSearchParams(terms=p.terms, query_type=p.query_type),
             x_dimension=x_dimension,
             y_dimension=y_dimension,

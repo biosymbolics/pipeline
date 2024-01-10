@@ -30,9 +30,9 @@ async def _patent_characteristics(raw_event: dict, context):
     Return a graph of patent characteristics
 
     Invocation:
-    - Local: `serverless invoke local --function patents-characteristics --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
-    - Remote: `serverless invoke --function patents-characteristics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
-    - API: `curl https://api.biosymbolics.ai/patents/reports/graph?terms=asthma`
+    - Local: `serverless invoke local --function document-characteristics --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - Remote: `serverless invoke --function document-characteristics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - API: `curl https://api.biosymbolics.ai/reports/graph?terms=asthma`
     """
     p = PatentCharacteristicParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}

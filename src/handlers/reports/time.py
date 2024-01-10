@@ -24,7 +24,7 @@ async def _aggregate_over_time(raw_event: dict, context):
     Invocation:
     - Local: `serverless invoke local --function documents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - Remote: `serverless invoke --function documents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
-    - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
+    - API: `curl https://api.biosymbolics.ai/reports/time?terms=asthma`
     """
     p = CommonSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}

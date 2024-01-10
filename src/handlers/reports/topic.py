@@ -20,9 +20,9 @@ async def _analyze_topics(raw_event: dict, context):
     Analyize patent topics
 
     Invocation:
-    - Local: `serverless invoke local --function patent-topics --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
-    - Remote: `serverless invoke --function patent-topics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
-    - API: `curl https://api.biosymbolics.ai/patents/reports/topics?terms=asthma`
+    - Local: `serverless invoke local --function document-topics --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
+    - Remote: `serverless invoke --function document-topics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - API: `curl https://api.biosymbolics.ai/reports/topics?terms=asthma`
     """
     p = PatentSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}

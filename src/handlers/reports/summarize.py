@@ -18,13 +18,13 @@ logger.setLevel(logging.INFO)
 
 async def _summarize(raw_event: dict, context):
     """
-    Summarize patents by terms (diseases, compounds, etc)
+    Summarize documents by terms (diseases, compounds, etc)
 
     Invocation:
     - Local: `serverless invoke local --function summarize-documents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
     - Local: `serverless invoke local --function summarize-documents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma",  "term_field": "canonical_name" }}'`
     - Remote: `serverless invoke --function summarize-documents --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
-    - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
+    - API: `curl https://api.biosymbolics.ai/reports/summarize?terms=asthma`
     """
     p = CommonSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
