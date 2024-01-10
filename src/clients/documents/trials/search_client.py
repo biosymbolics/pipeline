@@ -60,6 +60,7 @@ async def _search(
             include={
                 "interventions": True,
                 "indications": True,
+                "outcomes": True,
                 "sponsor": True,
             },
             take=limit,
