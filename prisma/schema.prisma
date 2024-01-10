@@ -178,8 +178,8 @@ model FinancialSnapshot {
 
 model Ownable {
     id                     Int                 @id @default(autoincrement())
-    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [assignee_patent_id], references: [id])
-    assignee_patent_id     String?
+    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [patent_id], references: [id])
+    patent_id              String?
     inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
     inventor_patent_id     String?
     is_primary             Boolean?            @default(false)
@@ -194,8 +194,8 @@ model Ownable {
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     trial_id               String?             @unique
 
-    @@unique([owner_id, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
-    @@unique([name, assignee_patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
     @@map("ownable")

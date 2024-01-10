@@ -5,7 +5,7 @@ import logging
 import time
 from prisma.models import BiomedicalEntity
 
-from clients.low_level.prisma import get_prisma_client
+from clients.low_level.prisma import prisma_context
 
 
 from .types import AutocompleteResult
@@ -25,7 +25,7 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     """
     start = time.monotonic()
 
-    async with get_prisma_client(300):
+    async with prisma_context(300):
         results = await BiomedicalEntity.prisma().find_many(
             where={"name": {"contains": string.lower()}},
             take=limit,

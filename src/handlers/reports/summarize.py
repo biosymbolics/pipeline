@@ -5,7 +5,7 @@ import json
 import logging
 
 from clients.documents.patents.constants import DOMAINS_OF_INTEREST
-from clients.documents.reports import group_by_xy_for_filters
+from clients.documents.reports import XYReport
 from handlers.utils import handle_async
 from utils.encoding.json_encoder import DataclassJSONEncoder
 from typings.client import CommonSearchParams
@@ -37,10 +37,10 @@ async def _summarize(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        summaries = await group_by_xy_for_filters(
+        summaries = await XYReport.group_by_xy_for_filters(
             search_params=p,
             x_dimension="canonical_name",
-            filters=[f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST],
+            filters={d: f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST},
         )
     except Exception as e:
         message = f"Error reporting on patents: {e}"

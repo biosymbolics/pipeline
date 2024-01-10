@@ -15,7 +15,14 @@ if DATABASE_URL is None:
 os.environ["DATABASE_URL"] = DATABASE_URL
 
 
-def get_prisma_client(timeout: int | None) -> Prisma:
+async def prisma_client(timeout: int | None, connect: bool = True) -> Prisma:
+    client = prisma_context(timeout)
+    if connect and not client.is_connected():
+        await client.connect()
+    return client
+
+
+def prisma_context(timeout: int | None) -> Prisma:
     """
     Get a Prisma client
 

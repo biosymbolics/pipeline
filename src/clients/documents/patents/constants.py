@@ -24,8 +24,11 @@ ENTITY_TYPES = ENTITY_TYPE_MAP.values()
 ENTITY_DOMAINS = ENTITY_TYPES
 
 DOMAINS_OF_INTEREST = [
-    *ENTITY_DOMAINS,
-    "assignees",
-    ATTRIBUTE_FIELD,
-    "inventors",
+    BiomedicalEntityType.MECHANISM.name,
+    BiomedicalEntityType.COMPOUND.name,
+    BiomedicalEntityType.BIOLOGIC.name,
+    BiomedicalEntityType.DISEASE.name,
+    # "assignees",
+    # "inventors",
+    # ATTRIBUTE_FIELD,
 ]

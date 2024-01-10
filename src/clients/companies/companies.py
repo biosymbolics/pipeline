@@ -4,7 +4,7 @@ from prisma.types import OwnableInclude, OwnableWhereInput, StringFilter
 from functools import lru_cache
 
 from pydash import uniq_by
-from clients.low_level.prisma import get_prisma_client
+from clients.low_level.prisma import prisma_context
 
 from typings.companies import CompanyFinancials
 

@@ -8,7 +8,7 @@ from prisma.client import Prisma
 from prisma.types import PatentWhereInput, PatentWhereInputRecursive2
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import get_prisma_client
+from clients.low_level.prisma import prisma_context
 from typings.patents import ScoredPatent as PatentApplication
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
@@ -28,7 +28,7 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     """
     Get embeddings for exemplar patents
     """
-    async with get_prisma_client(300) as client:
+    async with prisma_context(300) as client:
         results = await Prisma.query_raw(
             client,
             "SELECT embeddings FROM patent WHERE id = ANY($1)",
@@ -128,7 +128,7 @@ async def _search(
 
     where = get_where_clause(terms, query_type, min_patent_years)
 
-    async with get_prisma_client(300):
+    async with prisma_context(300):
         patents = await find_many(
             where=where,
             include={

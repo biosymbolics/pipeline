@@ -10,7 +10,7 @@ import logging
 from prisma.models import RegulatoryApproval, Trial
 from pydantic import BaseModel
 
-from clients.low_level.prisma import get_prisma_client
+from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.entities import Entity
@@ -129,7 +129,7 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
     """
     Internal search for documents grouped by entity
     """
-    async with get_prisma_client(300) as client:
+    async with prisma_context(300) as client:
         # doc ids that match the suppied terms
         docs_ids = await get_doc_ids(terms, client)
 

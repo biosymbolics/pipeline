@@ -16,7 +16,7 @@ from prisma.types import (
 )
 
 from clients.companies import get_financial_map
-from clients.low_level.prisma import get_prisma_client
+from clients.low_level.prisma import prisma_context
 from typings import ScoredPatent
 
 from .enrich import enrich_search_result

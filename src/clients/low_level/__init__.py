@@ -1,3 +1,3 @@
-from .prisma import get_prisma_client
+from .prisma import prisma_context
 
-__all__ = ["get_prisma_client"]
+__all__ = ["prisma_context"]
