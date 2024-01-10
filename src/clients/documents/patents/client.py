@@ -46,7 +46,7 @@ async def find_many(
     )
 
     ids = [p.id for p in patents]
-    financial_map = await get_financial_map(ids, "assignee_patent_id")
+    financial_map = await get_financial_map(ids, "patent_id")
     enriched_results = enrich_search_result(patents, financial_map)
 
     logger.info(

@@ -13,7 +13,7 @@ ID_FIELDS = {k: v for k, v in OwnableWhereInput.__annotations__.items() if "id" 
 
 
 async def get_owner_map(
-    ids: Sequence[str], id_field: str = "assignee_patent_id"
+    ids: Sequence[str], id_field: str = "patent_id"
 ) -> dict[str, Owner]:
     """
     Fetch companies matching names.
@@ -22,7 +22,7 @@ async def get_owner_map(
 
     Args:
         ids: ids for which to fetch associated owners
-        id_field: field to use for id matching (e.g. "assignee_patent_id")
+        id_field: field to use for id matching (e.g. "patent_id")
     """
     if id_field not in ID_FIELDS:
         raise ValueError(f"Invalid id_field: {id_field}; must be one of {ID_FIELDS}")
@@ -40,7 +40,7 @@ async def get_owner_map(
 
 
 async def get_financial_map(
-    ids: Sequence[str], id_field: str = "assignee_patent_id"
+    ids: Sequence[str], id_field: str = "patent_id"
 ) -> dict[str, CompanyFinancials]:
     """
     Fetch companies matching names.
@@ -49,7 +49,7 @@ async def get_financial_map(
 
     Args:
         ids: ids for which to fetch associated owners
-        id_field: field to use for id matching (e.g. "assignee_patent_id")
+        id_field: field to use for id matching (e.g. "patent_id")
     """
     owner_map = await get_owner_map(tuple(ids), id_field)
     return {

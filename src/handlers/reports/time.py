@@ -22,8 +22,8 @@ async def _aggregate_over_time(raw_event: dict, context):
     Aggregate patents trends over time
 
     Invocation:
-    - Local: `serverless invoke local --function patents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma" }}'`
-    - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
+    - Local: `serverless invoke local --function documents-over-time --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma" }}'`
+    - Remote: `serverless invoke --function documents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
     p = CommonSearchParams(
@@ -37,12 +37,11 @@ async def _aggregate_over_time(raw_event: dict, context):
     logger.info("Fetching reports forparams: %s", p)
 
     try:
-        summaries = XYReport.group_by_xy_for_filters(
+        summaries = await XYReport.group_by_xy_for_filters(
+            filters={d: f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST},
             search_params=p,
             x_dimension="canonical_name",  # keyof typeof X_DIMENSIONS
             y_dimension="priority_date",
-            y_transform=lambda y: f"DATE_PART('Year', {y})",
-            filters=[f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST],
         )
     except Exception as e:
         message = f"Error generating patent reports: {e}"

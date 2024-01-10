@@ -242,7 +242,7 @@ class PatentEtl(DocumentEtl):
                         "name": a.lower(),
                         "canonical_name": a.lower(),  # may be overwritten later
                         "is_primary": True,
-                        "assignee_patent_id": p["id"],
+                        "patent_id": p["id"],
                     }
                     for p in batch
                     for a in p["assignees"]
