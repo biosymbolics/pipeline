@@ -8,8 +8,8 @@ import networkx as nx
 from pydash import uniq
 import polars as pl
 
-from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from clients.documents.patents.constants import ENTITY_DOMAINS
+from clients.low_level.prisma import prisma_client
 from typings.patents import ScoredPatent
 
 from .types import (
@@ -152,12 +152,10 @@ async def graph_patent_relationships(
             count(*) as weight,
             '{PATENT_GROUP}' as group
         FROM
-            ann a,
-            app app,
+            patent,
             tids t,
             umls_lookup umls
         WHERE a.publication_number = ANY(ARRAY{patent_ids})
-        AND app.publication_number = a.publication_number
         AND a.domain in {tuple(ENTITY_DOMAINS)}
         AND t.id = a.id
         AND umls.id = t.cid
@@ -165,7 +163,8 @@ async def graph_patent_relationships(
         ORDER BY weight DESC LIMIT 1000
     """
 
-    relationships = await PsqlDatabaseClient().select(sql)
+    client = await prisma_client(300)
+    relationships = await client.query_raw(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
     # create serialized link data
@@ -242,14 +241,12 @@ async def aggregate_patent_relationships(
             {head_sql} as head,
             umls.canonical_name as concept,
             count(*) as count,
-            array_agg(distinct app.publication_number) as patents
+            array_agg(distinct patent.id) as patents
         FROM
-            ann a,
-            apps app,
+            patent,
             tids t,
             umls_lookup umls
-        WHERE app.publication_number = ANY(ARRAY{patent_ids})
-        AND a.publication_number = app.publication_number
+        WHERE patent.id = ANY(ARRAY{patent_ids})
         AND a.domain in {tuple(domains)}
         AND t.id = a.id
         AND umls.id = t.cid
@@ -262,14 +259,12 @@ async def aggregate_patent_relationships(
             {head_sql} as head,
             tail_name as concept,
             count(*) as count,
-            array_agg(distinct app.publication_number) as patents
+            array_agg(distinct patent.id) as patents
         FROM
-            ann a,
-            apps app,
+            patent,
             tids t,
             umls_graph g
-        WHERE app.publication_number = ANY(ARRAY{patent_ids})
-        AND a.publication_number = app.publication_number
+        WHERE patent.id = ANY(ARRAY{patent_ids})
         AND a.domain in {tuple(domains)}
         AND t.id = a.id
         AND g.head_id = t.cid
@@ -278,7 +273,8 @@ async def aggregate_patent_relationships(
         GROUP BY {head_sql}, concept
     """
 
-    results = await PsqlDatabaseClient().select(sql)
+    client = await prisma_client(300)
+    results = await client.query_raw(sql)
     df = pl.DataFrame(results)
 
     # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
