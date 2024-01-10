@@ -6,7 +6,11 @@ from utils.classes import ByDefinitionOrderEnum
 
 
 class ScoredTrial(Trial, EntityBase):
-    pass
+    @property
+    def dropout_percent(self) -> float | None:
+        if self.enrollment is None or self.dropout_count is None:
+            return None
+        return self.dropout_count / self.enrollment
 
 
 class TrialStatusGroup(ByDefinitionOrderEnum):
