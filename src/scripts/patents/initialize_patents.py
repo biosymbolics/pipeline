@@ -4,7 +4,6 @@ Functions to initialize the patents database
 import asyncio
 import logging
 import sys
-from scripts.patents.copy_patents import PatentEtl
 
 from system import initialize
 
@@ -13,9 +12,11 @@ initialize()
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
+from scripts.approvals.copy_approvals import ApprovalEtl
+from scripts.owner import load_owners
+from scripts.patents.copy_patents import PatentEtl
 from scripts.trials.copy_trials import TrialEtl
 from scripts.umls.copy_umls import copy_umls
-from scripts.approvals.copy_approvals import ApprovalEtl
 
 from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
@@ -141,6 +142,9 @@ async def main(bootstrap: bool = False):
         await copy_bq_to_psql()
         # UMLS records (slow due to betweenness centrality calc)
         copy_umls()
+
+    # copy owner data (across all documents)
+    await load_owners.AllOwnersEtl().copy_all()
 
     # copy patent data
     await PatentEtl(document_type="patent").copy_all()

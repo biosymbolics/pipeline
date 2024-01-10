@@ -39,28 +39,28 @@ class AllOwnersEtl:
         # (because the clustering makes a mess of individuals)
         db_owner_query_map = {
             # patents db
-            # "patents": f"""
-            #     SELECT lower(unnest(assignees)) as name
-            #     FROM applications a
-            #     GROUP BY lower(name)
-            #     HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
-            #     UNION ALL
-            #     -- if fewer than 20 patents, BUT the name looks like a company, include it.
-            #     SELECT lower(max(name)) as name
-            #     FROM applications a, unnest(assignees) as name
-            #     WHERE name ~* '{company_re}\\.?'
-            #     GROUP BY lower(name)
-            #     HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
-            #     UNION ALL
-            #     SELECT lower(unnest(inventors)) as name
-            #     FROM applications a
-            #     GROUP BY lower(name)
-            #     HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
-            #     UNION ALL
-            #     SELECT lower(name) as name
-            #     FROM companies
-            #     GROUP BY lower(name)
-            # """,
+            "patents": f"""
+                SELECT lower(max(name)) as name
+                FROM applications a, unnest(assignees) as name
+                GROUP BY lower(name)
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
+
+                UNION ALL
+
+                -- if fewer than 20 patents, BUT the name looks like a company, include it.
+                SELECT lower(max(name)) as name
+                FROM applications a, unnest(assignees) as name
+                WHERE name ~* '{company_re}\\.?'
+                GROUP BY lower(name)
+                HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
+
+                UNION ALL
+
+                SELECT lower(max(name)) as name
+                FROM applications a, unnest(inventors) as name
+                GROUP BY lower(name)
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+            """,
             # ctgov db
             "aact": """
                 select lower(name) as name
