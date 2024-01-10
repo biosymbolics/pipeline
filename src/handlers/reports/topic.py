@@ -5,7 +5,7 @@ import json
 import logging
 
 from clients.documents import patents as patent_client
-from clients.documents.patents.reports.topic import model_patent_topics
+from clients.documents.reports.topic import model_patent_topics
 from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 

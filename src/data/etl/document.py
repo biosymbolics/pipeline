@@ -44,7 +44,8 @@ class DocumentEtl:
                     UPDATE {bet}
                     SET
                         entity_id=entity_synonym.entity_id,
-                        canonical_name=biomedical_entity.name
+                        canonical_name=biomedical_entity.name,
+                        canonical_type=biomedical_entity.entity_type
                     FROM entity_synonym, biomedical_entity
                     WHERE {bet}.name=entity_synonym.term
                     AND entity_synonym.entity_id=biomedical_entity.id;

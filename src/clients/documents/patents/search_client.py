@@ -3,7 +3,6 @@ Patent client
 """
 from functools import partial
 import logging
-import time
 from typing import Sequence
 from prisma.client import Prisma
 from prisma.types import PatentWhereInput, PatentWhereInputRecursive2
@@ -22,7 +21,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 MAX_SEARCH_RESULTS = 2000
-MAX_ARRAY_LENGTH = 50
 EXEMPLAR_SIMILARITY_THRESHOLD = 0.7
 
 
@@ -110,7 +108,7 @@ async def _search(
     exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "OR",
     min_patent_years: int = 10,
-    term_field: TermField = "terms",
+    term_field: TermField = "canonical_name",
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[PatentApplication]:
     """

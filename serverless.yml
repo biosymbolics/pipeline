@@ -134,49 +134,49 @@ functions:
     handler: src.handlers.patents.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  summarize-patents:
+  summarize-documents:
     events:
       - http:
-          path: patents/reports/summarize
+          path: reports/summarize
           method: get
           cors: true
-    handler: src.handlers.patents.reports.summarize
+    handler: src.handlers.reports.summarize
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-over-time:
+  documents-over-time:
     events:
       - http:
-          path: patents/reports/time
+          path: reports/time
           method: get
           cors: true
-    handler: src.handlers.patents.reports.aggregate_over_time
+    handler: src.handlers.reports.aggregate_over_time
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-x-by-y:
+  documents-x-by-y:
     events:
       - http:
-          path: patents/reports/x_by_y
+          path: reports/x_by_y
           method: get
           cors: true
-    handler: src.handlers.patents.reports.x_by_y
+    handler: src.handlers.reports.x_by_y
     layers:
       - Ref: PythonRequirementsLambdaLayer
   patents-characteristics:
     events:
       - http:
-          path: patents/reports/characteristics
+          path: reports/characteristics
           method: get
           cors: true
-    handler: src.handlers.patents.reports.patent_characteristics
+    handler: src.handlers.reports.patent_characteristics
     layers:
       - Ref: PythonRequirementsLambdaLayer
   patent-topics:
     events:
       - http:
-          path: patents/reports/topics
+          path: reports/topics
           method: get
           cors: true
-    handler: src.handlers.patents.reports.analyze_topics
+    handler: src.handlers.reports.analyze_topics
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:

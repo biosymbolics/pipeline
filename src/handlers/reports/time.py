@@ -4,14 +4,14 @@ Handler for patent timewise reports
 import json
 import logging
 
-from clients.documents import patents as patent_client
 from clients.documents.patents.constants import DOMAINS_OF_INTEREST
-from clients.documents.patents.reports import group_by_xy
-from handlers.patents.reports.constants import DEFAULT_REPORT_PARAMS
+from clients.documents.reports import XYReport
 from handlers.utils import handle_async
-from typings.client import PatentSearchParams
+from typings.client import CommonSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
+
+from .constants import DEFAULT_REPORT_PARAMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -26,7 +26,7 @@ async def _aggregate_over_time(raw_event: dict, context):
     - Remote: `serverless invoke --function patents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/time?terms=asthma`
     """
-    p = PatentSearchParams(
+    p = CommonSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
 
@@ -37,16 +37,12 @@ async def _aggregate_over_time(raw_event: dict, context):
     logger.info("Fetching reports forparams: %s", p)
 
     try:
-        patents = await patent_client.search(p)
-        if len(patents) == 0:
-            logging.info("No patents found for terms: %s", p.terms)
-            return {"statusCode": 200, "body": json.dumps([])}
-
-        summaries = group_by_xy(
-            patents,
-            x_dimensions=DOMAINS_OF_INTEREST,
-            y_dimensions=["priority_date"],
-            y_transform=lambda y: y.year,
+        summaries = XYReport.group_by_xy_for_filters(
+            search_params=p,
+            x_dimension="canonical_name",  # keyof typeof X_DIMENSIONS
+            y_dimension="priority_date",
+            y_transform=lambda y: f"DATE_PART('Year', {y})",
+            filters=[f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST],
         )
     except Exception as e:
         message = f"Error generating patent reports: {e}"

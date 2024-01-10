@@ -9,7 +9,7 @@ from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass
-from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
+from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 
 
 @dataclass(frozen=True)

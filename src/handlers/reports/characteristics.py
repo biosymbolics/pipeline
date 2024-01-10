@@ -5,8 +5,8 @@ import json
 import logging
 
 from clients.documents import patents as patent_client
-from clients.documents.patents.reports.graph import aggregate_patent_relationships
-from clients.documents.patents.reports.graph.types import CharacteristicHeadField
+from clients.documents.reports.graph import aggregate_patent_relationships
+from clients.documents.reports.graph.types import CharacteristicHeadField
 from handlers.utils import handle_async
 from typings.client import PatentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder

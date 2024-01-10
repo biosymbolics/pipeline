@@ -15,14 +15,14 @@ RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
 
 
 @dataclass(frozen=True)
-class PatentsReportRecord(Dataclass):
+class DocumentReportRecord(Dataclass):
     count: int
     x: str
     y: int | str | None = None
 
 
 @dataclass(frozen=True)
-class PatentsReport(Dataclass):
+class DocumentReport(Dataclass):
     x: str
     y: str | None
-    data: list[PatentsReportRecord] | None
+    data: list[DocumentReportRecord] | None

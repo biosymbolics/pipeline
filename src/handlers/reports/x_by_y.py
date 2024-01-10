@@ -5,9 +5,9 @@ import json
 import logging
 
 from clients.documents import patents as patent_client
-from clients.documents.patents.reports.reports import group_by_xy
+from clients.documents.reports import XYReport
 from handlers.utils import handle_async
-from typings.client import PatentSearchParams
+from typings.client import CommonSearchParams, PatentSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
 
@@ -54,13 +54,12 @@ async def _x_by_y(raw_event: dict, context):
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps([])}
 
-        reports = group_by_xy(
-            patents,
-            x_dimensions=[x_dimension],
-            y_dimensions=[y_dimension],
+        report = XYReport.group_by_xy(
+            search_params=CommonSearchParams(terms=p.terms, query_type=p.query_type),
+            x_dimension=x_dimension,
+            y_dimension=y_dimension,
         )
 
-        report = reports[0]
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)

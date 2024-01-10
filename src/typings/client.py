@@ -4,16 +4,14 @@ from pydantic import BaseModel, Field, field_validator
 
 
 QueryType = Literal["AND", "OR"]
-
-
-TermField = Literal["terms", "instance_rollup", "category_rollup"]
+TermField = Literal["name", "canonical_name", "instance_rollup"]
 
 
 class BaseSearchParams(BaseModel):
     limit: Annotated[int, Field(validate_default=True)] = 1000
     query_type: Annotated[QueryType, Field(validate_default=True)] = "AND"
     skip_cache: Annotated[bool, Field(validate_default=True)] = False
-    term_field: Annotated[TermField, Field(validate_default=True)] = "terms"
+    term_field: Annotated[TermField, Field(validate_default=True)] = "canonical_name"
 
 
 class BasePatentSearchParams(BaseSearchParams):

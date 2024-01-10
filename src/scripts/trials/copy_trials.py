@@ -287,8 +287,10 @@ class TrialEtl(DocumentEtl):
             await Ownable.prisma().create_many(
                 data=[
                     {
-                        "name": t["sponsor"] or "unknown",
-                        "canonical_name": t["sponsor"],  # overwritten later
+                        "name": (t["sponsor"] or "unknown").lower(),
+                        "canonical_name": (
+                            t["sponsor"] or "unknown"
+                        ).lower(),  # overwritten later
                         "is_primary": True,
                         "trial_id": t["id"],
                     }

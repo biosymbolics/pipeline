@@ -239,7 +239,8 @@ class PatentEtl(DocumentEtl):
             await Ownable.prisma().create_many(
                 data=[
                     {
-                        "name": a,
+                        "name": a.lower(),
+                        "canonical_name": a.lower(),  # may be overwritten later
                         "is_primary": True,
                         "assignee_patent_id": p["id"],
                     }
@@ -253,7 +254,8 @@ class PatentEtl(DocumentEtl):
             await Ownable.prisma().create_many(
                 data=[
                     {
-                        "name": i,
+                        "name": i.lower(),
+                        "canonical_name": i.lower(),  # may be overwritten later
                         "is_primary": True,
                         "inventor_patent_id": p["id"],
                     }

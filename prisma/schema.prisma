@@ -202,22 +202,23 @@ model Ownable {
 }
 
 model Intervenable {
-    id                     Int                 @id @default(autoincrement())
-    entity                 BiomedicalEntity?   @relation(fields: [entity_id], references: [id])
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
     entity_id              Int?
-    context_of_use         ContextOfUse        @default(NA)
-    is_primary             Boolean             @default(false)
-    mention_index          Int                 @default(-1)
-    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    context_of_use         ContextOfUse          @default(NA)
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
     patent_id              String?
     name                   String
     canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
     instance_rollup        String? // denormalized from biomedical entity
     category_rollup        String? // denormalized from biomedical entity
-    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
-    trial                  Trial?              @relation(fields: [trial_id], references: [id])
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
 
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "intervenable_name")
@@ -226,20 +227,21 @@ model Intervenable {
 }
 
 model Indicatable {
-    id                     Int                 @id @default(autoincrement())
-    entity                 BiomedicalEntity?   @relation(fields: [entity_id], references: [id])
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
     entity_id              Int?
-    is_primary             Boolean             @default(false)
-    mention_index          Int                 @default(-1)
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
     name                   String
     canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
     instance_rollup        String? // denormalized from biomedical entity
     category_rollup        String? // denormalized from biomedical entity
     trial_id               String?
-    trial                  Trial?              @relation(fields: [trial_id], references: [id])
-    patent                 Patent?             @relation(fields: [patent_id], references: [id])
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
     patent_id              String?
-    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
 
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])

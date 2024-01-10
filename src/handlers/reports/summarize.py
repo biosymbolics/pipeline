@@ -4,12 +4,11 @@ Handler for patent summarization reports
 import json
 import logging
 
-from clients.documents import patents as patent_client
 from clients.documents.patents.constants import DOMAINS_OF_INTEREST
-from clients.documents.patents.reports.reports import group_by_xy
+from clients.documents.reports import group_by_xy_for_filters
 from handlers.utils import handle_async
 from utils.encoding.json_encoder import DataclassJSONEncoder
-from typings.client import PatentSearchParams
+from typings.client import CommonSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
 
@@ -22,12 +21,12 @@ async def _summarize(raw_event: dict, context):
     Summarize patents by terms (diseases, compounds, etc)
 
     Invocation:
-    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
-    - Local: `serverless invoke local --function summarize-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma",  "term_field": "instance_rollup" }}'`
-    - Remote: `serverless invoke --function summarize-patents --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
+    - Local: `serverless invoke local --function summarize-documents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma",  "skip_cache": true }}'`
+    - Local: `serverless invoke local --function summarize-documents --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma",  "term_field": "canonical_name" }}'`
+    - Remote: `serverless invoke --function summarize-documents --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/patents/reports/summarize?terms=asthma`
     """
-    p = PatentSearchParams(
+    p = CommonSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
 
@@ -38,8 +37,11 @@ async def _summarize(raw_event: dict, context):
     logger.info("Fetching reports for params: %s", p)
 
     try:
-        results = await patent_client.search(p)
-        summaries = group_by_xy(results, [*DOMAINS_OF_INTEREST, "similar_patents"])
+        summaries = await group_by_xy_for_filters(
+            search_params=p,
+            x_dimension="canonical_name",
+            filters=[f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST],
+        )
     except Exception as e:
         message = f"Error reporting on patents: {e}"
         logger.error(message)
