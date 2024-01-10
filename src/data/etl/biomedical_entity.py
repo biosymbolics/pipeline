@@ -202,6 +202,9 @@ class BiomedicalEntityEtl:
                     if connect_info is not None
                 },  # type: ignore
             )
-            await BiomedicalEntity.prisma().update(
-                where={"name": entity_rec["name"]}, data=update
-            )
+            try:
+                await BiomedicalEntity.prisma().update(
+                    where={"name": entity_rec["name"]}, data=update
+                )
+            except Exception as e:
+                print(e, entity_rec)
