@@ -27,14 +27,15 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
 
     async with get_prisma_client(300):
         results = await BiomedicalEntity.prisma().find_many(
-            where={"name": {"contains": string}},
+            where={"name": {"contains": string.lower()}},
             take=limit,
         )
 
     logger.info(
-        "Autocomplete for string %s took %s seconds",
+        "Autocomplete for string %s took %s seconds (%s)",
         string,
         round(time.monotonic() - start, 2),
+        len(results),
     )
 
-    return [{"id": entity.id, "label": entity.name} for entity in results]
+    return [{"id": entity.name, "label": entity.name} for entity in results]

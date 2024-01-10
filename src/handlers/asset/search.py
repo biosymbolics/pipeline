@@ -38,7 +38,7 @@ async def _search(raw_event: dict, context):
     logger.info("Fetching assets for params: %s", p)
 
     try:
-        results = await asset_search(p)
+        assets = await asset_search(p)
     except Exception as e:
         message = f"Error searching entities: {e}"
         logger.error(message)
@@ -46,7 +46,7 @@ async def _search(raw_event: dict, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps(results, cls=DataclassJSONEncoder),
+        "body": json.dumps(assets, cls=DataclassJSONEncoder),
     }
 
 

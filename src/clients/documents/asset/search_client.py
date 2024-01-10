@@ -1,11 +1,11 @@
 """
 Entity client
 """
+import asyncio
 from dataclasses import dataclass
-import json
-from typing import Literal, Sequence, TypedDict
+from typing import Literal, Sequence
 from prisma import Prisma
-from pydash import compact, flatten
+from pydash import compact
 import logging
 from prisma.models import (
     RegulatoryApproval,
@@ -97,24 +97,32 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     Gets docs by type, matching doc_ids
     """
 
-    regulatory_approvals = await RegulatoryApproval.prisma().find_many(
-        where={"id": {"in": doc_ids}},
-        include={"interventions": True, "indications": True},
+    regulatory_approvals = asyncio.create_task(
+        RegulatoryApproval.prisma().find_many(
+            where={"id": {"in": doc_ids}},
+            include={"interventions": True, "indications": True},
+        )
     )
-    patents = await find_patents(
-        where={"id": {"in": doc_ids}},
-        include={"interventions": True, "indications": True},
+    patents = asyncio.create_task(
+        find_patents(
+            where={"id": {"in": doc_ids}},
+            include={"interventions": True, "indications": True},
+        )
     )
-    trials = await Trial.prisma().find_many(
-        where={"id": {"in": doc_ids}},
-        include={"interventions": True, "indications": True},
+    trials = asyncio.create_task(
+        Trial.prisma().find_many(
+            where={"id": {"in": doc_ids}},
+            include={"interventions": True, "indications": True},
+        )
     )
+
+    await asyncio.gather(regulatory_approvals, patents, trials)
 
     # TODO: centralize the prisma client + transform (e.g. to ScoredPatent)
     return DocsByType(
-        regulatory_approvals={r.id: r for r in regulatory_approvals},
-        patents={p.id: p for p in patents},
-        trials={t.id: t for t in trials},
+        regulatory_approvals={r.id: r for r in regulatory_approvals.result()},
+        patents={p.id: p for p in patents.result()},
+        trials={t.id: t for t in trials.result()},
     )
 
 

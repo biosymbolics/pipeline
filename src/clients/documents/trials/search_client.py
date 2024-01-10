@@ -5,7 +5,6 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.models import Trial
 from prisma.types import TrialWhereInput
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder

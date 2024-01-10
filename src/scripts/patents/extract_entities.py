@@ -13,7 +13,7 @@ initialize()
 
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.patents.constants import ENTITY_DOMAINS
+from clients.documents.patents.constants import ENTITY_DOMAINS
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from core.ner.classifier import classify_by_keywords
@@ -32,7 +32,7 @@ CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
     attr_map = get_patent_attribute_map()
     return [
-        [DocEntity(term, ATTRIBUTE_FIELD, 0, 0, term) for term in attribute_set]
+        [DocEntity(term, 0, 0, term, ATTRIBUTE_FIELD) for term in attribute_set]
         for attribute_set in classify_by_keywords(patent_docs, attr_map)
     ]
 

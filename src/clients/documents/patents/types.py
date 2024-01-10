@@ -8,7 +8,7 @@ from typings.core import Dataclass
 
 
 AutocompleteMode = Literal["id", "term"]
-AutocompleteResult = TypedDict("AutocompleteResult", {"id": int, "label": str})
+AutocompleteResult = TypedDict("AutocompleteResult", {"id": str, "label": str})
 
 
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
