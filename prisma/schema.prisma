@@ -27,6 +27,8 @@ model BiomedicalEntity {
     sources       Source[]
     synonyms      EntitySynonym[]
 
+    // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
+
     @@map("biomedical_entity")
 }
 

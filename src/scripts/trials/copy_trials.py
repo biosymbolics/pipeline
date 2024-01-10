@@ -152,7 +152,7 @@ class TrialEtl(DocumentEtl):
                 SELECT DISTINCT lower(mesh_term) as name FROM browse_conditions
                     WHERE mesh_type = 'mesh-list' AND mesh_term is not null
                 UNION ALL
-                SELECT DISTINCT lower(name) FROM conditions WHERE name is not null'
+                SELECT DISTINCT lower(name) FROM conditions WHERE name is not null
             ) s
         """
         records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
@@ -257,7 +257,7 @@ class TrialEtl(DocumentEtl):
                 "randomization": TrialRandomizationParser.find(
                     trial.randomization, design
                 ),
-                "text_for_search": f"{trial.title} {' '.join(trial.interventions)} {' '.join(trial.indications)} {trial.sponsor}",
+                "text_for_search": f"{trial.title} {trial.sponsor}",
                 "status": TrialStatusParser.find(trial.status),
                 "termination_reason": TerminationReasonParser.find(
                     trial.termination_description
