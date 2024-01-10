@@ -7,10 +7,7 @@ from typing import Literal, Sequence
 from prisma import Prisma
 from pydash import compact
 import logging
-from prisma.models import (
-    RegulatoryApproval,
-    Trial,
-)
+from prisma.models import RegulatoryApproval, Trial
 from pydantic import BaseModel
 
 from clients.low_level.prisma import get_prisma_client
@@ -19,7 +16,9 @@ from typings.core import Dataclass
 from typings.entities import Entity
 from typings.patents import ScoredPatent
 
+from ..approvals import find_many as find_regulatory_approvals
 from ..patents import find_many as find_patents
+from ..trials import find_many as find_trials
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -98,7 +97,7 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     """
 
     regulatory_approvals = asyncio.create_task(
-        RegulatoryApproval.prisma().find_many(
+        find_regulatory_approvals(
             where={"id": {"in": doc_ids}},
             include={"interventions": True, "indications": True},
         )
@@ -106,13 +105,13 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     patents = asyncio.create_task(
         find_patents(
             where={"id": {"in": doc_ids}},
-            include={"interventions": True, "indications": True},
+            include={"assignees": True, "interventions": True, "indications": True},
         )
     )
     trials = asyncio.create_task(
-        Trial.prisma().find_many(
+        find_trials(
             where={"id": {"in": doc_ids}},
-            include={"interventions": True, "indications": True},
+            include={"interventions": True, "indications": True, "sponsor": True},
         )
     )
 
