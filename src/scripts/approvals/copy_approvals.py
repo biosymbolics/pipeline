@@ -244,7 +244,12 @@ class ApprovalEtl(DocumentEtl):
         # create "indicatable" records, those that map approval to a canonical indication
         await Indicatable.prisma().create_many(
             data=[
-                {"name": i, "canonical_name": i, "regulatory_approval_id": a["id"]}
+                {
+                    "name": i,
+                    "canonical_name": i,
+                    "instance_rollup": i,
+                    "regulatory_approval_id": a["id"],
+                }
                 for a in approvals
                 for i in a["indications"]
             ]
@@ -261,7 +266,8 @@ class ApprovalEtl(DocumentEtl):
                     or "",
                     "instance_rollup": get_preferred_pharmacologic_class(
                         a["pharmacologic_classes"]
-                    ),
+                    )
+                    or "",
                     "is_primary": True,
                     "regulatory_approval_id": a["id"],
                 }

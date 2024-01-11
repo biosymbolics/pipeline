@@ -253,7 +253,7 @@ model Indicatable {
 model UmlsLookup {
     id              String   @unique
     name            String
-    hierarchy       String
+    hierarchy       String?
     type_ids        String[]
     type_names      String[]
     num_descendants Int
@@ -268,7 +268,7 @@ model UmlsLookup {
     l7_ancestor     String?
     l8_ancestor     String?
     l9_ancestor     String?
-    preferred_term  String
+    preferred_name  String
     level           String
     instance_rollup String
     category_rollup String

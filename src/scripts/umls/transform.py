@@ -34,7 +34,7 @@ class UmlsTransformer:
             """
             Enrich UMLS record with ancestor info, level and preferred name
             """
-            if r["hierarchy"] is not None:
+            if r.get("hierarchy") is not None:
                 # reverse to get nearest ancestor first
                 ancestors = r["hierarchy"].split(".")[::-1]
             else:
@@ -42,7 +42,7 @@ class UmlsTransformer:
 
             ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
             # OntologyLevel.find(r["id"], self.umls_graph.get_umls_centrality)
-            level = OntologyLevel.INSTANCE
+            level = OntologyLevel.INSTANCE.name
             preferred_name = clean_umls_name(
                 r["id"],
                 r["name"],
@@ -53,7 +53,7 @@ class UmlsTransformer:
 
             return UmlsRecord(
                 **{
-                    **r.__dict__,  # type: ignore
+                    **r,
                     **{
                         f"l{i}_ancestor": ancestor_cuis[i]
                         if i < len(ancestor_cuis)
@@ -119,12 +119,12 @@ class UmlsTransformer:
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")
 
-        cuis = [r.__dict__[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
+        cuis = [r[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
         ancestors = tuple(
             [self.lookup_dict[cui] for cui in cuis if cui in self.lookup_dict]
         )
         return UmlsRecord(
-            **omit(r.__dict__, ["instance_rollup", "category_rollup"]),  # type: ignore
+            **omit(r, ["instance_rollup", "category_rollup"]),  # type: ignore
             instance_rollup=UmlsTransformer.find_level_ancestor(
                 r, [OntologyLevel.INSTANCE], ancestors
             ),
@@ -152,4 +152,7 @@ class UmlsTransformer:
 
         batch_records = [self.lookup_dict[r["id"]] for r in batch]
 
-        return [self.transform_record(r) for r in batch_records]
+        records = [self.transform_record(r) for r in batch_records]
+        print(records[0:3])
+
+        return records
