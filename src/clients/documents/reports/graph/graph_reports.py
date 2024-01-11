@@ -2,18 +2,25 @@
 Patent graph reports
 """
 
+from enum import Enum
 from typing import Sequence
 import logging
 import networkx as nx
 from pydash import uniq
 import polars as pl
+from prisma.enums import BiomedicalEntityType
 
-from clients.documents.patents.constants import ENTITY_DOMAINS
 from clients.low_level.prisma import prisma_client
-from typings.documents.patents import ScoredPatent
+from typings import (
+    DOMAINS_OF_INTEREST,
+    DocType,
+    ScoredTrial,
+    ScoredRegulatoryApproval,
+    ScoredPatent,
+)
 
 from .types import (
-    AggregatePatentRelationship,
+    AggregateDocumentRelationship,
     CharacteristicHeadField,
     Node,
     Link,
@@ -77,7 +84,31 @@ RELATIONSHIPS_OF_INTEREST = [
 ]
 
 ENTITY_GROUP = "entity"
-PATENT_GROUP = "patent"
+DOCUMENT_GROUP = "patent"
+
+
+class TermField(Enum):
+    canonical_name = "canonical_name"
+    instance_rollup = "instance_rollup"
+
+
+def get_entity_subquery(term_field: TermField, doc_type: DocType, filter: str) -> str:
+    """
+    Subquery to use if the x dimension is an entity (indicatable, intervenable)
+    """
+    return f"""
+        (
+            select {doc_type.name}_id, canonical_type, {term_field.name}
+            from intervenable
+            where {doc_type.name}_id is not null AND {filter}
+
+            UNION ALL
+
+            select {doc_type.name}_id, canonical_type, {term_field.name}
+            from indicatable
+            where {doc_type.name}_id is not null AND {filter}
+        )
+    """
 
 
 def generate_graph(
@@ -119,7 +150,7 @@ def generate_graph(
     subgraph = g.subgraph(
         uniq(
             [
-                *[n[0] for n in list(g.nodes(data="group")) if n[1] == PATENT_GROUP],  # type: ignore
+                *[n[0] for n in list(g.nodes(data="group")) if n[1] == DOCUMENT_GROUP],  # type: ignore
                 *top_nodes,
             ]
         )
@@ -128,38 +159,42 @@ def generate_graph(
     return subgraph
 
 
-async def graph_patent_relationships(
-    patents: Sequence[ScoredPatent],
+async def graph_document_relationships(
+    documents: Sequence[ScoredPatent]
+    | Sequence[ScoredTrial]
+    | Sequence[ScoredRegulatoryApproval],
+    doc_type: DocType = DocType.patent,
     max_nodes: int = MAX_NODES,
 ) -> SerializableGraph:
     """
-    Graph UMLS ancestory for a set of patents
+    Graph UMLS ancestory for a set of documents
 
     - Nodes are UMLS entities
     - Edges are ancestory relationships OR patent co-occurrences (e.g. PD and anti-alpha-synucleins)
-    - Nodes contain metadata of the relevant patents
+    - Nodes contain metadata of the relevant documents
 
-    Note: perhaps inefficient to load patents just for ids, but patent call is cached (+ used by other queries)
+    Note: perhaps inefficient to load documents just for ids, but patent call is cached (+ used by other queries)
     """
-    patent_ids = [p.id for p in patents]
+    document_ids = [d.id for d in documents]
 
     # TODO: save relationship type, ancestors
     sql = f"""
-        -- patent-node to entity relationships
+        -- documents-node to entity relationships
         SELECT
-            TO_CHAR(app.priority_date, 'YYYY') as head,
+            TO_CHAR(document.priority_date, 'YYYY') as head,
             umls.canonical_name as tail,
             count(*) as weight,
-            '{PATENT_GROUP}' as group
-        FROM
-            patent,
-            tids t,
-            umls_lookup umls
-        WHERE a.publication_number = ANY(ARRAY{patent_ids})
-        AND a.domain in {tuple(ENTITY_DOMAINS)}
-        AND t.id = a.id
-        AND umls.id = t.cid
-        GROUP BY TO_CHAR(app.priority_date, 'YYYY'), umls.canonical_name
+            '{DOCUMENT_GROUP}' as group
+        FROM {doc_type.name} as document
+            JOIN {get_entity_subquery(TermField.canonical_name, doc_type, f"{doc_type.name}_id = document.id")} entities
+                ON entities.{doc_type.name}_id = document.id
+            JOIN biomedical_entity ON
+                biomedical_entity.id = entities.canonical_id
+                AND biomedical_entity.entity_types in {tuple(DOMAINS_OF_INTEREST)}
+            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN umls_lookup umls ON umls.id = etu."B"
+        WHERE document.id = ANY(ARRAY{document_ids})
+        GROUP BY TO_CHAR(document.priority_date, 'YYYY'), umls.canonical_name
         ORDER BY weight DESC LIMIT 1000
     """
 
@@ -215,41 +250,47 @@ async def graph_patent_relationships(
     )
 
 
-async def aggregate_patent_relationships(
-    patents: Sequence[ScoredPatent],
+async def aggregate_document_relationships(
+    documents: Sequence[ScoredPatent]
+    | Sequence[ScoredTrial]
+    | Sequence[ScoredRegulatoryApproval],
     head_field: CharacteristicHeadField = "priority_year",
-    domains: Sequence[str] = [],
+    entity_types: Sequence[BiomedicalEntityType] = [],
     relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
-) -> list[AggregatePatentRelationship]:
+    doc_type: DocType = DocType.patent,
+) -> list[AggregateDocumentRelationship]:
     """
-    Aggregated UMLS ancestory report for a set of patents
+    Aggregated UMLS ancestory report for a set of documents
     """
-    patent_ids = [p.id for p in patents]
+    ids = [d.id for d in documents]
 
     if head_field == "priority_year":
-        head_sql = "TO_CHAR(app.priority_date, 'YYYY')"
+        head_sql = "TO_CHAR(document.priority_date, 'YYYY')"
     elif head_field == "assignee":
-        head_sql = "app.assignees[1]"  # TODO: all?
-    elif head_field == "publication_number":
-        head_sql = "app.publication_number"
+        head_sql = "document.assignees[1]"  # TODO: all?
+    elif head_field == "id":
+        head_sql = "document.id"
     else:
         raise Exception(f"Invalid head field: {head_field}")
 
+    entity_sq = get_entity_subquery(
+        TermField.canonical_name, doc_type, f"{doc_type.name}_id = document.id"
+    )
     sql = f"""
-        -- patent to entity relationships
+        -- document to entity relationships
         SELECT
             {head_sql} as head,
             umls.canonical_name as concept,
             count(*) as count,
-            array_agg(distinct patent.id) as patents
-        FROM
-            patent,
-            tids t,
-            umls_lookup umls
-        WHERE patent.id = ANY(ARRAY{patent_ids})
-        AND a.domain in {tuple(domains)}
-        AND t.id = a.id
-        AND umls.id = t.cid
+            array_agg(distinct {doc_type.name}.id) as documents
+        FROM {doc_type.name} as document
+            JOIN {entity_sq} entities
+                ON entities.{doc_type.name}_id = document.id
+            JOIN biomedical_entity ON biomedical_entity.id = entities.canonical_id
+                AND biomedical_entity.entity_types in {tuple(entity_types)}
+            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN umls_lookup umls ON umls.id = etu."B"
+        WHERE document.id = ANY(ARRAY{ids})
         GROUP BY {head_sql}, concept
 
         UNION ALL
@@ -259,15 +300,14 @@ async def aggregate_patent_relationships(
             {head_sql} as head,
             tail_name as concept,
             count(*) as count,
-            array_agg(distinct patent.id) as patents
-        FROM
-            patent,
-            tids t,
-            umls_graph g
-        WHERE patent.id = ANY(ARRAY{patent_ids})
-        AND a.domain in {tuple(domains)}
-        AND t.id = a.id
-        AND g.head_id = t.cid
+            array_agg(distinct {doc_type.name}.id) as documents
+        FROM {doc_type.name} as document
+            JOIN {entity_sq} entities ON entities.{doc_type.name}_id = document.id
+            JOIN biomedical_entity ON biomedical_entity.id = entities.canonical_id
+                AND biomedical_entity.entity_types in {tuple(entity_types)}
+            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN umls_graph ON umls_graph.head_id = etu."B"
+        WHERE document.id = ANY(ARRAY{ids})
         AND head_id<>tail_id
         AND g.relationship in {tuple(relationships)}
         GROUP BY {head_sql}, concept
@@ -297,4 +337,4 @@ async def aggregate_patent_relationships(
         .to_dicts()
     )
 
-    return [AggregatePatentRelationship(**tr) for tr in top_records]
+    return [AggregateDocumentRelationship(**tr) for tr in top_records]

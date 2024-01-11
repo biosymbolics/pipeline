@@ -5,7 +5,7 @@ import json
 import logging
 
 from clients.documents import patents as patent_client
-from clients.documents.reports.graph import aggregate_patent_relationships
+from clients.documents.reports.graph import aggregate_document_relationships
 from clients.documents.reports.graph.types import CharacteristicHeadField
 from handlers.utils import handle_async
 from typings.client import PatentSearchParams
@@ -49,7 +49,7 @@ async def _patent_characteristics(raw_event: dict, context):
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
 
-        report = aggregate_patent_relationships(patents, p.head_field)
+        report = aggregate_document_relationships(patents, p.head_field)
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)

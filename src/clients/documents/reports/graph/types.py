@@ -31,11 +31,11 @@ class SerializableGraph:
 
 
 @dataclass(frozen=True)
-class AggregatePatentRelationship(Dataclass):
+class AggregateDocumentRelationship(Dataclass):
     head: str
     concept: str
     count: int
-    patents: list[str]
+    documents: list[str]
 
 
-CharacteristicHeadField = Literal["priority_year", "assignee", "publication_number"]
+CharacteristicHeadField = Literal["priority_year", "assignee", "id"]
