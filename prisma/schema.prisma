@@ -250,6 +250,43 @@ model Indicatable {
     @@map("indicatable")
 }
 
+model UmlsLookup {
+    id              String   @unique
+    name            String
+    hierarchy       String
+    type_ids        String[]
+    type_names      String[]
+    num_descendants Int
+    synonyms        String[]
+    l0_ancestor     String?
+    l1_ancestor     String?
+    l2_ancestor     String?
+    l3_ancestor     String?
+    l4_ancestor     String?
+    l5_ancestor     String?
+    l6_ancestor     String?
+    l7_ancestor     String?
+    l8_ancestor     String?
+    l9_ancestor     String?
+    preferred_term  String
+    level           String
+    instance_rollup String
+    category_rollup String
+
+    @@map("umls_lookup")
+}
+
+model UmlsGraph {
+    head_id   String
+    head_name String
+    tail_id   String
+    tail_name String
+    relation  String
+
+    @@unique([head_id, tail_id, relation])
+    @@map("umls_graph")
+}
+
 enum ComparisonType {
     ACTIVE
     PLACEBO

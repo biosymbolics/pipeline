@@ -1,8 +1,13 @@
 """
 Utils for ETLing UMLs data
 """
+import asyncio
+from datetime import datetime
 import sys
 import logging
+from prisma.models import UmlsLookup
+from pydash import flatten
+from prisma.types import UmlsLookupCreateWithoutRelationsInput as UmlsRecord
 
 from system import initialize
 
@@ -11,6 +16,7 @@ initialize()
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
+from utils.list import batch
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
 from .transform import UmlsTransformer
@@ -19,13 +25,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 UMLS_LOOKUP_TABLE = "umls_lookup"
+SOURCE_DB = "umls"
 
 
-def create_umls_lookup():
+async def create_umls_lookup():
     """
     Create UMLS lookup table
 
-    - Creates a table of UMLS entities: id, name, ancestor ids
+    Creates a table of UMLS entities: id, name, ancestor ids
     """
 
     ANCESTOR_FIELDS = [
@@ -35,7 +42,7 @@ def create_umls_lookup():
     source_sql = f"""
         SELECT
             TRIM(entities.cui) as id,
-            TRIM(max(entities.str)) as canonical_name,
+            TRIM(max(entities.str)) as name,
             TRIM(max(ancestors.ptr)) as hierarchy,
             array_agg(distinct semantic_types.tui::text) as type_ids,
             array_agg(distinct semantic_types.sty::text) as type_names,
@@ -69,42 +76,24 @@ def create_umls_lookup():
     umls_db = f"{BASE_DATABASE_URL}/umls"
     aui_lookup = {
         r["aui"]: r["cui"]
-        for r in PsqlDatabaseClient(umls_db).select(
+        for r in await PsqlDatabaseClient(umls_db).select(
             "select TRIM(aui) aui, TRIM(cui) cui from mrconso"
         )
     }
 
-    PsqlDatabaseClient(umls_db).truncate_table(UMLS_LOOKUP_TABLE)
     transform = UmlsTransformer(aui_lookup)
-    PsqlDatabaseClient.copy_between_db(
-        umls_db,
-        source_sql,
-        f"{BASE_DATABASE_URL}/patents",
-        UMLS_LOOKUP_TABLE,
-        transform=lambda batch, all_records: transform(batch, all_records),
-    )
+    umls_lookups = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
+    batched = batch(umls_lookups, 10000)
+    transformed = flatten([transform(batch, umls_lookups) for batch in batched])
 
-    PsqlDatabaseClient().create_indices(
-        [
-            {
-                "table": UMLS_LOOKUP_TABLE,
-                "column": "id",
-            },
-            {
-                "table": UMLS_LOOKUP_TABLE,
-                "column": "type_ids",
-                "is_gin": True,
-            },
-            {
-                "table": UMLS_LOOKUP_TABLE,
-                "column": "canonical_name",
-                "is_tgrm": True,
-            },
-        ]
+    # create approval records
+    await UmlsLookup.prisma().create_many(
+        data=transformed,
+        skip_duplicates=True,
     )
 
 
-def copy_relationships():
+async def copy_relationships():
     """
     Copy relationships from umls to patents
 
@@ -132,34 +121,20 @@ def copy_relationships():
         GROUP BY head_id, tail_id, relationship
     """
 
-    new_table_name = "umls_graph"
+    umls_lookups = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
-    umls_db = f"{BASE_DATABASE_URL}/umls"
-    PsqlDatabaseClient(umls_db).truncate_table(new_table_name)
-    PsqlDatabaseClient.copy_between_db(
-        umls_db, source_sql, f"{BASE_DATABASE_URL}/patents", new_table_name
-    )
-
-    PsqlDatabaseClient().create_indices(
-        [
-            {
-                "table": new_table_name,
-                "column": "head_id",
-            },
-            {
-                "table": new_table_name,
-                "column": "relationship",
-            },
-        ]
+    await UmlsLookup.prisma().create_many(
+        data=[UmlsRecord(**r) for r in umls_lookups],
+        skip_duplicates=True,
     )
 
 
-def copy_umls():
+async def copy_umls():
     """
     Copy data from umls to patents
     """
-    create_umls_lookup()
-    # copy_relationships()
+    await create_umls_lookup()
+    await copy_relationships()
 
 
 if __name__ == "__main__":
@@ -172,4 +147,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    copy_umls()
+    asyncio.run(copy_umls())

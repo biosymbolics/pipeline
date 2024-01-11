@@ -2,9 +2,10 @@ import time
 from typing import Sequence
 import logging
 from pydash import omit
+from prisma.types import UmlsLookupCreateWithoutRelationsInput as UmlsRecord
 
 from data.domain.biomedical.umls import clean_umls_name
-from typings.umls import OntologyLevel, UmlsRecord
+from typings.umls import OntologyLevel
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
@@ -25,28 +26,34 @@ class UmlsTransformer:
         self.lookup_dict: dict[str, UmlsRecord] | None = None
 
         # graph w/ betweenness centrality to find ancestors
-        self.umls_graph = AncestorUmlsGraph()
+        # TODO!
+        # self.umls_graph = AncestorUmlsGraph()
 
     def _create_lookup(self, records: Sequence[UmlsRecord]) -> dict[str, UmlsRecord]:
         def _enrich(r: UmlsRecord) -> UmlsRecord:
             """
             Enrich UMLS record with ancestor info, level and preferred name
             """
-            if r.hierarchy is not None:
+            if r["hierarchy"] is not None:
                 # reverse to get nearest ancestor first
-                ancestors = r.hierarchy.split(".")[::-1]
+                ancestors = r["hierarchy"].split(".")[::-1]
             else:
                 ancestors = []
 
             ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
-            level = OntologyLevel.find(r.id, self.umls_graph.get_umls_centrality)
+            # OntologyLevel.find(r["id"], self.umls_graph.get_umls_centrality)
+            level = OntologyLevel.INSTANCE
             preferred_name = clean_umls_name(
-                r.id, r.canonical_name, r.synonyms, r.type_ids, False
+                r["id"],
+                r["name"],
+                r.get("synonyms") or [],
+                r.get("type_ids") or [],
+                False,
             )
 
             return UmlsRecord(
                 **{
-                    **r,
+                    **r.__dict__,  # type: ignore
                     **{
                         f"l{i}_ancestor": ancestor_cuis[i]
                         if i < len(ancestor_cuis)
@@ -112,12 +119,12 @@ class UmlsTransformer:
         if self.lookup_dict is None:
             raise ValueError("Lookup dict is not initialized")
 
-        cuis = [r[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
+        cuis = [r.__dict__[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
         ancestors = tuple(
             [self.lookup_dict[cui] for cui in cuis if cui in self.lookup_dict]
         )
         return UmlsRecord(
-            **omit(r.__dict__, ["instance_rollup", "category_rollup"]),
+            **omit(r.__dict__, ["instance_rollup", "category_rollup"]),  # type: ignore
             instance_rollup=UmlsTransformer.find_level_ancestor(
                 r, [OntologyLevel.INSTANCE], ancestors
             ),
@@ -139,7 +146,7 @@ class UmlsTransformer:
             all_records (Sequence[dict]): all UMLs records
         """
         if self.lookup_dict is None:
-            as_umls_records = [UmlsRecord(**r) for r in all_records]
+            as_umls_records = [UmlsRecord(**r) for r in all_records]  # type: ignore
             self.lookup_dict = self._create_lookup(as_umls_records)
             assert self.lookup_dict is not None
 

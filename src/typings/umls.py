@@ -1,7 +1,5 @@
-from dataclasses import dataclass
 from typing import Callable, Literal
 
-from typings.core import Dataclass
 from utils.classes import ByDefinitionOrderEnum
 
 L1_CATEGORY_CUTOFF = 0.0001
@@ -37,31 +35,6 @@ class OntologyLevel(ByDefinitionOrderEnum):
 
         # 6418 as of 11/23
         return cls.L2_CATEGORY
-
-
-@dataclass(frozen=True)
-class UmlsRecord(Dataclass):
-    id: str
-    canonical_name: str
-    category_rollup: str | None
-    hierarchy: str | None
-    instance_rollup: str | None
-    num_descendants: int
-    level: OntologyLevel | None
-    preferred_name: str
-    synonyms: list[str]
-    type_ids: list[str]
-    type_names: list[str]
-    l0_ancestor: str | None
-    l1_ancestor: str | None
-    l2_ancestor: str | None
-    l3_ancestor: str | None
-    l4_ancestor: str | None
-    l5_ancestor: str | None
-    l6_ancestor: str | None
-    l7_ancestor: str | None
-    l8_ancestor: str | None
-    l9_ancestor: str | None
 
 
 RollupLevel = Literal[OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY]  # type: ignore
