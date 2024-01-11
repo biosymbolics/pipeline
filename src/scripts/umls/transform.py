@@ -62,22 +62,30 @@ class UmlsLevelTransformer:
     """
 
     def __init__(self):
-        self.lookup_dict: dict[str, UmlsIdLevel] | None = None
+        self.level_lookup: dict[str, UmlsIdLevel] | None = None
 
     @staticmethod
-    async def create() -> "UmlsLevelTransformer":
+    async def create(records: Sequence[Umls]) -> "UmlsLevelTransformer":
         """
         Factory for UmlsLevelTransformer
         """
         ult = UmlsLevelTransformer()
-        await ult.load()
+        await ult.load(records)
+
         return ult
 
-    async def load(self):
+    async def load(self, records: Sequence[Umls]):
         """
         Load UMLS graph
         """
         self.umls_graph = await AncestorUmlsGraph.create()
+        self.level_lookup = {
+            r.id: UmlsIdLevel(
+                id=r.id,
+                level=get_ontology_level(r.id, self.umls_graph.get_umls_centrality),
+            )
+            for r in records
+        }
 
     @staticmethod
     def find_level_ancestor(
@@ -119,12 +127,12 @@ class UmlsLevelTransformer:
         """
         Transform a single UMLS record with updates (level, instance_rollup, category_rollup)
         """
-        if self.lookup_dict is None:
-            raise ValueError("Lookup dict is not initialized")
+        if self.level_lookup is None:
+            raise ValueError("level_lookup is not initialized")
 
         cuis = [r.__dict__[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
         ancestors = tuple(
-            [self.lookup_dict[cui] for cui in cuis if cui in self.lookup_dict]
+            [self.level_lookup[cui] for cui in cuis if cui in self.level_lookup]
         )
         level = get_ontology_level(r.id, self.umls_graph.get_umls_centrality)
         id_level = UmlsIdLevel(id=r.id, level=level)

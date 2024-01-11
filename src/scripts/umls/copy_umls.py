@@ -103,12 +103,12 @@ class UmlsEtl:
         Run *after* BiomedicalEntityEtl
         """
         # all records with UNKNOWN / UNSET level
-        records = await Umls.prisma().find_many(where={"level": OntologyLevel.UNKNOWN})
+        records = await Umls.prisma().find_many()
 
         # might be slow, if doing betweenness centrality calc.
-        ult = await UmlsLevelTransformer.create()
+        ult = await UmlsLevelTransformer.create(records)
 
-        client = await prisma_client(300)
+        client = await prisma_client(1000)
         async with client.tx() as transaction:
             for r in records:
                 await Umls.prisma(transaction).update(
