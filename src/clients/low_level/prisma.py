@@ -39,7 +39,10 @@ def prisma_context(timeout: int | None) -> Prisma:
         client = PRISMA_CLIENT
 
     if not client.is_registered():
-        logger.debug("Registering prisma client")
-        register(client)
+        try:
+            logger.debug("Registering prisma client")
+            register(client)
+        except Exception as e:
+            logger.debug("Error registering prisma client, perhaps a race condition")
 
     return client

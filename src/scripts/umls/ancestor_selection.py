@@ -56,19 +56,21 @@ class AncestorUmlsGraph(UmlsGraph):
                 -- Start with UMLS terms associated directly to patents
                 SELECT
                     {self.doc_type.name}_id as head,
-                    _entity_to_umls.B as tail, -- B is cui
+                    etu."B" as tail, -- B is cui
                     1 AS depth
-                FROM biomedical_entity, intervenable
+                FROM biomedical_entity, intervenable, _entity_to_umls AS etu
                 WHERE biomedical_entity.id=intervenable.entity_id
+                AND etu."A"=intervenable.id
 
                 UNION
 
                 SELECT
                     {self.doc_type.name}_id as head,
-                    _entity_to_umls.B as tail, -- B is cui
+                    etu."B" as tail, -- B is cui
                     1 AS depth
-                FROM biomedical_entity, indicatable
+                FROM biomedical_entity, indicatable, _entity_to_umls AS etu
                 WHERE biomedical_entity.id=indicatable.entity_id
+                AND etu."A"=indicatable.id
 
                 UNION
 
@@ -93,8 +95,8 @@ class AncestorUmlsGraph(UmlsGraph):
                 and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
                 and ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
-                and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
-                and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not head_entity.name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not tail_entity.name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
             )
             SELECT DISTINCT head, tail
             FROM working_terms;

@@ -1,11 +1,9 @@
 from abc import abstractmethod
-import asyncio
 import time
 from typing import Sequence
 import networkx as nx
 import logging
 
-from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.umls import UMLS_NAME_SUPPRESSIONS
 from utils.file import load_json_from_file, save_json_as_file
@@ -59,7 +57,7 @@ class UmlsGraph(object):
         G = nx.Graph()
 
         client = await prisma_client(300)
-        edges = await client.query_raw.select(self.edge_query(suppressions))
+        edges = await client.query_raw(self.edge_query(suppressions))
         G.add_edges_from([(e["head"], e["tail"]) for e in edges])
 
         logger.info(
