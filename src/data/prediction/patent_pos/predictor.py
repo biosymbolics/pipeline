@@ -4,10 +4,10 @@ from typing import cast
 import torch
 from ignite.metrics import Precision, Recall
 
-from clients.patents import search_client
+from clients.documents import patent_search as search_client
 from data.types import ModelMetrics
 from utils.tensor import pad_or_truncate_to_size
-from typings.patents import PatentApplication
+from typings.documents.patents import ScoredPatent as PatentApplication
 
 from .constants import (
     BATCH_SIZE,
@@ -125,10 +125,10 @@ class ModelPredictor:
         for i, patent in enumerate(patents):
             logging.info(
                 "Patent %s (pred: %s, act: %s): %s (%s)",
-                patent["publication_number"],
+                patent.id,
                 (predictions[i] > TRUE_THRESHOLD).item(),
                 (actuals[i] > TRUE_THRESHOLD).item(),
-                patent["title"],
+                patent.title,
                 predictions[i].item(),
             )
 

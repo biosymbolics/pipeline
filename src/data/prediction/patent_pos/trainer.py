@@ -5,8 +5,8 @@ from typing import Any, Optional, Sequence, cast
 import torch
 from ignite.metrics import Precision, Recall
 
-from clients.patents import search_client
-from typings.patents import PatentApplication
+from clients.documents import patent_search as search_client
+from typings.documents.patents import ScoredPatent as PatentApplication
 
 from .constants import (
     BATCH_SIZE,

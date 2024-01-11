@@ -14,7 +14,7 @@ from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.entities import Entity
-from typings.patents import ScoredPatent
+from typings.documents.patents import ScoredPatent
 
 from ..approvals import find_many as find_regulatory_approvals
 from ..patents import find_many as find_patents

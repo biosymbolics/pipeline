@@ -1,4 +1,4 @@
-from .approvals import ScoredRegulatoryApproval
+from .documents.approvals import ScoredRegulatoryApproval
 from .client import (
     ApprovalSearchParams,
     QueryType,
@@ -7,11 +7,11 @@ from .client import (
     TrialSearchParams,
 )
 from .core import JsonSerializable, Primitive
-from .patents import (
+from .documents.patents import (
     PatentsTopicReport,
     ScoredPatent,
 )
-from .trials import ScoredTrial
+from .documents.trials import ScoredTrial
 
 __all__ = [
     "ApprovalSearchParams",

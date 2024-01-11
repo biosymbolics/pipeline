@@ -6,7 +6,7 @@ from prisma.models import Owner
 
 from constants.patents import SUITABILITY_SCORE_MAP
 from typings.companies import CompanyFinancials
-from typings.patents import AvailabilityLikelihood, SuitabilityScoreMap
+from typings.documents.patents import AvailabilityLikelihood, SuitabilityScoreMap
 
 from .constants import EST_MAX_CLINDEV, MAX_PATENT_LIFE
 

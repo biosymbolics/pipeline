@@ -11,7 +11,7 @@ from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 
 from typings import QueryType, TrialSearchParams
-from typings.trials import ScoredTrial
+from typings.documents.trials import ScoredTrial
 from utils.string import get_id
 
 from .client import find_many

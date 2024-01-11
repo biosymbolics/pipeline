@@ -5,9 +5,12 @@ import asyncio
 import sys
 import logging
 from prisma import Prisma
-from prisma.models import UmlsLookup
+from prisma.models import UmlsGraph, UmlsLookup
 from pydash import flatten
-from prisma.types import UmlsLookupCreateWithoutRelationsInput as UmlsRecord
+from prisma.types import (
+    UmlsLookupCreateWithoutRelationsInput as UmlsRecord,
+    UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
+)
 
 from system import initialize
 
@@ -107,7 +110,7 @@ class UmlsEtl:
             SELECT
                 cui1 as head_id, max(head.str) as head_name,
                 cui2 as tail_id, max(tail.str) as tail_name,
-                rela as relationship
+                COALESCE(rela, '') as relationship
             FROM mrrel
             JOIN mrconso as head on head.cui = cui1
             JOIN mrconso as tail on tail.cui = cui2
@@ -127,8 +130,8 @@ class UmlsEtl:
 
         umls_lookups = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
-        await UmlsLookup.prisma().create_many(
-            data=[UmlsRecord(**r) for r in umls_lookups],
+        await UmlsGraph.prisma().create_many(
+            data=[UmlsGraphRecord(**r) for r in umls_lookups],
             skip_duplicates=True,
         )
 

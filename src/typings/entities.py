@@ -6,10 +6,10 @@ from pydash import compact, flatten, uniq
 from prisma.enums import TrialPhase, TrialStatus
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
-from typings.trials import TrialStatusGroup, get_trial_status_parent
+from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass
-from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood
+from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 
 
 @dataclass(frozen=True)

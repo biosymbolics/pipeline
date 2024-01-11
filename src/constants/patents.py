@@ -2,7 +2,7 @@ from pydash import flatten
 
 from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
-from typings.patents import SuitabilityScoreMap
+from typings.documents.patents import SuitabilityScoreMap
 
 BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))

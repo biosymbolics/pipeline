@@ -7,6 +7,7 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
+from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
@@ -19,8 +20,9 @@ class AncestorUmlsGraph(UmlsGraph):
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
     """
 
-    def __init__(self):
+    def __init__(self, doc_type: DocType = DocType.patent):
         super().__init__()
+        self.doc_type = doc_type
 
     @overrides(UmlsGraph)
     def edge_query(self, suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS) -> str:
@@ -40,11 +42,11 @@ class AncestorUmlsGraph(UmlsGraph):
             WITH RECURSIVE working_terms AS (
                 -- Start with UMLS terms associated directly to patents
                 SELECT
-                    publication_number as head,
-                    term_ids.cid as tail,
+                    {self.doc_type}_id as head,
+                    term_ids.canonical_id as tail, -- TODO: should be ids
                     1 AS depth
-                FROM annotations, term_ids
-                WHERE annotations.id=term_ids.id
+                FROM biomedical_entity, intervenable
+                WHERE biomedical_entity.id=intervenable.entity_id
 
                 UNION
 

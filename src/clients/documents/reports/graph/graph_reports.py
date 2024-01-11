@@ -10,7 +10,7 @@ import polars as pl
 
 from clients.documents.patents.constants import ENTITY_DOMAINS
 from clients.low_level.prisma import prisma_client
-from typings.patents import ScoredPatent
+from typings.documents.patents import ScoredPatent
 
 from .types import (
     AggregatePatentRelationship,

@@ -27,18 +27,15 @@ class UmlsTransformer:
 
         # graph w/ betweenness centrality to find ancestors
         # TODO!
-        # self.umls_graph = AncestorUmlsGraph()
+        self.umls_graph = AncestorUmlsGraph()
 
     def _create_lookup(self, records: Sequence[UmlsRecord]) -> dict[str, UmlsRecord]:
         def _enrich(r: UmlsRecord) -> UmlsRecord:
             """
             Enrich UMLS record with ancestor info, level and preferred name
             """
-            if r.get("hierarchy") is not None:
-                # reverse to get nearest ancestor first
-                ancestors = r["hierarchy"].split(".")[::-1]
-            else:
-                ancestors = []
+            # reverse to get nearest ancestor first
+            ancestors = (r.get("hierarchy") or "").split(".")[::-1]
 
             ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
             # OntologyLevel.find(r["id"], self.umls_graph.get_umls_centrality)

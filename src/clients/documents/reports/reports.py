@@ -4,7 +4,7 @@ Patent reports
 
 import asyncio
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence
+from typing import Callable, Literal
 import logging
 
 

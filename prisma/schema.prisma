@@ -26,6 +26,7 @@ model BiomedicalEntity {
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      EntitySynonym[]
+    umls_entities Umls[]
 
     // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
 
@@ -250,40 +251,42 @@ model Indicatable {
     @@map("indicatable")
 }
 
-model UmlsLookup {
-    id              String   @unique
-    name            String
-    hierarchy       String?
-    type_ids        String[]
-    type_names      String[]
-    num_descendants Int
-    synonyms        String[]
-    l0_ancestor     String?
-    l1_ancestor     String?
-    l2_ancestor     String?
-    l3_ancestor     String?
-    l4_ancestor     String?
-    l5_ancestor     String?
-    l6_ancestor     String?
-    l7_ancestor     String?
-    l8_ancestor     String?
-    l9_ancestor     String?
-    preferred_name  String
-    level           String
-    instance_rollup String
-    category_rollup String
+model Umls {
+    id                 String            @unique
+    name               String
+    hierarchy          String?
+    type_ids           String[]
+    type_names         String[]
+    num_descendants    Int
+    synonyms           String[]
+    l0_ancestor        String?
+    l1_ancestor        String?
+    l2_ancestor        String?
+    l3_ancestor        String?
+    l4_ancestor        String?
+    l5_ancestor        String?
+    l6_ancestor        String?
+    l7_ancestor        String?
+    l8_ancestor        String?
+    l9_ancestor        String?
+    preferred_name     String
+    level              String
+    instance_rollup    String
+    category_rollup    String
+    BiomedicalEntity   BiomedicalEntity? @relation(fields: [biomedicalEntityId], references: [id])
+    biomedicalEntityId Int?
 
-    @@map("umls_lookup")
+    @@map("umls")
 }
 
 model UmlsGraph {
-    head_id   String
-    head_name String
-    tail_id   String
-    tail_name String
-    relation  String
+    head_id      String
+    head_name    String
+    tail_id      String
+    tail_name    String
+    relationship String @default("")
 
-    @@unique([head_id, tail_id, relation])
+    @@unique([head_id, tail_id, relationship])
     @@map("umls_graph")
 }
 

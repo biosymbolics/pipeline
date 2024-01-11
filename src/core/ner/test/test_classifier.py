@@ -2,7 +2,7 @@ import unittest
 
 from core.ner.classifier import classify_by_keywords, classify_string
 from constants.patents import get_patent_attribute_map
-from typings.trials import TERMINATION_KEYWORD_MAP, TerminationReason
+from typings.documents.trials import TERMINATION_KEYWORD_MAP, TerminationReason
 
 
 PATENT_ATTRIBUTE_MAP = get_patent_attribute_map()

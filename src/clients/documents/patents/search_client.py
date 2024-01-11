@@ -9,7 +9,7 @@ from prisma.types import PatentWhereInput, PatentWhereInputRecursive2
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from typings.patents import ScoredPatent as PatentApplication
+from typings.documents.patents import ScoredPatent as PatentApplication
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
 
