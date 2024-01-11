@@ -257,7 +257,8 @@ class ApprovalEtl(DocumentEtl):
                     "name": a["generic_name"] or a["brand_name"],
                     "canonical_name": get_preferred_pharmacologic_class(
                         a["pharmacologic_classes"]
-                    ),
+                    )
+                    or "",
                     "instance_rollup": get_preferred_pharmacologic_class(
                         a["pharmacologic_classes"]
                     ),

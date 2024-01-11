@@ -241,6 +241,7 @@ class PatentEtl(DocumentEtl):
                     {
                         "name": a.lower(),
                         "canonical_name": a.lower(),  # may be overwritten later
+                        "instance_rollup": a.lower(),  # may be overwritten later
                         "is_primary": True,
                         "patent_id": p["id"],
                     }
@@ -256,6 +257,7 @@ class PatentEtl(DocumentEtl):
                     {
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # may be overwritten later
+                        "instance_rollup": i.lower(),  # may be overwritten later
                         "is_primary": True,
                         "inventor_patent_id": p["id"],
                     }
@@ -301,6 +303,7 @@ class PatentEtl(DocumentEtl):
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
                     "canonical_name": ir["term"],  # overwritten later
+                    "instance_rollup": ir["term"],  # may be overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in indicatable_records
@@ -319,6 +322,7 @@ class PatentEtl(DocumentEtl):
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
                     "canonical_name": ir["term"],  # overwritten later
+                    "instance_rollup": ir["term"],  # may be overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in intervenable_records

@@ -288,9 +288,8 @@ class TrialEtl(DocumentEtl):
                 data=[
                     {
                         "name": (t["sponsor"] or "unknown").lower(),
-                        "canonical_name": (
-                            t["sponsor"] or "unknown"
-                        ).lower(),  # overwritten later
+                        "canonical_name": (t["sponsor"] or "unknown").lower(),
+                        "instance_rollup": (t["sponsor"] or "unknown").lower(),
                         "is_primary": True,
                         "trial_id": t["id"],
                     }
@@ -305,6 +304,7 @@ class TrialEtl(DocumentEtl):
                     {
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # overwritten later
+                        "instance_rollup": i.lower(),  # overwritten later
                         "trial_id": t["id"],
                     }
                     for t in rows
@@ -319,6 +319,7 @@ class TrialEtl(DocumentEtl):
                     {
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # overwritten later
+                        "instance_rollup": i.lower(),  # overwritten later
                         "is_primary": True,
                         "trial_id": t["id"],
                     }

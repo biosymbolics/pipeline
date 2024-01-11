@@ -45,6 +45,7 @@ class DocumentEtl:
                     SET
                         entity_id=entity_synonym.entity_id,
                         canonical_name=biomedical_entity.name,
+                        instance_rollup=biomedical_entity.name, -- todo
                         canonical_type=biomedical_entity.entity_type
                     FROM entity_synonym, biomedical_entity
                     WHERE {bet}.name=entity_synonym.term
@@ -57,7 +58,8 @@ class DocumentEtl:
                 UPDATE ownable
                 SET
                     owner_id=owner_synonym.owner_id,
-                    canonical_name=owner.name
+                    canonical_name=owner.name,
+                    instance_rollup=biomedical_entity.name -- todo
                 FROM owner_synonym, owner
                 WHERE ownable.name=owner_synonym.term
                 AND owner_synonym.owner_id=owner.id;

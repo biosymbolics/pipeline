@@ -32,13 +32,23 @@ class DimensionInfo:
 
 
 X_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
-    "regulatory_approval": {"canonical_name": DimensionInfo(is_entity=True)},
+    "regulatory_approval": {
+        "name": DimensionInfo(is_entity=True),
+        "canonical_name": DimensionInfo(is_entity=True),
+        "instance_rollup": DimensionInfo(is_entity=True),
+    },
     "patent": {
         "attributes": DimensionInfo(),
+        "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
+        "instance_rollup": DimensionInfo(is_entity=True),
         "similar_patents": DimensionInfo(),
     },
-    "trial": {"canonical_name": DimensionInfo(is_entity=True)},
+    "trial": {
+        "name": DimensionInfo(is_entity=True),
+        "canonical_name": DimensionInfo(is_entity=True),
+        "instance_rollup": DimensionInfo(is_entity=True),
+    },
 }
 
 Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
@@ -64,22 +74,25 @@ Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
 
 class XYReport:
     @staticmethod
-    def _get_entity_subquery(doc_type: str, filter: str) -> str:
+    def _get_entity_subquery(x: str, doc_type: str, filter: str) -> str:
+        """
+        Subquery to use if the x dimension is an entity (indicatable, intervenable, ownable)
+        """
         return f"""
             (
-                select {doc_type}_id, canonical_type, canonical_name
+                select {doc_type}_id, canonical_type, {x}
                 from intervenable
                 where {doc_type}_id is not null AND {filter}
 
                 UNION ALL
 
-                select {doc_type}_id, canonical_type, canonical_name
+                select {doc_type}_id, canonical_type, {x}
                 from indicatable
                 where {doc_type}_id is not null AND {filter}
 
                 UNION ALL
 
-                select {doc_type}_id, 'OTHER' as canonical_type, canonical_name
+                select {doc_type}_id, 'OTHER' as canonical_type, {x}
                 from ownable
                 where {doc_type}_id is not null AND {filter}
             )
@@ -89,7 +102,7 @@ class XYReport:
     def get_query(
         x: str,
         y: str | None,
-        search_field: str,
+        search_field: str,  # field against which to search, e.g. canonical_name or instance_rollup
         doc_type: DocType,
         filter: str | None = None,
     ) -> str:
@@ -103,7 +116,7 @@ class XYReport:
 
         # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
         if x_info.is_entity:
-            sq = XYReport._get_entity_subquery(doc_type, f"{search_field} is not null")
+            sq = XYReport._get_entity_subquery(x, doc_type, f"{x} is not null")
             entity_join = (
                 f"LEFT JOIN {sq} entities on entities.{doc_type}_id={doc_type}.id"
             )
@@ -111,7 +124,9 @@ class XYReport:
             entity_join = ""
 
         # search join to determine result set for report
-        search_sq = XYReport._get_entity_subquery(doc_type, f"{search_field} = ANY($1)")
+        search_sq = XYReport._get_entity_subquery(
+            search_field, doc_type, f"{search_field} = ANY($1)"
+        )
         search_subquery = f"""
             SELECT id
             FROM {doc_type}
