@@ -54,7 +54,7 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
 def get_term_clause(
     terms: Sequence[str], query_type: QueryType
 ) -> list[PatentWhereInputRecursive2]:
-    if query_type == "AND":
+    if False and query_type == "AND":
         return [
             {
                 "AND": [

@@ -41,7 +41,7 @@ def get_where_clause(
 
 async def _search(
     terms: Sequence[str],
-    query_type: QueryType = "AND",
+    query_type: QueryType = "OR",
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[ScoredRegulatoryApproval]:
     """

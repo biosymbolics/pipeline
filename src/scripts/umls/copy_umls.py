@@ -6,7 +6,6 @@ import sys
 import logging
 from prisma import Prisma
 from prisma.models import UmlsGraph, Umls
-from prisma.enums import OntologyLevel
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
 
 from system import initialize
@@ -14,7 +13,6 @@ from system import initialize
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.low_level.prisma import prisma_client
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
@@ -108,13 +106,14 @@ class UmlsEtl:
         # might be slow, if doing betweenness centrality calc.
         ult = await UmlsLevelTransformer.create(records)
 
-        client = await prisma_client(1000)
-        async with client.tx(timeout=1000) as transaction:
-            for r in records:
-                await Umls.prisma(transaction).update(
+        for r in records:
+            try:
+                await Umls.prisma().update(
                     data=ult.transform(r),
                     where={"id": r.id},
                 )
+            except Exception as e:
+                print(e, r)
 
     @staticmethod
     async def copy_relationships():

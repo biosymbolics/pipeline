@@ -47,7 +47,7 @@ async def _document_characteristics(raw_event: dict, context):
         patents = await patent_client.search(p)
         if len(patents) == 0:
             logging.info("No patents found for terms: %s", p.terms)
-            return {"statusCode": 200, "body": json.dumps({})}
+            return {"statusCode": 200, "body": json.dumps([])}
 
         report = await aggregate_document_relationships(patents, p.head_field)
     except Exception as e:

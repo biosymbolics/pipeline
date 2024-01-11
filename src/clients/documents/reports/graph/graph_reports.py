@@ -309,11 +309,8 @@ async def aggregate_document_relationships(
         GROUP BY {head_sql}, concept
     """
 
-    print(sql)
-
     client = await prisma_client(300)
     results = await client.query_raw(sql)
-    print("results", len(results))
     df = pl.DataFrame(results)
 
     # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
