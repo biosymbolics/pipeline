@@ -17,24 +17,24 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class PatentCharacteristicParams(PatentSearchParams):
+class DocumentCharacteristicParams(PatentSearchParams):
     """
-    Parameters for patent characteristics
+    Parameters for document characteristics
     """
 
     head_field: CharacteristicHeadField = "priority_year"
 
 
-async def _patent_characteristics(raw_event: dict, context):
+async def _document_characteristics(raw_event: dict, context):
     """
-    Return a graph of patent characteristics
+    Return a graph of document characteristics
 
     Invocation:
     - Local: `serverless invoke local --function document-characteristics --param='ENV=local' --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - Remote: `serverless invoke --function document-characteristics --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/reports/graph?terms=asthma`
     """
-    p = PatentCharacteristicParams(
+    p = DocumentCharacteristicParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
@@ -49,7 +49,7 @@ async def _patent_characteristics(raw_event: dict, context):
             logging.info("No patents found for terms: %s", p.terms)
             return {"statusCode": 200, "body": json.dumps({})}
 
-        report = aggregate_document_relationships(patents, p.head_field)
+        report = await aggregate_document_relationships(patents, p.head_field)
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)
@@ -61,4 +61,4 @@ async def _patent_characteristics(raw_event: dict, context):
     }
 
 
-patent_characteristics = handle_async(_patent_characteristics)
+document_characteristics = handle_async(_document_characteristics)

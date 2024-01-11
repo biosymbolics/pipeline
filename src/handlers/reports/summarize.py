@@ -1,12 +1,12 @@
 """
-Handler for patent summarization reports
+Handler for document summarization reports
 """
 import json
 import logging
 
-from clients.documents.patents.constants import DOMAINS_OF_INTEREST
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
+from typings import DOMAINS_OF_INTEREST
 from utils.encoding.json_encoder import DataclassJSONEncoder
 from typings.client import CommonSearchParams
 

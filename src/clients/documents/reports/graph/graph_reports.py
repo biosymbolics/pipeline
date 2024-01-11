@@ -92,21 +92,21 @@ class TermField(Enum):
     instance_rollup = "instance_rollup"
 
 
-def get_entity_subquery(term_field: TermField, doc_type: DocType, filter: str) -> str:
+def get_entity_subquery(term_field: TermField, doc_type: DocType) -> str:
     """
-    Subquery to use if the x dimension is an entity (indicatable, intervenable)
+    Subquery to use if the term_field is an entity (indicatable, intervenable)
     """
     return f"""
         (
-            select {doc_type.name}_id, canonical_type, {term_field.name}
+            select {doc_type.name}_id, entity_id, canonical_type, {term_field.name}
             from intervenable
-            where {doc_type.name}_id is not null AND {filter}
+            where {doc_type.name}_id is not null
 
             UNION ALL
 
-            select {doc_type.name}_id, canonical_type, {term_field.name}
+            select {doc_type.name}_id, entity_id, canonical_type, {term_field.name}
             from indicatable
-            where {doc_type.name}_id is not null AND {filter}
+            where {doc_type.name}_id is not null
         )
     """
 
@@ -182,19 +182,19 @@ async def graph_document_relationships(
         -- documents-node to entity relationships
         SELECT
             TO_CHAR(document.priority_date, 'YYYY') as head,
-            umls.canonical_name as tail,
+            umls.name as tail,
             count(*) as weight,
             '{DOCUMENT_GROUP}' as group
         FROM {doc_type.name} as document
-            JOIN {get_entity_subquery(TermField.canonical_name, doc_type, f"{doc_type.name}_id = document.id")} entities
+            JOIN {get_entity_subquery(TermField.canonical_name, doc_type)} entities
                 ON entities.{doc_type.name}_id = document.id
             JOIN biomedical_entity ON
                 biomedical_entity.id = entities.canonical_id
                 AND biomedical_entity.entity_types in {tuple(DOMAINS_OF_INTEREST)}
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
-            JOIN umls_lookup umls ON umls.id = etu."B"
+            JOIN umls ON umls.id = etu."B"
         WHERE document.id = ANY(ARRAY{document_ids})
-        GROUP BY TO_CHAR(document.priority_date, 'YYYY'), umls.canonical_name
+        GROUP BY TO_CHAR(document.priority_date, 'YYYY'), umls.name
         ORDER BY weight DESC LIMIT 1000
     """
 
@@ -273,23 +273,20 @@ async def aggregate_document_relationships(
     else:
         raise Exception(f"Invalid head field: {head_field}")
 
-    entity_sq = get_entity_subquery(
-        TermField.canonical_name, doc_type, f"{doc_type.name}_id = document.id"
-    )
+    entity_sq = get_entity_subquery(TermField.canonical_name, doc_type)
     sql = f"""
         -- document to entity relationships
         SELECT
             {head_sql} as head,
-            umls.canonical_name as concept,
+            umls.name as concept,
             count(*) as count,
-            array_agg(distinct {doc_type.name}.id) as documents
+            array_agg(distinct document.id) as documents
         FROM {doc_type.name} as document
             JOIN {entity_sq} entities
                 ON entities.{doc_type.name}_id = document.id
-            JOIN biomedical_entity ON biomedical_entity.id = entities.canonical_id
-                AND biomedical_entity.entity_types in {tuple(entity_types)}
+            JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
-            JOIN umls_lookup umls ON umls.id = etu."B"
+            JOIN umls ON umls.id = etu."B"
         WHERE document.id = ANY(ARRAY{ids})
         GROUP BY {head_sql}, concept
 
@@ -300,21 +297,23 @@ async def aggregate_document_relationships(
             {head_sql} as head,
             tail_name as concept,
             count(*) as count,
-            array_agg(distinct {doc_type.name}.id) as documents
+            array_agg(distinct document.id) as documents
         FROM {doc_type.name} as document
             JOIN {entity_sq} entities ON entities.{doc_type.name}_id = document.id
-            JOIN biomedical_entity ON biomedical_entity.id = entities.canonical_id
-                AND biomedical_entity.entity_types in {tuple(entity_types)}
+            JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
             JOIN umls_graph ON umls_graph.head_id = etu."B"
         WHERE document.id = ANY(ARRAY{ids})
         AND head_id<>tail_id
-        AND g.relationship in {tuple(relationships)}
+        AND umls_graph.relationship in {tuple(relationships)}
         GROUP BY {head_sql}, concept
     """
 
+    print(sql)
+
     client = await prisma_client(300)
     results = await client.query_raw(sql)
+    print("results", len(results))
     df = pl.DataFrame(results)
 
     # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)

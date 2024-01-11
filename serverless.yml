@@ -161,16 +161,16 @@ functions:
     handler: src.handlers.reports.x_by_y
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-characteristics:
+  document-characteristics:
     events:
       - http:
           path: reports/characteristics
           method: get
           cors: true
-    handler: src.handlers.reports.patent_characteristics
+    handler: src.handlers.reports.document_characteristics
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patent-topics:
+  document-topics:
     events:
       - http:
           path: reports/topics

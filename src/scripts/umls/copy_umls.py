@@ -109,7 +109,7 @@ class UmlsEtl:
         ult = await UmlsLevelTransformer.create(records)
 
         client = await prisma_client(1000)
-        async with client.tx() as transaction:
+        async with client.tx(timeout=1000) as transaction:
             for r in records:
                 await Umls.prisma(transaction).update(
                     data=ult.transform(r),

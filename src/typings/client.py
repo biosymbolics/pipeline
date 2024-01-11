@@ -9,7 +9,7 @@ TermField = Literal["name", "canonical_name", "instance_rollup"]
 
 class BaseSearchParams(BaseModel):
     limit: Annotated[int, Field(validate_default=True)] = 1000
-    query_type: Annotated[QueryType, Field(validate_default=True)] = "AND"
+    query_type: Annotated[QueryType, Field(validate_default=True)] = "OR"  # TODO AND
     skip_cache: Annotated[bool, Field(validate_default=True)] = False
     term_field: Annotated[TermField, Field(validate_default=True)] = "canonical_name"
 
