@@ -14,15 +14,10 @@ from clients.documents.patents.types import (
 )
 from clients.low_level.prisma import prisma_client
 from typings.client import CommonSearchParams
+from typings.documents.common import DocType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-DocType = Literal[
-    "patent",
-    "regulatory_approval",
-    "trial",
-]
 
 
 @dataclass(frozen=True)
@@ -32,19 +27,19 @@ class DimensionInfo:
 
 
 X_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
-    "regulatory_approval": {
+    DocType.regulatory_approval: {
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
     },
-    "patent": {
+    DocType.patent: {
         "attributes": DimensionInfo(),
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
         "similar_patents": DimensionInfo(),
     },
-    "trial": {
+    DocType.trial: {
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
@@ -52,14 +47,14 @@ X_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
 }
 
 Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
-    "regulatory_approval": {
+    DocType.regulatory_approval: {
         "approval_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
     },
-    "patent": {
+    DocType.patent: {
         "country_code": DimensionInfo(),
         "priority_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
     },
-    "trial": {
+    DocType.trial: {
         "comparison_type": DimensionInfo(),
         "design": DimensionInfo(),
         "end_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
@@ -74,27 +69,27 @@ Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
 
 class XYReport:
     @staticmethod
-    def _get_entity_subquery(x: str, doc_type: str, filter: str) -> str:
+    def _get_entity_subquery(x: str, doc_type: DocType, filter: str) -> str:
         """
         Subquery to use if the x dimension is an entity (indicatable, intervenable, ownable)
         """
         return f"""
             (
-                select {doc_type}_id, canonical_type, {x}
+                select {doc_type.name}_id, canonical_type, {x}
                 from intervenable
-                where {doc_type}_id is not null AND {filter}
+                where {doc_type.name}_id is not null AND {filter}
 
                 UNION ALL
 
-                select {doc_type}_id, canonical_type, {x}
+                select {doc_type.name}_id, canonical_type, {x}
                 from indicatable
-                where {doc_type}_id is not null AND {filter}
+                where {doc_type.name}_id is not null AND {filter}
 
                 UNION ALL
 
-                select {doc_type}_id, 'OTHER' as canonical_type, {x}
+                select {doc_type.name}_id, 'OTHER' as canonical_type, {x}
                 from ownable
-                where {doc_type}_id is not null AND {filter}
+                where {doc_type.name}_id is not null AND {filter}
             )
         """
 
@@ -117,9 +112,7 @@ class XYReport:
         # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
         if x_info.is_entity:
             sq = XYReport._get_entity_subquery(x, doc_type, f"{x} is not null")
-            entity_join = (
-                f"LEFT JOIN {sq} entities on entities.{doc_type}_id={doc_type}.id"
-            )
+            entity_join = f"LEFT JOIN {sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
         else:
             entity_join = ""
 
@@ -129,15 +122,15 @@ class XYReport:
         )
         search_subquery = f"""
             SELECT id
-            FROM {doc_type}
-            JOIN {search_sq} context_entities ON {doc_type}.id=context_entities.{doc_type}_id
+            FROM {doc_type.name}
+            JOIN {search_sq} context_entities ON {doc_type.name}.id=context_entities.{doc_type.name}_id
         """
 
         return f"""
             select {x_t} as x, count(*) as count {f', {y_t} as y' if y_t else ''}
-            from {doc_type}
+            from {doc_type.name}
             {entity_join}
-            WHERE {doc_type}_id in ({search_subquery})
+            WHERE {doc_type.name}_id in ({search_subquery})
             {f'AND {filter}' if filter else ''}
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
@@ -150,7 +143,7 @@ class XYReport:
         x_title: str | None = None,
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
         y_title: str | None = None,
-        doc_type: DocType = "patent",
+        doc_type: DocType = DocType.patent,
         filter: str | None = None,
     ) -> DocumentReport:
         """

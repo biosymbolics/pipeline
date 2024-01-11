@@ -1,7 +1,7 @@
 from typing import Sequence
 import logging
 
-from clients.umls.graph import UmlsGraph
+from clients.umls.graph import BETWEENNESS_FILE, UmlsGraph
 from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
@@ -20,9 +20,22 @@ class AncestorUmlsGraph(UmlsGraph):
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
     """
 
-    def __init__(self, doc_type: DocType = DocType.patent):
-        super().__init__()
+    def __init__(
+        self, doc_type: DocType = DocType.patent, file_name: str = BETWEENNESS_FILE
+    ):
+        super().__init__(file_name)
         self.doc_type = doc_type
+
+    @staticmethod
+    async def create(
+        doc_type: DocType = DocType.patent, file_name: str = BETWEENNESS_FILE
+    ) -> "AncestorUmlsGraph":
+        """
+        Factory for AncestorUmlsGraph
+        """
+        aug = AncestorUmlsGraph(doc_type, file_name)
+        await aug.load()
+        return aug
 
     @overrides(UmlsGraph)
     def edge_query(self, suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS) -> str:
@@ -42,11 +55,20 @@ class AncestorUmlsGraph(UmlsGraph):
             WITH RECURSIVE working_terms AS (
                 -- Start with UMLS terms associated directly to patents
                 SELECT
-                    {self.doc_type}_id as head,
-                    term_ids.canonical_id as tail, -- TODO: should be ids
+                    {self.doc_type.name}_id as head,
+                    _entity_to_umls.B as tail, -- B is cui
                     1 AS depth
                 FROM biomedical_entity, intervenable
                 WHERE biomedical_entity.id=intervenable.entity_id
+
+                UNION
+
+                SELECT
+                    {self.doc_type.name}_id as head,
+                    _entity_to_umls.B as tail, -- B is cui
+                    1 AS depth
+                FROM biomedical_entity, indicatable
+                WHERE biomedical_entity.id=indicatable.entity_id
 
                 UNION
 
@@ -56,8 +78,8 @@ class AncestorUmlsGraph(UmlsGraph):
                     ut.depth + 1
                 FROM umls_graph
                 JOIN working_terms ut ON ut.tail = head_id
-                JOIN umls_lookup as head_entity on head_entity.id = umls_graph.head_id
-                JOIN umls_lookup as tail_entity on tail_entity.id = umls_graph.tail_id
+                JOIN umls as head_entity on head_entity.id = umls_graph.head_id
+                JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
                 where ut.depth < 3
                 and (
                     relationship is null

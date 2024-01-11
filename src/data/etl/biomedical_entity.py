@@ -9,11 +9,13 @@ from prisma.types import (
     BiomedicalEntityCreateWithoutRelationsInput,
 )
 from pydash import compact, flatten, group_by, omit, uniq
+from clients.low_level.prisma import prisma_client
 
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
+from scripts.umls.copy_umls import UmlsEtl
 
 from .types import (
     BiomedicalEntityCreateInputWithRelationIds,
@@ -110,6 +112,9 @@ class BiomedicalEntityEtl:
                     "name": canonical.name.lower(),
                     "entity_type": entity_type,
                     "sources": [Source.UMLS],
+                    "umls": {
+                        "connect": {"id": {"in": canonical.ids}},
+                    },
                 }
             else:
                 entity_type = (
@@ -194,17 +199,22 @@ class BiomedicalEntityEtl:
         )
 
         # update records with relationships (parents, comprised_of, synonyms)
-        for entity_rec in entity_recs:
-            update = BiomedicalEntityUpdateInput(
-                **{
-                    k: connect_info.form_prisma_relation(entity_rec)
-                    for k, connect_info in self.relation_id_field_map.items()
-                    if connect_info is not None
-                },  # type: ignore
-            )
-            try:
-                await BiomedicalEntity.prisma().update(
-                    where={"name": entity_rec["name"]}, data=update
+        client = await prisma_client(300)
+        async with client.tx() as transaction:
+            for entity_rec in entity_recs:
+                update = BiomedicalEntityUpdateInput(
+                    **{
+                        k: connect_info.form_prisma_relation(entity_rec)
+                        for k, connect_info in self.relation_id_field_map.items()
+                        if connect_info is not None
+                    },  # type: ignore
                 )
-            except Exception as e:
-                print(e, entity_rec)
+                try:
+                    await BiomedicalEntity.prisma(transaction).update(
+                        where={"name": entity_rec["name"]}, data=update
+                    )
+                except Exception as e:
+                    print(e, entity_rec)
+
+        # perform final Umls updates, which depends upon Biomedical Entities being in place.
+        await UmlsEtl.update_with_ontology_level()

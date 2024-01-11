@@ -6,6 +6,7 @@ import networkx as nx
 import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_client
 from constants.umls import UMLS_NAME_SUPPRESSIONS
 from utils.file import load_json_from_file, save_json_as_file
 from utils.graph import betweenness_centrality_parallel
@@ -23,14 +24,16 @@ class UmlsGraph(object):
     """
 
     def __init__(self, file_name: str = BETWEENNESS_FILE):
-        self.db = PsqlDatabaseClient()
-        asyncio.run(self.load(file_name))
+        """
+        ***Either use a factory method in the subclass, or call load() after init***
+        """
+        self.bc_file = file_name
 
-    async def load(self, bc_file: str):
+    async def load(self):
         self.G = await self.load_graph()
         self.nodes: dict[str, dict] = dict(self.G.nodes.data())
         try:
-            self.betweenness_map = load_json_from_file(bc_file)
+            self.betweenness_map = load_json_from_file(self.bc_file)
         except FileNotFoundError:
             self.betweenness_map = self._load_betweenness()
 
@@ -55,7 +58,8 @@ class UmlsGraph(object):
         logger.info("Loading UMLS into graph")
         G = nx.Graph()
 
-        edges = await self.db.select(self.edge_query(suppressions))
+        client = await prisma_client(300)
+        edges = await client.query_raw.select(self.edge_query(suppressions))
         G.add_edges_from([(e["head"], e["tail"]) for e in edges])
 
         logger.info(

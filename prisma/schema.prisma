@@ -26,7 +26,7 @@ model BiomedicalEntity {
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      EntitySynonym[]
-    umls_entities Umls[]
+    umls_entities Umls[]                   @relation("entity_to_umls")
 
     // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
 
@@ -252,29 +252,28 @@ model Indicatable {
 }
 
 model Umls {
-    id                 String            @unique
-    name               String
-    hierarchy          String?
-    type_ids           String[]
-    type_names         String[]
-    num_descendants    Int
-    synonyms           String[]
-    l0_ancestor        String?
-    l1_ancestor        String?
-    l2_ancestor        String?
-    l3_ancestor        String?
-    l4_ancestor        String?
-    l5_ancestor        String?
-    l6_ancestor        String?
-    l7_ancestor        String?
-    l8_ancestor        String?
-    l9_ancestor        String?
-    preferred_name     String
-    level              String
-    instance_rollup    String
-    category_rollup    String
-    BiomedicalEntity   BiomedicalEntity? @relation(fields: [biomedicalEntityId], references: [id])
-    biomedicalEntityId Int?
+    id                  String             @id @unique
+    biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
+    category_rollup     String
+    hierarchy           String?
+    instance_rollup     String
+    l0_ancestor         String?
+    l1_ancestor         String?
+    l2_ancestor         String?
+    l3_ancestor         String?
+    l4_ancestor         String?
+    l5_ancestor         String?
+    l6_ancestor         String?
+    l7_ancestor         String?
+    l8_ancestor         String?
+    l9_ancestor         String?
+    level               OntologyLevel
+    name                String
+    num_descendants     Int
+    preferred_name      String
+    synonyms            String[]
+    type_ids            String[]
+    type_names          String[]
 
     @@map("umls")
 }
@@ -445,6 +444,14 @@ enum ContextOfUse {
     MENTION
     TREATMENT
     NONE
+    NA
+    UNKNOWN
+}
+
+enum OntologyLevel {
+    INSTANCE
+    L1_CATEGORY
+    L2_CATEGORY
     NA
     UNKNOWN
 }

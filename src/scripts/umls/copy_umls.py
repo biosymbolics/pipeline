@@ -5,30 +5,27 @@ import asyncio
 import sys
 import logging
 from prisma import Prisma
-from prisma.models import UmlsGraph, UmlsLookup
-from pydash import flatten
-from prisma.types import (
-    UmlsLookupCreateWithoutRelationsInput as UmlsRecord,
-    UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
-)
+from prisma.models import UmlsGraph, Umls
+from prisma.enums import OntologyLevel
+from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_client
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
-from utils.list import batch
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
-from .transform import UmlsTransformer
+from .transform import UmlsLevelTransformer, UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-UMLS_LOOKUP_TABLE = "umls_lookup"
 SOURCE_DB = "umls"
+BATCH_SIZE = 10000
 
 
 class UmlsEtl:
@@ -76,7 +73,6 @@ class UmlsEtl:
             AND entities.ts='P' -- preferred terms
             AND entities.ispref='Y' -- preferred term
             GROUP BY entities.cui -- because multiple preferred terms
-            limit 1000
         """
 
         umls_db = f"{BASE_DATABASE_URL}/umls"
@@ -88,15 +84,37 @@ class UmlsEtl:
         }
 
         transform = UmlsTransformer(aui_lookup)
-        umls_lookups = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
-        batched = batch(umls_lookups, 10000)
-        transformed = flatten([transform(batch, umls_lookups) for batch in batched])
 
-        # create approval records
-        await UmlsLookup.prisma().create_many(
-            data=transformed,
-            skip_duplicates=True,
+        async def handle_batch(batch):
+            await Umls.prisma().create_many(
+                data=[transform(r) for r in batch],
+                skip_duplicates=True,
+            )
+
+        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+            query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
+
+    @staticmethod
+    async def update_with_ontology_level():
+        """
+        Adds ontology levels (heavy, with dependencies)
+
+        Run *after* BiomedicalEntityEtl
+        """
+        # all records with UNKNOWN / UNSET level
+        records = await Umls.prisma().find_many(where={"level": OntologyLevel.UNKNOWN})
+
+        # might be slow, if doing betweenness centrality calc.
+        ult = await UmlsLevelTransformer.create()
+
+        client = await prisma_client(300)
+        async with client.tx() as transaction:
+            for r in records:
+                await Umls.prisma(transaction).update(
+                    data=ult.transform(r),
+                    where={"id": r.id},
+                )
 
     @staticmethod
     async def copy_relationships():
@@ -125,14 +143,16 @@ class UmlsEtl:
             AND head_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
             AND tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
             GROUP BY head_id, tail_id, relationship
-            limit 1000
         """
 
-        umls_lookups = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
+        async def handle_batch(batch):
+            await UmlsGraph.prisma().create_many(
+                data=[UmlsGraphRecord(**r) for r in batch],
+                skip_duplicates=True,
+            )
 
-        await UmlsGraph.prisma().create_many(
-            data=[UmlsGraphRecord(**r) for r in umls_lookups],
-            skip_duplicates=True,
+        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+            query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
 
     @staticmethod
@@ -142,8 +162,9 @@ class UmlsEtl:
         """
         db = Prisma(auto_register=True, http={"timeout": None})
         await db.connect()
-        await UmlsEtl.create_umls_lookup()
-        await UmlsEtl.copy_relationships()
+        # await UmlsEtl.create_umls_lookup()
+        # await UmlsEtl.copy_relationships()
+        await UmlsEtl.update_with_ontology_level()
         await db.disconnect()
 
 
