@@ -161,9 +161,8 @@ class UmlsEtl:
         """
         db = Prisma(auto_register=True, http={"timeout": None})
         await db.connect()
-        # await UmlsEtl.create_umls_lookup()
-        # await UmlsEtl.copy_relationships()
-        await UmlsEtl.update_with_ontology_level()
+        await UmlsEtl.create_umls_lookup()
+        await UmlsEtl.copy_relationships()
         await db.disconnect()
 
 
