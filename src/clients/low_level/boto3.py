@@ -3,7 +3,7 @@ Boto3 client
 """
 import json
 import os
-from typing import Any, Callable, Sequence, TypeVar, cast
+from typing import Any, Awaitable, Callable, Sequence, TypeVar, cast
 import boto3
 from botocore.exceptions import ClientError
 import logging
@@ -90,8 +90,8 @@ def storage_decoder(obj: Any) -> Any:
     return json.loads(obj, object_hook=date_deserializer)
 
 
-def retrieve_with_cache_check(
-    operation: Callable[[int], T] | Callable[[], T],
+async def retrieve_with_cache_check(
+    operation: Callable[[int], Awaitable[T]] | Callable[[], Awaitable[T]],
     key: str,
     limit: int | None = None,
     cache_name: str = DEFAULT_BUCKET,
@@ -132,9 +132,9 @@ def retrieve_with_cache_check(
 
         # If not in cache, perform the operation
         if limit:
-            data: T = operation(limit=limit)  # type: ignore
+            data: T = await operation(limit=limit)  # type: ignore
         else:
-            data: T = operation()  # type: ignore
+            data: T = await operation()  # type: ignore
 
         # if limit is set and result is list, see if the result size is less than limit.
         # if so, adjust the cache key to indicate that this is all the results.

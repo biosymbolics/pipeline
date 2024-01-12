@@ -16,7 +16,7 @@ from constants.patterns.intervention import (
 )
 from constants.patterns.iupac import is_iupac
 from data.domain.biomedical.constants import PHRASE_REWRITES
-from utils.re import get_or_re, remove_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
+from utils.re import get_or_re, sub_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .types import DocEntity, is_entity_doc_list
@@ -188,7 +188,7 @@ class EntityCleaner:
             unwrap_parens,
             remove_parentheticals,  # order matters (run after unwrap)
             make_substitutions,  # order matters (after unwrap/format_parentheticals)
-            remove_extra_spaces,
+            sub_extra_spaces,
             # partial(
             #     rearrange_terms, base_patterns=list(PRIMARY_MECHANISM_BASE_TERMS.keys())
             # ),
@@ -196,7 +196,7 @@ class EntityCleaner:
             # normalize_by_pos,  # not important if linking
             rewrite_phrases,  # order matters (after rearrange)
             *self.additional_cleaners,
-            remove_extra_spaces,
+            sub_extra_spaces,
             lower,
         ]
 
@@ -228,7 +228,7 @@ class EntityCleaner:
                     **{  # type: ignore
                         **orig_ents[i]._asdict(),
                         "normalized_term": modified_texts[i],
-                        "linked_entity": orig_ents[i].linked_entity,
+                        "canonical_entity": orig_ents[i].canonical_entity,
                     }
                 )
                 for i in range(len(orig_ents))

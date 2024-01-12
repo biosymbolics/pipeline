@@ -3,8 +3,8 @@ import math
 from typing import Any, Optional
 
 from data.prediction.types import AllCategorySizes
+from scripts.trials.enums import ComparisonTypeParser  # Bad!
 from typings.core import Dataclass
-from typings.trials import ComparisonType
 
 
 @dataclass(frozen=True)
@@ -99,7 +99,7 @@ class StageSizes:
 class PatentTrialPrediction(Dataclass):
     publication_number: Optional[str]
     blinding: str
-    comparison_type: ComparisonType
+    comparison_type: ComparisonTypeParser
     conditions: list[str]
     design: str
     duration: str
@@ -112,6 +112,5 @@ class PatentTrialPrediction(Dataclass):
     # sponsor_type: str
     start_date: str
     starting_phase: Optional[str]
-
     max_timeframe: Optional[float]
     sponsor: Optional[str]

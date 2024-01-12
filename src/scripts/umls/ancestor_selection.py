@@ -1,12 +1,13 @@
 from typing import Sequence
 import logging
 
-from clients.umls.graph import UmlsGraph
+from clients.umls.graph import BETWEENNESS_FILE, UmlsGraph
 from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
+from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
@@ -19,8 +20,22 @@ class AncestorUmlsGraph(UmlsGraph):
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self, doc_type: DocType = DocType.patent, file_name: str = BETWEENNESS_FILE
+    ):
+        super().__init__(file_name)
+        self.doc_type = doc_type
+
+    @staticmethod
+    async def create(
+        doc_type: DocType = DocType.patent, file_name: str = BETWEENNESS_FILE
+    ) -> "AncestorUmlsGraph":
+        """
+        Factory for AncestorUmlsGraph
+        """
+        aug = AncestorUmlsGraph(doc_type, file_name)
+        await aug.load()
+        return aug
 
     @overrides(UmlsGraph)
     def edge_query(self, suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS) -> str:
@@ -40,11 +55,22 @@ class AncestorUmlsGraph(UmlsGraph):
             WITH RECURSIVE working_terms AS (
                 -- Start with UMLS terms associated directly to patents
                 SELECT
-                    publication_number as head,
-                    term_ids.cid as tail,
+                    {self.doc_type.name}_id as head,
+                    etu."B" as tail, -- B is cui
                     1 AS depth
-                FROM annotations, term_ids
-                WHERE annotations.id=term_ids.id
+                FROM biomedical_entity, intervenable, _entity_to_umls AS etu
+                WHERE biomedical_entity.id=intervenable.entity_id
+                AND etu."A"=intervenable.id
+
+                UNION
+
+                SELECT
+                    {self.doc_type.name}_id as head,
+                    etu."B" as tail, -- B is cui
+                    1 AS depth
+                FROM biomedical_entity, indicatable, _entity_to_umls AS etu
+                WHERE biomedical_entity.id=indicatable.entity_id
+                AND etu."A"=indicatable.id
 
                 UNION
 
@@ -54,8 +80,8 @@ class AncestorUmlsGraph(UmlsGraph):
                     ut.depth + 1
                 FROM umls_graph
                 JOIN working_terms ut ON ut.tail = head_id
-                JOIN umls_lookup as head_entity on head_entity.id = umls_graph.head_id
-                JOIN umls_lookup as tail_entity on tail_entity.id = umls_graph.tail_id
+                JOIN umls as head_entity on head_entity.id = umls_graph.head_id
+                JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
                 where ut.depth < 3
                 and (
                     relationship is null
@@ -69,8 +95,8 @@ class AncestorUmlsGraph(UmlsGraph):
                 and tail_id not in {tuple(UMLS_CUI_SUPPRESSIONS.keys())}
                 and ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
                 and ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
-                and not head_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
-                and not tail_entity.canonical_name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not head_entity.name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
+                and not tail_entity.name ~* '\y{get_or_re(suppressions, permit_plural=False)}\y'
             )
             SELECT DISTINCT head, tail
             FROM working_terms;

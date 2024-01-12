@@ -1,7 +1,8 @@
+import asyncio
 import json
 import logging
 import sys
-from typing import Sequence
+from typing import Any, Sequence, TypeGuard
 from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
@@ -15,7 +16,6 @@ system.initialize()
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import APPLICATIONS_TABLE, PUBLICATION_NUMBER_MAP_TABLE
-from typings.core import is_dict_list
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -29,6 +29,19 @@ db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
+    """
+    Checks if an object is a list of dicts
+
+    Args:
+        obj (Any): object to check
+
+    Returns:
+        bool: True if the object is a list of dicts
+    """
+    return isinstance(obj, list) and all(isinstance(x, dict) for x in obj)
 
 
 PATENT_APPLICATION_FIELDS = [
@@ -77,7 +90,7 @@ GCS_BUCKET = "biosym-patents"
 # adjust this based on how large you want each shard to be
 
 
-def create_patent_applications_table():
+async def create_patent_applications_table():
     """
     Create a table of patent applications in BigQuery
     (which is then exported and imported into psql)
@@ -85,33 +98,35 @@ def create_patent_applications_table():
     logging.info("Create a table of patent applications on BigQuery for sharding")
 
     client = BQDatabaseClient()
-    client.delete_table(APPLICATIONS_TABLE)
+    await client.delete_table(APPLICATIONS_TABLE)
 
+    # NOTE: as of 01/08, left join has not been tested (might cause errors down the line)
     applications = f"""
         SELECT {','.join(PATENT_APPLICATION_FIELDS)}
-        FROM `{BQ_DATASET_ID}.publications` pubs,
-        `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs
-        WHERE pubs.publication_number = gpr_pubs.publication_number
+        FROM `{BQ_DATASET_ID}.publications` pubs
+        LEFT JOIN `{BQ_DATASET_ID}.{GPR_PUBLICATIONS_TABLE}` gpr_pubs on pubs.publication_number = gpr_pubs.publication_number
     """
-    client.create_from_select(applications, APPLICATIONS_TABLE)
+    await client.create_from_select(applications, APPLICATIONS_TABLE)
 
 
-def shared_and_export(shard_query: str, shared_table_name: str, table: str, value: str):
+async def shared_and_export(
+    shard_query: str, shared_table_name: str, table: str, value: str
+):
     """
     Create a shared table, export to GCS and delete
     """
-    db_client.create_from_select(shard_query, shared_table_name)
+    await db_client.create_from_select(shard_query, shared_table_name)
     destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
     db_client.export_table_to_storage(shared_table_name, destination_uri)
-    db_client.delete_table(shared_table_name)
+    await db_client.delete_table(shared_table_name)
 
 
-def export_bq_tables():
+async def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
     logging.info("Exporting BigQuery tables to GCS")
-    create_patent_applications_table()
+    await create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
         if shard_spec is None:
@@ -124,7 +139,7 @@ def export_bq_tables():
                     SELECT * FROM `{BQ_DATASET_ID}.{table}`
                     WHERE {shard_spec["column"]} = '{value}'
                 """
-                shared_and_export(shard_query, shared_table_name, table, value)
+                await shared_and_export(shard_query, shared_table_name, table, value)
         else:
             shared_table_name = f"{table}_shard_tmp"
             current_shard = shard_spec["starting_value"]
@@ -138,10 +153,12 @@ def export_bq_tables():
                     WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
                     AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
                 """
-                shared_and_export(shard_query, shared_table_name, table, current_shard)
+                await shared_and_export(
+                    shard_query, shared_table_name, table, current_shard
+                )
 
 
-def import_into_psql(today: str):
+async def import_into_psql(today: str):
     """
     Load data from a JSON file into a psql table
     """
@@ -150,7 +167,7 @@ def import_into_psql(today: str):
 
     # truncate table copy in postgres
     for table in EXPORT_TABLES.keys():
-        client.truncate_table(table)
+        await client.truncate_table(table)
 
     def transform(value: str | dict | int | float | Sequence | pl.Series, col: str):
         if col.endswith("_date") and isinstance(value, int) and value == 0:
@@ -166,7 +183,7 @@ def import_into_psql(today: str):
                 return [compact(v.values())[0] for v in value if len(value) > 0]
         return value
 
-    def load_data_from_json(file_blob: storage.Blob, table_name: str):
+    async def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
         df = pl.DataFrame(records)
@@ -178,8 +195,8 @@ def import_into_psql(today: str):
         columns = dict(
             [(f'"{k}"', determine_data_type(v, k)) for k, v in first_record.items()]
         )
-        client.create_table(table_name, columns, exists_ok=True)
-        client.insert_into_table(df.to_dicts(), table_name)
+        await client.create_table(table_name, columns, exists_ok=True)
+        await client.insert_into_table(df.to_dicts(), table_name)
 
     bucket = storage_client.bucket(GCS_BUCKET)
     blobs: list[storage.Blob] = list(bucket.list_blobs(prefix=today))
@@ -195,19 +212,19 @@ def import_into_psql(today: str):
             continue
 
         logging.info("Adding data to table %s (%s)", table_name, blob.name)
-        load_data_from_json(blob, table_name)
+        await load_data_from_json(blob, table_name)
 
 
-def create_derived_tables(client: PsqlDatabaseClient):
+async def create_derived_tables(client: PsqlDatabaseClient):
     """
     Create derived tables
     """
     # create mapping between the main publication number (WPO) and all other publication numbers
-    client.create_from_select(
+    await client.create_from_select(
         f"select publication_number, unnest(all_base_publication_numbers) as other_publication_number from {APPLICATIONS_TABLE}",
         PUBLICATION_NUMBER_MAP_TABLE,
     )
-    client.create_indices(
+    await client.create_indices(
         [
             {
                 "table": PUBLICATION_NUMBER_MAP_TABLE,
@@ -221,18 +238,18 @@ def create_derived_tables(client: PsqlDatabaseClient):
     )
 
 
-def copy_bq_to_psql():
+async def copy_bq_to_psql():
     """
     Copy data from BigQuery to psql + create index
     """
     today = datetime.now().strftime("%Y%m%d")
-    export_bq_tables()
-    import_into_psql(today)
+    await export_bq_tables()
+    await import_into_psql(today)
 
     client = PsqlDatabaseClient()
-    create_derived_tables(client)
+    await create_derived_tables(client)
 
-    client.create_indices(
+    await client.create_indices(
         [
             {
                 "table": APPLICATIONS_TABLE,
@@ -263,7 +280,7 @@ def copy_bq_to_psql():
         ]
     )
 
-    client.create_indices(
+    await client.create_indices(
         [
             {
                 "table": GPR_ANNOTATIONS_TABLE,
@@ -283,7 +300,7 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y%m%d")
 
     if "-export" in sys.argv:
-        export_bq_tables()
+        asyncio.run(export_bq_tables())
 
     if "-import" in sys.argv:
-        import_into_psql(today)
+        asyncio.run(import_into_psql(today))

@@ -97,11 +97,11 @@ class BQDatabaseClient(DatabaseClient):
         return {"data": results, "columns": {}}
 
     @overrides(DatabaseClient)
-    def _insert(self, table_name: str, records: list[T]):
+    async def _insert(self, table_name: str, records: list[T]):
         self.client.insert_rows(self.get_table(table_name), records)
 
     @overrides(DatabaseClient)
-    def _create(
+    async def _create(
         self, table_name: str, columns: list[str] | dict[str, str]
     ) -> bigquery.Table:
         """
@@ -140,7 +140,7 @@ class BQDatabaseClient(DatabaseClient):
         return table
 
     @nonoverride
-    def upsert_df_into_table(
+    async def upsert_df_into_table(
         self,
         df: pl.DataFrame,
         table_name: str,
@@ -167,7 +167,7 @@ class BQDatabaseClient(DatabaseClient):
         tmp_table_id = table_id + "_tmp"
 
         # truncate if exists to avoid dups
-        self.truncate_table(tmp_table_id)
+        await self.truncate_table(tmp_table_id)
 
         # Create and populate temp table
         pd_df = df.to_pandas(use_pyarrow_extension_array=True)
@@ -199,11 +199,11 @@ class BQDatabaseClient(DatabaseClient):
             self.execute_query(sql)
         except Exception as e:
             logging.error("Error upserting rows: %s", e)
-            self.delete_table(tmp_table_id)
+            await self.delete_table(tmp_table_id)
             raise e
         finally:
             # Delete the temporary table
-            self.delete_table(tmp_table_id)
+            await self.delete_table(tmp_table_id)
 
     @nonoverride
     def export_table_to_storage(self, table_name: str, destination_uri: str):

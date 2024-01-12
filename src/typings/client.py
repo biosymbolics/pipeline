@@ -1,19 +1,18 @@
 from typing import Annotated, Literal, Sequence
+from prisma.types import PatentInclude
 
 from pydantic import BaseModel, Field, field_validator
 
 
 QueryType = Literal["AND", "OR"]
-
-
-TermField = Literal["terms", "instance_rollup", "category_rollup"]
+TermField = Literal["name", "canonical_name", "instance_rollup"]
 
 
 class BaseSearchParams(BaseModel):
     limit: Annotated[int, Field(validate_default=True)] = 1000
-    query_type: Annotated[QueryType, Field(validate_default=True)] = "AND"
+    query_type: Annotated[QueryType, Field(validate_default=True)] = "OR"  # TODO AND
     skip_cache: Annotated[bool, Field(validate_default=True)] = False
-    term_field: Annotated[TermField, Field(validate_default=True)] = "terms"
+    term_field: Annotated[TermField, Field(validate_default=True)] = "canonical_name"
 
 
 class BasePatentSearchParams(BaseSearchParams):
@@ -33,6 +32,8 @@ class CommonSearchParams(BaseSearchParams):
 
 class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
+    # None will be replaced with default (all relations)
+    include: PatentInclude | None = None
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
@@ -46,11 +47,14 @@ class TrialSearchParams(CommonSearchParams):
     pass
 
 
-class EntitySearchParams(PatentSearchParams):
+EntityType = Literal["intervention", "indication"]
+
+
+class AssetSearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_types: Annotated[
-        Sequence[Literal["pharmaceutical"]], Field(validate_default=True)
-    ] = ["pharmaceutical"]
+    entity_types: Annotated[Sequence[EntityType], Field(validate_default=True)] = [
+        "intervention"
+    ]
 
     @field_validator("entity_types", mode="before")
     def entity_types_from_string(cls, v):

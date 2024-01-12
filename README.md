@@ -147,6 +147,13 @@ importlib.reload(common.ner.ner)
 - `keys *`
 - `HGETALL "term:PD-1 inhibitors"`
 
+#### Database
+```
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+create role biosym with password '';
+alter role biosym with superuser;
+prisma db push
+```
 
 #### Random
 ```

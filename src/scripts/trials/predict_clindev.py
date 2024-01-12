@@ -2,6 +2,7 @@
 Script for running inference with the trial characteristics model,
 which persists these attributes to a table for later use.
 """
+import asyncio
 import sys
 import logging
 
@@ -23,7 +24,7 @@ def predict_clindev():
     pass
 
 
-def create_predicted_clindev_table():
+async def create_predicted_clindev_table():
     """
     Create patent to predicted clindev table
     """
@@ -36,8 +37,8 @@ def create_predicted_clindev_table():
         applications patents
         where patents.publication_number=annotations.publication_number
     """
-    client.create_from_select(query, table)
-    client.create_indices(
+    await client.create_from_select(query, table)
+    await client.create_indices(
         [
             {
                 "table": table,
@@ -51,7 +52,7 @@ def predict_clindev_characteristics():
     """
     Predict clindev characteristics
     """
-    create_predicted_clindev_table()
+    asyncio.run(create_predicted_clindev_table())
 
 
 if __name__ == "__main__":

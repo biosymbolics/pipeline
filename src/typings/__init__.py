@@ -1,3 +1,4 @@
+from .documents.approvals import ScoredRegulatoryApproval
 from .client import (
     ApprovalSearchParams,
     QueryType,
@@ -6,23 +7,26 @@ from .client import (
     TrialSearchParams,
 )
 from .core import JsonSerializable, Primitive
-from .patents import (
-    PatentBasicInfo,
-    PatentApplication,
+from .documents.patents import (
     PatentsTopicReport,
-    ScoredPatentApplication,
+    ScoredPatent,
 )
+from .documents.common import ENTITY_DOMAINS, DOMAINS_OF_INTEREST, DocType
+from .documents.trials import ScoredTrial
 
 __all__ = [
+    "ENTITY_DOMAINS",
+    "DOMAINS_OF_INTEREST",
     "ApprovalSearchParams",
+    "DocType",
     "Primitive",
     "JsonSerializable",
-    "PatentBasicInfo",
-    "PatentApplication",
     "PatentsTopicReport",
     "PatentSearchParams",
     "QueryType",
-    "ScoredPatentApplication",
+    "ScoredPatent",
+    "ScoredRegulatoryApproval",
+    "ScoredTrial",
     "TermField",
     "TrialSearchParams",
 ]

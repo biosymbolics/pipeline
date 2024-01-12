@@ -6,6 +6,7 @@ from torch.nn import functional as F
 import networkx as nx
 from functools import reduce
 import logging
+from scispacy.candidate_generation import MentionCandidate, KnowledgeBase
 
 from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
@@ -14,6 +15,8 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
+from core.ner.types import CanonicalEntity
+from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
 
@@ -134,7 +137,7 @@ def similarity_with_residual_penalty(
     if distance is None:
         _distance = F.cosine_similarity(mention_vector, candidate_vector, dim=0)
     else:
-        _distance = distance
+        _distance = torch.tensor(distance)
 
     similarity = 2 - _distance
 
@@ -185,22 +188,23 @@ def score_candidate(
     candidate_id: str,
     candidate_canonical_name: str,
     candidate_types: list[str],
-    original_vector: torch.Tensor,
-    candidate_vector: torch.Tensor,
-    syntactic_similarity: float,
-    semantic_distance: float,
+    syntactic_similarity: float | None = None,
 ) -> float:
     """
-    Generate a score for a candidate
+    Generate a score for a candidate (semantic or not)
+
+    - suppresses certain CUIs
+    - suppresses certain names
+    - scores based on
+        1. UMLS type (tui)
+        2. syntactic similarity (if supplied)
 
     Args:
         candidate_id (str): candidate ID
         candidate_canonical_name (str): candidate canonical name
         candidate_types (list[str]): candidate types
-        syntactic_similarity (float): syntactic similarity score
-        original_vector (torch.Tensor): original mention vector
-        candidate_vector (torch.Tensor): candidate vector
-        semantic_distance (float): semantic distance
+        syntactic_similarity (float): syntactic similarity score from tfidf vectorizer
+            if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
 
     if candidate_id in UMLS_CUI_SUPPRESSIONS:
@@ -220,11 +224,50 @@ def score_candidate(
             candidate_types, list(MOST_PREFERRED_UMLS_TYPES.keys())
         )
         if not is_preferred_type:
-            return 0.75
+            return 0.8
         if not is_most_preferred_type:
-            return 0.9
+            return 1.0
 
-        return 1.0
+        return 1.1
+
+    if syntactic_similarity is not None:
+        return type_score() * syntactic_similarity
+
+    return type_score()
+
+
+def score_semantic_candidate(
+    candidate_id: str,
+    candidate_canonical_name: str,
+    candidate_types: list[str],
+    original_vector: torch.Tensor,
+    candidate_vector: torch.Tensor,
+    syntactic_similarity: float,
+    semantic_distance: float,
+) -> float:
+    """
+    Generate a score for a semantic candidate
+
+    Score based on
+    - "score_candidate" rules
+    - syntactic similarity
+
+
+    Args:
+        candidate_id (str): candidate ID
+        candidate_canonical_name (str): candidate canonical name
+        candidate_types (list[str]): candidate types
+        syntactic_similarity (float): syntactic similarity score
+        original_vector (torch.Tensor): original mention vector
+        candidate_vector (torch.Tensor): candidate vector
+        semantic_distance (float): semantic distance
+    """
+    type_score = score_candidate(
+        candidate_id, candidate_canonical_name, candidate_types
+    )
+
+    if type_score == 0:
+        return 0.0
 
     semantic_similarity = similarity_with_residual_penalty(
         original_vector, candidate_vector, semantic_distance
@@ -232,7 +275,7 @@ def score_candidate(
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
         + SYNTACTIC_SIMILARITY_WEIGHT * syntactic_similarity
-    ) * type_score()
+    ) * type_score
 
 
 JOIN_PUNCT = ["-", "/", "'"]
@@ -262,7 +305,7 @@ def join_punctuated_tokens(doc: Doc) -> list[Token | Span]:
     join_tuples = [(pi - 1, pi, pi + 1) for pi in punct_indices]
     join_indices = flatten(join_tuples)
     join_starts = [j[0] for j in join_tuples]
-    tokens = []
+    tokens: list[Token | Span] = []
     for i in range(len(doc)):
         if i in join_indices:
             if i in join_starts:
@@ -273,3 +316,58 @@ def join_punctuated_tokens(doc: Doc) -> list[Token | Span]:
             tokens.append(doc[i])
 
     return tokens
+
+
+def candidate_to_canonical(
+    candidate: MentionCandidate, kb: KnowledgeBase
+) -> CanonicalEntity:
+    """
+    Convert a MentionCandidate to a CanonicalEntity
+    """
+    # go to kb to get canonical name
+    entity = kb.cui_to_entity[candidate.concept_id]
+    name = clean_umls_name(
+        entity.concept_id,
+        entity.canonical_name,
+        entity.aliases,
+        entity.types,
+        False,
+    )
+
+    return CanonicalEntity(
+        id=entity.concept_id,
+        ids=[entity.concept_id],
+        name=name,
+        aliases=entity.aliases,
+        description=entity.definition,
+        types=entity.types,
+    )
+
+
+UMLS_WORD_OVERRIDES = {
+    "modulator": "C0005525",  # "Biological Response Modifiers"
+    "modulators": "C0005525",
+    "binder": "C1145667",  # "Binding action"
+    "binders": "C1145667",
+}
+
+
+def apply_umls_word_overrides(
+    text: str,
+    candidates: list[MentionCandidate],
+    overrides: dict[str, str] = UMLS_WORD_OVERRIDES,
+) -> list[MentionCandidate]:
+    """
+    Certain words we match to an explicit cui (e.g. "modulator" -> "C0005525")
+    """
+    # look for any overrides (terms -> candidate)
+    has_override = text.lower() in overrides
+    if has_override:
+        return [
+            MentionCandidate(
+                concept_id=overrides[text.lower()],
+                aliases=[text],
+                similarities=[1],
+            )
+        ]
+    return candidates

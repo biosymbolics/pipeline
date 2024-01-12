@@ -1,7 +1,8 @@
 """
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
-from utils.re import get_or_re
+from typing import Literal
+from prisma.enums import BiomedicalEntityType
 
 # TODO: maybe choose NCI as canonical name
 UMLS_NAME_OVERRIDES = {
@@ -220,3 +221,24 @@ MOST_PREFERRED_UMLS_TYPES = {
 BIOSYM_UMLS_TFIDF_PATH = (
     "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
 )
+
+# ENTITY_TYPES
+ENTITY_TO_UMLS_TYPE = {
+    BiomedicalEntityType.COMPOUND: UMLS_COMPOUND_TYPES,
+    BiomedicalEntityType.BIOLOGIC: UMLS_BIOLOGIC_TYPES,
+    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
+    BiomedicalEntityType.DEVICE: UMLS_DEVICE_TYPES,
+    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
+    BiomedicalEntityType.DISEASE: UMLS_DISEASE_TYPES,
+}
+
+UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
+
+LegacyDomainType = Literal[
+    "compounds",
+    "biologics",
+    "devices",
+    "diseases",
+    "procedures",
+    "mechanisms",
+]

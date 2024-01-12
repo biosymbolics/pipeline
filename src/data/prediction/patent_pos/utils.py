@@ -13,7 +13,7 @@ from data.prediction.utils import (
     resize_and_batch,
 )
 from typings.core import Primitive
-from typings.patents import PatentApplication
+from typings.documents.patents import ScoredPatent as PatentApplication
 
 
 # Query for approval data
@@ -66,7 +66,8 @@ def prepare_inputs(
         x1 = resize_and_batch(embeddings, batch_size)
 
         y_vals = [
-            (1.0 if patent["approval_date"] is not None else 0.0) for patent in patents
+            0.0
+            for patent in patents  # (1.0 if patent.approval_date is not None else 0.0) for patent in patents
         ]
         y = batch_and_pad(cast(list[Primitive], y_vals), batch_size)
         logging.info(

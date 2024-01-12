@@ -9,7 +9,7 @@ import polars as pl
 import logging
 
 from clients.openai.gpt_client import GptApiClient
-from typings.patents import PatentsTopicReport
+from typings.documents.patents import PatentsTopicReport
 
 RANDOM_STATE = 42
 

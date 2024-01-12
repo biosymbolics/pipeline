@@ -1,23 +1,24 @@
 from dataclasses import dataclass
 from datetime import date
 from functools import cached_property
-from itertools import groupby
 from typing import Any
-from pydash import compact, flatten, group_by, uniq
+from pydash import compact, flatten, uniq
+from prisma.enums import TrialPhase, TrialStatus
 
-from typings.approvals import RegulatoryApproval
+from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
+from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass
-from .patents import MAX_PATENT_LIFE, AvailabilityLikelihood, Patent
-from .trials import Trial, TrialPhase, TrialStatus, TrialStatusGroup
+from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 
 
 @dataclass(frozen=True)
 class Entity(Dataclass):
+    id: int
     name: str
-    approvals: list[RegulatoryApproval]
-    patents: list[Patent]
-    trials: list[Trial]
+    patents: list[ScoredPatent]
+    regulatory_approvals: list[ScoredRegulatoryApproval]
+    trials: list[ScoredTrial]
 
     @property
     def activity(self) -> list[int]:
@@ -37,7 +38,7 @@ class Entity(Dataclass):
                     if t.end_date is not None and t.start_date is not None
                 ]
             )
-            + [a.approval_date for a in self.approvals]
+            + [a.approval_date for a in self.regulatory_approvals]
         )
         return [
             dates.count(y)
@@ -46,7 +47,7 @@ class Entity(Dataclass):
 
     @property
     def approval_count(self) -> int:
-        return len(self.approvals)
+        return len(self.regulatory_approvals)
 
     @property
     def total_enrollment(self) -> int:
@@ -71,7 +72,7 @@ class Entity(Dataclass):
         return len(self.patents)
 
     @cached_property
-    def most_recent_patent(self) -> Patent | None:
+    def most_recent_patent(self) -> ScoredPatent | None:
         if len(self.patents) == 0:
             return None
         patents = sorted(self.patents, key=lambda x: x.priority_date)
@@ -84,7 +85,7 @@ class Entity(Dataclass):
         return self.most_recent_patent.priority_date.year
 
     @cached_property
-    def most_recent_trial(self) -> Trial | None:
+    def most_recent_trial(self) -> ScoredTrial | None:
         if len(self.trials) == 0:
             return None
         trials = sorted(self.trials, key=lambda x: x.last_updated_date)
@@ -145,8 +146,16 @@ class Entity(Dataclass):
     @property
     def owners(self) -> list[str]:
         return uniq(
-            flatten([p.assignees for p in self.patents])
-            + [t.normalized_sponsor for t in self.trials]
+            compact(
+                flatten(
+                    [a.canonical_name for p in self.patents for a in p.assignees or []]
+                )
+                + [
+                    t.sponsor.canonical_name
+                    for t in self.trials
+                    if t.sponsor is not None
+                ]
+            )
         )
 
     @property
@@ -157,7 +166,7 @@ class Entity(Dataclass):
     def percent_stopped(self) -> float:
         if self.trial_count == 0:
             return 0.0
-        trial_statuses = [TrialStatus(t.status).parent for t in self.trials]
+        trial_statuses = [get_trial_status_parent(t.status) for t in self.trials]
         return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
 
     def serialize(self) -> dict[str, Any]:
@@ -167,10 +176,15 @@ class Entity(Dataclass):
         """
         trials = [t.serialize() for t in self.trials]
         patents = [p.serialize() for p in self.patents]
-        approvals = [a.serialize() for a in self.approvals]
+        regulatory_approvals = [a.serialize() for a in self.regulatory_approvals]
 
         o = super().serialize()
-        return {**o, "approvals": approvals, "patents": patents, "trials": trials}
+        return {
+            **o,
+            "regulatory_approvals": regulatory_approvals,
+            "patents": patents,
+            "trials": trials,
+        }
 
     # TODO - average dropout rate
     # TODO - average trial duration

@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.umls.transform import UmlsTransformer
+from scripts.umls.transform import UmlsIdLevel, UmlsLevelTransformer
 from typings.umls import OntologyLevel
 
 
@@ -150,7 +150,9 @@ class TestTrialUtils(unittest.TestCase):
         for test in test_cases:
             expected_output = test["expected"]
 
-            result = UmlsTransformer.find_level_ancestor(
-                test["record"], test["levels"], test["ancestors"]
+            result = UmlsLevelTransformer.find_level_ancestor(
+                UmlsIdLevel(id=test["record"]["id"], level=test["record"]["level"]),
+                test["levels"],
+                tuple([UmlsIdLevel(**a) for a in test["ancestors"]]),
             )
             self.assertEqual(result, expected_output)

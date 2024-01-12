@@ -74,7 +74,7 @@ provider:
     runtime: "python3.11"
     AWS_ACCOUNT_ID: ${AWS::AccountId}
     CACHE_BUCKET: biosym-patents-${self:provider.stage}
-    DATABASE_URL: postgres://localhost:5432/patents # ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
+    DATABASE_URL: postgres://biosym:ok@localhost:5432/biosym # ${ssm:/biosymbolics/pipeline/database/patents/runtime_url}
     DB_CLUSTER:
       Ref: RdsCluster
     ENV: ${param:ENV, 'dev'}
@@ -107,13 +107,13 @@ functions:
     handler: src.handlers.system.rds_control
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  search-entities:
+  search-assets:
     events:
       - http:
-          path: entities/search
+          path: assets/search
           method: get
           cors: true
-    handler: src.handlers.entity.search
+    handler: src.handlers.asset.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
   search-patents:
@@ -134,49 +134,49 @@ functions:
     handler: src.handlers.patents.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  summarize-patents:
+  summarize-documents:
     events:
       - http:
-          path: patents/reports/summarize
+          path: reports/summarize
           method: get
           cors: true
-    handler: src.handlers.patents.reports.summarize
+    handler: src.handlers.reports.summarize
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-over-time:
+  documents-over-time:
     events:
       - http:
-          path: patents/reports/time
+          path: reports/time
           method: get
           cors: true
-    handler: src.handlers.patents.reports.aggregate_over_time
+    handler: src.handlers.reports.aggregate_over_time
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-x-by-y:
+  documents-x-by-y:
     events:
       - http:
-          path: patents/reports/x_by_y
+          path: reports/x_by_y
           method: get
           cors: true
-    handler: src.handlers.patents.reports.x_by_y
+    handler: src.handlers.reports.x_by_y
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patents-characteristics:
+  document-characteristics:
     events:
       - http:
-          path: patents/reports/characteristics
+          path: reports/characteristics
           method: get
           cors: true
-    handler: src.handlers.patents.reports.patent_characteristics
+    handler: src.handlers.reports.document_characteristics
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  patent-topics:
+  document-topics:
     events:
       - http:
-          path: patents/reports/topics
+          path: reports/topics
           method: get
           cors: true
-    handler: src.handlers.patents.reports.analyze_topics
+    handler: src.handlers.reports.analyze_topics
     layers:
       - Ref: PythonRequirementsLambdaLayer
   describe-terms:
@@ -196,7 +196,7 @@ functions:
           path: clindev/predict/timelines
           method: get
           cors: true
-    handler: src.handlers.clindev.predict_timelines
+    handler: src.handlers.trials.predict_timelines
     layers:
       - Ref: PythonRequirementsLambdaLayer
   search-trials:
@@ -205,7 +205,7 @@ functions:
           path: trials/search
           method: get
           cors: true
-    handler: src.handlers.clindev.search
+    handler: src.handlers.trials.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
 

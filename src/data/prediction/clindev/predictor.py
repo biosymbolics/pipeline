@@ -8,6 +8,7 @@ from typing import Any, Sequence
 from pydash import flatten, omit_by
 import torch
 import polars as pl
+from prisma.enums import TrialPhase
 
 
 import system
@@ -16,7 +17,6 @@ system.initialize()
 
 from data.prediction.clindev.types import PatentTrialPrediction
 from data.prediction.utils import ModelInput, decode_output
-from typings.trials import TrialPhase
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import (
@@ -124,7 +124,7 @@ def predict(inputs: Sequence[dict]) -> list[PatentTrialPrediction]:
             InputRecord(
                 **{
                     **{k: v for k, v in input.items() if k in ALL_INPUT_FIELD_LISTS},
-                    "max_timeframe": phase._order,
+                    "max_timeframe": 2,  # phase._order, # TODO!!!!
                     "phase": phase,
                     "start_date": sd,
                 }
@@ -163,7 +163,7 @@ def predict_single(record: dict):
                 "sponsor": "Janssen",
                 **omit_by(record, lambda x: x is None),
                 "phase": phase,
-                "max_timeframe": phase._order,
+                "max_timeframe": 2,  # phase._order, # TODO!!!!
             }
         )
         pred = predictor.predict([input])[0]

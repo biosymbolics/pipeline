@@ -2,6 +2,7 @@
 Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
+from pydash import flatten
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
 from constants.patterns.iupac import IUPAC_STRINGS
 from utils.re import get_or_re
@@ -589,3 +590,28 @@ DOSAGE_UOMS = [
     "nanogram",
     "ng",
 ]
+
+DOSAGE_UOM_DENOMINATORS = [
+    "lb",
+    "kg",
+    "day",
+    "hour",
+    "week",
+    "month",
+    "prn",
+]
+
+NUM_RE = r"[0-9]+(?:\.[0-9]+)?"
+
+DOSAGE_UOM_RES = flatten(
+    [
+        [
+            rf"{NUM_RE}[ ]?{uom}s?(?:[ ]?(?:/|per)[ ]?{get_or_re(DOSAGE_UOM_DENOMINATORS, enforce_word_boundaries=False)})?"
+        ]
+        for uom in DOSAGE_UOMS
+    ]
+)
+
+DOSAGE_UOM_RE = get_or_re(
+    DOSAGE_UOM_RES, enforce_word_boundaries=True, permit_plural=False
+)

@@ -2,10 +2,16 @@
 Linking/cleaning of terms
 """
 from typing import Sequence
+import logging
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
+from core.ner.linker.types import CandidateSelectorType
+from core.ner.spacy import get_transformer_nlp
 from core.ner.types import DocEntity
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class TermNormalizer:
@@ -28,19 +34,29 @@ class TermNormalizer:
     def __init__(
         self,
         link: bool = True,
+        candidate_selector: CandidateSelectorType | None = None,
         additional_cleaners: Sequence[CleanFunction] = [],
     ):
         """
         Initialize term normalizer
         """
         if link:
-            self.term_linker: TermLinker | None = TermLinker()
+            self.term_linker: TermLinker | None = (
+                TermLinker(candidate_selector) if candidate_selector else TermLinker()
+            )
         else:
             self.term_linker = None
 
         self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
+        self.candidate_selector = candidate_selector
+
+        if self.candidate_selector == "CandidateSelector":
+            self.nlp = None
+        else:
+            # used for vectorization if direct entity linking
+            self.nlp = get_transformer_nlp()
 
     def normalize(self, entity_sets: Sequence[DocEntity]) -> list[DocEntity]:
         """
@@ -62,6 +78,19 @@ class TermNormalizer:
         return cleaned_entity_sets
 
     def normalize_strings(self, terms: Sequence[str]) -> list[DocEntity]:
+        if self.candidate_selector not in [
+            "CandidateSelector",
+            "CompositeCandidateSelector",
+        ]:
+            if self.nlp is None:
+                raise ValueError(
+                    "nlp model required for vectorization-based candidate selection"
+                )
+            docs = self.nlp.pipe(terms)
+        else:
+            logger.info("No nlp model required for CandidateSelector")
+            docs = [None for _ in terms]
+
         doc_ents = [
             DocEntity(
                 term=term,
@@ -69,8 +98,9 @@ class TermNormalizer:
                 start_char=0,
                 end_char=0,
                 normalized_term=term,
+                spacy_doc=doc,  # required for comparing semantic similarity of potential matches
             )
-            for term in terms
+            for term, doc in zip(terms, docs)
         ]
         return self.normalize(doc_ents)
 

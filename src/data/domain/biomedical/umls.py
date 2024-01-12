@@ -1,5 +1,4 @@
 from typing import Sequence
-from scispacy.candidate_generation import MentionCandidate
 
 from constants.umls import (
     UMLS_GENE_PROTEIN_TYPES,

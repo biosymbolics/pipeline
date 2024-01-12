@@ -1,6 +1,10 @@
 {
   "devDependencies": {
+    "prisma": "^5.4.2",
     "serverless-offline": "^13.3.0",
     "serverless-python-requirements": "^6.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.4.2"
   }
 }

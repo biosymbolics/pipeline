@@ -2,7 +2,7 @@
 Low-level Postgres client
 """
 import time
-from typing import Any, Callable, Sequence
+from typing import Any, Awaitable, Callable, Sequence, cast
 import logging
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -100,7 +100,7 @@ class PsqlDatabaseClient(DatabaseClient):
         return table_name
 
     @overrides(DatabaseClient)
-    def is_table_exists(self, table_name: str) -> bool:
+    async def is_table_exists(self, table_name: str) -> bool:
         """
         Check if a table exists
         """
@@ -112,7 +112,7 @@ class PsqlDatabaseClient(DatabaseClient):
             );
         """
         try:
-            res = self.execute_query(query, [])
+            res = await self.execute_query(query, [])
             return res["data"][0]["exists"]
         except Exception as e:
             logger.error("Error checking table exists: %s", e)
@@ -148,27 +148,31 @@ class PsqlDatabaseClient(DatabaseClient):
         return {"data": [], "columns": {}}
 
     @overrides(DatabaseClient)
-    def execute_query(
+    async def execute_query(
         self,
         query: str,
-        values: Sequence = [],
+        params: Sequence = [],
+        handle_result_batch: Callable[[list], Awaitable[None]] | None = None,
+        batch_size: int = 10000000,
         ignore_error: bool = False,
     ) -> ExecuteResult:
         """
         Execute query
 
         Args:
-            query (str): SQL query
-            ignore_error (bool): if True, will not raise an error if the query fails
+            query (str): SQL query (select, update, insert, etc)
+            params (Sequence): params for query, if any (default: [])
+            handle_result_batch (Callable): function to handle results in batches (default: None)
+            batch_size (int): batch size for handle_result_batch (default: 10000000; only used if handle_result_batch is not None)
+            ignore_error (bool): ignore error if True (default: False)
         """
         start = time.time()
         logger.info("Starting query: %s", query)
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:
-            # execute query
             try:
-                cursor.execute(query, values)  # type: ignore
+                cursor.execute(query, params)  # type: ignore # TODO: LiteralString
                 conn.commit()
                 logger.info("Row count for query: %s", cursor.rowcount)
             except Exception as e:
@@ -188,11 +192,18 @@ class PsqlDatabaseClient(DatabaseClient):
                 if cursor.rownumber is None:
                     raise NoResults("Query returned no rows")
 
-                data = list(cursor.fetchall())
+                if handle_result_batch is not None:
+                    while rows := cursor.fetchmany(batch_size):
+                        await handle_result_batch(rows)
+
+                    self.client.put_conn(conn)
+                    return {"data": [], "columns": {}}
+
+                rows = list(cursor.fetchmany(batch_size))
                 columns = get_schema_from_cursor(cursor)
                 self.client.put_conn(conn)
 
-                return {"data": data, "columns": columns}
+                return {"data": cast(Sequence[dict], rows), "columns": columns}
             except Exception as e:
                 return self.handle_error(conn, e, ignore_error=ignore_error)
 
@@ -214,7 +225,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 return self.handle_error(conn, e, query=query, is_rollback=True)
 
     @overrides(DatabaseClient)
-    def _create(self, table_name: str, columns: list[str] | dict[str, str]):
+    async def _create(self, table_name: str, columns: list[str] | dict[str, str]):
         """
         Simple create table function, makes up schema based on column names
 
@@ -231,18 +242,18 @@ class PsqlDatabaseClient(DatabaseClient):
             raise Exception("Invalid columns")
 
         query = f"CREATE TABLE {table_id} ({(', ').join(schema)});"
-        self.execute_query(query)
+        await self.execute_query(query)
 
     @nonoverride
-    def create_index(self, index_def: IndexCreateDef | IndexSql):
+    async def create_index(self, index_def: IndexCreateDef | IndexSql):
         """
         Add an index
         """
-        self.execute_query("CREATE EXTENSION pg_trgm", [], ignore_error=True)
+        await self.execute_query("CREATE EXTENSION pg_trgm", [], ignore_error=True)
         try:
             if is_index_sql(index_def):
                 logger.info("Creating index: %s", index_def["sql"])
-                self.execute_query(index_def["sql"], [])
+                await self.execute_query(index_def["sql"], [])
                 return
 
             if is_index_create_def(index_def):
@@ -262,7 +273,7 @@ class PsqlDatabaseClient(DatabaseClient):
                     sql = f"CREATE {'UNIQUE' if is_uniq else ''} INDEX index_{table}_{column} ON {table} ({col})"
 
                 logger.info("Creating index: %s", sql)
-                self.execute_query(sql, [])
+                await self.execute_query(sql, [])
 
             else:
                 raise Exception("Invalid index def")
@@ -270,16 +281,16 @@ class PsqlDatabaseClient(DatabaseClient):
             logger.warning("Index already exists: %s", e)
 
     @nonoverride
-    def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
+    async def create_indices(self, index_defs: list[IndexCreateDef | IndexSql]):
         """
         Add indices
         """
         for index_def in index_defs:
-            self.create_index(index_def)
+            await self.create_index(index_def)
 
     @nonoverride
     @staticmethod
-    def copy_between_db(
+    async def copy_between_db(
         source_db: str,
         source_sql: str,
         dest_db: str,
@@ -300,7 +311,7 @@ class PsqlDatabaseClient(DatabaseClient):
         dest_client = PsqlDatabaseClient(dest_db)
         source_client = PsqlDatabaseClient(source_db)
 
-        results = source_client.execute_query(source_sql)
+        results = await source_client.execute_query(source_sql)
         records = results["data"]
         logger.info("Records in memory")
 
@@ -313,7 +324,7 @@ class PsqlDatabaseClient(DatabaseClient):
 
         logger.info("Creating table/inserting records (%s)", len(records))
         # add records
-        dest_client.create_and_insert(
+        await dest_client.create_and_insert(
             dest_table_name,
             records,
             schema,

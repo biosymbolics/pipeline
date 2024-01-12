@@ -29,26 +29,26 @@ class DatabaseClient:
         raise NotImplementedError
 
     @abstractmethod
-    def execute_query(self, query: str, values: Sequence = []) -> ExecuteResult:
+    async def execute_query(self, query: str, values: Sequence = []) -> ExecuteResult:
         raise NotImplementedError
 
     @abstractmethod
-    def is_table_exists(self, table_name: str) -> bool:
+    async def is_table_exists(self, table_name: str) -> bool:
         raise NotImplementedError
 
     @abstractmethod
-    def _insert(self, table_name: str, records: Sequence[M]):
+    async def _insert(self, table_name: str, records: Sequence[M]):
         raise NotImplementedError
 
     @abstractmethod
-    def _create(
+    async def _create(
         self,
         table_name: str,
         columns: Sequence[str] | Mapping[str, str],
     ):
         raise NotImplementedError
 
-    def create_from_select(self, query: str, new_table_name: str):
+    async def create_from_select(self, query: str, new_table_name: str):
         """
         Create a new table from a query
         Drops table if existing.
@@ -63,9 +63,9 @@ class DatabaseClient:
             DROP TABLE IF EXISTS {new_table_id};
             CREATE TABLE {new_table_id} AS {query};
         """
-        self.execute_query(create_table_query)
+        await self.execute_query(create_table_query)
 
-    def select(self, query: str, values: Sequence = []) -> Sequence[dict]:
+    async def select(self, query: str, values: Sequence = []) -> Sequence[dict]:
         """
         Execute a query and return the results as a list of dicts
         (must include provide fully qualified table name in query)
@@ -74,12 +74,12 @@ class DatabaseClient:
             query (str): SQL query
         """
         logger.debug("Running query: %s (%s)", query, values)
-        results = self.execute_query(query, values)
+        results = await self.execute_query(query, values)
         records = [dict(row) for row in results["data"]]
 
         return records
 
-    def select_insert_into_table(self, select_query: str, table_name: str):
+    async def select_insert_into_table(self, select_query: str, table_name: str):
         """
         Insert rows into a table from a select query
 
@@ -90,9 +90,9 @@ class DatabaseClient:
         table_id = self.get_table_id(table_name)
         query = f"INSERT INTO {table_id} {select_query}"
         logger.info("Inserting via query (%s) into table %s", query, table_id)
-        self.execute_query(query)
+        await self.execute_query(query)
 
-    def create_and_insert(
+    async def create_and_insert(
         self,
         table_name: str,
         records: Sequence[M],
@@ -110,12 +110,12 @@ class DatabaseClient:
             batch_size (int, optional): number of records to insert per batch. Defaults to 1000.
         """
         schema = columns or list(records[0].keys())
-        self.create_table(
+        await self.create_table(
             table_name, schema, exists_ok=True, truncate_if_exists=truncate_if_exists
         )
-        self.insert_into_table(records, table_name, transform, batch_size)
+        await self.insert_into_table(records, table_name, transform, batch_size)
 
-    def insert_into_table(
+    async def insert_into_table(
         self,
         records: Sequence[M],
         table_name: str,
@@ -136,11 +136,11 @@ class DatabaseClient:
         for i, b in enumerate(batched):
             logging.debug("Inserting batch %s into table %s", i, table_name)
             transformed = transform(b, records) if transform else b
-            self._insert(table_name, transformed)
+            await self._insert(table_name, transformed)
 
             logging.debug("Successfully inserted %s rows", len(b))
 
-    def create_table(
+    async def create_table(
         self,
         table_name: str,
         schema: Sequence[str] | Mapping[str, str],
@@ -163,15 +163,15 @@ class DatabaseClient:
 
         if self.is_table_exists(table_name):
             if truncate_if_exists:
-                self.truncate_table(table_name)
+                await self.truncate_table(table_name)
             elif not exists_ok:
                 raise Exception(f"Table {table_name} already exists")
             else:
                 logging.info("Table %s already exists", table_name)
         else:
-            self._create(table_name, schema)
+            await self._create(table_name, schema)
 
-    def delete_table(self, table_name: str, is_cascade: bool = False):
+    async def delete_table(self, table_name: str, is_cascade: bool = False):
         """
         Delete a table (if exists)
 
@@ -184,10 +184,10 @@ class DatabaseClient:
         delete_table_query = (
             f"DROP TABLE IF EXISTS {table_id} {'CASCADE' if is_cascade else ''};"
         )
-        self.execute_query(delete_table_query)
+        await self.execute_query(delete_table_query)
         logging.info("Deleted table %s", table_name)
 
-    def truncate_table(self, table_name: str):
+    async def truncate_table(self, table_name: str):
         """
         Truncate a table (if exists)
 
@@ -204,7 +204,7 @@ class DatabaseClient:
         table_id = self.get_table_id(table_name)
         logger.info("Truncating table %s", table_id)
         truncate_table_query = f"TRUNCATE TABLE {table_id};"
-        self.execute_query(truncate_table_query)
+        await self.execute_query(truncate_table_query)
         logging.info("Truncated table %s", table_name)
 
 

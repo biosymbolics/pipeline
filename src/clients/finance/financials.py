@@ -5,7 +5,6 @@ import yfinance as yf
 import logging
 import requests_cache
 
-from typings.companies import COMPANY_STR_KEYS
 from utils.list import contains
 
 from .stock import StockPerformance
@@ -28,13 +27,7 @@ TL = "TotalLiabilities"
 SIG_DIGITS = 2
 
 
-COMPANY_STR_KEYS_EXT = [
-    *COMPANY_STR_KEYS,
-    "timeframe",
-]
-
-
-class CompanyFinancials(StockPerformance):
+class CompanyFinancialExtractor(StockPerformance):
     """
     Company financial performance client
 
@@ -65,7 +58,9 @@ class CompanyFinancials(StockPerformance):
         self.timeframe = timeframe
 
     def __str__(self):
-        return ", ".join([f"{k}={getattr(self, k)}" for k in COMPANY_STR_KEYS_EXT])
+        return ", ".join(
+            [f"{k}={getattr(self, k)}" for k in self.__class__.__dict__.keys()]
+        )
 
     def __repr__(self):
         return self.__str__()
@@ -165,15 +160,6 @@ class CompanyFinancials(StockPerformance):
             return None
 
         return round(net_income / self.shareholders_equity, SIG_DIGITS)
-
-    @property
-    def is_low_return_on_equity(self, min_roe: float = 0.15) -> bool:
-        """
-        Return on equity should be > 15%
-        """
-        if self.return_on_equity is None:
-            return False
-        return self.return_on_equity < min_roe
 
     @property
     def gross_profit(self) -> float | None:
@@ -291,15 +277,6 @@ class CompanyFinancials(StockPerformance):
         return nds[0]
 
     @property
-    def is_trading_below_cash(self) -> bool:
-        if self.market_cap is None or self.net_debt is None:
-            logger.warning(
-                "Unable to fetch market cap and/or net debt for %s", self.symbol
-            )
-            return False
-        return self.market_cap < self.net_debt
-
-    @property
     def current_ratio(self) -> float | None:
         """
         CR = current_assets / current_liabilities
@@ -317,16 +294,6 @@ class CompanyFinancials(StockPerformance):
         return round(current_assets / current_liabilities, SIG_DIGITS)
 
     @property
-    def is_bad_current_ratio(self) -> bool:
-        """
-        Current ratio should be > 1
-        """
-        if self.current_ratio is None:
-            logger.warning("Unable to fetch current ratio for %s", self.symbol)
-            return False
-        return self.current_ratio < 1
-
-    @property
     def debt_equity_ratio(self) -> float | None:
         """
         DER = total_debt / total_equity
@@ -338,34 +305,3 @@ class CompanyFinancials(StockPerformance):
             return None
 
         return round(total_debt / total_equity, SIG_DIGITS)
-
-    @property
-    def is_bad_debt_equity_ratio(self, max_ratio: float = 1.5) -> bool:
-        """
-        Debt equity ratio should be < 1.5
-        """
-        if self.debt_equity_ratio is None:
-            logger.warning("Unable to fetch d/e ratio for %s", self.symbol)
-            return False
-        return self.debt_equity_ratio > max_ratio
-
-    @property
-    def is_troubled(self) -> bool:
-        """
-        Returns true if any of the following are true:
-
-        - is trading below cash
-        - has a bad current ratio
-        - has a bad debt equity ratio
-
-        This indicates a company may be at risk of bankruptcy, being scrapped,
-        or interested in liquidation or buyout.
-
-        TODO: include change over time
-        """
-        return (
-            self.is_trading_below_cash
-            or self.is_bad_current_ratio
-            or self.is_bad_debt_equity_ratio
-            or self.is_low_return_on_equity
-        )

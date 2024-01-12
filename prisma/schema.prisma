@@ -1,0 +1,464 @@
+// database
+datasource db {
+    provider   = "postgresql"
+    url        = env("DATABASE_URL")
+    extensions = [vector]
+}
+
+// generator
+generator client {
+    provider             = "prisma-client-py"
+    recursive_type_depth = 5
+    previewFeatures      = ["fullTextSearch", "postgresqlExtensions"]
+}
+
+model BiomedicalEntity {
+    id            Int                      @id @default(autoincrement())
+    canonical_id  String?                  @unique
+    children      BiomedicalEntity[]       @relation("entity_to_parent")
+    comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
+    comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
+    entity_type   BiomedicalEntityType
+    indications   Indicatable[] // backref
+    interventions Intervenable[] // backref
+    name          String                   @unique
+    parents       BiomedicalEntity[]       @relation("entity_to_parent")
+    search        Unsupported("tsvector")?
+    sources       Source[]
+    synonyms      EntitySynonym[]
+    umls_entities Umls[]                   @relation("entity_to_umls")
+
+    // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
+
+    @@map("biomedical_entity")
+}
+
+model EntitySynonym {
+    id        Int              @id @default(autoincrement())
+    entity    BiomedicalEntity @relation(fields: [entity_id], references: [id])
+    entity_id Int
+    term      String
+
+    @@unique([term, entity_id]) // TODO: should be on term
+    @@map("entity_synonym")
+}
+
+model Owner {
+    id                 Int                      @id @default(autoincrement())
+    children           Owner[]                  @relation("owner_to_parent")
+    financial_snapshot FinancialSnapshot?
+    ownables           Ownable[] // backref
+    owner_type         OwnerType
+    parents            Owner[]                  @relation("owner_to_parent")
+    name               String                   @unique
+    search             Unsupported("tsvector")?
+    synonyms           OwnerSynonym[]
+
+    @@map("owner")
+}
+
+model OwnerSynonym {
+    id       Int    @id @default(autoincrement())
+    owner    Owner  @relation(fields: [owner_id], references: [id])
+    owner_id Int
+    term     String
+
+    @@unique([term, owner_id]) // TODO: should be on term
+    @@map("owner_synonym")
+}
+
+model Patent {
+    id                  String                     @id @unique // publication_number
+    application_number  String
+    abstract            String
+    assignees           Ownable[]                  @relation("assignee_to_patent")
+    attributes          String[]
+    claims              String?
+    country_code        String
+    embeddings          Unsupported("vector(64)")?
+    exemplar_similarity Float? // not stored in db. hack to represent this in the py classes
+    interventions       Intervenable[]
+    indications         Indicatable[]
+    inventors           Ownable[]                  @relation("inventor_to_patent")
+    ipc_codes           String[]
+    other_ids           String[]
+    priority_date       DateTime
+    search              Unsupported("tsvector")?
+    search_rank         Float? // not stored in db. hack to represent this in the py classes
+    similar_patents     String[]
+    text_for_search     String
+    title               String
+    url                 String
+
+    @@map("patent")
+}
+
+model RegulatoryApproval {
+    id               String                   @id @unique
+    agency           String
+    application_type String
+    approval_date    DateTime
+    indications      Indicatable[]
+    interventions    Intervenable[]
+    owners           Ownable[]
+    search           Unsupported("tsvector")?
+    text_for_search  String
+    url              String
+
+    @@map("regulatory_approval")
+}
+
+model Trial {
+    id                      String                   @id @unique
+    abstract                String?
+    acronym                 String?
+    arm_count               Int?                     @default(-1)
+    arm_types               String[]
+    comparison_type         ComparisonType
+    design                  TrialDesign
+    dropout_count           Int?
+    dropout_reasons         String[]
+    duration                Int?
+    end_date                DateTime?
+    enrollment              Int?
+    hypothesis_type         HypothesisType // calc field??
+    indications             Indicatable[]
+    interventions           Intervenable[]
+    intervention_type       BiomedicalEntityType
+    last_updated_date       DateTime
+    masking                 TrialMasking
+    max_timeframe           Int?
+    outcomes                TrialOutcome[]
+    phase                   TrialPhase
+    purpose                 String
+    randomization           TrialRandomization
+    search                  Unsupported("tsvector")?
+    sponsor_id              Int?                     @unique
+    sponsor                 Ownable?
+    start_date              DateTime?
+    status                  TrialStatus
+    termination_description String?
+    termination_reason      TerminationReason
+    text_for_search         String
+    title                   String
+    url                     String
+
+    @@map("trial")
+}
+
+model TrialOutcome {
+    id              Int             @id @default(autoincrement())
+    description     String?
+    hypothesis_type HypothesisType?
+    name            String
+    trial_id        String
+    trial           Trial?          @relation(fields: [trial_id], references: [id])
+    timeframe       String?
+
+    @@map("trial_outcome")
+}
+
+model FinancialSnapshot {
+    id                         Int      @id @default(autoincrement())
+    owner_id                   Int      @unique
+    owner                      Owner    @relation(fields: [owner_id], references: [id])
+    current_ratio              Float?
+    debt_equity_ratio          Float?
+    ebitda                     Float?
+    gross_profit               Float?
+    market_cap                 Float?
+    net_debt                   Float?
+    return_on_equity           Float?
+    return_on_research_capital Float?
+    snapshot_date              DateTime
+    symbol                     String   @unique
+    total_debt                 Float?
+
+    @@map("financials")
+}
+
+model Ownable {
+    id                     Int                 @id @default(autoincrement())
+    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [patent_id], references: [id])
+    patent_id              String?
+    inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
+    inventor_patent_id     String?
+    is_primary             Boolean?            @default(false)
+    owner                  Owner?              @relation(fields: [owner_id], references: [id])
+    owner_id               Int?
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    instance_rollup        String // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    trial                  Trial?              @relation(fields: [trial_id], references: [id])
+    trial_id               String?             @unique
+
+    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "ownable_name")
+    @@index([canonical_name], name: "ownable_canonical_name")
+    @@map("ownable")
+}
+
+model Intervenable {
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    context_of_use         ContextOfUse          @default(NA)
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
+    instance_rollup        String // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    trial_id               String?
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
+
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "intervenable_name")
+    @@index([canonical_name], name: "intervenable_canonical_name")
+    @@map("intervenable")
+}
+
+model Indicatable {
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
+    instance_rollup        String // denormalized from biomedical entity
+    category_rollup        String? // denormalized from biomedical entity
+    trial_id               String?
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "indicatable_name")
+    @@index([canonical_name], name: "indicatable_canonical_name")
+    @@map("indicatable")
+}
+
+model Umls {
+    id                  String             @id @unique
+    biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
+    category_rollup     String
+    hierarchy           String?
+    instance_rollup     String
+    l0_ancestor         String?
+    l1_ancestor         String?
+    l2_ancestor         String?
+    l3_ancestor         String?
+    l4_ancestor         String?
+    l5_ancestor         String?
+    l6_ancestor         String?
+    l7_ancestor         String?
+    l8_ancestor         String?
+    l9_ancestor         String?
+    level               OntologyLevel
+    name                String
+    num_descendants     Int
+    preferred_name      String
+    synonyms            String[]
+    type_ids            String[]
+    type_names          String[]
+
+    @@map("umls")
+}
+
+model UmlsGraph {
+    head_id      String
+    head_name    String
+    tail_id      String
+    tail_name    String
+    relationship String @default("")
+
+    @@unique([head_id, tail_id, relationship])
+    @@map("umls_graph")
+}
+
+enum ComparisonType {
+    ACTIVE
+    PLACEBO
+    NO_INTERVENTION
+    NO_CONTROL
+    DOSE
+    OTHER
+    NA
+    UNKNOWN
+}
+
+enum HypothesisType {
+    SUPERIORITY
+    NON_INFERIORITY
+    EQUIVALENCE
+    MULTIPLE
+    NON_SUPERIORITY
+    OTHER
+    UNKNOWN
+}
+
+enum OwnerType {
+    INDUSTRY_LARGE
+    INDUSTRY
+    UNIVERSITY
+    GOVERNMENTAL
+    HEALTH_SYSTEM
+    FOUNDATION
+    OTHER_ORGANIZATION
+    INDIVIDUAL
+    OTHER
+}
+
+enum TrialDesign {
+    PARALLEL
+    CROSSOVER
+    FACTORIAL
+    SEQUENTIAL
+    SINGLE_GROUP
+    DOSING
+    NA
+    UNKNOWN
+}
+
+enum TrialPhase {
+    PRECLINICAL
+    EARLY_PHASE_1
+    PHASE_1
+    PHASE_1_2
+    PHASE_2
+    PHASE_2_3
+    PHASE_3
+    APPROVED
+    PHASE_4
+    NA
+    UNKNOWN
+}
+
+enum TrialPurpose {
+    TREATMENT
+    PREVENTION
+    DIAGNOSTIC
+    BASIC_SCIENCE
+    SUPPORTIVE_CARE
+    DEVICE
+    OTHER
+    UNKNOWN
+}
+
+enum TrialRandomization {
+    RANDOMIZED
+    NON_RANDOMIZED
+    NA
+    UNKNOWN
+}
+
+enum TrialStatus {
+    PRE_ENROLLMENT
+    ENROLLMENT
+    WITHDRAWN
+    SUSPENDED
+    TERMINATED
+    COMPLETED
+    UNKNOWN
+    NA
+}
+
+enum TrialMasking {
+    NONE
+    SINGLE
+    DOUBLE
+    TRIPLE
+    QUADRUPLE
+    UNKNOWN
+}
+
+enum TerminationReason {
+    FUTILITY
+    SAFETY
+    NOT_SAFETY
+    NOT_FUTILITY
+    BUSINESS
+    SUPPLY_CHAIN
+    LOGISTICS
+    ENROLLMENT
+    FEASIBILITY
+    INVESTIGATOR
+    FUNDING
+    COVID
+    OVERSIGHT
+    PROTOCOL_REVISION
+    OTHER
+    NA
+}
+
+enum BiomedicalEntityType {
+    // indication
+    CONDITION
+    DISEASE
+    PHENOTYPE
+
+    // intervention
+    BEHAVIORAL
+    BIOLOGIC
+    CLASS
+    COMBINATION
+    COMPOUND
+    DEVICE
+    DIAGNOSTIC
+    DIETARY
+    DOSAGE_FORM
+    MECHANISM
+    PROCEDURE
+    PROCESS
+    RESEARCH
+    ROA
+
+    // group intervention
+    PHARMACOLOGICAL
+
+    // both
+    PATHWAY
+    TARGET
+
+    // other
+    OTHER
+    UNKNOWN
+}
+
+enum ContextOfUse {
+    COMBINATION
+    COMPARATOR
+    MENTION
+    TREATMENT
+    NONE
+    NA
+    UNKNOWN
+}
+
+enum OntologyLevel {
+    INSTANCE
+    L1_CATEGORY
+    L2_CATEGORY
+    NA
+    UNKNOWN
+}
+
+enum Source {
+    BIOSYM
+    CTGOV
+    FDA
+    UMLS
+}

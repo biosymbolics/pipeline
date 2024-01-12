@@ -20,7 +20,7 @@ from data.prediction import (
     is_model_input,
     is_model_input_output,
 )
-from typings.trials import TrialSummary
+from typings.documents.trials import ScoredTrial as TrialSummary
 
 from .constants import (
     BASE_ENCODER_DIRECTORY,
