@@ -7,14 +7,13 @@ from typing import Literal, Sequence
 from prisma import Prisma
 from pydash import compact
 import logging
-from prisma.models import RegulatoryApproval, Trial
 from pydantic import BaseModel
 
 from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.entities import Entity
-from typings.documents.patents import ScoredPatent
+from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 
 from ..approvals import find_many as find_regulatory_approvals
 from ..patents import find_many as find_patents
@@ -27,8 +26,8 @@ logger.setLevel(logging.INFO)
 @dataclass(frozen=True)
 class DocsByType(Dataclass):
     patents: dict[str, ScoredPatent]
-    regulatory_approvals: dict[str, RegulatoryApproval]
-    trials: dict[str, Trial]
+    regulatory_approvals: dict[str, ScoredRegulatoryApproval]
+    trials: dict[str, ScoredTrial]
 
 
 MapTables = Literal["intervenable", "indicatable"]
@@ -117,7 +116,6 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
 
     await asyncio.gather(regulatory_approvals, patents, trials)
 
-    # TODO: centralize the prisma client + transform (e.g. to ScoredPatent)
     return DocsByType(
         regulatory_approvals={r.id: r for r in regulatory_approvals.result()},
         patents={p.id: p for p in patents.result()},
@@ -143,12 +141,16 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
         Entity(
             id=ent_with_doc.id,
             name=ent_with_doc.name,
-            **{
-                k: compact(
-                    [doc_by_type.__dict__[k].get(id) for id in ent_with_doc.__dict__[k]]
-                )
-                for k in DocResults.__annotations__.keys()
-            },
+            patents=compact(
+                [doc_by_type.patents.get(id) for id in ent_with_doc.patents]
+            ),
+            regulatory_approvals=compact(
+                [
+                    doc_by_type.regulatory_approvals.get("id")
+                    for id in ent_with_doc.regulatory_approvals
+                ]
+            ),
+            trials=compact([doc_by_type.trials.get(id) for id in ent_with_doc.trials]),
         )
         for ent_with_doc in ent_with_docs
     ]
