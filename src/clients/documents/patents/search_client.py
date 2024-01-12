@@ -108,7 +108,7 @@ async def _search(
     exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "OR",
     min_patent_years: int = 10,
-    term_field: TermField = "canonical_name",
+    term_field: TermField = TermField.canonical_name,
     limit: int = MAX_SEARCH_RESULTS,
     include: PatentInclude = {
         "assignees": True,

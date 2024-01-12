@@ -20,14 +20,14 @@ async def _search(raw_event: dict, context):
     Search assets by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-assets --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "query_type": "OR" }}'`
-    - Remote: `serverless invoke --function search-assets --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension" }}'`
+    - Local: `serverless invoke local --function search-assets --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "query_type": "OR", "limit": 50 }}'`
+    - Remote: `serverless invoke --function search-assets --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "limit": 50 }}'`
     - API: `curl https://api.biosymbolics.ai/assets/search?terms=asthma`
     """
     p = AssetSearchParams(
         **{
-            **(raw_event.get("queryStringParameters") or {}),
             **DEFAULT_SEARCH_PARAMS,
+            **(raw_event.get("queryStringParameters") or {}),
         },
     )
 

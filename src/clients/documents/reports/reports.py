@@ -12,7 +12,7 @@ from clients.documents.patents.types import (
 )
 from clients.low_level.prisma import prisma_client
 from typings.client import CommonSearchParams
-from typings.documents.common import DocType
+from typings.documents.common import DocType, TermField
 
 from .constants import X_DIMENSIONS, Y_DIMENSIONS
 
@@ -50,7 +50,7 @@ class XYReport:
     def get_query(
         x: str,
         y: str | None,
-        search_field: str,  # field against which to search, e.g. canonical_name or instance_rollup
+        term_field: TermField,  # field against which to search, e.g. canonical_name or instance_rollup
         doc_type: DocType,
         filter: str | None = None,
     ) -> str:
@@ -71,7 +71,7 @@ class XYReport:
 
         # search join to determine result set for report
         search_sq = XYReport._get_entity_subquery(
-            search_field, doc_type, f"{search_field} = ANY($1)"
+            term_field.name, doc_type, f"{term_field.name} = ANY($1)"
         )
         search_subquery = f"""
             SELECT id
@@ -132,7 +132,7 @@ class XYReport:
             XYReport.get_query(
                 x_dimension,
                 y_dimension,
-                search_field=search_params.term_field,
+                term_field=search_params.term_field,
                 filter=filter,
                 doc_type=doc_type,
             ),

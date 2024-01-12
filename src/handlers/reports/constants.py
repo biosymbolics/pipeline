@@ -1,2 +1,4 @@
-# TODO
-DEFAULT_REPORT_PARAMS = {"term_field": "canonical_name", "limit": 10000}
+from typings.documents.common import TermField
+
+
+DEFAULT_REPORT_PARAMS = {"term_field": TermField.canonical_name, "limit": 10000}

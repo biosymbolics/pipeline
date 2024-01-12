@@ -16,6 +16,8 @@ from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 class Entity(Dataclass):
     id: int
     name: str
+    child_count: int
+    children: list["Entity"]
     patents: list[ScoredPatent]
     regulatory_approvals: list[ScoredRegulatoryApproval]
     trials: list[ScoredTrial]
@@ -132,7 +134,6 @@ class Entity(Dataclass):
     @property
     def maybe_available_count(self) -> int:
         return [
-            # TODO: why isn't p.availability_likelihood the enum?
             p.availability_likelihood
             in [
                 AvailabilityLikelihood.POSSIBLE,
@@ -181,6 +182,7 @@ class Entity(Dataclass):
         o = super().serialize()
         return {
             **o,
+            "children": [c.serialize() for c in self.children],
             "regulatory_approvals": regulatory_approvals,
             "patents": patents,
             "trials": trials,
