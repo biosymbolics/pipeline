@@ -13,10 +13,10 @@ from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from scripts.approvals.copy_approvals import ApprovalEtl
-from scripts.owner import load_owners
+from scripts.owner.load_owners import AllOwnersEtl
 from scripts.patents.copy_patents import PatentEtl
 from scripts.trials.copy_trials import TrialEtl
-from scripts.umls.copy_umls import copy_umls
+from scripts.umls.copy_umls import UmlsEtl
 
 from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
@@ -82,29 +82,16 @@ async def main(bootstrap: bool = False):
     Followed by:
     ```
     # from local machine
-    pg_dump --no-owner patents \
-        -t aggregated_annotations \
-        -t annotations \
-        -t applications \
-        -t terms \
-        -t patent_to_trial \
-        -t trials \
-        -t regulatory_approvals \
-        -t umls_lookup \
-        -t umls_graph \
-        -t term_ids \
-        -t companies \
-        -t patent_clindev_predictions \
-        -t patent_to_regulatory_approval > patents.psql
-    zip patents.psql.zip patents.psql
-    aws s3 mv s3://biosympatentsdb/patents.psql.zip s3://biosympatentsdb/patents.psql.zip.back-$(date +%Y-%m-%d)
-    aws s3 cp patents.psql.zip s3://biosympatentsdb/patents.psql.zip
-    rm patents.psql*
+    pg_dump --no-owner biosym > biosym.psql
+    zip biosym.psql.zip biosym.psql
+    aws s3 mv s3://biosympatentsdb/biosym.psql.zip s3://biosympatentsdb/biosym.psql.zip.back-$(date +%Y-%m-%d)
+    aws s3 cp biosym.psql.zip s3://biosympatentsdb/biosym.psql.zip
+    rm biosym.psql*
 
     # then proceeding in ec2
     aws configure sso
-    aws s3 cp s3://biosympatentsdb/patents.psql.zip patents.psql.zip
-    unzip patents.psql.zip
+    aws s3 cp s3://biosympatentsdb/patents.psql.zip biosym.psql.zip
+    unzip biosym.psql.zip
     y
     export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
     echo "
@@ -121,16 +108,13 @@ async def main(bootstrap: bool = False):
     -- vacuum analyze;
     -- analyze applications;
     -- reindex database patents;
-        " >> patents.psql
+        " >> biosym.psql
     echo $PASSWORD
-    dropdb patents --force  -h 172.31.55.68 -p 5432 --username postgres
-    createdb patents -h 172.31.55.68 -p 5432 --username postgres
-    psql -d patents -h 172.31.55.68 -p 5432 --username postgres --password -f patents.psql
-    rm patents.psql*
+    dropdb biosym --force  -h 172.31.55.68 -p 5432 --username postgres
+    createdb biosym -h 172.31.55.68 -p 5432 --username postgres
+    psql -d biosym -h 172.31.55.68 -p 5432 --username postgres --password -f biosym.psql
+    rm biosym.psql*
     ```
-
-    if new bastion:
-    - yum install postgresql15
     """
     if bootstrap:
         # copy gpr_publications, publications, gpr_annotations tables
@@ -141,10 +125,10 @@ async def main(bootstrap: bool = False):
         # create patent applications etc in postgres
         await copy_bq_to_psql()
         # UMLS records (slow due to betweenness centrality calc)
-        copy_umls()
+        await UmlsEtl().copy_all()
 
     # copy owner data (across all documents)
-    await load_owners.AllOwnersEtl().copy_all()
+    await AllOwnersEtl().copy_all()
 
     # copy patent data
     await PatentEtl(document_type="patent").copy_all()
@@ -154,23 +138,6 @@ async def main(bootstrap: bool = False):
 
     # copy trial data
     await TrialEtl(document_type="trial").copy_all()
-
-    # post
-    # TODO: same mods to trials? or needs to be in-line adjustment in normalizing/mapping
-    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
-    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein$';
-    # update annotations set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
-    # update annotations set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
-
-    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} gene$';
-    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein$';
-    # update terms set term=regexp_replace(term, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where term ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
-    # update terms set term=regexp_replace(term, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where term ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
-
-    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) gene$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} gene$';
-    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) protein$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} protein$';
-    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)^([a-z0-9-]{3,}) protein, [a-z]{3,}$', '\1', 'i') where instance_rollup ~* '^[a-z0-9-]{3,} protein, [a-z]{3,}$';
-    # update annotations set instance_rollup=regexp_replace(instance_rollup, '(?i)(?:\[EPC\]|\[MoA\]|\(disposition\)|\(antigen\)|\(disease\)|\(disorder\)|\(finding\)|\(treatment\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$', '', 'i') where instance_rollup ~* '(?:\[EPC\]|\[MoA\]|\(disposition\)|\(disease\)|\(treatment\)|\(antigen\)|\(disorder\)|\(finding\)|\(qualifier value\)|\(morphologic abnormality\)|\(procedure\)|\(product\)|\(substance\)|\(biomedical material\)|\(Chemistry\))$';
 
     # select t.term, ul.type_names, array_agg(distinct domain), array_agg(distinct original_term), count(*) from biosym_annotations, terms t, umls_lookup ul
     #     where ul.id=t.id
@@ -239,48 +206,6 @@ async def main(bootstrap: bool = False):
     #     and not original_term ~* '.*(?:anti|inflammation|therapeutic|repair).*'
     #     and t.id not in ('C0268275', 'C1173729', 'C0031516', 'C0332837', 'C0037188', 'C0027627', 'C0011175', 'C0015967', 'C0151747', 'C0026837', 'C0700198', 'C0233656', 'C0043242', 'C0332875', 'C1510411', 'C2926602', 'C0242781', 'C0220811', 'C4074771', 'C0158328', 'C0011119', 'C0555975', 'C0877578', 'C0856151', 'C0263557', 'C0276640', 'C0858714', 'C0595920', 'C1318484', 'C0020488', 'C0278134', 'C0220724', 'C2029593', 'C0265604', 'C0012359', 'C0234985', 'C0027960', 'C1384489', 'C0277825', 'C0392483', 'C0010957', 'C0015376', 'C0011389', 'C0597561', 'C0036974', 'C0233494', 'C0011334', 'C0013146', 'C0030201', 'C0000925', 'C0332157', 'C0151908', 'C0024524', 'C0037293', 'C0233601', 'C4023747', 'C0262568', 'C0542351', 'C0036572', 'C0858950', 'C0001511', 'C0080194', 'C1514893', 'C0003516', 'C0332568', 'C0445243', 'C0349506', 'C0599156', 'C0033119', 'C4721411', 'C3658343', 'C1136365', 'C1704681', 'C0017374', 'C1334103', 'C0017345', 'C0017343', 'C0678941')
     #     and array_length(t.synonyms, 1) < 15;
-
-    # UPDATE trials
-    # SET interventions = sub.new_interventions
-    # FROM (
-    #   SELECT nct_id, array_agg(i) as new_interventions
-    #   FROM trials, unnest(interventions) i
-    #   where not i ~* '\ystandard therapy\y'
-    #   group by nct_id
-    # ) sub
-    # where sub.nct_id=trials.nct_id
-
-    # UPDATE trials
-    # SET interventions = sub.new_interventions
-    # FROM (
-    #   SELECT nct_id, array_agg(i), array_agg(
-    #       regexp_replace(i, '(.*) [0-9]+%', '\1', 'ig')
-    #   ) AS new_interventions
-    #   FROM trials, unnest(interventions) i
-    #   where array_to_string(interventions, '::') ~* ' [0-9]+%'
-    #   group by nct_id
-    # ) sub
-    # where sub.nct_id=trials.nct_id
-
-    # UPDATE trials
-    # SET interventions = sub.new_interventions
-    # FROM (
-    #   SELECT nct_id, array_agg(i), array_agg(
-    #       trim(i)
-    #   ) AS new_interventions
-    #   FROM trials, unnest(interventions) i
-    #   group by nct_id
-    # ) sub
-    # where sub.nct_id=trials.nct_id
-
-    # update annotations set instance_rollup=lower(instance_rollup) where instance_rollup<>lower(instance_rollup);
-    # update annotations set instance_rollup=term where domain not in ('attributes', 'assignees') and lower(instance_rollup) in  ('pharmacologic substance', 'inhibitor', '11-dehydrocorticosterone', 'peptides', 'disease', 'compound', 'base sequence','salts', 'bacteria', 'alleles', 'modulator', 'syndrome', 'antibodies', 'abnormality of digestive system morphology', 'antagonist', 'agonist', 'proteins', 'catalyst', 'agent', 'promoters', 'enhancer of transcription', 'laboratory chemicals', 'monomers', 'syndrome', 'disease', 'cells', 'chemical group', 'copolymer', 'polymers', 'plant-based natural product', 'degrader')
-    # delete from annotations where lower(term) in ('inhibitor', '11-dehydrocorticosterone', 'composition', 'composition comprising', 'peptides', 'disease', 'compound', 'base sequence','salts', 'bacteria', 'alleles', 'modulator', 'syndrome', 'antibodies', 'abnormality of digestive system morphology', 'antagonist', 'agonist', 'proteins', 'catalyst', 'agent', 'promoters', 'enhancer of transcription', 'laboratory chemicals', 'monomers', 'syndrome', 'disease', 'cells', 'chemical group', 'copolymer', 'polymers', 'plant-based natural product', 'degrader');
-    # refresh materialized view aggregated_annotations;
-
-    # update annotations set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
-    # update biosym_annotations_source set domain='diseases' where domain<>'diseases' and term ~* '^.* leukemias?$';
-    # update biosym_annotations set domain='diseases' where domain<>'diseases' and original_term ~* '^.* leukemias?$';
 
 
 if __name__ == "__main__":

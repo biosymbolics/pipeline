@@ -1,7 +1,6 @@
 import unittest
 import pytest
 
-from clients.patents.constants import ENTITY_DOMAINS
 from core.ner import NerTagger
 
 
@@ -27,7 +26,7 @@ class TestNerUtils(unittest.TestCase):
 
     def setUp(self):
         self.tagger = NerTagger(
-            entity_types=frozenset(ENTITY_DOMAINS),
+            entity_types=frozenset(["compounds", "diseases", "mechanisms"]),
             link=False,
             normalize=True,
             rule_sets=[],

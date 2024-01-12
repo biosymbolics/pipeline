@@ -132,6 +132,7 @@ def clean_owners(
         sub_suppressions,
         normalize_terms,  # order matters
         sub_extra_spaces,
+        lambda owners: [t.title() for t in owners],
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
 
