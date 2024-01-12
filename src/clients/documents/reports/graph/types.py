@@ -36,6 +36,3 @@ class AggregateDocumentRelationship(Dataclass):
     concept: str
     count: int
     documents: list[str]
-
-
-CharacteristicHeadField = Literal["priority_year", "assignee", "id"]

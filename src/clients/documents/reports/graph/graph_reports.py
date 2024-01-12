@@ -21,11 +21,13 @@ from typings import (
 
 from .types import (
     AggregateDocumentRelationship,
-    CharacteristicHeadField,
     Node,
     Link,
     SerializableGraph,
 )
+
+from ..constants import X_DIMENSIONS, Y_DIMENSIONS
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -95,6 +97,10 @@ class TermField(Enum):
 def get_entity_subquery(term_field: TermField, doc_type: DocType) -> str:
     """
     Subquery to use if the term_field is an entity (indicatable, intervenable)
+
+    Args:
+        term_field (TermField): term field
+        doc_type (DocType): doc type
     """
     return f"""
         (
@@ -160,10 +166,9 @@ def generate_graph(
 
 
 async def graph_document_relationships(
-    documents: Sequence[ScoredPatent]
-    | Sequence[ScoredTrial]
-    | Sequence[ScoredRegulatoryApproval],
+    ids: Sequence[str],
     doc_type: DocType = DocType.patent,
+    head_field: str = "priority_date",
     max_nodes: int = MAX_NODES,
 ) -> SerializableGraph:
     """
@@ -173,28 +178,33 @@ async def graph_document_relationships(
     - Edges are ancestory relationships OR patent co-occurrences (e.g. PD and anti-alpha-synucleins)
     - Nodes contain metadata of the relevant documents
 
-    Note: perhaps inefficient to load documents just for ids, but patent call is cached (+ used by other queries)
+    Args:
+        ids (Sequence[str]): doc ids (must correspond to doc_type)
+        doc_type (DocType, optional): doc type. Defaults to DocType.patent.
+        head_field (str, optional): head field. Defaults to "priority_date".
+        max_nodes (int, optional): max nodes. Defaults to MAX_NODES.
     """
-    document_ids = [d.id for d in documents]
+    head_field_info = Y_DIMENSIONS[doc_type][head_field]
+    head_sql = head_field_info.transform(head_field)
 
     # TODO: save relationship type, ancestors
     sql = f"""
         -- documents-node to entity relationships
         SELECT
-            TO_CHAR(document.priority_date, 'YYYY') as head,
+            {head_sql} as head,
             umls.name as tail,
             count(*) as weight,
             '{DOCUMENT_GROUP}' as group
-        FROM {doc_type.name} as document
+        FROM {doc_type.name}
             JOIN {get_entity_subquery(TermField.canonical_name, doc_type)} entities
-                ON entities.{doc_type.name}_id = document.id
+                ON entities.{doc_type.name}_id = {doc_type.name}.id
             JOIN biomedical_entity ON
                 biomedical_entity.id = entities.canonical_id
                 AND biomedical_entity.entity_types in {tuple(DOMAINS_OF_INTEREST)}
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
             JOIN umls ON umls.id = etu."B"
-        WHERE document.id = ANY(ARRAY{document_ids})
-        GROUP BY TO_CHAR(document.priority_date, 'YYYY'), umls.name
+        WHERE {doc_type.name}.id = ANY(ARRAY{ids})
+        GROUP BY {head_sql}, umls.name
         ORDER BY weight DESC LIMIT 1000
     """
 
@@ -251,27 +261,28 @@ async def graph_document_relationships(
 
 
 async def aggregate_document_relationships(
-    documents: Sequence[ScoredPatent]
-    | Sequence[ScoredTrial]
-    | Sequence[ScoredRegulatoryApproval],
-    head_field: CharacteristicHeadField = "priority_year",
-    entity_types: Sequence[BiomedicalEntityType] = [],
+    ids: Sequence[str],
+    head_field: str = "priority_date",
+    entity_types: Sequence[BiomedicalEntityType] | None = None,
     relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
     doc_type: DocType = DocType.patent,
 ) -> list[AggregateDocumentRelationship]:
     """
     Aggregated UMLS ancestory report for a set of documents
-    """
-    ids = [d.id for d in documents]
 
-    if head_field == "priority_year":
-        head_sql = "TO_CHAR(document.priority_date, 'YYYY')"
-    elif head_field == "assignee":
-        head_sql = "document.assignees[1]"  # TODO: all?
-    elif head_field == "id":
-        head_sql = "document.id"
-    else:
-        raise Exception(f"Invalid head field: {head_field}")
+    Args:
+        ids (Sequence[str]): doc ids (must correspond to doc_type)
+        head_field (str, optional): head field. Defaults to "priority_date".
+        entity_types (Sequence[BiomedicalEntityType], optional): entity types. Defaults to None.
+        relationships (Sequence[str], optional): relationships. Defaults to RELATIONSHIPS_OF_INTEREST.
+        doc_type (DocType, optional): doc type. Defaults to DocType.patent.
+    """
+
+    if head_field not in Y_DIMENSIONS[doc_type]:
+        raise ValueError(f"Invalid head field: {head_field}")
+
+    head_field_info = Y_DIMENSIONS[doc_type][head_field]
+    head_sql = head_field_info.transform(head_field)
 
     entity_sq = get_entity_subquery(TermField.canonical_name, doc_type)
     sql = f"""
@@ -280,14 +291,15 @@ async def aggregate_document_relationships(
             {head_sql} as head,
             umls.name as concept,
             count(*) as count,
-            array_agg(distinct document.id) as documents
-        FROM {doc_type.name} as document
+            array_agg(distinct {doc_type.name}.id) as documents
+        FROM {doc_type.name}
             JOIN {entity_sq} entities
-                ON entities.{doc_type.name}_id = document.id
+                ON entities.{doc_type.name}_id = {doc_type.name}.id
             JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
+                {f"AND biomedical_entity.entity_types in {tuple(entity_types)} " if entity_types else ""}
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
             JOIN umls ON umls.id = etu."B"
-        WHERE document.id = ANY(ARRAY{ids})
+        WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         GROUP BY {head_sql}, concept
 
         UNION ALL
@@ -297,13 +309,14 @@ async def aggregate_document_relationships(
             {head_sql} as head,
             tail_name as concept,
             count(*) as count,
-            array_agg(distinct document.id) as documents
-        FROM {doc_type.name} as document
-            JOIN {entity_sq} entities ON entities.{doc_type.name}_id = document.id
+            array_agg(distinct {doc_type.name}.id) as documents
+        FROM {doc_type.name}
+            JOIN {entity_sq} entities ON entities.{doc_type.name}_id = {doc_type.name}.id
             JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
+                {f"AND biomedical_entity.entity_types in {tuple(entity_types)} " if entity_types else ""}
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
             JOIN umls_graph ON umls_graph.head_id = etu."B"
-        WHERE document.id = ANY(ARRAY{ids})
+        WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         AND head_id<>tail_id
         AND umls_graph.relationship in {tuple(relationships)}
         GROUP BY {head_sql}, concept

@@ -5,11 +5,11 @@ from functools import partial
 import logging
 from typing import Sequence
 from prisma.client import Prisma
-from prisma.types import PatentWhereInput, PatentWhereInputRecursive2
+from prisma.types import PatentWhereInput, PatentWhereInputRecursive2, PatentInclude
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from typings.documents.patents import ScoredPatent as PatentApplication
+from typings.documents.patents import ScoredPatent
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
 
@@ -110,7 +110,13 @@ async def _search(
     min_patent_years: int = 10,
     term_field: TermField = "canonical_name",
     limit: int = MAX_SEARCH_RESULTS,
-) -> list[PatentApplication]:
+    include: PatentInclude = {
+        "assignees": True,
+        "inventors": True,
+        "interventions": True,
+        "indications": True,
+    },
+) -> list[ScoredPatent]:
     """
     Search patents by terms
 
@@ -131,19 +137,14 @@ async def _search(
     async with prisma_context(300):
         patents = await find_many(
             where=where,
-            include={
-                "assignees": True,
-                "inventors": True,
-                "interventions": True,
-                "indications": True,
-            },
+            include=include,
             take=limit,
         )
 
     return patents
 
 
-async def search(p: PatentSearchParams) -> list[PatentApplication]:
+async def search(p: PatentSearchParams) -> list[ScoredPatent]:
     """
     Search patents by terms
     Filters on
@@ -155,10 +156,12 @@ async def search(p: PatentSearchParams) -> list[PatentApplication]:
         p.terms (Sequence[str]): list of terms to search for
         p.exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
         p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
+        p.include (PatentInclude, optional): which relation fields to include. Defaults to all, which is typically what is desired
+            (unless looking to do a lightweight grab of say, ids)
         p.min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         p.term_field (TermField, optional): which field to search on. Defaults to "terms".
-                Other values are `instance_rollup` (which are rollup terms at a high level of specificity, e.g. "Aspirin 50mg" might have a rollup term of "Aspirin")
-                and `category_rollup` (wherein "Aspirin 50mg" might have a rollup category of "NSAIDs")
+                Other values are `instance_rollup` ("Aspirin 50mg" might have instance_rollup == "Aspirin")
+                and `category_rollup` (wherein "Aspirin 50mg" might have category_rollup == "NSAIDs")
         p.limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
 
@@ -166,8 +169,8 @@ async def search(p: PatentSearchParams) -> list[PatentApplication]:
 
     Example:
     ```
-    from clients.patents import search_client
-    from handlers.patents.types import PatentSearchParams
+    from clients.documents.patents import search_client
+    from typings.client import PatentSearchParams
     p = search_client.search(PatentSearchParams(terms=['migraine disorders'], skip_cache=True, limit=5))
     [t.search_rank for t in p]
     ```
@@ -175,6 +178,7 @@ async def search(p: PatentSearchParams) -> list[PatentApplication]:
     args = {
         "terms": p.terms,
         "exemplar_patents": p.exemplar_patents,
+        "include": p.include,
         "query_type": p.query_type,
         "min_patent_years": p.min_patent_years,
         "term_field": p.term_field,
@@ -195,7 +199,5 @@ async def search(p: PatentSearchParams) -> list[PatentApplication]:
         search_partial,
         key=key,
         limit=p.limit,
-        decode=lambda str_data: [
-            PatentApplication(**p) for p in storage_decoder(str_data)
-        ],
+        decode=lambda str_data: [ScoredPatent(**p) for p in storage_decoder(str_data)],
     )

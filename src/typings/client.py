@@ -1,4 +1,5 @@
 from typing import Annotated, Literal, Sequence
+from prisma.types import PatentInclude
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -31,6 +32,8 @@ class CommonSearchParams(BaseSearchParams):
 
 class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
+    # None will be replaced with default (all relations)
+    include: PatentInclude | None = None
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):

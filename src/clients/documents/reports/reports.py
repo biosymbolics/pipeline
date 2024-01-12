@@ -3,8 +3,6 @@ Patent reports
 """
 
 import asyncio
-from dataclasses import dataclass
-from typing import Callable, Literal
 import logging
 
 
@@ -16,55 +14,10 @@ from clients.low_level.prisma import prisma_client
 from typings.client import CommonSearchParams
 from typings.documents.common import DocType
 
+from .constants import X_DIMENSIONS, Y_DIMENSIONS
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-@dataclass(frozen=True)
-class DimensionInfo:
-    is_entity: bool = False
-    transform: Callable[[str], str] = lambda x: x
-
-
-X_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
-    DocType.regulatory_approval: {
-        "name": DimensionInfo(is_entity=True),
-        "canonical_name": DimensionInfo(is_entity=True),
-        "instance_rollup": DimensionInfo(is_entity=True),
-    },
-    DocType.patent: {
-        "attributes": DimensionInfo(),
-        "name": DimensionInfo(is_entity=True),
-        "canonical_name": DimensionInfo(is_entity=True),
-        "instance_rollup": DimensionInfo(is_entity=True),
-        "similar_patents": DimensionInfo(),
-    },
-    DocType.trial: {
-        "name": DimensionInfo(is_entity=True),
-        "canonical_name": DimensionInfo(is_entity=True),
-        "instance_rollup": DimensionInfo(is_entity=True),
-    },
-}
-
-Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
-    DocType.regulatory_approval: {
-        "approval_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
-    },
-    DocType.patent: {
-        "country_code": DimensionInfo(),
-        "priority_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
-    },
-    DocType.trial: {
-        "comparison_type": DimensionInfo(),
-        "design": DimensionInfo(),
-        "end_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
-        "hypothesis_type": DimensionInfo(),
-        "masking": DimensionInfo(),
-        "start_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
-        "status": DimensionInfo(),
-        "termination_reason": DimensionInfo(),
-    },
-}
 
 
 class XYReport:
