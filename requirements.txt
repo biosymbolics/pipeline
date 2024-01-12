@@ -11,6 +11,7 @@ nmslib @ git+https://github.com/nmslib/nmslib.git@ade4bcdc9dd3719990de2503871450
 annoy
 openai
 polars
+prisma
 psycopg[binary,pool]
 pydash
 pydantic
@@ -18,12 +19,10 @@ python-dotenv
 requests
 scispacy
 scikit-learn
-spacy_llm
 spacy
 torch
 pytorch-ignite
 requests_cache
 transformers
 typing_extensions
-umap-learn
 yfinance
