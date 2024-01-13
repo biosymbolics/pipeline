@@ -62,6 +62,11 @@ class DocumentEtl:
                 );
                 INSERT INTO biomedical_entity_count (entity_id, count)
                     SELECT entity_id, count(*) FROM {bet} GROUP BY entity_id;
+
+                UPDATE biomedical_entity SET count=biomedical_entity_count.count
+                    FROM biomedical_entity_count
+                     WHERE biomedical_entity_count.entity_id=biomedical_entity.id;
+
                 DROP TABLE IF EXISTS biomedical_entity_count;
                 """
             )
