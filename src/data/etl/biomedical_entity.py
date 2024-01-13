@@ -9,8 +9,8 @@ from prisma.types import (
     BiomedicalEntityCreateWithoutRelationsInput,
 )
 from pydash import compact, flatten, group_by, omit, uniq
-from clients.low_level.prisma import prisma_client
 
+from clients.low_level.prisma import prisma_client
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -18,7 +18,7 @@ from core.ner.types import CanonicalEntity
 from scripts.umls.copy_umls import UmlsEtl
 
 from .types import (
-    BiomedicalEntityCreateInputWithRelationIds,
+    BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
     RelationIdFieldMap,
 )
 
@@ -48,11 +48,26 @@ class BiomedicalEntityEtl:
         self.relation_id_field_map = relation_id_field_map
         self.non_canonical_source = non_canonical_source
 
+    def generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
+        """
+        Generate canonical map for source terms
+        """
+
+        lookup_docs = self.normalizer.normalize_strings(terms)
+
+        # map for quick lookup of canonical entities
+        lookup_map = {
+            on: de.canonical_entity
+            for on, de in zip(terms, lookup_docs)
+            if de.canonical_entity is not None
+        }
+        return lookup_map
+
     def maybe_merge_insert_records(
         self,
-        groups: list[BiomedicalEntityCreateInputWithRelationIds],
+        groups: list[BiomedicalEntityCreateInput],
         canonical_id: str,
-    ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
+    ) -> list[BiomedicalEntityCreateInput]:
         """
         Merge records with same canonical id
         """
@@ -61,7 +76,7 @@ class BiomedicalEntityEtl:
             return groups
 
         return [
-            BiomedicalEntityCreateInputWithRelationIds(
+            BiomedicalEntityCreateInput(
                 **{
                     "canonical_id": groups[0].get("canonical_id"),
                     "name": groups[0]["name"],
@@ -80,14 +95,17 @@ class BiomedicalEntityEtl:
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-    ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
+    ) -> list[BiomedicalEntityCreateInput]:
         """
         Create record dicts for entity insert
         """
 
-        def get_insert_record(
+        def create_input(
             orig_name: str,
-        ) -> BiomedicalEntityCreateInputWithRelationIds:
+        ) -> BiomedicalEntityCreateInput:
+            """
+            Form create input for a given term
+            """
             source_rec = source_map[orig_name]
             canonical = canonical_map.get(orig_name)
 
@@ -127,7 +145,7 @@ class BiomedicalEntityEtl:
                     "sources": [self.non_canonical_source],
                 }
 
-            return BiomedicalEntityCreateInputWithRelationIds(
+            return BiomedicalEntityCreateInput(
                 **{
                     **canonical_dependent_fields,  # type: ignore
                     **relation_fields,
@@ -136,7 +154,7 @@ class BiomedicalEntityEtl:
 
         # merge records with same canonical id
         def merge_records():
-            flat_recs = [get_insert_record(name) for name in terms_to_insert]
+            flat_recs = [create_input(name) for name in terms_to_insert]
             grouped_recs = group_by(flat_recs, "canonical_id")
             merged_recs = flatten(
                 [
@@ -149,21 +167,6 @@ class BiomedicalEntityEtl:
 
         insert_records = merge_records()
         return insert_records
-
-    def generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
-        """
-        Generate canonical map for source terms
-        """
-
-        lookup_docs = self.normalizer.normalize_strings(terms)
-
-        # map for quick lookup of canonical entities
-        lookup_map = {
-            on: de.canonical_entity
-            for on, de in zip(terms, lookup_docs)
-            if de.canonical_entity is not None
-        }
-        return lookup_map
 
     async def create_records(
         self,
@@ -216,5 +219,22 @@ class BiomedicalEntityEtl:
                 except Exception as e:
                     print(e, entity_rec)
 
+        # populate search index with name & syns
+        await BiomedicalEntityEtl.update_search_index()
+
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
         await UmlsEtl.update_with_ontology_level()
+
+    @staticmethod
+    async def update_search_index():
+        """
+        update search index
+        """
+        client = await prisma_client(300)
+        await client.execute_raw(
+            f"""
+            DROP INDEX IF EXISTS biomedical_entity_search_idx;
+            UPDATE biomedical_entity SET search = to_tsvector('english', name || ' ' || array_to_string(synonyms, ' '));
+            CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search);
+            """
+        )

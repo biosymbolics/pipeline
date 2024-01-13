@@ -18,6 +18,7 @@ model BiomedicalEntity {
     children      BiomedicalEntity[]       @relation("entity_to_parent")
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
+    count         Int                      @default(0)
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
@@ -30,6 +31,7 @@ model BiomedicalEntity {
 
     // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
 
+    @@index([entity_type], name: "biomedical_entity_type")
     @@map("biomedical_entity")
 }
 
@@ -90,6 +92,7 @@ model Patent {
     title               String
     url                 String
 
+    @@index([priority_date], name: "patent_priority_date")
     @@map("patent")
 }
 
@@ -105,6 +108,7 @@ model RegulatoryApproval {
     text_for_search  String
     url              String
 
+    @@index([approval_date], name: "approval_date")
     @@map("regulatory_approval")
 }
 
@@ -143,6 +147,7 @@ model Trial {
     title                   String
     url                     String
 
+    @@index([start_date], name: "trial_start_date")
     @@map("trial")
 }
 
@@ -199,6 +204,8 @@ model Ownable {
     @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
+    @@index([instance_rollup], name: "ownable_instance_rollup")
+    @@index([category_rollup], name: "ownable_category_rollup")
     @@map("ownable")
 }
 
@@ -224,6 +231,8 @@ model Intervenable {
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "intervenable_name")
     @@index([canonical_name], name: "intervenable_canonical_name")
+    @@index([instance_rollup], name: "intervenable_instance_rollup")
+    @@index([category_rollup], name: "intervenable_category_rollup")
     @@map("intervenable")
 }
 
@@ -248,6 +257,8 @@ model Indicatable {
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "indicatable_name")
     @@index([canonical_name], name: "indicatable_canonical_name")
+    @@index([instance_rollup], name: "indicatable_instance_rollup")
+    @@index([category_rollup], name: "indicatable_category_rollup")
     @@map("indicatable")
 }
 
