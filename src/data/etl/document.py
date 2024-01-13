@@ -56,8 +56,13 @@ class DocumentEtl:
             # add counts to biomedical_entity
             await db.execute_raw(
                 """
-                update biomedical_entity set count=(select count(*) from intervenable where entity_id=biomedical_entity.id);
-                update biomedical_entity set count=count + (select count(*) from indicatable where entity_id=biomedical_entity.id);
+                CREATE TEMP TABLE biomedical_entity_count(
+                    entity_id int,
+                    count int
+                );
+                INSERT INTO biomedical_entity_count (entity_id, count)
+                    SELECT entity_id, count(*) FROM {bet} GROUP BY entity_id;
+                DROP TABLE IF EXISTS biomedical_entity_count;
                 """
             )
 
