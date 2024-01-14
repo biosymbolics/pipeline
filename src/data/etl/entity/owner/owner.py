@@ -11,6 +11,7 @@ from prisma.types import OwnerUpdateInput
 
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
+from data.etl.base_entity_etl import BaseEntityEtl
 from data.etl.types import OwnerCreateWithSynonymsInput
 from typings.companies import CompanyInfo
 
@@ -23,7 +24,7 @@ logger.setLevel(logging.INFO)
 DEFAULT_TYPE_FIELD = "default_type"
 
 
-class BaseOwnerEtl:
+class BaseOwnerEtl(BaseEntityEtl):
     """
     Class for owner etl
 
@@ -135,3 +136,54 @@ class BaseOwnerEtl:
         await self.create_records(names)
         await self.load_financials(public_companies)
         await db.disconnect()
+
+    @staticmethod
+    async def pre_doc_finalize():
+        pass
+
+    @staticmethod
+    async def add_counts():
+        """
+        add counts to owner table (used for autocomplete ordering)
+        """
+        async with Prisma(http={"timeout": None}) as db:
+            await db.execute_raw(
+                f"""
+                CREATE TEMP TABLE temp_count(id int, count int);
+                INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id;
+                UPDATE owner ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id;
+                DROP TABLE IF EXISTS temp_count;
+                """
+            )
+
+    @staticmethod
+    async def link_to_documents():
+        """
+        - Link "ownable" to canonical entities
+        - add instance_rollup and category_rollups
+        """
+        async with Prisma(http={"timeout": None}) as db:
+            await db.execute_raw(
+                f"""
+                UPDATE ownable
+                SET
+                    owner_id=owner_synonym.owner_id,
+                    canonical_name=owner.name,
+                    instance_rollup=biomedical_entity.name -- todo,
+                    category_rollup=biomedical_entity.name -- todo
+                FROM owner_synonym, owner
+                WHERE ownable.name=owner_synonym.term
+                AND owner_synonym.owner_id=owner.id;
+                """
+            )
+
+    @staticmethod
+    async def post_doc_finalize():
+        """
+        Run after:
+            1) all biomedical entities are loaded
+            2) all documents are loaded
+            3) UMLS is loaded
+        """
+        await BaseOwnerEtl.link_to_documents()
+        await BaseOwnerEtl.add_counts()

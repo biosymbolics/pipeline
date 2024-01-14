@@ -1,7 +1,5 @@
-from .biomedical_entity import BiomedicalEntityLoader
+from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
-from .owner import OwnerLoader
-from .umls import UmlsLoader
 
 
 async def load_all():

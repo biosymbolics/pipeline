@@ -2,6 +2,7 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
+from prisma import Prisma
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
@@ -15,18 +16,20 @@ from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
-from data.etl.umls import UmlsLoader
-
-from ..types import (
+from data.etl.types import (
     BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
     RelationIdFieldMap,
 )
+from typings.documents.common import EntityMapType
+
+from .umls.load import UmlsLoader
+from ..base_entity_etl import BaseEntityEtl
 
 DEFAULT_TYPE_FIELD = "default_type"
 OVERRIDE_TYPE_FIELD = "type"
 
 
-class BiomedicalEntityEtl:
+class BiomedicalEntityEtl(BaseEntityEtl):
     """
     Class for biomedical entity etl
 
@@ -48,7 +51,7 @@ class BiomedicalEntityEtl:
         self.relation_id_field_map = relation_id_field_map
         self.non_canonical_source = non_canonical_source
 
-    def generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
+    def _generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
         """
         Generate canonical map for source terms
         """
@@ -168,7 +171,7 @@ class BiomedicalEntityEtl:
         insert_records = merge_records()
         return insert_records
 
-    async def create_records(
+    async def copy_all(
         self,
         terms: Sequence[str],
         terms_to_canonicalize: Sequence[str],
@@ -183,7 +186,7 @@ class BiomedicalEntityEtl:
                                for additional fields, e.g. synonyms, "active_ingredients", etc.
             terms_to_canonicalize (Sequence[str]): terms to canonicalize, if different than terms
         """
-        canonical_map = self.generate_lookup_map(terms_to_canonicalize or terms)
+        canonical_map = self._generate_lookup_map(terms_to_canonicalize or terms)
         entity_recs = self._generate_insert_records(
             terms,
             source_map,
@@ -240,7 +243,7 @@ class BiomedicalEntityEtl:
         )
 
     @staticmethod
-    async def finalize():
+    async def pre_doc_finalize():
         """
         Finalize etl
         """
@@ -249,3 +252,65 @@ class BiomedicalEntityEtl:
 
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
         await UmlsLoader.update_with_ontology_level()
+
+    @staticmethod
+    async def add_counts():
+        """
+        add counts to biomedical_entity (used for autocomplete ordering)
+        """
+        async with Prisma(http={"timeout": None}) as db:
+            # add counts to biomedical_entity & owner
+            bioent_tables = EntityMapType.__dict__.values()
+            for table in bioent_tables:
+                await db.execute_raw(
+                    f"""
+                    CREATE TEMP TABLE temp_count(id int, count int);
+                    INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id;
+                    UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id;
+                    DROP TABLE IF EXISTS temp_count;
+                    """
+                )
+
+    @staticmethod
+    async def link_to_documents():
+        """
+        - Link mapping tables "intervenable" and "indicatable" to canonical entities
+        - add instance_rollup and category_rollups
+        """
+        async with Prisma(http={"timeout": None}) as db:
+            bioent_tables = EntityMapType.__dict__.values()
+            for bet in bioent_tables:
+                await db.execute_raw(
+                    f"""
+                    UPDATE {bet}
+                    SET
+                        entity_id=entity_synonym.entity_id,
+                        canonical_name=biomedical_entity.name,
+                        canonical_type=biomedical_entity.entity_type,
+                        category_rollup=umls_category_rollup.preferred_name,
+                        instance_rollup=umls_instance_rollup.preferred_name
+                    FROM entity_synonym,
+                        biomedical_entity,
+                        _entity_to_umls as etu
+                        umls,
+                        umls_instance_rollup,
+                        umls_category_rollup
+                    WHERE {bet}.name=entity_synonym.term
+                    AND entity_synonym.entity_id=biomedical_entity.id
+                    AND biomedical_entity.id=etu."A"
+                    AND umls.id=etu."B"
+                    AND umls_instance_rollup.id=umls.instance_rollup_id
+                    AND umls_category_rollup.id=umls.category_rollup_id
+                    """
+                )
+
+    @staticmethod
+    async def post_doc_finalize():
+        """
+        Run after:
+            1) all biomedical entities are loaded
+            2) all documents are loaded
+            3) UMLS is loaded
+        """
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()
