@@ -1,25 +1,23 @@
 import asyncio
-from datetime import datetime
-import re
 import sys
-from typing import Sequence, TypedDict, cast
 import polars as pl
-from prisma import Prisma
 from pydash import flatten, uniq
 from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
 from constants.company import COMPANY_INDICATORS
-from data.etl.owner import OwnerEtl
 from typings.companies import CompanyInfo
 from utils.re import get_or_re
+
+from .owner import BaseOwnerEtl
+
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
 ASSIGNEE_PATENT_THRESHOLD = 20
 
 
-class AllOwnersEtl:
+class OwnerLoader:
     @staticmethod
     async def get_owner_names():
         """
@@ -82,9 +80,7 @@ class AllOwnersEtl:
                 for db, query in db_owner_query_map.items()
             ]
         )
-        stock_names = [
-            record["name"] for record in AllOwnersEtl.load_public_companies()
-        ]
+        stock_names = [record["name"] for record in OwnerLoader.load_public_companies()]
         names = uniq([row["name"] for row in rows]) + stock_names
         return names
 
@@ -109,11 +105,11 @@ class AllOwnersEtl:
     async def copy_all(self):
         names = await self.get_owner_names()
         public_companies = self.load_public_companies()
-        await OwnerEtl().copy_all(names, public_companies)
+        await BaseOwnerEtl().copy_all(names, public_companies)
 
 
 def main():
-    asyncio.run(AllOwnersEtl().copy_all())
+    asyncio.run(OwnerLoader().copy_all())
 
 
 if __name__ == "__main__":

@@ -12,11 +12,6 @@ initialize()
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
-from scripts.approvals.copy_approvals import ApprovalEtl
-from scripts.owner.load_owners import AllOwnersEtl
-from scripts.patents.copy_patents import PatentEtl
-from scripts.trials.copy_trials import TrialEtl
-from scripts.umls.copy_umls import UmlsEtl
 
 from .prep_bq_patents import copy_patent_tables
 from .import_bq_patents import copy_bq_to_psql
@@ -125,19 +120,6 @@ async def main(bootstrap: bool = False):
         # create patent applications etc in postgres
         await copy_bq_to_psql()
         # UMLS records (slow due to betweenness centrality calc)
-        await UmlsEtl().copy_all()
-
-    # copy owner data (across all documents)
-    await AllOwnersEtl().copy_all()
-
-    # copy patent data
-    await PatentEtl(document_type="patent").copy_all()
-
-    # copy data about approvals
-    await ApprovalEtl(document_type="regulatory_approval").copy_all()
-
-    # copy trial data
-    await TrialEtl(document_type="trial").copy_all()
 
     # select t.term, ul.type_names, array_agg(distinct domain), array_agg(distinct original_term), count(*) from biosym_annotations, terms t, umls_lookup ul
     #     where ul.id=t.id

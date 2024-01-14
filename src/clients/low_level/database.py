@@ -65,7 +65,7 @@ class DatabaseClient:
         """
         await self.execute_query(create_table_query)
 
-    async def select(self, query: str, values: Sequence = []) -> Sequence[dict]:
+    async def select(self, query: str, values: Sequence = []) -> list[dict]:
         """
         Execute a query and return the results as a list of dicts
         (must include provide fully qualified table name in query)

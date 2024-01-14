@@ -478,10 +478,10 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     entity_set = [
         DocEntity(
             span.text,
-            span.label_,
             span.start_char,
             span.end_char,
             normalized_term=span.text,  # just to init
+            type=span.label_,
             vector=span.vector.tolist(),
             spacy_doc=span.as_doc(),
         )

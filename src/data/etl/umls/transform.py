@@ -138,10 +138,10 @@ class UmlsLevelTransformer:
         id_level = UmlsIdLevel(id=r.id, level=level)
         return UmlsUpdateInput(
             level=level,
-            instance_rollup=UmlsLevelTransformer.find_level_ancestor(
+            instance_rollup_id=UmlsLevelTransformer.find_level_ancestor(
                 id_level, [OntologyLevel.INSTANCE], ancestors
             ),
-            category_rollup=UmlsLevelTransformer.find_level_ancestor(
+            category_rollup_id=UmlsLevelTransformer.find_level_ancestor(
                 id_level,
                 [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 ancestors,

@@ -26,7 +26,7 @@ SOURCE_DB = "umls"
 BATCH_SIZE = 10000
 
 
-class UmlsEtl:
+class UmlsLoader:
     @staticmethod
     async def create_umls_lookup():
         """
@@ -161,8 +161,8 @@ class UmlsEtl:
         """
         db = Prisma(auto_register=True, http={"timeout": None})
         await db.connect()
-        await UmlsEtl.create_umls_lookup()
-        await UmlsEtl.copy_relationships()
+        await UmlsLoader.create_umls_lookup()
+        await UmlsLoader.copy_relationships()
         await db.disconnect()
 
 
@@ -176,4 +176,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    asyncio.run(UmlsEtl.copy_all())
+    asyncio.run(UmlsLoader.copy_all())

@@ -1,11 +1,15 @@
 from dataclasses import dataclass, fields
-from typing import Literal, TypedDict
+from typing import Callable, Literal, Sequence, TypedDict
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from prisma.types import (
     BiomedicalEntityCreateWithoutRelationsInput,
     OwnerCreateWithoutRelationsInput,
 )
+from prisma.enums import Source
+
+from core.ner.linker.types import CandidateSelectorType
+from core.ner.cleaning import CleanFunction
 
 
 class BiomedicalEntityCreateInputWithRelationIds(
@@ -54,3 +58,21 @@ class RelationIdFieldMap(Dataclass):
     comprised_of: RelationConnectInfo | None = None
     parents: RelationConnectInfo | None = None
     synonyms: RelationConnectInfo | None = None
+
+
+@dataclass(frozen=True)
+class BiomedicalEntitySpec:
+    sql: str
+    candidate_selector: CandidateSelectorType
+    get_source_map: Callable[[list[dict]], dict]
+    additional_cleaners: Sequence[CleanFunction] = []
+    get_terms: Callable[[dict], Sequence[str]] = lambda sm: list(sm.keys())
+    get_terms_to_canonicalize: Callable[[dict], Sequence[str]] = lambda sm: list(
+        sm.keys()
+    )
+    non_canonical_source: Source = Source.BIOSYM
+    relation_id_field_map: RelationIdFieldMap = RelationIdFieldMap(
+        synonyms=RelationConnectInfo(
+            source_field="synonyms", dest_field="term", input_type="create"
+        ),
+    )

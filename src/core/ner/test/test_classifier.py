@@ -3,7 +3,7 @@ from prisma.enums import TerminationReason
 
 from core.ner.classifier import classify_by_keywords, classify_string
 from constants.patents import get_patent_attribute_map
-from scripts.trials.enums import TERMINATION_KEYWORD_MAP
+from data.domain.biomedical.trials import TERMINATION_KEYWORD_MAP
 
 
 PATENT_ATTRIBUTE_MAP = get_patent_attribute_map()

@@ -264,7 +264,6 @@ class EntityCleaner:
 
         cleaned = self.normalize_terms([self._get_text(ent) for ent in entities])
 
-        # INFO:core.ner.cleaning:Cleaned 2268406 entities in 1957.85 seconds
         logger.info(
             "Cleaned %s entities in %s seconds",
             len(entities),

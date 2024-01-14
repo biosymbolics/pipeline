@@ -15,10 +15,11 @@ from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
-from scripts.umls.copy_umls import UmlsEtl
+from data.etl.umls import UmlsLoader
 
-from .types import (
+from ..types import (
     BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
+    RelationConnectInfo,
     RelationIdFieldMap,
 )
 
@@ -63,7 +64,7 @@ class BiomedicalEntityEtl:
         }
         return lookup_map
 
-    def maybe_merge_insert_records(
+    def _maybe_merge_insert_records(
         self,
         groups: list[BiomedicalEntityCreateInput],
         canonical_id: str,
@@ -158,7 +159,7 @@ class BiomedicalEntityEtl:
             grouped_recs = group_by(flat_recs, "canonical_id")
             merged_recs = flatten(
                 [
-                    self.maybe_merge_insert_records(groups, cid)
+                    self._maybe_merge_insert_records(groups, cid)
                     for cid, groups in grouped_recs.items()
                 ]
             )
@@ -171,8 +172,8 @@ class BiomedicalEntityEtl:
     async def create_records(
         self,
         terms: Sequence[str],
+        terms_to_canonicalize: Sequence[str],
         source_map: dict[str, dict],
-        terms_to_canonicalize: Sequence[str] | None = None,
     ):
         """
         Create records for entities and relationships
@@ -223,7 +224,7 @@ class BiomedicalEntityEtl:
         await BiomedicalEntityEtl.update_search_index()
 
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
-        await UmlsEtl.update_with_ontology_level()
+        await UmlsLoader.update_with_ontology_level()
 
     @staticmethod
     async def update_search_index():
@@ -234,7 +235,13 @@ class BiomedicalEntityEtl:
         await client.execute_raw(
             f"""
             DROP INDEX IF EXISTS biomedical_entity_search_idx;
-            UPDATE biomedical_entity SET search = to_tsvector('english', name || ' ' || array_to_string(synonyms, ' '));
+            WITH synonym as (
+                SELECT entity_id, array_agg(term) as terms
+                FROM entity_synonym
+                GROUP BY entity_id
+            )
+            UPDATE biomedical_entity SET search = to_tsvector('english', name || ' ' || array_to_string(synonym.terms, ' '))
+                from synonym where entity_id=biomedical_entity.id;
             CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search);
             """
         )

@@ -1,5 +1,5 @@
 """
-Utils for copying approvals data
+Load script for Trial etl
 """
 import asyncio
 import re
@@ -23,13 +23,11 @@ from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
-from data.etl.biomedical_entity import BiomedicalEntityEtl
-from data.etl.document import DocumentEtl
-from data.etl.types import RelationConnectInfo, RelationIdFieldMap
+from data.etl.types import BiomedicalEntityLoadSpec
 from data.domain.trials import extract_max_timeframe
-from scripts.trials.constants import CONTROL_TERMS
 from utils.re import get_or_re
 
+from .constants import CONTROL_TERMS
 from .enums import (
     ComparisonTypeParser,
     HypothesisTypeParser,
@@ -44,6 +42,9 @@ from .enums import (
     TrialStatusParser,
     calc_duration,
 )
+
+from ..base_doc_etl import BaseDocumentEtl
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -106,7 +107,7 @@ def get_source_fields() -> list[str]:
     )
 
 
-class TrialEtl(DocumentEtl):
+class TrialLoader(BaseDocumentEtl):
     def __init__(self, document_type: str):
         self.document_type = document_type
 
@@ -148,76 +149,52 @@ class TrialEtl(DocumentEtl):
         """
         return source_sql
 
-    async def copy_indications(self):
+    @staticmethod
+    def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         """
-        Create indication records
+        Specs for creating associated biomedical entities (executed by BiomedicalEntityEtl)
         """
-        source_sql = f"""
-            select distinct name as indication from (
-                SELECT DISTINCT lower(mesh_term) as name FROM browse_conditions
-                    WHERE mesh_type = 'mesh-list' AND mesh_term is not null
-                UNION ALL
-                SELECT DISTINCT lower(name) FROM conditions WHERE name is not null
-            ) s
-        """
-        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
 
-        insert_map = {
-            ir["indication"]: {
-                "synonyms": [ir["indication"]],
-                "default_type": BiomedicalEntityType.DISEASE,
-            }
-            for ir in records
-        }
+        def get_sql(mesh_table: str, table: str):
+            return f"""
+                select distinct name from (
+                    SELECT DISTINCT lower(mesh_term) as name FROM {mesh_table}
+                        WHERE mesh_type = 'mesh-list' AND mesh_term is not null
+                    UNION
+                    SELECT DISTINCT lower(name) FROM {table} WHERE name is not null
+                ) s
+            """
 
-        terms = list(insert_map.keys())
-
-        await BiomedicalEntityEtl(
-            "CandidateSelector",
-            relation_id_field_map=RelationIdFieldMap(
-                synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
-                ),
-            ),
+        indication_spec = BiomedicalEntityLoadSpec(
+            candidate_selector="CandidateSelector",
+            get_source_map=lambda recs: {
+                rec["name"]: {
+                    "synonyms": [rec["name"]],
+                    "default_type": BiomedicalEntityType.DISEASE,
+                }
+                for rec in recs
+            },
             non_canonical_source=Source.CTGOV,
-        ).create_records(terms, source_map=insert_map)
-
-    async def copy_interventions(self):
-        source_sql = f"""
-            select distinct name as intervention from (
-                SELECT DISTINCT lower(mesh_term) as name FROM browse_interventions
-                    WHERE mesh_type = 'mesh-list' AND mesh_term is not null
-                UNION ALL
-                SELECT DISTINCT lower(name) FROM interventions
-                    WHERE name is not null AND name ~* '{get_or_re(CONTROL_TERMS)}'
-            ) s
-        """
-        records = await PsqlDatabaseClient(SOURCE_DB).select(query=source_sql)
-
-        insert_map = {
-            ir["intervention"]: {
-                "synonyms": [ir["intervention"]],
-                "default_type": BiomedicalEntityType.PHARMACOLOGICAL,  # CONTROL?
-            }
-            for ir in records
-        }
-
-        terms = list(insert_map.keys())
-
-        await BiomedicalEntityEtl(
-            "CandidateSelector",
-            relation_id_field_map=RelationIdFieldMap(
-                synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
-                ),
-            ),
+            sql=get_sql("browse_conditions", "conditions"),
+        )
+        intervention_spec = BiomedicalEntityLoadSpec(
             additional_cleaners=[
                 lambda terms: remove_trailing_leading(terms, REMOVAL_WORDS),
                 # remove dosage uoms
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
+            candidate_selector="CandidateSelector",
+            get_source_map=lambda recs: {
+                rec["name"]: {
+                    "synonyms": [rec["name"]],
+                    "default_type": BiomedicalEntityType.PHARMACOLOGICAL,  # CONTROL?
+                }
+                for rec in recs
+            },
             non_canonical_source=Source.CTGOV,
-        ).create_records(terms, source_map=insert_map)
+            sql=get_sql("browse_interventions", "interventions"),
+        )
+        return [indication_spec, intervention_spec]
 
     @staticmethod
     def transform(record: dict) -> TrialCreateWithoutRelationsInput:
@@ -262,7 +239,6 @@ class TrialEtl(DocumentEtl):
                 "randomization": TrialRandomizationParser.find(
                     trial.randomization, design
                 ),
-                "text_for_search": f"{trial.title} {trial.sponsor}",
                 "status": TrialStatusParser.find(trial.status),
                 "termination_reason": TerminationReasonParser.find(
                     trial.termination_description
@@ -279,7 +255,7 @@ class TrialEtl(DocumentEtl):
         async def handle_batch(rows: list[dict]) -> bool:
             # create main trial records
             await Trial.prisma().create_many(
-                data=[TrialEtl.transform(t) for t in rows],
+                data=[TrialLoader.transform(t) for t in rows],
                 skip_duplicates=True,
             )
 
@@ -355,7 +331,7 @@ class TrialEtl(DocumentEtl):
 
 
 def main():
-    asyncio.run(TrialEtl(document_type="trial").copy_all())
+    asyncio.run(TrialLoader(document_type="trial").copy_all())
 
 
 if __name__ == "__main__":

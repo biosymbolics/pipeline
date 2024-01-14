@@ -48,6 +48,7 @@ model EntitySynonym {
 model Owner {
     id                 Int                      @id @default(autoincrement())
     children           Owner[]                  @relation("owner_to_parent")
+    count              Int                      @default(0)
     financial_snapshot FinancialSnapshot?
     ownables           Ownable[] // backref
     owner_type         OwnerType
@@ -85,10 +86,8 @@ model Patent {
     ipc_codes           String[]
     other_ids           String[]
     priority_date       DateTime
-    search              Unsupported("tsvector")?
     search_rank         Float? // not stored in db. hack to represent this in the py classes
     similar_patents     String[]
-    text_for_search     String
     title               String
     url                 String
 
@@ -97,15 +96,13 @@ model Patent {
 }
 
 model RegulatoryApproval {
-    id               String                   @id @unique
+    id               String         @id @unique
     agency           String
     application_type String
     approval_date    DateTime
     indications      Indicatable[]
     interventions    Intervenable[]
     owners           Ownable[]
-    search           Unsupported("tsvector")?
-    text_for_search  String
     url              String
 
     @@index([approval_date], name: "approval_date")
@@ -113,10 +110,10 @@ model RegulatoryApproval {
 }
 
 model Trial {
-    id                      String                   @id @unique
+    id                      String               @id @unique
     abstract                String?
     acronym                 String?
-    arm_count               Int?                     @default(-1)
+    arm_count               Int?                 @default(-1)
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
@@ -136,14 +133,12 @@ model Trial {
     phase                   TrialPhase
     purpose                 String
     randomization           TrialRandomization
-    search                  Unsupported("tsvector")?
-    sponsor_id              Int?                     @unique
+    sponsor_id              Int?                 @unique
     sponsor                 Ownable?
     start_date              DateTime?
     status                  TrialStatus
     termination_description String?
     termination_reason      TerminationReason
-    text_for_search         String
     title                   String
     url                     String
 
@@ -265,9 +260,9 @@ model Indicatable {
 model Umls {
     id                  String             @id @unique
     biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    category_rollup     String
+    category_rollup_id  String?
     hierarchy           String?
-    instance_rollup     String
+    instance_rollup_id  String // TODO: add as biomedical parent
     l0_ancestor         String?
     l1_ancestor         String?
     l2_ancestor         String?

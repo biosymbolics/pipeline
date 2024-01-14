@@ -4,9 +4,9 @@ Patents ETL script
 import sys
 import asyncio
 import logging
-from typing import Literal, Sequence
+from typing import Sequence
 from prisma import Prisma
-from prisma.enums import BiomedicalEntityType, Source
+from prisma.enums import BiomedicalEntityType
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput
 
@@ -17,10 +17,11 @@ from constants.core import (
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
 from constants.umls import LegacyDomainType
-from data.etl.biomedical_entity import BiomedicalEntityEtl
-from data.etl.document import DocumentEtl
-from data.etl.types import RelationConnectInfo, RelationIdFieldMap
-from scripts.patents.constants import GPR_ANNOTATIONS_TABLE
+from data.etl.types import BiomedicalEntityLoadSpec
+
+from ..base_doc_etl import BaseDocumentEtl
+
+GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 
 
 logger = logging.getLogger(__name__)
@@ -36,11 +37,8 @@ INTERVENTION_DOMAINS: list[LegacyDomainType] = [
     "mechanisms",
 ]
 
-# if len(grouped_synonyms[0][1]) > MIN_CANONICAL_NAME_COUNT:
-canonical_sql = "select id, canonical_name, preferred_name, instance_rollup, category_rollup from umls_lookup"
 
-
-def get_patent_mapping_entities_sql(domains: Sequence[str]) -> str:
+def get_mapping_entities_sql(domains: Sequence[str]) -> str:
     """
     Get sql for mapping entities (i.e. intervenable, indicatable)
     """
@@ -74,40 +72,7 @@ def get_patent_mapping_entities_sql(domains: Sequence[str]) -> str:
     return biosym_sql
 
 
-def get_patent_entity_sql(domains: list[LegacyDomainType]) -> str:
-    """
-    Get entities from biosym annotations table for creation of biomedical entities
-
-    Args:
-        domains: domains to copy
-    """
-    biosym_sql = f"""
-        SELECT lower(original_term) as term
-        FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
-        WHERE domain in ('{"','".join(domains)}')
-        GROUP BY lower(original_term)
-    """
-
-    if "diseases" in domains:
-        # add in gpr annotations (that is, annotations from google; we only kept diseases)
-        sql = f"""
-            SELECT distinct term from (
-                SELECT lower(preferred_name) as term
-                FROM {GPR_ANNOTATIONS_TABLE}
-                WHERE domain='diseases'
-                GROUP BY lower(preferred_name)
-
-                UNION ALL
-
-                {biosym_sql}
-            ) t
-        """
-        return sql
-
-    return biosym_sql
-
-
-class PatentEtl(DocumentEtl):
+class PatentLoader(BaseDocumentEtl):
     @staticmethod
     def get_source_sql(fields: list[str]):
         return f"""
@@ -131,65 +96,64 @@ class PatentEtl(DocumentEtl):
             ) annotations ON applications.publication_number = annotations.publication_number
         """
 
-    async def _copy_entities(
-        self,
-        domains: list[LegacyDomainType],
-        type: BiomedicalEntityType,
-        type_type: Literal["override", "default"] = "default",
-    ):
+    @staticmethod
+    def get_entity_sql(domains: list[LegacyDomainType]) -> str:
         """
-        Create entities
+        Get entities from biosym annotations table for creation of biomedical entities
 
         Args:
             domains: domains to copy
-            type: entity type
-            type_type: type of type - either "override" (forcing) or "default" (only if no type found via canonicalization)
+        """
+        biosym_sql = f"""
+            SELECT lower(original_term) as term
+            FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
+            WHERE domain in ('{"','".join(domains)}')
+            GROUP BY lower(original_term)
         """
 
-        async def handle_batch(batch: list[dict]):
-            # dedup and map to source
-            source_map = {
-                sr["term"]: {
-                    "synonyms": [sr["term"]],
-                    "type" if type_type == "override" else "default_type": type,
+        if "diseases" in domains:
+            # add in gpr annotations (that is, annotations from google; we only kept diseases)
+            sql = f"""
+                SELECT distinct term from (
+                    SELECT lower(preferred_name) as term
+                    FROM {GPR_ANNOTATIONS_TABLE}
+                    WHERE domain='diseases'
+                    GROUP BY lower(preferred_name)
+
+                    UNION ALL
+
+                    {biosym_sql}
+                ) t
+            """
+            return sql
+
+        return biosym_sql
+
+    @staticmethod
+    def entity_specs() -> list[BiomedicalEntityLoadSpec]:
+        indication_spec = BiomedicalEntityLoadSpec(
+            candidate_selector="CompositeCandidateSelector",
+            get_source_map=lambda recs: {
+                rec["term"]: {
+                    "synonyms": [rec["term"]],
+                    "type": BiomedicalEntityType.DISEASE,
                 }
-                for sr in batch
-            }
-
-            terms = list(source_map.keys())
-
-            await BiomedicalEntityEtl(
-                "CompositeCandidateSelector",
-                relation_id_field_map=RelationIdFieldMap(
-                    synonyms=RelationConnectInfo(
-                        source_field="synonyms", dest_field="term", input_type="create"
-                    ),
-                ),
-                non_canonical_source=Source.BIOSYM,
-            ).create_records(terms, source_map=source_map)
-
-        source_sql = get_patent_entity_sql(domains)
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
-            query=source_sql, handle_result_batch=handle_batch, batch_size=200000
+                for rec in recs
+            },
+            sql=PatentLoader.get_entity_sql(["diseases"]),
         )
-
-    async def copy_indications(self):
-        """
-        Create indication entity records
-        """
-        await self._copy_entities(
-            ["diseases"], BiomedicalEntityType.DISEASE, type_type="override"
+        intervention_spec = BiomedicalEntityLoadSpec(
+            candidate_selector="CompositeCandidateSelector",
+            get_source_map=lambda recs: {
+                rec["term"]: {
+                    "synonyms": [rec["term"]],
+                    "default_type": BiomedicalEntityType.OTHER,
+                }
+                for rec in recs
+            },
+            sql=PatentLoader.get_entity_sql(INTERVENTION_DOMAINS),
         )
-
-    async def copy_interventions(self):
-        """
-        Create intervention entity records
-        """
-        await self._copy_entities(
-            INTERVENTION_DOMAINS,
-            BiomedicalEntityType.OTHER,  # TODO: "INTERVENTION"?
-            type_type="default",
-        )
+        return [indication_spec, intervention_spec]
 
     async def copy_documents(self):
         """
@@ -217,7 +181,6 @@ class PatentEtl(DocumentEtl):
                             "other_ids": p["all_publication_numbers"],
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
-                            "text_for_search": f"{p['title']} {p['abstract']} {' '.join(p['assignees'])} {' '.join(p['annotations'])}",  # TODO: add canonicalized annotations!!!
                             "title": p["title"],
                             "url": p["url"],
                         }
@@ -294,7 +257,7 @@ class PatentEtl(DocumentEtl):
 
         # create "indicatable" records, those that map approval to a canonical indication
         indicatable_records = await PsqlDatabaseClient(SOURCE_DB).select(
-            query=get_patent_mapping_entities_sql(["diseases"])
+            query=get_mapping_entities_sql(["diseases"])
         )
         await Indicatable.prisma().create_many(
             data=[
@@ -313,7 +276,7 @@ class PatentEtl(DocumentEtl):
 
         # create "intervenable" records, those that map approval to a canonical intervention
         intervenable_records = await PsqlDatabaseClient(SOURCE_DB).select(
-            query=get_patent_mapping_entities_sql(INTERVENTION_DOMAINS)
+            query=get_mapping_entities_sql(INTERVENTION_DOMAINS)
         )
         await Intervenable.prisma().create_many(
             data=[
@@ -332,7 +295,7 @@ class PatentEtl(DocumentEtl):
 
 
 async def main():
-    await PatentEtl(document_type="patent").copy_all()
+    await PatentLoader(document_type="patent").copy_all()
 
 
 if __name__ == "__main__":
