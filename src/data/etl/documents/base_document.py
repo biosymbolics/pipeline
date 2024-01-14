@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-class DocumentEtl:
+class BaseDocumentEtl:
     def __init__(self, document_type: str):
         self.document_type = document_type
 
     @abstractmethod
-    async def entity_specs(self) -> list[BiomedicalEntityLoadSpec]:
+    def entity_specs(self) -> list[BiomedicalEntityLoadSpec]:
         """
         Specs for creating associated biomedical entities
         """

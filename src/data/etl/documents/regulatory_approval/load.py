@@ -18,7 +18,6 @@ from prisma.models import (
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
-from data.etl.documents.base_doc_etl import BaseDocumentEtl
 from data.etl.types import (
     BiomedicalEntityLoadSpec,
     RelationConnectInfo,
@@ -27,6 +26,9 @@ from data.etl.types import (
 from utils.re import get_or_re
 
 from .types import InterventionIntermediate
+
+from ..base_document import BaseDocumentEtl
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -125,6 +127,10 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict:
 
 
 class RegulatoryApprovalLoader(BaseDocumentEtl):
+    """
+    Load regulatory approvals and associated entities
+    """
+
     @staticmethod
     def get_source_sql(fields: list[str]):
         return f"""

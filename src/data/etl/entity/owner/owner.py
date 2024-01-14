@@ -11,7 +11,7 @@ from prisma.types import OwnerUpdateInput
 
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
-from data.etl.base_entity_etl import BaseEntityEtl
+from data.etl.entity.base_entity_etl import BaseEntityEtl
 from data.etl.types import OwnerCreateWithSynonymsInput
 from typings.companies import CompanyInfo
 
@@ -147,14 +147,14 @@ class BaseOwnerEtl(BaseEntityEtl):
         add counts to owner table (used for autocomplete ordering)
         """
         async with Prisma(http={"timeout": None}) as db:
+            await db.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
             await db.execute_raw(
-                f"""
-                CREATE TEMP TABLE temp_count(id int, count int);
-                INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id;
-                UPDATE owner ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id;
-                DROP TABLE IF EXISTS temp_count;
-                """
+                f"INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id"
             )
+            await db.execute_raw(
+                "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+            )
+            await db.execute_raw("DROP TABLE IF EXISTS temp_count")
 
     @staticmethod
     async def link_to_documents():

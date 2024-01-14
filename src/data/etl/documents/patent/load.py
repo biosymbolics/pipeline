@@ -19,7 +19,7 @@ from constants.core import (
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
 
-from ..base_doc_etl import BaseDocumentEtl
+from ..base_document import BaseDocumentEtl
 
 GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 
@@ -73,6 +73,10 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
 
 
 class PatentLoader(BaseDocumentEtl):
+    """
+    Load patents and associated entities
+    """
+
     @staticmethod
     def get_source_sql(fields: list[str]):
         return f"""

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Callable, Literal, Sequence, TypedDict
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
@@ -65,7 +65,7 @@ class BiomedicalEntityLoadSpec(Dataclass):
     sql: str
     candidate_selector: CandidateSelectorType
     get_source_map: Callable[[list[dict]], dict]
-    additional_cleaners: Sequence[CleanFunction] = []
+    additional_cleaners: Sequence[CleanFunction] = field(default_factory=list)
     get_terms: Callable[[dict], Sequence[str]] = lambda sm: list(sm.keys())
     get_terms_to_canonicalize: Callable[[dict], Sequence[str]] = lambda sm: list(
         sm.keys()

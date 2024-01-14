@@ -20,7 +20,7 @@ from data.etl.types import (
     BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
     RelationIdFieldMap,
 )
-from typings.documents.common import EntityMapType
+from typings.documents.common import ENTITY_MAP_TABLES
 
 from .umls.load import UmlsLoader
 from ..base_entity_etl import BaseEntityEtl
@@ -260,16 +260,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         async with Prisma(http={"timeout": None}) as db:
             # add counts to biomedical_entity & owner
-            bioent_tables = EntityMapType.__dict__.values()
-            for table in bioent_tables:
+            for table in ENTITY_MAP_TABLES:
+                await db.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
                 await db.execute_raw(
-                    f"""
-                    CREATE TEMP TABLE temp_count(id int, count int);
-                    INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id;
-                    UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id;
-                    DROP TABLE IF EXISTS temp_count;
-                    """
+                    f"INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id"
                 )
+                await db.execute_raw(
+                    "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+                )
+                await db.execute_raw("DROP TABLE IF EXISTS temp_count;")
 
     @staticmethod
     async def link_to_documents():
@@ -278,8 +277,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         - add instance_rollup and category_rollups
         """
         async with Prisma(http={"timeout": None}) as db:
-            bioent_tables = EntityMapType.__dict__.values()
-            for bet in bioent_tables:
+            for bet in ENTITY_MAP_TABLES:
                 await db.execute_raw(
                     f"""
                     UPDATE {bet}
@@ -291,10 +289,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                         instance_rollup=umls_instance_rollup.preferred_name
                     FROM entity_synonym,
                         biomedical_entity,
-                        _entity_to_umls as etu
+                        _entity_to_umls as etu,
                         umls,
-                        umls_instance_rollup,
-                        umls_category_rollup
+                        umls as umls_instance_rollup,
+                        umls as umls_category_rollup
                     WHERE {bet}.name=entity_synonym.term
                     AND entity_synonym.entity_id=biomedical_entity.id
                     AND biomedical_entity.id=etu."A"

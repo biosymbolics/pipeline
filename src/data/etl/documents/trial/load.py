@@ -25,6 +25,7 @@ from data.domain.biomedical import (
 )
 from data.etl.types import BiomedicalEntityLoadSpec
 from data.domain.trials import extract_max_timeframe
+from utils.classes import overrides
 from utils.re import get_or_re
 
 from .constants import CONTROL_TERMS
@@ -43,7 +44,7 @@ from .enums import (
     calc_duration,
 )
 
-from ..base_doc_etl import BaseDocumentEtl
+from ..base_document import BaseDocumentEtl
 
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,10 @@ def get_source_fields() -> list[str]:
 
 
 class TrialLoader(BaseDocumentEtl):
+    """
+    Load trials and associated entities
+    """
+
     def __init__(self, document_type: str):
         self.document_type = document_type
 
@@ -150,6 +155,7 @@ class TrialLoader(BaseDocumentEtl):
         return source_sql
 
     @staticmethod
+    @overrides(BaseDocumentEtl)
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         """
         Specs for creating associated biomedical entities (executed by BiomedicalEntityEtl)
@@ -247,6 +253,7 @@ class TrialLoader(BaseDocumentEtl):
             },
         )
 
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Copy data from Postgres (drugcentral) to Postgres (patents)
