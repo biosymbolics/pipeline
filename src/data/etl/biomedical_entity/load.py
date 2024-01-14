@@ -31,6 +31,8 @@ class BiomedicalEntityLoader:
                 non_canonical_source=spec.non_canonical_source,
             ).create_records(terms, terms_to_canonicalize, source_map)
 
+        await BiomedicalEntityEtl.finalize()
+
 
 def main():
     asyncio.run(BiomedicalEntityLoader().copy_all())

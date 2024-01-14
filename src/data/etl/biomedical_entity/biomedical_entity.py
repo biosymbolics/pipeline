@@ -19,7 +19,6 @@ from data.etl.umls import UmlsLoader
 
 from ..types import (
     BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
-    RelationConnectInfo,
     RelationIdFieldMap,
 )
 
@@ -220,14 +219,8 @@ class BiomedicalEntityEtl:
                 except Exception as e:
                     print(e, entity_rec)
 
-        # populate search index with name & syns
-        await BiomedicalEntityEtl.update_search_index()
-
-        # perform final Umls updates, which depends upon Biomedical Entities being in place.
-        await UmlsLoader.update_with_ontology_level()
-
     @staticmethod
-    async def update_search_index():
+    async def _update_search_index():
         """
         update search index
         """
@@ -245,3 +238,14 @@ class BiomedicalEntityEtl:
             CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search);
             """
         )
+
+    @staticmethod
+    async def finalize():
+        """
+        Finalize etl
+        """
+        # populate search index with name & syns
+        await BiomedicalEntityEtl._update_search_index()
+
+        # perform final Umls updates, which depends upon Biomedical Entities being in place.
+        await UmlsLoader.update_with_ontology_level()

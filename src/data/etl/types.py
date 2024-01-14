@@ -61,7 +61,7 @@ class RelationIdFieldMap(Dataclass):
 
 
 @dataclass(frozen=True)
-class BiomedicalEntitySpec:
+class BiomedicalEntityLoadSpec(Dataclass):
     sql: str
     candidate_selector: CandidateSelectorType
     get_source_map: Callable[[list[dict]], dict]
