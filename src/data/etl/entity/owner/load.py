@@ -116,7 +116,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.owner.load_owners
+            Usage: python3 -m data.etl.entity.owner.load
             """
         )
         sys.exit()

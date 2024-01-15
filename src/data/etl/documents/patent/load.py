@@ -303,7 +303,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.patents.copy_patents
+            Usage: python3 -m data.etl.documents.patent.load
             Copies patents data to biosym
             """
         )

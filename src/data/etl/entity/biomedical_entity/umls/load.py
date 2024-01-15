@@ -51,8 +51,8 @@ class UmlsLoader:
                 {", ".join(ANCESTOR_FIELDS)},
                 '' as preferred_name,
                 '' as level,
-                '' as instance_rollup,
-                '' as category_rollup
+                '' as instance_rollup_id,
+                '' as category_rollup_id
             FROM mrconso as entities
             LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
             LEFT JOIN (
@@ -84,6 +84,7 @@ class UmlsLoader:
         transform = UmlsTransformer(aui_lookup)
 
         async def handle_batch(batch):
+            logger.info("Creating %s UMLS records", len(batch))
             await Umls.prisma().create_many(
                 data=[transform(r) for r in batch],
                 skip_duplicates=True,
@@ -141,6 +142,7 @@ class UmlsLoader:
         """
 
         async def handle_batch(batch):
+            logger.info("Creating %s UmlsGraph records", len(batch))
             await UmlsGraph.prisma().create_many(
                 data=[UmlsGraphRecord(**r) for r in batch],
                 skip_duplicates=True,
@@ -166,7 +168,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.umls.copy_umls
+            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load
             UMLS etl
         """
         )

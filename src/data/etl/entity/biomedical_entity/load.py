@@ -44,7 +44,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.biomedical_entity.load
+            Usage: python3 -m data.etl.entity.biomedical_entity.load
             """
         )
         sys.exit()
