@@ -1,4 +1,3 @@
-import time
 from typing import Sequence
 import logging
 from pydantic import BaseModel
@@ -90,7 +89,7 @@ class UmlsLevelTransformer:
     @staticmethod
     def find_level_ancestor(
         record: UmlsIdLevel,
-        levels: Sequence[OntologyLevel],
+        levels: Sequence[OntologyLevel],  # acceptable/desired level(s)
         ancestors: tuple[UmlsIdLevel, ...],
     ) -> str:
         """
@@ -98,16 +97,17 @@ class UmlsLevelTransformer:
 
         Args:
             record (Umls): UMLS record
-            level (OntologyLevel): level to find
+            levels (OntologyLevel): acceptable/desired level(s)
             ancestors (tuple[UmlsIdLevel]): ordered list of ancestors
 
         Returns (str): ancestor id, or "" if none found
         """
         level_ancestors = [a for a in ancestors if a.level in levels]
 
+        # return self as instance ancestor if no ancestors
+        # AND record level is greater than or equal to any desired level
         if len(level_ancestors) == 0:
-            # return self as instance ancestor if no ancestors
-            if record.level in levels:
+            if any(record.level >= level for level in levels):
                 return record.id
 
             return ""

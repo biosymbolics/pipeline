@@ -5,7 +5,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Sequence
 from prisma import Prisma
-from pydash import compact, group_by
+from pydash import compact, flatten, group_by
 import logging
 from pydantic import BaseModel
 
@@ -38,7 +38,7 @@ class DocResults(BaseModel):
 
 
 class EntWithDocResult(DocResults):
-    id: int
+    # id: int
     name: str
     child: str | None = None
 
@@ -74,7 +74,6 @@ async def get_docs_by_entity_id(
     """
     query = f"""
         SELECT
-            entity_id as id,
             {rollup_field.name} as name,
             {f'{child_field.name} as child,' if child_field else ''}
             array_remove(array_agg(patent_id), NULL) as patents,
@@ -85,8 +84,7 @@ async def get_docs_by_entity_id(
         AND entity_id is not NULL
         GROUP BY
             {rollup_field.name},
-            {f'{child_field.name},' if child_field else ''}
-            entity_id
+            {f'{child_field.name}' if child_field else ''}
         """
     result = await client.query_raw(query, doc_ids)
 
@@ -103,19 +101,19 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     regulatory_approvals = asyncio.create_task(
         find_regulatory_approvals(
             where={"id": {"in": doc_ids}},
-            include={"indications": True, "interventions": True},
+            include={},
         )
     )
     patents = asyncio.create_task(
         find_patents(
             where={"id": {"in": doc_ids}},
-            include={"assignees": True, "indications": True, "interventions": True},
+            include={"assignees": True},
         )
     )
     trials = asyncio.create_task(
         find_trials(
             where={"id": {"in": doc_ids}},
-            include={"indications": True, "interventions": True, "sponsor": True},
+            include={"sponsor": True},
         )
     )
 
@@ -136,7 +134,7 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
         # doc ids that match the suppied terms
         docs_ids = await get_doc_ids(client, terms)
 
-        # full docs (if pulled in the prior query, might pull duplicates)
+        # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
         docs_by_type = await get_matching_docs(docs_ids)
 
         # entity/doc matching for ents in first order docs
@@ -148,20 +146,17 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
             EntityMapType.intervention,
         )
 
-    grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.id)
-    lookup = {ewd.id: ewd for ewd in ent_with_docs}
+    grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 
     documents_by_entity = [
         Entity(
-            id=id,
+            id=rollup,
             name=ewds[0].name,
-            child_count=len(ewds),
             children=[
                 Entity(
-                    id=id * 10000 + ewds.index(ewd),
+                    id=rollup + ewd.child,
                     name=ewd.child,
                     children=[],
-                    child_count=0,
                     patents=compact(
                         [docs_by_type.patents.get(id) for id in ewd.patents]
                     ),
@@ -177,20 +172,28 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
                 if ewd.child
             ],
             patents=compact(
-                [docs_by_type.patents.get(id) for id in lookup[id].patents]
+                [
+                    docs_by_type.patents.get(id)
+                    for id in flatten([ewd.patents for ewd in ewds])
+                ]
             ),
             regulatory_approvals=compact(
                 [
                     docs_by_type.regulatory_approvals.get(id)
-                    for id in lookup[id].regulatory_approvals
+                    for id in flatten([ewd.patents for ewd in ewds])
                 ]
             ),
-            trials=compact([docs_by_type.trials.get(id) for id in lookup[id].trials]),
+            trials=compact(
+                [
+                    docs_by_type.trials.get(id)
+                    for id in flatten([ewd.patents for ewd in ewds])
+                ]
+            ),
         )
-        for id, ewds in grouped_ents.items()
+        for rollup, ewds in grouped_ents.items()
     ]
 
-    return documents_by_entity[0:500]
+    return documents_by_entity[0:1000]
 
 
 async def search(params: AssetSearchParams) -> list[Entity]:

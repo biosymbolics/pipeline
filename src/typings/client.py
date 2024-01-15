@@ -16,6 +16,12 @@ class BaseSearchParams(BaseModel):
         TermField, Field(validate_default=True)
     ] = TermField.canonical_name
 
+    @field_validator("term_field", mode="before")
+    def term_field_from_string(cls, tf):
+        if isinstance(tf, TermField):
+            return tf
+        return TermField[tf]
+
 
 class BasePatentSearchParams(BaseSearchParams):
     min_patent_years: Annotated[int, Field(validate_default=True)] = 10

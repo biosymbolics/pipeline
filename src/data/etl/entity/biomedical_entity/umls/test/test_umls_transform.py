@@ -1,7 +1,11 @@
 import unittest
 
-from scripts.umls.transform import UmlsIdLevel, UmlsLevelTransformer
 from typings.umls import OntologyLevel
+
+from data.etl.entity.biomedical_entity.umls.transform import (
+    UmlsIdLevel,
+    UmlsLevelTransformer,
+)
 
 
 class TestTrialUtils(unittest.TestCase):
@@ -113,6 +117,22 @@ class TestTrialUtils(unittest.TestCase):
                 "ancestors": tuple([]),
                 "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "",
+            },
+            {
+                "description": "use self if no ancestors at the desired level, and self is at or above desired level",
+                "record": {
+                    "level": OntologyLevel.L2_CATEGORY,
+                    "id": "C2987634",
+                    "canonical_name": "agonist",
+                },
+                "ancestors": tuple(
+                    [
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "C0450442"},
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "C1254372"},
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "C2987634",
             },
             {
                 "description": "does not go to lower level",

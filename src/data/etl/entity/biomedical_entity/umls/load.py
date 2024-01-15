@@ -108,10 +108,7 @@ class UmlsLoader:
 
         for r in records:
             try:
-                await Umls.prisma().update(
-                    data=ult.transform(r),
-                    where={"id": r.id},
-                )
+                await Umls.prisma().update(data=ult.transform(r), where={"id": r.id})
             except Exception as e:
                 print(e, r)
 

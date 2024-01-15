@@ -283,7 +283,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     UPDATE {bet}
                     SET
                         entity_id=entity_synonym.entity_id,
-                        canonical_name=biomedical_entity.name,
+                        canonical_name=biomedical_entity.preferred_name,
                         canonical_type=biomedical_entity.entity_type,
                         category_rollup=umls_category_rollup.preferred_name,
                         instance_rollup=umls_instance_rollup.preferred_name
