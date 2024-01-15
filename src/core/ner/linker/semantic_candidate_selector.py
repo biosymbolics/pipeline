@@ -96,6 +96,9 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         ]
         # only use the first alias, since that's the most syntactically similar to the mention
         tuis = [self.kb.cui_to_entity[c.concept_id].types[0] for c in candidates]
+
+        # get (preferred) UMLS types these to use in semantic similarity determination
+        # because otherwise terms are totally without disambiguating context
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
         vectors = self.batch_vectorize(canonical_names + types)

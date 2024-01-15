@@ -53,27 +53,34 @@ class AncestorUmlsGraph(UmlsGraph):
         return rf"""
             -- patent to umls edges
             WITH RECURSIVE working_terms AS (
-                -- Start with UMLS terms associated directly to patents
+                -- intervention-mapped UMLS terms associated with docs, if preferred type
+                -- e.g. NCT12345 & C12345; WO-12345-A1 & C12345
                 SELECT
                     {self.doc_type.name}_id as head,
-                    etu."B" as tail, -- B is cui
+                    umls.id as tail,
                     1 AS depth
-                FROM biomedical_entity, intervenable, _entity_to_umls AS etu
+                FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
                 WHERE biomedical_entity.id=intervenable.entity_id
                 AND etu."A"=intervenable.id
+                AND umls.id=etu."B"
+                AND umls.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
 
                 UNION
 
+                -- indication-mapped UMLS terms associated with docs, if preferred type
                 SELECT
                     {self.doc_type.name}_id as head,
-                    etu."B" as tail, -- B is cui
+                    umls.id as tail,
                     1 AS depth
-                FROM biomedical_entity, indicatable, _entity_to_umls AS etu
+                FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
                 WHERE biomedical_entity.id=indicatable.entity_id
                 AND etu."A"=indicatable.id
+                AND umls.id=etu."B"
+                AND umls.type_ids && ARRAY{list(MOST_PREFERRED_UMLS_TYPES.keys())}
 
                 UNION
 
+                -- UMLS to UMLS relationships
                 SELECT
                     head_id as head,
                     tail_id as tail,
@@ -111,9 +118,9 @@ class AncestorUmlsGraph(UmlsGraph):
         Else, return -1 (which will be the case for entities we excluded from ancestor consideration)
         """
         if id in self.betweenness_map:
-            return self.betweenness_map[id]
+            return self.betweenness_map[id]  # category rollups
 
         elif id in self.nodes:
-            return 0
+            return 0  # potential instance rollups
 
-        return -1
+        return -1  # excluded from ancestor consideration

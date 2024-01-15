@@ -17,7 +17,7 @@ from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
-from .transform import UmlsLevelTransformer, UmlsTransformer
+from .transform import UmlsAncestorTransformer, UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -68,9 +68,9 @@ class UmlsLoader:
                 group by cui
             ) as synonyms on synonyms.id = entities.cui
             WHERE entities.lat='ENG' -- english
-            AND entities.ts='P' -- preferred terms
-            AND entities.ispref='Y' -- preferred term
-            GROUP BY entities.cui -- because multiple preferred terms
+            AND entities.ts='P' -- preferred terms (according to UMLS)
+            AND entities.ispref='Y' -- preferred term (according to UMLS)
+            GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
         """
 
         umls_db = f"{BASE_DATABASE_URL}/umls"
@@ -100,11 +100,10 @@ class UmlsLoader:
 
         Run *after* BiomedicalEntityEtl
         """
-        # all records with UNKNOWN / UNSET level
         records = await Umls.prisma().find_many()
 
         # might be slow, if doing betweenness centrality calc.
-        ult = await UmlsLevelTransformer.create(records)
+        ult = await UmlsAncestorTransformer.create(records)
 
         for r in records:
             try:

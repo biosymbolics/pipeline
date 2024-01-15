@@ -2,7 +2,7 @@ from typing import Mapping, Sequence
 from pydash import omit_by
 import logging
 
-from constants.umls import PREFERRED_UMLS_TYPES
+from constants.umls import MOST_PREFERRED_UMLS_TYPES
 from core.ner.linker.candidate_selector import CandidateSelector
 from core.ner.linker.types import EntityWithScore
 from core.ner.types import CanonicalEntity, DocEntity
@@ -66,7 +66,7 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         preferred = [
             m
             for m in real_members
-            if has_intersection(m[0].types, list(PREFERRED_UMLS_TYPES.keys()))
+            if has_intersection(m[0].types, list(MOST_PREFERRED_UMLS_TYPES.keys()))
         ]
         if len(preferred) >= 1:
             return preferred

@@ -194,7 +194,6 @@ class PatentLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # TODO: do in bulk for perf
             async with Prisma(http={"timeout": None}) as db:
                 # sigh https://github.com/prisma/prisma/issues/18442
                 for p in batch:
@@ -270,7 +269,6 @@ class PatentLoader(BaseDocumentEtl):
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
                     "canonical_name": ir["term"],  # overwritten later
-                    "instance_rollup": ir["term"],  # may be overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in indicatable_records
@@ -289,7 +287,6 @@ class PatentLoader(BaseDocumentEtl):
                     "mention_index": ir["mention_index"],
                     "name": ir["term"],
                     "canonical_name": ir["term"],  # overwritten later
-                    "instance_rollup": ir["term"],  # may be overwritten later
                     "patent_id": ir["id"],
                 }
                 for ir in intervenable_records

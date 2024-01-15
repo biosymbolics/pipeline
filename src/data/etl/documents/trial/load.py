@@ -287,7 +287,6 @@ class TrialLoader(BaseDocumentEtl):
                     {
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # overwritten later
-                        "instance_rollup": i.lower(),  # overwritten later
                         "trial_id": t["id"],
                     }
                     for t in rows
@@ -302,7 +301,6 @@ class TrialLoader(BaseDocumentEtl):
                     {
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # overwritten later
-                        "instance_rollup": i.lower(),  # overwritten later
                         "is_primary": True,
                         "trial_id": t["id"],
                     }

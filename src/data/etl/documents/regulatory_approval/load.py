@@ -264,8 +264,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     or "",
                     "instance_rollup": get_preferred_pharmacologic_class(
                         a["pharmacologic_classes"]
-                    )
-                    or "",
+                    ),  # TODO: should be done via biomedical_entity/UMLS mapping step
                     "is_primary": True,
                     "regulatory_approval_id": a["id"],
                 }

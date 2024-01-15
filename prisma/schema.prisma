@@ -188,8 +188,8 @@ model Ownable {
     owner_id               Int?
     name                   String
     canonical_name         String // denormalized from biomedical entity
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?             @default("") // denormalized from biomedical entity
+    category_rollup        String?             @default("") // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
@@ -216,8 +216,8 @@ model Intervenable {
     name                   String
     canonical_name         String // denormalized from biomedical entity
     canonical_type         BiomedicalEntityType?
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
@@ -240,8 +240,8 @@ model Indicatable {
     name                   String
     canonical_name         String // denormalized from biomedical entity
     canonical_type         BiomedicalEntityType?
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
     trial_id               String?
     trial                  Trial?                @relation(fields: [trial_id], references: [id])
     patent                 Patent?               @relation(fields: [patent_id], references: [id])

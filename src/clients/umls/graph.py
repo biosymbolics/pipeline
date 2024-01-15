@@ -18,7 +18,7 @@ BETWEENNESS_FILE = "umls_betweenness.json"
 class UmlsGraph(object):
     """
     Abstract class for UMLS graph
-    Cmputes betweenness centrality for nodes, which is used for ancestor selection.
+    Computes betweenness centrality for nodes, which is used for ancestor selection.
     """
 
     def __init__(self, file_name: str = BETWEENNESS_FILE):
@@ -68,22 +68,30 @@ class UmlsGraph(object):
         )
         return G
 
-    def _get_betweenness_subgraph(self, k: int = 50000):
+    def _get_topk_subgraph(self, k: int, max_degree: int = 1000):
         """
         Get subgraph of top k nodes by degree
 
         Args:
             k: number of nodes to include in the map (for performance reasons)
         """
-        degrees: list[tuple[str, int]] = self.G.degree  # type: ignore
-        top_nodes = [
-            node for (node, _) in sorted(degrees, key=lambda x: x[1], reverse=True)[:k]
+        nodes: list[tuple[str, int]] = self.G.degree  # type: ignore
+
+        # non-trivial hubs (i.e. not massive and therefore meaningless)
+        nontrivial_hubs = [
+            (node, degree)
+            for (node, degree) in nodes
+            if degree < max_degree and degree > 0
         ]
-        return self.G.subgraph(top_nodes)
+
+        # top k nodes by degree
+        top_nodes = sorted(nontrivial_hubs, key=lambda x: x[1], reverse=True)[:k]
+
+        return self.G.subgraph([node for (node, _) in top_nodes])
 
     def _load_betweenness(
         self,
-        k: int = 50000,
+        k: int = 10000,
         file_name: str | None = BETWEENNESS_FILE,
     ) -> dict[str, float]:
         """
@@ -95,9 +103,10 @@ class UmlsGraph(object):
             file_name: if provided, will load from file instead of computing (or save to file after computing)
 
         11/23 - Takes roughly 1 hour for 50k nodes using 6 cores
+        1/10 - Took roughly 3 hours (maybe?) for 10k nodes using 6 cores
         """
         start = time.monotonic()
-        bc_subgraph = self._get_betweenness_subgraph(k)
+        bc_subgraph = self._get_topk_subgraph(k)
 
         sample_k = round(k / 4)
         logger.info("Calcing betweenness centrality (top %s; sampling %s)", k, sample_k)

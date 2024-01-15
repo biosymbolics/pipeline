@@ -12,6 +12,7 @@ from prisma.types import (
 from pydash import compact, flatten, group_by, omit, uniq
 
 from clients.low_level.prisma import prisma_client
+from constants.umls import UMLS_DISEASE_TYPES, UMLS_TARGET_TYPES
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -276,31 +277,64 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         - Link mapping tables "intervenable" and "indicatable" to canonical entities
         - add instance_rollup and category_rollups
         """
+
+        def get_query(table: str, filters: list[str] = []) -> str:
+            return f"""
+                UPDATE {table}
+                SET
+                    entity_id=entity_synonym.entity_id,
+                    canonical_name=lower(biomedical_entity.name),
+                    canonical_type=biomedical_entity.entity_type,
+                    category_rollup=lower(umls_category_rollup.preferred_name),
+                    instance_rollup=lower(umls_instance_rollup.preferred_name)
+                FROM entity_synonym,
+                    biomedical_entity,
+                    _entity_to_umls as etu,
+                    umls,
+                    umls as umls_instance_rollup,
+                    umls as umls_category_rollup
+                WHERE table.name=entity_synonym.term
+                AND entity_synonym.entity_id=biomedical_entity.id
+                AND biomedical_entity.id=etu."A"
+                AND umls.id=etu."B"
+                AND umls_instance_rollup.id=umls.instance_rollup_id
+                AND umls_category_rollup.id=umls.category_rollup_id
+                {'AND ' + ' AND '.join(filters) if filters else ''}
+            """
+
+        # specification for linking docs to ents & umls
+        spec = {
+            "intervenable": [
+                {
+                    # prefer linkage that is TARGET TYPE
+                    "filters": [
+                        f"umls.type_ids && ARRAY{list(UMLS_TARGET_TYPES.keys())}"
+                    ],
+                },
+                {
+                    # then, only update those not yet updated
+                    "filters": ["instance_rollup = ''"],
+                },
+            ],
+            "indicatable": [
+                {
+                    # prefer linkage of type disease
+                    "filters": [
+                        f"umls.type_ids && ARRAY{list(UMLS_DISEASE_TYPES.keys())}"
+                    ],
+                },
+                {
+                    # then, only update those not yet updated
+                    "filters": ["instance_rollup = ''"],
+                },
+            ],
+        }
+
+        # execute the spec
         async with Prisma(http={"timeout": None}) as db:
-            for bet in ENTITY_MAP_TABLES:
-                await db.execute_raw(
-                    f"""
-                    UPDATE {bet}
-                    SET
-                        entity_id=entity_synonym.entity_id,
-                        canonical_name=biomedical_entity.preferred_name,
-                        canonical_type=biomedical_entity.entity_type,
-                        category_rollup=umls_category_rollup.preferred_name,
-                        instance_rollup=umls_instance_rollup.preferred_name
-                    FROM entity_synonym,
-                        biomedical_entity,
-                        _entity_to_umls as etu,
-                        umls,
-                        umls as umls_instance_rollup,
-                        umls as umls_category_rollup
-                    WHERE {bet}.name=entity_synonym.term
-                    AND entity_synonym.entity_id=biomedical_entity.id
-                    AND biomedical_entity.id=etu."A"
-                    AND umls.id=etu."B"
-                    AND umls_instance_rollup.id=umls.instance_rollup_id
-                    AND umls_category_rollup.id=umls.category_rollup_id
-                    """
-                )
+            for table, specs in spec.items():
+                for spec in specs:
+                    await db.execute_raw(get_query(table, spec.get("filters") or []))
 
     @staticmethod
     async def post_doc_finalize():

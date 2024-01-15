@@ -3,13 +3,103 @@ import unittest
 from typings.umls import OntologyLevel
 
 from data.etl.entity.biomedical_entity.umls.transform import (
-    UmlsIdLevel,
-    UmlsLevelTransformer,
+    UmlsInfo,
+    UmlsAncestorTransformer,
 )
 
 
 class TestTrialUtils(unittest.TestCase):
-    def test_find_level_ancestor(self):
+    def test_choose_best_ancestor_from_type(self):
+        test_cases = [
+            {
+                "description": "select target type ancestor for intervention type",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C123123123",
+                    "type_ids": ["T121"],  # "Pharmacologic Substance"
+                },
+                "ancestors": tuple(
+                    [
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C444444",
+                            "type_ids": ["T121"],  # "Pharmacologic Substance"
+                        },
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C555555",
+                            "type_ids": ["T116"],  # "Amino Acid, Peptide, or Protein"
+                        },
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "C555555",
+            },
+            {
+                "description": "select indication type ancestor for indication type",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C123123123",
+                    "type_ids": ["T047"],  # "Disease or Syndrome"
+                },
+                "ancestors": tuple(
+                    [
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C444444",
+                            "type_ids": ["T047"],  # "Disease or Syndrome"
+                        },
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C555555",
+                            "type_ids": ["T116"],  # "Amino Acid, Peptide, or Protein"
+                        },
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "C444444",
+            },
+            {
+                "description": "choose based on level of no type match (furthest LEVEL ancestor)",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C123123123",
+                    "type_ids": ["T121"],  # "Pharmacologic Substance"
+                },
+                "ancestors": tuple(
+                    [
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C444444",
+                            "type_ids": ["T121"],  # "Pharmacologic Substance"
+                        },
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "C555555",
+                            "type_ids": ["T121"],  # "Pharmacologic Substance"
+                        },
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "C555555",
+            },
+        ]
+
+        for test in test_cases:
+            expected_output = test["expected"]
+
+            result = UmlsAncestorTransformer.choose_best_ancestor(
+                UmlsInfo(
+                    id=test["record"]["id"],
+                    level=test["record"]["level"],
+                    type_ids=test["record"]["type_ids"],
+                ),
+                test["levels"],
+                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
+            )
+            self.assertEqual(result, expected_output)
+
+    def test_choose_best_ancestor_from_level(self):
         test_cases = [
             {
                 "description": "finds distant instance ancestor",
@@ -170,9 +260,11 @@ class TestTrialUtils(unittest.TestCase):
         for test in test_cases:
             expected_output = test["expected"]
 
-            result = UmlsLevelTransformer.find_level_ancestor(
-                UmlsIdLevel(id=test["record"]["id"], level=test["record"]["level"]),
+            result = UmlsAncestorTransformer.choose_best_ancestor(
+                UmlsInfo(
+                    id=test["record"]["id"], level=test["record"]["level"], type_ids=[]
+                ),
                 test["levels"],
-                tuple([UmlsIdLevel(**a) for a in test["ancestors"]]),
+                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
             )
             self.assertEqual(result, expected_output)
