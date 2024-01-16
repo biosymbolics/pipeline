@@ -28,10 +28,17 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     client = await prisma_client(30)
     results = await client.query_raw(
         f"""
-        SELECT name, count
-        FROM biomedical_entity
-        WHERE search @@ to_tsquery('english', $1)
-        ORDER BY count desc
+        SELECT name, count from (
+            SELECT name, count
+            FROM biomedical_entity
+            WHERE search @@ to_tsquery('english', $1)
+
+            UNION
+
+            SELECT name, count
+            FROM owner
+            WHERE search @@ to_tsquery('english', $1)
+        ) s ORDER BY count DESC
         LIMIT {limit}
         """,
         string,
