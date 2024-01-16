@@ -11,6 +11,7 @@ from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_client
 from constants.core import (
     ETL_BASE_DATABASE_URL,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
@@ -137,6 +138,7 @@ class PatentLoader(BaseDocumentEtl):
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CompositeCandidateSelector",
+            database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
@@ -148,6 +150,7 @@ class PatentLoader(BaseDocumentEtl):
         )
         intervention_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CompositeCandidateSelector",
+            database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
@@ -194,12 +197,12 @@ class PatentLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            async with Prisma(http={"timeout": None}) as db:
-                # sigh https://github.com/prisma/prisma/issues/18442
-                for p in batch:
-                    await db.execute_raw(
-                        f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
-                    )
+            client = await prisma_client(None)
+            # sigh https://github.com/prisma/prisma/issues/18442
+            for p in batch:
+                await client.execute_raw(
+                    f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
+                )
 
             # create assignee owner records
             await Ownable.prisma().create_many(

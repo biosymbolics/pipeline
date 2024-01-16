@@ -7,6 +7,7 @@ from pydash import flatten, group_by, omit, uniq
 import logging
 from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
+from clients.low_level.prisma import prisma_client
 
 
 from core.ner.cleaning import CleanFunction
@@ -146,15 +147,15 @@ class BaseOwnerEtl(BaseEntityEtl):
         """
         add counts to owner table (used for autocomplete ordering)
         """
-        async with Prisma(http={"timeout": None}) as db:
-            await db.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
-            await db.execute_raw(
-                f"INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id"
-            )
-            await db.execute_raw(
-                "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
-            )
-            await db.execute_raw("DROP TABLE IF EXISTS temp_count")
+        client = await prisma_client(None)
+        await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
+        await client.execute_raw(
+            f"INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id"
+        )
+        await client.execute_raw(
+            "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+        )
+        await client.execute_raw("DROP TABLE IF EXISTS temp_count")
 
     @staticmethod
     async def link_to_documents():
@@ -162,20 +163,20 @@ class BaseOwnerEtl(BaseEntityEtl):
         - Link "ownable" to canonical entities
         - add instance_rollup and category_rollups
         """
-        async with Prisma(http={"timeout": None}) as db:
-            await db.execute_raw(
-                f"""
-                UPDATE ownable
-                SET
-                    owner_id=owner_synonym.owner_id,
-                    canonical_name=owner.name,
-                    instance_rollup=biomedical_entity.name -- todo,
-                    category_rollup=biomedical_entity.name -- todo
-                FROM owner_synonym, owner
-                WHERE ownable.name=owner_synonym.term
-                AND owner_synonym.owner_id=owner.id;
-                """
-            )
+        client = await prisma_client(None)
+        await client.execute_raw(
+            f"""
+            UPDATE ownable
+            SET
+                owner_id=owner_synonym.owner_id,
+                canonical_name=owner.name,
+                instance_rollup=biomedical_entity.name -- todo,
+                category_rollup=biomedical_entity.name -- todo
+            FROM owner_synonym, owner
+            WHERE ownable.name=owner_synonym.term
+            AND owner_synonym.owner_id=owner.id;
+            """
+        )
 
     @staticmethod
     async def post_doc_finalize():

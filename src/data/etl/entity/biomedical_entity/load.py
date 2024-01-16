@@ -2,6 +2,7 @@ import asyncio
 import sys
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_context
 from data.etl.documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
 
@@ -23,7 +24,7 @@ class BiomedicalEntityLoader:
         specs = patent_specs + regulatory_approval_specs + trial_specs
 
         for spec in specs:
-            records = await PsqlDatabaseClient().select(spec.sql)
+            records = await PsqlDatabaseClient(spec.database).select(spec.sql)
             source_map = spec.get_source_map(records)
             terms = spec.get_terms(source_map)
             terms_to_canonicalize = spec.get_terms_to_canonicalize(source_map)
@@ -37,6 +38,7 @@ class BiomedicalEntityLoader:
 
 
 def main():
+    prisma_context(300)
     asyncio.run(BiomedicalEntityLoader().copy_all())
 
 

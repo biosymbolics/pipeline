@@ -162,6 +162,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         """
         indication_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CandidateSelector",
+            database="drugcentral",
             get_source_map=get_indication_source_map,
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
@@ -173,6 +174,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
 
         intervention_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CandidateSelector",
+            database="drugcentral",
             get_source_map=get_intervention_source_map,
             relation_id_field_map=RelationIdFieldMap(
                 comprised_of=RelationConnectInfo(

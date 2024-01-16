@@ -173,6 +173,7 @@ class TrialLoader(BaseDocumentEtl):
 
         indication_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CandidateSelector",
+            database="aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
                     "synonyms": [rec["name"]],
@@ -190,6 +191,7 @@ class TrialLoader(BaseDocumentEtl):
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
             candidate_selector="CandidateSelector",
+            database="aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
                     "synonyms": [rec["name"]],

@@ -22,6 +22,7 @@ from data.etl.types import (
     RelationIdFieldMap,
 )
 from typings.documents.common import ENTITY_MAP_TABLES
+from utils.file import save_json_as_file
 
 from .umls.load import UmlsLoader
 from ..base_entity_etl import BaseEntityEtl
@@ -170,6 +171,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             return merged_recs
 
         insert_records = merge_records()
+        save_json_as_file(insert_records, "insert_records.json")
         return insert_records
 
     async def copy_all(
@@ -206,22 +208,20 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         )
 
         # update records with relationships (parents, comprised_of, synonyms)
-        client = await prisma_client(300)
-        async with client.tx() as transaction:
-            for entity_rec in entity_recs:
-                update = BiomedicalEntityUpdateInput(
-                    **{
-                        k: connect_info.form_prisma_relation(entity_rec)
-                        for k, connect_info in self.relation_id_field_map.items()
-                        if connect_info is not None
-                    },  # type: ignore
+        for entity_rec in entity_recs:
+            update = BiomedicalEntityUpdateInput(
+                **{
+                    k: connect_info.form_prisma_relation(entity_rec)
+                    for k, connect_info in self.relation_id_field_map.items()
+                    if connect_info is not None
+                },  # type: ignore
+            )
+            try:
+                await BiomedicalEntity.prisma().update(
+                    where={"name": entity_rec["name"]}, data=update
                 )
-                try:
-                    await BiomedicalEntity.prisma(transaction).update(
-                        where={"name": entity_rec["name"]}, data=update
-                    )
-                except Exception as e:
-                    print(e, entity_rec)
+            except Exception as e:
+                print(e, entity_rec)
 
     @staticmethod
     async def _update_search_index():
@@ -259,17 +259,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         add counts to biomedical_entity (used for autocomplete ordering)
         """
-        async with Prisma(http={"timeout": None}) as db:
-            # add counts to biomedical_entity & owner
-            for table in ENTITY_MAP_TABLES:
-                await db.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
-                await db.execute_raw(
-                    f"INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id"
-                )
-                await db.execute_raw(
-                    "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
-                )
-                await db.execute_raw("DROP TABLE IF EXISTS temp_count;")
+        client = await prisma_client(None)
+        # add counts to biomedical_entity & owner
+        for table in ENTITY_MAP_TABLES:
+            await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
+            await client.execute_raw(
+                f"INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id"
+            )
+            await client.execute_raw(
+                "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+            )
+            await client.execute_raw("DROP TABLE IF EXISTS temp_count;")
 
     @staticmethod
     async def link_to_documents():
@@ -331,11 +331,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         }
 
         # execute the spec
-        async with Prisma(http={"timeout": None}) as db:
-            for table, specs in spec.items():
-                for spec in specs:
-                    query = get_query(table, spec["filters"])
-                    await db.execute_raw(query)
+        client = await prisma_client(None)
+        for table, specs in spec.items():
+            for spec in specs:
+                query = get_query(table, spec["filters"])
+                await client.execute_raw(query)
 
     @staticmethod
     async def post_doc_finalize():

@@ -10,3 +10,7 @@ class InterventionIntermediate(Dataclass):
     brand_name: str
     active_ingredients: list[str]
     pharmacologic_classes: list[str]
+
+    @property
+    def intervention(self) -> str:
+        return self.generic_name or self.brand_name

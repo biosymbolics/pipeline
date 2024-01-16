@@ -15,7 +15,7 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import APPLICATIONS_TABLE, PUBLICATION_NUMBER_MAP_TABLE
+from constants.core import PUBLICATION_NUMBER_MAP_TABLE
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -29,6 +29,8 @@ db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+APPLICATIONS_TABLE = "applications"
 
 
 def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
@@ -70,7 +72,7 @@ EXPORT_TABLES = {
         "column": "domain",
         "values": ["attributes", "compounds", "diseases", "mechanisms"],
     },
-    APPLICATIONS_TABLE: {
+    "applications": {
         "column": "priority_date",
         "size": timedelta(days=730),
         "transform": lambda x: int(x.strftime("%Y%m%d")),

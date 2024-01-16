@@ -12,6 +12,7 @@ UMLS_NAME_OVERRIDES = {
     "C1420201": "SGLT2",  # otherwise SLC5A2
     # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
+    "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -52,6 +53,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0597357": "receptor",  # TODO: we don't want to suppress this so much as make it unimportant
     "C0243076": "antagonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "C0243192": "agonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C2987634
+    "C0243077": "inhibitors",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C1999216
     "C0243072": "derivative",  # useless
     "C1413336": "cel gene",  # matches cell
     "C0815040": "acidic amino acid",  # matches amino acid

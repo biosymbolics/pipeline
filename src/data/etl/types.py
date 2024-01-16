@@ -63,6 +63,7 @@ class RelationIdFieldMap(Dataclass):
 @dataclass(frozen=True)
 class BiomedicalEntityLoadSpec(Dataclass):
     sql: str
+    database: str
     candidate_selector: CandidateSelectorType
     get_source_map: Callable[[list[dict]], dict]
     additional_cleaners: Sequence[CleanFunction] = field(default_factory=list)
