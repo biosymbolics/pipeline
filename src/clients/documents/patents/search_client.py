@@ -24,6 +24,8 @@ from utils.string import get_id
 from .client import find_many
 from .utils import get_max_priority_date
 
+from ..utils import get_where_clause as get_term_clause
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -59,42 +61,6 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     return [r["embeddings"] for r in results]
 
 
-def get_term_clause(
-    terms: Sequence[str], term_fields: Sequence[TermField], query_type: QueryType
-) -> PatentWhereInputRecursive1:
-    """
-    Get term search clause
-        - look for each term in any of the term fields / mapping tables
-        - AND/OR according to query type
-
-    TODO:
-    - performance???
-    - Use tsvector as soon as https://github.com/RobertCraigie/prisma-client-py/issues/52
-    """
-
-    def get_predicates(
-        term: str, term_field: TermField
-    ) -> list[PatentWhereInputRecursive3]:
-        return [
-            {"interventions": {"some": {term_field.name: {"equals": term}}}},
-            {"indications": {"some": {term_field.name: {"equals": term}}}},
-            {"assignees": {"some": {term_field.name: {"equals": term}}}},
-        ]
-
-    term_clause: list[PatentWhereInputRecursive2] = [
-        {
-            "OR": flatten(
-                [get_predicates(term, term_field) for term_field in term_fields]
-            )
-        }
-        for term in terms
-    ]
-    if query_type == "AND":
-        return {"AND": term_clause}
-
-    return {"OR": term_clause}
-
-
 def get_where_clause(
     terms: Sequence[str],
     term_fields: Sequence[TermField],
@@ -110,8 +76,9 @@ def get_where_clause(
     if is_id_search:
         return {"id": {"in": list(terms)}}
 
-    lower_terms = [t.lower() for t in terms]
-    term_clause = get_term_clause(lower_terms, term_fields, query_type)
+    term_clause = get_term_clause(
+        terms, term_fields, query_type, PatentWhereInputRecursive1
+    )
 
     where: PatentWhereInput = {
         "AND": [

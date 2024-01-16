@@ -5,12 +5,19 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.types import TrialWhereInput
+from prisma.types import (
+    TrialWhereInput,
+    TrialWhereInputRecursive1,
+    TrialWhereInputRecursive2,
+)
+from pydash import flatten
+from clients.documents.utils import get_where_clause
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 
 from typings import QueryType, TrialSearchParams
+from typings.documents.common import TermField
 from typings.documents.trials import ScoredTrial
 from utils.string import get_id
 
@@ -22,25 +29,13 @@ logger.setLevel(logging.INFO)
 MAX_SEARCH_RESULTS = 2000
 
 
-def get_where_clause(
-    terms: Sequence[str],
-    query_type: QueryType,
-) -> TrialWhereInput:
-    lower_terms = [t.lower() for t in terms]
-    where: TrialWhereInput = {
-        "OR": [
-            {"interventions": {"some": {"canonical_name": {"in": lower_terms}}}},
-            {"indications": {"some": {"canonical_name": {"in": lower_terms}}}},
-            {"sponsor": {"is": {"canonical_name": {"in": lower_terms}}}},
-        ]
-    }
-
-    return where
-
-
 async def _search(
     terms: Sequence[str],
     query_type: QueryType = "OR",
+    term_fields: Sequence[TermField] = [
+        TermField.canonical_name,
+        TermField.instance_rollup,
+    ],
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[ScoredTrial]:
     """
@@ -52,7 +47,7 @@ async def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    where = get_where_clause(terms, query_type)
+    where = get_where_clause(terms, term_fields, query_type, TrialWhereInput)
 
     async with prisma_context(300):
         trials = await find_many(
