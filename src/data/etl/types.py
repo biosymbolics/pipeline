@@ -2,6 +2,7 @@ from dataclasses import dataclass, field, fields
 from typing import Callable, Literal, Sequence, TypedDict
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
+from prisma.enums import BiomedicalEntityType
 from prisma.types import (
     BiomedicalEntityCreateWithoutRelationsInput,
     OwnerCreateWithoutRelationsInput,
@@ -58,14 +59,30 @@ class RelationIdFieldMap(Dataclass):
     comprised_of: RelationConnectInfo | None = None
     parents: RelationConnectInfo | None = None
     synonyms: RelationConnectInfo | None = None
+    umls_entities: RelationConnectInfo | None = None
+
+
+def default_get_source_map(records: Sequence[dict]) -> dict:
+    """
+    Default source map for records
+    (mostly as an example since it isn't strongly typed)
+    """
+    return {
+        rec["term"]: {
+            "synonyms": [rec["term"]],
+            "type": BiomedicalEntityType.OTHER,
+        }
+        for rec in records
+    }
 
 
 @dataclass(frozen=True)
 class BiomedicalEntityLoadSpec(Dataclass):
-    sql: str
     database: str
     candidate_selector: CandidateSelectorType
-    get_source_map: Callable[[list[dict]], dict]
+    sql: str
+    # get_source_map must yield map of term -> fields, for at least all fields mentioned in relation_id_field_map
+    get_source_map: Callable[[Sequence[dict]], dict] = default_get_source_map
     additional_cleaners: Sequence[CleanFunction] = field(default_factory=list)
     get_terms: Callable[[dict], Sequence[str]] = lambda sm: list(sm.keys())
     get_terms_to_canonicalize: Callable[[dict], Sequence[str]] = lambda sm: list(

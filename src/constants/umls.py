@@ -37,6 +37,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1173729": "SPES herbal extract",
     "C0233656": "mental condensation",  # matches condensation
     "C0242781": "disease transmission",  # transmission
+    "C0012634": "disease",  # useless
     "C0012359": "Pathological Dilatation",
     "C0234985": "Mental deterioration",
     "C0000925": "Incised wound",

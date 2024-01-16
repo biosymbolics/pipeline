@@ -2,7 +2,6 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
-from prisma import Prisma
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
@@ -82,16 +81,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         return [
             BiomedicalEntityCreateInput(
+                canonical_id=groups[0].get("canonical_id"),
+                name=groups[0]["name"],
+                entity_type=groups[0]["entity_type"],
+                sources=groups[0].get("sources") or [],
+                # add in relationship ids to add in subsequent update
                 **{
-                    "canonical_id": groups[0].get("canonical_id"),
-                    "name": groups[0]["name"],
-                    "entity_type": groups[0]["entity_type"],
-                    "sources": groups[0].get("sources") or [],
-                    **{
-                        k: uniq(flatten([g.get(k) or [] for g in groups]))
-                        for k in self.relation_id_field_map.keys()
-                    },  # type: ignore
-                }
+                    k: uniq(flatten([g.get(k) or [] for g in groups]))
+                    for k in self.relation_id_field_map.keys()
+                },  # type: ignore
             )
         ]
 
@@ -244,10 +242,33 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         )
 
     @staticmethod
+    async def _map_umls():
+        """
+        Map UMLS to entities, based on id field (which we know to be a pipe-delimited list of UMLS ids (+random strings we ignore)
+
+        TODO: should do the mapping insert inline, since we have the ids
+        """
+        query = """
+            insert into _entity_to_umls ("A", "B")
+            select s.id, cid from (
+                select id, unnest(string_to_array(canonical_id, '|')) as cid
+                from biomedical_entity
+                where canonical_id is not null
+            ) s
+            JOIN umls on umls.id = s.cid
+            on conflict do nothing;
+        """
+        client = await prisma_client(300)
+        await client.execute_raw(query)
+
+    @staticmethod
     async def pre_doc_finalize():
         """
         Finalize etl
         """
+        # map umls to entities
+        await BiomedicalEntityEtl._map_umls()
+
         # populate search index with name & syns
         await BiomedicalEntityEtl._update_search_index()
 
