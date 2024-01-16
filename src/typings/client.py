@@ -12,15 +12,6 @@ class BaseSearchParams(BaseModel):
     limit: Annotated[int, Field(validate_default=True)] = 1000
     query_type: Annotated[QueryType, Field(validate_default=True)] = "OR"  # TODO AND
     skip_cache: Annotated[bool, Field(validate_default=True)] = False
-    term_field: Annotated[
-        TermField, Field(validate_default=True)
-    ] = TermField.canonical_name
-
-    @field_validator("term_field", mode="before")
-    def term_field_from_string(cls, tf):
-        if isinstance(tf, TermField):
-            return tf
-        return TermField[tf]
 
 
 class BasePatentSearchParams(BaseSearchParams):
