@@ -79,7 +79,7 @@ class CandidateSelector(AbstractCandidateSelector):
         ]
 
         if len(sufficiently_similiar_candidates) == 0:
-            logger.warning(
+            logger.debug(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
             return None
