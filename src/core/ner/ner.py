@@ -79,7 +79,9 @@ class NerTagger:
         self.rule_sets = rule_sets
         self.entity_types = entity_types
         self.normalizer = (
-            TermNormalizer(link, additional_cleaners) if normalize else None
+            TermNormalizer(link, additional_cleaners=additional_cleaners)
+            if normalize
+            else None
         )
 
         if link and not normalize:

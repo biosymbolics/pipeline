@@ -142,14 +142,14 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         """
         Select compsosite candidate for a mention text (i.e. analog to select_candidate_from_entity)
         """
-        tokens = entity.normalized_term.split(" ")
-
-        token_entity_map = {
-            t: self.select_candidate(t)
-            for t in tokens
-            # avoid weird matches for single characters/nums & words like "of"
+        # len check - avoid weird matches for single characters/nums & words like "of"
+        tokens = [
+            t
+            for t in entity.normalized_term.split(" ")
             if len(t) > self.min_word_length
-        }
+        ]
+
+        token_entity_map = {t: self.select_candidate(t) for t in tokens}
         composite = self._generate_composite(
             tokens,
             omit_by(
@@ -191,14 +191,14 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
             return None
 
         if comp_score > match_score:
-            logger.info(
+            logger.debug(
                 "Returning composite match with higher score (%s vs %s)",
                 comp_score,
                 match_score,
             )
             return comp_match
 
-        logger.info(
+        logger.debug(
             "Returning non-composite match with higher score (%s vs %s)",
             match_score,
             comp_score,

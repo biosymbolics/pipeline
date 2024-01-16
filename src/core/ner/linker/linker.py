@@ -2,6 +2,7 @@
 Term Normalizer
 """
 import logging
+from multiprocessing import Pool
 import time
 from typing import Sequence
 
@@ -49,21 +50,21 @@ class TermLinker:
             modules, candidate_selector_class
         )(*args, **kwargs)
 
-    def link(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
+    def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
             terms (Sequence[str]): list of terms to normalize
         """
-        if len(entity_set) == 0:
+        if len(entities) == 0:
             logging.warning("No entities to link")
             return []
 
         start = time.monotonic()
 
         # generate the candidates (somewhat time consuming)
-        canonical_entities = [self.candidate_selector(e) for e in entity_set]
+        canonical_entities = [self.candidate_selector(e) for e in entities]
 
         def get_canonical(ce: CanonicalEntity | None, de: DocEntity) -> CanonicalEntity:
             # create a pseudo-canonical entity if no canonical entity found
@@ -75,12 +76,12 @@ class TermLinker:
 
         linked_doc_ents = [
             DocEntity(**{**e, "canonical_entity": get_canonical(ce, e)})
-            for e, ce in zip(entity_set, canonical_entities)
+            for e, ce in zip(entities, canonical_entities)
         ]
 
         logging.info(
-            "Completed linking batch of %s entity sets, took %ss",
-            len(entity_set),
+            "Completed linking batch of %s entities, took %ss",
+            len(entities),
             round(time.monotonic() - start),
         )
 
