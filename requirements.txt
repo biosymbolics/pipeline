@@ -20,7 +20,7 @@ requests
 scispacy
 scikit-learn
 spacy
-torch
+torch+cpu
 pytorch-ignite
 requests_cache
 transformers
