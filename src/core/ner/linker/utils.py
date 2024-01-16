@@ -220,11 +220,14 @@ def score_candidate(
         is_preferred_type = has_intersection(
             candidate_types, list(PREFERRED_UMLS_TYPES.keys())
         )
+
+        if not is_preferred_type:
+            return 0.8
+
         is_most_preferred_type = has_intersection(
             candidate_types, list(MOST_PREFERRED_UMLS_TYPES.keys())
         )
-        if not is_preferred_type:
-            return 0.8
+
         if not is_most_preferred_type:
             return 1.0
 
