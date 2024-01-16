@@ -293,7 +293,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     umls,
                     umls as umls_instance_rollup,
                     umls as umls_category_rollup
-                WHERE table.name=entity_synonym.term
+                WHERE {table}.name=entity_synonym.term
                 AND entity_synonym.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
@@ -334,7 +334,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         async with Prisma(http={"timeout": None}) as db:
             for table, specs in spec.items():
                 for spec in specs:
-                    await db.execute_raw(get_query(table, spec.get("filters") or []))
+                    query = get_query(table, spec["filters"])
+                    await db.execute_raw(query)
 
     @staticmethod
     async def post_doc_finalize():

@@ -101,7 +101,7 @@ class UmlsLoader:
 
         Run *after* BiomedicalEntityEtl
         """
-        records = await Umls.prisma().find_many()
+        records = await Umls.prisma().find_many(where={"instance_rollup_id": ""})
 
         # might be slow, if doing betweenness centrality calc.
         ult = await UmlsAncestorTransformer.create(records)

@@ -11,6 +11,7 @@ from pydash import flatten
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name
 from typings.umls import OntologyLevel, get_ontology_level
+from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
@@ -130,7 +131,7 @@ class UmlsAncestorTransformer:
             ok_ancestors = [
                 a
                 for a in _ancestors
-                if any(t in a.type_ids for t in good_ancestor_types)
+                if has_intersection(a.type_ids, good_ancestor_types)
             ]
             if len(ok_ancestors) == 0:
                 return None

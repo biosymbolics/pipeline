@@ -50,6 +50,12 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1704681": "gene probe",  # matches 'probe'
     "C0017374": "synthetic gene",  # matches 'synthetic'
     "C0597357": "receptor",  # TODO: we don't want to suppress this so much as make it unimportant
+    "C0243076": "antagonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "C0243192": "agonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C2987634
+    "C0243072": "derivative",  # useless
+    "C1413336": "cel gene",  # matches cell
+    "C0815040": "acidic amino acid",  # matches amino acid
+    "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
 }
 
 

@@ -110,12 +110,6 @@ async def _search(
     min_patent_years: int = 10,
     term_field: TermField = TermField.canonical_name,
     limit: int = MAX_SEARCH_RESULTS,
-    include: PatentInclude = {
-        "assignees": True,
-        "inventors": True,
-        "interventions": True,
-        "indications": True,
-    },
 ) -> list[ScoredPatent]:
     """
     Search patents by terms
@@ -137,7 +131,12 @@ async def _search(
     async with prisma_context(300):
         patents = await find_many(
             where=where,
-            include=include,
+            include={
+                "assignees": True,
+                "inventors": True,
+                "interventions": True,
+                "indications": True,
+            },
             take=limit,
         )
 
@@ -156,8 +155,6 @@ async def search(p: PatentSearchParams) -> list[ScoredPatent]:
         p.terms (Sequence[str]): list of terms to search for
         p.exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
         p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        p.include (PatentInclude, optional): which relation fields to include. Defaults to all, which is typically what is desired
-            (unless looking to do a lightweight grab of say, ids)
         p.min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
         p.term_field (TermField, optional): which field to search on. Defaults to "terms".
                 Other values are `instance_rollup` ("Aspirin 50mg" might have instance_rollup == "Aspirin")
@@ -178,7 +175,6 @@ async def search(p: PatentSearchParams) -> list[ScoredPatent]:
     args = {
         "terms": p.terms,
         "exemplar_patents": p.exemplar_patents,
-        "include": p.include,
         "query_type": p.query_type,
         "min_patent_years": p.min_patent_years,
         "term_field": p.term_field,
