@@ -5,7 +5,7 @@ import logging
 import time
 from prisma.models import BiomedicalEntity
 
-from clients.low_level.prisma import prisma_context
+from clients.low_level.prisma import prisma_client, prisma_context
 
 
 from .types import AutocompleteResult
@@ -25,12 +25,24 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     """
     start = time.monotonic()
 
-    async with prisma_context(300):
-        results = await BiomedicalEntity.prisma().find_many(
-            where={"name": {"contains": string.lower()}},
-            order={"count": "desc"},
-            take=limit,
+    client = await prisma_client(30)
+    results = await client.query_raw(
+        f"""
+        SELECT name, count
+        FROM biomedical_entity
+        WHERE search @@ to_tsquery('english', $1)
+        ORDER BY count desc
+        LIMIT {limit}
+        """,
+        string,
+    )
+
+    results = [
+        AutocompleteResult(
+            id=result["name"], label=f"{result['name']} ({result['count']})"
         )
+        for result in results
+    ]
 
     logger.info(
         "Autocomplete for string %s took %s seconds (%s)",
@@ -39,7 +51,4 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
         len(results),
     )
 
-    return [
-        AutocompleteResult(id=entity.name, label=f"{entity.name} ({entity.count})")
-        for entity in results
-    ]
+    return results
