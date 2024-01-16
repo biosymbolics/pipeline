@@ -6,6 +6,7 @@ import logging
 from typing import Sequence
 from prisma.client import Prisma
 from prisma.types import PatentWhereInput, PatentWhereInputRecursive2, PatentInclude
+from pydash import flatten
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
@@ -52,7 +53,7 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
 
 
 def get_term_clause(
-    terms: Sequence[str], query_type: QueryType
+    terms: Sequence[str], term_fields: Sequence[TermField], query_type: QueryType
 ) -> list[PatentWhereInputRecursive2]:
     if False and query_type == "AND":
         return [
@@ -72,14 +73,22 @@ def get_term_clause(
             }
         ]
 
-    return [
-        {"interventions": {"some": {"canonical_name": {"in": terms}}}},
-        {"indications": {"some": {"canonical_name": {"in": terms}}}},
-    ]
+    return flatten(
+        [
+            (
+                {"interventions": {"some": {term_field.name: {"in": terms}}}},
+                {"indications": {"some": {term_field.name: {"in": terms}}}},
+            )
+            for term_field in term_fields
+        ]
+    )
 
 
 def get_where_clause(
-    terms: Sequence[str], query_type: QueryType, min_patent_years: int
+    terms: Sequence[str],
+    term_fields: Sequence[TermField],
+    query_type: QueryType,
+    min_patent_years: int,
 ) -> PatentWhereInput:
     is_id_search = all([t.startswith("WO-") for t in terms])
 
@@ -91,7 +100,7 @@ def get_where_clause(
         return {"id": {"in": list(terms)}}
 
     lower_terms = [t.lower() for t in terms]
-    term_clause = get_term_clause(lower_terms, query_type)
+    term_clause = get_term_clause(lower_terms, term_fields, query_type)
 
     where: PatentWhereInput = {
         "AND": [
@@ -108,14 +117,11 @@ async def _search(
     exemplar_patents: Sequence[str] = [],
     query_type: QueryType = "OR",
     min_patent_years: int = 10,
-    term_field: TermField = "canonical_name",
+    term_fields: Sequence[TermField] = [
+        TermField.canonical_name,
+        TermField.instance_rollup,
+    ],
     limit: int = MAX_SEARCH_RESULTS,
-    include: PatentInclude = {
-        "assignees": True,
-        "inventors": True,
-        "interventions": True,
-        "indications": True,
-    },
 ) -> list[ScoredPatent]:
     """
     Search patents by terms
@@ -132,12 +138,17 @@ async def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    where = get_where_clause(terms, query_type, min_patent_years)
+    where = get_where_clause(terms, term_fields, query_type, min_patent_years)
 
     async with prisma_context(300):
         patents = await find_many(
             where=where,
-            include=include,
+            include={
+                "assignees": True,
+                "inventors": True,
+                "interventions": True,
+                "indications": True,
+            },
             take=limit,
         )
 
@@ -156,12 +167,7 @@ async def search(p: PatentSearchParams) -> list[ScoredPatent]:
         p.terms (Sequence[str]): list of terms to search for
         p.exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
         p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        p.include (PatentInclude, optional): which relation fields to include. Defaults to all, which is typically what is desired
-            (unless looking to do a lightweight grab of say, ids)
         p.min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        p.term_field (TermField, optional): which field to search on. Defaults to "terms".
-                Other values are `instance_rollup` ("Aspirin 50mg" might have instance_rollup == "Aspirin")
-                and `category_rollup` (wherein "Aspirin 50mg" might have category_rollup == "NSAIDs")
         p.limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
         p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
 
@@ -178,10 +184,8 @@ async def search(p: PatentSearchParams) -> list[ScoredPatent]:
     args = {
         "terms": p.terms,
         "exemplar_patents": p.exemplar_patents,
-        "include": p.include,
         "query_type": p.query_type,
         "min_patent_years": p.min_patent_years,
-        "term_field": p.term_field,
     }
     key = get_id(
         {

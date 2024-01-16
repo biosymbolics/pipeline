@@ -3,18 +3,18 @@ Entity client
 """
 import asyncio
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Sequence
 from prisma import Prisma
-from pydash import compact
+from pydash import compact, flatten, group_by
 import logging
-from prisma.models import RegulatoryApproval, Trial
 from pydantic import BaseModel
 
 from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
+from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
 from typings.entities import Entity
-from typings.documents.patents import ScoredPatent
+from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 
 from ..approvals import find_many as find_regulatory_approvals
 from ..patents import find_many as find_patents
@@ -27,12 +27,8 @@ logger.setLevel(logging.INFO)
 @dataclass(frozen=True)
 class DocsByType(Dataclass):
     patents: dict[str, ScoredPatent]
-    regulatory_approvals: dict[str, RegulatoryApproval]
-    trials: dict[str, Trial]
-
-
-MapTables = Literal["intervenable", "indicatable"]
-MAP_TABLES: list[MapTables] = ["intervenable", "indicatable"]
+    regulatory_approvals: dict[str, ScoredRegulatoryApproval]
+    trials: dict[str, ScoredTrial]
 
 
 class DocResults(BaseModel):
@@ -42,11 +38,12 @@ class DocResults(BaseModel):
 
 
 class EntWithDocResult(DocResults):
-    id: int
+    # id: int
     name: str
+    child: str | None = None
 
 
-async def get_doc_ids(terms: Sequence[str], client: Prisma) -> list[str]:
+async def get_doc_ids(client: Prisma, terms: Sequence[str]) -> list[str]:
     def get_doc_query(table) -> str:
         return f"""
             SELECT COALESCE(patent_id, regulatory_approval_id, trial_id) as id
@@ -57,7 +54,7 @@ async def get_doc_ids(terms: Sequence[str], client: Prisma) -> list[str]:
     doc_result = await client.query_raw(
         f"""
         SELECT distinct id
-        FROM ({' UNION ALL '.join([get_doc_query(table) for table in MAP_TABLES])}) s
+        FROM ({' UNION ALL '.join([get_doc_query(table) for table in ENTITY_MAP_TABLES])}) s
         """,
         terms,
     )
@@ -66,25 +63,30 @@ async def get_doc_ids(terms: Sequence[str], client: Prisma) -> list[str]:
 
 
 async def get_docs_by_entity_id(
-    doc_ids: Sequence[str], client: Prisma
+    client: Prisma,
+    doc_ids: Sequence[str],
+    rollup_field: TermField,
+    child_field: TermField | None,
+    entity_map_type: EntityMapType,
 ) -> list[EntWithDocResult]:
     """
     Gets documents by entity
     """
-    result = await client.query_raw(
-        f"""
+    query = f"""
         SELECT
-            entity_id as id, canonical_name as name,
+            {rollup_field.name} as name,
+            {f'{child_field.name} as child,' if child_field else ''}
             array_remove(array_agg(patent_id), NULL) as patents,
             array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
             array_remove(array_agg(trial_id), NULL) as trials
-        FROM intervenable
+        FROM {entity_map_type.value}
         WHERE COALESCE(patent_id, regulatory_approval_id, trial_id) = ANY($1)
         AND entity_id is not NULL
-        GROUP BY canonical_name, entity_id
-        """,
-        doc_ids,
-    )
+        GROUP BY
+            {rollup_field.name},
+            {f'{child_field.name}' if child_field else ''}
+        """
+    result = await client.query_raw(query, doc_ids)
 
     ents_with_docs = [EntWithDocResult(**r) for r in result]
 
@@ -99,25 +101,24 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     regulatory_approvals = asyncio.create_task(
         find_regulatory_approvals(
             where={"id": {"in": doc_ids}},
-            include={"interventions": True, "indications": True},
+            include={},
         )
     )
     patents = asyncio.create_task(
         find_patents(
             where={"id": {"in": doc_ids}},
-            include={"assignees": True, "interventions": True, "indications": True},
+            include={"assignees": True},
         )
     )
     trials = asyncio.create_task(
         find_trials(
             where={"id": {"in": doc_ids}},
-            include={"interventions": True, "indications": True, "sponsor": True},
+            include={"sponsor": True},
         )
     )
 
     await asyncio.gather(regulatory_approvals, patents, trials)
 
-    # TODO: centralize the prisma client + transform (e.g. to ScoredPatent)
     return DocsByType(
         regulatory_approvals={r.id: r for r in regulatory_approvals.result()},
         patents={p.id: p for p in patents.result()},
@@ -131,29 +132,68 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
     """
     async with prisma_context(300) as client:
         # doc ids that match the suppied terms
-        docs_ids = await get_doc_ids(terms, client)
+        docs_ids = await get_doc_ids(client, terms)
 
-        # full docs (if pulled in the prior query, might pull duplicates)
-        doc_by_type = await get_matching_docs(docs_ids)
+        # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
+        docs_by_type = await get_matching_docs(docs_ids)
 
         # entity/doc matching for ents in first order docs
-        ent_with_docs = await get_docs_by_entity_id(docs_ids, client)
+        ent_with_docs = await get_docs_by_entity_id(
+            client,
+            docs_ids,
+            TermField.instance_rollup,
+            TermField.canonical_name,
+            EntityMapType.intervention,
+        )
+
+    grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 
     documents_by_entity = [
         Entity(
-            id=ent_with_doc.id,
-            name=ent_with_doc.name,
-            **{
-                k: compact(
-                    [doc_by_type.__dict__[k].get(id) for id in ent_with_doc.__dict__[k]]
+            id=rollup,
+            name=ewds[0].name,
+            children=[
+                Entity(
+                    id=rollup + ewd.child,
+                    name=ewd.child,
+                    children=[],
+                    patents=compact(
+                        [docs_by_type.patents.get(id) for id in ewd.patents]
+                    ),
+                    regulatory_approvals=compact(
+                        [
+                            docs_by_type.regulatory_approvals.get(id)
+                            for id in ewd.regulatory_approvals
+                        ]
+                    ),
+                    trials=compact([docs_by_type.trials.get(id) for id in ewd.trials]),
                 )
-                for k in DocResults.__annotations__.keys()
-            },
+                for ewd in ewds
+                if ewd.child
+            ],
+            patents=compact(
+                [
+                    docs_by_type.patents.get(id)
+                    for id in flatten([ewd.patents for ewd in ewds])
+                ]
+            ),
+            regulatory_approvals=compact(
+                [
+                    docs_by_type.regulatory_approvals.get(id)
+                    for id in flatten([ewd.patents for ewd in ewds])
+                ]
+            ),
+            trials=compact(
+                [
+                    docs_by_type.trials.get(id)
+                    for id in flatten([ewd.patents for ewd in ewds])
+                ]
+            ),
         )
-        for ent_with_doc in ent_with_docs
+        for rollup, ewds in grouped_ents.items()
     ]
 
-    return documents_by_entity
+    return documents_by_entity[0:1000]
 
 
 async def search(params: AssetSearchParams) -> list[Entity]:

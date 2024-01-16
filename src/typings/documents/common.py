@@ -8,6 +8,21 @@ class DocType(Enum):
     trial = "trial"
 
 
+class TermField(Enum):
+    canonical_name = "canonical_name"
+    instance_rollup = "instance_rollup"
+    category_rollup = "category_rollup"
+
+
+# TODO: arcane name
+class EntityMapType(Enum):
+    intervention = "intervenable"
+    indication = "indicatable"
+
+
+ENTITY_MAP_TABLES = [t.value for t in EntityMapType]
+
+
 ENTITY_TYPE_MAP = BiomedicalEntityType.__members__
 ENTITY_TYPES = ENTITY_TYPE_MAP.values()
 ENTITY_DOMAINS = ENTITY_TYPES

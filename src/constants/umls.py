@@ -12,6 +12,7 @@ UMLS_NAME_OVERRIDES = {
     "C1420201": "SGLT2",  # otherwise SLC5A2
     # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
+    "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -49,6 +50,14 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1136365": "gene component",  # matches too much stuff
     "C1704681": "gene probe",  # matches 'probe'
     "C0017374": "synthetic gene",  # matches 'synthetic'
+    "C0597357": "receptor",  # TODO: we don't want to suppress this so much as make it unimportant
+    "C0243076": "antagonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "C0243192": "agonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C2987634
+    "C0243077": "inhibitors",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "C0243072": "derivative",  # useless
+    "C1413336": "cel gene",  # matches cell
+    "C0815040": "acidic amino acid",  # matches amino acid
+    "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
 }
 
 
@@ -87,21 +96,26 @@ UMLS_GENE_PROTEIN_TYPES = {
     "T116": "Amino Acid, Peptide, or Protein",
 }
 
-UMLS_BIOLOGIC_TYPES = {
+UMLS_TARGET_TYPES = {
     **UMLS_GENE_PROTEIN_TYPES,
-    "T038": "Biologic Function",
-    "T043": "Cell Function",
-    "T044": "Molecular Function",
-    "T045": "Genetic Function",
-    "T085": "Molecular Sequence",
-    "T086": "Nucleotide Sequence",
-    "T087": "Amino Acid Sequence",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",  # 14666 of 14889 are NOT also in UMLS_GENE_PROTEIN_TYPES
+}
+
+UMLS_BIOLOGIC_TYPES = {
+    **UMLS_TARGET_TYPES,
+    "T038": "Biologic Function",  # activation, inhibition, induction, etc
+    "T043": "Cell Function",  # regulation, inhibition, transport, secretion, transduction
+    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity
+    "T045": "Genetic Function",  # lots of integration, methylation, acetylation, transcription, etc
+    # "T085": "Molecular Sequence", # this has 12 entries...
+    "T086": "Nucleotide Sequence",  # SNPs, repeats, codons, etc (< 500 entries)
+    "T087": "Amino Acid Sequence",  # domains, motifs (200 entries)
     "T088": "Carbohydrate",  #  "Carbohydrate Sequence",
-    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
-    "T125": "Hormone",
-    "T126": "Enzyme",
-    "T129": "Immunologic Factor",
-    "T192": "Receptor",
+    "T129": "Immunologic Factor",  # proteins, isoforms, enzymes (usually duplicated elsewhere, e.g. "amino acid, peptide, protein")
+    # the following could be target types, but avoiding overlap
+    "T125": "Hormone",  # 2039 of 3348 are NOT also in UMLS_GENE_PROTEIN_TYPES
+    "T126": "Enzyme",  # only 28 or 30924 are NOT also in UMLS_GENE_PROTEIN_TYPES
+    "T192": "Receptor",  # only 198 of 5655 are NOT also in UMLS_GENE_PROTEIN_TYPES
 }
 
 
@@ -150,6 +164,7 @@ UMLS_PATHOGEN_TYPES = {
 }
 
 UMLS_DISEASE_TYPES = {
+    **UMLS_PATHOGEN_TYPES,
     "T019": "Congenital Abnormality",
     "T020": "Acqjuired Abnormality",
     "T037": "Injury or Poisoning",
@@ -161,7 +176,6 @@ UMLS_DISEASE_TYPES = {
     "T184": "Symptom",  # "Sign or Symptom",
     "T190": "Anatomical Abnormality",
     "T191": "Cancer",  # "Neoplastic Process",  # e.g. 'Mantle cell lymphoma'
-    **UMLS_PATHOGEN_TYPES,
 }
 
 
@@ -171,7 +185,7 @@ UMLS_PHENOTYPE_TYPES = {
     "T024": "Tissue",
     "T025": "Cell",
     "T026": "Cell Component",
-    "T028": "Gene",  # "Gene or Genome",
+    # "T028": "Gene",  # "Gene or Genome"; **ALSO in biologic**
     "T031": "Body Substance",  # includes plaque, atherosclerotic
     "T033": "Finding",
     "T042": "Organ or Tissue Function",  # includes "graft rejection"
@@ -195,7 +209,7 @@ UMLS_OTHER_TYPES = {
     "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
 }
 
-# TODO: all these names are lacking distinctness
+# UMLS ents of these types will be included in the UMLS load
 BIOMEDICAL_GRAPH_UMLS_TYPES = {
     **UMLS_INTERVENTION_TYPES,
     **UMLS_DISEASE_TYPES,
@@ -242,3 +256,12 @@ LegacyDomainType = Literal[
     "procedures",
     "mechanisms",
 ]
+
+
+DESIREABLE_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_DISEASE_TYPES.keys()},
+    **{
+        k: list(UMLS_TARGET_TYPES.keys())
+        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+    },
+}

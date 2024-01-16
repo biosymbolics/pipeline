@@ -34,7 +34,7 @@ async def _aggregate_over_time(raw_event: dict, context):
         logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching reports forparams: %s", p)
+    logger.info("Fetching reports for params: %s", p)
 
     try:
         summaries = await XYReport.group_by_xy_for_filters(

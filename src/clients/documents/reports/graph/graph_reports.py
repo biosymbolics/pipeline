@@ -14,10 +14,8 @@ from clients.low_level.prisma import prisma_client
 from typings import (
     DOMAINS_OF_INTEREST,
     DocType,
-    ScoredTrial,
-    ScoredRegulatoryApproval,
-    ScoredPatent,
 )
+from typings.client import TermField
 
 from .types import (
     AggregateDocumentRelationship,
@@ -26,7 +24,7 @@ from .types import (
     SerializableGraph,
 )
 
-from ..constants import X_DIMENSIONS, Y_DIMENSIONS
+from ..constants import Y_DIMENSIONS
 
 
 logger = logging.getLogger(__name__)
@@ -87,11 +85,6 @@ RELATIONSHIPS_OF_INTEREST = [
 
 ENTITY_GROUP = "entity"
 DOCUMENT_GROUP = "patent"
-
-
-class TermField(Enum):
-    canonical_name = "canonical_name"
-    instance_rollup = "instance_rollup"
 
 
 def get_entity_subquery(term_field: TermField, doc_type: DocType) -> str:

@@ -158,6 +158,16 @@ NON_SEMANTIC_COMPOSITE_TEST_CASES = [
             }
         ],  # avoid C1539188 / DNAAF6 ("TWISTER")
     },
+    {
+        "description": "should not match htr7",
+        "text": ["5-ht7 receptor antagonists"],
+        "expected": [
+            {
+                "id": "C0533325",  # TODO?
+                "name": "TWIST1",  # "Musculoskeletal torsion River driver",  # TODO
+            }
+        ],
+    },
 ]
 
 SEMANTIC_COMPOSITE_TEST_CASES = [

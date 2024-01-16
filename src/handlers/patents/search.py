@@ -3,6 +3,7 @@ Handler for patents search
 """
 import json
 import logging
+import traceback
 
 from clients.documents import patent_search
 from handlers.utils import handle_async
@@ -42,6 +43,7 @@ async def _search(raw_event: dict, context):
     except Exception as e:
         message = f"Error searching patents: {e}"
         logger.error(message)
+        traceback.print_exc()
         return {"statusCode": 500, "body": message}
 
     return {

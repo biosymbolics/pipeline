@@ -18,6 +18,7 @@ model BiomedicalEntity {
     children      BiomedicalEntity[]       @relation("entity_to_parent")
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
+    count         Int                      @default(0)
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
@@ -30,6 +31,7 @@ model BiomedicalEntity {
 
     // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
 
+    @@index([entity_type], name: "biomedical_entity_type")
     @@map("biomedical_entity")
 }
 
@@ -46,6 +48,7 @@ model EntitySynonym {
 model Owner {
     id                 Int                      @id @default(autoincrement())
     children           Owner[]                  @relation("owner_to_parent")
+    count              Int                      @default(0)
     financial_snapshot FinancialSnapshot?
     ownables           Ownable[] // backref
     owner_type         OwnerType
@@ -83,36 +86,34 @@ model Patent {
     ipc_codes           String[]
     other_ids           String[]
     priority_date       DateTime
-    search              Unsupported("tsvector")?
     search_rank         Float? // not stored in db. hack to represent this in the py classes
     similar_patents     String[]
-    text_for_search     String
     title               String
     url                 String
 
+    @@index([priority_date], name: "patent_priority_date")
     @@map("patent")
 }
 
 model RegulatoryApproval {
-    id               String                   @id @unique
+    id               String         @id @unique
     agency           String
     application_type String
     approval_date    DateTime
     indications      Indicatable[]
     interventions    Intervenable[]
     owners           Ownable[]
-    search           Unsupported("tsvector")?
-    text_for_search  String
     url              String
 
+    @@index([approval_date], name: "approval_date")
     @@map("regulatory_approval")
 }
 
 model Trial {
-    id                      String                   @id @unique
+    id                      String               @id @unique
     abstract                String?
     acronym                 String?
-    arm_count               Int?                     @default(-1)
+    arm_count               Int?                 @default(-1)
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
@@ -132,17 +133,16 @@ model Trial {
     phase                   TrialPhase
     purpose                 String
     randomization           TrialRandomization
-    search                  Unsupported("tsvector")?
-    sponsor_id              Int?                     @unique
+    sponsor_id              Int?                 @unique
     sponsor                 Ownable?
     start_date              DateTime?
     status                  TrialStatus
     termination_description String?
     termination_reason      TerminationReason
-    text_for_search         String
     title                   String
     url                     String
 
+    @@index([start_date], name: "trial_start_date")
     @@map("trial")
 }
 
@@ -188,8 +188,8 @@ model Ownable {
     owner_id               Int?
     name                   String
     canonical_name         String // denormalized from biomedical entity
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?             @default("") // denormalized from biomedical entity
+    category_rollup        String?             @default("") // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
@@ -199,6 +199,8 @@ model Ownable {
     @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
+    @@index([instance_rollup], name: "ownable_instance_rollup")
+    @@index([category_rollup], name: "ownable_category_rollup")
     @@map("ownable")
 }
 
@@ -214,8 +216,8 @@ model Intervenable {
     name                   String
     canonical_name         String // denormalized from biomedical entity
     canonical_type         BiomedicalEntityType?
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
     regulatory_approval_id String?
     trial_id               String?
@@ -224,6 +226,8 @@ model Intervenable {
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "intervenable_name")
     @@index([canonical_name], name: "intervenable_canonical_name")
+    @@index([instance_rollup], name: "intervenable_instance_rollup")
+    @@index([category_rollup], name: "intervenable_category_rollup")
     @@map("intervenable")
 }
 
@@ -236,8 +240,8 @@ model Indicatable {
     name                   String
     canonical_name         String // denormalized from biomedical entity
     canonical_type         BiomedicalEntityType?
-    instance_rollup        String // denormalized from biomedical entity
-    category_rollup        String? // denormalized from biomedical entity
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
     trial_id               String?
     trial                  Trial?                @relation(fields: [trial_id], references: [id])
     patent                 Patent?               @relation(fields: [patent_id], references: [id])
@@ -248,15 +252,17 @@ model Indicatable {
     @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "indicatable_name")
     @@index([canonical_name], name: "indicatable_canonical_name")
+    @@index([instance_rollup], name: "indicatable_instance_rollup")
+    @@index([category_rollup], name: "indicatable_category_rollup")
     @@map("indicatable")
 }
 
 model Umls {
     id                  String             @id @unique
     biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    category_rollup     String
+    category_rollup_id  String?
     hierarchy           String?
-    instance_rollup     String
+    instance_rollup_id  String // TODO: add as biomedical parent
     l0_ancestor         String?
     l1_ancestor         String?
     l2_ancestor         String?

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from functools import cached_property
-from typing import Any
+from typing import Any, Sequence
 from pydash import compact, flatten, uniq
 from prisma.enums import TrialPhase, TrialStatus
 
@@ -14,14 +14,61 @@ from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 
 @dataclass(frozen=True)
 class Entity(Dataclass):
-    id: int
+    activity: list[int]
+    approval_count: int
+    children: list["Entity"]
+    enrollment: int
+    id: str
+    maybe_available_count: int
     name: str
-    patents: list[ScoredPatent]
-    regulatory_approvals: list[ScoredRegulatoryApproval]
-    trials: list[ScoredTrial]
+    patent_count: int
+    percent_stopped: float
+    most_recent_patent: ScoredPatent | None
+    most_recent_trial: ScoredTrial | None
+    owners: list[str]
+    trial_count: int
+
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        children: list["Entity"],
+        patents: list[ScoredPatent],
+        regulatory_approvals: list[ScoredRegulatoryApproval],
+        trials: list[ScoredTrial],
+    ):
+        object.__setattr__(self, "id", id)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "children", children)
+        object.__setattr__(
+            self, "activity", self.get_activity(patents, regulatory_approvals, trials)
+        )
+        object.__setattr__(self, "approval_count", len(regulatory_approvals))
+        object.__setattr__(self, "enrollment", self.get_enrollment(trials))
+        object.__setattr__(self, "patent_count", len(patents))
+        object.__setattr__(
+            self, "most_recent_patent", self.get_most_recent_patent(patents)
+        )
+        object.__setattr__(
+            self, "most_recent_trial", self.get_most_recent_trial(trials)
+        )
+        object.__setattr__(self, "trial_count", len(trials))
+        object.__setattr__(
+            self, "maybe_available_count", self.get_maybe_available_count(patents)
+        )
+        object.__setattr__(self, "owners", self.get_owners(patents, trials))
+        object.__setattr__(self, "percent_stopped", self.get_percent_stopped(trials))
 
     @property
-    def activity(self) -> list[int]:
+    def child_count(self):
+        return len(self.children)
+
+    def get_activity(
+        self,
+        patents: list[ScoredPatent],
+        regulatory_approvals: list[ScoredRegulatoryApproval],
+        trials: list[ScoredTrial],
+    ) -> list[int]:
         """
         Simple line chart of activity over time
 
@@ -30,36 +77,31 @@ class Entity(Dataclass):
         - approval dates
         """
         dates = (
-            [p.priority_date.year for p in self.patents]
+            [p.priority_date.year for p in patents]
             + flatten(
                 [
                     list(range(t.start_date.year, t.end_date.year))
-                    for t in self.trials
+                    for t in trials
                     if t.end_date is not None and t.start_date is not None
                 ]
             )
-            + [a.approval_date for a in self.regulatory_approvals]
+            + [a.approval_date for a in regulatory_approvals]
         )
         return [
             dates.count(y)
             for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
         ]
 
-    @property
-    def approval_count(self) -> int:
-        return len(self.regulatory_approvals)
-
-    @property
-    def total_enrollment(self) -> int:
-        return sum([t.enrollment for t in self.trials if t.enrollment is not None]) or 0
+    def get_enrollment(self, trials) -> int:
+        return sum([t.enrollment for t in trials if t.enrollment is not None]) or 0
 
     @property
     def investment_level(self) -> str:
-        if self.total_enrollment > 5000:
+        if self.enrollment > 5000:
             return "very high"
-        if self.total_enrollment > 1000:
+        if self.enrollment > 1000:
             return "high"
-        if self.total_enrollment > 500:
+        if self.enrollment > 500:
             return "medium"
         return "low"
 
@@ -67,15 +109,12 @@ class Entity(Dataclass):
     def is_approved(self) -> bool:
         return self.approval_count > 0
 
-    @property
-    def patent_count(self) -> int:
-        return len(self.patents)
-
-    @cached_property
-    def most_recent_patent(self) -> ScoredPatent | None:
-        if len(self.patents) == 0:
+    def get_most_recent_patent(
+        self, patents: Sequence[ScoredPatent]
+    ) -> ScoredPatent | None:
+        if len(patents) == 0:
             return None
-        patents = sorted(self.patents, key=lambda x: x.priority_date)
+        patents = sorted(patents, key=lambda x: x.priority_date)
         return patents[-1]
 
     @property
@@ -84,11 +123,12 @@ class Entity(Dataclass):
             return None
         return self.most_recent_patent.priority_date.year
 
-    @cached_property
-    def most_recent_trial(self) -> ScoredTrial | None:
-        if len(self.trials) == 0:
+    def get_most_recent_trial(
+        self, trials: Sequence[ScoredTrial]
+    ) -> ScoredTrial | None:
+        if len(trials) == 0:
             return None
-        trials = sorted(self.trials, key=lambda x: x.last_updated_date)
+        trials = sorted(trials, key=lambda x: x.last_updated_date)
         return trials[-1]
 
     @property
@@ -122,17 +162,11 @@ class Entity(Dataclass):
         return TrialPhase(self.most_recent_trial.phase)
 
     @property
-    def trial_count(self) -> int:
-        return len(self.trials)
-
-    @property
     def record_count(self) -> int:
-        return self.trial_count + self.patent_count
+        return self.patent_count + self.approval_count + self.trial_count
 
-    @property
-    def maybe_available_count(self) -> int:
+    def get_maybe_available_count(self, patents: Sequence[ScoredPatent]) -> int:
         return [
-            # TODO: why isn't p.availability_likelihood the enum?
             p.availability_likelihood
             in [
                 AvailabilityLikelihood.POSSIBLE,
@@ -140,21 +174,16 @@ class Entity(Dataclass):
                 "POSSIBLE",
                 "LIKELY",
             ]
-            for p in self.patents
+            for p in patents
         ].count(True)
 
-    @property
-    def owners(self) -> list[str]:
+    def get_owners(
+        self, patents: Sequence[ScoredPatent], trials: Sequence[ScoredTrial]
+    ) -> list[str]:
         return uniq(
             compact(
-                flatten(
-                    [a.canonical_name for p in self.patents for a in p.assignees or []]
-                )
-                + [
-                    t.sponsor.canonical_name
-                    for t in self.trials
-                    if t.sponsor is not None
-                ]
+                flatten([a.canonical_name for p in patents for a in p.assignees or []])
+                + [t.sponsor.canonical_name for t in trials if t.sponsor is not None]
             )
         )
 
@@ -162,11 +191,10 @@ class Entity(Dataclass):
     def owner_count(self) -> int:
         return len(self.owners)
 
-    @property
-    def percent_stopped(self) -> float:
+    def get_percent_stopped(self, trials: list[ScoredTrial]) -> float:
         if self.trial_count == 0:
             return 0.0
-        trial_statuses = [get_trial_status_parent(t.status) for t in self.trials]
+        trial_statuses = [get_trial_status_parent(t.status) for t in trials]
         return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
 
     def serialize(self) -> dict[str, Any]:
@@ -174,16 +202,10 @@ class Entity(Dataclass):
         Custom serialization for entity
         TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
         """
-        trials = [t.serialize() for t in self.trials]
-        patents = [p.serialize() for p in self.patents]
-        regulatory_approvals = [a.serialize() for a in self.regulatory_approvals]
-
         o = super().serialize()
         return {
             **o,
-            "regulatory_approvals": regulatory_approvals,
-            "patents": patents,
-            "trials": trials,
+            "children": [c.serialize() for c in self.children],
         }
 
     # TODO - average dropout rate

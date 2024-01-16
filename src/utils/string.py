@@ -4,6 +4,7 @@ String utilities
 
 
 from datetime import date
+from enum import Enum
 import regex as re
 from typing import Mapping, TypeGuard, Union
 
@@ -38,6 +39,9 @@ def get_id(value: Idable) -> str:
 
     if isinstance(value, int):
         value = str(value)
+
+    if isinstance(value, Enum):
+        value = str(value.value)
 
     return value.replace(" ", "_").lower()
 
