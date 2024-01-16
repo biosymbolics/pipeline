@@ -5,11 +5,18 @@ from functools import partial
 import logging
 from typing import Sequence
 from prisma.client import Prisma
-from prisma.types import PatentWhereInput, PatentWhereInputRecursive2, PatentInclude
+from prisma.types import (
+    PatentWhereInput,
+    PatentWhereInputRecursive1,
+    PatentWhereInputRecursive2,
+    PatentWhereInputRecursive3,
+    PatentInclude,
+)
 from pydash import flatten
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
+from typings.documents.common import ENTITY_MAP_TABLES
 from typings.documents.patents import ScoredPatent
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
@@ -54,34 +61,38 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
 
 def get_term_clause(
     terms: Sequence[str], term_fields: Sequence[TermField], query_type: QueryType
-) -> list[PatentWhereInputRecursive2]:
-    if False and query_type == "AND":
+) -> PatentWhereInputRecursive1:
+    """
+    Get term search clause
+        - look for each term in any of the term fields / mapping tables
+        - AND/OR according to query type
+
+    TODO:
+    - performance???
+    - Use tsvector as soon as https://github.com/RobertCraigie/prisma-client-py/issues/52
+    """
+
+    def get_predicates(
+        term: str, term_field: TermField
+    ) -> list[PatentWhereInputRecursive3]:
         return [
-            {
-                "AND": [
-                    {"interventions": {"some": {"canonical_name": {"in": terms}}}},
-                    {"indications": {"some": {"canonical_name": {"in": terms}}}},
-                ],
-                "AND": [
-                    {"interventions": {"some": {"canonical_name": {"in": terms}}}},
-                    {"assignees": {"some": {"canonical_name": {"in": terms}}}},
-                ],
-                "AND": [
-                    {"indications": {"some": {"canonical_name": {"in": terms}}}},
-                    {"assignees": {"some": {"canonical_name": {"in": terms}}}},
-                ],
-            }
+            {"interventions": {"some": {term_field.name: {"equals": term}}}},
+            {"indications": {"some": {term_field.name: {"equals": term}}}},
+            {"assignees": {"some": {term_field.name: {"equals": term}}}},
         ]
 
-    return flatten(
-        [
-            (
-                {"interventions": {"some": {term_field.name: {"in": terms}}}},
-                {"indications": {"some": {term_field.name: {"in": terms}}}},
+    term_clause: list[PatentWhereInputRecursive2] = [
+        {
+            "OR": flatten(
+                [get_predicates(term, term_field) for term_field in term_fields]
             )
-            for term_field in term_fields
-        ]
-    )
+        }
+        for term in terms
+    ]
+    if query_type == "AND":
+        return {"AND": term_clause}
+
+    return {"OR": term_clause}
 
 
 def get_where_clause(
@@ -104,7 +115,7 @@ def get_where_clause(
 
     where: PatentWhereInput = {
         "AND": [
-            {"OR": term_clause},
+            term_clause,
             {"priority_date": {"gte": get_max_priority_date(int(min_patent_years))}},
         ],
     }

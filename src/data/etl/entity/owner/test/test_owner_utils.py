@@ -1,6 +1,6 @@
 import unittest
 
-from ..owner import clean_owners
+from data.etl.entity.owner.owner import clean_owners
 
 
 class TestPatentScriptUtils(unittest.TestCase):

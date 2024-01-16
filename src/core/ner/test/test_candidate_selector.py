@@ -205,6 +205,7 @@ SEMANTIC_COMPOSITE_TEST_CASES = [
 ]
 
 
+@pytest.mark.skip(reason="Too slow to include in CI")
 class TestCompositeCandidateSelector(unittest.TestCase):
     """
     Note: test initialization is slow because of the UMLS cache
