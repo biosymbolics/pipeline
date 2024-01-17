@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import date
-from functools import cached_property
 from typing import Any, Sequence
 from pydash import compact, flatten, uniq
 from prisma.enums import TrialPhase, TrialStatus
@@ -13,51 +12,75 @@ from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 
 
 @dataclass(frozen=True)
-class Entity(Dataclass):
+class AssetActivity(Dataclass):
+    # ids
+    approvals: list[str]
+    patents: list[str]
+    trials: list[str]
+    year: int
+
+
+@dataclass(frozen=True)
+class Asset(Dataclass):
     activity: list[int]
     approval_count: int
-    children: list["Entity"]
-    enrollment: int
+    average_trial_dropout: float
+    average_trial_duration: float
+    average_trial_enrollment: int
+    children: list["Asset"]
     id: str
     maybe_available_count: int
     name: str
+    owners: list[str]
     patent_count: int
     percent_stopped: float
     most_recent_patent: ScoredPatent | None
     most_recent_trial: ScoredTrial | None
-    owners: list[str]
+    total_trial_enrollment: int
     trial_count: int
 
     def __init__(
         self,
         id: str,
         name: str,
-        children: list["Entity"],
+        children: list["Asset"],
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         trials: list[ScoredTrial],
     ):
         object.__setattr__(self, "id", id)
         object.__setattr__(self, "name", name)
-        object.__setattr__(self, "children", children)
         object.__setattr__(
             self, "activity", self.get_activity(patents, regulatory_approvals, trials)
         )
         object.__setattr__(self, "approval_count", len(regulatory_approvals))
-        object.__setattr__(self, "enrollment", self.get_enrollment(trials))
-        object.__setattr__(self, "patent_count", len(patents))
+        object.__setattr__(
+            self, "average_trial_dropout", self.get_average_trial_dropout(trials)
+        )
+        object.__setattr__(
+            self, "average_trial_duration", self.get_average_trial_duration(trials)
+        )
+        object.__setattr__(
+            self, "average_trial_enrollment", self.get_average_trial_enrollment(trials)
+        )
+        object.__setattr__(self, "children", children)
+        # TODO: rename
+        object.__setattr__(
+            self, "total_trial_enrollment", self.get_total_trial_enrollment(trials)
+        )
+        object.__setattr__(
+            self, "maybe_available_count", self.get_maybe_available_count(patents)
+        )
         object.__setattr__(
             self, "most_recent_patent", self.get_most_recent_patent(patents)
         )
         object.__setattr__(
             self, "most_recent_trial", self.get_most_recent_trial(trials)
         )
-        object.__setattr__(self, "trial_count", len(trials))
-        object.__setattr__(
-            self, "maybe_available_count", self.get_maybe_available_count(patents)
-        )
         object.__setattr__(self, "owners", self.get_owners(patents, trials))
+        object.__setattr__(self, "patent_count", len(patents))
         object.__setattr__(self, "percent_stopped", self.get_percent_stopped(trials))
+        object.__setattr__(self, "trial_count", len(trials))
 
     @property
     def child_count(self):
@@ -92,16 +115,13 @@ class Entity(Dataclass):
             for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
         ]
 
-    def get_enrollment(self, trials) -> int:
-        return sum([t.enrollment for t in trials if t.enrollment is not None]) or 0
-
     @property
     def investment_level(self) -> str:
-        if self.enrollment > 5000:
+        if self.total_trial_enrollment > 5000:
             return "very high"
-        if self.enrollment > 1000:
+        if self.total_trial_enrollment > 1000:
             return "high"
-        if self.enrollment > 500:
+        if self.total_trial_enrollment > 500:
             return "medium"
         return "low"
 
@@ -109,27 +129,11 @@ class Entity(Dataclass):
     def is_approved(self) -> bool:
         return self.approval_count > 0
 
-    def get_most_recent_patent(
-        self, patents: Sequence[ScoredPatent]
-    ) -> ScoredPatent | None:
-        if len(patents) == 0:
-            return None
-        patents = sorted(patents, key=lambda x: x.priority_date)
-        return patents[-1]
-
     @property
     def last_priority_year(self) -> int | None:
         if not self.most_recent_patent:
             return None
         return self.most_recent_patent.priority_date.year
-
-    def get_most_recent_trial(
-        self, trials: Sequence[ScoredTrial]
-    ) -> ScoredTrial | None:
-        if len(trials) == 0:
-            return None
-        trials = sorted(trials, key=lambda x: x.last_updated_date)
-        return trials[-1]
 
     @property
     def last_status(self) -> TrialStatus | str:
@@ -162,10 +166,73 @@ class Entity(Dataclass):
         return TrialPhase(self.most_recent_trial.phase)
 
     @property
+    def owner_count(self) -> int:
+        return len(self.owners)
+
+    @property
     def record_count(self) -> int:
         return self.patent_count + self.approval_count + self.trial_count
 
-    def get_maybe_available_count(self, patents: Sequence[ScoredPatent]) -> int:
+    @classmethod
+    def get_average_trial_enrollment(cls, trials) -> int:
+        enrollments = [t.enrollment for t in trials if t.enrollment is not None]
+
+        if len(enrollments) == 0:
+            return 0
+        return round(sum(enrollments) / len(trials))
+
+    @classmethod
+    def get_total_trial_enrollment(cls, trials) -> int:
+        """
+        Used as proxy for level of investment
+        """
+        enrollments = [t.enrollment for t in trials if t.enrollment is not None]
+
+        if len(enrollments) == 0:
+            return 0
+        return sum(enrollments)
+
+    @classmethod
+    def get_most_recent_patent(
+        cls, patents: Sequence[ScoredPatent]
+    ) -> ScoredPatent | None:
+        if len(patents) == 0:
+            return None
+        patents = sorted(patents, key=lambda x: x.priority_date)
+        return patents[-1]
+
+    @classmethod
+    def get_most_recent_trial(cls, trials: Sequence[ScoredTrial]) -> ScoredTrial | None:
+        if len(trials) == 0:
+            return None
+        trials = sorted(trials, key=lambda x: x.last_updated_date)
+        return trials[-1]
+
+    @classmethod
+    def get_average_trial_dropout(cls, trials: list[ScoredTrial]) -> float:
+        if len(trials) == 0:
+            return 0.0
+
+        enroll_drop = [
+            (t.enrollment, t.dropout_count)
+            for t in trials
+            if t.enrollment is not None
+            and t.enrollment > 0
+            and t.dropout_count is not None
+            and t.dropout_count < (t.enrollment or 0)
+        ]
+        return sum([d[1] for d in enroll_drop]) / sum([d[0] for d in enroll_drop])
+
+    @classmethod
+    def get_average_trial_duration(cls, trials: list[ScoredTrial]) -> float:
+        if len(trials) == 0:
+            return 0.0
+
+        durations = [trial.duration for trial in trials if trial.duration is not None]
+        return sum(durations) / len(durations)
+
+    @classmethod
+    def get_maybe_available_count(cls, patents: Sequence[ScoredPatent]) -> int:
         return [
             p.availability_likelihood
             in [
@@ -177,8 +244,9 @@ class Entity(Dataclass):
             for p in patents
         ].count(True)
 
+    @classmethod
     def get_owners(
-        self, patents: Sequence[ScoredPatent], trials: Sequence[ScoredTrial]
+        cls, patents: Sequence[ScoredPatent], trials: Sequence[ScoredTrial]
     ) -> list[str]:
         return uniq(
             compact(
@@ -187,12 +255,9 @@ class Entity(Dataclass):
             )
         )
 
-    @property
-    def owner_count(self) -> int:
-        return len(self.owners)
-
-    def get_percent_stopped(self, trials: list[ScoredTrial]) -> float:
-        if self.trial_count == 0:
+    @classmethod
+    def get_percent_stopped(cls, trials: list[ScoredTrial]) -> float:
+        if len(trials) == 0:
             return 0.0
         trial_statuses = [get_trial_status_parent(t.status) for t in trials]
         return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
@@ -208,6 +273,4 @@ class Entity(Dataclass):
             "children": [c.serialize() for c in self.children],
         }
 
-    # TODO - average dropout rate
-    # TODO - average trial duration
     # TODO - chart with more info

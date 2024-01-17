@@ -1,5 +1,5 @@
 """
-Entity client
+Asset client
 """
 import asyncio
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
-from typings.entities import Entity
+from typings.entities import Asset
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 
 from ..approvals import find_many as find_regulatory_approvals
@@ -126,7 +126,7 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     )
 
 
-async def _search(terms: Sequence[str]) -> list[Entity]:
+async def _search(terms: Sequence[str]) -> list[Asset]:
     """
     Internal search for documents grouped by entity
     """
@@ -149,11 +149,11 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
     grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 
     documents_by_entity = [
-        Entity(
+        Asset(
             id=rollup,
             name=ewds[0].name,
             children=[
-                Entity(
+                Asset(
                     id=rollup + ewd.child,
                     name=ewd.child,
                     children=[],
@@ -196,7 +196,7 @@ async def _search(terms: Sequence[str]) -> list[Entity]:
     return documents_by_entity[0:1000]
 
 
-async def search(params: AssetSearchParams) -> list[Entity]:
+async def search(params: AssetSearchParams) -> list[Asset]:
     """
     Search for documents, grouped by entity
     """
