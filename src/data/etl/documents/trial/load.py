@@ -5,6 +5,7 @@ import asyncio
 import re
 import sys
 import logging
+from typing import Sequence
 from pydash import omit
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
@@ -17,6 +18,7 @@ from prisma.models import (
 from prisma.types import TrialCreateWithoutRelationsInput
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_client
 from constants.core import ETL_BASE_DATABASE_URL
 from constants.patterns.intervention import DOSAGE_UOM_RE
 from data.domain.biomedical import (
@@ -127,7 +129,7 @@ class TrialLoader(BaseDocumentEtl):
                     'Dietary Supplement', 'Genetic', 'Other', 'Procedure'
                 )
                 AND interventions.name is not null
-                AND interventions.name ~* '{get_or_re(CONTROL_TERMS)}'
+                AND NOT interventions.name ~* '{get_or_re(CONTROL_TERMS)}'
             LEFT JOIN design_groups on design_groups.nct_id = studies.nct_id
             LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
                 AND mesh_conditions.mesh_type='mesh-list'
@@ -158,7 +160,7 @@ class TrialLoader(BaseDocumentEtl):
         Specs for creating associated biomedical entities (executed by BiomedicalEntityEtl)
         """
 
-        def get_sql(mesh_table: str, table: str):
+        def get_sql(mesh_table: str, table: str, filters: Sequence[str] = []):
             return f"""
                 SELECT DISTINCT name FROM (
                     SELECT DISTINCT LOWER(mesh_term) AS name
@@ -167,6 +169,8 @@ class TrialLoader(BaseDocumentEtl):
                     UNION
                     SELECT DISTINCT LOWER(name) FROM {table} WHERE name IS NOT null
                 ) s
+                {'WHERE ' if filters else ''}
+                {' AND '.join(filters)}
             """
 
         indication_spec = BiomedicalEntityLoadSpec(
@@ -198,7 +202,11 @@ class TrialLoader(BaseDocumentEtl):
                 for rec in recs
             },
             non_canonical_source=Source.CTGOV,
-            sql=get_sql("browse_interventions", "interventions"),
+            sql=get_sql(
+                "browse_interventions",
+                "interventions",
+                [f"AND NOT interventions.name ~* '{get_or_re(CONTROL_TERMS)}'"],
+            ),
         )
         return [indication_spec, intervention_spec]
 
@@ -258,15 +266,17 @@ class TrialLoader(BaseDocumentEtl):
         Copy data from Postgres (drugcentral) to Postgres (patents)
         """
 
+        client = await prisma_client(None)
+
         async def handle_batch(rows: list[dict]) -> bool:
             # create main trial records
-            await Trial.prisma().create_many(
+            await Trial.prisma(client).create_many(
                 data=[TrialLoader.transform(t) for t in rows],
                 skip_duplicates=True,
             )
 
-            # create owner records (aka sponsors)
-            await Ownable.prisma().create_many(
+            # # create owner records (aka sponsors)
+            await Ownable.prisma(client).create_many(
                 data=[
                     {
                         "name": (t["sponsor"] or "unknown").lower(),
@@ -280,8 +290,8 @@ class TrialLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # create "indicatable" records, those that map approval to a canonical indication
-            await Indicatable.prisma().create_many(
+            # # create "indicatable" records, those that map approval to a canonical indication
+            await Indicatable.prisma(client).create_many(
                 data=[
                     {
                         "name": i.lower(),
@@ -295,7 +305,7 @@ class TrialLoader(BaseDocumentEtl):
             )
 
             # create "intervenable" records, those that map approval to a canonical intervention
-            await Intervenable.prisma().create_many(
+            await Intervenable.prisma(client).create_many(
                 data=[
                     {
                         "name": i.lower(),
@@ -310,7 +320,7 @@ class TrialLoader(BaseDocumentEtl):
             )
 
             # create "outcome" records
-            await TrialOutcome.prisma().create_many(
+            await TrialOutcome.prisma(client).create_many(
                 data=[
                     {
                         "name": o["title"],
@@ -329,7 +339,7 @@ class TrialLoader(BaseDocumentEtl):
 
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
             query=self.get_source_sql(),
-            batch_size=1000,
+            batch_size=5000,
             handle_result_batch=handle_batch,  # type: ignore
         )
 

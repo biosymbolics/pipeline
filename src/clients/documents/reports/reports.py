@@ -132,7 +132,7 @@ class XYReport:
             XYReport.get_query(
                 x_dimension,
                 y_dimension,
-                term_field=search_params.term_field,
+                term_field=TermField.instance_rollup,  # TODO
                 filter=filter,
                 doc_type=doc_type,
             ),

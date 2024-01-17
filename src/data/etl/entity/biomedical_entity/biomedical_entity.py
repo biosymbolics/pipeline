@@ -303,7 +303,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 AND entity_synonym.entity_id=biomedical_entity.id
             """
 
-        # execute the spec
         client = await prisma_client(None)
         for table in ["intervenable", "indicatable"]:
             query = get_query(table)

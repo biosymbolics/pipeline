@@ -1,7 +1,6 @@
 """
 Regulatory approval ETL script
 """
-from datetime import datetime
 import re
 import sys
 import asyncio
@@ -216,7 +215,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
             "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
             "MAX(prod.marketing_status) as application_type",
-            "MAX(approval.approval) as approval_date",
+            "MAX(approval.approval)::TIMESTAMP as approval_date",
             "MAX(approval.type) as agency",
             "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
             "JSON_AGG(pharma_class.*) as pharmacologic_classes",
@@ -232,7 +231,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 {
                     "id": a["id"],
                     "agency": a["agency"],
-                    "approval_date": datetime(*a["approval_date"].timetuple()[:6]),
+                    "approval_date": a["approval_date"],
                     "application_type": a["application_type"],
                     "url": a["url"],
                 }

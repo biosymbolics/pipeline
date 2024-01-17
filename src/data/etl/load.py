@@ -1,7 +1,6 @@
 import asyncio
 import sys
 
-from clients.low_level.prisma import prisma_context
 from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
