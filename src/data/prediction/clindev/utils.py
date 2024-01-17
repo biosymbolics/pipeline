@@ -20,7 +20,7 @@ from data.prediction import (
     is_model_input,
     is_model_input_output,
 )
-from typings.documents.trials import ScoredTrial as TrialSummary
+from typings.documents.trials import ScoredTrial
 
 from .constants import (
     BASE_ENCODER_DIRECTORY,
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-T = TypeVar("T", bound=Sequence[InputRecord | TrialSummary])
+T = TypeVar("T", bound=Sequence[InputRecord | ScoredTrial])
 
 
 def preprocess_inputs(

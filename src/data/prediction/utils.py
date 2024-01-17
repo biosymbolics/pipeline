@@ -35,6 +35,7 @@ from data.prediction.types import (
     OutputCategorySizes,
 )
 from typings.core import Dataclass, Primitive
+from typings.documents.trials import ScoredTrial
 from utils.encoding.quant_encoder import BinEncoder
 from utils.encoding.saveable_encoder import LabelCategoryEncoder
 from utils.encoding.text_encoder import WORD_VECTOR_LENGTH, TextEncoder
@@ -345,7 +346,7 @@ def encode_features(
 
     args = {"directory": directory, "device": device}
 
-    field_types = {
+    field_types: dict[str, Callable] = {
         "multi_select": partial(
             encode_multi_select, max_items_per_cat=max_items_per_cat, **args
         ),
@@ -480,7 +481,7 @@ def encode_and_batch_all(
     return ModelInputAndOutput(**batched), AllCategorySizes(**sizes)
 
 
-R = TypeVar("R", bound=Mapping | Dataclass)
+R = TypeVar("R", bound=Mapping | Dataclass | ScoredTrial)
 
 
 def split_train_and_test(
