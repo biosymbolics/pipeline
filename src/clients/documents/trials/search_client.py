@@ -49,17 +49,16 @@ async def _search(
 
     where = get_where_clause(terms, term_fields, query_type, TrialWhereInput)
 
-    async with prisma_context(300):
-        trials = await find_many(
-            where=where,
-            include={
-                "interventions": True,
-                "indications": True,
-                "outcomes": True,
-                "sponsor": True,
-            },
-            take=limit,
-        )
+    trials = await find_many(
+        where=where,
+        include={
+            "interventions": True,
+            "indications": True,
+            "outcomes": True,
+            "sponsor": True,
+        },
+        take=limit,
+    )
 
     logger.info(
         "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(trials)

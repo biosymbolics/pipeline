@@ -80,41 +80,40 @@ async def fetch_training_trials(
     """
     Fetch all trial summaries by status
     """
-    async with prisma_context(600):
-        trials = await trial_client.find_many(
-            where={
-                "status": status,
-                "duration": {"gt": 0},
-                "enrollment": {"gt": 0},
-                "intervention_type": BiomedicalEntityType.PHARMACOLOGICAL,
-                "interventions": {"some": {"id": {"gt": 0}}},
-                "indications": {"some": {"id": {"gt": 0}}},
-                "max_timeframe": {"gt": 0},
-                "purpose": {
-                    "in": [
-                        TrialPurpose.TREATMENT.name,
-                        TrialPurpose.BASIC_SCIENCE.name,
-                    ]
-                },
-                # "sponsor": {"is_not": {"owner_type": OwnerType.OTHER}},
-                "NOT": [
-                    {"design": TrialDesign.UNKNOWN},
-                    {"design": TrialDesign.FACTORIAL},
-                    {"comparison_type": ComparisonType.UNKNOWN},
-                    {"comparison_type": ComparisonType.OTHER},
-                    {"masking": TrialMasking.UNKNOWN},
-                    {"randomization": TrialRandomization.UNKNOWN},
-                    {"phase": TrialPhase.NA},
-                ],
+    trials = await trial_client.find_many(
+        where={
+            "status": status,
+            "duration": {"gt": 0},
+            "enrollment": {"gt": 0},
+            "intervention_type": BiomedicalEntityType.PHARMACOLOGICAL,
+            "interventions": {"some": {"id": {"gt": 0}}},
+            "indications": {"some": {"id": {"gt": 0}}},
+            "max_timeframe": {"gt": 0},
+            "purpose": {
+                "in": [
+                    TrialPurpose.TREATMENT.name,
+                    TrialPurpose.BASIC_SCIENCE.name,
+                ]
             },
-            include={
-                "interventions": True,
-                "indications": True,
-                "outcomes": True,
-                "sponsor": True,
-            },
-            take=limit,
-        )
+            # "sponsor": {"is_not": {"owner_type": OwnerType.OTHER}},
+            "NOT": [
+                {"design": TrialDesign.UNKNOWN},
+                {"design": TrialDesign.FACTORIAL},
+                {"comparison_type": ComparisonType.UNKNOWN},
+                {"comparison_type": ComparisonType.OTHER},
+                {"masking": TrialMasking.UNKNOWN},
+                {"randomization": TrialRandomization.UNKNOWN},
+                {"phase": TrialPhase.NA},
+            ],
+        },
+        include={
+            "interventions": True,
+            "indications": True,
+            "outcomes": True,
+            "sponsor": True,
+        },
+        take=limit,
+    )
 
     logger.info("Fetched %s trials", len(trials))
 

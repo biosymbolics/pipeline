@@ -32,7 +32,4 @@ class BaseDocumentEtl:
         raise NotImplementedError
 
     async def copy_all(self):
-        db = Prisma(auto_register=True, http={"timeout": None})
-        await db.connect()
         await self.copy_documents()
-        await db.disconnect()

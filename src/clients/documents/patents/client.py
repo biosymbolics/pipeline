@@ -16,7 +16,7 @@ from prisma.types import (
 )
 
 from clients.companies import get_financial_map
-from clients.low_level.prisma import prisma_context
+from clients.low_level.prisma import prisma_client, prisma_context
 from typings import ScoredPatent
 
 from .enrich import enrich_search_result
@@ -40,8 +40,8 @@ async def find_many(
     ```
     """
     start = time.monotonic()
-
-    patents = await Patent.prisma().find_many(
+    client = await prisma_client(300)
+    patents = await Patent.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )
 

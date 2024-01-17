@@ -75,9 +75,6 @@ def get_source_fields() -> list[str]:
         "drop_withdrawals.dropout_count": "dropout_count",
         "drop_withdrawals.reasons": "dropout_reasons",
         "outcome_analyses.non_inferiority_types": "hypothesis_types",
-        # TODO this will break; just a placeholder.
-        # update trials set intervention=lower(interventions[0]) where array_length(interventions, 1) > 0 and intervention is null;
-        # "COALESCE(mesh_interventions[1].mesh_term, interventions[1].name)": "intervention",  # TODO: there can be many, tho not sure if those are combos or comparators
     }
 
     multi_fields = {
@@ -103,7 +100,7 @@ def get_source_fields() -> list[str]:
                 array_agg(distinct lower(conditions.name)),
                 array_agg(distinct lower(mesh_conditions.mesh_term))
             ), NULL) as indications
-            """,  # needed for search index
+            """,
         ]
     )
 
@@ -230,7 +227,6 @@ class TrialLoader(BaseDocumentEtl):
                     "sponsor",
                     "time_frames",
                 ),  # type: ignore
-                # "blinding": TrialBlinding.find(masking),
                 "comparison_type": ComparisonTypeParser.find(
                     trial["arm_types"] or [], trial["interventions"], design
                 ),

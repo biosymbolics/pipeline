@@ -5,17 +5,10 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.types import (
-    RegulatoryApprovalWhereInput,
-    RegulatoryApprovalWhereInputRecursive1,
-    RegulatoryApprovalWhereInputRecursive2,
-)
-from pydash import flatten
+from prisma.types import RegulatoryApprovalWhereInput
+
 from clients.documents.utils import get_where_clause
-
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_context
-
 from typings import QueryType, ApprovalSearchParams, ScoredRegulatoryApproval
 from typings.documents.common import TermField
 from utils.string import get_id
@@ -59,15 +52,14 @@ async def _search(
         terms, term_fields, query_type, RegulatoryApprovalWhereInput
     )
 
-    async with prisma_context(300):
-        approvals = await find_many(
-            where=where,
-            include={
-                "interventions": True,
-                "indications": True,
-            },
-            take=limit,
-        )
+    approvals = await find_many(
+        where=where,
+        include={
+            "interventions": True,
+            "indications": True,
+        },
+        take=limit,
+    )
 
     logger.info(
         "Search took %s seconds (%s)",

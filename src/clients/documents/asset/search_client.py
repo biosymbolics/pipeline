@@ -9,7 +9,7 @@ from pydash import compact, flatten, group_by
 import logging
 from pydantic import BaseModel
 
-from clients.low_level.prisma import prisma_context
+from clients.low_level.prisma import prisma_client
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
@@ -130,21 +130,22 @@ async def _search(terms: Sequence[str]) -> list[Asset]:
     """
     Internal search for documents grouped by entity
     """
-    async with prisma_context(300) as client:
-        # doc ids that match the suppied terms
-        docs_ids = await get_doc_ids(client, terms)
+    client = await prisma_client(300)
 
-        # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
-        docs_by_type = await get_matching_docs(docs_ids)
+    # doc ids that match the suppied terms
+    docs_ids = await get_doc_ids(client, terms)
 
-        # entity/doc matching for ents in first order docs
-        ent_with_docs = await get_docs_by_entity_id(
-            client,
-            docs_ids,
-            TermField.instance_rollup,
-            TermField.canonical_name,
-            EntityMapType.intervention,
-        )
+    # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
+    docs_by_type = await get_matching_docs(docs_ids)
+
+    # entity/doc matching for ents in first order docs
+    ent_with_docs = await get_docs_by_entity_id(
+        client,
+        docs_ids,
+        TermField.instance_rollup,
+        TermField.canonical_name,
+        EntityMapType.intervention,
+    )
 
     grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 

@@ -37,6 +37,23 @@ INTERVENTION_DOMAINS: list[LegacyDomainType] = [
     "procedures",
     "mechanisms",
 ]
+PATENT_SOURCE_FIELDS = [
+    "applications.publication_number as id",
+    "abstract",
+    "all_publication_numbers",
+    "application_number",
+    "assignees",
+    "attributes",
+    "claims",
+    "country",
+    "embeddings",
+    "ipc_codes",
+    "inventors",
+    "priority_date::TIMESTAMP as priority_date",
+    "similar_patents",
+    "title",
+    "url",
+]
 
 
 def get_mapping_entities_sql(domains: Sequence[str]) -> str:
@@ -165,9 +182,11 @@ class PatentLoader(BaseDocumentEtl):
         Create regulatory approval records
         """
 
+        client = await prisma_client(None)
+
         async def handle_batch(batch: list[dict]) -> bool:
             # create patent records
-            await Patent.prisma().create_many(
+            await Patent.prisma(client).create_many(
                 data=[
                     PatentCreateInput(
                         **{
@@ -195,12 +214,12 @@ class PatentLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            client = await prisma_client(None)
             # sigh https://github.com/prisma/prisma/issues/18442
             for p in batch:
-                await client.execute_raw(
-                    f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
-                )
+                async with client.tx() as tx:
+                    await tx.execute_raw(
+                        f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
+                    )
 
             # create assignee owner records
             await Ownable.prisma().create_many(
@@ -236,25 +255,8 @@ class PatentLoader(BaseDocumentEtl):
 
             return True
 
-        source_fields = [
-            "applications.publication_number as id",
-            "abstract",
-            "all_publication_numbers",
-            "application_number",
-            "assignees",
-            "attributes",
-            "claims",
-            "country",
-            "embeddings",
-            "ipc_codes",
-            "inventors",
-            "priority_date::TIMESTAMP as priority_date",
-            "similar_patents",
-            "title",
-            "url",
-        ]
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
-            query=self.get_source_sql(source_fields),
+            query=self.get_source_sql(PATENT_SOURCE_FIELDS),
             batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore
         )

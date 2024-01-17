@@ -1,28 +1,13 @@
 from dataclasses import dataclass, field, fields
-from typing import Callable, Literal, Sequence, TypedDict
+from typing import Callable, Literal, Sequence
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from prisma.enums import BiomedicalEntityType
-from prisma.types import (
-    BiomedicalEntityCreateWithoutRelationsInput,
-    OwnerCreateWithoutRelationsInput,
-)
 from prisma.enums import Source
 
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.cleaning import CleanFunction
-
-
-class BiomedicalEntityCreateInputWithRelationIds(
-    BiomedicalEntityCreateWithoutRelationsInput
-):
-    comprised_of: list[str]
-    parents: list[str]
-    synonyms: list[str]
-
-
-class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):
-    synonyms: list[str]
+from typings.prisma import BiomedicalEntityCreateInputWithRelationIds
 
 
 @dataclass(frozen=True)

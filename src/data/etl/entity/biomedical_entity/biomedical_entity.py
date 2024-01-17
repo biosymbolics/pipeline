@@ -285,25 +285,52 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         - Link mapping tables "intervenable" and "indicatable" to canonical entities
         - add instance_rollup and category_rollups
+
+        TODO: add UMLS to biomedical_entity hierarchy; select rollups from there
+            (which will include the MoAs we add in approvals load)
+            Also, remember to use approval MoAs as nucleators.
+        """
+
+        def get_query(table: str) -> str:
+            return f"""
+                UPDATE {table}
+                SET
+                    entity_id=entity_synonym.entity_id,
+                    canonical_name=lower(biomedical_entity.name),
+                    canonical_type=biomedical_entity.entity_type
+                FROM entity_synonym, biomedical_entity
+                WHERE {table}.name=entity_synonym.term
+                AND entity_synonym.entity_id=biomedical_entity.id
+            """
+
+        # execute the spec
+        client = await prisma_client(None)
+        for table in ["intervenable", "indicatable"]:
+            query = get_query(table)
+            await client.execute_raw(query)
+
+    @staticmethod
+    async def add_rollups():
+        """
+        Set instance_rollup and category_rollup for biomedical entities
+
+        TODO: add UMLS to biomedical_entity hierarchy; select rollups from there
+            (which will include the MoAs we add in approvals load)
+            Also, remember to use approval MoAs as nucleators.
         """
 
         def get_query(table: str, filters: list[str] = []) -> str:
             return f"""
                 UPDATE {table}
                 SET
-                    entity_id=entity_synonym.entity_id,
-                    canonical_name=lower(biomedical_entity.name),
-                    canonical_type=biomedical_entity.entity_type,
                     category_rollup=lower(umls_category_rollup.preferred_name),
                     instance_rollup=lower(umls_instance_rollup.preferred_name)
-                FROM entity_synonym,
-                    biomedical_entity,
+                FROM biomedical_entity,
                     _entity_to_umls as etu,
                     umls,
                     umls as umls_instance_rollup,
                     umls as umls_category_rollup
-                WHERE {table}.name=entity_synonym.term
-                AND entity_synonym.entity_id=biomedical_entity.id
+                WHERE {table}.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
                 AND umls_instance_rollup.id=umls.instance_rollup_id
@@ -365,8 +392,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()
+
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
         await UmlsLoader.update_with_ontology_level()
 
-        await BiomedicalEntityEtl.link_to_documents()
-        await BiomedicalEntityEtl.add_counts()
+        # add instance & category rollups
+        await BiomedicalEntityEtl.add_rollups()
