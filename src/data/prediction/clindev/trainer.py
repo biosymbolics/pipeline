@@ -10,8 +10,20 @@ import torch
 import torch.nn as nn
 from ignite.metrics import Accuracy, MeanAbsoluteError, Precision, Recall
 import polars as pl
+from prisma.enums import (
+    BiomedicalEntityType,
+    ComparisonType,
+    OwnerType,
+    TrialDesign,
+    TrialMasking,
+    TrialPhase,
+    TrialPurpose,
+    TrialRandomization,
+    TrialStatus,
+)
 
 import system
+from typings.documents.trials import ScoredTrial
 
 system.initialize()
 
@@ -20,7 +32,8 @@ from data.prediction.utils import (
     decode_output,
     split_train_and_test,
 )
-from clients.low_level.postgres import PsqlDatabaseClient
+from clients.documents.trials import client as trial_client
+from clients.low_level.prisma import prisma_context
 from utils.list import batch
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -61,45 +74,51 @@ STAGE2_MSE_WEIGHT = 20
 STAGE1_CORR_WEIGHT = 0.2
 
 
-async def fetch_trials(status: str, limit: int = 2000) -> list[dict]:
+async def fetch_training_trials(
+    status: TrialStatus, limit: int = 2000
+) -> list[ScoredTrial]:
     """
     Fetch all trial summaries by status
-
-    Currently specific to the ClinDev model
-
-    Args:
-        status (str): Trial status
-        limit (int, optional): Number of trials to fetch. Defaults to 2000.
     """
+    async with prisma_context(600):
+        trials = await trial_client.find_many(
+            where={
+                "status": status,
+                "duration": {"gt": 0},
+                "enrollment": {"gt": 0},
+                "intervention_type": BiomedicalEntityType.PHARMACOLOGICAL,
+                "interventions": {"some": {"id": {"gt": 0}}},
+                "indications": {"some": {"id": {"gt": 0}}},
+                "max_timeframe": {"gt": 0},
+                "purpose": {
+                    "in": [
+                        TrialPurpose.TREATMENT.name,
+                        TrialPurpose.BASIC_SCIENCE.name,
+                    ]
+                },
+                # "sponsor": {"is_not": {"owner_type": OwnerType.OTHER}},
+                "NOT": [
+                    {"design": TrialDesign.UNKNOWN},
+                    {"design": TrialDesign.FACTORIAL},
+                    {"comparison_type": ComparisonType.UNKNOWN},
+                    {"comparison_type": ComparisonType.OTHER},
+                    {"masking": TrialMasking.UNKNOWN},
+                    {"randomization": TrialRandomization.UNKNOWN},
+                    {"phase": TrialPhase.NA},
+                ],
+            },
+            include={
+                "interventions": True,
+                "indications": True,
+                "outcomes": True,
+                "sponsor": True,
+            },
+            take=limit,
+        )
 
-    query = f"""
-        SELECT *, array_distinct(array_cat(conditions, mesh_conditions)) as conditions
-        FROM trials
-        WHERE status=%s
-        AND duration > 0
-        AND purpose in ('TREATMENT', 'BASIC_SCIENCE')
-        AND array_length(conditions, 1) > 0
-        AND array_length(mesh_conditions, 1) > 0
-        AND max_timeframe is not null
-        AND array_length(interventions, 1) > 0
-        AND comparison_type not in ('UNKNOWN', 'OTHER')
-        AND intervention_type='PHARMACOLOGICAL'
-        AND design not in ('UNKNOWN', 'FACTORIAL')
-        AND randomization not in ('UNKNOWN') -- rare
-        AND masking not in ('UNKNOWN')
-        -- AND phase in ('PHASE_1', 'PHASE_2', 'PHASE_3') -- there are others, but for model we're only estimating these
-        -- AND sponsor_type not in ('OTHER', 'OTHER_ORGANIZATION')
-        AND sponsor_type in ('INDUSTRY', 'LARGE_INDUSTRY')
-        AND enrollment is not null
-        ORDER BY RANDOM() -- start_date DESC
-        limit {limit}
-    """
-    trials = await PsqlDatabaseClient().select(query, [status])
+    logger.info("Fetched %s trials", len(trials))
 
-    if len(trials) == 0:
-        raise ValueError(f"No trials found for status {status}")
-
-    return list(trials)
+    return trials
 
 
 class ModelTrainer:
@@ -347,11 +366,13 @@ class ModelTrainer:
 
         cpu_y2_preds = torch.softmax(y2_preds.detach().to("cpu"), dim=1)
         cpu_y2_oh_true = y2_oh_true.detach().to("cpu")
-        for metric, transform in self.stage2_metrics.values():
-            if transform:
-                metric.update((transform(cpu_y2_preds), transform(cpu_y2_oh_true)))
+        for mw in self.stage2_metrics.values():
+            if mw.transform is not None:
+                mw.metric.update(
+                    (mw.transform(cpu_y2_preds), mw.transform(cpu_y2_oh_true))
+                )
             else:
-                metric.update((cpu_y2_preds, cpu_y2_oh_true))
+                mw.metric.update((cpu_y2_preds, cpu_y2_oh_true))
 
     def evaluate(
         self,
@@ -405,21 +426,22 @@ class ModelTrainer:
 
     @staticmethod
     async def train_from_trials(batch_size: int = BATCH_SIZE):
-        trials = await fetch_trials("COMPLETED", limit=50000)
+        trials = await fetch_training_trials(TrialStatus.COMPLETED, limit=50000)
         trials = preprocess_inputs(trials)
+        trial_dicts = [t.__dict__ for t in trials]
 
         inputs, category_sizes = prepare_data(
             [
                 InputAndOutputRecord(
                     **{k: v for k, v in t.items() if k in ALL_FIELD_LISTS}
                 )
-                for t in trials
+                for t in trial_dicts
             ],
             field_lists,
             batch_size=batch_size,
             device=DEVICE,
         )
-        batched_trials = batch(trials, batch_size)
+        batched_trials = batch(trial_dicts, batch_size)
 
         training_input, test_input, _, test_records = split_train_and_test(
             inputs, batched_trials, TRAINING_PROPORTION

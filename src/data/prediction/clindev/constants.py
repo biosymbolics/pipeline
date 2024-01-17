@@ -34,7 +34,7 @@ SINGLE_SELECT_CATEGORICAL_FIELDS: list[str] = [
     # "countries" ??
 ]
 MULTI_SELECT_CATEGORICAL_FIELDS: list[str] = []
-TEXT_FIELDS: list[str] = ["conditions", "interventions", "sponsor", "title"]
+TEXT_FIELDS: list[str] = ["indications", "interventions", "sponsor", "title"]
 
 
 QUANTITATIVE_FIELDS: list[str] = [
@@ -109,7 +109,7 @@ def get_fields_to_types(
     _field_lists: AnyFieldLists,
 ) -> tuple[tuple[str, type | UnionType], ...]:
     vals = _field_lists.__dict__.items()
-    vals = flatten(
+    vals = flatten(  # type: ignore
         [
             [(v, _get_type(k))]
             if isinstance(v, str)
