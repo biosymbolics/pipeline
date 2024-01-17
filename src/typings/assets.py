@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Sequence
-from pydash import compact, flatten, uniq
+from pydash import compact, flatten, group_by, uniq
 from prisma.enums import TrialPhase, TrialStatus
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
@@ -14,8 +14,8 @@ from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
 @dataclass(frozen=True)
 class AssetActivity(Dataclass):
     # ids
-    approvals: list[str]
     patents: list[str]
+    regulatory_approvals: list[str]
     trials: list[str]
     year: int
 
@@ -24,6 +24,7 @@ class AssetActivity(Dataclass):
 class Asset(Dataclass):
     activity: list[int]
     approval_count: int
+    detailed_activity: list[AssetActivity]
     average_trial_dropout: float
     average_trial_duration: int
     average_trial_enrollment: int
@@ -54,6 +55,11 @@ class Asset(Dataclass):
             self, "activity", self.get_activity(patents, regulatory_approvals, trials)
         )
         object.__setattr__(self, "approval_count", len(regulatory_approvals))
+        object.__setattr__(
+            self,
+            "detailed_activity",
+            self.get_detailed_activity(patents, regulatory_approvals, trials),
+        )
         object.__setattr__(
             self, "average_trial_dropout", self.get_average_trial_dropout(trials)
         )
@@ -87,35 +93,6 @@ class Asset(Dataclass):
     @property
     def child_count(self):
         return len(self.children)
-
-    def get_activity(
-        self,
-        patents: list[ScoredPatent],
-        regulatory_approvals: list[ScoredRegulatoryApproval],
-        trials: list[ScoredTrial],
-    ) -> list[int]:
-        """
-        Simple line chart of activity over time
-
-        - patent filing priority dates
-        - trial operational dates (start through end)
-        - approval dates
-        """
-        dates = (
-            [p.priority_date.year for p in patents]
-            + flatten(
-                [
-                    list(range(t.start_date.year, t.end_date.year))
-                    for t in trials
-                    if t.end_date is not None and t.start_date is not None
-                ]
-            )
-            + [a.approval_date for a in regulatory_approvals]
-        )
-        return [
-            dates.count(y)
-            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
-        ]
 
     @property
     def investment_level(self) -> str:
@@ -174,6 +151,73 @@ class Asset(Dataclass):
     @property
     def record_count(self) -> int:
         return self.patent_count + self.approval_count + self.trial_count
+
+    @classmethod
+    def get_activity(
+        cls,
+        patents: list[ScoredPatent],
+        regulatory_approvals: list[ScoredRegulatoryApproval],
+        trials: list[ScoredTrial],
+    ) -> list[int]:
+        """
+        Simple line chart of activity over time
+
+        - patent filing priority dates
+        - trial operational dates (start through end)
+        - approval dates
+        """
+        dates = (
+            [p.priority_date.year for p in patents]
+            + flatten(
+                [
+                    list(range(t.start_date.year, t.end_date.year))
+                    for t in trials
+                    if t.end_date is not None and t.start_date is not None
+                ]
+            )
+            + [a.approval_date for a in regulatory_approvals]
+        )
+        return [
+            dates.count(y)
+            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
+        ]
+
+    @classmethod
+    def get_detailed_activity(
+        cls,
+        patents: list[ScoredPatent],
+        regulatory_approvals: list[ScoredRegulatoryApproval],
+        trials: list[ScoredTrial],
+    ) -> list[AssetActivity]:
+        """
+        Detailed activity over time
+
+        - patent filing priority dates
+        - trial *start dates* (todo: operational dates)
+        - approval dates
+        """
+        patent_map = dict(group_by(patents, lambda p: p.priority_date.year))
+        regulatory_approval_map = dict(
+            group_by(regulatory_approvals, lambda a: a.approval_date.year)
+        )
+        trial_map = dict(
+            group_by(
+                trials,
+                lambda t: t.start_date.year
+                if t.start_date is not None
+                else t.last_updated_date.year,
+            )
+        )
+
+        return [
+            AssetActivity(
+                year=y,
+                patents=[p.id for p in patent_map.get(y, [])],
+                regulatory_approvals=[a.id for a in regulatory_approval_map.get(y, [])],
+                trials=[t.id for t in trial_map.get(y, [])],
+            )
+            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
+        ]
 
     @classmethod
     def get_average_trial_enrollment(cls, trials) -> int:

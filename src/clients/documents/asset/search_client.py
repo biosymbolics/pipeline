@@ -13,7 +13,7 @@ from clients.low_level.prisma import prisma_context
 from typings.client import AssetSearchParams
 from typings.core import Dataclass
 from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
-from typings.entities import Asset
+from typings.assets import Asset
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 
 from ..approvals import find_many as find_regulatory_approvals
