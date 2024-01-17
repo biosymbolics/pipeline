@@ -227,9 +227,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         update search index
         """
         client = await prisma_client(300)
+        await client.execute_raw("DROP INDEX IF EXISTS biomedical_entity_search_idx")
         await client.execute_raw(
             f"""
-            DROP INDEX IF EXISTS biomedical_entity_search_idx;
             WITH synonym as (
                 SELECT entity_id, array_agg(term) as terms
                 FROM entity_synonym
@@ -237,8 +237,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             )
             UPDATE biomedical_entity SET search = to_tsvector('english', name || ' ' || array_to_string(synonym.terms, ' '))
                 from synonym where entity_id=biomedical_entity.id;
-            CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search);
             """
+        )
+        await client.execute_raw(
+            "CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search)"
         )
 
     @staticmethod
@@ -260,20 +262,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         client = await prisma_client(300)
         await client.execute_raw(query)
-
-    @staticmethod
-    async def pre_doc_finalize():
-        """
-        Finalize etl
-        """
-        # map umls to entities
-        await BiomedicalEntityEtl._map_umls()
-
-        # populate search index with name & syns
-        await BiomedicalEntityEtl._update_search_index()
-
-        # perform final Umls updates, which depends upon Biomedical Entities being in place.
-        await UmlsLoader.update_with_ontology_level()
 
     @staticmethod
     async def add_counts():
@@ -359,12 +347,26 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 await client.execute_raw(query)
 
     @staticmethod
+    async def pre_doc_finalize():
+        """
+        Finalize etl
+        """
+        # map umls to entities
+        await BiomedicalEntityEtl._map_umls()
+
+        # populate search index with name & syns
+        await BiomedicalEntityEtl._update_search_index()
+
+    @staticmethod
     async def post_doc_finalize():
         """
         Run after:
-            1) all biomedical entities are loaded
-            2) all documents are loaded
-            3) UMLS is loaded
+            1) UMLS is loaded
+            2) all biomedical entities are loaded
+            3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
+        # perform final Umls updates, which depends upon Biomedical Entities being in place.
+        await UmlsLoader.update_with_ontology_level()
+
         await BiomedicalEntityEtl.link_to_documents()
         await BiomedicalEntityEtl.add_counts()

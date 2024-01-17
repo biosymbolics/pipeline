@@ -10,7 +10,11 @@ from pydash import flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name
-from typings.umls import OntologyLevel, get_ontology_level
+from typings.umls import (
+    OntologyLevel,
+    compare_ontology_levels,
+    get_ontology_level,
+)
 from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
@@ -93,7 +97,7 @@ class UmlsAncestorTransformer:
     @staticmethod
     def choose_best_ancestor(
         record: UmlsInfo,
-        levels: Sequence[OntologyLevel],  # acceptable/desired level(s)
+        desired_levels: Sequence[OntologyLevel],  # acceptable/desired level(s)
         ancestors: tuple[UmlsInfo, ...],
     ) -> str:
         """
@@ -103,7 +107,7 @@ class UmlsAncestorTransformer:
 
         Args:
             record (Umls): UMLS record
-            levels (OntologyLevel): acceptable/desired level(s)
+            desired_levels (OntologyLevel): acceptable/desired level(s)
             ancestors (tuple[UmlsInfo]): ordered list of ancestors
 
         Returns (str): ancestor id, or "" if none found
@@ -128,36 +132,49 @@ class UmlsAncestorTransformer:
                     for type_id in record.type_ids
                 ]
             )
-            ok_ancestors = [
+            good_ancestors = [
                 a
                 for a in _ancestors
                 if has_intersection(a.type_ids, good_ancestor_types)
             ]
-            if len(ok_ancestors) == 0:
+            if len(good_ancestors) == 0:
                 return None
 
-            return choose_by_level(tuple(ok_ancestors))
+            return choose_by_level(tuple(good_ancestors))
 
         def choose_by_level(_ancestors: tuple[UmlsInfo, ...]) -> str:
             """
             based on record level, find the first ancestor at or above the desired level
+
+            TODO: impl is complex and confusing.
             """
-            ok_ancestors = [a for a in _ancestors if a.level in levels]
+            # ancestors at or above the desired level
+            ok_ancestors = [a for a in _ancestors if a.level in desired_levels]
 
-            # return self as instance ancestor if no ancestors
-            # AND record level is greater than or equal to any desired level
+            # is the record eligible to be its own ancestor? (gte to any desired level)
+            is_self_ancestor = any(
+                compare_ontology_levels(record.level, level) >= 0
+                for level in desired_levels
+            )
+
+            # if no ok ancestors:
             if len(ok_ancestors) == 0:
-                if any(record.level >= level for level in levels):
+                # if record is eligible to be its own ancestor, return self
+                if is_self_ancestor:
                     return record.id
-
-                return ""
+                return ""  # otherwise, no ancestor
 
             # for instance level, use the last "INSTANCE" ancestor
-            if OntologyLevel.INSTANCE in levels:
+            # e.g. for [{"id": "A", "level": "INSTANCE"}, {"id": "B", "level": "INSTANCE"}, {"id": "C", "level": "L1_CATEGORY"}] return "B"
+            if OntologyLevel.INSTANCE in desired_levels:
                 return ok_ancestors[-1].id
 
-            # else, use self as ancestor if matching or exceeding level
-            if all(record.level >= level for level in levels):
+            # is the record now seemingly its own best ancestor? (gte to ALL desired levels)
+            is_strong_self_ancestor = all(
+                compare_ontology_levels(record.level, level) >= 0
+                for level in desired_levels
+            )
+            if is_strong_self_ancestor:
                 return record.id
 
             # otherwise, use the first matching ancestor

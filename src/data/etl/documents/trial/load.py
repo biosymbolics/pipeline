@@ -119,8 +119,8 @@ class TrialLoader(BaseDocumentEtl):
     @staticmethod
     def get_source_sql(fields: list[str] = get_source_fields()) -> str:
         source_sql = f"""
-            select {", ".join(fields)}
-            from designs, studies
+            SELECT {", ".join(fields)}
+            FROM designs, studies
             JOIN conditions on conditions.nct_id = studies.nct_id
             LEFT JOIN browse_interventions as mesh_interventions on mesh_interventions.nct_id = studies.nct_id
                 AND mesh_interventions.mesh_type = 'mesh-list'
@@ -148,9 +148,9 @@ class TrialLoader(BaseDocumentEtl):
                 from outcome_analyses
                 group by nct_id
             ) outcome_analyses on outcome_analyses.nct_id = studies.nct_id
-            where study_type = 'Interventional'
+            WHERE study_type = 'Interventional'
             AND designs.nct_id = studies.nct_id
-            group by studies.nct_id
+            GROUP BY studies.nct_id
         """
         return source_sql
 
@@ -163,17 +163,18 @@ class TrialLoader(BaseDocumentEtl):
 
         def get_sql(mesh_table: str, table: str):
             return f"""
-                select distinct name from (
-                    SELECT DISTINCT lower(mesh_term) as name FROM {mesh_table}
-                        WHERE mesh_type = 'mesh-list' AND mesh_term is not null
+                SELECT DISTINCT name FROM (
+                    SELECT DISTINCT LOWER(mesh_term) AS name
+                        FROM {mesh_table}
+                        WHERE mesh_type = 'mesh-list' AND mesh_term IS NOT null
                     UNION
-                    SELECT DISTINCT lower(name) FROM {table} WHERE name is not null
+                    SELECT DISTINCT LOWER(name) FROM {table} WHERE name IS NOT null
                 ) s
             """
 
         indication_spec = BiomedicalEntityLoadSpec(
             candidate_selector="CandidateSelector",
-            database="aact",
+            database=f"{ETL_BASE_DATABASE_URL}/aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
                     "synonyms": [rec["name"]],
@@ -191,7 +192,7 @@ class TrialLoader(BaseDocumentEtl):
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
             candidate_selector="CandidateSelector",
-            database="aact",
+            database=f"{ETL_BASE_DATABASE_URL}/aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
                     "synonyms": [rec["name"]],

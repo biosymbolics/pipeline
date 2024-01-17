@@ -1,15 +1,13 @@
 """
 Class for biomedical entity etl
 """
-from prisma import Prisma
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
 from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
+
 from clients.low_level.prisma import prisma_client
-
-
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
 from data.etl.entity.base_entity_etl import BaseEntityEtl
@@ -132,11 +130,8 @@ class BaseOwnerEtl(BaseEntityEtl):
     async def copy_all(
         self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
     ):
-        db = Prisma(auto_register=True, http={"timeout": None})
-        await db.connect()
         await self.create_records(names)
         await self.load_financials(public_companies)
-        await db.disconnect()
 
     @staticmethod
     async def pre_doc_finalize():

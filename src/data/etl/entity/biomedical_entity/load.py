@@ -15,7 +15,7 @@ class BiomedicalEntityLoader:
         """
         Copies all biomedical entities based on specs pulled from each document type
 
-        NOTE: is slow due to UMLS linking (1-3 hours?)
+        NOTE: is slow due to UMLS linking (5-8 hours?)
         """
         patent_specs = PatentLoader.entity_specs()
         regulatory_approval_specs = RegulatoryApprovalLoader.entity_specs()
@@ -35,6 +35,10 @@ class BiomedicalEntityLoader:
             ).copy_all(terms, terms_to_canonicalize, source_map)
 
         await BiomedicalEntityEtl.pre_doc_finalize()
+
+    @staticmethod
+    async def post_doc_finalize():
+        await BiomedicalEntityEtl.post_doc_finalize()
 
 
 def main():

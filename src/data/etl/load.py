@@ -12,7 +12,7 @@ async def load_all():
         # await UmlsLoader().copy_all()
 
         # copy all biomedical entities (from all doc types)
-        await BiomedicalEntityLoader().copy_all()
+        # await BiomedicalEntityLoader().copy_all()
 
         # copy owner data (across all documents)
         await OwnerLoader().copy_all()
@@ -25,6 +25,9 @@ async def load_all():
 
         # copy trial data
         await TrialLoader(document_type="trial").copy_all()
+
+        # do final biomedical entity stuff that requires everything else be in place
+        await BiomedicalEntityLoader().post_doc_finalize()
 
 
 if __name__ == "__main__":

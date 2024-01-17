@@ -12,9 +12,11 @@ from system import initialize
 
 initialize()
 
+from clients.low_level.prisma import prisma_context
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
+from utils.list import batch
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
 from .transform import UmlsAncestorTransformer, UmlsTransformer
@@ -106,11 +108,17 @@ class UmlsLoader:
         # might be slow, if doing betweenness centrality calc.
         ult = await UmlsAncestorTransformer.create(records)
 
-        for r in records:
-            try:
-                await Umls.prisma().update(data=ult.transform(r), where={"id": r.id})
-            except Exception as e:
-                print(e, r)
+        batches = batch(records, 1000)
+
+        for b in batches:
+            async with Prisma().tx() as tx:
+                try:
+                    for r in b:
+                        await Umls.prisma(tx).update(
+                            data=ult.transform(r), where={"id": r.id}
+                        )
+                except Exception as e:
+                    print(e)
 
     @staticmethod
     async def copy_relationships():
@@ -157,11 +165,14 @@ class UmlsLoader:
         """
         Copy all UMLS data
         """
-        db = Prisma(auto_register=True, http={"timeout": None})
-        await db.connect()
-        await UmlsLoader.create_umls_lookup()
-        await UmlsLoader.copy_relationships()
-        await db.disconnect()
+        async with prisma_context(None):
+            await UmlsLoader.create_umls_lookup()
+            await UmlsLoader.copy_relationships()
+
+    @staticmethod
+    async def update_all():
+        async with prisma_context(None):
+            await UmlsLoader.update_with_ontology_level()
 
 
 if __name__ == "__main__":

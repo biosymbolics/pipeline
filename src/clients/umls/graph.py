@@ -58,6 +58,10 @@ class UmlsGraph(object):
 
         client = await prisma_client(300)
         edges = await client.query_raw(self.edge_query(suppressions))
+
+        if len(edges) == 0:
+            raise ValueError("No edges found")
+
         G.add_edges_from([(e["head"], e["tail"]) for e in edges])
 
         logger.info(
