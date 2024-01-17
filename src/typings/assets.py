@@ -23,7 +23,6 @@ class AssetActivity(Dataclass):
 @dataclass(frozen=True)
 class Asset(Dataclass):
     activity: list[int]
-    approval_count: int
     detailed_activity: list[AssetActivity]
     average_trial_dropout: float
     average_trial_duration: int
@@ -33,12 +32,16 @@ class Asset(Dataclass):
     maybe_available_count: int
     name: str
     owners: list[str]
+    patent_ids: list[str]
     patent_count: int
     percent_trials_stopped: float
     most_recent_patent: ScoredPatent | None
     most_recent_trial: ScoredTrial | None
+    regulatory_approval_count: int
+    regulatory_approval_ids: list[str]
     total_trial_enrollment: int
     trial_count: int
+    trial_ids: list[str]
 
     def __init__(
         self,
@@ -54,12 +57,6 @@ class Asset(Dataclass):
         object.__setattr__(
             self, "activity", self.get_activity(patents, regulatory_approvals, trials)
         )
-        object.__setattr__(self, "approval_count", len(regulatory_approvals))
-        object.__setattr__(
-            self,
-            "detailed_activity",
-            self.get_detailed_activity(patents, regulatory_approvals, trials),
-        )
         object.__setattr__(
             self, "average_trial_dropout", self.get_average_trial_dropout(trials)
         )
@@ -70,9 +67,10 @@ class Asset(Dataclass):
             self, "average_trial_enrollment", self.get_average_trial_enrollment(trials)
         )
         object.__setattr__(self, "children", children)
-        # TODO: rename
         object.__setattr__(
-            self, "total_trial_enrollment", self.get_total_trial_enrollment(trials)
+            self,
+            "detailed_activity",
+            self.get_detailed_activity(patents, regulatory_approvals, trials),
         )
         object.__setattr__(
             self, "maybe_available_count", self.get_maybe_available_count(patents)
@@ -85,10 +83,19 @@ class Asset(Dataclass):
         )
         object.__setattr__(self, "owners", self.get_owners(patents, trials))
         object.__setattr__(self, "patent_count", len(patents))
+        object.__setattr__(self, "patent_ids", [p.id for p in patents])
         object.__setattr__(
             self, "percent_trials_stopped", self.get_percent_trials_stopped(trials)
         )
+        object.__setattr__(self, "regulatory_approval_count", len(regulatory_approvals))
+        object.__setattr__(
+            self, "regulatory_approval_ids", [a.id for a in regulatory_approvals]
+        )
         object.__setattr__(self, "trial_count", len(trials))
+        object.__setattr__(self, "trial_ids", [t.id for t in trials])
+        object.__setattr__(
+            self, "total_trial_enrollment", self.get_total_trial_enrollment(trials)
+        )
 
     @property
     def child_count(self):
@@ -106,7 +113,7 @@ class Asset(Dataclass):
 
     @property
     def is_approved(self) -> bool:
-        return self.approval_count > 0
+        return self.regulatory_approval_count > 0
 
     @property
     def last_priority_year(self) -> int | None:
@@ -138,7 +145,7 @@ class Asset(Dataclass):
 
     @property
     def max_phase(self) -> TrialPhase | str:
-        if self.approval_count > 0:
+        if self.regulatory_approval_count > 0:
             return TrialPhase.APPROVED
         if not self.most_recent_trial:
             return TrialPhase.PRECLINICAL
@@ -150,7 +157,7 @@ class Asset(Dataclass):
 
     @property
     def record_count(self) -> int:
-        return self.patent_count + self.approval_count + self.trial_count
+        return self.patent_count + self.regulatory_approval_count + self.trial_count
 
     @classmethod
     def get_activity(
@@ -225,7 +232,7 @@ class Asset(Dataclass):
 
         if len(enrollments) == 0:
             return 0
-        return round(sum(enrollments) / len(trials))
+        return round(sum(enrollments) / len(enrollments))
 
     @classmethod
     def get_total_trial_enrollment(cls, trials) -> int:
@@ -256,9 +263,6 @@ class Asset(Dataclass):
 
     @classmethod
     def get_average_trial_dropout(cls, trials: list[ScoredTrial]) -> float:
-        if len(trials) == 0:
-            return 0.0
-
         enroll_drop = [
             (t.enrollment, t.dropout_count)
             for t in trials
@@ -267,6 +271,10 @@ class Asset(Dataclass):
             and t.dropout_count is not None
             and t.dropout_count < (t.enrollment or 0)
         ]
+
+        if len(enroll_drop) == 0:
+            return 0.0
+
         return sum([d[1] for d in enroll_drop]) / sum([d[0] for d in enroll_drop])
 
     @classmethod
