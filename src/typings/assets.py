@@ -25,7 +25,7 @@ class Asset(Dataclass):
     activity: list[int]
     approval_count: int
     average_trial_dropout: float
-    average_trial_duration: float
+    average_trial_duration: int
     average_trial_enrollment: int
     children: list["Asset"]
     id: str
@@ -33,7 +33,7 @@ class Asset(Dataclass):
     name: str
     owners: list[str]
     patent_count: int
-    percent_stopped: float
+    percent_trials_stopped: float
     most_recent_patent: ScoredPatent | None
     most_recent_trial: ScoredTrial | None
     total_trial_enrollment: int
@@ -79,7 +79,9 @@ class Asset(Dataclass):
         )
         object.__setattr__(self, "owners", self.get_owners(patents, trials))
         object.__setattr__(self, "patent_count", len(patents))
-        object.__setattr__(self, "percent_stopped", self.get_percent_stopped(trials))
+        object.__setattr__(
+            self, "percent_trials_stopped", self.get_percent_trials_stopped(trials)
+        )
         object.__setattr__(self, "trial_count", len(trials))
 
     @property
@@ -224,12 +226,13 @@ class Asset(Dataclass):
         return sum([d[1] for d in enroll_drop]) / sum([d[0] for d in enroll_drop])
 
     @classmethod
-    def get_average_trial_duration(cls, trials: list[ScoredTrial]) -> float:
-        if len(trials) == 0:
-            return 0.0
-
+    def get_average_trial_duration(cls, trials: list[ScoredTrial]) -> int:
         durations = [trial.duration for trial in trials if trial.duration is not None]
-        return sum(durations) / len(durations)
+
+        if len(durations) == 0:
+            return 0
+
+        return round(sum(durations) / len(durations))
 
     @classmethod
     def get_maybe_available_count(cls, patents: Sequence[ScoredPatent]) -> int:
@@ -256,7 +259,7 @@ class Asset(Dataclass):
         )
 
     @classmethod
-    def get_percent_stopped(cls, trials: list[ScoredTrial]) -> float:
+    def get_percent_trials_stopped(cls, trials: list[ScoredTrial]) -> float:
         if len(trials) == 0:
             return 0.0
         trial_statuses = [get_trial_status_parent(t.status) for t in trials]
