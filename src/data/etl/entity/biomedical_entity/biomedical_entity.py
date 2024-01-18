@@ -326,14 +326,13 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     instance_rollup=lower(umls_instance_rollup.preferred_name)
                 FROM biomedical_entity,
                     _entity_to_umls as etu,
-                    umls,
                     umls as umls_instance_rollup,
-                    umls as umls_category_rollup
+                    umls
+                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls_category_rollup.category_rollup_id
                 WHERE {table}.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
                 AND umls_instance_rollup.id=umls.instance_rollup_id
-                AND umls_category_rollup.id=umls.category_rollup_id
                 {'AND ' + ' AND '.join(filters) if filters else ''}
             """
 
