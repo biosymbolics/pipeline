@@ -8,15 +8,10 @@ from prisma.client import Prisma
 from prisma.types import (
     PatentWhereInput,
     PatentWhereInputRecursive1,
-    PatentWhereInputRecursive2,
-    PatentWhereInputRecursive3,
-    PatentInclude,
 )
-from pydash import flatten
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from typings.documents.common import ENTITY_MAP_TABLES
 from typings.documents.patents import ScoredPatent
 from typings.client import PatentSearchParams, QueryType, TermField
 from utils.string import get_id
@@ -93,7 +88,7 @@ def get_where_clause(
 async def _search(
     terms: Sequence[str],
     exemplar_patents: Sequence[str] = [],
-    query_type: QueryType = "OR",
+    query_type: QueryType = "AND",
     min_patent_years: int = 10,
     term_fields: Sequence[TermField] = [
         TermField.canonical_name,
