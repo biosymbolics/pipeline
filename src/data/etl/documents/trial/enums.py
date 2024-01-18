@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-import random
 from typing import Sequence
 import logging
 import re
@@ -446,47 +445,6 @@ class TrialSummary(BaseTrial):
     termination_reason: TerminationReason
     status: TrialStatus
     url: str
-
-
-@dataclass(frozen=True)
-class ScoredTrialSummary(TrialSummary):
-    score: float
-
-    # @property
-    # def condition(self) -> str | None:
-    #     if len(self.mesh_conditions or []) == 0:
-    #         if len(self.conditions or []) > 0:
-    #             return self.conditions[0]
-    #     return self.mesh_conditions[0]
-
-    # @property
-    # def instance_rollup(self) -> str | None:
-    #     ir = self.pharmacologic_class or self.intervention
-    #     if ir is None:
-    #         return None
-    #     return ir.lower()
-
-    @property
-    def dropout_percent(self) -> float:
-        if not self.enrollment or not self.dropout_count:
-            return 0.0
-        return round(self.dropout_count / self.enrollment, 2)
-
-    @property
-    def reformulation_score(self) -> float:
-        """
-        Score for reformulation potential
-
-        **FAKE**!!
-        """
-        if (
-            self.termination_reason is None
-            or self.termination_reason == TerminationReason.NA
-            or self.termination_reason == "NA"
-        ):
-            return 0.0
-
-        return random.betavariate(2, 8)
 
 
 def calc_duration(start_date: datetime | None, end_date: datetime | None) -> int:
