@@ -3,18 +3,21 @@ Asset client
 """
 import asyncio
 from dataclasses import dataclass
-from typing import Sequence
+from functools import partial
+from typing import Sequence, cast
 from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
 from pydantic import BaseModel
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 
 from clients.low_level.prisma import prisma_client
-from typings.client import AssetSearchParams
+from typings.client import AssetSearchParams, QueryType
 from typings.core import Dataclass
 from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
 from typings.assets import Asset
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
+from utils.string import get_id
 
 from ..approvals import find_many as find_regulatory_approvals
 from ..patents import find_many as find_patents
@@ -43,7 +46,9 @@ class EntWithDocResult(DocResults):
     child: str | None = None
 
 
-async def get_doc_ids(client: Prisma, terms: Sequence[str]) -> list[str]:
+async def get_doc_ids(
+    client: Prisma, terms: Sequence[str], query_type: QueryType
+) -> list[str]:
     def get_doc_query(table) -> str:
         return f"""
             SELECT COALESCE(patent_id, regulatory_approval_id, trial_id) as id
@@ -126,14 +131,16 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     )
 
 
-async def _search(terms: Sequence[str]) -> list[Asset]:
+async def _search(
+    terms: Sequence[str], query_type: QueryType, limit: int
+) -> list[Asset]:
     """
     Internal search for documents grouped by entity
     """
     client = await prisma_client(300)
 
     # doc ids that match the suppied terms
-    docs_ids = await get_doc_ids(client, terms)
+    docs_ids = await get_doc_ids(client, terms, query_type)
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(docs_ids)
@@ -150,11 +157,11 @@ async def _search(terms: Sequence[str]) -> list[Asset]:
     grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 
     documents_by_entity = [
-        Asset(
+        Asset.create(
             id=rollup,
             name=ewds[0].name,
             children=[
-                Asset(
+                Asset.create(
                     id=rollup + ewd.child,
                     name=ewd.child,
                     children=[],
@@ -194,16 +201,34 @@ async def _search(terms: Sequence[str]) -> list[Asset]:
         for rollup, ewds in grouped_ents.items()
     ]
 
-    return documents_by_entity[0:1000]
+    return sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)[
+        0:limit
+    ]
 
 
-async def search(params: AssetSearchParams) -> list[Asset]:
+async def search(p: AssetSearchParams) -> list[Asset]:
     """
     Search for documents, grouped by entity
     """
+    args = {
+        "terms": p.terms,
+        "query_type": p.query_type,
+    }
+    key = get_id(
+        {
+            **args,
+            "api": "assets",
+        }
+    )
+    search_partial = partial(_search, **args)
 
-    documents_by_entity = await _search(params.terms)
+    if p.skip_cache == True:
+        patents = await search_partial(limit=p.limit)
+        return patents
 
-    logger.info("Got %s assets", len(documents_by_entity))
-
-    return sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)
+    return await retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        limit=p.limit,
+        decode=lambda str_data: [Asset.load(**p) for p in storage_decoder(str_data)],
+    )

@@ -1,14 +1,16 @@
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Sequence
-from pydash import compact, flatten, group_by, uniq
+from pydash import compact, count_by, flatten, group_by, uniq
 from prisma.enums import TrialPhase, TrialStatus
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
-from .core import Dataclass
+from .core import Dataclass, EntityBase
 from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
+
+OWNERS_LIMIT = 10
 
 
 @dataclass(frozen=True)
@@ -20,8 +22,7 @@ class AssetActivity(Dataclass):
     year: int
 
 
-@dataclass(frozen=True)
-class Asset(Dataclass):
+class Asset(EntityBase):
     activity: list[int]
     detailed_activity: list[AssetActivity]
     average_trial_dropout: float
@@ -39,62 +40,66 @@ class Asset(Dataclass):
     most_recent_trial: ScoredTrial | None
     regulatory_approval_count: int
     regulatory_approval_ids: list[str]
-    total_trial_enrollment: int
     trial_count: int
     trial_ids: list[str]
+    total_trial_enrollment: int
 
-    def __init__(
-        self,
+    @classmethod
+    def load(
+        cls,
+        most_recent_patent: dict | None,
+        most_recent_trial: dict | None,
+        children: list[dict],
+        **kwargs: Any
+    ) -> "Asset":
+        """
+        Load from storage
+        """
+        asset = Asset(
+            most_recent_patent=ScoredPatent(**most_recent_patent)
+            if most_recent_patent
+            else None,
+            most_recent_trial=ScoredTrial(**most_recent_trial)
+            if most_recent_trial
+            else None,
+            children=[Asset.load(**c) for c in children],
+            **kwargs
+        )
+        return asset
+
+    @classmethod
+    def create(
+        cls,
         id: str,
         name: str,
         children: list["Asset"],
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         trials: list[ScoredTrial],
-    ):
-        object.__setattr__(self, "id", id)
-        object.__setattr__(self, "name", name)
-        object.__setattr__(
-            self, "activity", self.get_activity(patents, regulatory_approvals, trials)
-        )
-        object.__setattr__(
-            self, "average_trial_dropout", self.get_average_trial_dropout(trials)
-        )
-        object.__setattr__(
-            self, "average_trial_duration", self.get_average_trial_duration(trials)
-        )
-        object.__setattr__(
-            self, "average_trial_enrollment", self.get_average_trial_enrollment(trials)
-        )
-        object.__setattr__(self, "children", children)
-        object.__setattr__(
-            self,
-            "detailed_activity",
-            self.get_detailed_activity(patents, regulatory_approvals, trials),
-        )
-        object.__setattr__(
-            self, "maybe_available_count", self.get_maybe_available_count(patents)
-        )
-        object.__setattr__(
-            self, "most_recent_patent", self.get_most_recent_patent(patents)
-        )
-        object.__setattr__(
-            self, "most_recent_trial", self.get_most_recent_trial(trials)
-        )
-        object.__setattr__(self, "owners", self.get_owners(patents, trials))
-        object.__setattr__(self, "patent_count", len(patents))
-        object.__setattr__(self, "patent_ids", [p.id for p in patents])
-        object.__setattr__(
-            self, "percent_trials_stopped", self.get_percent_trials_stopped(trials)
-        )
-        object.__setattr__(self, "regulatory_approval_count", len(regulatory_approvals))
-        object.__setattr__(
-            self, "regulatory_approval_ids", [a.id for a in regulatory_approvals]
-        )
-        object.__setattr__(self, "trial_count", len(trials))
-        object.__setattr__(self, "trial_ids", [t.id for t in trials])
-        object.__setattr__(
-            self, "total_trial_enrollment", self.get_total_trial_enrollment(trials)
+    ) -> "Asset":
+        return Asset(
+            id=id,
+            name=name,
+            activity=cls.get_activity(patents, regulatory_approvals, trials),
+            average_trial_dropout=cls.get_average_trial_dropout(trials),
+            average_trial_duration=cls.get_average_trial_duration(trials),
+            average_trial_enrollment=cls.get_average_trial_enrollment(trials),
+            children=children,
+            detailed_activity=cls.get_detailed_activity(
+                patents, regulatory_approvals, trials
+            ),
+            maybe_available_count=cls.get_maybe_available_count(patents),
+            most_recent_patent=cls.get_most_recent_patent(patents),
+            most_recent_trial=cls.get_most_recent_trial(trials),
+            owners=cls.get_owners(patents, trials),
+            patent_count=len(patents),
+            patent_ids=[p.id for p in patents],
+            percent_trials_stopped=cls.get_percent_trials_stopped(trials),
+            regulatory_approval_count=len(regulatory_approvals),
+            regulatory_approval_ids=[a.id for a in regulatory_approvals],
+            total_trial_enrollment=cls.get_total_trial_enrollment(trials),
+            trial_count=len(trials),
+            trial_ids=[t.id for t in trials],
         )
 
     @property
@@ -303,12 +308,26 @@ class Asset(Dataclass):
     def get_owners(
         cls, patents: Sequence[ScoredPatent], trials: Sequence[ScoredTrial]
     ) -> list[str]:
-        return uniq(
-            compact(
-                flatten([a.canonical_name for p in patents for a in p.assignees or []])
-                + [t.sponsor.canonical_name for t in trials if t.sponsor is not None]
-            )
+        # count and sort owners
+        sorted_owners: list[tuple[str, int]] = sorted(
+            count_by(
+                compact(
+                    flatten(
+                        [a.canonical_name for p in patents for a in p.assignees or []]
+                    )
+                    + [
+                        t.sponsor.canonical_name
+                        for t in trials
+                        if t.sponsor is not None
+                    ]
+                )
+            ).items(),
+            key=lambda x: x[1],
+            reverse=True,
         )
+
+        # return top N owners
+        return [o[0] for o in sorted_owners[0:OWNERS_LIMIT]]
 
     @classmethod
     def get_percent_trials_stopped(cls, trials: list[ScoredTrial]) -> float:
@@ -322,9 +341,8 @@ class Asset(Dataclass):
         Custom serialization for entity
         TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
         """
-        o = super().serialize()
         return {
-            **o,
+            **super().serialize(),
             "children": [c.serialize() for c in self.children],
         }
 
