@@ -64,7 +64,9 @@ class XYReport:
 
         # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
         if x_info.is_entity:
-            sq = XYReport._get_entity_subquery(x, doc_type, f"{x} is not null")
+            sq = XYReport._get_entity_subquery(
+                x, doc_type, f"coalesce(length({x}), 0) > 0"
+            )
             entity_join = f"LEFT JOIN {sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
         else:
             entity_join = ""
@@ -128,16 +130,14 @@ class XYReport:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
         client = await prisma_client(300)
-        results = await client.query_raw(
-            XYReport.get_query(
-                x_dimension,
-                y_dimension,
-                term_field=TermField.instance_rollup,  # TODO
-                filter=filter,
-                doc_type=doc_type,
-            ),
-            search_params.terms,
+        query = XYReport.get_query(
+            x_dimension,
+            y_dimension,
+            term_field=TermField.canonical_name,  # TODO
+            filter=filter,
+            doc_type=doc_type,
         )
+        results = await client.query_raw(query, search_params.terms)
 
         return DocumentReport(
             x=x_title or x_dimension,
