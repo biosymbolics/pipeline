@@ -13,7 +13,7 @@ from prisma.types import (
     TrialScalarFieldKeys,
 )
 
-from clients.low_level.prisma import prisma_context
+from clients.low_level.prisma import prisma_client
 from typings import ScoredTrial
 
 
@@ -36,7 +36,8 @@ async def find_many(
     """
     start = time.monotonic()
 
-    trials = await Trial.prisma().find_many(
+    client = await prisma_client(300)
+    trials = await Trial.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )
 

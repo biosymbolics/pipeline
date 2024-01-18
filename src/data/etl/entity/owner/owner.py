@@ -1,20 +1,19 @@
 """
 Class for biomedical entity etl
 """
-from prisma import Prisma
 from typing import Sequence
+from prisma import Prisma
 from pydash import flatten, group_by, omit, uniq
 import logging
 from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
-from clients.low_level.prisma import prisma_client
 
-
+from clients.low_level.prisma import batch_update, prisma_client
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
 from data.etl.entity.base_entity_etl import BaseEntityEtl
-from data.etl.types import OwnerCreateWithSynonymsInput
 from typings.companies import CompanyInfo
+from typings.prisma import OwnerCreateWithSynonymsInput
 
 from .transform import clean_owners, OwnerTypeParser, transform_financials
 
@@ -84,11 +83,12 @@ class BaseOwnerEtl(BaseEntityEtl):
         Args:
             names: list of names to insert
         """
+        client = await prisma_client(None)
         lookup_map = self.generate_lookup_map(names)
         insert_recs = self._generate_insert_records(names, lookup_map)
 
         # create flat records
-        await Owner.prisma().create_many(
+        await Owner.prisma(client).create_many(
             data=[
                 OwnerCreateWithSynonymsInput(**omit(ir, "synonyms"))  # type: ignore
                 for ir in insert_recs
@@ -96,14 +96,15 @@ class BaseOwnerEtl(BaseEntityEtl):
             skip_duplicates=True,
         )
 
-        # update with synonym records
-        for ir in insert_recs:
-            await Owner.prisma().update(
-                where={"name": ir["name"]},
+        await batch_update(
+            insert_recs,
+            update_func=lambda r, tx: Owner.prisma(tx).update(
+                where={"name": r["name"]},
                 data=OwnerUpdateInput(
-                    synonyms={"create": [{"term": s} for s in uniq(ir["synonyms"])]},
+                    synonyms={"create": [{"term": s} for s in uniq(r["synonyms"])]},
                 ),
-            )
+            ),
+        )
 
     @staticmethod
     async def load_financials(public_companies: Sequence[CompanyInfo]):
@@ -132,11 +133,8 @@ class BaseOwnerEtl(BaseEntityEtl):
     async def copy_all(
         self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
     ):
-        db = Prisma(auto_register=True, http={"timeout": None})
-        await db.connect()
         await self.create_records(names)
         await self.load_financials(public_companies)
-        await db.disconnect()
 
     @staticmethod
     async def pre_doc_finalize():

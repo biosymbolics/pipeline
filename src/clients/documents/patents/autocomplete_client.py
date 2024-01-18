@@ -31,13 +31,13 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
         SELECT name, count from (
             SELECT name, count
             FROM biomedical_entity
-            WHERE search @@ to_tsquery('english', $1)
+            WHERE search @@ plainto_tsquery('english', $1)
 
             UNION
 
             SELECT name, count
             FROM owner
-            WHERE search @@ to_tsquery('english', $1)
+            WHERE search @@ plainto_tsquery('english', $1)
         ) s ORDER BY count DESC
         LIMIT {limit}
         """,

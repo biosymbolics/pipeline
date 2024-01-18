@@ -1,8 +1,12 @@
+from typing import Awaitable, Callable, Sequence, TypeVar, TypedDict
 from prisma.client import Prisma, register
 import logging
 import os
 
+
 from constants.core import DATABASE_URL
+from typings.prisma import AllModelTypes
+from utils.list import batch
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -46,3 +50,26 @@ def prisma_context(timeout: int | None) -> Prisma:
             logger.debug("Error registering prisma client, perhaps a race condition")
 
     return client
+
+
+T = TypeVar("T", bound=AllModelTypes)
+
+
+async def batch_update(
+    records: Sequence[T],
+    update_func: Callable[[T, Prisma], Awaitable],
+    batch_size: int = 1000,
+    timeout: int | None = 300,
+):
+    """
+    Batch update records (in a transaction, for performance)
+    """
+    client = await prisma_client(timeout)
+    batches = batch(records, batch_size)
+    for b in batches:
+        async with client.tx() as tx:
+            for r in b:
+                try:
+                    await update_func(r, tx)
+                except Exception as e:
+                    logger.warning("Error encountered in update: %s", e)

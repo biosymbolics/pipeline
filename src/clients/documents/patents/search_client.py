@@ -118,17 +118,16 @@ async def _search(
 
     where = get_where_clause(terms, term_fields, query_type, min_patent_years)
 
-    async with prisma_context(300):
-        patents = await find_many(
-            where=where,
-            include={
-                "assignees": True,
-                "inventors": True,
-                "interventions": True,
-                "indications": True,
-            },
-            take=limit,
-        )
+    patents = await find_many(
+        where=where,
+        include={
+            "assignees": True,
+            "inventors": True,
+            "interventions": True,
+            "indications": True,
+        },
+        take=limit,
+    )
 
     return patents
 

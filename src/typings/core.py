@@ -7,7 +7,6 @@ from typing import (
     Dict,
 )
 import inspect
-
 from pydantic import BaseModel
 
 JsonSerializable = Union[

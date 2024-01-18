@@ -4,7 +4,7 @@ Patent reports
 
 import asyncio
 import logging
-
+import polars as pl
 
 from clients.documents.patents.types import (
     DocumentReport,
@@ -15,6 +15,7 @@ from typings.client import CommonSearchParams
 from typings.documents.common import DocType, TermField
 
 from .constants import X_DIMENSIONS, Y_DIMENSIONS
+from .types import Aggregation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -51,6 +52,7 @@ class XYReport:
         x: str,
         y: str | None,
         term_field: TermField,  # field against which to search, e.g. canonical_name or instance_rollup
+        aggregation: Aggregation,
         doc_type: DocType,
         filter: str | None = None,
     ) -> str:
@@ -64,27 +66,33 @@ class XYReport:
 
         # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
         if x_info.is_entity:
-            sq = XYReport._get_entity_subquery(x, doc_type, f"{x} is not null")
+            sq = XYReport._get_entity_subquery(
+                x, doc_type, f"coalesce(length({x}), 0) > 0"
+            )
             entity_join = f"LEFT JOIN {sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
         else:
             entity_join = ""
 
-        # search join to determine result set for report
+        # search join to determine result set over which the report is generated
+        # should be identical to search (once we implement query_type)
         search_sq = XYReport._get_entity_subquery(
             term_field.name, doc_type, f"{term_field.name} = ANY($1)"
         )
-        search_subquery = f"""
-            SELECT id
-            FROM {doc_type.name}
-            JOIN {search_sq} context_entities ON {doc_type.name}.id=context_entities.{doc_type.name}_id
-        """
 
         return f"""
-            select {x_t} as x, count(*) as count {f', {y_t} as y' if y_t else ''}
-            from {doc_type.name}
-            {entity_join}
-            WHERE {doc_type.name}_id in ({search_subquery})
-            {f'AND {filter}' if filter else ''}
+            SELECT
+                {x_t} as x,
+                {aggregation.func}({aggregation.field}) as {aggregation.func}
+                {f', {y_t} as y' if y_t else ''}
+            FROM {doc_type.name}
+                {entity_join}
+            WHERE
+                {doc_type.name}_id IN (
+                    SELECT id
+                    FROM {doc_type.name}
+                    JOIN {search_sq} context_entities ON {doc_type.name}.id=context_entities.{doc_type.name}_id
+                )
+                {f'AND {filter}' if filter else ''}
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
         """
@@ -96,8 +104,10 @@ class XYReport:
         x_title: str | None = None,
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
         y_title: str | None = None,
+        aggregation: Aggregation = Aggregation(func="count", field="*"),
         doc_type: DocType = DocType.patent,
         filter: str | None = None,
+        impute_missing: bool = True,
     ) -> DocumentReport:
         """
         Group summary stats by x and optionally y dimension
@@ -109,9 +119,12 @@ class XYReport:
             x_title (str, optional): x title. Defaults to None.
             y_dimension (str, optional): y dimension. Defaults to None.
             y_title (str, optional): y title. Defaults to None.
+            aggregation (Aggregation, optional): aggregation. Defaults to Aggregation(func="count", field="*").
+                                                 TODO: support other aggregations, and multiple.
             doc_type (DocType, optional): doc type. Defaults to "patent".
             filter (str, optional): additional filter. Defaults to None.
-
+            impute_missing (bool, optional): ensure that for every x, there is a y.
+                                             only applies if y_dimension is set. defaults to True.
         Usage:
         ```
         group_by_xy(
@@ -128,21 +141,38 @@ class XYReport:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
         client = await prisma_client(300)
-        results = await client.query_raw(
-            XYReport.get_query(
-                x_dimension,
-                y_dimension,
-                term_field=search_params.term_field,
-                filter=filter,
-                doc_type=doc_type,
-            ),
-            search_params.terms,
+        query = XYReport.get_query(
+            x_dimension,
+            y_dimension,
+            term_field=TermField.canonical_name,  # TODO
+            filter=filter,
+            aggregation=aggregation,
+            doc_type=doc_type,
         )
+        logger.debug("Running query for xy report: %s", query)
+        results = await client.query_raw(query, search_params.terms)
+
+        if y_dimension and impute_missing:
+            # pivot into x by [y1, y2, y3, ...] format, fill nulls with 0
+            # to ensure every x has a value for every y
+            df = (
+                pl.DataFrame(
+                    [DocumentReportRecord(**r) for r in results],
+                    # TODO!! just a temp hack for time charts
+                    schema_overrides={"y": pl.Int32},
+                )
+                .pivot(values=aggregation.func, index="x", columns="y")
+                .fill_null(0)
+                .melt(id_vars=["x"])
+            ).rename({"variable": "y", "value": aggregation.func})
+            data = [DocumentReportRecord(**r) for r in df.to_dicts()]
+        else:
+            data = [DocumentReportRecord(**r) for r in results]
 
         return DocumentReport(
+            data=data,
             x=x_title or x_dimension,
             y=y_title or y_dimension,
-            data=[DocumentReportRecord(**r) for r in results],
         )
 
     @staticmethod

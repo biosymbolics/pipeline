@@ -7,6 +7,7 @@ import logging
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
 from typings import DOMAINS_OF_INTEREST
+from typings.documents.common import TermField
 from utils.encoding.json_encoder import DataclassJSONEncoder
 from typings.client import CommonSearchParams
 
@@ -39,7 +40,7 @@ async def _summarize(raw_event: dict, context):
     try:
         summaries = await XYReport.group_by_xy_for_filters(
             search_params=p,
-            x_dimension="instance_rollup",
+            x_dimension=TermField.instance_rollup.name,
             filters={d: f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST},
         )
     except Exception as e:

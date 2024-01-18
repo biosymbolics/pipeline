@@ -35,11 +35,4 @@ class BaseEntityEtl:
 
     @classmethod
     async def post_doc_finalize(cls):
-        """
-        Run after:
-            1) all biomedical entities or owners are loaded
-            2) all documents are loaded
-            3) UMLS is loaded
-        """
-        await cls.link_to_documents()
-        await cls.add_counts()
+        raise NotImplementedError
