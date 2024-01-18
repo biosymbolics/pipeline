@@ -181,13 +181,13 @@ async def _search(terms: Sequence[str]) -> list[Asset]:
             regulatory_approvals=compact(
                 [
                     docs_by_type.regulatory_approvals.get(id)
-                    for id in flatten([ewd.patents for ewd in ewds])
+                    for id in flatten([ewd.regulatory_approvals for ewd in ewds])
                 ]
             ),
             trials=compact(
                 [
                     docs_by_type.trials.get(id)
-                    for id in flatten([ewd.patents for ewd in ewds])
+                    for id in flatten([ewd.trials for ewd in ewds])
                 ]
             ),
         )
