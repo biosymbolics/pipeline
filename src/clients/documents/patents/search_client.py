@@ -6,14 +6,23 @@ import logging
 from typing import Sequence
 from prisma.client import Prisma
 from prisma.types import (
+    PatentInclude,
     PatentWhereInput,
     PatentWhereInputRecursive1,
 )
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
+from typings import TermField
 from typings.documents.patents import ScoredPatent
-from typings.client import PatentSearchParams, QueryType, TermField
+from typings.client import (
+    DEFAULT_PATENT_INCLUDE,
+    DEFAULT_QUERY_TYPE,
+    DEFAULT_TERM_FIELDS,
+    CommonSearchParams,
+    PatentSearchParams,
+    QueryType,
+)
 from utils.string import get_id
 
 from .client import find_many
@@ -60,7 +69,6 @@ def get_where_clause(
     terms: Sequence[str],
     term_fields: Sequence[TermField],
     query_type: QueryType,
-    min_patent_years: int,
 ) -> PatentWhereInput:
     is_id_search = all([t.startswith("WO-") for t in terms])
 
@@ -78,7 +86,7 @@ def get_where_clause(
     where: PatentWhereInput = {
         "AND": [
             term_clause,
-            {"priority_date": {"gte": get_max_priority_date(int(min_patent_years))}},
+            {"priority_date": {"gte": get_max_priority_date(0)}},  # TODO
         ],
     }
 
@@ -88,12 +96,9 @@ def get_where_clause(
 async def _search(
     terms: Sequence[str],
     exemplar_patents: Sequence[str] = [],
-    query_type: QueryType = "AND",
-    min_patent_years: int = 10,
-    term_fields: Sequence[TermField] = [
-        TermField.canonical_name,
-        TermField.instance_rollup,
-    ],
+    query_type: QueryType = DEFAULT_QUERY_TYPE,
+    term_fields: Sequence[TermField] = DEFAULT_TERM_FIELDS,
+    include: PatentInclude = DEFAULT_PATENT_INCLUDE,
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[ScoredPatent]:
     """
@@ -111,23 +116,18 @@ async def _search(
         logger.error("Terms must be a list: %s (%s)", terms, type(terms))
         raise ValueError("Terms must be a list")
 
-    where = get_where_clause(terms, term_fields, query_type, min_patent_years)
+    where = get_where_clause(terms, term_fields, query_type)
 
     patents = await find_many(
         where=where,
-        include={
-            "assignees": True,
-            "inventors": True,
-            "interventions": True,
-            "indications": True,
-        },
+        include=include,
         take=limit,
     )
 
     return patents
 
 
-async def search(p: PatentSearchParams) -> list[ScoredPatent]:
+async def search(params: CommonSearchParams | PatentSearchParams) -> list[ScoredPatent]:
     """
     Search patents by terms
     Filters on
@@ -153,11 +153,12 @@ async def search(p: PatentSearchParams) -> list[ScoredPatent]:
     [t.search_rank for t in p]
     ```
     """
+    p = PatentSearchParams(**params.__dict__)
     args = {
-        "terms": p.terms,
         "exemplar_patents": p.exemplar_patents,
+        "include": p.include,
         "query_type": p.query_type,
-        "min_patent_years": p.min_patent_years,
+        "terms": p.terms,
     }
     key = get_id(
         {

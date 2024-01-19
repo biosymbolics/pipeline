@@ -47,13 +47,17 @@ class EntWithDocResult(DocResults):
 
 
 async def get_doc_ids(
-    client: Prisma, terms: Sequence[str], query_type: QueryType
+    client: Prisma,
+    terms: Sequence[str],
+    query_type: QueryType,
+    term_fields: Sequence[TermField],
 ) -> list[str]:
     def get_doc_query(table) -> str:
+        tf_criteria = " OR ".join([f"{tf.name} = ANY($1)" for tf in term_fields])
         return f"""
             SELECT COALESCE(patent_id, regulatory_approval_id, trial_id) as id
             FROM {table}
-            WHERE canonical_name = ANY($1)
+            WHERE {tf_criteria}
         """
 
     doc_result = await client.query_raw(
@@ -84,9 +88,10 @@ async def get_docs_by_entity_id(
             array_remove(array_agg(patent_id), NULL) as patents,
             array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
             array_remove(array_agg(trial_id), NULL) as trials
-        FROM {entity_map_type.value}
+        FROM {entity_map_type.value} -- intervenable or indicatable
         WHERE COALESCE(patent_id, regulatory_approval_id, trial_id) = ANY($1)
         AND entity_id is not NULL
+        AND instance_rollup<>'' -- TODO?
         GROUP BY
             {rollup_field.name},
             {f'{child_field.name}' if child_field else ''}
@@ -132,7 +137,13 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
 
 
 async def _search(
-    terms: Sequence[str], query_type: QueryType, limit: int
+    terms: Sequence[str],
+    query_type: QueryType,
+    limit: int,
+    term_fields: Sequence[TermField] = [
+        TermField.canonical_name,
+        TermField.instance_rollup,
+    ],
 ) -> list[Asset]:
     """
     Internal search for documents grouped by entity
@@ -140,7 +151,7 @@ async def _search(
     client = await prisma_client(300)
 
     # doc ids that match the suppied terms
-    docs_ids = await get_doc_ids(client, terms, query_type)
+    docs_ids = await get_doc_ids(client, terms, query_type, term_fields)
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(docs_ids)

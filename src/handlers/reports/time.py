@@ -3,6 +3,7 @@ Handler for patent timewise reports
 """
 import json
 import logging
+import traceback
 
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
@@ -46,6 +47,7 @@ async def _aggregate_over_time(raw_event: dict, context):
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)
+        traceback.print_exc()
         return {"statusCode": 500, "body": message}
 
     return {"statusCode": 200, "body": json.dumps(summaries, cls=DataclassJSONEncoder)}

@@ -328,11 +328,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     _entity_to_umls as etu,
                     umls as umls_instance_rollup,
                     umls
-                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls_category_rollup.category_rollup_id
+                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls.category_rollup_id
                 WHERE {table}.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
                 AND umls_instance_rollup.id=umls.instance_rollup_id
+                AND instance_rollup=''
                 {'AND ' + ' AND '.join(filters) if filters else ''}
             """
 
@@ -340,7 +341,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         spec = {
             "intervenable": [
                 {
-                    # prefer linkage that is TARGET TYPE
+                    # prefer target linkage (protein/gene)
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_TARGET_TYPES.keys())}"
                     ],
@@ -352,7 +353,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             ],
             "indicatable": [
                 {
-                    # prefer linkage of type disease
+                    # prefer disease linkage
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_DISEASE_TYPES.keys())}"
                     ],
@@ -390,11 +391,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
-        await BiomedicalEntityEtl.link_to_documents()
-        await BiomedicalEntityEtl.add_counts()
+        # await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.add_counts()
 
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
-        await UmlsLoader.update_with_ontology_level()
+        # await UmlsLoader.update_with_ontology_level()
 
         # add instance & category rollups
         await BiomedicalEntityEtl.add_rollups()

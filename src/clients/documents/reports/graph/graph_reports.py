@@ -14,8 +14,8 @@ from clients.low_level.prisma import prisma_client
 from typings import (
     DOMAINS_OF_INTEREST,
     DocType,
+    TermField,
 )
-from typings.client import TermField
 
 from .types import (
     AggregateDocumentRelationship,

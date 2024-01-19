@@ -244,9 +244,8 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         await Indicatable.prisma().create_many(
             data=[
                 {
-                    "name": i,
-                    "canonical_name": i,
-                    "instance_rollup": i,
+                    "name": i.lower(),
+                    "canonical_name": i.lower(),
                     "regulatory_approval_id": a["id"],
                 }
                 for a in approvals
@@ -258,11 +257,8 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         await Intervenable.prisma().create_many(
             data=[
                 {
-                    "name": a["generic_name"] or a["brand_name"],
-                    "canonical_name": get_preferred_pharmacologic_class(
-                        a["pharmacologic_classes"]
-                    )
-                    or "",
+                    "name": (a["generic_name"] or a["brand_name"]).lower(),
+                    "canonical_name": a["generic_name"].lower(),
                     "is_primary": True,
                     "regulatory_approval_id": a["id"],
                 }

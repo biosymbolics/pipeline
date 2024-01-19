@@ -1,11 +1,9 @@
 """
 Patent client
 """
-import inspect
 import logging
 import time
 from typing import Optional
-from prisma.actions import PatentActions
 from prisma.models import Patent
 from prisma.types import (
     PatentWhereInput,
@@ -16,7 +14,7 @@ from prisma.types import (
 )
 
 from clients.companies import get_financial_map
-from clients.low_level.prisma import prisma_client, prisma_context
+from clients.low_level.prisma import prisma_client
 from typings import ScoredPatent
 
 from .enrich import enrich_search_result
@@ -45,12 +43,18 @@ async def find_many(
         take, skip, where, cursor, include, order, distinct
     )
 
+    logger.info(
+        "Find took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
+    )
+
     ids = [p.id for p in patents]
     financial_map = await get_financial_map(ids, "patent_id")
     enriched_results = enrich_search_result(patents, financial_map)
 
     logger.info(
-        "Search took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
+        "Find + enrichment took %s seconds (%s)",
+        round(time.monotonic() - start, 2),
+        len(patents),
     )
 
     return enriched_results

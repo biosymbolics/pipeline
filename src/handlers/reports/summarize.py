@@ -6,10 +6,9 @@ import logging
 
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
-from typings import DOMAINS_OF_INTEREST
-from typings.documents.common import TermField
-from utils.encoding.json_encoder import DataclassJSONEncoder
+from typings import DOMAINS_OF_INTEREST, TermField
 from typings.client import CommonSearchParams
+from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import DEFAULT_REPORT_PARAMS
 

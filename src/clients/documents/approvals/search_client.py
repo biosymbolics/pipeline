@@ -9,8 +9,12 @@ from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.documents.utils import get_where_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from typings import QueryType, ApprovalSearchParams, ScoredRegulatoryApproval
-from typings.documents.common import TermField
+from typings import (
+    QueryType,
+    RegulatoryApprovalSearchParams,
+    ScoredRegulatoryApproval,
+    TermField,
+)
 from utils.string import get_id
 
 from .client import find_many
@@ -70,13 +74,14 @@ async def _search(
     return approvals
 
 
-async def search(p: ApprovalSearchParams) -> list[ScoredRegulatoryApproval]:
+async def search(p: RegulatoryApprovalSearchParams) -> list[ScoredRegulatoryApproval]:
     """
     Search regulatory approvals by terms
     """
     args = {
         "terms": p.terms,
         "query_type": p.query_type,
+        "include": p.include,
     }
     key = get_id(
         {

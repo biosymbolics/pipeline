@@ -128,7 +128,7 @@ async def retrieve_with_cache_check(
         if not ex.response["Error"]["Code"] == "NoSuchKey":
             raise ex
 
-        logger.info("Checking miss for key: %s", key)
+        logger.info("Cache miss for key: %s", key)
 
         # If not in cache, perform the operation
         if limit:

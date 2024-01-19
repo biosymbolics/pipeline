@@ -33,15 +33,12 @@ class Asset(EntityBase):
     maybe_available_count: int
     name: str
     owners: list[str]
-    patent_ids: list[str]
     patent_count: int
     percent_trials_stopped: float
     most_recent_patent: ScoredPatent | None
     most_recent_trial: ScoredTrial | None
     regulatory_approval_count: int
-    regulatory_approval_ids: list[str]
     trial_count: int
-    trial_ids: list[str]
     total_trial_enrollment: int
 
     @classmethod
@@ -93,13 +90,10 @@ class Asset(EntityBase):
             most_recent_trial=cls.get_most_recent_trial(trials),
             owners=cls.get_owners(patents, trials),
             patent_count=len(patents),
-            patent_ids=[p.id for p in patents],
             percent_trials_stopped=cls.get_percent_trials_stopped(trials),
             regulatory_approval_count=len(regulatory_approvals),
-            regulatory_approval_ids=[a.id for a in regulatory_approvals],
             total_trial_enrollment=cls.get_total_trial_enrollment(trials),
             trial_count=len(trials),
-            trial_ids=[t.id for t in trials],
         )
 
     @property
@@ -345,5 +339,3 @@ class Asset(EntityBase):
             **super().serialize(),
             "children": [c.serialize() for c in self.children],
         }
-
-    # TODO - chart with more info

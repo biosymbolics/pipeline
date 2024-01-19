@@ -4,19 +4,18 @@ Utils for ETLing UMLs data
 import asyncio
 import sys
 import logging
-from prisma import Prisma
 from prisma.models import UmlsGraph, Umls
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
+from data.domain.biomedical.umls import clean_umls_name
 
 from system import initialize
 
 initialize()
 
-from clients.low_level.prisma import batch_update, prisma_client, prisma_context
+from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
-from utils.list import batch
 
 from .constants import MAX_DENORMALIZED_ANCESTORS
 from .transform import UmlsAncestorTransformer, UmlsTransformer
@@ -72,6 +71,7 @@ class UmlsLoader:
             WHERE entities.lat='ENG' -- english
             AND entities.ts='P' -- preferred terms (according to UMLS)
             AND entities.ispref='Y' -- preferred term (according to UMLS)
+            AND entities.stt='PF' -- preferred term (according to UMLS)
             GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
         """
 

@@ -1,24 +1,41 @@
 from typing import Annotated, Literal
-from prisma.types import PatentInclude
 from pydantic import BaseModel, Field, field_validator
+from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
-from typings.documents.common import EntityMapType, TermField
+from .documents.common import EntityMapType, TermField
 
 
 QueryType = Literal["AND", "OR"]
+DEFAULT_QUERY_TYPE: QueryType = "AND"
+DEFAULT_TERM_FIELDS = [
+    TermField.canonical_name,
+    TermField.instance_rollup,
+]
+
+DEFAULT_PATENT_INCLUDE: PatentInclude = {
+    "assignees": True,
+    # "inventors": True,
+    "interventions": True,
+    "indications": True,
+}
+
+DEFAULT_REGULATORY_APPROVAL_INCLUDE: RegulatoryApprovalInclude = {
+    "interventions": True,
+    "indications": True,
+}
+
+DEFAULT_TRIAL_INCLUDE: TrialInclude = {
+    "interventions": True,
+    "indications": True,
+    "outcomes": True,
+    "sponsor": True,
+}
 
 
-class BaseSearchParams(BaseModel):
+class CommonSearchParams(BaseModel):
     limit: Annotated[int, Field(validate_default=True)] = 1000
     query_type: Annotated[QueryType, Field(validate_default=True)] = "OR"  # TODO AND
     skip_cache: Annotated[bool, Field(validate_default=True)] = False
-
-
-class BasePatentSearchParams(BaseSearchParams):
-    min_patent_years: Annotated[int, Field(validate_default=True)] = 10
-
-
-class CommonSearchParams(BaseSearchParams):
     terms: Annotated[list[str], Field(validate_default=True)] = []
 
     @field_validator("terms", mode="before")
@@ -29,8 +46,9 @@ class CommonSearchParams(BaseSearchParams):
         return terms
 
 
-class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
+class PatentSearchParams(CommonSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
+    include: PatentInclude = DEFAULT_PATENT_INCLUDE
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
@@ -40,8 +58,17 @@ class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
         return patents
 
 
+class RegulatoryApprovalSearchParams(CommonSearchParams):
+    include: RegulatoryApprovalInclude = DEFAULT_REGULATORY_APPROVAL_INCLUDE
+
+
 class TrialSearchParams(CommonSearchParams):
-    pass
+    include: TrialInclude = DEFAULT_TRIAL_INCLUDE
+
+
+GenericSearchParams = (
+    PatentSearchParams | RegulatoryApprovalSearchParams | TrialSearchParams
+)
 
 
 class AssetSearchParams(PatentSearchParams):
@@ -55,7 +82,3 @@ class AssetSearchParams(PatentSearchParams):
         if isinstance(v, EntityMapType):
             return v
         return EntityMapType(v)
-
-
-class ApprovalSearchParams(CommonSearchParams):
-    pass

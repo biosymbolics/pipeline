@@ -5,19 +5,11 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.types import (
-    TrialWhereInput,
-    TrialWhereInputRecursive1,
-    TrialWhereInputRecursive2,
-)
-from pydash import flatten
+from prisma.types import TrialWhereInput
 from clients.documents.utils import get_where_clause
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_context
-
-from typings import QueryType, TrialSearchParams
-from typings.documents.common import TermField
+from typings import QueryType, TrialSearchParams, TermField
 from typings.documents.trials import ScoredTrial
 from utils.string import get_id
 
@@ -74,6 +66,7 @@ async def search(p: TrialSearchParams) -> list[ScoredTrial]:
     args = {
         "terms": p.terms,
         "query_type": p.query_type,
+        "include": p.include,
     }
     key = get_id(
         {
