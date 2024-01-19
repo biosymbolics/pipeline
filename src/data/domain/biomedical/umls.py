@@ -40,11 +40,27 @@ def clean_umls_name(
     # - not composite,
     # - not a stupidly long name (e.g. https://uts.nlm.nih.gov/uts/umls/concept/C4086713),
     # - and not a gene/protein
+    # ... or
+    # - no aliases
+    # - 1 word
+    # non-gene/protein 2 word name without comma/parens/etc.
     if (
         not is_composite
         and len(name_words) < 5
         and not has_intersection(type_ids, list(UMLS_GENE_PROTEIN_TYPES.keys()))
-    ) or (len(aliases) == 0):
+    ) or (
+        len(aliases) == 0  # no aliases
+        or len(name_words) == 1  # 1 word
+        # if 1-2 words (+non-gene/protein) or no aliases, prefer canonical name
+        or (
+            len(name_words) == 2
+            and name_words[1].lower()
+            # e.g. "XYZ modulator", not "XYZ gene"
+            not in ["gene", "protein"]
+            # but not "XYZ, modulator" (??)
+            and not has_intersection(BAD_NAME_CHARS, list(canonical_name))
+        )
+    ):
         return canonical_name
 
     def name_sorter(a: str) -> int:
@@ -61,18 +77,6 @@ def clean_umls_name(
             # prefer non-comma
             + (5 if has_intersection(BAD_NAME_CHARS, list(a)) else 0)
         )
-
-    # if 1-2 words (+non-gene/protein) or no aliases, prefer canonical name
-    if (
-        len(name_words) == 1
-        or (
-            len(name_words) == 2
-            and name_words[1].lower() not in ["gene", "protein"]
-            and not has_intersection(BAD_NAME_CHARS, list(canonical_name))
-        )
-        or len(aliases) == 0
-    ):
-        return canonical_name
 
     aliases = sorted(aliases, key=name_sorter)
     return aliases[0]
