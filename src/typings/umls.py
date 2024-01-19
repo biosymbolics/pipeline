@@ -24,9 +24,9 @@ def compare_ontology_levels(a: OntologyLevel, b: OntologyLevel) -> int:
     if a not in ONTOLOGY_LEVEL_MAP and b not in ONTOLOGY_LEVEL_MAP:
         return 0
     if a not in ONTOLOGY_LEVEL_MAP:
-        return 1
-    if b not in ONTOLOGY_LEVEL_MAP:
         return -1
+    if b not in ONTOLOGY_LEVEL_MAP:
+        return 1
     return ONTOLOGY_LEVEL_MAP[a] - ONTOLOGY_LEVEL_MAP[b]
 
 
