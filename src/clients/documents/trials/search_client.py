@@ -5,11 +5,12 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.types import TrialWhereInput
+from prisma.types import TrialInclude, TrialWhereInput
 from clients.documents.utils import get_where_clause
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import QueryType, TrialSearchParams, TermField
+from typings.client import DEFAULT_TRIAL_INCLUDE
 from typings.documents.trials import ScoredTrial
 from utils.string import get_id
 
@@ -28,6 +29,7 @@ async def _search(
         TermField.canonical_name,
         TermField.instance_rollup,
     ],
+    include: TrialInclude = DEFAULT_TRIAL_INCLUDE,
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[ScoredTrial]:
     """
@@ -43,12 +45,7 @@ async def _search(
 
     trials = await find_many(
         where=where,
-        include={
-            "interventions": True,
-            "indications": True,
-            "outcomes": True,
-            "sponsor": True,
-        },
+        include=include,
         take=limit,
     )
 

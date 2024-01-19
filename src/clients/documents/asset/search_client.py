@@ -4,13 +4,13 @@ Asset client
 import asyncio
 from dataclasses import dataclass
 from functools import partial
-from typing import Sequence, cast
+from typing import Sequence
 from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
 from pydantic import BaseModel
-from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
 from typings.client import AssetSearchParams, QueryType
 from typings.core import Dataclass

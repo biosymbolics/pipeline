@@ -62,7 +62,7 @@ def enrich_search_result(
 
     enriched_df = reduce(lambda _df, step: step(_df), steps, df)
 
-    logging.warning(
+    logging.info(
         "Took %s seconds to format %s results", round(time.time() - start, 2), len(df)
     )
 

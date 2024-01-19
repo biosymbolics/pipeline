@@ -13,7 +13,6 @@ import polars as pl
 from prisma.enums import (
     BiomedicalEntityType,
     ComparisonType,
-    OwnerType,
     TrialDesign,
     TrialMasking,
     TrialPhase,
@@ -23,7 +22,7 @@ from prisma.enums import (
 )
 
 import system
-from typings.documents.trials import ScoredTrial
+
 
 system.initialize()
 
@@ -33,7 +32,8 @@ from data.prediction.utils import (
     split_train_and_test,
 )
 from clients.documents.trials import client as trial_client
-from clients.low_level.prisma import prisma_context
+from typings.client import DEFAULT_TRIAL_INCLUDE
+from typings.documents.trials import ScoredTrial
 from utils.list import batch
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -106,12 +106,7 @@ async def fetch_training_trials(
                 {"phase": TrialPhase.NA},
             ],
         },
-        include={
-            "interventions": True,
-            "indications": True,
-            "outcomes": True,
-            "sponsor": True,
-        },
+        include=DEFAULT_TRIAL_INCLUDE,
         take=limit,
     )
 

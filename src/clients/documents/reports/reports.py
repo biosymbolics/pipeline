@@ -152,6 +152,12 @@ class XYReport:
         logger.debug("Running query for xy report: %s", query)
         results = await client.query_raw(query, search_params.terms)
 
+        if len(results) == 0:
+            logger.warning("No results for query: %s", query)
+            return DocumentReport(
+                data=[], x=x_title or x_dimension, y=y_title or y_dimension
+            )
+
         if y_dimension and impute_missing:
             # pivot into x by [y1, y2, y3, ...] format, fill nulls with 0
             # to ensure every x has a value for every y

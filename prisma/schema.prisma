@@ -42,6 +42,7 @@ model EntitySynonym {
     term      String
 
     @@unique([term, entity_id]) // TODO: should be on term
+    @@index([term], name: "entity_synonym_term")
     @@map("entity_synonym")
 }
 
@@ -67,6 +68,7 @@ model OwnerSynonym {
     term     String
 
     @@unique([term, owner_id]) // TODO: should be on term
+    @@index([term], name: "owner_synonym_term")
     @@map("owner_synonym")
 }
 
@@ -201,6 +203,9 @@ model Ownable {
     @@index([canonical_name], name: "ownable_canonical_name")
     @@index([instance_rollup], name: "ownable_instance_rollup")
     @@index([category_rollup], name: "ownable_category_rollup")
+    @@index([patent_id], name: "ownable_patent_id")
+    @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
+    // @@index([trial_id], name: "ownable_trial_id") // already a uniq index (since 1<>1)
     @@map("ownable")
 }
 
@@ -228,6 +233,9 @@ model Intervenable {
     @@index([canonical_name], name: "intervenable_canonical_name")
     @@index([instance_rollup], name: "intervenable_instance_rollup")
     @@index([category_rollup], name: "intervenable_category_rollup")
+    @@index([patent_id], name: "intervenable_patent_id")
+    @@index([regulatory_approval_id], name: "intervenable_regulatory_approval_id")
+    @@index([trial_id], name: "intervenable_trial_id")
     @@map("intervenable")
 }
 
@@ -254,6 +262,9 @@ model Indicatable {
     @@index([canonical_name], name: "indicatable_canonical_name")
     @@index([instance_rollup], name: "indicatable_instance_rollup")
     @@index([category_rollup], name: "indicatable_category_rollup")
+    @@index([patent_id], name: "indicatable_patent_id")
+    @@index([regulatory_approval_id], name: "indicatable_regulatory_approval_id")
+    @@index([trial_id], name: "indicatable_trial_id")
     @@map("indicatable")
 }
 

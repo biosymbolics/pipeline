@@ -149,7 +149,7 @@ importlib.reload(common.ner.ner)
 
 #### Database
 ```
-export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym?connection_limit=50
 create role biosym with password '';
 alter role biosym with superuser;
 prisma db push

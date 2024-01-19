@@ -5,7 +5,7 @@ from functools import partial
 import logging
 import time
 from typing import Sequence
-from prisma.types import RegulatoryApprovalWhereInput
+from prisma.types import RegulatoryApprovalInclude, RegulatoryApprovalWhereInput
 
 from clients.documents.utils import get_where_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
@@ -15,6 +15,7 @@ from typings import (
     ScoredRegulatoryApproval,
     TermField,
 )
+from typings.client import DEFAULT_REGULATORY_APPROVAL_INCLUDE
 from utils.string import get_id
 
 from .client import find_many
@@ -34,6 +35,7 @@ async def _search(
         TermField.canonical_name,
         TermField.instance_rollup,
     ],
+    include: RegulatoryApprovalInclude = DEFAULT_REGULATORY_APPROVAL_INCLUDE,
     limit: int = MAX_SEARCH_RESULTS,
 ) -> list[ScoredRegulatoryApproval]:
     """
@@ -58,10 +60,7 @@ async def _search(
 
     approvals = await find_many(
         where=where,
-        include={
-            "interventions": True,
-            "indications": True,
-        },
+        include=include,
         take=limit,
     )
 

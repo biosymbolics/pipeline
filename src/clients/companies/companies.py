@@ -27,10 +27,10 @@ async def get_owner_map(
     if id_field not in ID_FIELDS:
         raise ValueError(f"Invalid id_field: {id_field}; must be one of {ID_FIELDS}")
 
-    where = {id_field: StringFilter({"in": list(ids)})}
+    where = OwnableWhereInput(**{id_field: StringFilter({"in": list(ids)})})  # type: ignore
 
     ownables = await Ownable.prisma().find_many(
-        where=OwnableWhereInput(**where),  # type: ignore
+        where=where,
         include=OwnableInclude(owner={"include": {"financial_snapshot": True}}),
     )
 

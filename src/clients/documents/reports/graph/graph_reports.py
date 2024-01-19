@@ -2,20 +2,24 @@
 Patent graph reports
 """
 
-from enum import Enum
+from functools import partial
 from typing import Sequence
 import logging
 import networkx as nx
 from pydash import uniq
 import polars as pl
 from prisma.enums import BiomedicalEntityType
+from clients.documents.constants import DOC_CLIENT_LOOKUP
 
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
 from typings import (
     DOMAINS_OF_INTEREST,
     DocType,
     TermField,
 )
+from typings.client import DocumentCharacteristicParams
+from utils.string import get_id
 
 from .types import (
     AggregateDocumentRelationship,
@@ -253,11 +257,11 @@ async def graph_document_relationships(
     )
 
 
-async def aggregate_document_relationships(
+async def _aggregate_document_relationships(
     ids: Sequence[str],
-    head_field: str = "priority_date",
-    entity_types: Sequence[BiomedicalEntityType] | None = None,
-    relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
+    head_field: str,
+    entity_types: Sequence[BiomedicalEntityType] | None,
+    relationships: Sequence[str],
     doc_type: DocType = DocType.patent,
 ) -> list[AggregateDocumentRelationship]:
     """
@@ -340,3 +344,42 @@ async def aggregate_document_relationships(
     )
 
     return [AggregateDocumentRelationship(**tr) for tr in top_records]
+
+
+async def aggregate_document_relationships(
+    p: DocumentCharacteristicParams,
+) -> list[AggregateDocumentRelationship]:
+    """
+    Aggregated UMLS ancestory report for a set of documents
+    """
+    documents = await DOC_CLIENT_LOOKUP[p.doc_type].search(p)
+    if len(documents) == 0:
+        logging.info("No documents found for terms: %s", p.terms)
+        return []
+
+    key = get_id(
+        {
+            **p.__dict__,
+            "api": "patents",
+        }
+    )
+
+    ids = [d.id for d in documents]
+    search_partial = partial(
+        _aggregate_document_relationships,
+        ids=ids,
+        head_field=p.head_field,
+        entity_types=None,
+        relationships=RELATIONSHIPS_OF_INTEREST,
+        doc_type=p.doc_type,
+    )
+
+    if p.skip_cache == True:
+        patents = await search_partial()
+        return patents
+
+    return await retrieve_with_cache_check(
+        search_partial,
+        key=key,
+        decode=lambda str_data: storage_decoder(str_data),
+    )

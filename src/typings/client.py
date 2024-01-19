@@ -2,6 +2,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
+from typings.documents.common import DocType
+
 from .documents.common import EntityMapType, TermField
 
 
@@ -82,3 +84,12 @@ class AssetSearchParams(PatentSearchParams):
         if isinstance(v, EntityMapType):
             return v
         return EntityMapType(v)
+
+
+class DocumentCharacteristicParams(CommonSearchParams):
+    """
+    Parameters for document characteristics
+    """
+
+    doc_type: DocType = DocType.patent
+    head_field: str = "priority_date"

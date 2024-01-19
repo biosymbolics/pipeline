@@ -391,11 +391,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
-        # await BiomedicalEntityEtl.link_to_documents()
-        # await BiomedicalEntityEtl.add_counts()
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()
 
         # perform final Umls updates, which depends upon Biomedical Entities being in place.
-        # await UmlsLoader.update_with_ontology_level()
+        await UmlsLoader.update_with_ontology_level()
 
         # add instance & category rollups
         await BiomedicalEntityEtl.add_rollups()
