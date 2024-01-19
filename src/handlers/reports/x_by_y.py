@@ -6,7 +6,7 @@ import logging
 
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
-from typings.client import CommonSearchParams, PatentSearchParams
+from typings.client import DocumentSearchParams, PatentSearchParams
 
 from .constants import DEFAULT_REPORT_PARAMS
 
@@ -49,7 +49,7 @@ async def _x_by_y(raw_event: dict, context):
 
     try:
         report = await XYReport.group_by_xy(
-            search_params=CommonSearchParams(terms=p.terms, query_type=p.query_type),
+            search_params=DocumentSearchParams(terms=p.terms, query_type=p.query_type),
             x_dimension=x_dimension,
             y_dimension=y_dimension,
         )

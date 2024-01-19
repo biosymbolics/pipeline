@@ -56,7 +56,7 @@ class UmlsGraph(object):
         logger.info("Loading UMLS into graph")
         G = nx.Graph()
 
-        client = await prisma_client(300)
+        client = await prisma_client(120)
         edges = await client.query_raw(self.edge_query(suppressions))
 
         if len(edges) == 0:

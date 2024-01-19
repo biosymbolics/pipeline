@@ -6,20 +6,16 @@ import logging
 from typing import Sequence
 from prisma.client import Prisma
 from prisma.types import (
-    PatentInclude,
     PatentWhereInput,
     PatentWhereInputRecursive1,
 )
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from typings import TermField
 from typings.documents.patents import ScoredPatent
 from typings.client import (
-    DEFAULT_PATENT_INCLUDE,
-    DEFAULT_QUERY_TYPE,
-    DEFAULT_TERM_FIELDS,
-    CommonSearchParams,
+    DocumentSearchCriteria,
+    DocumentSearchParams,
     PatentSearchParams,
     QueryType,
 )
@@ -34,7 +30,6 @@ from ..utils import get_where_clause as get_term_clause
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_SEARCH_RESULTS = 2000
 EXEMPLAR_SIMILARITY_THRESHOLD = 0.7
 
 
@@ -65,23 +60,17 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
     return [r["embeddings"] for r in results]
 
 
-def get_where_clause(
-    terms: Sequence[str],
-    term_fields: Sequence[TermField],
-    query_type: QueryType,
-) -> PatentWhereInput:
-    is_id_search = all([t.startswith("WO-") for t in terms])
+def get_where_clause(p: DocumentSearchCriteria) -> PatentWhereInput:
+    is_id_search = all([t.startswith("WO-") for t in p.terms])
 
     # require homogeneous search
-    if is_id_search and any([not t.startswith("WO-") for t in terms]):
+    if is_id_search and any([not t.startswith("WO-") for t in p.terms]):
         raise ValueError("ID search must be all WO-")
 
     if is_id_search:
-        return {"id": {"in": list(terms)}}
+        return {"id": {"in": list(p.terms)}}
 
-    term_clause = get_term_clause(
-        terms, term_fields, query_type, PatentWhereInputRecursive1
-    )
+    term_clause = get_term_clause(p, PatentWhereInputRecursive1)
 
     where: PatentWhereInput = {
         "AND": [
@@ -93,41 +82,9 @@ def get_where_clause(
     return where
 
 
-async def _search(
-    terms: Sequence[str],
-    exemplar_patents: Sequence[str] = [],
-    query_type: QueryType = DEFAULT_QUERY_TYPE,
-    term_fields: Sequence[TermField] = DEFAULT_TERM_FIELDS,
-    include: PatentInclude = DEFAULT_PATENT_INCLUDE,
-    limit: int = MAX_SEARCH_RESULTS,
+async def search(
+    params: DocumentSearchParams | PatentSearchParams,
 ) -> list[ScoredPatent]:
-    """
-    Search patents by terms
-
-    REPL:
-    ```
-    import asyncio
-    from clients.patents.search_client import _search
-    with asyncio.Runner() as runner:
-        runner.run(_search(["asthma"]))
-    ```
-    """
-    if not isinstance(terms, list):
-        logger.error("Terms must be a list: %s (%s)", terms, type(terms))
-        raise ValueError("Terms must be a list")
-
-    where = get_where_clause(terms, term_fields, query_type)
-
-    patents = await find_many(
-        where=where,
-        include=include,
-        take=limit,
-    )
-
-    return patents
-
-
-async def search(params: CommonSearchParams | PatentSearchParams) -> list[ScoredPatent]:
     """
     Search patents by terms
     Filters on
@@ -138,9 +95,12 @@ async def search(params: CommonSearchParams | PatentSearchParams) -> list[Scored
     Args:
         p.terms (Sequence[str]): list of terms to search for
         p.exemplar_patents (Sequence[str], optional): list of exemplar patents to search for. Defaults to [].
+        p.include (PatentInclude, optional): whether to include assignees, inventors, interventions, indications. Defaults to DEFAULT_PATENT_INCLUDE.
+        p.start_year (int, optional): minimum priority date year. Defaults to DEFAULT_START_YEAR.
+        p.end_year (int, optional): maximum priority date year. Defaults to DEFAULT_END_YEAR.
         p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        p.min_patent_years (int, optional): minimum patent age in years. Defaults to 10.
-        p.limit (int, optional): max results to return. Defaults to MAX_SEARCH_RESULTS.
+        p.term_fields (Sequence[TermField], optional): which fields to search for terms in. Defaults to DEFAULT_TERM_FIELDS.
+        p.limit (int, optional): max results to return.
         p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
 
     Returns: a list of matching patent applications
@@ -153,27 +113,30 @@ async def search(params: CommonSearchParams | PatentSearchParams) -> list[Scored
     [t.search_rank for t in p]
     ```
     """
-    p = PatentSearchParams(**params.__dict__)
-    args = {
-        "exemplar_patents": p.exemplar_patents,
-        "include": p.include,
-        "query_type": p.query_type,
-        "terms": p.terms,
-    }
+    p = PatentSearchParams.parse(params)
+    search_criteria = DocumentSearchCriteria.parse(p)
     key = get_id(
         {
-            **args,
+            **search_criteria.__dict__,
             "api": "patents",
         }
     )
-    search_partial = partial(_search, **args)
+
+    async def _search(limit: int):
+        where = get_where_clause(search_criteria)
+
+        return await find_many(
+            where=where,
+            include=p.include,
+            take=limit,
+        )
 
     if p.skip_cache == True:
-        patents = await search_partial(limit=p.limit)
+        patents = await _search(limit=p.limit)
         return patents
 
     return await retrieve_with_cache_check(
-        search_partial,
+        _search,
         key=key,
         limit=p.limit,
         decode=lambda str_data: [ScoredPatent(**p) for p in storage_decoder(str_data)],

@@ -10,7 +10,6 @@ from handlers.utils import handle_async
 from typings.client import AssetSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
-from .constants import DEFAULT_SEARCH_PARAMS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -26,10 +25,7 @@ async def _search(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/assets/search?terms=asthma`
     """
     p = AssetSearchParams(
-        **{
-            **DEFAULT_SEARCH_PARAMS,
-            **(raw_event.get("queryStringParameters") or {}),
-        },
+        **(raw_event.get("queryStringParameters") or {}),
     )
 
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):

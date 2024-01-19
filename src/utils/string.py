@@ -29,7 +29,7 @@ def get_id(value: Idable) -> str:
         )
 
     if isinstance(value, list):
-        value = "_".join(value)
+        value = "_".join([str(v) for v in value])
 
     if isinstance(value, bool):
         value = str(value)

@@ -260,7 +260,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             JOIN umls on umls.id = s.cid
             on conflict do nothing;
         """
-        client = await prisma_client(300)
+        client = await prisma_client(600)
         await client.execute_raw(query)
 
     @staticmethod
@@ -268,7 +268,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         add counts to biomedical_entity (used for autocomplete ordering)
         """
-        client = await prisma_client(None)
+        client = await prisma_client(6)
         # add counts to biomedical_entity & owner
         for table in ENTITY_MAP_TABLES:
             await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
@@ -303,7 +303,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 AND entity_synonym.entity_id=biomedical_entity.id
             """
 
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         for table in ["intervenable", "indicatable"]:
             query = get_query(table)
             await client.execute_raw(query)
@@ -366,7 +366,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         }
 
         # execute the spec
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         for table, specs in spec.items():
             for spec in specs:
                 query = get_query(table, spec["filters"])

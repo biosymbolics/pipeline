@@ -8,7 +8,7 @@ from prisma.types import (
 )
 
 from typings import TermField
-from typings.client import QueryType
+from typings.client import DocumentSearchCriteria, QueryType
 
 T = TypeVar(
     "T",
@@ -20,9 +20,7 @@ T = TypeVar(
 
 
 def get_where_clause(
-    terms: Sequence[str],
-    term_fields: Sequence[TermField],
-    query_type: QueryType,
+    p: DocumentSearchCriteria,
     return_type: Type[T],
 ) -> T:
     """
@@ -62,14 +60,17 @@ def get_where_clause(
     term_clause = [
         {
             "OR": flatten(
-                [get_predicates(term.lower(), term_field) for term_field in term_fields]
+                [
+                    get_predicates(term.lower(), term_field)
+                    for term_field in p.term_fields
+                ]
             )
         }
-        for term in terms
+        for term in p.terms
     ]
 
     # then ANDing or ORing those clauses will abide by the desired query type
-    if query_type == "AND":
+    if p.query_type == "AND":
         return cast(T, {"AND": term_clause})
 
     return cast(T, {"OR": term_clause})

@@ -11,7 +11,7 @@ from clients.documents.patents.types import (
     DocumentReportRecord,
 )
 from clients.low_level.prisma import prisma_client
-from typings.client import CommonSearchParams
+from typings.client import DocumentSearchParams
 from typings.documents.common import DocType, TermField
 
 from .constants import X_DIMENSIONS, Y_DIMENSIONS
@@ -99,7 +99,7 @@ class XYReport:
 
     @staticmethod
     async def group_by_xy(
-        search_params: CommonSearchParams,
+        search_params: DocumentSearchParams,
         x_dimension: str,  # keyof typeof X_DIMENSIONS
         x_title: str | None = None,
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
@@ -140,7 +140,7 @@ class XYReport:
         if y_dimension and y_dimension not in Y_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
-        client = await prisma_client(300)
+        client = await prisma_client(120)
         query = XYReport.get_query(
             x_dimension,
             y_dimension,
@@ -184,7 +184,7 @@ class XYReport:
     @staticmethod
     async def group_by_xy_for_filters(
         filters: dict[str, str],
-        search_params: CommonSearchParams,
+        search_params: DocumentSearchParams,
         x_dimension: str,  # keyof typeof X_DIMENSIONS
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
     ) -> list[DocumentReport]:

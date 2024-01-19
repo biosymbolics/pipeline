@@ -36,7 +36,7 @@ async def find_many(
     """
     start = time.monotonic()
 
-    client = await prisma_client(300)
+    client = await prisma_client(120)
     trials = await Trial.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )

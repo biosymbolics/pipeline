@@ -103,7 +103,7 @@ class UmlsLoader:
 
         Run *after* BiomedicalEntityEtl
         """
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         records = await Umls.prisma(client).find_many(where={"instance_rollup_id": ""})
 
         # might be slow, if doing betweenness centrality calc.

@@ -4,6 +4,7 @@ Asset client
 import asyncio
 from dataclasses import dataclass
 from functools import partial
+import time
 from typing import Sequence
 from prisma import Prisma
 from pydash import compact, flatten, group_by
@@ -12,16 +13,24 @@ from pydantic import BaseModel
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
-from typings.client import AssetSearchParams, QueryType
+from typings.client import (
+    AssetSearchParams,
+    DocumentSearchCriteria,
+    DocumentSearchParams,
+    PatentSearchParams as PatentParams,
+    QueryType,
+    RegulatoryApprovalSearchParams as ApprovalParams,
+    TrialSearchParams as TrialParams,
+)
 from typings.core import Dataclass
 from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
 from typings.assets import Asset
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 from utils.string import get_id
 
-from ..approvals import find_many as find_regulatory_approvals
-from ..patents import find_many as find_patents
-from ..trials import find_many as find_trials
+from .. import approvals as regulatory_approval_client
+from .. import patents as patent_client
+from .. import trials as trial_client
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -44,31 +53,6 @@ class EntWithDocResult(DocResults):
     # id: int
     name: str
     child: str | None = None
-
-
-async def get_doc_ids(
-    client: Prisma,
-    terms: Sequence[str],
-    query_type: QueryType,
-    term_fields: Sequence[TermField],
-) -> list[str]:
-    def get_doc_query(table) -> str:
-        tf_criteria = " OR ".join([f"{tf.name} = ANY($1)" for tf in term_fields])
-        return f"""
-            SELECT COALESCE(patent_id, regulatory_approval_id, trial_id) as id
-            FROM {table}
-            WHERE {tf_criteria}
-        """
-
-    doc_result = await client.query_raw(
-        f"""
-        SELECT distinct id
-        FROM ({' UNION ALL '.join([get_doc_query(table) for table in ENTITY_MAP_TABLES])}) s
-        """,
-        terms,
-    )
-
-    return [r["id"] for r in doc_result]
 
 
 async def get_docs_by_entity_id(
@@ -103,28 +87,19 @@ async def get_docs_by_entity_id(
     return ents_with_docs
 
 
-async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
+async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     """
     Gets docs by type, matching doc_ids
     """
 
     regulatory_approvals = asyncio.create_task(
-        find_regulatory_approvals(
-            where={"id": {"in": doc_ids}},
-            include={},
-        )
+        regulatory_approval_client.search(ApprovalParams.parse(p, include={}))
     )
     patents = asyncio.create_task(
-        find_patents(
-            where={"id": {"in": doc_ids}},
-            include={"assignees": True},
-        )
+        patent_client.search(PatentParams.parse(p, include={"assignees": True}))
     )
     trials = asyncio.create_task(
-        find_trials(
-            where={"id": {"in": doc_ids}},
-            include={"sponsor": True},
-        )
+        trial_client.search(TrialParams.parse(p, include={"sponsor": True}))
     )
 
     await asyncio.gather(regulatory_approvals, patents, trials)
@@ -136,30 +111,22 @@ async def get_matching_docs(doc_ids: list[str]) -> DocsByType:
     )
 
 
-async def _search(
-    terms: Sequence[str],
-    query_type: QueryType,
-    limit: int,
-    term_fields: Sequence[TermField] = [
-        TermField.canonical_name,
-        TermField.instance_rollup,
-    ],
-) -> list[Asset]:
+async def _search(p: DocumentSearchParams) -> list[Asset]:
     """
     Internal search for documents grouped by entity
     """
-    client = await prisma_client(300)
-
-    # doc ids that match the suppied terms
-    docs_ids = await get_doc_ids(client, terms, query_type, term_fields)
+    start = time.monotonic()
+    client = await prisma_client(120)
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
-    docs_by_type = await get_matching_docs(docs_ids)
+    docs_by_type = await get_matching_docs(p)
+
+    doc_ids: list[str] = [k for d in flatten(docs_by_type.values()) for k in d.keys()]
 
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
         client,
-        docs_ids,
+        doc_ids,
         TermField.instance_rollup,
         TermField.canonical_name,
         EntityMapType.intervention,
@@ -212,34 +179,33 @@ async def _search(
         for rollup, ewds in grouped_ents.items()
     ]
 
-    return sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)[
-        0:limit
+    assets = sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)[
+        0 : p.limit
     ]
+
+    logger.info("Asset search took %s seconds", round(time.monotonic() - start))
+    return assets
 
 
 async def search(p: AssetSearchParams) -> list[Asset]:
     """
     Search for documents, grouped by entity
     """
-    args = {
-        "terms": p.terms,
-        "query_type": p.query_type,
-    }
+    search_criteria = DocumentSearchParams.parse(p)
     key = get_id(
         {
-            **args,
+            **search_criteria.__dict__,
             "api": "assets",
         }
     )
-    search_partial = partial(_search, **args)
+    search_partial = partial(_search, search_criteria)
 
     if p.skip_cache == True:
-        patents = await search_partial(limit=p.limit)
+        patents = await search_partial()
         return patents
 
     return await retrieve_with_cache_check(
         search_partial,
         key=key,
-        limit=p.limit,
         decode=lambda str_data: [Asset.load(**p) for p in storage_decoder(str_data)],
     )

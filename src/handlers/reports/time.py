@@ -7,7 +7,7 @@ import traceback
 
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
-from typings.client import CommonSearchParams
+from typings.client import DocumentSearchParams
 from typings import DOMAINS_OF_INTEREST
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
@@ -27,7 +27,7 @@ async def _aggregate_over_time(raw_event: dict, context):
     - Remote: `serverless invoke --function documents-over-time --data='{"queryStringParameters": { "terms":"asthma" }}'`
     - API: `curl https://api.biosymbolics.ai/reports/time?terms=asthma`
     """
-    p = CommonSearchParams(
+    p = DocumentSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
 

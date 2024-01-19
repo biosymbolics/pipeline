@@ -7,7 +7,7 @@ import logging
 from clients.documents.reports import XYReport
 from handlers.utils import handle_async
 from typings import DOMAINS_OF_INTEREST, TermField
-from typings.client import CommonSearchParams
+from typings.client import DocumentSearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import DEFAULT_REPORT_PARAMS
@@ -26,7 +26,7 @@ async def _summarize(raw_event: dict, context):
     - Remote: `serverless invoke --function summarize-documents --data='{"queryStringParameters": { "terms":"gpr84 antagonist" }}'`
     - API: `curl https://api.biosymbolics.ai/reports/summarize?terms=asthma`
     """
-    p = CommonSearchParams(
+    p = DocumentSearchParams(
         **{**raw_event["queryStringParameters"], **DEFAULT_REPORT_PARAMS}
     )
 

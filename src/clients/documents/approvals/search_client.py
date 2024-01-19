@@ -1,21 +1,19 @@
 """
 Regulatory approvals client
 """
-from functools import partial
 import logging
-import time
-from typing import Sequence
-from prisma.types import RegulatoryApprovalInclude, RegulatoryApprovalWhereInput
+from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.documents.utils import get_where_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import (
-    QueryType,
     RegulatoryApprovalSearchParams,
     ScoredRegulatoryApproval,
-    TermField,
 )
-from typings.client import DEFAULT_REGULATORY_APPROVAL_INCLUDE
+from typings.client import (
+    DocumentSearchCriteria,
+    DocumentSearchParams,
+)
 from utils.string import get_id
 
 from .client import find_many
@@ -25,77 +23,46 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-MAX_SEARCH_RESULTS = 2000
-
-
-async def _search(
-    terms: Sequence[str],
-    query_type: QueryType = "OR",
-    term_fields: Sequence[TermField] = [
-        TermField.canonical_name,
-        TermField.instance_rollup,
-    ],
-    include: RegulatoryApprovalInclude = DEFAULT_REGULATORY_APPROVAL_INCLUDE,
-    limit: int = MAX_SEARCH_RESULTS,
+async def search(
+    params: DocumentSearchParams | RegulatoryApprovalSearchParams,
 ) -> list[ScoredRegulatoryApproval]:
     """
     Search regulatory approvals by terms
 
-    REPL:
-    ```
-    import asyncio
-    from clients.approvals.search_client import _search
-    asyncio.run(_search(["asthma"]))
-    ```
+    Args:
+        p.terms (Sequence[str]): list of terms to search for
+        p.include (RegulatoryApprovalInclude, optional): whether to include assignees, inventors, interventions, indications. Defaults to DEFAULT_PATENT_INCLUDE.
+        p.start_year (int, optional): minimum priority date year. Defaults to DEFAULT_START_YEAR.
+        p.end_year (int, optional): maximum priority date year. Defaults to DEFAULT_END_YEAR.
+        p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
+        p.term_fields (Sequence[TermField], optional): which fields to search for terms in. Defaults to DEFAULT_TERM_FIELDS.
+        p.limit (int, optional): max results to return.
+        p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
     """
-    start = time.monotonic()
-
-    if not isinstance(terms, list):
-        logger.error("Terms must be a list: %s (%s)", terms, type(terms))
-        raise ValueError("Terms must be a list")
-
-    where = get_where_clause(
-        terms, term_fields, query_type, RegulatoryApprovalWhereInput
-    )
-
-    approvals = await find_many(
-        where=where,
-        include=include,
-        take=limit,
-    )
-
-    logger.info(
-        "Search took %s seconds (%s)",
-        round(time.monotonic() - start, 2),
-        len(approvals),
-    )
-
-    return approvals
-
-
-async def search(p: RegulatoryApprovalSearchParams) -> list[ScoredRegulatoryApproval]:
-    """
-    Search regulatory approvals by terms
-    """
-    args = {
-        "terms": p.terms,
-        "query_type": p.query_type,
-        "include": p.include,
-    }
+    p = RegulatoryApprovalSearchParams.parse(params)
+    search_criteria = DocumentSearchCriteria.parse(p)
     key = get_id(
         {
-            **args,
+            **search_criteria.__dict__,
             "api": "approvals",
         }
     )
-    search_partial = partial(_search, **args)
+
+    async def _search(limit: int):
+        where = get_where_clause(search_criteria, RegulatoryApprovalWhereInput)
+
+        return await find_many(
+            where=where,
+            include=p.include,
+            take=limit,
+        )
 
     if p.skip_cache == True:
-        approvals = await search_partial(limit=p.limit)
+        approvals = await _search(limit=p.limit)
         return approvals
 
     return await retrieve_with_cache_check(
-        search_partial,
+        _search,
         key=key,
         limit=p.limit,
         decode=lambda str_data: [
