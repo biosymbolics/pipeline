@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Annotated, Literal, TypeVar
-from pydantic import BaseModel, Field, field_validator
+from typing import Annotated, Any, Literal, TypeVar, TypedDict, Union
+from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
 from typings.documents.common import DocType
@@ -36,6 +36,18 @@ DEFAULT_TRIAL_INCLUDE: TrialInclude = {
 }
 
 
+def include_discriminator(v: Any) -> str:
+    if isinstance(v, dict):
+        if v.get("assignees"):
+            return "patent_include"
+        elif v.get("sponsor"):
+            return "trial_include"
+        elif v.get("interventions"):
+            return "regulatory_approval_include"
+
+    return "no_include"
+
+
 class DocumentSearchCriteria(BaseModel):
     """
     Document search criteria
@@ -48,6 +60,15 @@ class DocumentSearchCriteria(BaseModel):
     term_fields: Annotated[
         list[TermField], Field(validate_default=True)
     ] = DEFAULT_TERM_FIELDS
+    include: Annotated[
+        Union[
+            Annotated[PatentInclude, Tag("patent_include")],
+            Annotated[RegulatoryApprovalInclude, Tag("regulatory_approval_include")],
+            Annotated[TrialInclude, Tag("trial_include")],
+            Annotated[None, Tag("no_include")],
+        ],
+        Discriminator(include_discriminator),
+    ] = None
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
@@ -69,7 +90,9 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 class PatentSearchParams(DocumentSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
-    include: PatentInclude = DEFAULT_PATENT_INCLUDE
+    include: Annotated[
+        Union[PatentInclude, None], Field(validate_default=True)
+    ] = DEFAULT_PATENT_INCLUDE
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
@@ -80,11 +103,15 @@ class PatentSearchParams(DocumentSearchParams):
 
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
-    include: RegulatoryApprovalInclude = DEFAULT_REGULATORY_APPROVAL_INCLUDE
+    include: Annotated[
+        Union[RegulatoryApprovalInclude, None], Field(validate_default=True)
+    ] = DEFAULT_REGULATORY_APPROVAL_INCLUDE
 
 
 class TrialSearchParams(DocumentSearchParams):
-    include: TrialInclude = DEFAULT_TRIAL_INCLUDE
+    include: Annotated[
+        Union[TrialInclude, None], Field(validate_default=True)
+    ] = DEFAULT_TRIAL_INCLUDE
 
 
 class AssetSearchParams(DocumentSearchParams):
@@ -92,6 +119,7 @@ class AssetSearchParams(DocumentSearchParams):
     entity_map_type: Annotated[
         EntityMapType, Field(validate_default=True)
     ] = EntityMapType.intervention
+    include: Annotated[None, Field()] = None
 
     @field_validator("entity_map_type", mode="before")
     def entity_map_type_from_string(cls, v):
