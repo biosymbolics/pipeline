@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Annotated, Any, Literal, TypeVar, TypedDict, Union
+import inspect
+from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
@@ -70,7 +71,7 @@ class DocumentSearchCriteria(TermSearchCriteria):
             Annotated[None, Tag("no_include")],
         ],
         Discriminator(include_discriminator),
-    ] = None
+    ]
     start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
 
     @field_validator("terms", mode="before")
@@ -82,8 +83,8 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
     @classmethod
     def parse(cls, params: "DocumentSearchCriteria", **kwargs):
-        p = {k: v for k, v in params.__dict__.items() if k in params.model_fields_set}
-        return cls(**p, **kwargs)
+        p = {k: v for k, v in params.__dict__.items() if k in cls.model_fields.keys()}
+        return cls(**{**p, **kwargs})
 
 
 class DocumentSearchParams(DocumentSearchCriteria):

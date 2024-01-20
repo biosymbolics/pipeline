@@ -119,6 +119,7 @@ async def search(
     ```
     """
     p = PatentSearchParams.parse(params)
+
     search_criteria = DocumentSearchCriteria.parse(p)
     key = get_id(
         {
