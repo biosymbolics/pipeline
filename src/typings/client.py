@@ -48,18 +48,20 @@ def include_discriminator(v: Any) -> str:
     return "no_include"
 
 
-class DocumentSearchCriteria(BaseModel):
+class TermSearchCriteria(BaseModel):
+    query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
+    terms: Annotated[list[str], Field(validate_default=True)] = []
+    term_fields: Annotated[
+        list[TermField], Field(validate_default=True)
+    ] = DEFAULT_TERM_FIELDS
+
+
+class DocumentSearchCriteria(TermSearchCriteria):
     """
     Document search criteria
     """
 
     end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
-    query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
-    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
-    terms: Annotated[list[str], Field(validate_default=True)] = []
-    term_fields: Annotated[
-        list[TermField], Field(validate_default=True)
-    ] = DEFAULT_TERM_FIELDS
     include: Annotated[
         Union[
             Annotated[PatentInclude, Tag("patent_include")],
@@ -69,6 +71,7 @@ class DocumentSearchCriteria(BaseModel):
         ],
         Discriminator(include_discriminator),
     ] = None
+    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):

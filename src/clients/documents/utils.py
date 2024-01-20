@@ -1,26 +1,28 @@
-from typing import Sequence, Type, TypeVar, cast
+from typing import Type, TypeVar, cast
 from pydash import flatten
 from prisma.types import (
     PatentWhereInput,
     PatentWhereInputRecursive1,
     RegulatoryApprovalWhereInput,
     TrialWhereInput,
+    TrialWhereInputRecursive1,
 )
 
 from typings import TermField
-from typings.client import DocumentSearchCriteria, QueryType
+from typings.client import TermSearchCriteria
 
 T = TypeVar(
     "T",
     bound=RegulatoryApprovalWhereInput
     | TrialWhereInput
     | PatentWhereInput
-    | PatentWhereInputRecursive1,
+    | PatentWhereInputRecursive1
+    | TrialWhereInputRecursive1,
 )
 
 
-def get_where_clause(
-    p: DocumentSearchCriteria,
+def get_term_clause(
+    p: TermSearchCriteria,
     return_type: Type[T],
 ) -> T:
     """
@@ -40,7 +42,7 @@ def get_where_clause(
     # choose mapping tables (from which we look for term matches) based on return type
     if return_type == PatentWhereInput or return_type == PatentWhereInputRecursive1:
         mapping_tables = {**base_mapping_tables, "assignees": "some"}
-    elif return_type == TrialWhereInput:
+    elif return_type == TrialWhereInput or return_type == TrialWhereInputRecursive1:
         mapping_tables = {**base_mapping_tables, "sponsor": "is"}
     elif return_type == RegulatoryApprovalWhereInput:
         mapping_tables = base_mapping_tables

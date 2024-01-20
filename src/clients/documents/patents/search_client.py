@@ -1,6 +1,7 @@
 """
 Patent client
 """
+from datetime import datetime
 from functools import partial
 import logging
 from typing import Sequence
@@ -22,9 +23,8 @@ from typings.client import (
 from utils.string import get_id
 
 from .client import find_many
-from .utils import get_max_priority_date
 
-from ..utils import get_where_clause as get_term_clause
+from ..utils import get_term_clause
 
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,12 @@ def get_where_clause(p: DocumentSearchCriteria) -> PatentWhereInput:
     where: PatentWhereInput = {
         "AND": [
             term_clause,
-            {"priority_date": {"gte": get_max_priority_date(0)}},  # TODO
+            {
+                "priority_date": {
+                    "gte": datetime(p.start_year, 1, 1),
+                    "lte": datetime(p.end_year, 1, 1),
+                }
+            },
         ],
     }
 

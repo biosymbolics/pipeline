@@ -1,10 +1,11 @@
 """
 Regulatory approvals client
 """
+from datetime import datetime
 import logging
 from prisma.types import RegulatoryApprovalWhereInput
 
-from clients.documents.utils import get_where_clause
+from clients.documents.utils import get_term_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import (
     RegulatoryApprovalSearchParams,
@@ -21,6 +22,23 @@ from .client import find_many
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def get_where_clause(p: DocumentSearchCriteria) -> RegulatoryApprovalWhereInput:
+    """
+    Get where clause for regulatory approvals
+    """
+    term_clause = get_term_clause(p, RegulatoryApprovalWhereInput)
+
+    where: RegulatoryApprovalWhereInput = {
+        **term_clause,
+        "approval_date": {
+            "gte": datetime(p.start_year, 1, 1),
+            "lte": datetime(p.end_year, 1, 1),
+        },
+    }
+
+    return where
 
 
 async def search(
@@ -49,13 +67,8 @@ async def search(
     )
 
     async def _search(limit: int):
-        where = get_where_clause(search_criteria, RegulatoryApprovalWhereInput)
-
-        return await find_many(
-            where=where,
-            include=p.include,
-            take=limit,
-        )
+        where = get_where_clause(search_criteria)
+        return await find_many(where=where, include=p.include, take=limit)
 
     if p.skip_cache == True:
         approvals = await _search(limit=p.limit)

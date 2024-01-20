@@ -1,10 +1,11 @@
 """
 Trials client
 """
+from datetime import datetime
 import logging
-from prisma.types import TrialWhereInput
-from clients.documents.utils import get_where_clause
+from prisma.types import TrialWhereInput, TrialWhereInputRecursive1
 
+from clients.documents.utils import get_term_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import TrialSearchParams
 from typings.client import (
@@ -18,6 +19,24 @@ from .client import find_many
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def get_where_clause(p: DocumentSearchCriteria) -> TrialWhereInput:
+    term_clause = get_term_clause(p, TrialWhereInputRecursive1)
+
+    where: TrialWhereInput = {
+        "AND": [
+            term_clause,
+            {
+                "start_date": {
+                    "gte": datetime(p.start_year, 1, 1),
+                    "lte": datetime(p.end_year, 1, 1),
+                }
+            },
+        ],
+    }
+
+    return where
 
 
 async def search(params: DocumentSearchParams | TrialSearchParams) -> list[ScoredTrial]:
@@ -44,13 +63,8 @@ async def search(params: DocumentSearchParams | TrialSearchParams) -> list[Score
     )
 
     async def _search(limit: int):
-        where = get_where_clause(search_criteria, TrialWhereInput)
-
-        return await find_many(
-            where=where,
-            include=p.include,
-            take=limit,
-        )
+        where = get_where_clause(search_criteria)
+        return await find_many(where=where, include=p.include, take=limit)
 
     if p.skip_cache == True:
         trials = await _search(limit=p.limit)
