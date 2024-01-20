@@ -25,7 +25,11 @@ async def _document_characteristics(raw_event: dict, context):
     - API: `curl https://api.biosymbolics.ai/reports/graph?terms=asthma`
     """
     p = DocumentCharacteristicParams(
-        **{**raw_event["queryStringParameters"], "include": {}, **DEFAULT_REPORT_PARAMS}
+        **{
+            **raw_event["queryStringParameters"],
+            "include": None,
+            **DEFAULT_REPORT_PARAMS,
+        }
     )
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
         logger.error("Missing or malformed params: %s", p)
