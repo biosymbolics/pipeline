@@ -73,7 +73,11 @@ async def get_docs_by_entity_id(
             array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
             array_remove(array_agg(trial_id), NULL) as trials
         FROM {entity_map_type.value} -- intervenable or indicatable
-        WHERE COALESCE(patent_id, regulatory_approval_id, trial_id) = ANY($1)
+        WHERE (
+            patent_id = ANY($1)
+            OR regulatory_approval_id = ANY($1)
+            OR trial_id = ANY($1)
+        )
         AND entity_id is not NULL
         AND instance_rollup<>'' -- TODO?
         GROUP BY
@@ -183,6 +187,7 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
         0 : p.limit
     ]
 
+    # half the time is in fetching all docs, the other half in transmitting.
     logger.info("Asset search took %s seconds", round(time.monotonic() - start))
     return assets
 
