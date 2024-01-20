@@ -111,14 +111,13 @@ async def retrieve_with_cache_check(
     s3 = get_boto_client("s3")
 
     try:
-        logger.info("Checking cache `%s` for key `%s`", cache_name, key)
-
         if limit is not None:
             # If limit is set, first check if there is a limit=all result.
             response = get_cache_with_all_check(key, limit, cache_name=cache_name)
         else:
             response = s3.get_object(Bucket=cache_name, Key=get_cache_key(key))
 
+        logger.info("Cache hit (%s) for key `%s`", cache_name, key)
         data = decode(response["Body"].read().decode("utf-8"))
 
         if limit is not None and len(data) > limit:
@@ -128,7 +127,7 @@ async def retrieve_with_cache_check(
         if not ex.response["Error"]["Code"] == "NoSuchKey":
             raise ex
 
-        logger.info("Checking miss for key: %s", key)
+        logger.info("Cache miss for key: %s", key)
 
         # If not in cache, perform the operation
         if limit:

@@ -1,28 +1,28 @@
-from typing import Sequence, Type, TypeVar, cast
+from typing import Type, TypeVar, cast
 from pydash import flatten
 from prisma.types import (
     PatentWhereInput,
     PatentWhereInputRecursive1,
     RegulatoryApprovalWhereInput,
     TrialWhereInput,
+    TrialWhereInputRecursive1,
 )
 
 from typings import TermField
-from typings.client import QueryType
+from typings.client import TermSearchCriteria
 
 T = TypeVar(
     "T",
     bound=RegulatoryApprovalWhereInput
     | TrialWhereInput
     | PatentWhereInput
-    | PatentWhereInputRecursive1,
+    | PatentWhereInputRecursive1
+    | TrialWhereInputRecursive1,
 )
 
 
-def get_where_clause(
-    terms: Sequence[str],
-    term_fields: Sequence[TermField],
-    query_type: QueryType,
+def get_term_clause(
+    p: TermSearchCriteria,
     return_type: Type[T],
 ) -> T:
     """
@@ -42,7 +42,7 @@ def get_where_clause(
     # choose mapping tables (from which we look for term matches) based on return type
     if return_type == PatentWhereInput or return_type == PatentWhereInputRecursive1:
         mapping_tables = {**base_mapping_tables, "assignees": "some"}
-    elif return_type == TrialWhereInput:
+    elif return_type == TrialWhereInput or return_type == TrialWhereInputRecursive1:
         mapping_tables = {**base_mapping_tables, "sponsor": "is"}
     elif return_type == RegulatoryApprovalWhereInput:
         mapping_tables = base_mapping_tables
@@ -62,14 +62,17 @@ def get_where_clause(
     term_clause = [
         {
             "OR": flatten(
-                [get_predicates(term.lower(), term_field) for term_field in term_fields]
+                [
+                    get_predicates(term.lower(), term_field)
+                    for term_field in p.term_fields
+                ]
             )
         }
-        for term in terms
+        for term in p.terms
     ]
 
     # then ANDing or ORing those clauses will abide by the desired query type
-    if query_type == "AND":
+    if p.query_type == "AND":
         return cast(T, {"AND": term_clause})
 
     return cast(T, {"OR": term_clause})

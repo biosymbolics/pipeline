@@ -83,7 +83,7 @@ class BaseOwnerEtl(BaseEntityEtl):
         Args:
             names: list of names to insert
         """
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         lookup_map = self.generate_lookup_map(names)
         insert_recs = self._generate_insert_records(names, lookup_map)
 
@@ -145,7 +145,7 @@ class BaseOwnerEtl(BaseEntityEtl):
         """
         add counts to owner table (used for autocomplete ordering)
         """
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
         await client.execute_raw(
             f"INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id"
@@ -161,7 +161,7 @@ class BaseOwnerEtl(BaseEntityEtl):
         - Link "ownable" to canonical entities
         - add instance_rollup and category_rollups
         """
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         await client.execute_raw(
             f"""
             UPDATE ownable

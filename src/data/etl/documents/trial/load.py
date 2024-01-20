@@ -266,7 +266,7 @@ class TrialLoader(BaseDocumentEtl):
         Copy data from Postgres (drugcentral) to Postgres (patents)
         """
 
-        client = await prisma_client(None)
+        client = await prisma_client(600)
 
         async def handle_batch(rows: list[dict]) -> bool:
             # create main trial records

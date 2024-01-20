@@ -4,6 +4,7 @@ Patent reports
 
 import asyncio
 import logging
+from typing import Sequence
 import polars as pl
 
 from clients.documents.patents.types import (
@@ -11,7 +12,7 @@ from clients.documents.patents.types import (
     DocumentReportRecord,
 )
 from clients.low_level.prisma import prisma_client
-from typings.client import CommonSearchParams
+from typings.client import DocumentSearchParams
 from typings.documents.common import DocType, TermField
 
 from .constants import X_DIMENSIONS, Y_DIMENSIONS
@@ -48,10 +49,16 @@ class XYReport:
         """
 
     @staticmethod
+    def _get_search_subquery(doc_type: DocType, filter: str) -> str:
+        return XYReport._get_entity_subquery("'NX'", doc_type, filter)
+
+    @staticmethod
     def get_query(
         x: str,
         y: str | None,
-        term_field: TermField,  # field against which to search, e.g. canonical_name or instance_rollup
+        term_fields: Sequence[
+            TermField
+        ],  # field against which to search, e.g. canonical_name or instance_rollup
         aggregation: Aggregation,
         doc_type: DocType,
         filter: str | None = None,
@@ -66,17 +73,17 @@ class XYReport:
 
         # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
         if x_info.is_entity:
-            sq = XYReport._get_entity_subquery(
+            entity_sq = XYReport._get_entity_subquery(
                 x, doc_type, f"coalesce(length({x}), 0) > 0"
             )
-            entity_join = f"LEFT JOIN {sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
+            entity_join = f"LEFT JOIN {entity_sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
         else:
             entity_join = ""
 
         # search join to determine result set over which the report is generated
-        # should be identical to search (once we implement query_type)
-        search_sq = XYReport._get_entity_subquery(
-            term_field.name, doc_type, f"{term_field.name} = ANY($1)"
+        # TODO: make identical to search
+        search_sq = XYReport._get_search_subquery(
+            doc_type, " OR ".join([f"{tf.name} = ANY($1)" for tf in term_fields])
         )
 
         return f"""
@@ -99,7 +106,7 @@ class XYReport:
 
     @staticmethod
     async def group_by_xy(
-        search_params: CommonSearchParams,
+        search_params: DocumentSearchParams,
         x_dimension: str,  # keyof typeof X_DIMENSIONS
         x_title: str | None = None,
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
@@ -125,32 +132,29 @@ class XYReport:
             filter (str, optional): additional filter. Defaults to None.
             impute_missing (bool, optional): ensure that for every x, there is a y.
                                              only applies if y_dimension is set. defaults to True.
-        Usage:
-        ```
-        group_by_xy(
-            search_params=SearchParams(terms=["asthma"]),
-            x_dimension="canonical_name",
-            x_title="disease",
-            y_dimension="priority_date",
-        )
-        ```
         """
         if x_dimension not in X_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid x dimension: {x_dimension}")
         if y_dimension and y_dimension not in Y_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
-        client = await prisma_client(300)
+        client = await prisma_client(120)
         query = XYReport.get_query(
             x_dimension,
             y_dimension,
-            term_field=TermField.canonical_name,  # TODO
+            term_fields=search_params.term_fields,
             filter=filter,
             aggregation=aggregation,
             doc_type=doc_type,
         )
         logger.debug("Running query for xy report: %s", query)
         results = await client.query_raw(query, search_params.terms)
+
+        if len(results) == 0:
+            logger.warning("No results for query: %s", query)
+            return DocumentReport(
+                data=[], x=x_title or x_dimension, y=y_title or y_dimension
+            )
 
         if y_dimension and impute_missing:
             # pivot into x by [y1, y2, y3, ...] format, fill nulls with 0
@@ -178,7 +182,7 @@ class XYReport:
     @staticmethod
     async def group_by_xy_for_filters(
         filters: dict[str, str],
-        search_params: CommonSearchParams,
+        search_params: DocumentSearchParams,
         x_dimension: str,  # keyof typeof X_DIMENSIONS
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
     ) -> list[DocumentReport]:

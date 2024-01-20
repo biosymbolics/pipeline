@@ -182,7 +182,7 @@ class PatentLoader(BaseDocumentEtl):
         Create regulatory approval records
         """
 
-        client = await prisma_client(None)
+        client = await prisma_client(600)
 
         async def handle_batch(batch: list[dict]) -> bool:
             # create patent records

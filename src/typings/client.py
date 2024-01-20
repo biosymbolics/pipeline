@@ -1,25 +1,78 @@
-from typing import Annotated, Literal
-from prisma.types import PatentInclude
-from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
+import inspect
+from typing import Annotated, Any, Literal, Union
+from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
+from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
-from typings.documents.common import EntityMapType, TermField
+from typings.documents.common import DocType
+
+from .documents.common import EntityMapType, TermField
 
 
 QueryType = Literal["AND", "OR"]
+DEFAULT_QUERY_TYPE: QueryType = "AND"
+DEFAULT_TERM_FIELDS = [
+    TermField.canonical_name,
+    TermField.instance_rollup,
+]
+DEFAULT_START_YEAR = datetime.today().year - 10
+DEFAULT_END_YEAR = datetime.today().year + 1
+DEFAULT_LIMIT = 2000
+
+DEFAULT_PATENT_INCLUDE: PatentInclude = {
+    "assignees": True,
+    # "inventors": True,
+    "interventions": True,
+    "indications": True,
+}
+DEFAULT_REGULATORY_APPROVAL_INCLUDE: RegulatoryApprovalInclude = {
+    "interventions": True,
+    "indications": True,
+}
+DEFAULT_TRIAL_INCLUDE: TrialInclude = {
+    "interventions": True,
+    "indications": True,
+    "outcomes": True,
+    "sponsor": True,
+}
 
 
-class BaseSearchParams(BaseModel):
-    limit: Annotated[int, Field(validate_default=True)] = 1000
-    query_type: Annotated[QueryType, Field(validate_default=True)] = "OR"  # TODO AND
-    skip_cache: Annotated[bool, Field(validate_default=True)] = False
+def include_discriminator(v: Any) -> str:
+    if isinstance(v, dict):
+        if v.get("assignees"):
+            return "patent_include"
+        elif v.get("sponsor"):
+            return "trial_include"
+        elif v.get("interventions"):
+            return "regulatory_approval_include"
+
+    return "no_include"
 
 
-class BasePatentSearchParams(BaseSearchParams):
-    min_patent_years: Annotated[int, Field(validate_default=True)] = 10
-
-
-class CommonSearchParams(BaseSearchParams):
+class TermSearchCriteria(BaseModel):
+    query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
     terms: Annotated[list[str], Field(validate_default=True)] = []
+    term_fields: Annotated[
+        list[TermField], Field(validate_default=True)
+    ] = DEFAULT_TERM_FIELDS
+
+
+class DocumentSearchCriteria(TermSearchCriteria):
+    """
+    Document search criteria
+    """
+
+    end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
+    include: Annotated[
+        Union[
+            Annotated[PatentInclude, Tag("patent_include")],
+            Annotated[RegulatoryApprovalInclude, Tag("regulatory_approval_include")],
+            Annotated[TrialInclude, Tag("trial_include")],
+            Annotated[None, Tag("no_include")],
+        ],
+        Discriminator(include_discriminator),
+    ]
+    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
@@ -28,9 +81,22 @@ class CommonSearchParams(BaseSearchParams):
         terms = [t.strip() for t in (v.split(";") if v else [])]
         return terms
 
+    @classmethod
+    def parse(cls, params: "DocumentSearchCriteria", **kwargs):
+        p = {k: v for k, v in params.__dict__.items() if k in cls.model_fields.keys()}
+        return cls(**{**p, **kwargs})
 
-class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
+
+class DocumentSearchParams(DocumentSearchCriteria):
+    limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
+    skip_cache: Annotated[bool, Field(validate_default=True)] = False
+
+
+class PatentSearchParams(DocumentSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
+    include: Annotated[
+        Union[PatentInclude, None], Field(validate_default=True)
+    ] = DEFAULT_PATENT_INCLUDE
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
@@ -40,15 +106,24 @@ class PatentSearchParams(BasePatentSearchParams, CommonSearchParams):
         return patents
 
 
-class TrialSearchParams(CommonSearchParams):
-    pass
+class RegulatoryApprovalSearchParams(DocumentSearchParams):
+    include: Annotated[
+        Union[RegulatoryApprovalInclude, None], Field(validate_default=True)
+    ] = DEFAULT_REGULATORY_APPROVAL_INCLUDE
 
 
-class AssetSearchParams(PatentSearchParams):
+class TrialSearchParams(DocumentSearchParams):
+    include: Annotated[
+        Union[TrialInclude, None], Field(validate_default=True)
+    ] = DEFAULT_TRIAL_INCLUDE
+
+
+class AssetSearchParams(DocumentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
     entity_map_type: Annotated[
         EntityMapType, Field(validate_default=True)
     ] = EntityMapType.intervention
+    include: Annotated[None, Field()] = None
 
     @field_validator("entity_map_type", mode="before")
     def entity_map_type_from_string(cls, v):
@@ -57,5 +132,10 @@ class AssetSearchParams(PatentSearchParams):
         return EntityMapType(v)
 
 
-class ApprovalSearchParams(CommonSearchParams):
-    pass
+class DocumentCharacteristicParams(DocumentSearchParams):
+    """
+    Parameters for document characteristics
+    """
+
+    doc_type: DocType = DocType.patent
+    head_field: str = "priority_date"

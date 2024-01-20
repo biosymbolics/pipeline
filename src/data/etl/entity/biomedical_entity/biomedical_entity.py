@@ -260,7 +260,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             JOIN umls on umls.id = s.cid
             on conflict do nothing;
         """
-        client = await prisma_client(300)
+        client = await prisma_client(600)
         await client.execute_raw(query)
 
     @staticmethod
@@ -268,7 +268,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         add counts to biomedical_entity (used for autocomplete ordering)
         """
-        client = await prisma_client(None)
+        client = await prisma_client(6)
         # add counts to biomedical_entity & owner
         for table in ENTITY_MAP_TABLES:
             await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
@@ -303,7 +303,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 AND entity_synonym.entity_id=biomedical_entity.id
             """
 
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         for table in ["intervenable", "indicatable"]:
             query = get_query(table)
             await client.execute_raw(query)
@@ -328,11 +328,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     _entity_to_umls as etu,
                     umls as umls_instance_rollup,
                     umls
-                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls_category_rollup.category_rollup_id
+                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls.category_rollup_id
                 WHERE {table}.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
                 AND umls_instance_rollup.id=umls.instance_rollup_id
+                AND instance_rollup=''
                 {'AND ' + ' AND '.join(filters) if filters else ''}
             """
 
@@ -340,7 +341,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         spec = {
             "intervenable": [
                 {
-                    # prefer linkage that is TARGET TYPE
+                    # prefer target linkage (protein/gene)
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_TARGET_TYPES.keys())}"
                     ],
@@ -352,7 +353,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             ],
             "indicatable": [
                 {
-                    # prefer linkage of type disease
+                    # prefer disease linkage
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_DISEASE_TYPES.keys())}"
                     ],
@@ -365,7 +366,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         }
 
         # execute the spec
-        client = await prisma_client(None)
+        client = await prisma_client(600)
         for table, specs in spec.items():
             for spec in specs:
                 query = get_query(table, spec["filters"])

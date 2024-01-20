@@ -2,7 +2,8 @@
 Patent graph reports
 """
 
-from enum import Enum
+from functools import partial
+import time
 from typing import Sequence
 import logging
 import networkx as nx
@@ -10,12 +11,16 @@ from pydash import uniq
 import polars as pl
 from prisma.enums import BiomedicalEntityType
 
+from clients.documents.constants import DOC_CLIENT_LOOKUP
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
 from typings import (
     DOMAINS_OF_INTEREST,
     DocType,
+    TermField,
 )
-from typings.client import TermField
+from typings.client import DocumentCharacteristicParams
+from utils.string import get_id
 
 from .types import (
     AggregateDocumentRelationship,
@@ -201,7 +206,7 @@ async def graph_document_relationships(
         ORDER BY weight DESC LIMIT 1000
     """
 
-    client = await prisma_client(300)
+    client = await prisma_client(120)
     relationships = await client.query_raw(sql)
     g = generate_graph(relationships, max_nodes=max_nodes)
 
@@ -253,11 +258,11 @@ async def graph_document_relationships(
     )
 
 
-async def aggregate_document_relationships(
+async def _aggregate_document_relationships(
     ids: Sequence[str],
-    head_field: str = "priority_date",
-    entity_types: Sequence[BiomedicalEntityType] | None = None,
-    relationships: Sequence[str] = RELATIONSHIPS_OF_INTEREST,
+    head_field: str,
+    entity_types: Sequence[BiomedicalEntityType] | None,
+    relationships: Sequence[str],
     doc_type: DocType = DocType.patent,
 ) -> list[AggregateDocumentRelationship]:
     """
@@ -270,6 +275,7 @@ async def aggregate_document_relationships(
         relationships (Sequence[str], optional): relationships. Defaults to RELATIONSHIPS_OF_INTEREST.
         doc_type (DocType, optional): doc type. Defaults to DocType.patent.
     """
+    start = time.monotonic()
 
     if head_field not in Y_DIMENSIONS[doc_type]:
         raise ValueError(f"Invalid head field: {head_field}")
@@ -315,8 +321,9 @@ async def aggregate_document_relationships(
         GROUP BY {head_sql}, concept
     """
 
-    client = await prisma_client(300)
+    client = await prisma_client(120)
     results = await client.query_raw(sql)
+
     df = pl.DataFrame(results)
 
     # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
@@ -339,4 +346,44 @@ async def aggregate_document_relationships(
         .to_dicts()
     )
 
+    logger.info(
+        "Generated characteristics report (%s records) in %s seconds",
+        len(results),
+        round(time.monotonic() - start),
+    )
+
     return [AggregateDocumentRelationship(**tr) for tr in top_records]
+
+
+async def aggregate_document_relationships(
+    p: DocumentCharacteristicParams,
+) -> list[AggregateDocumentRelationship]:
+    """
+    Aggregated UMLS ancestory report for a set of documents
+    """
+
+    async def _run_report() -> list[AggregateDocumentRelationship]:
+        documents = await DOC_CLIENT_LOOKUP[p.doc_type].search(p)
+        if len(documents) == 0:
+            logging.info("No documents found for terms: %s", p.terms)
+            return []
+
+        return await _aggregate_document_relationships(
+            ids=[d.id for d in documents],
+            head_field=p.head_field,
+            entity_types=None,
+            relationships=RELATIONSHIPS_OF_INTEREST,
+            doc_type=p.doc_type,
+        )
+
+    if p.skip_cache == True:
+        patents = await _run_report()
+        return patents
+
+    key = get_id({**p.__dict__, "api": "document_relationships"})
+
+    return await retrieve_with_cache_check(
+        _run_report,
+        key=key,
+        decode=lambda str_data: storage_decoder(str_data),
+    )
