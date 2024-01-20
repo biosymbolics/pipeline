@@ -205,7 +205,8 @@ async def search(p: AssetSearchParams) -> list[Asset]:
     )
     search_partial = partial(_search, search_criteria)
 
-    if p.skip_cache == True:
+    # not caching for now; persist to s3 takes too long and it isn't worth.
+    if True or p.skip_cache == True:
         patents = await search_partial()
         return patents
 
