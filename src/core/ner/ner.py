@@ -189,10 +189,8 @@ class NerTagger:
         """
         # if not set, include all types
         if not self.entity_types:
-            logger.warning("NO TYPESSSPSPSPS %s", entity_sets)
             return entity_sets
 
-        logger.warning("HEY %s", [[e.type for e in es] for es in entity_sets])
         for es in entity_sets:
             yield [e for e in es if e.type in self.entity_types]
 

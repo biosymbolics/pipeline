@@ -476,7 +476,7 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
         spans: list of spacy spans
     """
     entity_set = [
-        DocEntity(
+        DocEntity.create(
             span.text,
             span.start_char,
             span.end_char,

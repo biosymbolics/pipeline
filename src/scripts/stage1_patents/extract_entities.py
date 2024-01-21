@@ -44,7 +44,7 @@ ENTITY_TYPES = frozenset(
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
     attr_map = get_patent_attribute_map()
     return [
-        [DocEntity(term, 0, 0, term, ATTRIBUTE_FIELD) for term in attribute_set]
+        [DocEntity.create(term, 0, 0, term, ATTRIBUTE_FIELD) for term in attribute_set]
         for attribute_set in classify_by_keywords(patent_docs, attr_map)
     ]
 
@@ -120,7 +120,7 @@ class BaseEnricher:
 
         return texts
 
-    def _extract(self, patents: pl.DataFrame) -> Optional[pl.DataFrame]:
+    def _extract(self, patents: pl.DataFrame) -> tuple[pl.DataFrame, list[dict]] | None:
         """
         Enriches patents with entities
 
@@ -128,7 +128,7 @@ class BaseEnricher:
             patents (pl.DataFrame): patents to enrich
 
         Returns:
-            pl.DataFrame: enriched patents
+            tuple[pl.DataFrame, list[dict]] | None: entities, embeddings
         """
 
         processed_pubs = self._get_processed_pubs()
@@ -160,6 +160,17 @@ class BaseEnricher:
 
         unprocessed_patent_ids = unprocessed_patents["publication_number"].to_list()
 
+        doc_embeddings = [
+            {"publication_number": id, "vector": de}
+            for id, de in zip(
+                unprocessed_patent_ids, [es[0].doc_vector for es in entities]
+            )
+        ]
+        if len(doc_embeddings) != len(entities):
+            raise ValueError(
+                f"Doc embeddings: {len(doc_embeddings)}, entities: {len(entities)}"
+            )
+
         # turn into dicts for polars' sake
         entity_dicts = [
             [
@@ -172,8 +183,7 @@ class BaseEnricher:
             for i, es in enumerate(entities)
         ]
 
-        # TODO: probably some to suppress?
-        flattened_df = (
+        entity_df = (
             pl.DataFrame(flatten(entity_dicts))
             .rename(
                 {
@@ -188,7 +198,7 @@ class BaseEnricher:
             )
         )
 
-        return flattened_df
+        return entity_df, doc_embeddings
 
     @abstractmethod
     async def upsert(self, df: pl.DataFrame):
@@ -209,11 +219,19 @@ class BaseEnricher:
         last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
-            df = self._extract(pl.DataFrame(patents))
+            ent_df, doc_embeddings = self._extract(pl.DataFrame(patents)) or (
+                None,
+                None,
+            )
 
-            if df is not None:
-                await self.upsert(df)
-                self._checkpoint(df)
+            # doc-level embeddings
+            if doc_embeddings is not None:
+                await self.db.insert_into_table(doc_embeddings, "patent_embeddings")
+
+            # entity-level embeddings
+            if ent_df is not None:
+                await self.upsert(ent_df)
+                self._checkpoint(ent_df)
 
             patents = await self._fetch_patents_batch(last_id=str(last_id))
             if patents:
@@ -269,7 +287,6 @@ class PatentEnricher(BaseEnricher):
 
     @overrides(BaseEnricher)
     async def upsert(self, df: pl.DataFrame):
-        print(df)
         await self.db.upsert_df_into_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
@@ -291,6 +308,10 @@ class PatentEnricher(BaseEnricher):
                 "character_offset_end",
             ],
             on_conflict="UPDATE SET target.domain = source.domain",
+        )
+        await self.db.insert_into_table(
+            df.select(["publication_number", "vector"]).to_dicts(),
+            "patent_embeddings",
         )
 
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:

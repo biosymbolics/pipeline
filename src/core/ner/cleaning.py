@@ -224,7 +224,7 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity(
+                DocEntity.create(
                     **{  # type: ignore
                         **orig_ents[i]._asdict(),
                         "normalized_term": modified_texts[i],

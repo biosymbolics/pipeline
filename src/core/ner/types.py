@@ -63,9 +63,27 @@ class DocEntity(Dataclass):
     spacy_doc: Optional[Doc] = None
     canonical_entity: Optional[CanonicalEntity] = None
 
-    def __post_init__(self):
-        object.__setattr__(self, "type", self.get_type())
-        object.__setattr__(self, "vector", self.get_vector())
+    @staticmethod
+    def create(
+        term,
+        start_char,
+        end_char,
+        normalized_term,
+        type=None,
+        vector=None,
+        spacy_doc=None,
+        canonical_entity=None,
+    ):
+        return DocEntity(
+            term=term,
+            start_char=start_char,
+            end_char=end_char,
+            normalized_term=normalized_term,
+            type=type or (spacy_doc.label_ if spacy_doc else None),
+            vector=vector or (spacy_doc.vector.tolist() if spacy_doc else None),
+            spacy_doc=spacy_doc,
+            canonical_entity=canonical_entity,
+        )
 
     @property
     def id(self) -> Optional[str]:
@@ -85,18 +103,10 @@ class DocEntity(Dataclass):
     def __repr__(self):
         return self.__str__()
 
-    def get_vector(self):
-        if self.vector is not None:
-            return self.vector
+    @property
+    def doc_vector(self):
         if self.spacy_doc is not None:
             return self.spacy_doc.vector.tolist()
-        return None
-
-    def get_type(self):
-        if self.type is not None:
-            return self.type
-        if self.canonical_entity is not None:
-            return self.canonical_entity.type
         return None
 
     def to_flat_dict(self):
