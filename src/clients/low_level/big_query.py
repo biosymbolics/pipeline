@@ -78,7 +78,7 @@ class BQDatabaseClient(DatabaseClient):
             return False
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str, values: list = []) -> ExecuteResult:
+    async def execute_query(self, query: str, values: list = []) -> ExecuteResult:
         """
         Execute BigQuery query
 
@@ -196,7 +196,7 @@ class BQDatabaseClient(DatabaseClient):
 
         logging.info("Running query: %s", sql)
         try:
-            self.execute_query(sql)
+            await self.execute_query(sql)
         except Exception as e:
             logging.error("Error upserting rows: %s", e)
             await self.delete_table(tmp_table_id)

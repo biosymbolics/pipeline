@@ -1,12 +1,10 @@
 """
 Named-entity recognition using spacy
-
-No hardware acceleration: see https://github.com/explosion/spaCy/issues/10783#issuecomment-1132523032
 """
 from functools import reduce
 from itertools import groupby
 import time
-from typing import Any, Literal, Optional, Sequence, TypeVar
+from typing import Any, Iterable, Literal, Optional, Sequence, TypeVar
 import logging
 import html
 from spacy.tokens import Span, Doc
@@ -84,14 +82,15 @@ class NerTagger:
             else None
         )
 
-        if link and not normalize:
-            raise ValueError("Cannot link entities without normalizing")
-
         if entity_types is not None and not isinstance(entity_types, frozenset):
             raise ValueError("entity_types must be a frozenset")
 
         if not normalize:
             logger.warning("Normalization is disabled")
+            if len(additional_cleaners) > 0:
+                logger.warning("Additional cleaners are disabled")
+            if link:
+                raise ValueError("Cannot link entities without normalizing")
         if not link:
             logger.warning("Linking is disabled")
 
@@ -181,10 +180,26 @@ class NerTagger:
 
         return [spans_to_doc_entities(doc.ents) for doc in binder_docs]
 
+    def _filter_by_type(
+        self,
+        entity_sets: list[DocEntities],
+    ) -> Iterable[DocEntities]:
+        """
+        Filter entities by type
+        """
+        # if not set, include all types
+        if not self.entity_types:
+            logger.warning("NO TYPESSSPSPSPS %s", entity_sets)
+            return entity_sets
+
+        logger.warning("HEY %s", [[e.type for e in es] for es in entity_sets])
+        for es in entity_sets:
+            yield [e for e in es if e.type in self.entity_types]
+
     def _normalize(
         self,
         entity_sets: list[DocEntities],
-    ) -> list[DocEntities]:
+    ) -> Iterable[DocEntities]:
         """
         Normalize entity set
 
@@ -193,27 +208,18 @@ class NerTagger:
         """
         if not self.normalizer:
             logger.debug("Skipping normalization step")
-            return entity_sets
+            # TODO: why is yield seemingly necessary?
+            for es in entity_sets:
+                yield es
+            return
 
-        def normalize_set(entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-            assert self.normalizer is not None
-            normalizations = self.normalizer.normalize(entity_set)
-            if self.entity_types is None:
-                return normalizations
-
-            # filter by entity types, if provided
-            return [ne for ne in normalizations if ne.type in self.entity_types]
-
-        norm_entity_sets = [normalize_set(es) for es in entity_sets]
-
-        assert len(norm_entity_sets) == len(entity_sets)
-
-        return norm_entity_sets
+        for es in entity_sets:
+            yield self.normalizer.normalize(es)
 
     def extract(
         self,
         content: Sequence[str],
-    ) -> Sequence[DocEntities]:
+    ) -> list[DocEntities]:
         """
         Extract named entities from a list of content
         - basic SpaCy pipeline
@@ -244,16 +250,21 @@ class NerTagger:
             raise Exception("Content must be a list")
 
         prepped_content = self._prep_for_extract(content)
-        entity_sets = self._dual_model_extract(prepped_content)
-        norm_entity_sets = self._normalize(entity_sets)
+        extractions = self._dual_model_extract(prepped_content)
+
+        steps = [
+            lambda _entity_sets: self._filter_by_type(_entity_sets),
+            lambda _entity_sets: self._normalize(_entity_sets),
+        ]
+        entity_sets = list(reduce(lambda c, f: f(c), steps, extractions))  # type: ignore
 
         logger.info(
-            "Full entity extraction took %s seconds for %s docs, yielded %s",
+            "Full entity extraction took %s seconds for %s docs",
             round(time.time() - start_time, 2),
             len(content),
-            norm_entity_sets,
         )
-        return norm_entity_sets
+        logger.debug("NER yielded %s", entity_sets)
+        return entity_sets
 
     def extract_string_map(self, content: list[str], **kwargs) -> dict[str, list[str]]:
         """

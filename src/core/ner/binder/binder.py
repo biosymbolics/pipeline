@@ -111,8 +111,8 @@ class BinderNlp:
             for e in doc.ents
         ]
 
-        # all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
-        doc.set_ents(compact(new_ents + existing_ents))
+        all_ents = remove_overlapping_spans(compact(new_ents + existing_ents))
+        doc.set_ents(all_ents)
 
         return doc
 

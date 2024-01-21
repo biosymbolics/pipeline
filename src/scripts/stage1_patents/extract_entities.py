@@ -1,7 +1,8 @@
 from abc import abstractmethod
+import asyncio
 import logging
 import sys
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 import polars as pl
 from pydash import flatten
 
@@ -10,10 +11,9 @@ from system import initialize
 
 initialize()
 
-
+from clients.low_level.database import DatabaseClient
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.documents.patents.constants import ENTITY_DOMAINS
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from core.ner.classifier import classify_by_keywords
@@ -23,10 +23,22 @@ from utils.classes import overrides
 
 
 ID_FIELD = "publication_number"
-ENTITY_TYPES = frozenset(ENTITY_DOMAINS)
 MAX_TEXT_LENGTH = 2000
 ENRICH_PROCESSED_PUBS_FILE = "data/enrich_processed_pubs.txt"
 CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
+
+
+ENTITY_TYPES = frozenset(
+    [
+        "biologics",
+        "compounds",
+        "devices",
+        "diagnotics",
+        "diseases",
+        "mechanisms",
+        "procedures",
+    ]
+)
 
 
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
@@ -41,7 +53,7 @@ class BaseEnricher:
     def __init__(
         self,
         processed_pubs_file: str,
-        DbImpl: Callable[[], Any],
+        DbImpl: type[DatabaseClient],
         batch_size: int,
     ):
         """
@@ -70,7 +82,7 @@ class BaseEnricher:
         with open(self.processed_pubs_file, "a+") as f:
             f.write("\n" + "\n".join(df["publication_number"].to_list()))
 
-    def _fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
+    async def _fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
         """
         Fetch a batch of patents from BigQuery
 
@@ -89,7 +101,7 @@ class BaseEnricher:
             ORDER BY apps.{ID_FIELD} ASC
             limit {self.batch_size}
         """
-        patents = self.db.select(query)
+        patents = await self.db.select(query)
         return patents
 
     def _format_patent_docs(self, patents: pl.DataFrame) -> list[str]:
@@ -179,36 +191,36 @@ class BaseEnricher:
         return flattened_df
 
     @abstractmethod
-    def upsert(self, df: pl.DataFrame):
+    async def upsert(self, df: pl.DataFrame):
         """override with impl"""
 
     @abstractmethod
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
         """override with impl"""
 
-    def enrich(self, starting_id: Optional[str] = None) -> None:
+    async def enrich(self, starting_id: Optional[str] = None) -> None:
         """
         Enriches patents with NER annotations
 
         Args:
             starting_id (Optional[str], optional): last id to paginate from. Defaults to None.
         """
-        patents = self._fetch_patents_batch(last_id=starting_id)
+        patents = await self._fetch_patents_batch(last_id=starting_id)
         last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
             df = self._extract(pl.DataFrame(patents))
 
             if df is not None:
-                self.upsert(df)
+                await self.upsert(df)
                 self._checkpoint(df)
 
-            patents = self._fetch_patents_batch(last_id=str(last_id))
+            patents = await self._fetch_patents_batch(last_id=str(last_id))
             if patents:
                 last_id = max(patent["publication_number"] for patent in patents)
 
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        self.enrich(*args, **kwds)
+    async def __call__(self, *args: Any, **kwds: Any) -> Any:
+        await self.enrich(*args, **kwds)
 
 
 class PatentClassifier(BaseEnricher):
@@ -224,13 +236,13 @@ class PatentClassifier(BaseEnricher):
         super().__init__(CLASSIFY_PROCESSED_PUBS_FILE, PsqlDatabaseClient, batch_size)
 
     @overrides(BaseEnricher)
-    def upsert(self, df: pl.DataFrame):
+    async def upsert(self, df: pl.DataFrame):
         """
         Persist attribute annotations to table
 
         *** assumes domain="attributes" has been removed first ***
         """
-        self.db.insert_into_table(df.to_dicts(), "annotations")  # ??
+        await self.db.insert_into_table(df.to_dicts(), "annotations")  # ??
 
     @overrides(BaseEnricher)
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
@@ -248,13 +260,17 @@ class PatentEnricher(BaseEnricher):
         """
         Initialize the enricher
         """
-        batch_size = 250
+        batch_size = 50
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
-        self.tagger = NerTagger.get_instance(entity_types=ENTITY_TYPES, link=False)
+        self.db = BQDatabaseClient()
+        self.tagger = NerTagger.get_instance(
+            entity_types=ENTITY_TYPES, link=False, normalize=False
+        )
 
     @overrides(BaseEnricher)
-    def upsert(self, df: pl.DataFrame):
-        self.db.upsert_df_into_table(
+    async def upsert(self, df: pl.DataFrame):
+        print(df)
+        await self.db.upsert_df_into_table(
             df,
             SOURCE_BIOSYM_ANNOTATIONS_TABLE,
             id_fields=[
@@ -269,7 +285,7 @@ class PatentEnricher(BaseEnricher):
                 ID_FIELD,
                 "term",
                 "domain",
-                "embeddings",
+                "vector",
                 "source",
                 "character_offset_start",
                 "character_offset_end",
@@ -279,16 +295,17 @@ class PatentEnricher(BaseEnricher):
 
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
         entities = self.tagger.extract(patent_docs)
-        attributes = extract_attributes(patent_docs)
-        all = [e[0] + e[1] for e in zip(entities, attributes)]
-        return all
+        # attributes = extract_attributes(patent_docs)
+        # all = [e[0] + e[1] for e in zip(entities, attributes)]
+        return entities
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.patents.extract_entities [starting_id]\nLoads NER data for patents
+            Usage: python3 -m scripts.stage1_patents.extract_entities [starting_id]
+            Loads NER data for patents
             """
         )
         sys.exit()
@@ -296,4 +313,4 @@ if __name__ == "__main__":
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
     # enricher = PatentClassifier() # only use if wanting to re-classify (comparatively fast)
-    enricher(starting_id)
+    asyncio.run(enricher(starting_id))

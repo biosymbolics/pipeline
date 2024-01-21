@@ -152,7 +152,7 @@ class PatentLoader(BaseDocumentEtl):
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",
+            candidate_selector="CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
@@ -164,7 +164,7 @@ class PatentLoader(BaseDocumentEtl):
             sql=PatentLoader.get_entity_sql(["diseases"]),
         )
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",
+            candidate_selector="CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
