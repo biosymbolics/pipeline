@@ -85,9 +85,11 @@ class UmlsLoader:
 
         transform = UmlsTransformer(aui_lookup)
 
+        client = await prisma_client(600)
+
         async def handle_batch(batch):
             logger.info("Creating %s UMLS records", len(batch))
-            await Umls.prisma().create_many(
+            await Umls.prisma(client).create_many(
                 data=[transform(r) for r in batch],
                 skip_duplicates=True,
             )
