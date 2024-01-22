@@ -316,9 +316,10 @@ class PatentEnricher(BaseEnricher):
 
         # hack: make even number to be divisible by 2 (# of GPUs)
         # https://github.com/pytorch/pytorch/issues/52289
-        uniq_content_even = (
-            uniq_content + [] if len(uniq_content) % 2 == 0 else [uniq_content[0]]
-        )
+        uniq_content_even = [
+            *uniq_content,
+            *([] if len(uniq_content) % 2 == 0 else [uniq_content[0]]),
+        ]
 
         if len(uniq_content) < len(patent_docs):
             logger.info(
