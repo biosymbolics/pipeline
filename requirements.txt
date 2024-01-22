@@ -16,6 +16,7 @@ psycopg[binary,pool]
 pydash
 pydantic
 python-dotenv
+regex
 requests
 scispacy
 scikit-learn

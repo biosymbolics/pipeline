@@ -5,10 +5,10 @@
 - `. .pythonenv`
 - `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
-- `python3 -m spacy download en_core_web_md`
 - `CFLAGS="-mavx -DWARN(a)=(a)" pip install 'nmslib @ git+https://github.com/nmslib/nmslib.git#egg=nmslib'`
 - Create/copy binder.pt for non-GPT NER
 - AWS authenticate if needed: `aws configure sso`
+- pip install -U prisma
 - psql
   - psql -h 172.31.14.226 -p 5432 --username postgres
 - sls offlne
