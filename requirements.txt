@@ -21,6 +21,7 @@ requests
 scispacy
 scikit-learn
 spacy
+spacy-lookups-data
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==2.1.2+cpu
 pytorch-ignite

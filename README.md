@@ -1,28 +1,29 @@
 ### Setup
 
-- `brew install pre-commit`
-- `pre-commit install`
 - `. .pythonenv`
-- `source .env` (containing OPENAI_API_KEY, SEC_API_KEY, etc)
 - `python3 -m pip install -r requirements.txt`
 - `CFLAGS="-mavx -DWARN(a)=(a)" pip install 'nmslib @ git+https://github.com/nmslib/nmslib.git#egg=nmslib'`
-- Create/copy binder.pt for non-GPT NER
+``````
+pip install -U prisma
+apt-get install gcc g++ unzip
+PYTHONPATH=$(pwd)/src:$(pwd)/:./binder:/opt/homebrew/lib/python3.11/site-packages/
+export DEFAULT_TORCH_DEVICE=cuda
+python -m spacy download en_core_web_trf
+pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
+pip install pandas # sigh
+pip install nvidia-smi
+pip install pyarrow
+watch -n 1 nvidia-smi
+```
+- https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+  - https://d-90679e1dba.awsapps.com/start#/
+  - CLI profile name: default
 - AWS authenticate if needed: `aws configure sso`
-- pip install -U prisma
 - psql
   - psql -h 172.31.14.226 -p 5432 --username postgres
 - sls offlne
   - https://github.com/dherault/serverless-offline/issues/1696
 - Docker - new ECR for lambda
-
-curl https://api.openai.com/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -d '{
-    "input": "autoactivates",
-    "model": "text-embedding-ada-002"
-  }'
-
 ```
 aws ecr create-repository --repository-name biosym_lambda-repo
 
