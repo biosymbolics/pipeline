@@ -5,7 +5,7 @@ import sys
 from typing import Any, Optional
 import polars as pl
 from pydash import flatten, uniq
-
+import hashlib
 
 from system import initialize
 
@@ -141,7 +141,7 @@ class BaseEnricher:
         patents_to_process = df.filter(
             ~pl.col("publication_number").is_in(self._get_processed_pubs())
         )
-        patent_ids = uniq(patents_to_process["publication_number"].to_list())
+        patent_ids = patents_to_process["publication_number"].to_list()
 
         if len(patents_to_process) == 0:
             logger.info("No patents to process")
@@ -309,10 +309,28 @@ class PatentEnricher(BaseEnricher):
         )
 
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
-        entities = self.tagger.extract(patent_docs)
+        uniq_content = uniq(patent_docs)
+
+        if len(uniq_content) < len(patent_docs):
+            logger.info(
+                f"Avoiding processing of %s duplicate patents",
+                len(patent_docs) - len(uniq_content),
+            )
+
+        entities = self.tagger.extract(uniq_content)
+        hash_entities_map = {
+            hashlib.sha1(c.encode()).hexdigest(): de
+            for c, de in zip(uniq_content, entities)
+        }
+
+        all_entities = [
+            hash_entities_map[hashlib.sha1(doc.encode()).hexdigest()]
+            for doc in patent_docs
+        ]
+
         # attributes = extract_attributes(patent_docs)
         # all = [e[0] + e[1] for e in zip(entities, attributes)]
-        return entities
+        return all_entities
 
 
 if __name__ == "__main__":
