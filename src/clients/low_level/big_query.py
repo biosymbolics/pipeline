@@ -98,7 +98,12 @@ class BQDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     async def _insert(self, table_name: str, records: list[T]):
-        self.client.insert_rows(self.get_table(table_name), records)
+        table = self.get_table(table_name)
+        try:
+            self.client.insert_rows(table, records)
+        except Exception as e:
+            logging.error("Error inserting rows: %s", e)
+            raise e
 
     @overrides(DatabaseClient)
     async def _create(

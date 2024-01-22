@@ -134,11 +134,11 @@ class DatabaseClient:
         batched = batch(records, batch_size)
 
         for i, b in enumerate(batched):
-            logging.debug("Inserting batch %s into table %s", i, table_name)
+            logging.info("Inserting batch %s into table %s", i, table_name)
             transformed = transform(b, records) if transform else b
             await self._insert(table_name, transformed)
 
-            logging.debug("Successfully inserted %s rows", len(b))
+            logging.info("Successfully inserted %s rows", len(b))
 
     async def create_table(
         self,
