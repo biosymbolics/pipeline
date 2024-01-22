@@ -9,7 +9,7 @@ class BinderConfig(PretrainedConfig):
         revision="main",
         use_auth_token=False,
         hidden_dropout_prob=0.1,
-        max_span_width=513,
+        max_span_width=30,
         use_span_width_embedding=True,
         linear_size=128,
         init_temperature=0.07,
