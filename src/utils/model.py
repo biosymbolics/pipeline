@@ -1,10 +1,6 @@
-from collections import defaultdict
-from functools import reduce
 import os
 from pathlib import Path
 import logging
-from typing import Any, OrderedDict
-from pydash import set_
 
 from clients.low_level.boto3 import fetch_s3_obj
 
