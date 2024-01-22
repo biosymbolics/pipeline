@@ -53,7 +53,7 @@ class Spacy:
         """
         # acceleration via https://github.com/explosion/thinc-apple-ops
         # details: https://github.com/explosion/spaCy/discussions/12713
-        spacy.require_gpu()  # type: ignore
+        spacy.prefer_gpu()  # type: ignore
 
         if model.endswith("_trf"):
             logger.warning("Setting GPU allocator to pytorch")
