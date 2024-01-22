@@ -330,7 +330,7 @@ class PatentEnricher(BaseEnricher):
         entities = self.tagger.extract(uniq_content_even)
         hash_entities_map = {
             hashlib.sha1(c.encode()).hexdigest(): de
-            for c, de in zip(uniq_content, entities)
+            for c, de in zip(uniq_content_even, entities)
         }
 
         all_entities = [
