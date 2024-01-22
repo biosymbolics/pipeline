@@ -10,7 +10,7 @@ class BinderConfig(PretrainedConfig):
         use_auth_token=False,
         hidden_dropout_prob=0.1,
         max_span_width=513,
-        use_span_width_embedding=False,
+        use_span_width_embedding=True,
         linear_size=128,
         init_temperature=0.07,
         start_loss_weight=0.2,
