@@ -4,7 +4,7 @@ import logging
 import sys
 from typing import Any, Optional
 import polars as pl
-from pydash import flatten
+from pydash import flatten, uniq
 
 
 from system import initialize
@@ -21,6 +21,9 @@ from core.ner.types import DocEntities, DocEntity
 from core.ner import NerTagger
 from utils.classes import overrides
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 ID_FIELD = "publication_number"
 MAX_TEXT_LENGTH = 2000
@@ -78,9 +81,10 @@ class BaseEnricher:
         Persists processing state
         - processed publication numbers added to a file
         """
-        logging.info(f"Persisting processed publication_numbers")
+        ids = uniq(df["publication_number"].to_list())
+        logger.info(f"Persisting processed publication_numbers (%s)", len(ids))
         with open(self.processed_pubs_file, "a+") as f:
-            f.write("\n" + "\n".join(df["publication_number"].to_list()))
+            f.write("\n" + "\n".join(ids))
 
     async def _fetch_patents_batch(self, last_id: Optional[str] = None) -> list[dict]:
         """
@@ -120,7 +124,7 @@ class BaseEnricher:
 
         return texts
 
-    def _extract(self, patents: pl.DataFrame) -> tuple[pl.DataFrame, list[dict]] | None:
+    def _extract(self, patents: list[dict]) -> tuple[pl.DataFrame, list[dict]] | None:
         """
         Enriches patents with entities
 
@@ -131,52 +135,45 @@ class BaseEnricher:
             tuple[pl.DataFrame, list[dict]] | None: entities, embeddings
         """
 
-        processed_pubs = self._get_processed_pubs()
+        df = pl.DataFrame(patents)
 
         # remove already processed patents
-        unprocessed_patents = patents.filter(
-            ~pl.col("publication_number").is_in(processed_pubs)
+        patents_to_process = df.filter(
+            ~pl.col("publication_number").is_in(self._get_processed_pubs())
         )
+        patent_ids = uniq(patents_to_process["publication_number"].to_list())
 
-        if len(unprocessed_patents) == 0:
-            logging.info("No patents to process")
+        if len(patents_to_process) == 0:
+            logger.info("No patents to process")
             return None
 
-        if len(unprocessed_patents) < len(patents):
-            logging.info(
+        if len(patents_to_process) < len(patents):
+            logger.warning(
                 f"Filtered out %s patents that have already been processed",
-                len(patents) - len(unprocessed_patents),
+                len(patents) - len(patents_to_process),
             )
 
         # get patent descriptions
-        patent_docs = self._format_patent_docs(unprocessed_patents)
+        patent_docs = self._format_patent_docs(patents_to_process)
 
         # extract entities
         entities = self.extractor(patent_docs)
 
         if len(flatten(entities)) == 0:
-            logging.info("No entities found")
+            logger.warning("No entities found")
             return None
 
-        unprocessed_patent_ids = unprocessed_patents["publication_number"].to_list()
-
-        doc_embeddings = [
+        doc_vector_inserts = [
             {"publication_number": id, "vector": de}
-            for id, de in zip(
-                unprocessed_patent_ids, [es[0].doc_vector for es in entities]
-            )
+            for id, de in zip(patent_ids, [es[0].doc_vector for es in entities])
         ]
-        if len(doc_embeddings) != len(entities):
-            raise ValueError(
-                f"Doc embeddings: {len(doc_embeddings)}, entities: {len(entities)}"
-            )
 
         # turn into dicts for polars' sake
         entity_dicts = [
             [
                 {
                     **a.to_flat_dict(),
-                    "publication_number": unprocessed_patent_ids[i],
+                    "publication_number": patent_ids[i],
                 }
                 for a in es
             ]
@@ -198,7 +195,7 @@ class BaseEnricher:
             )
         )
 
-        return entity_df, doc_embeddings
+        return entity_df, doc_vector_inserts
 
     @abstractmethod
     async def upsert(self, df: pl.DataFrame):
@@ -216,26 +213,27 @@ class BaseEnricher:
             starting_id (Optional[str], optional): last id to paginate from. Defaults to None.
         """
         patents = await self._fetch_patents_batch(last_id=starting_id)
-        last_id = max(patent["publication_number"] for patent in patents)
 
         while patents:
-            ent_df, doc_embeddings = self._extract(pl.DataFrame(patents)) or (
+            # get the new last id
+            last_id = patents[-1]["publication_number"]
+
+            # do NER
+            ent_df, doc_embeddings = self._extract(patents) or (
                 None,
                 None,
             )
 
-            # doc-level embeddings
+            # persist doc-level embeddings
             if doc_embeddings is not None:
                 await self.db.insert_into_table(doc_embeddings, "patent_embeddings")
 
-            # entity-level embeddings
+            # persist entity-level embeddings
             if ent_df is not None:
                 await self.upsert(ent_df)
                 self._checkpoint(ent_df)
 
             patents = await self._fetch_patents_batch(last_id=str(last_id))
-            if patents:
-                last_id = max(patent["publication_number"] for patent in patents)
 
     async def __call__(self, *args: Any, **kwds: Any) -> Any:
         await self.enrich(*args, **kwds)
@@ -278,7 +276,7 @@ class PatentEnricher(BaseEnricher):
         """
         Initialize the enricher
         """
-        batch_size = 50
+        batch_size = 1000
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(
@@ -308,10 +306,6 @@ class PatentEnricher(BaseEnricher):
                 "character_offset_end",
             ],
             on_conflict="UPDATE SET target.domain = source.domain",
-        )
-        await self.db.insert_into_table(
-            df.select(["publication_number", "vector"]).to_dicts(),
-            "patent_embeddings",
         )
 
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
