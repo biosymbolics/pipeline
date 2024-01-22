@@ -103,7 +103,6 @@ class BQDatabaseClient(DatabaseClient):
             self.client.insert_rows(table, records, retry=None)
         except Exception as e:
             logging.error("Error inserting rows: %s", e)
-            raise e
 
     @overrides(DatabaseClient)
     async def _create(
