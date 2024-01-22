@@ -43,8 +43,9 @@ class BinderNlp:
         logger.info(
             "Loading torch model from: %s (device %s)", model_file, DEFAULT_TORCH_DEVICE
         )
-        self.model = nn.DataParallel(torch.load(model_file, map_location=device))
-        self.model.to(device)
+        # self.model = nn.DataParallel(torch.load(model_file, map_location=device))
+        self.model = torch.load(model_file, map_location=device)
+        # self.model.to(device)
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             base_model, use_fast=True, device_map="auto"

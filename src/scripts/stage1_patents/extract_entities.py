@@ -314,24 +314,16 @@ class PatentEnricher(BaseEnricher):
     def extractor(self, patent_docs: list[str]) -> list[DocEntities]:
         uniq_content = uniq(patent_docs)
 
-        # hack: make even number to be divisible by 2 (# of GPUs)
-        # https://github.com/pytorch/pytorch/issues/52289
-        missing = len(uniq_content) % 4
-        uniq_content_even = [
-            *uniq_content,
-            *uniq_content[0:missing],
-        ]
-
         if len(uniq_content) < len(patent_docs):
             logger.info(
                 f"Avoiding processing of %s duplicate patents",
                 len(patent_docs) - len(uniq_content),
             )
 
-        entities = self.tagger.extract(uniq_content_even)
+        entities = self.tagger.extract(uniq_content)
         hash_entities_map = {
             hashlib.sha1(c.encode()).hexdigest(): de
-            for c, de in zip(uniq_content_even, entities)
+            for c, de in zip(uniq_content, entities)
         }
 
         all_entities = [
