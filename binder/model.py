@@ -282,7 +282,7 @@ class Binder(PreTrainedModel):
         if self.width_embeddings is not None:
             if torch.cuda.is_available():
                 range_vector = (
-                    LongTensor(seq_length, device=sequence_output.device)
+                    torch.tensor(seq_length, device=sequence_output.device)
                     .fill_(1)
                     .cumsum(0)
                     - 1
