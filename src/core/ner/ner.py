@@ -189,7 +189,9 @@ class NerTagger:
         """
         # if not set, include all types
         if not self.entity_types:
-            return entity_sets
+            for es in entity_sets:
+                yield [e for e in es]
+            return
 
         for es in entity_sets:
             yield [e for e in es if e.type in self.entity_types]

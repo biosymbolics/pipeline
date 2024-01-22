@@ -2,16 +2,12 @@
 Utility functions for the Binder NER model
 """
 
-import time
-import numpy.typing as npt
-from pydash import flatten
 import torch
 from transformers import BatchEncoding
 from spacy.tokens import Span
 import polars as pl
 import logging
 
-from constants.core import DEFAULT_TORCH_DEVICE as DEVICE
 from core.ner.binder.types import Feature, Annotation
 
 logger = logging.getLogger(__name__)
@@ -64,8 +60,8 @@ def extract_prediction(
             scores.cpu().detach().numpy(),
             schema={
                 "type": pl.Int8,
-                "start": pl.Int32,
-                "end": pl.Int32,
+                "start": pl.Int16,
+                "end": pl.Int16,
                 "score": pl.Float32,
             },
         )
@@ -93,34 +89,7 @@ def extract_prediction(
     return annotations
 
 
-def extract_predictions(
-    features: list[Feature],
-    predictions: npt.NDArray,
-    type_map: dict[int, str],
-) -> list[Annotation]:
-    """
-    Extract predictions from a list of features.
-
-    Args:
-        features: the features from which to extract predictions.
-        predictions: the span predictions from the model.
-        type_map: the type map for reconstituting the NER types
-    """
-    all_predictions = flatten(
-        [
-            extract_prediction(
-                predictions[i],
-                feature,
-                type_map,
-            )
-            for i, feature in enumerate(features)
-        ]
-    )
-
-    return all_predictions
-
-
-def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
+def prepare_feature(text: str, index: int, tokenized: BatchEncoding) -> Feature:
     """
     Prepare features for torch model.
 
@@ -130,31 +99,19 @@ def prepare_features(text: str, tokenized: BatchEncoding) -> list[Feature]:
         text: the text to prepare features for.
         tokenized: the tokenized text.
     """
-    num_features = len(tokenized["input_ids"])  # type: ignore
-    offset_mapping = tokenized.pop("offset_mapping")
+    offset_mapping = tokenized.offset_mapping[index]
 
-    def process_feature(i: int):
-        sequence_ids = tokenized.sequence_ids(i)
-
-        feature: Feature = {
-            "id": f"feat-{str(i + 1)}",
-            "text": text,
-            "token_start_mask": torch.tensor(
-                [om[0] for om in offset_mapping[i]], device=DEVICE
-            ).bool(),
-            "token_end_mask": torch.tensor(
-                [om[1] for om in offset_mapping[i]], device=DEVICE
-            ).bool(),
-            "offset_mapping": [
-                om if sequence_ids[k] == 0 else None
-                for k, om in enumerate(offset_mapping[i])
-            ],
-        }
-
-        return feature
-
-    features = [process_feature(i) for i in range(num_features)]
-    return features
+    feature: Feature = {
+        "id": f"feat-{str(index + 1)}",
+        "text": text,
+        "token_start_mask": offset_mapping[:, 0].bool(),
+        "token_end_mask": offset_mapping[:, 1].bool(),
+        "offset_mapping": [
+            (om if i == 1 or om != (0, 0) else None)
+            for i, om in enumerate(offset_mapping)
+        ],
+    }
+    return feature
 
 
 def has_span_overlap(new_ent: Span, index: int, existing_ents: list[Span]) -> bool:
@@ -172,7 +129,7 @@ def has_span_overlap(new_ent: Span, index: int, existing_ents: list[Span]) -> bo
         if new_ent.start_char <= ent.end_char and new_ent.end_char >= ent.start_char
     ]
     if len(overlapping_ents) > 0:
-        logger.warning(
+        logger.debug(
             "Overlap detected between %s and %s", new_ent.text, overlapping_ents
         )
         return True

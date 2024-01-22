@@ -2,7 +2,6 @@
 Term Normalizer
 """
 import logging
-from multiprocessing import Pool
 import time
 from typing import Sequence
 

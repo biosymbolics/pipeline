@@ -135,7 +135,7 @@ class DatabaseClient:
 
         for i, b in enumerate(batched):
             logging.info("Inserting batch %s into table %s", i, table_name)
-            transformed = transform(b, records) if transform else b
+            transformed = transform(b, records) if transform is not None else b
             await self._insert(table_name, transformed)
 
             logging.info("Successfully inserted %s rows", len(b))

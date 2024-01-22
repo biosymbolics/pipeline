@@ -1,10 +1,9 @@
 """
 Binder NER model
 """
-from typing import Iterable, Iterator, Sequence
+from typing import Iterable, Sequence
 from pydash import compact
 import torch
-from torch import nn
 from transformers import AutoTokenizer
 import logging
 from spacy.tokens import Doc
@@ -19,9 +18,9 @@ from constants.core import (
 from .constants import NER_TYPES
 from .types import Annotation
 from .utils import (
-    extract_predictions,
+    extract_prediction,
     remove_overlapping_spans,
-    prepare_features,
+    prepare_feature,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,8 +43,7 @@ class BinderNlp:
             "Loading torch model from: %s (device %s)", model_file, DEFAULT_TORCH_DEVICE
         )
         # self.model = nn.DataParallel(torch.load(model_file, map_location=device))
-        self.model = torch.load(model_file, map_location=device)
-        # self.model.to(device)
+        self.model = torch.load(model_file, map_location=device)  # .to(device)
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             base_model, use_fast=True, device_map="auto"
@@ -80,7 +78,8 @@ class BinderNlp:
             "type_token_type_ids": descriptions["token_type_ids"],
         }
 
-    def add_ents(self, doc: Doc, annotations: Sequence[Annotation]) -> Doc:
+    @staticmethod
+    def add_entities_to_doc(doc: Doc, annotations: Sequence[Annotation]) -> Doc:
         """
         Add entity annotations to a SpaCy Doc.
 
@@ -128,6 +127,7 @@ class BinderNlp:
         tokenize_args: dict = {
             "return_overflowing_tokens": True,
             "return_offsets_mapping": True,
+            "return_tensors": "pt",
         },
     ):
         """
@@ -161,23 +161,28 @@ class BinderNlp:
         else:
             doc = input
 
-        inputs = self.tokenize(doc.text)  # TODO: avoid re-tokenizing?
-        features = prepare_features(doc.text, inputs)
+        # TODO: avoid re-tokenizing?
+        tokenized = self.tokenize(doc.text)
+        feature = prepare_feature(doc.text, 0, tokenized)
 
-        inputs.pop("overflow_to_sample_mapping")
+        tokenized.pop("overflow_to_sample_mapping")
+        tokenized.pop("offset_mapping")
 
-        outputs = self.model(**inputs, **self.type_descriptions)
+        outputs = self.model(**tokenized, **self.type_descriptions)
 
-        annotations = extract_predictions(features, outputs.span_scores, self.type_map)
-        return self.add_ents(doc, annotations)
+        annotations = extract_prediction(
+            outputs.span_scores[0],
+            feature,
+            self.type_map,
+        )
+        return self.add_entities_to_doc(doc, annotations)
 
     def pipe(
         self,
         texts: Iterable[str],
-    ) -> Iterator[Doc]:
+    ) -> Iterable[Doc]:
         """
         Apply the pipeline to a batch of texts.
-        Single threaded because GPU handles parallelism.
 
         Args:
             texts (Iterable[str]): The texts to annotate.

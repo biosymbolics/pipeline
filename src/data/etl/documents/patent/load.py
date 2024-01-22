@@ -34,9 +34,12 @@ INTERVENTION_DOMAINS: list[LegacyDomainType] = [
     "biologics",
     "compounds",
     "devices",
+    "diagnostics",
     "procedures",
     "mechanisms",
 ]
+
+
 PATENT_SOURCE_FIELDS = [
     "applications.publication_number as id",
     "abstract",
