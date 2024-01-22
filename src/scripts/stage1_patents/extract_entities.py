@@ -283,7 +283,7 @@ class PatentEnricher(BaseEnricher):
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(
-            entity_types=ENTITY_TYPES, link=False, normalize=False
+            entity_types=ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
         )
 
     @overrides(BaseEnricher)
