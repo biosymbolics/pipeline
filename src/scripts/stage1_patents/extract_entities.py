@@ -165,7 +165,10 @@ class BaseEnricher:
 
         doc_vector_inserts = [
             {"publication_number": id, "vector": de}
-            for id, de in zip(patent_ids, [es[0].doc_vector for es in entities])
+            for id, de in zip(
+                patent_ids,
+                [es[0].doc_vector if len(es) > 0 else None for es in entities],
+            )
         ]
 
         # turn into dicts for polars' sake
