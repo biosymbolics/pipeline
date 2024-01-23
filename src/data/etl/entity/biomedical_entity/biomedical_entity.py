@@ -333,7 +333,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
                 AND umls_instance_rollup.id=umls.instance_rollup_id
-                AND instance_rollup=''
                 {'AND ' + ' AND '.join(filters) if filters else ''}
             """
 
