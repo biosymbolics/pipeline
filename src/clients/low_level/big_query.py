@@ -100,7 +100,7 @@ class BQDatabaseClient(DatabaseClient):
     async def _insert(self, table_name: str, records: list[T]):
         table = self.get_table(table_name)
         try:
-            self.client.insert_rows(table, records, retry=None)
+            self.client.insert_rows(table, records, retry=None, skipInvalidRows=True)
         except Exception as e:
             logging.error("Error inserting rows: %s", e)
 
