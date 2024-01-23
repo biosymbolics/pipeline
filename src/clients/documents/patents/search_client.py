@@ -134,6 +134,8 @@ async def search(
         return await find_many(
             where=where,
             include=p.include,
+            # big perf improvement over default sort (id)
+            order={"priority_date": "desc"},
             take=limit,
         )
 
