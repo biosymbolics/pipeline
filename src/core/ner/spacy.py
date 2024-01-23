@@ -105,8 +105,8 @@ def get_transformer_nlp() -> Spacy:
     """
     nlp = Spacy.get_instance(
         model="en_core_web_trf",
-        # parser and tagger not currently "working" anyway. TODO: add back & make work!
-        disable=["ner"],  # "parser", "tagger"],
+        # parser and tagger don't work with transformer?
+        disable=["ner", "attribute_ruler", "parser", "tagger", "lemmatizer"],
         additional_pipelines={
             "transformer": {
                 "config": {

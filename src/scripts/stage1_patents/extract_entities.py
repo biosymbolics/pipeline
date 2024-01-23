@@ -229,6 +229,7 @@ class BaseEnricher:
 
             # persist doc-level embeddings
             if doc_embeddings is not None:
+                print(doc_embeddings[0])
                 await self.db.insert_into_table(doc_embeddings, "patent_embeddings")
 
             # persist entity-level embeddings
