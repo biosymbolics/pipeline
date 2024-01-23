@@ -2,7 +2,7 @@ from abc import abstractmethod
 import asyncio
 import logging
 import sys
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 import polars as pl
 from pydash import flatten, uniq
 import hashlib
@@ -41,6 +41,10 @@ ENTITY_TYPES = frozenset(
         "mechanisms",
         "procedures",
     ]
+)
+
+EmbeddingData = TypedDict(
+    "EmbeddingData", {"publication_number": str, "vector": list[float]}
 )
 
 
@@ -124,7 +128,9 @@ class BaseEnricher:
 
         return texts
 
-    def _extract(self, patents: list[dict]) -> tuple[pl.DataFrame, list[dict]] | None:
+    def _extract(
+        self, patents: list[dict]
+    ) -> tuple[pl.DataFrame, list[EmbeddingData]] | None:
         """
         Enriches patents with entities
 
@@ -163,12 +169,13 @@ class BaseEnricher:
             logger.warning("No entities found")
             return None
 
-        doc_vector_inserts = [
-            {"publication_number": id, "vector": de}
+        doc_vector_inserts: list[EmbeddingData] = [
+            EmbeddingData(publication_number=id, vector=de)
             for id, de in zip(
                 patent_ids,
                 [es[0].doc_vector if len(es) > 0 else None for es in entities],
             )
+            if de is not None
         ]
 
         # turn into dicts for polars' sake
@@ -229,7 +236,6 @@ class BaseEnricher:
 
             # persist doc-level embeddings
             if doc_embeddings is not None:
-                print(doc_embeddings[0])
                 await self.db.insert_into_table(doc_embeddings, "patent_embeddings")
 
             # persist entity-level embeddings

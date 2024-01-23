@@ -104,7 +104,7 @@ class DocEntity(Dataclass):
         return self.__str__()
 
     @property
-    def doc_vector(self):
+    def doc_vector(self) -> Optional[list[float]]:
         if self.spacy_doc is not None:
             return self.spacy_doc.vector.tolist()
         return None
