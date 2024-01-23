@@ -89,7 +89,6 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
 class DocumentSearchParams(DocumentSearchCriteria):
     limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
-    # s3 persist is big time hog; needs to be async and later, streamed to client
     skip_cache: Annotated[bool, Field(validate_default=True)] = True
 
 
