@@ -3,6 +3,7 @@ Regulatory approvals client
 """
 from datetime import datetime
 import logging
+import re
 from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.documents.utils import get_term_clause
@@ -23,11 +24,22 @@ from .client import find_many
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+APPROVAL_ID_RE = re.compile("^[0-9]{4,5}-[0-9]{3,4}$")
+
 
 def get_where_clause(p: DocumentSearchCriteria) -> RegulatoryApprovalWhereInput:
     """
     Get where clause for regulatory approvals
     """
+    is_id_search = any([APPROVAL_ID_RE.match(t) for t in p.terms])
+
+    # require homogeneous search
+    if is_id_search and any([not APPROVAL_ID_RE.match(t) for t in p.terms]):
+        raise ValueError("ID search; all terms must be XXXXX?-XXXX?")
+
+    if is_id_search:
+        return {"id": {"in": list(p.terms)}}
+
     term_clause = get_term_clause(p, RegulatoryApprovalWhereInput)
 
     where: RegulatoryApprovalWhereInput = {

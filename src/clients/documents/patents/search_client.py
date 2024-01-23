@@ -61,11 +61,11 @@ async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
 
 
 def get_where_clause(p: DocumentSearchCriteria) -> PatentWhereInput:
-    is_id_search = all([t.startswith("WO-") for t in p.terms])
+    is_id_search = any([t.startswith("WO-") for t in p.terms])
 
     # require homogeneous search
     if is_id_search and any([not t.startswith("WO-") for t in p.terms]):
-        raise ValueError("ID search must be all WO-")
+        raise ValueError("ID search; all terms must be WO-.*")
 
     if is_id_search:
         return {"id": {"in": list(p.terms)}}

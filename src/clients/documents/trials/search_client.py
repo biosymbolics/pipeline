@@ -22,6 +22,15 @@ logger.setLevel(logging.INFO)
 
 
 def get_where_clause(p: DocumentSearchCriteria) -> TrialWhereInput:
+    is_id_search = any([t.startswith("NCT") for t in p.terms])
+
+    # require homogeneous search
+    if is_id_search and any([not t.startswith("NCT") for t in p.terms]):
+        raise ValueError("ID search; all terms must be NCT.*")
+
+    if is_id_search:
+        return {"id": {"in": list(p.terms)}}
+
     term_clause = get_term_clause(p, TrialWhereInputRecursive1)
 
     where: TrialWhereInput = {
