@@ -120,6 +120,7 @@ def get_transformer_nlp() -> Spacy:
                         },
                         "tokenizer_config": {
                             "use_fast": True,
+                            "model_max_length": 512,
                             "device": DEFAULT_TORCH_DEVICE,
                             "mixed_precision": True,
                         },

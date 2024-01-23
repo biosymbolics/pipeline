@@ -189,12 +189,7 @@ class BinderNlp:
         """
         logger.debug("Starting binder NER extraction")
 
-        try:
-            docs = self.nlp.pipe(texts)
+        docs = self.nlp.pipe(texts)
 
-            for doc in docs:
-                yield self.extract(doc)
-        except Exception as e:
-            logger.error("Error extracting entities, abandoning attempt: %s", e)
-            logger.info("Texts: %s", list(texts))
-            raise e
+        for doc in docs:
+            yield self.extract(doc)
