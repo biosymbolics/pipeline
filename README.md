@@ -1,26 +1,10 @@
 ### Setup
 
-- `. .pythonenv`
-- `python3 -m pip install -r requirements.txt`
 - `CFLAGS="-mavx -DWARN(a)=(a)" pip install 'nmslib @ git+https://github.com/nmslib/nmslib.git#egg=nmslib'`
-``````
-pip install -U prisma
-apt-get install gcc g++ unzip
-PYTHONPATH=$(pwd)/src:$(pwd)/:./binder:/opt/homebrew/lib/python3.11/site-packages/
-export DEFAULT_TORCH_DEVICE=cuda
-python -m spacy download en_core_web_trf
-pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
-pip install pandas # sigh
-pip install nvidia-smi
-pip install pyarrow
-watch -n 1 nvidia-smi
-```
 - https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
   - https://d-90679e1dba.awsapps.com/start#/
   - CLI profile name: default
 - AWS authenticate if needed: `aws configure sso`
-- psql
-  - psql -h 172.31.14.226 -p 5432 --username postgres
 - sls offlne
   - https://github.com/dherault/serverless-offline/issues/1696
 - Docker - new ECR for lambda
@@ -32,6 +16,41 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 docker tag biosym_lambda-repo:chat_torch_latest 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 docker push 469840476741.dkr.ecr.us-east-1.amazonaws.com/biosym_lambda-repo:chat_torch_latest
 ```
+
+### Running a model on Vast.ai (or the like)
+```
+git clone https://github.com/biosymbolics/pipeline
+apt-get install gcc g++ unzip screen nvtop
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-460.0.0-linux-x86_64.tar.gz
+tar -xf google-cloud-cli-460.0.0-linux-x86_64.tar.gz
+./google-cloud-sdk/install.sh
+source ~/.bashrc
+gcloud auth application-default login
+pip install -U prisma
+cd pipeline
+python3 -m pip install -r requirements.txt
+python -m spacy download en_core_web_trf
+prisma generate
+mkdir models
+mkdir data
+pip uninstall torch
+pip install torch torchvision torchaudio
+pip install pandas
+pip install nvidia-smi
+pip install cupy-cuda12x
+export DEFAULT_TORCH_DEVICE=cuda
+cp .env.template .env
+. .pythonenv
+PYTHONPATH=$(pwd)/src:$(pwd)/:./binder:/opt/homebrew/lib/python3.11/site-packages/
+```
+- aws configure sso, using url https://d-90679e1dba.awsapps.com/start#/
+- gpu activity `nvtop`
+- `screen` - `ctrl-a d` to detach, `screen -r`` to reattach
+- `python3 -m scripts.stage1_patents.extract_entities WO-2004078070-A3` (or whatever)
+
 
 ### Running locally
 - `sls offline`

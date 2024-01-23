@@ -13,6 +13,7 @@ openai
 polars
 prisma
 psycopg[binary,pool]
+pyarrow
 pydash
 pydantic
 python-dotenv
