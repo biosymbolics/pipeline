@@ -161,25 +161,21 @@ class BinderNlp:
         else:
             doc = input
 
-        try:
-            # TODO: avoid re-tokenizing?
-            tokenized = self.tokenize(doc.text)
-            feature = prepare_feature(doc.text, 0, tokenized)
+        # TODO: avoid re-tokenizing?
+        tokenized = self.tokenize(doc.text)
+        feature = prepare_feature(doc.text, 0, tokenized)
 
-            tokenized.pop("overflow_to_sample_mapping")
-            tokenized.pop("offset_mapping")
+        tokenized.pop("overflow_to_sample_mapping")
+        tokenized.pop("offset_mapping")
 
-            outputs = self.model(**tokenized, **self.type_descriptions)
+        outputs = self.model(**tokenized, **self.type_descriptions)
 
-            annotations = extract_prediction(
-                outputs.span_scores[0],
-                feature,
-                self.type_map,
-            )
-            return self.add_entities_to_doc(doc, annotations)
-        except Exception as e:
-            logger.error("Error extracting entities, abandoning attempt: %s", e)
-            return doc
+        annotations = extract_prediction(
+            outputs.span_scores[0],
+            feature,
+            self.type_map,
+        )
+        return self.add_entities_to_doc(doc, annotations)
 
     def pipe(
         self,
@@ -196,4 +192,8 @@ class BinderNlp:
         docs = self.nlp.pipe(texts)
 
         for doc in docs:
-            yield self.extract(doc)
+            try:
+                yield self.extract(doc)
+            except Exception as e:
+                logger.error("Error extracting entities, abandoning attempt: %s", e)
+                yield doc
