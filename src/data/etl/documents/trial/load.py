@@ -6,7 +6,7 @@ import re
 import sys
 import logging
 from typing import Sequence
-from pydash import omit
+from pydash import omit, uniq
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
     Indicatable,
@@ -299,7 +299,7 @@ class TrialLoader(BaseDocumentEtl):
                         "trial_id": t["id"],
                     }
                     for t in rows
-                    for i in t["indications"]
+                    for i in uniq(t["indications"])
                 ],
                 skip_duplicates=True,
             )
@@ -314,7 +314,7 @@ class TrialLoader(BaseDocumentEtl):
                         "trial_id": t["id"],
                     }
                     for t in rows
-                    for i in t["interventions"]
+                    for i in uniq(t["interventions"])
                 ],
                 skip_duplicates=True,
             )
