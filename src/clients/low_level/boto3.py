@@ -3,6 +3,7 @@ Boto3 client
 """
 import json
 import os
+import time
 from typing import Any, Awaitable, Callable, Sequence, TypeVar, cast
 import boto3
 from botocore.exceptions import ClientError
@@ -140,6 +141,7 @@ async def retrieve_with_cache_check(
         is_all = limit is not None and isinstance(data, list) and len(data) < limit
         cache_key = get_cache_key(key, is_all=is_all, limit=limit)
 
+        start = time.monotonic()
         # can take many seconds - like 12s for atopic dermatitis assets
         s3.put_object(
             Bucket=cache_name,
@@ -147,5 +149,6 @@ async def retrieve_with_cache_check(
             Body=encode(data),  # type: ignore
             ContentType="application/json",
         )
+        logger.info("Cache put took %s seconds", round(time.monotonic() - start))
 
         return cast(T, data)

@@ -157,6 +157,7 @@ model TrialOutcome {
     trial           Trial?          @relation(fields: [trial_id], references: [id])
     timeframe       String?
 
+    @@index([trial_id], name: "trial_outcome_trial_id")
     @@map("trial_outcome")
 }
 
@@ -203,6 +204,7 @@ model Ownable {
     @@index([canonical_name], name: "ownable_canonical_name")
     @@index([instance_rollup], name: "ownable_instance_rollup")
     @@index([category_rollup], name: "ownable_category_rollup")
+    @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
     @@index([owner_id], name: "ownable_owner_id")
     @@index([patent_id], name: "ownable_patent_id")
     @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")

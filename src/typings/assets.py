@@ -31,14 +31,18 @@ class Asset(EntityBase):
     children: list["Asset"]
     id: str
     maybe_available_count: int
+    maybe_available_ids: list[str]
     name: str
     owners: list[str]
     patent_count: int
+    patent_ids: list[str]
     percent_trials_stopped: float
     most_recent_patent: ScoredPatent | None
     most_recent_trial: ScoredTrial | None
     regulatory_approval_count: int
+    regulatory_approval_ids: list[str]
     trial_count: int
+    trial_ids: list[str]
     total_trial_enrollment: int
 
     @classmethod
@@ -70,30 +74,39 @@ class Asset(EntityBase):
         id: str,
         name: str,
         children: list["Asset"],
+        end_year: int,
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
+        start_year: int,
         trials: list[ScoredTrial],
     ) -> "Asset":
+        maybe_available_ids = cls.get_maybe_available_ids(patents)
         return Asset(
             id=id,
             name=name,
-            activity=cls.get_activity(patents, regulatory_approvals, trials),
+            activity=cls.get_activity(
+                start_year, end_year, patents, regulatory_approvals, trials
+            ),
             average_trial_dropout=cls.get_average_trial_dropout(trials),
             average_trial_duration=cls.get_average_trial_duration(trials),
             average_trial_enrollment=cls.get_average_trial_enrollment(trials),
             children=children,
             detailed_activity=cls.get_detailed_activity(
-                patents, regulatory_approvals, trials
+                start_year, end_year, patents, regulatory_approvals, trials
             ),
-            maybe_available_count=cls.get_maybe_available_count(patents),
+            maybe_available_count=len(maybe_available_ids),
+            maybe_available_ids=maybe_available_ids,
             most_recent_patent=cls.get_most_recent_patent(patents),
             most_recent_trial=cls.get_most_recent_trial(trials),
             owners=cls.get_owners(patents, trials),
             patent_count=len(patents),
+            patent_ids=[p.id for p in patents],
             percent_trials_stopped=cls.get_percent_trials_stopped(trials),
             regulatory_approval_count=len(regulatory_approvals),
+            regulatory_approval_ids=[a.id for a in regulatory_approvals],
             total_trial_enrollment=cls.get_total_trial_enrollment(trials),
             trial_count=len(trials),
+            trial_ids=[t.id for t in trials],
         )
 
     @property
@@ -161,6 +174,8 @@ class Asset(EntityBase):
     @classmethod
     def get_activity(
         cls,
+        start_year: int,
+        end_year: int,
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         trials: list[ScoredTrial],
@@ -183,14 +198,13 @@ class Asset(EntityBase):
             )
             + [a.approval_date for a in regulatory_approvals]
         )
-        return [
-            dates.count(y)
-            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
-        ]
+        return [dates.count(y) for y in range(start_year, end_year)]
 
     @classmethod
     def get_detailed_activity(
         cls,
+        start_year: int,
+        end_year: int,
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         trials: list[ScoredTrial],
@@ -222,7 +236,7 @@ class Asset(EntityBase):
                 regulatory_approvals=[a.id for a in regulatory_approval_map.get(y, [])],
                 trials=[t.id for t in trial_map.get(y, [])],
             )
-            for y in range(date.today().year - MAX_PATENT_LIFE, date.today().year + 1)
+            for y in range(start_year, end_year)
         ]
 
     @classmethod
@@ -286,17 +300,18 @@ class Asset(EntityBase):
         return round(sum(durations) / len(durations))
 
     @classmethod
-    def get_maybe_available_count(cls, patents: Sequence[ScoredPatent]) -> int:
+    def get_maybe_available_ids(cls, patents: Sequence[ScoredPatent]) -> list[str]:
         return [
-            p.availability_likelihood
+            p.id
+            for p in patents
+            if p.availability_likelihood
             in [
                 AvailabilityLikelihood.POSSIBLE,
                 AvailabilityLikelihood.LIKELY,
                 "POSSIBLE",
                 "LIKELY",
             ]
-            for p in patents
-        ].count(True)
+        ]
 
     @classmethod
     def get_owners(

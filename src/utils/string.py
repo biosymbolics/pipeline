@@ -5,12 +5,34 @@ String utilities
 
 from datetime import date
 from enum import Enum
+import json
 import regex as re
 from typing import Mapping, TypeGuard, Union
+from hashlib import sha1
 
 
 _Idable = str | list[str] | int | date
 Idable = _Idable | Mapping[str, _Idable]
+
+
+MAX_ID_CHARS = 200
+
+
+def create_hash_key(identifiers: list) -> str:
+    """
+    Creates a hash key by hasing the identifier(s) provided
+
+    For example:
+    ```
+    create_hash_key(["PFE", "SEC", "10-K", "2020-01-01"]) -> "1df051d5fc67f9192bdc7d77957d9875"
+    ```
+
+    Args:
+        identifiers (list): list of identifiers to use for cache key
+    """
+    string = "-".join([json.dumps(id) for id in identifiers])
+    key = (sha1(string.encode())).hexdigest()
+    return key
 
 
 def get_id(value: Idable) -> str:
@@ -30,6 +52,10 @@ def get_id(value: Idable) -> str:
 
     if isinstance(value, list):
         value = "_".join([str(v) for v in value])
+        if len(value) > MAX_ID_CHARS:
+            # create a hash key if otherwise too long
+            # i.e. when we're looking up docs by a list of ids
+            value = create_hash_key([str(v) for v in value])
 
     if isinstance(value, bool):
         value = str(value)

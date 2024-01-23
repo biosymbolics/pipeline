@@ -1,29 +1,12 @@
 """
-Cache client
+Redis cache client
 """
 from typing import Any, Callable
-import json
-from hashlib import md5
 import logging
 
+from utils.string import create_hash_key
+
 from .redis import get_cached_value, set_cached_value
-
-
-def __get_cache_key(identifiers: list) -> str:
-    """
-    Creates a cache key by hasing the identifier(s) provided
-
-    For example:
-    ```
-    __get_cache_key(["PFE", "SEC", "10-K", "2020-01-01"]) -> "1df051d5fc67f9192bdc7d77957d9875"
-    ```
-
-    Args:
-        identifiers (list): list of identifiers to use for cache key
-    """
-    string = "-".join([json.dumps(id) for id in identifiers])
-    key = (md5(string.encode())).hexdigest()
-    return key
 
 
 def get_from_cache(identifiers: list) -> Any:
@@ -33,7 +16,7 @@ def get_from_cache(identifiers: list) -> Any:
     Args:
         identifiers (list): list of identifiers to use for cache key
     """
-    key = __get_cache_key(identifiers)
+    key = create_hash_key(identifiers)
 
     try:
         cached = get_cached_value(key)
@@ -54,7 +37,7 @@ def set_in_cache(identifiers: list, object: Any) -> None:
         identifiers (list): list of identifiers to use for cache key
         object (Any): object to set in cache
     """
-    key = __get_cache_key(identifiers)
+    key = create_hash_key(identifiers)
     logging.info("Setting value in cache: %s", key)
     set_cached_value(key, object)
 
