@@ -31,6 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install mypy pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        python -m spacy download en_core_web_trf
     - name: Generate prisma
       run: |
         echo "PYTHONPATH=$(pwd)/src:$(pwd)/" >> $GITHUB_ENV

@@ -78,7 +78,7 @@ class BQDatabaseClient(DatabaseClient):
             return False
 
     @overrides(DatabaseClient)
-    def execute_query(self, query: str, values: list = []) -> ExecuteResult:
+    async def execute_query(self, query: str, values: list = []) -> ExecuteResult:
         """
         Execute BigQuery query
 
@@ -98,7 +98,11 @@ class BQDatabaseClient(DatabaseClient):
 
     @overrides(DatabaseClient)
     async def _insert(self, table_name: str, records: list[T]):
-        self.client.insert_rows(self.get_table(table_name), records)
+        table = self.get_table(table_name)
+        try:
+            self.client.insert_rows(table, records, retry=None)
+        except Exception as e:
+            logging.error("Error inserting rows: %s", e)
 
     @overrides(DatabaseClient)
     async def _create(
@@ -196,7 +200,7 @@ class BQDatabaseClient(DatabaseClient):
 
         logging.info("Running query: %s", sql)
         try:
-            self.execute_query(sql)
+            await self.execute_query(sql)
         except Exception as e:
             logging.error("Error upserting rows: %s", e)
             await self.delete_table(tmp_table_id)

@@ -1,10 +1,6 @@
-from collections import defaultdict
-from functools import reduce
 import os
 from pathlib import Path
 import logging
-from typing import Any, OrderedDict
-from pydash import set_
 
 from clients.low_level.boto3 import fetch_s3_obj
 
@@ -12,6 +8,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DEFAULT_LOCATION = os.path.join(os.getcwd(), "models")
+DEFAULT_MODELS_BUCKET = "biosym-models"
 
 
 def get_model_path(model: str, dest: str = DEFAULT_LOCATION) -> str:
@@ -36,7 +33,6 @@ def download_model_from_s3(model: str, dest: str = DEFAULT_LOCATION) -> str:
     """
     logger.info("Downloading %s from S3", model)
     filename = os.path.join(Path(dest), model)
-    object_name = f"models/{model}"  # targz?
-    fetch_s3_obj(object_name, filename)
+    fetch_s3_obj(model, filename, bucket=DEFAULT_MODELS_BUCKET)
 
     return filename

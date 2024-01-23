@@ -27,7 +27,7 @@ DB_CLUSTER = os.environ.get("DB_CLUSTER")
 DEFAULT_BASE_TRANSFORMER_MODEL = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"
 DEFAULT_NLP_DOC_STRIDE = 16
 DEFAULT_NLP_MAX_LENGTH = 512  # same as with training
-DEFAULT_TORCH_DEVICE: str = "mps"
+DEFAULT_TORCH_DEVICE: str = os.environ.get("DEFAULT_TORCH_DEVICE") or "mps"
 
 DEFAULT_NLP_MODEL_ARGS = {
     "max_length": DEFAULT_NLP_MAX_LENGTH,

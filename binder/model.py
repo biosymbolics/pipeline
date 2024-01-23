@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple, List, Union, Dict
 import torch
-from torch import LongTensor, nn
+from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from transformers import PreTrainedModel, AutoModel, AutoConfig
@@ -280,20 +280,12 @@ class Binder(PreTrainedModel):
 
         # span_width_embeddings
         if self.width_embeddings is not None:
-            if torch.cuda.is_available():
-                range_vector = (
-                    LongTensor(seq_length, device=sequence_output.device)
-                    .fill_(1)
-                    .cumsum(0)
-                    - 1
-                )
-            else:
-                range_vector = (
-                    torch.arange(seq_length, device=sequence_output.device)
-                    .fill_(1)
-                    .cumsum(0)
-                    - 1
-                )
+            range_vector = (
+                torch.arange(seq_length, device=sequence_output.device)
+                .fill_(1)
+                .cumsum(0)
+                - 1
+            )
             span_width = range_vector.unsqueeze(0) - range_vector.unsqueeze(1) + 1
             # seq_length x seq_length x hidden_size
             span_width_embeddings = self.width_embeddings(span_width * (span_width > 0))
@@ -403,7 +395,7 @@ class Binder(PreTrainedModel):
             start_scores=start_scores,
             end_scores=end_scores,
             span_scores=span_scores,
-            loss=total_loss,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
+            # loss=total_loss,
+            # hidden_states=outputs.hidden_states,
+            # attentions=outputs.attentions,
         )

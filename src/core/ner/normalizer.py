@@ -96,7 +96,7 @@ class TermNormalizer:
             docs = [None for _ in uniq_terms]
 
         doc_ents = [
-            DocEntity(
+            DocEntity.create(
                 term=term,
                 type="unknown",
                 start_char=0,

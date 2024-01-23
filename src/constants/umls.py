@@ -253,6 +253,7 @@ LegacyDomainType = Literal[
     "compounds",
     "biologics",
     "devices",
+    "diagnostics",
     "diseases",
     "procedures",
     "mechanisms",

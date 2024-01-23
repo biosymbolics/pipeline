@@ -2,7 +2,6 @@
 Term Normalizer
 """
 import logging
-from multiprocessing import Pool
 import time
 from typing import Sequence
 
@@ -75,7 +74,7 @@ class TermLinker:
             return ce
 
         linked_doc_ents = [
-            DocEntity(**{**e, "canonical_entity": get_canonical(ce, e)})
+            DocEntity.create(**{**e, "canonical_entity": get_canonical(ce, e)})
             for e, ce in zip(entities, canonical_entities)
         ]
 

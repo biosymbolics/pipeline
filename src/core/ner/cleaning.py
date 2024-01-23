@@ -224,10 +224,13 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity(
-                    **{  # type: ignore
-                        **orig_ents[i]._asdict(),
+                DocEntity.create(
+                    **{
+                        "term": modified_texts[i],
+                        "start_char": orig_ents[i].start_char,
+                        "end_char": orig_ents[i].end_char,
                         "normalized_term": modified_texts[i],
+                        "type": orig_ents[i].type,
                         "canonical_entity": orig_ents[i].canonical_entity,
                     }
                 )

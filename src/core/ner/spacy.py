@@ -7,9 +7,9 @@ from typing import Any, Iterator
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
-from thinc.api import set_gpu_allocator, prefer_gpu
-from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL, DEFAULT_TORCH_DEVICE
+from thinc.api import set_gpu_allocator
 
+from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL, DEFAULT_TORCH_DEVICE
 from utils.args import make_hashable
 
 logger = logging.getLogger(__name__)
@@ -56,8 +56,8 @@ class Spacy:
         spacy.prefer_gpu()  # type: ignore
 
         if model.endswith("_trf"):
+            logger.warning("Setting GPU allocator to pytorch")
             set_gpu_allocator("pytorch")
-            prefer_gpu()
 
         self.model = model
 
@@ -91,9 +91,11 @@ class Spacy:
         args = [("model", model), *sorted(kwargs.items())]
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
-            logger.debug("Returning UNCACHED nlp model (%s)", model)
+            logger.info("Returning UNCACHED nlp model (%s)", model)
             cls._instances[args_hash] = cls(model, **kwargs)
-        logger.debug("Returning CACHED nlp model (%s)", model)
+        logger.info(
+            "Returning nlp model (%s) (all models: %s)", model, cls._instances.keys()
+        )
         return cls._instances[args_hash]
 
 

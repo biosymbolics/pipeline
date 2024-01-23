@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 T = TypeVar("T", bound=Sequence)
 
-DEFAULT_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")
+DEFAULT_BUCKET = os.environ.get("CACHE_BUCKET", "biosym-patents")  # ??
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 

@@ -2,14 +2,14 @@
 Tensor utilities
 """
 import logging
-from typing import Sequence, TypeVar, cast
+from typing import Sequence
 import torch
 import torch.nn.functional as F
 import numpy as np
-from utils.list import BATCH_SIZE, batch, is_sequence
 import torch
 
 from typings.core import Primitive
+from utils.list import BATCH_SIZE, batch, is_sequence
 
 
 def pad_or_truncate_to_size(

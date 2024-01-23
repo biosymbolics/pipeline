@@ -8,6 +8,7 @@ from typing import (
 )
 import inspect
 from pydantic import BaseModel
+from spacy.tokens import Doc
 
 JsonSerializable = Union[
     Dict[str, "JsonSerializable"], List["JsonSerializable"], str, int, float, bool, None
