@@ -458,6 +458,9 @@ enum BiomedicalEntityType {
     // other
     OTHER
     UNKNOWN
+
+    // hack
+    OWNER
 }
 
 enum ContextOfUse {

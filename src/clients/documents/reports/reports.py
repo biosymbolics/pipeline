@@ -42,7 +42,7 @@ class XYReport:
 
                 UNION ALL
 
-                select {doc_type.name}_id, 'OTHER' as canonical_type, {x}
+                select {doc_type.name}_id, 'OWNER' as canonical_type, {x}
                 from ownable
                 where {doc_type.name}_id is not null AND {filter}
             )

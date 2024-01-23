@@ -32,6 +32,7 @@ DOMAINS_OF_INTEREST = [
     BiomedicalEntityType.COMPOUND.name,
     BiomedicalEntityType.BIOLOGIC.name,
     BiomedicalEntityType.DISEASE.name,
+    "OWNER",
     # "assignees",
     # "inventors",
     # ATTRIBUTE_FIELD,
