@@ -14,6 +14,7 @@ from constants.umls import (
     PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
+    UMLS_WORD_OVERRIDES,
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name
@@ -345,14 +346,6 @@ def candidate_to_canonical(
         description=entity.definition,
         types=entity.types,
     )
-
-
-UMLS_WORD_OVERRIDES = {
-    "modulator": "C0005525",  # "Biological Response Modifiers"
-    "modulators": "C0005525",
-    "binder": "C1145667",  # "Binding action"
-    "binders": "C1145667",
-}
 
 
 def apply_umls_word_overrides(

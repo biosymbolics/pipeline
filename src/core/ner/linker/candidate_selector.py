@@ -49,13 +49,13 @@ class CandidateSelector(AbstractCandidateSelector):
     def _score_candidate(
         self,
         concept_id: str,
-        syntactic_similarity: float,
+        similarity: float,
     ) -> float:
         return score_candidate(
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
-            syntactic_similarity=syntactic_similarity,
+            syntactic_similarity=similarity,
         )
 
     def _get_best_candidate(self, text: str) -> tuple[MentionCandidate, float] | None:

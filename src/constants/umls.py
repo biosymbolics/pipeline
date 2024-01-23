@@ -5,6 +5,7 @@ from typing import Literal
 from prisma.enums import BiomedicalEntityType
 
 # TODO: maybe choose NCI as canonical name
+# rewrites preferred name
 UMLS_NAME_OVERRIDES = {
     "C4721408": "Antagonist",  # "Substance with receptor antagonist mechanism of action (substance)"
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
@@ -14,6 +15,7 @@ UMLS_NAME_OVERRIDES = {
     "C1550602": "Additive",  # otherwise "Additive (substance)"
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
 }
+
 
 UMLS_CUI_SUPPRESSIONS = {
     "C0243083": "associated disease",
@@ -77,8 +79,16 @@ UMLS_NAME_SUPPRESSIONS = [
     "by",  # https://uts.nlm.nih.gov/uts/umls/concept/C0682899
     "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
     "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
+    "product",  # e.g. gene product / https://uts.nlm.nih.gov/uts/umls/concept/C3828300
 ]
 
+# sets canonical based on word
+UMLS_WORD_OVERRIDES = {
+    "modulator": "C0005525",  # "Biological Response Modifiers"
+    "modulators": "C0005525",
+    "binder": "C1145667",  # "Binding action"
+    "binders": "C1145667",
+}
 
 UMLS_COMPOUND_TYPES = {
     "T103": "Chemical",
