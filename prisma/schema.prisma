@@ -157,6 +157,7 @@ model TrialOutcome {
     trial           Trial?          @relation(fields: [trial_id], references: [id])
     timeframe       String?
 
+    @@index([trial_id], name: "trial_outcome_trial_id")
     @@map("trial_outcome")
 }
 
