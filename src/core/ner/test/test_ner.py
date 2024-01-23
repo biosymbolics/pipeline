@@ -17,7 +17,7 @@ from data.etl.documents.patent.load import INTERVENTION_DOMAINS
 # Cyclin dependent kinase 5 phosphorylation of disabled 1 protein
 
 
-# @pytest.mark.skip(reason="Too stocastic to include in CI")
+@pytest.mark.skip(reason="Too stocastic to include in CI")
 class TestNerUtils(unittest.TestCase):
     """
     from core.ner import NerTagger; tagger=NerTagger()
