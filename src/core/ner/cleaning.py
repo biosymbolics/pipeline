@@ -232,6 +232,8 @@ class EntityCleaner:
                         "normalized_term": modified_texts[i],
                         "type": orig_ents[i].type,
                         "canonical_entity": orig_ents[i].canonical_entity,
+                        "vector": orig_ents[i].vector,
+                        "spacy_doc": orig_ents[i].spacy_doc,
                     }
                 )
                 for i in range(len(orig_ents))
