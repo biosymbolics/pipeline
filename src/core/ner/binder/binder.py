@@ -196,4 +196,5 @@ class BinderNlp:
                 yield self.extract(doc)
             except Exception as e:
                 logger.error("Error extracting entities, abandoning attempt: %s", e)
+                logger.info("Texts: %s", list(texts))
                 yield doc
