@@ -147,6 +147,7 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
                     id=rollup + ewd.child,
                     name=ewd.child,
                     children=[],
+                    end_year=p.end_year,
                     patents=compact(
                         [docs_by_type.patents.get(id) for id in ewd.patents]
                     ),
@@ -156,11 +157,13 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
                             for id in ewd.regulatory_approvals
                         ]
                     ),
+                    start_year=p.start_year,
                     trials=compact([docs_by_type.trials.get(id) for id in ewd.trials]),
                 )
                 for ewd in ewds
                 if ewd.child
             ],
+            end_year=p.end_year,
             patents=compact(
                 [
                     docs_by_type.patents.get(id)
@@ -173,6 +176,7 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
                     for id in flatten([ewd.regulatory_approvals for ewd in ewds])
                 ]
             ),
+            start_year=p.start_year,
             trials=compact(
                 [
                     docs_by_type.trials.get(id)
@@ -207,8 +211,8 @@ async def search(p: AssetSearchParams) -> list[Asset]:
 
     # not caching for now; persist to s3 takes too long and it isn't worth.
     if True or p.skip_cache == True:
-        patents = await search_partial()
-        return patents
+        assets = await search_partial()
+        return assets
 
     return await retrieve_with_cache_check(
         search_partial,
