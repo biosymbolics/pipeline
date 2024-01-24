@@ -9,7 +9,6 @@ from prisma.types import (
 from pydash import flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
-from core.ner.linker.utils import score_candidate
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from typings.umls import (
     OntologyLevel,
@@ -30,15 +29,17 @@ class UmlsInfo(BaseModel):
     id: str
     name: str
     level: OntologyLevel
-    type_ids: Sequence[str] = []
+    type_ids: list[str] = []
 
     @staticmethod
-    def from_umls(umls: Umls) -> "UmlsInfo":
+    def from_umls(umls: Umls, **kwargs) -> "UmlsInfo":
+        # combine in kwargs
+        _umls = Umls(**{**umls.__dict__, **kwargs})
         return UmlsInfo(
-            id=umls.id,
-            name=umls.name,
-            level=umls.level,
-            type_ids=umls.type_ids,
+            id=_umls.id,
+            name=_umls.name,
+            level=_umls.level,
+            type_ids=_umls.type_ids,
         )
 
 
@@ -96,7 +97,10 @@ class UmlsAncestorTransformer:
         Load UMLS graph
         """
         self.umls_graph = await AncestorUmlsGraph.create()
-        self.ancestor_lookup = {
+
+        # generate all levels first, so we can later do a single update
+        # (level + instance/category rollups)
+        self.level_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
                 name=r.name,
@@ -115,6 +119,7 @@ class UmlsAncestorTransformer:
         """
         Choose the best ancestor for the record at the specified level(s)
         - prefer ancestors that are *specific* genes/proteins/receptors, aka the drug's target, e.g. gpr83 (for instance)
+        - avoid suppressed UMLS records
         - otherwise prefer just based on level (e.g. L1_CATEGORY, L2_CATEGORY, INSTANCE)
 
         Args:
@@ -148,7 +153,6 @@ class UmlsAncestorTransformer:
                 a
                 for a in _ancestors
                 if has_intersection(a.type_ids, good_ancestor_types)
-                and not is_umls_suppressed(a.id, a.name)
             ]
             if len(good_ancestors) == 0:
                 return None
@@ -193,28 +197,40 @@ class UmlsAncestorTransformer:
             # otherwise, use the first matching ancestor
             return ok_ancestors[0].id
 
-        # prefer type-preferred ancestor, otherwise just go by level
-        return choose_by_type(ancestors) or choose_by_level(ancestors)
+        # remove suppressions
+        ok_ancestors = tuple(
+            [a for a in ancestors if not is_umls_suppressed(a.id, a.name)]
+        )
 
-    def transform(self, r: Umls) -> UmlsUpdateInput:
+        # prefer type-preferred ancestor, otherwise just go by level
+        return choose_by_type(ok_ancestors) or choose_by_level(ok_ancestors)
+
+    def transform(self, partial_record: Umls) -> UmlsUpdateInput:
         """
         Transform a single UMLS record with updates (level, instance_rollup, category_rollup)
         """
-        if self.ancestor_lookup is None:
-            raise ValueError("ancestor_lookup is not initialized")
+        if self.level_lookup is None:
+            raise ValueError("level_lookup is not initialized")
 
-        cuis = [r.__dict__[f"l{i}_ancestor"] for i in range(MAX_DENORMALIZED_ANCESTORS)]
         ancestors = tuple(
-            [self.ancestor_lookup[cui] for cui in cuis if cui in self.ancestor_lookup]
+            [
+                self.level_lookup[partial_record.__dict__[f"l{i}_ancestor"]]
+                for i in range(MAX_DENORMALIZED_ANCESTORS)
+            ]
         )
-        level = get_ontology_level(r.id, self.umls_graph.get_umls_centrality)
+
+        # add level info so it can be used for update and choose_best_ancestor
+        record = UmlsInfo.from_umls(
+            partial_record, level=self.level_lookup[partial_record.id].level
+        )
+
         return UmlsUpdateInput(
-            level=level,
+            level=record.level,
             instance_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                UmlsInfo.from_umls(r), [OntologyLevel.INSTANCE], ancestors
+                record, [OntologyLevel.INSTANCE], ancestors
             ),
             category_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                UmlsInfo.from_umls(r),
+                record,
                 [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 ancestors,
             ),

@@ -89,9 +89,9 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
-                test["record"],
+                UmlsInfo(**test["record"], name=test["record"]["id"]),
                 test["levels"],
-                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
+                tuple([UmlsInfo(**a, name=a["id"]) for a in test["ancestors"]]),
             )
             self.assertEqual(result, expected_output)
 
@@ -251,6 +251,22 @@ class TestTrialUtils(unittest.TestCase):
                 "levels": [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 "expected": "ee5",
             },
+            # should be fixed by level assignment?
+            # {
+            #     "description": "instance after l2",
+            #     "record": {
+            #         "level": OntologyLevel.INSTANCE,
+            #         "id": "anl2cat",
+            #     },
+            #     "ancestors": tuple(
+            #         [
+            #             {"level": OntologyLevel.L2_CATEGORY, "id": "l2"},
+            #             {"level": OntologyLevel.INSTANCE, "id": "iafterl2"},
+            #         ]
+            #     ),
+            #     "levels": [OntologyLevel.INSTANCE],
+            #     "expected": "l2",
+            # },
         ]
 
         for test in test_cases:
@@ -264,6 +280,6 @@ class TestTrialUtils(unittest.TestCase):
                     type_ids=[],
                 ),
                 test["levels"],
-                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
+                tuple([UmlsInfo(**a, name=a["id"]) for a in test["ancestors"]]),
             )
             self.assertEqual(result, expected_output)
