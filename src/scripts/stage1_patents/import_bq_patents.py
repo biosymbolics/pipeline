@@ -3,19 +3,20 @@ import json
 import logging
 import sys
 from typing import Any, Sequence, TypeGuard
-from google.cloud import storage
-from datetime import datetime, timedelta
+from datetime import datetime
 import polars as pl
 from pydash import compact
 import logging
+import google.cloud.storage as storage
 
 import system
 
 system.initialize()
 
+from constants.umls import NER_ENTITY_TYPES
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import PUBLICATION_NUMBER_MAP_TABLE
+from constants.core import PUBLICATION_NUMBER_MAP_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -68,24 +69,24 @@ PATENT_APPLICATION_FIELDS = [
 ]
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": {
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE: {
         "column": "domain",
-        "values": ["attributes", "compounds", "diseases", "mechanisms"],
+        "values": NER_ENTITY_TYPES,
     },
-    "applications": {
-        "column": "priority_date",
-        "size": timedelta(days=730),
-        "transform": lambda x: int(x.strftime("%Y%m%d")),
-        "starting_value": datetime(2000, 1, 1),
-        "ending_value": datetime(2023, 1, 1),
-    },
-    GPR_ANNOTATIONS_TABLE: {
-        "column": "confidence",
-        "size": 0.0125,
-        "starting_value": 0.774,
-        "ending_value": 0.91,  # max 0.90
-        "transform": lambda x: x,
-    },
+    # "applications": {
+    #     "column": "priority_date",
+    #     "size": timedelta(days=730),
+    #     "transform": lambda x: int(x.strftime("%Y%m%d")),
+    #     "starting_value": datetime(2000, 1, 1),
+    #     "ending_value": datetime(2023, 1, 1),
+    # },
+    # GPR_ANNOTATIONS_TABLE: {
+    #     "column": "confidence",
+    #     "size": 0.0125,
+    #     "starting_value": 0.774,
+    #     "ending_value": 0.91,  # max 0.90
+    #     "transform": lambda x: x,
+    # },
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -259,35 +260,13 @@ async def copy_bq_to_psql():
                 "is_uniq": True,
             },
             {
-                "table": APPLICATIONS_TABLE,
-                "column": "abstract",
-                "is_tgrm": True,
-            },
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "title",
-                "is_tgrm": True,
-            },
-            # As long as this date is used for the order by, DO NOT index it - it will ironically kill perf
-            # https://dba.stackexchange.com/questions/110636/poor-performance-on-query-with-limit-when-i-add-an-order-by
-            # {
-            #     "table": APPLICATIONS_TABLE,
-            #     "column": "priority_date",
-            # },
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "all_base_publication_numbers",
-                "is_gin": True,
-            },
-        ]
-    )
-
-    await client.create_indices(
-        [
-            {
                 "table": GPR_ANNOTATIONS_TABLE,
                 "column": "preferred_term",
                 "is_lower": True,
+            },
+            {
+                "table": GPR_ANNOTATIONS_TABLE,
+                "column": "domain",
             },
             {"table": GPR_ANNOTATIONS_TABLE, "column": "publication_number"},
         ]

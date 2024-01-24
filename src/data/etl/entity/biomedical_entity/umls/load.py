@@ -6,7 +6,6 @@ import sys
 import logging
 from prisma.models import UmlsGraph, Umls
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
-from data.domain.biomedical.umls import clean_umls_name
 
 from system import initialize
 

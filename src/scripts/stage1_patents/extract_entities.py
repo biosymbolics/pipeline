@@ -6,6 +6,7 @@ from typing import Any, Optional, TypedDict
 import polars as pl
 from pydash import flatten, uniq
 import hashlib
+from constants.umls import NER_ENTITY_TYPES
 
 from system import initialize
 
@@ -30,18 +31,6 @@ MAX_TEXT_LENGTH = 2000
 ENRICH_PROCESSED_PUBS_FILE = "data/enrich_processed_pubs.txt"
 CLASSIFY_PROCESSED_PUBS_FILE = "data/classify_processed_pubs.txt"
 
-
-ENTITY_TYPES = frozenset(
-    [
-        "biologics",
-        "compounds",
-        "devices",
-        "diagnotics",
-        "diseases",
-        "mechanisms",
-        "procedures",
-    ]
-)
 
 EmbeddingData = TypedDict(
     "EmbeddingData", {"publication_number": str, "vector": list[float]}
@@ -290,7 +279,7 @@ class PatentEnricher(BaseEnricher):
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(
-            entity_types=ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
+            entity_types=NER_ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
         )
 
     @overrides(BaseEnricher)

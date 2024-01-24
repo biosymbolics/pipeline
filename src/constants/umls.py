@@ -271,6 +271,18 @@ LegacyDomainType = Literal[
 ]
 
 
+NER_ENTITY_TYPES = frozenset(
+    [
+        "biologics",
+        "compounds",
+        "devices",
+        "diseases",
+        "mechanisms",
+        "procedures",
+    ]
+)
+
+
 DESIREABLE_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
     **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_DISEASE_TYPES.keys()},
     **{

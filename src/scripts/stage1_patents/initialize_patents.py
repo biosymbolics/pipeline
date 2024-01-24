@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-async def __create_biosym_annotations_source_table():
+async def _create_biosym_annotations_source_table():
     """
     Creates biosym annotations table if need be
     (NOTE: does not check schema)
@@ -115,7 +115,7 @@ async def main(bootstrap: bool = False):
         # copy gpr_publications, publications, gpr_annotations tables
         # idempotent but expensive
         await create_funcs()
-        await __create_biosym_annotations_source_table()
+        await _create_biosym_annotations_source_table()
         await copy_patent_tables()
         # create patent applications etc in postgres
         await copy_bq_to_psql()

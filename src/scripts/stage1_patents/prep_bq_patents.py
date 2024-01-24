@@ -2,7 +2,6 @@
 Functions for copying around subsets of the patents database
 """
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
-
 from constants.patents import BIOMEDICAL_IPC_CODE_PREFIX_RE
 from .constants import GPR_ANNOTATIONS_TABLE, GPR_PUBLICATIONS_TABLE
 
