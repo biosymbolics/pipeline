@@ -13,12 +13,10 @@ from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
     PREFERRED_UMLS_TYPES,
     PREFERRED_UMLS_TYPES,
-    UMLS_CUI_SUPPRESSIONS,
-    UMLS_NAME_SUPPRESSIONS,
     UMLS_WORD_OVERRIDES,
 )
 from core.ner.types import CanonicalEntity
-from data.domain.biomedical.umls import clean_umls_name
+from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from utils.list import has_intersection
 
 
@@ -189,8 +187,8 @@ def get_orthogonal_members(
 def score_candidate(
     candidate_id: str,
     candidate_canonical_name: str,
-    candidate_types: list[str],
-    candidate_aliases: list[str],
+    candidate_type_ids: Sequence[str],
+    candidate_aliases: Sequence[str],
     syntactic_similarity: float | None = None,
 ) -> float:
     """
@@ -211,10 +209,7 @@ def score_candidate(
             if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
 
-    if candidate_id in UMLS_CUI_SUPPRESSIONS:
-        return 0.0
-
-    if has_intersection(candidate_canonical_name.split(" "), UMLS_NAME_SUPPRESSIONS):
+    if is_umls_suppressed(candidate_id, candidate_canonical_name):
         return 0.0
 
     def type_score():
@@ -222,14 +217,14 @@ def score_candidate(
         Compute a score based on the UMLS type (tui) of the candidate
         """
         is_preferred_type = has_intersection(
-            candidate_types, list(PREFERRED_UMLS_TYPES.keys())
+            candidate_type_ids, list(PREFERRED_UMLS_TYPES.keys())
         )
 
         if not is_preferred_type:
             return 0.8
 
         is_most_preferred_type = has_intersection(
-            candidate_types, list(MOST_PREFERRED_UMLS_TYPES.keys())
+            candidate_type_ids, list(MOST_PREFERRED_UMLS_TYPES.keys())
         )
 
         if not is_most_preferred_type:

@@ -1,8 +1,10 @@
 from typing import Sequence
 
 from constants.umls import (
+    UMLS_CUI_SUPPRESSIONS,
     UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
+    UMLS_NAME_SUPPRESSIONS,
 )
 from utils.list import has_intersection
 
@@ -80,3 +82,20 @@ def clean_umls_name(
 
     aliases = sorted(aliases, key=name_sorter)
     return aliases[0]
+
+
+def is_umls_suppressed(id: str, canonical_name: str) -> bool:
+    """
+    Whether a UMLS concept should be suppressed from candidate linking / ancestors /etc
+
+    Args:
+        id (str): cui
+        canonical_name (str): canonical name
+    """
+    if id in UMLS_CUI_SUPPRESSIONS:
+        return True
+
+    if has_intersection(canonical_name.split(" "), UMLS_NAME_SUPPRESSIONS):
+        return True
+
+    return False

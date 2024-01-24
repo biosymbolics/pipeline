@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, TypeVar
 import logging
 from pydantic import BaseModel
 from prisma.models import Umls
@@ -9,7 +9,8 @@ from prisma.types import (
 from pydash import flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
-from data.domain.biomedical.umls import clean_umls_name
+from core.ner.linker.utils import score_candidate
+from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from typings.umls import (
     OntologyLevel,
     compare_ontology_levels,
@@ -27,8 +28,18 @@ logger.setLevel(logging.INFO)
 
 class UmlsInfo(BaseModel):
     id: str
+    name: str
     level: OntologyLevel
     type_ids: Sequence[str] = []
+
+    @staticmethod
+    def from_umls(umls: Umls) -> "UmlsInfo":
+        return UmlsInfo(
+            id=umls.id,
+            name=umls.name,
+            level=umls.level,
+            type_ids=umls.type_ids,
+        )
 
 
 class UmlsTransformer:
@@ -88,6 +99,7 @@ class UmlsAncestorTransformer:
         self.ancestor_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
+                name=r.name,
                 level=get_ontology_level(r.id, self.umls_graph.get_umls_centrality),
                 type_ids=r.type_ids,
             )
@@ -136,6 +148,7 @@ class UmlsAncestorTransformer:
                 a
                 for a in _ancestors
                 if has_intersection(a.type_ids, good_ancestor_types)
+                and not is_umls_suppressed(a.id, a.name)
             ]
             if len(good_ancestors) == 0:
                 return None
@@ -195,14 +208,13 @@ class UmlsAncestorTransformer:
             [self.ancestor_lookup[cui] for cui in cuis if cui in self.ancestor_lookup]
         )
         level = get_ontology_level(r.id, self.umls_graph.get_umls_centrality)
-        umls_rec = UmlsInfo(id=r.id, level=level, type_ids=r.type_ids)
         return UmlsUpdateInput(
             level=level,
             instance_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                umls_rec, [OntologyLevel.INSTANCE], ancestors
+                UmlsInfo.from_umls(r), [OntologyLevel.INSTANCE], ancestors
             ),
             category_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                umls_rec,
+                UmlsInfo.from_umls(r),
                 [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 ancestors,
             ),

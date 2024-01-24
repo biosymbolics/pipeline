@@ -89,11 +89,7 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
-                UmlsInfo(
-                    id=test["record"]["id"],
-                    level=test["record"]["level"],
-                    type_ids=test["record"]["type_ids"],
-                ),
+                test["record"],
                 test["levels"],
                 tuple([UmlsInfo(**a) for a in test["ancestors"]]),
             )
@@ -262,7 +258,10 @@ class TestTrialUtils(unittest.TestCase):
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
                 UmlsInfo(
-                    id=test["record"]["id"], level=test["record"]["level"], type_ids=[]
+                    id=test["record"]["id"],
+                    name="athing",
+                    level=test["record"]["level"],
+                    type_ids=[],
                 ),
                 test["levels"],
                 tuple([UmlsInfo(**a) for a in test["ancestors"]]),
