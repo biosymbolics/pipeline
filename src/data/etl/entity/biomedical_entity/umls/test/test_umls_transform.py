@@ -252,20 +252,56 @@ class TestTrialUtils(unittest.TestCase):
                 "expected": "ee5",
             },
             {
-                "description": "skip non-monotonic entries",
+                "description": "skip non-monotonic entries 1 - takes second not last instance",
                 "record": {
                     "level": OntologyLevel.INSTANCE,
                     "id": "anl2cat",
                 },
                 "ancestors": tuple(
                     [
-                        {"level": OntologyLevel.INSTANCE, "id": "realinstance"},
+                        {"level": OntologyLevel.INSTANCE, "id": "firstinstance"},
+                        {"level": OntologyLevel.INSTANCE, "id": "secondinstance"},
                         {"level": OntologyLevel.L2_CATEGORY, "id": "l2"},
                         {"level": OntologyLevel.INSTANCE, "id": "l1afterl2"},
                     ]
                 ),
                 "levels": [OntologyLevel.INSTANCE],
-                "expected": "realinstance",
+                "expected": "secondinstance",
+            },
+            {
+                "description": "skip non-monotonic entries 2 - takes self",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "selfinstance",
+                },
+                "ancestors": tuple(
+                    [
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "l2"},
+                        {"level": OntologyLevel.INSTANCE, "id": "l1afterl2"},
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "selfinstance",
+            },
+            {
+                "description": "skip non-monotonic entries 3 - grabs l1",
+                "record": {
+                    # TNFSF14 protein, human
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "C1570446",
+                },
+                "ancestors": tuple(
+                    [
+                        # Tumor Necrosis Factors
+                        {"level": OntologyLevel.L1_CATEGORY, "id": "C0041368"},
+                        # cytokine
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "C0079189"},
+                        # Genome Encoded Entity
+                        {"level": OntologyLevel.INSTANCE, "id": "C1704222"},
+                    ]
+                ),
+                "levels": [OntologyLevel.L1_CATEGORY],
+                "expected": "C0041368",
             },
         ]
 
