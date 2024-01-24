@@ -13,7 +13,6 @@ import system
 
 system.initialize()
 
-from constants.umls import NER_ENTITY_TYPES
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import PUBLICATION_NUMBER_MAP_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
@@ -35,15 +34,6 @@ APPLICATIONS_TABLE = "applications"
 
 
 def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
-    """
-    Checks if an object is a list of dicts
-
-    Args:
-        obj (Any): object to check
-
-    Returns:
-        bool: True if the object is a list of dicts
-    """
     return isinstance(obj, list) and all(isinstance(x, dict) for x in obj)
 
 
@@ -70,8 +60,11 @@ PATENT_APPLICATION_FIELDS = [
 
 EXPORT_TABLES = {
     SOURCE_BIOSYM_ANNOTATIONS_TABLE: {
-        "column": "domain",
-        "values": NER_ENTITY_TYPES,
+        "column": "character_offset_end",
+        "size": 5,
+        "starting_value": 0,
+        "ending_value": 2000,
+        "transform": lambda x: x,
     },
     # "applications": {
     #     "column": "priority_date",
@@ -118,10 +111,13 @@ async def shared_and_export(
     """
     Create a shared table, export to GCS and delete
     """
-    await db_client.create_from_select(shard_query, shared_table_name)
-    destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
-    db_client.export_table_to_storage(shared_table_name, destination_uri)
-    await db_client.delete_table(shared_table_name)
+    try:
+        await db_client.create_from_select(shard_query, shared_table_name)
+        destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
+        db_client.export_table_to_storage(shared_table_name, destination_uri)
+        await db_client.delete_table(shared_table_name)
+    except Exception as e:
+        logging.error("Error exporting %s: %s", table, e)
 
 
 async def export_bq_tables():
@@ -132,33 +128,22 @@ async def export_bq_tables():
     await create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
-        if shard_spec is None:
-            destination_uri = f"gs://{GCS_BUCKET}/{table}.csv"
-            db_client.export_table_to_storage(table, destination_uri)
-        if "values" in shard_spec:
-            for value in shard_spec["values"]:
-                shared_table_name = f"{table}_shard_tmp"
-                shard_query = f"""
-                    SELECT * FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {shard_spec["column"]} = '{value}'
-                """
-                await shared_and_export(shard_query, shared_table_name, table, value)
-        else:
-            shared_table_name = f"{table}_shard_tmp"
-            current_shard = shard_spec["starting_value"]
-            while current_shard < shard_spec["ending_value"]:
-                shard_end = current_shard + shard_spec["size"]
+        shared_table_name = f"{table}_shard_tmp"
+        current_shard = shard_spec["starting_value"]
+        while current_shard < shard_spec["ending_value"]:
+            shard_end = current_shard + shard_spec["size"]
 
-                # Construct the SQL for exporting the shard
-                shard_query = f"""
-                    SELECT *
-                    FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
-                    AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
-                """
-                await shared_and_export(
-                    shard_query, shared_table_name, table, current_shard
-                )
+            # Construct the SQL for exporting the shard
+            shard_query = f"""
+                SELECT *
+                FROM `{BQ_DATASET_ID}.{table}`
+                WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
+                AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
+            """
+            await shared_and_export(
+                shard_query, shared_table_name, table, current_shard
+            )
+            current_shard = shard_end
 
 
 async def import_into_psql(today: str):
@@ -275,7 +260,9 @@ async def copy_bq_to_psql():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")
+        print(
+            "Usage: python3 -m scripts.stage1_patents.import_bq_patents -export -import"
+        )
         sys.exit()
 
     today = datetime.now().strftime("%Y%m%d")
