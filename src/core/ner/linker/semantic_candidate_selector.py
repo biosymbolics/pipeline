@@ -125,6 +125,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
+            self.kb.cui_to_entity[concept_id].aliases,
             mention_vector,
             candidate_vector=candidate_vector,
             syntactic_similarity=syntactic_similarity,

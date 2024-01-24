@@ -116,6 +116,7 @@ class UmlsLoader:
             update_func=lambda r, tx: Umls.prisma(tx).update(
                 data=ult.transform(r), where={"id": r.id}
             ),
+            batch_size=10000,
         )
 
     @staticmethod
@@ -181,4 +182,5 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    asyncio.run(UmlsLoader.copy_all())
+    # asyncio.run(UmlsLoader.copy_all())
+    asyncio.run(UmlsLoader.update_all())

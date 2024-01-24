@@ -195,14 +195,14 @@ class UmlsAncestorTransformer:
             [self.ancestor_lookup[cui] for cui in cuis if cui in self.ancestor_lookup]
         )
         level = get_ontology_level(r.id, self.umls_graph.get_umls_centrality)
-        id_level = UmlsInfo(id=r.id, level=level, type_ids=r.type_ids)
+        umls_rec = UmlsInfo(id=r.id, level=level, type_ids=r.type_ids)
         return UmlsUpdateInput(
             level=level,
             instance_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                id_level, [OntologyLevel.INSTANCE], ancestors
+                umls_rec, [OntologyLevel.INSTANCE], ancestors
             ),
             category_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                id_level,
+                umls_rec,
                 [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 ancestors,
             ),

@@ -1,3 +1,4 @@
+import math
 from typing import Sequence, cast
 from pydash import flatten, uniq
 from spacy.tokens import Doc, Span, Token
@@ -189,6 +190,7 @@ def score_candidate(
     candidate_id: str,
     candidate_canonical_name: str,
     candidate_types: list[str],
+    candidate_aliases: list[str],
     syntactic_similarity: float | None = None,
 ) -> float:
     """
@@ -204,6 +206,7 @@ def score_candidate(
         candidate_id (str): candidate ID
         candidate_canonical_name (str): candidate canonical name
         candidate_types (list[str]): candidate types
+        candidate_aliases (list[str]): candidate aliases
         syntactic_similarity (float): syntactic similarity score from tfidf vectorizer
             if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
@@ -234,16 +237,21 @@ def score_candidate(
 
         return 1.1
 
-    if syntactic_similarity is not None:
-        return type_score() * syntactic_similarity
+    # give candidates with more aliases a higher score, as proxy for number of ontologies in which it is represented.
+    # log base 4 - roughly 10% of entries have 5+ aliases. lower bounds at 0.5
+    alias_score = max(0.5, math.log(len(candidate_aliases), 4))
 
-    return type_score()
+    if syntactic_similarity is not None:
+        return type_score() * alias_score * syntactic_similarity
+
+    return type_score() * alias_score
 
 
 def score_semantic_candidate(
     candidate_id: str,
     candidate_canonical_name: str,
     candidate_types: list[str],
+    candidate_alises: list[str],
     original_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,
@@ -267,7 +275,7 @@ def score_semantic_candidate(
         semantic_distance (float): semantic distance
     """
     type_score = score_candidate(
-        candidate_id, candidate_canonical_name, candidate_types
+        candidate_id, candidate_canonical_name, candidate_types, candidate_alises
     )
 
     if type_score == 0:

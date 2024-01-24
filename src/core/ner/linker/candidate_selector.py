@@ -55,6 +55,7 @@ class CandidateSelector(AbstractCandidateSelector):
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
+            self.kb.cui_to_entity[concept_id].aliases,
             syntactic_similarity=similarity,
         )
 
