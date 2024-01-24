@@ -46,6 +46,7 @@ cp .env.template .env
 . .pythonenv
 PYTHONPATH=$(pwd)/src:$(pwd)/:./binder:/opt/homebrew/lib/python3.11/site-packages/
 ```
+- gcloud auth application-default login
 - aws configure sso, using url https://d-90679e1dba.awsapps.com/start#/
 - gpu activity `nvtop`
 - `screen` - `ctrl-a d` to detach, `screen -r`` to reattach

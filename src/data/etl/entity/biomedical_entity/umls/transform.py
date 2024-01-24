@@ -1,6 +1,6 @@
-from typing import Sequence, TypeVar
+from typing import Callable, Sequence
 import logging
-from pydantic import BaseModel
+from prisma.enums import OntologyLevel
 from prisma.models import Umls
 from prisma.types import (
     UmlsCreateWithoutRelationsInput as UmlsCreateInput,
@@ -10,37 +10,45 @@ from pydash import flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
-from typings.umls import (
-    OntologyLevel,
-    compare_ontology_levels,
-    get_ontology_level,
-)
 from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
-from .constants import MAX_DENORMALIZED_ANCESTORS
+from .constants import (
+    L1_CATEGORY_CUTOFF,
+    MAX_DENORMALIZED_ANCESTORS,
+)
+from .types import (
+    UmlsInfo,
+    compare_ontology_level,
+)
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class UmlsInfo(BaseModel):
-    id: str
-    name: str
-    level: OntologyLevel
-    type_ids: list[str] = []
+def get_ontology_level(
+    id: str,
+    get_centrality: Callable[[str], float],
+):
+    """
+    Simple heuristic to find approximate semantic level of UMLS record
+    """
+    centrality = get_centrality(id)
 
-    @staticmethod
-    def from_umls(umls: Umls, **kwargs) -> "UmlsInfo":
-        # combine in kwargs
-        _umls = Umls(**{**umls.__dict__, **kwargs})
-        return UmlsInfo(
-            id=_umls.id,
-            name=_umls.name,
-            level=_umls.level,
-            type_ids=_umls.type_ids,
-        )
+    if centrality == -1:
+        return OntologyLevel.NA  # not eligible for inclusion
+
+    if centrality == 0:
+        # assume it isn't in the map due to too low degree
+        return OntologyLevel.INSTANCE
+
+    if centrality < L1_CATEGORY_CUTOFF:
+        # 49837 as of 11/23
+        return OntologyLevel.L1_CATEGORY
+
+    # 6418 as of 11/23
+    return OntologyLevel.L2_CATEGORY
 
 
 class UmlsTransformer:
@@ -165,12 +173,16 @@ class UmlsAncestorTransformer:
 
             TODO: impl is complex and confusing.
             """
-            # ancestors at or above the desired level
-            ok_ancestors = [a for a in _ancestors if a.level in desired_levels]
+            # ancestors at or above the desired level, and are monotonic
+            ok_ancestors = [
+                a
+                for i, a in enumerate(_ancestors)
+                if a.level in desired_levels and (i == 0 or a >= _ancestors[i - 1])
+            ]
 
             # is the record eligible to be its own ancestor? (gte to any desired level)
             is_self_ancestor = any(
-                compare_ontology_levels(record.level, level) >= 0
+                compare_ontology_level(record.level, level) >= 0
                 for level in desired_levels
             )
 
@@ -188,7 +200,7 @@ class UmlsAncestorTransformer:
 
             # is the record now seemingly its own best ancestor? (gte to ALL desired levels)
             is_strong_self_ancestor = all(
-                compare_ontology_levels(record.level, level) >= 0
+                compare_ontology_level(record.level, level) >= 0
                 for level in desired_levels
             )
             if is_strong_self_ancestor:

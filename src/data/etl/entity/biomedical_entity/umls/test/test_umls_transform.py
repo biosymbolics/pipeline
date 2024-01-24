@@ -1,6 +1,6 @@
 import unittest
+from prisma.enums import OntologyLevel
 
-from typings.umls import OntologyLevel
 
 from data.etl.entity.biomedical_entity.umls.transform import (
     UmlsInfo,
@@ -251,22 +251,22 @@ class TestTrialUtils(unittest.TestCase):
                 "levels": [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 "expected": "ee5",
             },
-            # should be fixed by level assignment?
-            # {
-            #     "description": "instance after l2",
-            #     "record": {
-            #         "level": OntologyLevel.INSTANCE,
-            #         "id": "anl2cat",
-            #     },
-            #     "ancestors": tuple(
-            #         [
-            #             {"level": OntologyLevel.L2_CATEGORY, "id": "l2"},
-            #             {"level": OntologyLevel.INSTANCE, "id": "iafterl2"},
-            #         ]
-            #     ),
-            #     "levels": [OntologyLevel.INSTANCE],
-            #     "expected": "l2",
-            # },
+            {
+                "description": "skip non-monotonic entries",
+                "record": {
+                    "level": OntologyLevel.INSTANCE,
+                    "id": "anl2cat",
+                },
+                "ancestors": tuple(
+                    [
+                        {"level": OntologyLevel.INSTANCE, "id": "realinstance"},
+                        {"level": OntologyLevel.L2_CATEGORY, "id": "l2"},
+                        {"level": OntologyLevel.INSTANCE, "id": "l1afterl2"},
+                    ]
+                ),
+                "levels": [OntologyLevel.INSTANCE],
+                "expected": "realinstance",
+            },
         ]
 
         for test in test_cases:

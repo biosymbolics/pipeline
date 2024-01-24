@@ -182,5 +182,5 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    # asyncio.run(UmlsLoader.copy_all())
-    asyncio.run(UmlsLoader.update_all())
+    asyncio.run(UmlsLoader.copy_all())
+    # asyncio.run(UmlsLoader.update_all())
