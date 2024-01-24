@@ -3,6 +3,7 @@ import pytest
 
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
+from core.ner.types import CanonicalEntity
 
 COMMON_COMPOSITE_TEST_CASES = [
     {
@@ -276,3 +277,49 @@ class TestCompositeSemanticCandidateSelector(unittest.TestCase):
                         result.canonical_entity._asdict()[field],
                         test["expected"][0][field],
                     )
+
+
+class TestCompositeTypeSelection(unittest.TestCase):
+    def test_CanonicalEntity_type(self):
+        test_cases = [
+            {
+                "description": "basic test",
+                "ent": {
+                    "id": "C0002716|C2916840|C3470309",
+                    "name": "amyloid fam222a her inhibitors",
+                    "types": ["T116", "T123", "T044", "T028"],
+                },
+                "expected": "BIOLOGIC",  # or mechanism
+            },
+            {
+                "description": "skip over unknown TUI",
+                "ent": {
+                    "id": "CXXXYYYZZZ|C00XXXX",
+                    "name": "some T116 thing",
+                    "types": ["TUNKNOWN", "T116"],
+                },
+                "expected": "BIOLOGIC",
+            },
+            {
+                "description": "handle BiomedicalEntityType",
+                "ent": {
+                    "id": "CXXXYYYZZZ",
+                    "name": "some ent",
+                    "types": ["MECHANISM"],
+                },
+                "expected": "MECHANISM",
+            },
+            {
+                "description": "prefer BiomedicalEntityType",
+                "ent": {
+                    "id": "CXXXYYYZZZ",
+                    "name": "some ent",
+                    "types": ["T116", "MECHANISM"],
+                },
+                "expected": "MECHANISM",
+            },
+        ]
+
+        for test in test_cases:
+            e = CanonicalEntity(**test["ent"])
+            self.assertEqual(e.type, test["expected"])

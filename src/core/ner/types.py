@@ -13,12 +13,13 @@ from typing import (
     TypedDict,
     Union,
 )
+from pydash import compact
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
 
-from constants.umls import UMLS_TO_ENTITY_TYPE
+from constants.umls import PREFERRED_UMLS_TYPES, UMLS_TO_ENTITY_TYPE
 from typings.core import Dataclass
 
 
@@ -41,15 +42,26 @@ class CanonicalEntity(Dataclass):
 
     @property
     def type(self) -> BiomedicalEntityType:
-        if len(self.types) == 0 or self.types[0] not in UMLS_TO_ENTITY_TYPE:
+        # if any already BiomedicalEntityTypes, return one
+        bets = compact([BiomedicalEntityType.__members__.get(t) for t in self.types])
+
+        if len(bets) > 0:
+            return bets[0]
+
+        # else, grab known tuis
+        known_tuis = [tui for tui in self.types if tui in UMLS_TO_ENTITY_TYPE]
+
+        if len(known_tuis) == 0:
             return BiomedicalEntityType.UNKNOWN
 
-        # if it is already a BiomedicalEntityType, return it
-        if BiomedicalEntityType.__members__.get(self.types[0]):
-            return BiomedicalEntityType[self.types[0]]
+        # chose preferred tuis
+        preferred_tuis = [tui for tui in self.types if tui in PREFERRED_UMLS_TYPES]
 
-        # otherwise assume it is a TUI (UMLS) type and do a lookup
-        return UMLS_TO_ENTITY_TYPE[self.types[0]]
+        # if no preferred types, return first known tui
+        if len(preferred_tuis) == 0:
+            return UMLS_TO_ENTITY_TYPE[known_tuis[0]]
+
+        return UMLS_TO_ENTITY_TYPE[preferred_tuis[0]]
 
 
 @dataclass(frozen=True)
