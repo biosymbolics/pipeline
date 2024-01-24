@@ -106,17 +106,17 @@ class UmlsLoader:
         Run *after* BiomedicalEntityEtl
         """
         client = await prisma_client(600)
-        records = await Umls.prisma(client).find_many(where={"instance_rollup_id": ""})
+        all_umls = await Umls.prisma(client).find_many()
 
         # might be slow, if doing betweenness centrality calc.
-        ult = await UmlsAncestorTransformer.create(records)
+        ult = await UmlsAncestorTransformer.create(all_umls)
 
         await batch_update(
-            records,
+            all_umls,
             update_func=lambda r, tx: Umls.prisma(tx).update(
                 data=ult.transform(r), where={"id": r.id}
             ),
-            batch_size=10000,
+            batch_size=1000,  # gets mad if more than 1000 or so
         )
 
     @staticmethod
