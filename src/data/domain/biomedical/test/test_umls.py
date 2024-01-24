@@ -40,6 +40,17 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": "GPR84 a human protein",
             },
             {
+                "description": "prefer no [Meta]",
+                "cui": "C2757011",
+                "canonical_name": "Tyrosine Kinase Inhibitors [MoA]",
+                "aliases": [
+                    "Tyrosine Kinase Inhibitors [MoA]",
+                    "Tyrosine Kinase Inhibitors",
+                    "Tyrosine Kinase Inhibitors [MoA]",
+                ],
+                "expected": "Tyrosine Kinase Inhibitors",
+            },
+            {
                 "description": "do not choose ridiculously short alias",
                 "cui": "C0003873",
                 "canonical_name": "Rheumatoid Arthritis (RA)",  # fabricated to avoid other rule
