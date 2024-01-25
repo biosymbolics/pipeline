@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field, fields
 from typing import Callable, Literal, Sequence
+from prisma.enums import BiomedicalEntityType, Source
+
+from core.ner.cleaning import CleanFunction
+from core.ner.linker.types import CandidateSelectorType
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
-from prisma.enums import BiomedicalEntityType
-from prisma.enums import Source
-
-from core.ner.linker.types import CandidateSelectorType
-from core.ner.cleaning import CleanFunction
 from typings.prisma import BiomedicalEntityCreateInputWithRelationIds
 
 

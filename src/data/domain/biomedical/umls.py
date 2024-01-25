@@ -1,10 +1,13 @@
 from typing import Sequence
+from prisma.enums import BiomedicalEntityType
 
 from constants.umls import (
+    PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
     UMLS_NAME_SUPPRESSIONS,
+    UMLS_TO_ENTITY_TYPE,
 )
 from utils.list import has_intersection
 
@@ -99,3 +102,26 @@ def is_umls_suppressed(id: str, canonical_name: str) -> bool:
         return True
 
     return False
+
+
+def tuis_to_entity_type(tuis: Sequence[str]) -> BiomedicalEntityType:
+    """
+    Given a list of tuis, return the corresponding entity type
+
+    Args:
+        tuis (list[str]): list of tuis
+    """
+    # else, grab known tuis
+    known_tuis = [tui for tui in tuis if tui in UMLS_TO_ENTITY_TYPE]
+
+    if len(known_tuis) == 0:
+        return BiomedicalEntityType.UNKNOWN
+
+    # chose preferred tuis
+    preferred_tuis = [tui for tui in tuis if tui in PREFERRED_UMLS_TYPES]
+
+    # if no preferred types, return first known tui
+    if len(preferred_tuis) == 0:
+        return UMLS_TO_ENTITY_TYPE[known_tuis[0]]
+
+    return UMLS_TO_ENTITY_TYPE[preferred_tuis[0]]

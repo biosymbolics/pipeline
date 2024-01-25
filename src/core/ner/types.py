@@ -6,7 +6,6 @@ from typing import (
     Any,
     Callable,
     Collection,
-    List,
     Mapping,
     Optional,
     TypeGuard,
@@ -19,7 +18,7 @@ from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
 
-from constants.umls import PREFERRED_UMLS_TYPES, UMLS_TO_ENTITY_TYPE
+from data.domain.biomedical.umls import tuis_to_entity_type
 from typings.core import Dataclass
 
 
@@ -48,20 +47,7 @@ class CanonicalEntity(Dataclass):
         if len(bets) > 0:
             return bets[0]
 
-        # else, grab known tuis
-        known_tuis = [tui for tui in self.types if tui in UMLS_TO_ENTITY_TYPE]
-
-        if len(known_tuis) == 0:
-            return BiomedicalEntityType.UNKNOWN
-
-        # chose preferred tuis
-        preferred_tuis = [tui for tui in self.types if tui in PREFERRED_UMLS_TYPES]
-
-        # if no preferred types, return first known tui
-        if len(preferred_tuis) == 0:
-            return UMLS_TO_ENTITY_TYPE[known_tuis[0]]
-
-        return UMLS_TO_ENTITY_TYPE[preferred_tuis[0]]
+        return tuis_to_entity_type(self.types)
 
 
 @dataclass(frozen=True)

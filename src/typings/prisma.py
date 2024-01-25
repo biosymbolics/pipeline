@@ -9,6 +9,8 @@ from prisma.models import (
     Umls,
 )
 from prisma.types import (
+    BiomedicalEntityCreateInput,
+    BiomedicalEntityUpdateInput,
     BiomedicalEntityCreateWithoutRelationsInput,
     OwnerCreateWithoutRelationsInput,
 )
@@ -29,7 +31,10 @@ class OwnerCreateWithSynonymsInput(OwnerCreateWithoutRelationsInput):
 # Add more as needed
 # (or create a proper base class that works for clients.low_level.prisma.batch_update)
 AllModelTypes = Union[
+    dict,
     BiomedicalEntity,
+    BiomedicalEntityCreateInput,
+    BiomedicalEntityUpdateInput,
     BiomedicalEntityCreateInputWithRelationIds,
     Patent,
     RegulatoryApproval,

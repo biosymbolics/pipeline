@@ -5,23 +5,24 @@ from typing import Sequence
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
+    BiomedicalEntityCreateInput,
     BiomedicalEntityUpdateInput,
     BiomedicalEntityCreateWithoutRelationsInput,
 )
 from pydash import compact, flatten, group_by, omit, uniq
 
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import batch_update, prisma_client
 from constants.umls import UMLS_DISEASE_TYPES, UMLS_TARGET_TYPES
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
+from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import (
-    BiomedicalEntityCreateInputWithRelationIds as BiomedicalEntityCreateInput,
+    BiomedicalEntityCreateInputWithRelationIds,
     RelationIdFieldMap,
 )
 from typings.documents.common import ENTITY_MAP_TABLES
-from utils.file import save_json_as_file
 
 from .umls.load import UmlsLoader
 from ..base_entity_etl import BaseEntityEtl
@@ -67,43 +68,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         }
         return lookup_map
 
-    def _maybe_merge_insert_records(
-        self,
-        groups: list[BiomedicalEntityCreateInput],
-        canonical_id: str,
-    ) -> list[BiomedicalEntityCreateInput]:
-        """
-        Merge records with same canonical id
-        """
-        # if no canonical id, then no merging
-        if canonical_id is None:
-            return groups
-
-        return [
-            BiomedicalEntityCreateInput(
-                canonical_id=groups[0].get("canonical_id"),
-                name=groups[0]["name"],
-                entity_type=groups[0]["entity_type"],
-                sources=groups[0].get("sources") or [],
-                # add in relationship ids to add in subsequent update
-                **{
-                    k: uniq(flatten([g.get(k) or [] for g in groups]))
-                    for k in self.relation_id_field_map.keys()
-                },  # type: ignore
-            )
-        ]
-
     def _generate_insert_records(
         self,
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-    ) -> list[BiomedicalEntityCreateInput]:
+    ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
         """
         Create record dicts for entity insert
         """
 
-        def create_input(orig_name: str) -> BiomedicalEntityCreateInput:
+        def create_input(orig_name: str) -> BiomedicalEntityCreateInputWithRelationIds:
             """
             Form create input for a given term
             """
@@ -129,9 +104,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 entity_type = source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type
                 canonical_dependent_fields = {
                     "canonical_id": canonical.id,
+                    "entity_type": entity_type,
                     "is_preferred": source_rec.get("is_preferred") or False,
                     "name": canonical.name.lower(),
-                    "entity_type": entity_type,
                     "sources": [Source.UMLS],
                     "umls": {"connect": {"id": {"in": canonical.ids}}},
                 }
@@ -141,9 +116,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 )
                 canonical_dependent_fields = {
                     "canonical_id": None,
+                    "entity_type": entity_type,
                     "is_preferred": source_rec.get("is_preferred") or False,
                     "name": orig_name,
-                    "entity_type": entity_type,
                     "sources": [self.non_canonical_source],
                 }
 
@@ -154,21 +129,41 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 }
             )
 
+        def _maybe_merge_insert_records(
+            groups: list[BiomedicalEntityCreateInputWithRelationIds],
+            canonical_id: str,
+        ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
+            """
+            Merge records with same canonical id
+            """
+            # if no canonical id, then no merging
+            if canonical_id is None:
+                return groups
+
+            return [
+                BiomedicalEntityCreateInputWithRelationIds(
+                    canonical_id=groups[0].get("canonical_id"),
+                    name=groups[0]["name"],
+                    entity_type=groups[0]["entity_type"],
+                    sources=groups[0].get("sources") or [],
+                    # add in relationship ids to add in subsequent update
+                    **{
+                        k: uniq(flatten([g.get(k) or [] for g in groups]))
+                        for k in self.relation_id_field_map.keys()
+                    },  # type: ignore
+                )
+            ]
+
         # merge records with same canonical id
-        def merge_records():
-            flat_recs = [create_input(name) for name in terms_to_insert]
-            grouped_recs = group_by(flat_recs, "canonical_id")
-            merged_recs = flatten(
-                [
-                    self._maybe_merge_insert_records(groups, cid)
-                    for cid, groups in grouped_recs.items()
-                ]
-            )
+        flat_recs = [create_input(name) for name in terms_to_insert]
+        grouped_recs = group_by(flat_recs, "canonical_id")
+        insert_records = flatten(
+            [
+                _maybe_merge_insert_records(groups, cid)
+                for cid, groups in grouped_recs.items()
+            ]
+        )
 
-            return merged_recs
-
-        insert_records = merge_records()
-        save_json_as_file(insert_records, "insert_records.json")
         return insert_records
 
     async def copy_all(
@@ -235,7 +230,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 GROUP BY entity_id
             )
             UPDATE biomedical_entity SET search = to_tsvector('english', name || ' ' || array_to_string(synonym.terms, ' '))
-                from synonym where entity_id=biomedical_entity.id;
+                FROM synonym WHERE entity_id=biomedical_entity.id;
             """
         )
         await client.execute_raw(
@@ -250,17 +245,60 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         TODO: should do the mapping insert inline, since we have the ids
         """
         query = """
-            insert into _entity_to_umls ("A", "B")
-            select s.id, cid from (
-                select id, unnest(string_to_array(canonical_id, '|')) as cid
-                from biomedical_entity
-                where canonical_id is not null
+            INSERT into _entity_to_umls ("A", "B")
+            SELECT s.id, cid FROM (
+                SELECT id, unnest(string_to_array(canonical_id, '|')) as cid
+                FROM biomedical_entity
+                WHERE canonical_id IS NOT null
             ) s
-            JOIN umls on umls.id = s.cid
-            on conflict do nothing;
+            JOIN umls ON umls.id = s.cid
+            ON CONFLICT DO NOTHING;
         """
         client = await prisma_client(600)
         await client.execute_raw(query)
+
+    @staticmethod
+    async def _umls_to_biomedical_entity():
+        """
+        Create biomedical entity records for UMLS parents.
+        """
+        query = """
+            SELECT
+                biomedical_entity.id AS child_id,
+                umls_parent.id AS canonical_id,
+                umls_parent.preferred_name AS name,
+                umls_parent.type_ids AS tuis
+            FROM biomedical_entity, umls, _entity_to_umls etu, umls_parent
+            WHERE
+                etu."A"=biomedical_entity.id
+                AND umls.id=etu."B"
+                AND umls_parent.id=umls.instance_rollup_id -- category_rollup_id next?
+        """
+        client = await prisma_client(300)
+        results = await client.query_raw(query)
+
+        await batch_update(
+            [
+                {
+                    "canonical_id": r["canonical_id"],
+                    # a problem in a txn?
+                    "children": {"connect": {"id": r["child_id"]}},
+                    "entity_type": tuis_to_entity_type(r["tuis"]),
+                    "name": r["name"],
+                    "sources": [Source.UMLS],
+                    "umls": {"connect": {"id": {"equals": r["canonical_id"]}}},
+                }
+                for r in results
+            ],
+            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
+                data={
+                    "create": BiomedicalEntityCreateInput(**r),  # type: ignore
+                    "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
+                },
+                where={"canonical_id": r["canonical_id"]},  # type: ignore
+            ),
+            batch_size=1000,
+        )
 
     @staticmethod
     async def add_counts():
