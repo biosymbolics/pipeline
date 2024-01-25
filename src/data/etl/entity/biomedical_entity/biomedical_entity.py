@@ -7,9 +7,9 @@ from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateInput,
     BiomedicalEntityUpdateInput,
-    BiomedicalEntityCreateWithoutRelationsInput,
+    BiomedicalEntityUpsertInput,
 )
-from pydash import compact, flatten, group_by, omit, uniq
+from pydash import flatten, group_by, uniq
 
 from clients.low_level.prisma import batch_update, prisma_client
 from constants.umls import UMLS_DISEASE_TYPES, UMLS_TARGET_TYPES
@@ -18,10 +18,7 @@ from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
-from data.etl.types import (
-    BiomedicalEntityCreateInputWithRelationIds,
-    RelationIdFieldMap,
-)
+from data.etl.types import RelationIdFieldMap
 from typings.documents.common import ENTITY_MAP_TABLES
 
 from .umls.load import UmlsLoader
@@ -73,31 +70,24 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-    ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
+    ) -> list[BiomedicalEntityUpdateInput]:
         """
         Create record dicts for entity insert
         """
 
-        def create_input(orig_name: str) -> BiomedicalEntityCreateInputWithRelationIds:
+        def create_input(orig_name: str) -> BiomedicalEntityUpdateInput:
             """
             Form create input for a given term
             """
             source_rec = source_map[orig_name]
             canonical = canonical_map.get(orig_name)
 
-            # fields for N-to-N relationships (synonyms, comprised_of, parents)
+            # create input for N-to-N relationships (synonyms, comprised_of, parents)
             # taken from source map
-            relation_fields: dict[str, list[str]] = {
-                rel_field: uniq(
-                    compact(
-                        [
-                            connect_info.get_value(val, canonical_map)
-                            for val in source_rec.get(connect_info.source_field) or []
-                        ]
-                    )
-                )
-                for rel_field, connect_info in self.relation_id_field_map.items()
-                if connect_info is not None
+            relation_fields = {
+                field: rel_spec.form_prisma_relation(source_rec, canonical_map)
+                for field, rel_spec in self.relation_id_field_map.items()
+                if rel_spec is not None
             }
 
             if canonical is not None:
@@ -122,36 +112,30 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     "sources": [self.non_canonical_source],
                 }
 
-            return BiomedicalEntityCreateInput(
-                **{
-                    **canonical_dependent_fields,  # type: ignore
-                    **relation_fields,
-                }
+            return BiomedicalEntityUpdateInput(
+                **canonical_dependent_fields,  # type: ignore
+                **relation_fields,
             )
 
         def _maybe_merge_insert_records(
-            groups: list[BiomedicalEntityCreateInputWithRelationIds],
+            groups: list[BiomedicalEntityUpdateInput],
             canonical_id: str,
-        ) -> list[BiomedicalEntityCreateInputWithRelationIds]:
+        ) -> list[BiomedicalEntityUpdateInput]:
             """
             Merge records with same canonical id
             """
-            # if no canonical id, then no merging
+            # if no canonical id, then no merge. return all.
             if canonical_id is None:
                 return groups
 
+            # merge relationship ids across groups
+            relation_fields = {
+                field: uniq(flatten([g.get(field) or [] for g in groups]))
+                for field in self.relation_id_field_map.keys()
+            }
+
             return [
-                BiomedicalEntityCreateInputWithRelationIds(
-                    canonical_id=groups[0].get("canonical_id"),
-                    name=groups[0]["name"],
-                    entity_type=groups[0]["entity_type"],
-                    sources=groups[0].get("sources") or [],
-                    # add in relationship ids to add in subsequent update
-                    **{
-                        k: uniq(flatten([g.get(k) or [] for g in groups]))
-                        for k in self.relation_id_field_map.keys()
-                    },  # type: ignore
-                )
+                BiomedicalEntityUpdateInput(**(groups[0]).__dict__, **relation_fields)  # type: ignore
             ]
 
         # merge records with same canonical id
@@ -159,8 +143,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         grouped_recs = group_by(flat_recs, "canonical_id")
         insert_records = flatten(
             [
-                _maybe_merge_insert_records(groups, cid)
-                for cid, groups in grouped_recs.items()
+                _maybe_merge_insert_records(groups, canonical_id)
+                for canonical_id, groups in grouped_recs.items()
             ]
         )
 
@@ -188,32 +172,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             canonical_map,
         )
 
-        # create flat records
-        await BiomedicalEntity.prisma().create_many(
-            data=[
-                BiomedicalEntityCreateWithoutRelationsInput(
-                    **omit(er, *self.relation_id_field_map.keys())  # type: ignore
-                )
-                for er in entity_recs
-            ],
-            skip_duplicates=True,
+        await batch_update(
+            entity_recs,
+            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
+                data=BiomedicalEntityUpsertInput(
+                    create=BiomedicalEntityCreateInput(**r),  # type: ignore
+                    update=BiomedicalEntityUpdateInput(**r),
+                ),
+                where={"name": r["name"]},  # type: ignore
+            ),
+            batch_size=1000,
         )
-
-        # update records with relationships (parents, comprised_of, synonyms)
-        for entity_rec in entity_recs:
-            update = BiomedicalEntityUpdateInput(
-                **{
-                    k: connect_info.form_prisma_relation(entity_rec)
-                    for k, connect_info in self.relation_id_field_map.items()
-                    if connect_info is not None
-                },  # type: ignore
-            )
-            try:
-                await BiomedicalEntity.prisma().update(
-                    where={"name": entity_rec["name"]}, data=update
-                )
-            except Exception as e:
-                print(e, entity_rec)
 
     @staticmethod
     async def _update_search_index():
@@ -348,11 +317,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     @staticmethod
     async def add_rollups():
         """
-        Set instance_rollup and category_rollup for biomedical entities
-
-        TODO: add UMLS to biomedical_entity hierarchy; select rollups from there
-            (which will include the MoAs we add in approvals load)
-            Also, remember to use approval MoAs as nucleators.
+        Set instance_rollup and category_rollup for map tables (intervenable, indicatable)
+        intentional denormalization for reporting (faster than querying biomedical_entity or umls)
         """
 
         def get_query(table: str, filters: list[str] = []) -> str:
@@ -377,7 +343,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         spec = {
             "intervenable": [
                 {
-                    # prefer target linkage (protein/gene)
+                    # prefer target types (protein/gene)
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_TARGET_TYPES.keys())}"
                     ],
@@ -389,7 +355,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             ],
             "indicatable": [
                 {
-                    # prefer disease linkage
+                    # prefer disease types
                     "filters": [
                         f"umls.type_ids && ARRAY{list(UMLS_DISEASE_TYPES.keys())}"
                     ],

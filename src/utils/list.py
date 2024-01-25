@@ -5,7 +5,7 @@ Utils for lists/arrays
 
 from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar, cast
 import numpy as np
-from pydash import compact
+from pydash import compact, uniq
 import polars as pl
 
 T = TypeVar("T")
@@ -112,3 +112,10 @@ def is_tuple_list(x: Any) -> TypeGuard[list[tuple]]:
         return True
 
     return False
+
+
+def uniq_compact(array: Iterable[T | None]) -> list[T]:
+    """
+    Compact and deduplicate an array
+    """
+    return uniq(compact(array))

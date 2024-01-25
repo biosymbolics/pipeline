@@ -143,15 +143,15 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 comprised_of=RelationConnectInfo(
                     source_field="active_ingredients",
                     dest_field="canonical_id",
-                    input_type="set",
+                    connect_type="connect",
                 ),
                 parents=RelationConnectInfo(
                     source_field="pharmacologic_classes",
                     dest_field="canonical_id",
-                    input_type="set",
+                    connect_type="connect",
                 ),
                 synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
+                    source_field="synonyms", dest_field="term", connect_type="create"
                 ),
             ),
             get_terms_to_canonicalize=lambda sm: [
