@@ -1,68 +1,69 @@
 from abc import abstractmethod
 import time
-from typing import Sequence
 import networkx as nx
 import logging
 
-from clients.low_level.prisma import prisma_client
-from constants.umls import UMLS_NAME_SUPPRESSIONS
-from utils.file import load_json_from_file, save_json_as_file
-from utils.graph import betweenness_centrality_parallel
+
+from .types import EdgeRecord, NodeRecord
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-BETWEENNESS_FILE = "umls_betweenness.json"
 
 
 class UmlsGraph(object):
     """
     Abstract class for UMLS graph
     Computes betweenness centrality for nodes, which is used for ancestor selection.
+
+    TODO: no reason this needs to be UMLS-specific
     """
 
-    def __init__(self, file_name: str = BETWEENNESS_FILE):
+    def __init__(self):
         """
         ***Either use a factory method in the subclass, or call load() after init***
         """
-        self.bc_file = file_name
+        pass
 
     async def load(self):
         self.G = await self.load_graph()
         self.nodes: dict[str, dict] = dict(self.G.nodes.data())
-        try:
-            self.betweenness_map = load_json_from_file(self.bc_file)
-        except FileNotFoundError:
-            self.betweenness_map = self._load_betweenness()
 
     @abstractmethod
-    def edge_query(self, suppressions: Sequence[str] | set[str]) -> str:
+    async def get_edges(self) -> list[EdgeRecord]:
         """
         Query edges from umls
-
-        TODO: make "get_edges" and enforce type (head/tail)
         """
         raise NotImplementedError
 
-    async def load_graph(
-        self, suppressions: Sequence[str] | set[str] = UMLS_NAME_SUPPRESSIONS
-    ) -> nx.Graph:
+    @abstractmethod
+    async def get_nodes(self) -> list[NodeRecord]:
+        """
+        Query nodes from umls
+        """
+        raise NotImplementedError
+
+    async def load_graph(self) -> nx.DiGraph:
         """
         Load UMLS graph from database
-
-        Restricted to ancestoral relationships between biomedical entities
         """
         start = time.monotonic()
-        logger.info("Loading UMLS into graph")
-        G = nx.Graph()
+        logger.info("Loading graph")
+        G = nx.DiGraph()
 
-        client = await prisma_client(120)
-        edges = await client.query_raw(self.edge_query(suppressions))
+        nodes = await self.get_nodes()
+        edges = await self.get_edges()
+
+        if len(nodes) == 0:
+            raise ValueError("No nodes found")
 
         if len(edges) == 0:
             raise ValueError("No edges found")
 
-        G.add_edges_from([(e["head"], e["tail"]) for e in edges])
+        G.add_nodes_from([(n.id, n) for n in nodes])
+        G.add_edges_from([(e.head, e.tail) for e in edges])
+
+        # propogate counts up the tree
+        G = self._propagate_counts(G)
 
         logger.info(
             "Graph has %s nodes, %s edges (took %s seconds)",
@@ -71,6 +72,32 @@ class UmlsGraph(object):
             round(time.monotonic() - start),
         )
         return G
+
+    @staticmethod
+    def _propagate_counts(G: nx.DiGraph) -> nx.DiGraph:
+        """
+        Propagate counts up the tree
+            - assumes leafs have counts
+            - assumes edges are directed from child to parent
+            - has parent counts = sum of children counts
+        """
+        logger.info("Recursively propagating counts up the tree")
+
+        def _execute(_G, node):
+            children = _G.successors(node)
+            node_weight = sum(_G.nodes[child]["count"] for child in children)
+            _G.nodes[node]["count"] = node_weight
+
+            for child in children:
+                _execute(_G, child)
+
+        new_g = G.copy().to_directed()
+        for node in new_g.nodes():
+            # start from leaf nodes
+            if new_g.out_degree(node) == 0:
+                _execute(new_g, node)
+
+        return new_g
 
     def _get_topk_subgraph(self, k: int, max_degree: int = 1000):
         """
@@ -92,35 +119,3 @@ class UmlsGraph(object):
         top_nodes = sorted(nontrivial_hubs, key=lambda x: x[1], reverse=True)[:k]
 
         return self.G.subgraph([node for (node, _) in top_nodes])
-
-    def _load_betweenness(
-        self,
-        k: int = 10000,
-        file_name: str | None = BETWEENNESS_FILE,
-    ) -> dict[str, float]:
-        """
-        Load betweenness centrality map
-
-        Args:
-            k: number of nodes to include in the map (for performance reasons)
-            hub_degree_threshold: nodes with degree above this threshold will be excluded
-            file_name: if provided, will load from file instead of computing (or save to file after computing)
-
-        11/23 - Takes roughly 1 hour for 50k nodes using 6 cores
-        1/10 - Took roughly 3 hours (maybe?) for 10k nodes using 6 cores
-        """
-        start = time.monotonic()
-        bc_subgraph = self._get_topk_subgraph(k)
-
-        sample_k = round(k / 4)
-        logger.info("Calcing betweenness centrality (top %s; sampling %s)", k, sample_k)
-        bc_map = betweenness_centrality_parallel(bc_subgraph, sample_k)
-
-        if file_name is not None:
-            logger.info("Saving bc map to %s", file_name)
-            save_json_as_file(bc_map, file_name)
-        else:
-            logger.warning("Not saving bc map to file, because no filename specified.")
-
-        logger.info("Loaded bc map in %s seconds", round(time.monotonic() - start))
-        return bc_map

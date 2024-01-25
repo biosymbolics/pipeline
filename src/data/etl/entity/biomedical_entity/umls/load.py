@@ -16,7 +16,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
-from .transform import UmlsAncestorTransformer, UmlsTransformer
+from .umls_transform import UmlsAncestorTransformer, UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

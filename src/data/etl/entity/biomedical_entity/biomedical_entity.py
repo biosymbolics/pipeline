@@ -229,47 +229,58 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await client.execute_raw(query)
 
     @staticmethod
-    async def _umls_to_biomedical_entity():
+    async def _umls_to_biomedical_entity(n_depth: int = 3):
         """
         Create biomedical entity records for UMLS parents.
-        """
-        query = """
-            SELECT
-                biomedical_entity.id AS child_id,
-                umls_parent.id AS canonical_id,
-                umls_parent.preferred_name AS name,
-                umls_parent.type_ids AS tuis
-            FROM biomedical_entity, umls, _entity_to_umls etu, umls_parent
-            WHERE
-                etu."A"=biomedical_entity.id
-                AND umls.id=etu."B"
-                AND umls_parent.id=umls.rollup_id
-        """
-        client = await prisma_client(300)
-        results = await client.query_raw(query)
-        records = [
-            {
-                "canonical_id": r["canonical_id"],
-                "children": {"connect": {"id": r["child_id"]}},  # a problem in a txn?
-                "entity_type": tuis_to_entity_type(r["tuis"]),
-                "name": r["name"],
-                "sources": [Source.UMLS],
-                "umls": {"connect": {"id": {"equals": r["canonical_id"]}}},
-            }
-            for r in results
-        ]
 
-        await batch_update(
-            records,
-            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
-                data={
-                    "create": BiomedicalEntityCreateInput(**r),  # type: ignore
-                    "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
-                },
-                where={"canonical_id": r["canonical_id"]},  # type: ignore
-            ),
-            batch_size=1000,
-        )
+        Args:
+            n_depth (int): numer of iterations / recursion depth
+                e.g. iteration 1, we get parents. iteration 2, we get parents of parents, etc.
+        """
+
+        async def execute():
+            query = """
+                SELECT
+                    biomedical_entity.id AS child_id,
+                    umls_parent.id AS canonical_id,
+                    umls_parent.preferred_name AS name,
+                    umls_parent.type_ids AS tuis
+                FROM biomedical_entity, umls, _entity_to_umls etu, umls_parent
+                WHERE
+                    etu."A"=biomedical_entity.id
+                    AND umls.id=etu."B"
+                    AND umls_parent.id=umls.rollup_id
+            """
+            client = await prisma_client(300)
+            results = await client.query_raw(query)
+            records = [
+                {
+                    "canonical_id": r["canonical_id"],
+                    "children": {
+                        "connect": {"id": r["child_id"]}
+                    },  # a problem in a txn?
+                    "entity_type": tuis_to_entity_type(r["tuis"]),
+                    "name": r["name"],
+                    "sources": [Source.UMLS],
+                    "umls": {"connect": {"id": {"equals": r["canonical_id"]}}},
+                }
+                for r in results
+            ]
+
+            await batch_update(
+                records,
+                update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
+                    data={
+                        "create": BiomedicalEntityCreateInput(**r),  # type: ignore
+                        "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
+                    },
+                    where={"canonical_id": r["canonical_id"]},  # type: ignore
+                ),
+                batch_size=1000,
+            )
+
+        for _ in range(n_depth):
+            await execute()
 
     @staticmethod
     async def add_counts():
@@ -321,6 +332,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         Set instance_rollup and category_rollup for map tables (intervenable, indicatable)
         intentional denormalization for reporting (faster than querying biomedical_entity or umls)
+
+        TODO: look only at biomedical_entity & parent/child relationships
         """
 
         def get_query(table: str, filters: list[str] = []) -> str:
@@ -395,8 +408,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await BiomedicalEntityEtl.link_to_documents()
         await BiomedicalEntityEtl.add_counts()
 
-        # perform final Umls updates, which depends upon Biomedical Entities being in place.
+        # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         await UmlsLoader.update_with_ontology_level()
 
+        # recursively add parents from UMLS
+        await BiomedicalEntityEtl._umls_to_biomedical_entity()
+
         # add instance & category rollups
+        # TODO: should get rollups via biomedical_entity
         await BiomedicalEntityEtl.add_rollups()
