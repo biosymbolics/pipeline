@@ -3,7 +3,7 @@ import json
 import logging
 import sys
 from typing import Any, Sequence, TypeGuard
-from datetime import datetime
+from datetime import datetime, timedelta
 import polars as pl
 from pydash import compact
 import logging
@@ -111,6 +111,7 @@ async def shared_and_export(
     """
     Create a shared table, export to GCS and delete
     """
+    today = datetime.now().strftime("%Y%m%d")
     try:
         await db_client.create_from_select(shard_query, shared_table_name)
         destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
@@ -124,6 +125,7 @@ async def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
+    raise Exception("This costs too much money to run")
     logging.info("Exporting BigQuery tables to GCS")
     await create_patent_applications_table()
 
@@ -151,7 +153,7 @@ async def import_into_psql(today: str):
     Load data from a JSON file into a psql table
     """
     logging.info("Importing applications table (etc) into postgres")
-    client = PsqlDatabaseClient()
+    client = PsqlDatabaseClient("patents")
 
     # truncate table copy in postgres
     for table in EXPORT_TABLES.keys():
@@ -167,6 +169,7 @@ async def import_into_psql(today: str):
         elif (isinstance(value, list) or isinstance(value, pl.Series)) and len(
             value
         ) > 0:
+            # also a hack (first value of each dict)
             if is_dict_list(value):
                 return [compact(v.values())[0] for v in value if len(value) > 0]
         return value
@@ -174,9 +177,9 @@ async def import_into_psql(today: str):
     async def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
-        df = pl.DataFrame(records)
+        df = pl.DataFrame(records).drop("embeddings")
         df = df.select(
-            *[pl.col(c).apply(lambda s: transform(s, c)) for c in df.columns]
+            *[pl.col(c).map_elements(lambda s: transform(s, c)) for c in df.columns]
         )
 
         first_record = records[0]
@@ -265,10 +268,10 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    today = datetime.now().strftime("%Y%m%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
     if "-export" in sys.argv:
         asyncio.run(export_bq_tables())
 
     if "-import" in sys.argv:
-        asyncio.run(import_into_psql(today))
+        asyncio.run(import_into_psql(yesterday))

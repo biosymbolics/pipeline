@@ -6,7 +6,6 @@ from typing import Any, Optional, TypedDict
 import polars as pl
 from pydash import flatten, uniq
 import hashlib
-from constants.umls import NER_ENTITY_TYPES
 
 from system import initialize
 
@@ -15,8 +14,9 @@ initialize()
 from clients.low_level.database import DatabaseClient
 from clients.low_level.big_query import BQDatabaseClient
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
+from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
+from constants.umls import NER_ENTITY_TYPES
 from core.ner.classifier import classify_by_keywords
 from core.ner.types import DocEntities, DocEntity
 from core.ner import NerTagger
@@ -275,11 +275,15 @@ class PatentEnricher(BaseEnricher):
         """
         Initialize the enricher
         """
+
         batch_size = 1000
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, BQDatabaseClient, batch_size)
         self.db = BQDatabaseClient()
         self.tagger = NerTagger.get_instance(
             entity_types=NER_ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
+        )
+        raise Exception(
+            "Switch to postgres before running again, lest we pay $400 again for export"
         )
 
     @overrides(BaseEnricher)
