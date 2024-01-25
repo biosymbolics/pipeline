@@ -74,6 +74,7 @@ class BiomedicalEntityLoadSpec(Dataclass):
         sm.keys()
     )
     non_canonical_source: Source = Source.BIOSYM
+    # operates on source_map
     relation_id_field_map: RelationIdFieldMap = RelationIdFieldMap(
         synonyms=RelationConnectInfo(
             source_field="synonyms", dest_field="term", input_type="create"

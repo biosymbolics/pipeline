@@ -22,6 +22,7 @@ model BiomedicalEntity {
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
+    is_priority   Boolean                  @default(false)
     name          String                   @unique
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?

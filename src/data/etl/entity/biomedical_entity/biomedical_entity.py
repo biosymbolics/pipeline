@@ -103,9 +103,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         Create record dicts for entity insert
         """
 
-        def create_input(
-            orig_name: str,
-        ) -> BiomedicalEntityCreateInput:
+        def create_input(orig_name: str) -> BiomedicalEntityCreateInput:
             """
             Form create input for a given term
             """
@@ -113,6 +111,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             canonical = canonical_map.get(orig_name)
 
             # fields for N-to-N relationships (synonyms, comprised_of, parents)
+            # taken from source map
             relation_fields: dict[str, list[str]] = {
                 rel_field: uniq(
                     compact(
@@ -130,12 +129,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 entity_type = source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type
                 canonical_dependent_fields = {
                     "canonical_id": canonical.id,
+                    "is_preferred": source_rec.get("is_preferred") or False,
                     "name": canonical.name.lower(),
                     "entity_type": entity_type,
                     "sources": [Source.UMLS],
-                    "umls": {
-                        "connect": {"id": {"in": canonical.ids}},
-                    },
+                    "umls": {"connect": {"id": {"in": canonical.ids}}},
                 }
             else:
                 entity_type = (
@@ -143,6 +141,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 )
                 canonical_dependent_fields = {
                     "canonical_id": None,
+                    "is_preferred": source_rec.get("is_preferred") or False,
                     "name": orig_name,
                     "entity_type": entity_type,
                     "sources": [self.non_canonical_source],
