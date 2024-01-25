@@ -210,7 +210,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     @staticmethod
     async def _map_umls():
         """
-        Map UMLS to entities, based on id field (which we know to be a pipe-delimited list of UMLS ids (+random strings we ignore)
+        Map UMLS to entities, based on id field
+            (which we know to be a pipe-delimited list of UMLS ids (+random strings we ignore))
 
         TODO: should do the mapping insert inline, since we have the ids
         """
@@ -242,7 +243,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             WHERE
                 etu."A"=biomedical_entity.id
                 AND umls.id=etu."B"
-                AND umls_parent.id=umls.instance_rollup_id -- category_rollup_id next?
+                AND umls_parent.id=umls.rollup_id
         """
         client = await prisma_client(300)
         results = await client.query_raw(query)
@@ -328,15 +329,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 SET
                     category_rollup=lower(umls_category_rollup.preferred_name),
                     instance_rollup=lower(umls_instance_rollup.preferred_name)
-                FROM biomedical_entity,
-                    _entity_to_umls as etu,
-                    umls as umls_instance_rollup,
-                    umls
-                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls.category_rollup_id
+                FROM biomedical_entity, _entity_to_umls as etu, umls
+                JOIN umls as umls_rollup on umls_rollup.id=umls.rollup_id
+                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls_instance_rollup.rollup_id
                 WHERE {table}.entity_id=biomedical_entity.id
                 AND biomedical_entity.id=etu."A"
                 AND umls.id=etu."B"
-                AND umls_instance_rollup.id=umls.instance_rollup_id
                 {'AND ' + ' AND '.join(filters) if filters else ''}
             """
 

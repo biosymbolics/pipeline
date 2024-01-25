@@ -61,15 +61,12 @@ class UmlsTransformer:
         Transform a single UMLS record for create
         """
         # reverse to get nearest ancestor first
-        ancestors = (r.get("hierarchy") or "").split(".")[::-1]
+        ancestors = r["hierarchy"].split(".")[::-1]
         ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
         preferred_name = clean_umls_name(
-            r["id"],
-            r["name"],
-            r.get("synonyms") or [],
-            r.get("type_ids") or [],
-            False,
+            r["id"], r["name"], r["synonyms"], r["type_ids"], False
         )
+
         return UmlsCreateInput(
             **{
                 **r,
@@ -77,9 +74,10 @@ class UmlsTransformer:
                     f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestor_cuis) else ""
                     for i in range(MAX_DENORMALIZED_ANCESTORS)
                 },  # type: ignore
-                "level": OntologyLevel.UNKNOWN,
-                "preferred_name": preferred_name,
-            }
+            },
+            rollup_id=r["id"],  # start with self as rollup
+            preferred_name=preferred_name,
+            level=OntologyLevel.UNKNOWN,
         )
 
 
@@ -87,9 +85,6 @@ class UmlsAncestorTransformer:
     """
     Class for transforming UMLS records
     """
-
-    def __init__(self):
-        self.level_lookup: dict[str, UmlsInfo] | None = None
 
     @staticmethod
     async def create(records: Sequence[Umls]) -> "UmlsAncestorTransformer":
@@ -121,25 +116,22 @@ class UmlsAncestorTransformer:
     @staticmethod
     def choose_best_ancestor(
         record: UmlsInfo,
-        desired_levels: Sequence[OntologyLevel],  # acceptable/desired level(s)
         ancestors: tuple[UmlsInfo, ...],
     ) -> str:
         """
-        Choose the best ancestor for the record at the specified level(s)
+        Choose the best ancestor for the record
         - prefer ancestors that are *specific* genes/proteins/receptors, aka the drug's target, e.g. gpr83 (for instance)
         - avoid suppressed UMLS records
         - otherwise prefer just based on level (e.g. L1_CATEGORY, L2_CATEGORY, INSTANCE)
 
         Args:
             record (Umls): UMLS record
-            desired_levels (OntologyLevel): acceptable/desired level(s)
             ancestors (tuple[UmlsInfo]): ordered list of ancestors
 
         Returns (str): ancestor id, or "" if none found
 
         TODO:
         - prefer family rollups - e.g. serotonin for 5-HTXY receptors
-        - prefer ancestors with the most ontology representation (e.g. MESH and NCI and SNOMED over just MESH)
         - know that "inhibitor", "antagonist", "agonist" etc are children of "modulator"
 
         NOTES:
@@ -169,42 +161,18 @@ class UmlsAncestorTransformer:
 
         def choose_by_level(_ancestors: tuple[UmlsInfo, ...]) -> str:
             """
-            based on record level, find the first ancestor at or above the desired level
-
-            TODO: impl is complex and confusing.
+            based on record level, find the best ancestor
             """
-            # ancestors at or above the desired level, and are monotonic
+            # ancestors that are monotonic
             ok_ancestors = [
-                a
-                for i, a in enumerate(_ancestors)
-                if a.level in desired_levels and (i == 0 or a >= _ancestors[i - 1])
+                a for i, a in enumerate(_ancestors) if i == 0 or a >= _ancestors[i - 1]
             ]
 
-            # is the record eligible to be its own ancestor? (gte to any desired level)
-            is_self_ancestor = any(
-                compare_ontology_level(record.level, level) >= 0
-                for level in desired_levels
-            )
-
-            # if no ok ancestors:
+            # if no ok ancestors, stick with self
             if len(ok_ancestors) == 0:
-                # if record is eligible to be its own ancestor, return self
-                if is_self_ancestor:
-                    return record.id
-                return ""  # otherwise, no ancestor
-
-            # for instance level, use the last "INSTANCE" ancestor
-            # e.g. for [{"id": "A", "level": "INSTANCE"}, {"id": "B", "level": "INSTANCE"}, {"id": "C", "level": "L1_CATEGORY"}] return "B"
-            if OntologyLevel.INSTANCE in desired_levels:
-                return ok_ancestors[-1].id
-
-            # is the record now seemingly its own best ancestor? (gte to ALL desired levels)
-            is_strong_self_ancestor = all(
-                compare_ontology_level(record.level, level) >= 0
-                for level in desired_levels
-            )
-            if is_strong_self_ancestor:
                 return record.id
+
+            # TODO: If good self-ancestor, use self
 
             # otherwise, use the first matching ancestor
             return ok_ancestors[0].id
@@ -219,7 +187,7 @@ class UmlsAncestorTransformer:
 
     def transform(self, partial_record: Umls) -> UmlsUpdateInput:
         """
-        Transform a single UMLS record with updates (level, instance_rollup, category_rollup)
+        Transform a single UMLS record with updates (level, rollup_id)
         """
         if self.level_lookup is None:
             raise ValueError("level_lookup is not initialized")
@@ -238,12 +206,5 @@ class UmlsAncestorTransformer:
 
         return UmlsUpdateInput(
             level=record.level,
-            instance_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                record, [OntologyLevel.INSTANCE], ancestors
-            ),
-            category_rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
-                record,
-                [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
-                ancestors,
-            ),
+            rollup_id=UmlsAncestorTransformer.choose_best_ancestor(record, ancestors),
         )

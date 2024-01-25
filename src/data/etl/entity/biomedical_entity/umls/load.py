@@ -16,7 +16,6 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
-from .constants import MAX_DENORMALIZED_ANCESTORS
 from .transform import UmlsAncestorTransformer, UmlsTransformer
 
 logger = logging.getLogger(__name__)
@@ -35,24 +34,15 @@ class UmlsLoader:
         Creates a table of UMLS entities: id, name, ancestor ids
         """
 
-        ANCESTOR_FIELDS = [
-            f"'' as l{i}_ancestor" for i in range(MAX_DENORMALIZED_ANCESTORS)
-        ]
-
         source_sql = f"""
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
-                TRIM(max(ancestors.ptr)) as hierarchy,
-                array_agg(distinct semantic_types.tui::text) as type_ids,
-                array_agg(distinct semantic_types.sty::text) as type_names,
+                COALESCE(TRIM(max(ancestors.ptr)), "") as hierarchy,
+                COALESCE(array_agg(distinct semantic_types.tui::text), []::text) as type_ids,
+                COALESCE(array_agg(distinct semantic_types.sty::text), []::text) as type_names,
                 COALESCE(max(descendants.count), 0) as num_descendants,
-                max(synonyms.terms) as synonyms,
-                {", ".join(ANCESTOR_FIELDS)},
-                '' as preferred_name,
-                '' as level,
-                '' as instance_rollup_id,
-                '' as category_rollup_id
+                COALESCE(max(synonyms.terms), []::text) as synonyms
             FROM mrconso as entities
             LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
             LEFT JOIN (
@@ -86,10 +76,11 @@ class UmlsLoader:
 
         client = await prisma_client(600)
 
-        async def handle_batch(batch):
+        async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
+            insert_data = [transform(r) for r in batch]
             await Umls.prisma(client).create_many(
-                data=[transform(r) for r in batch],
+                data=insert_data,
                 skip_duplicates=True,
             )
 

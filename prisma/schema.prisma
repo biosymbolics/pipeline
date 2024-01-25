@@ -277,9 +277,7 @@ model Indicatable {
 model Umls {
     id                  String             @id @unique
     biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    category_rollup_id  String?
     hierarchy           String?
-    instance_rollup_id  String // TODO: add as biomedical parent
     l0_ancestor         String?
     l1_ancestor         String?
     l2_ancestor         String?
@@ -294,6 +292,7 @@ model Umls {
     name                String
     num_descendants     Int
     preferred_name      String
+    rollup_id           String // TODO: add as biomedical parent
     synonyms            String[]
     type_ids            String[]
     type_names          String[]
