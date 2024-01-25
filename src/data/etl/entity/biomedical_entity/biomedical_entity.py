@@ -276,20 +276,20 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         client = await prisma_client(300)
         results = await client.query_raw(query)
+        records = [
+            {
+                "canonical_id": r["canonical_id"],
+                "children": {"connect": {"id": r["child_id"]}},  # a problem in a txn?
+                "entity_type": tuis_to_entity_type(r["tuis"]),
+                "name": r["name"],
+                "sources": [Source.UMLS],
+                "umls": {"connect": {"id": {"equals": r["canonical_id"]}}},
+            }
+            for r in results
+        ]
 
         await batch_update(
-            [
-                {
-                    "canonical_id": r["canonical_id"],
-                    # a problem in a txn?
-                    "children": {"connect": {"id": r["child_id"]}},
-                    "entity_type": tuis_to_entity_type(r["tuis"]),
-                    "name": r["name"],
-                    "sources": [Source.UMLS],
-                    "umls": {"connect": {"id": {"equals": r["canonical_id"]}}},
-                }
-                for r in results
-            ],
+            records,
             update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
                 data={
                     "create": BiomedicalEntityCreateInput(**r),  # type: ignore
