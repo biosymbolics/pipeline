@@ -1,4 +1,4 @@
-from typing import Callable, Sequence
+from typing import Sequence
 import logging
 from prisma.enums import OntologyLevel
 from prisma.models import Umls
@@ -13,10 +13,7 @@ from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
-from .constants import (
-    L1_CATEGORY_CUTOFF,
-    MAX_DENORMALIZED_ANCESTORS,
-)
+from .constants import MAX_DENORMALIZED_ANCESTORS
 from .types import UmlsInfo
 
 

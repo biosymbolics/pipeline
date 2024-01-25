@@ -72,7 +72,7 @@ class AncestorUmlsGraph(UmlsGraph):
             GROUP BY umls.id
             """
 
-        client = await prisma_client(120)
+        client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
         return [NodeRecord(**r) for r in results]
 
@@ -87,7 +87,6 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         Query edges from umls
         - non-null hierarchy (good idea??)
-        - only ancestor relationships RN, RB, CHD, PAR (narrower, broader, child, parent)
         - only isa/inverse_isa/mapped_from/mapped_to or no relationship
         - limits types to biomedical
         - applies some naming restrictions (via 'suppressions')
@@ -152,6 +151,6 @@ class AncestorUmlsGraph(UmlsGraph):
             FROM working_terms;
             """
 
-        client = await prisma_client(120)
+        client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
         return [EdgeRecord(**r) for r in results]

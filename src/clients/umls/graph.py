@@ -80,6 +80,15 @@ class UmlsGraph(object):
             - assumes leafs have counts
             - assumes edges are directed from child to parent
             - has parent counts = sum of children counts
+
+        See distribution of counts:
+        ```
+        import seaborn as sns
+        from data.etl.entity.biomedical_entity.umls.ancestor_selection import AncestorUmlsGraph
+        g = await AncestorUmlsGraph.create()
+        data = [v["count"] for v in g.nodes.values()]
+        sns.displot(data, kde=True, aspect=10/4)
+        ```
         """
         logger.info("Recursively propagating counts up the tree")
 
