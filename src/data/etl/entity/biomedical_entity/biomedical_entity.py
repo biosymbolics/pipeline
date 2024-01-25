@@ -129,14 +129,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 return groups
 
             # merge relationship ids across groups
-            relation_fields = {
-                field: uniq(flatten([g.get(field) or [] for g in groups]))
-                for field in self.relation_id_field_map.keys()
+            merged = {
+                **groups[0].__dict__,
+                **{
+                    field: uniq(flatten([g.get(field) or [] for g in groups]))
+                    for field in self.relation_id_field_map.keys()
+                },
             }
 
-            return [
-                BiomedicalEntityUpdateInput(**(groups[0]).__dict__, **relation_fields)  # type: ignore
-            ]
+            return [BiomedicalEntityUpdateInput(**merged)]
 
         # merge records with same canonical id
         flat_recs = [create_input(name) for name in terms_to_insert]
