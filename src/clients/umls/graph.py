@@ -1,13 +1,20 @@
 from abc import abstractmethod
+import math
 import time
 import networkx as nx
 import logging
+
+from prisma.enums import OntologyLevel
+
+from data.etl.entity.biomedical_entity.umls.types import get_next_ontology_level
 
 
 from .types import EdgeRecord, NodeRecord
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+INSTANCE_THRESHOLD = 25
 
 
 class UmlsGraph(object):
@@ -62,8 +69,8 @@ class UmlsGraph(object):
         G.add_nodes_from([(n.id, n) for n in nodes])
         G.add_edges_from([(e.head, e.tail) for e in edges])
 
-        # propogate counts up the tree
-        G = self._propagate_counts(G)
+        # add levels
+        G = self._add_level_info(G)
 
         logger.info(
             "Graph has %s nodes, %s edges (took %s seconds)",
@@ -92,39 +99,84 @@ class UmlsGraph(object):
         """
         logger.info("Recursively propagating counts up the tree")
 
-        def _execute(_G, node):
-            children = _G.successors(node)
-            node_weight = sum(_G.nodes[child]["count"] for child in children)
-            _G.nodes[node]["count"] = node_weight
+        def _propagate(g: nx.DiGraph, node: NodeRecord):
+            children = g.successors(node)
 
+            # for children with no counts, aka non-leaf nodes, recurse
+            # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
+            # so we recurse to set Parent1 and Parent2 counts based on their children
             for child in children:
-                _execute(_G, child)
+                if g.nodes[child].get("count") is None:
+                    _propagate(g, child)
 
-        new_g = G.copy().to_directed()
-        for node in new_g.nodes():
-            # start from leaf nodes
-            if new_g.out_degree(node) == 0:
-                _execute(new_g, node)
+            # set count to sum of all children counts
+            g.nodes[node]["count"] = sum(g.nodes[child]["count"] for child in children)
+
+        # take all nodes with no *incoming* edges, i.e. root nodes
+        for node in [n for n, d in G.in_degree() if d == 0]:
+            _propagate(G, node)
+
+        return G
+
+    @staticmethod
+    def _add_level_info(G: nx.DiGraph) -> nx.DiGraph:
+        """
+        Add ontology level to nodes
+
+        Calls _propagate_counts to set counts on all nodes first.
+        """
+        logger.info("Recursively propagating counts up the tree")
+
+        def set_level(_G: nx.DiGraph, node, prev_node: dict | None = None):
+            parents = _G.predecessors(node)
+            max_parent_count = (
+                max([_G.nodes[p]["count"] for p in parents]) if parents else None
+            )
+            prev_count = prev_node["count"] if prev_node else 0
+            current_count = node["count"]
+
+            if prev_node is None:
+                """
+                leaf node. level it INSTANCE if sufficiently common.
+                """
+                if node["count"] < INSTANCE_THRESHOLD:
+                    level = OntologyLevel.SUBINSTANCE
+                else:
+                    level = OntologyLevel.INSTANCE
+            elif max_parent_count is None:
+                """
+                root node. level it one higher than prev node.
+                """
+                level = get_next_ontology_level(prev_node["level"])
+            else:
+                """
+                compare rate of change (in count / cumulative docs) between:
+                    - prev node and current node
+                    - current node and max parent node
+                """
+
+                dcdprev = current_count - prev_count
+                dparentdc = max_parent_count - current_count
+
+                # e.g. 100 150 175 -> 50, 25 -> 0.5 ... slow, plateauing
+                # so it isn't that meaningful to delineate this (vs the next) level
+                if dparentdc / dcdprev < 2:
+                    level = OntologyLevel.NA
+                # e.g. 5 50 1000 -> 45, 950 -> 21 ... fast growth
+                # so it's meaningful to delineate this level
+                else:
+                    level = get_next_ontology_level(prev_node["level"])
+
+            _G.nodes[node]["level"] = level
+
+            for parent in parents:
+                set_level(_G, parent, node)
+
+        # propogate counts up the tree
+        new_g = UmlsGraph._propagate_counts(G.copy().to_directed())
+
+        # take all nodes with no *outgoing* edges, i.e. leaf nodes
+        for node in [n for n, d in new_g.out_degree() if d == 0]:
+            set_level(new_g, node)
 
         return new_g
-
-    def _get_topk_subgraph(self, k: int, max_degree: int = 1000):
-        """
-        Get subgraph of top k nodes by degree
-
-        Args:
-            k: number of nodes to include in the map (for performance reasons)
-        """
-        nodes: list[tuple[str, int]] = self.G.degree  # type: ignore
-
-        # non-trivial hubs (i.e. not massive and therefore meaningless)
-        nontrivial_hubs = [
-            (node, degree)
-            for (node, degree) in nodes
-            if degree < max_degree and degree > 0
-        ]
-
-        # top k nodes by degree
-        top_nodes = sorted(nontrivial_hubs, key=lambda x: x[1], reverse=True)[:k]
-
-        return self.G.subgraph([node for (node, _) in top_nodes])

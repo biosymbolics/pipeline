@@ -9,12 +9,12 @@ from prisma.types import (
 from pydash import flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
-from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
+from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
-from .types import UmlsInfo
+from .types import UmlsInfo, compare_ontology_level
 
 
 logger = logging.getLogger(__name__)
@@ -71,13 +71,12 @@ class UmlsAncestorTransformer:
         """
         self.umls_graph = await AncestorUmlsGraph.create()
 
-        # generate all levels first, so we can later do a single update
-        # (level + instance/category rollups)
+        # generate all the level info first
         self.level_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
                 name=r.name,
-                level=OntologyLevel.UNKNOWN,  # TODO
+                level=self.umls_graph.get_ontology_level(r.id),
                 type_ids=r.type_ids,
             )
             for r in records
@@ -133,27 +132,24 @@ class UmlsAncestorTransformer:
             """
             based on record level, find the best ancestor
             """
-            # ancestors that are monotonic
+            # ancestors ABOVE the current level
+            # e.g. L1_CATEGORY if record.level == INSTANCE
+            # e.g. L2_CATEGORY if record.level == L1_CATEGORY
             ok_ancestors = [
-                a for i, a in enumerate(_ancestors) if i == 0 or a >= _ancestors[i - 1]
+                a
+                for a in _ancestors
+                if compare_ontology_level(a.level, record.level) > 0
             ]
 
-            # if no ok ancestors, stick with self
+            # if no ok ancestors, return ""
             if len(ok_ancestors) == 0:
-                return record.id
-
-            # TODO: If good self-ancestor, use self
+                return ""
 
             # otherwise, use the first matching ancestor
             return ok_ancestors[0].id
 
-        # remove suppressions
-        ok_ancestors = tuple(
-            [a for a in ancestors if not is_umls_suppressed(a.id, a.name)]
-        )
-
         # prefer type-preferred ancestor, otherwise just go by level
-        return choose_by_type(ok_ancestors) or choose_by_level(ok_ancestors)
+        return choose_by_type(ancestors) or choose_by_level(ancestors)
 
     def transform(self, partial_record: Umls) -> UmlsUpdateInput:
         """

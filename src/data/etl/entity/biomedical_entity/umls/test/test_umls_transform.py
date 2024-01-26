@@ -32,6 +32,7 @@ class TestTrialUtils(unittest.TestCase):
                         },
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C555555",
             },
             {
@@ -55,6 +56,7 @@ class TestTrialUtils(unittest.TestCase):
                         },
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C444444",
             },
             {
@@ -78,6 +80,7 @@ class TestTrialUtils(unittest.TestCase):
                         },
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C555555",
             },
         ]
@@ -113,6 +116,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C1415265",
             },
             {
@@ -126,6 +130,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "VERY SPECIFIC THING",
             },
             {
@@ -141,6 +146,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "dd6",
             },
             {
@@ -156,6 +162,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.L2_CATEGORY],
                 "expected": "ee5",
             },
             {
@@ -171,6 +178,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.L2_CATEGORY],
                 "expected": "ALREADY_L2_CATEGORY",
             },
             {
@@ -181,6 +189,7 @@ class TestTrialUtils(unittest.TestCase):
                     "canonical_name": "GPR84 gene",
                 },
                 "ancestors": tuple([]),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C1415265a",
             },
             {
@@ -191,6 +200,7 @@ class TestTrialUtils(unittest.TestCase):
                     "canonical_name": "GPR84 gene",
                 },
                 "ancestors": tuple([]),
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "",
             },
             {
@@ -206,6 +216,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "C1254372"},
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "C2987634",
             },
             {
@@ -221,6 +232,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "anl2cat",
             },
             {
@@ -235,6 +247,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
+                "levels": [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
                 "expected": "ee5",
             },
             {
@@ -251,6 +264,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.INSTANCE, "id": "l1afterl2"},
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "secondinstance",
             },
             {
@@ -265,6 +279,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.INSTANCE, "id": "l1afterl2"},
                     ]
                 ),
+                "levels": [OntologyLevel.INSTANCE],
                 "expected": "selfinstance",
             },
             {
@@ -284,6 +299,7 @@ class TestTrialUtils(unittest.TestCase):
                         {"level": OntologyLevel.INSTANCE, "id": "C1704222"},
                     ]
                 ),
+                "levels": [OntologyLevel.L1_CATEGORY],
                 "expected": "C0041368",
             },
         ]

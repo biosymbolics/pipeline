@@ -474,6 +474,7 @@ enum ContextOfUse {
 }
 
 enum OntologyLevel {
+    SUBINSTANCE
     INSTANCE
     L1_CATEGORY
     L2_CATEGORY

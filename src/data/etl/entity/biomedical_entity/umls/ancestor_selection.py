@@ -1,5 +1,6 @@
 from typing import Sequence
 import logging
+from prisma.enums import OntologyLevel
 
 from clients.low_level.prisma import prisma_client
 from clients.umls.graph import UmlsGraph
@@ -154,3 +155,14 @@ class AncestorUmlsGraph(UmlsGraph):
         client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
         return [EdgeRecord(**r) for r in results]
+
+    def get_ontology_level(self, cui: str) -> OntologyLevel:
+        """
+        Get ontology level for cui
+        """
+        if not cui in self.nodes:
+            return OntologyLevel.UNKNOWN
+
+        node = NodeRecord(**self.nodes[cui])
+
+        return node.level

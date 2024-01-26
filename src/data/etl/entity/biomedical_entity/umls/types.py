@@ -2,12 +2,22 @@ from pydantic import BaseModel
 from prisma.enums import OntologyLevel
 from prisma.models import Umls
 
-from data.etl.entity.biomedical_entity.umls.constants import ONTOLOGY_LEVEL_MAP
+
+ONTOLOGY_LEVEL_MAP = {
+    OntologyLevel.SUBINSTANCE: 0,
+    OntologyLevel.INSTANCE: 1,
+    OntologyLevel.L1_CATEGORY: 2,
+    OntologyLevel.L2_CATEGORY: 3,
+    # OntologyLevel.NA: -1, # excluded
+    # OntologyLevel.UNKNOWN: -1, # excluded
+}
 
 
 def compare_ontology_level(a: OntologyLevel, b: OntologyLevel) -> int:
     """
     Compare two ontology levels
+
+    Higher means more general.
 
     Returns:
         positive if a > b
@@ -23,6 +33,16 @@ def compare_ontology_level(a: OntologyLevel, b: OntologyLevel) -> int:
     return ONTOLOGY_LEVEL_MAP[a] - ONTOLOGY_LEVEL_MAP[b]
 
 
+def get_next_ontology_level(level: OntologyLevel) -> OntologyLevel:
+    if level == OntologyLevel.SUBINSTANCE:
+        return OntologyLevel.INSTANCE
+    if level == OntologyLevel.INSTANCE:
+        return OntologyLevel.L1_CATEGORY
+    if level == OntologyLevel.L1_CATEGORY:
+        return OntologyLevel.L2_CATEGORY
+    return level
+
+
 class UmlsInfo(BaseModel, object):
     id: str
     name: str
@@ -31,12 +51,12 @@ class UmlsInfo(BaseModel, object):
 
     @staticmethod
     def from_umls(umls: Umls, **kwargs) -> "UmlsInfo":
-        # combine in kwargs
+        # combine with kwargs
         _umls = Umls(**{**umls.__dict__, **kwargs})
         return UmlsInfo(
             id=_umls.id,
             name=_umls.name,
-            level=_umls.level,
+            level=umls.level,
             type_ids=_umls.type_ids,
         )
 

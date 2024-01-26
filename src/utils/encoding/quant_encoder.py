@@ -81,11 +81,11 @@ class BinEncoder(Encoder):
 
             return int(kneedle.elbow)
 
-        def gini_impurity(original, binned):
+        def gini_impurity(original: npt.NDArray, binned: npt.NDArray):
             hist, _ = np.histogram(original)
             gini_before = 1 - np.sum([p**2 for p in hist / len(original)])
 
-            def bin_gini(bin):
+            def bin_gini(bin: npt.NDArray):
                 p = np.mean(binned == bin)
                 return p * (1 - p)
 

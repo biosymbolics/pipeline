@@ -38,11 +38,11 @@ class UmlsLoader:
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
-                COALESCE(TRIM(max(ancestors.ptr)), "") as hierarchy,
-                COALESCE(array_agg(distinct semantic_types.tui::text), []::text) as type_ids,
-                COALESCE(array_agg(distinct semantic_types.sty::text), []::text) as type_names,
+                COALESCE(TRIM(max(ancestors.ptr)), '') as hierarchy,
+                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
+                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
                 COALESCE(max(descendants.count), 0) as num_descendants,
-                COALESCE(max(synonyms.terms), []::text) as synonyms
+                COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
             FROM mrconso as entities
             LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
             LEFT JOIN (
