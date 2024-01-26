@@ -68,7 +68,7 @@ class RelationIdFieldMap(Dataclass):
     comprised_of: RelationConnectInfo | None = None
     parents: RelationConnectInfo | None = None
     synonyms: RelationConnectInfo | None = None
-    umls_entities: RelationConnectInfo | None = None
+    # umls_entities: RelationConnectInfo | None = None
 
 
 def default_get_source_map(records: Sequence[dict]) -> dict:

@@ -234,7 +234,10 @@ def score_candidate(
 
     # give candidates with more aliases a higher score, as proxy for number of ontologies in which it is represented.
     # log base 4 - roughly 10% of entries have 5+ aliases. lower bounds at 0.5
-    alias_score = max(0.5, math.log(len(candidate_aliases), 4))
+    alias_score = max(
+        0.5,
+        (math.log(len(candidate_aliases), 4) if len(candidate_aliases) > 1 else 0.0),
+    )
 
     if syntactic_similarity is not None:
         return type_score() * alias_score * syntactic_similarity

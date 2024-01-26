@@ -10,7 +10,6 @@ class BaseTermRecord(TypedDict):
 
 class TermRecord(BaseTermRecord):
     domain: str
-    original_term: Optional[str]
 
 
 class AggregatedTermRecord(BaseTermRecord):

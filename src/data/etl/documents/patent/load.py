@@ -66,11 +66,11 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
     biosym_sql = f"""
             SELECT
                 publication_number as id,
-                lower(original_term) as term,
+                lower(term) as term,
                 min(character_offset_start) as mention_index
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
-            GROUP BY publication_number, lower(original_term)
+            GROUP BY publication_number, lower(term)
         """
     if "diseases" in domains:
         sql = f"""
@@ -106,7 +106,7 @@ class PatentLoader(BaseDocumentEtl):
             LEFT JOIN (
                 SELECT
                     publication_number,
-                    array_agg(original_term) as attributes
+                    array_agg(term) as attributes
                 from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
                 where domain='attributes'
                 group by publication_number
@@ -114,7 +114,7 @@ class PatentLoader(BaseDocumentEtl):
             LEFT JOIN (
                 SELECT
                     publication_number,
-                    array_agg(original_term) as annotations
+                    array_agg(term) as annotations
                 from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
                 where domain<>'attributes'
                 group by publication_number
@@ -130,7 +130,7 @@ class PatentLoader(BaseDocumentEtl):
             domains: domains to copy
         """
         biosym_sql = f"""
-            SELECT distinct lower(original_term) as term
+            SELECT distinct lower(term) as term
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
         """

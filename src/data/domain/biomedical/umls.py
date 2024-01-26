@@ -112,13 +112,13 @@ def tuis_to_entity_type(tuis: Sequence[str]) -> BiomedicalEntityType:
         tuis (list[str]): list of tuis
     """
     # else, grab known tuis
-    known_tuis = [tui for tui in tuis if tui in UMLS_TO_ENTITY_TYPE]
+    known_tuis = [tui for tui in tuis if tui in UMLS_TO_ENTITY_TYPE.values()]
 
     if len(known_tuis) == 0:
         return BiomedicalEntityType.UNKNOWN
 
     # chose preferred tuis
-    preferred_tuis = [tui for tui in tuis if tui in PREFERRED_UMLS_TYPES]
+    preferred_tuis = [tui for tui in known_tuis if tui in PREFERRED_UMLS_TYPES]
 
     # if no preferred types, return first known tui
     if len(preferred_tuis) == 0:

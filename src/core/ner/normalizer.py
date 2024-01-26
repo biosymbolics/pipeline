@@ -109,8 +109,7 @@ class TermNormalizer:
 
         logger.info("Normalizing %s terms (%s non-unique)", len(doc_ents), len(terms))
         normalized = self.normalize(doc_ents)
-        normalized_map = {n.term: n for n in normalized}
-        return [normalized_map[t] for t in terms]
+        return normalized
 
     def __call__(self, *args, **kwargs) -> list[DocEntity]:
         return self.normalize(*args, **kwargs)

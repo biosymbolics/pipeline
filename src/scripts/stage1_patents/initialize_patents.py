@@ -121,13 +121,13 @@ async def main(bootstrap: bool = False):
         await copy_bq_to_psql()
         # UMLS records (slow due to betweenness centrality calc)
 
-    # select t.term, ul.type_names, array_agg(distinct domain), array_agg(distinct original_term), count(*) from biosym_annotations, terms t, umls_lookup ul
+    # select t.term, ul.type_names, array_agg(distinct domain), array_agg(distinct term), count(*) from biosym_annotations, terms t, umls_lookup ul
     #     where ul.id=t.id
     #     and domain<>'mechanisms'
     #     and domain in ('compounds', 'devices', 'behavioral_interventions', 'procedures', 'diseases', 'diagnostics')
     #     and ul.type_ids::text[] <@ ARRAY['T120', 'T123', 'T195']
-    #     and not original_term ~* '.*(?:diagnost).*'
-    #     and lower(original_term)=ANY(t.synonyms)
+    #     and not term ~* '.*(?:diagnost).*'
+    #     and lower(term)=ANY(t.synonyms)
     #     and array_length(t.synonyms, 1) < 50
     #     group by t.term, ul.type_names
     #     order by count(*) desc limit 100;
@@ -138,8 +138,8 @@ async def main(bootstrap: bool = False):
     #     and domain<>'compounds'
     #     and domain in ('mechanisms', 'biologics', 'devices', 'behavioral_interventions', 'procedures', 'diseases', 'diagnostics')
     #     and ul.type_ids::text[] <@ ARRAY['T103', 'T104', 'T109',  'T127',  'T197', 'T200']
-    #     and lower(original_term)=ANY(t.synonyms)
-    #     and not original_term ~* '.*(?:inhibit|agoni|modulat)s?.*'
+    #     and lower(term)=ANY(t.synonyms)
+    #     and not term ~* '.*(?:inhibit|agoni|modulat)s?.*'
     #     and t.id not in ('C0268275', 'C1173729', 'C0031516', 'C0332837', 'C0037188', 'C0027627', 'C0011175', 'C0015967', 'C0151747', 'C0026837', 'C0700198', 'C0233656', 'C0043242', 'C0332875', 'C1510411', 'C2926602', 'C0242781', 'C0220811', 'C4074771', 'C0158328', 'C0011119', 'C0555975', 'C0877578', 'C0856151', 'C0263557', 'C0276640', 'C0858714', 'C0595920', 'C1318484', 'C0020488', 'C0278134', 'C0220724', 'C2029593', 'C0265604', 'C0012359', 'C0234985', 'C0027960', 'C1384489', 'C0277825', 'C0392483', 'C0010957', 'C0015376', 'C0011389', 'C0597561', 'C0036974', 'C0233494', 'C0011334', 'C0013146', 'C0030201', 'C0000925', 'C0332157', 'C0151908', 'C0024524', 'C0037293', 'C0233601', 'C4023747', 'C0262568', 'C0542351', 'C0036572', 'C0858950', 'C0001511', 'C0080194', 'C1514893', 'C0003516', 'C0332568', 'C0445243', 'C0349506', 'C0599156', 'C0033119', 'C4721411', 'C3658343', 'C1136365', 'C1704681', 'C0017374', 'C1334103', 'C0017345', 'C0017343', 'C0678941')
     #     and array_length(t.synonyms, 1) < 50;
 
@@ -149,8 +149,8 @@ async def main(bootstrap: bool = False):
     #     and domain<>'biologics'
     #     and domain in ('compounds', 'devices', 'behavioral_interventions', 'procedures', 'diseases')
     #     and ul.type_ids::text[] <@ ARRAY['T038', 'T044', 'T045', 'T028','T043','T085','T086','T087','T088', 'T114', 'T116', 'T123', 'T125', 'T126', 'T129', 'T192']
-    #     and lower(original_term)=ANY(t.synonyms)
-    #     and not original_term ~* '.*(?:disease|disorder|syndrome)s?.*'
+    #     and lower(term)=ANY(t.synonyms)
+    #     and not term ~* '.*(?:disease|disorder|syndrome)s?.*'
     #     and t.id not in ('C0268275', 'C1173729', 'C0031516', 'C0332837', 'C0037188', 'C0027627', 'C0011175', 'C0015967', 'C0151747', 'C0026837', 'C0700198', 'C0233656', 'C0043242', 'C0332875', 'C1510411', 'C2926602', 'C0242781', 'C0220811', 'C4074771', 'C0158328', 'C0011119', 'C0555975', 'C0877578', 'C0856151', 'C0263557', 'C0276640', 'C0858714', 'C0595920', 'C1318484', 'C0020488', 'C0278134', 'C0220724', 'C2029593', 'C0265604', 'C0012359', 'C0234985', 'C0027960', 'C1384489', 'C0277825', 'C0392483', 'C0010957', 'C0015376', 'C0011389', 'C0597561', 'C0036974', 'C0233494', 'C0011334', 'C0013146', 'C0030201', 'C0000925', 'C0332157', 'C0151908', 'C0024524', 'C0037293', 'C0233601', 'C4023747', 'C0262568', 'C0542351', 'C0036572', 'C0858950', 'C0001511', 'C0080194', 'C1514893', 'C0003516', 'C0332568', 'C0445243', 'C0349506', 'C0599156', 'C0033119', 'C4721411', 'C3658343', 'C1136365', 'C1704681', 'C0017374', 'C1334103', 'C0017345', 'C0017343', 'C0678941')
     #     and array_length(t.synonyms, 1) < 20;
 
@@ -160,7 +160,7 @@ async def main(bootstrap: bool = False):
     #     and domain<>'devices'
     #     and domain in ('compounds', 'mechanisms', 'biologics', 'behavioral_interventions', 'procedures', 'diseases')
     #     and ul.type_ids::text[] <@ ARRAY['T074', 'T075', 'T203']
-    #     and lower(original_term)=ANY(t.synonyms);
+    #     and lower(term)=ANY(t.synonyms);
 
     # update biosym_annotations set domain='procedures'
     #     from terms t, umls_lookup ul
@@ -168,7 +168,7 @@ async def main(bootstrap: bool = False):
     #     and domain<>'procedures'
     #     and domain in ('compounds', 'mechanisms', 'biologics', 'behavioral_interventions', 'devices', 'diseases')
     #     and ul.type_ids::text[] <@ ARRAY['T059', 'T061']
-    #     and lower(original_term)=ANY(t.synonyms);
+    #     and lower(term)=ANY(t.synonyms);
 
     # update biosym_annotations set domain='diagnostics'
     #     from terms t, umls_lookup ul
@@ -176,7 +176,7 @@ async def main(bootstrap: bool = False):
     #     and domain<>'diagnostics'
     #     and domain in ('compounds', 'mechanisms', 'biologics', 'behavioral_interventions', 'procedures', 'diseases', 'devices')
     #     and ul.type_ids::text[] <@ ARRAY['T060', 'T034', 'T130']
-    #     and lower(original_term)=ANY(t.synonyms);
+    #     and lower(term)=ANY(t.synonyms);
 
     # update biosym_annotations set domain='diseases'
     #     from terms t, umls_lookup ul
@@ -184,8 +184,8 @@ async def main(bootstrap: bool = False):
     #     and domain<>'diseases'
     #     and domain in ('compounds', 'mechanisms', 'biologics', 'behavioral_interventions', 'devices', 'procedures')
     #     and ul.type_ids::text[] <@ ARRAY['T019', 'T020', 'T037', 'T046', 'T047', 'T048', 'T184', 'T190', 'T191']
-    #     and lower(original_term)=ANY(t.synonyms)
-    #     and not original_term ~* '.*(?:anti|inflammation|therapeutic|repair).*'
+    #     and lower(term)=ANY(t.synonyms)
+    #     and not term ~* '.*(?:anti|inflammation|therapeutic|repair).*'
     #     and t.id not in ('C0268275', 'C1173729', 'C0031516', 'C0332837', 'C0037188', 'C0027627', 'C0011175', 'C0015967', 'C0151747', 'C0026837', 'C0700198', 'C0233656', 'C0043242', 'C0332875', 'C1510411', 'C2926602', 'C0242781', 'C0220811', 'C4074771', 'C0158328', 'C0011119', 'C0555975', 'C0877578', 'C0856151', 'C0263557', 'C0276640', 'C0858714', 'C0595920', 'C1318484', 'C0020488', 'C0278134', 'C0220724', 'C2029593', 'C0265604', 'C0012359', 'C0234985', 'C0027960', 'C1384489', 'C0277825', 'C0392483', 'C0010957', 'C0015376', 'C0011389', 'C0597561', 'C0036974', 'C0233494', 'C0011334', 'C0013146', 'C0030201', 'C0000925', 'C0332157', 'C0151908', 'C0024524', 'C0037293', 'C0233601', 'C4023747', 'C0262568', 'C0542351', 'C0036572', 'C0858950', 'C0001511', 'C0080194', 'C1514893', 'C0003516', 'C0332568', 'C0445243', 'C0349506', 'C0599156', 'C0033119', 'C4721411', 'C3658343', 'C1136365', 'C1704681', 'C0017374', 'C1334103', 'C0017345', 'C0017343', 'C0678941')
     #     and array_length(t.synonyms, 1) < 15;
 

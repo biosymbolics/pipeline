@@ -73,17 +73,17 @@ def remove_trailing_leading(
     return clean_terms
 
 
-def expand_parens_term(text: str, original_term: str) -> str | None:
+def expand_parens_term(text: str, term: str) -> str | None:
     """
     Returns expanded term in cases like 'agonists' -> '(sstr4) agonists'
     TODO: typically is more like 'somatostatin receptor subtype 4 (sstr4) agonists'
 
     Args:
         text (str): Text to search / full text
-        original_term (str): Original term
+        term (str): Original term
     """
     possible_parens_term = re.findall(
-        f"{TARGET_PARENS} {re.escape(original_term)}", text, re.IGNORECASE
+        f"{TARGET_PARENS} {re.escape(term)}", text, re.IGNORECASE
     )
 
     if len(possible_parens_term) == 0:
@@ -92,7 +92,7 @@ def expand_parens_term(text: str, original_term: str) -> str | None:
     return possible_parens_term[0]
 
 
-def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
+def expand_term(term: str, text: str, text_doc: Doc) -> str | None:
     """
     Returns expanded term
     Looks until it finds the next dobj or other suitable ending dep.
@@ -103,30 +103,30 @@ def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
     -  cd23  (ROOT, NOUN) antagonists  (dobj, NOUN) for  (prep, ADP) the  (det, DET) treatment  (pobj, NOUN) of  (prep, ADP) neoplastic  (amod, ADJ) disorders (pobj, NOUN)
 
     Args:
-        original_term (str): Original term
+        term (str): Original term
         text (str): Text to search / full text
         text_doc (Doc): Spacy doc (passed in for perf reasons)
     """
-    # owb/cwb in case original_term starts with (, which confuses the \b match
+    # owb/cwb in case term starts with (, which confuses the \b match
     wb_chars = ["(", ")"]
-    owb = "" if original_term[0] in wb_chars else r"\b"
-    cwb = "" if original_term[-1] in wb_chars else r"\b"
+    owb = "" if term[0] in wb_chars else r"\b"
+    cwb = "" if term[-1] in wb_chars else r"\b"
     s = re.search(
-        f"{owb}{re.escape(original_term)}{cwb}",
+        f"{owb}{re.escape(term)}{cwb}",
         text_doc.text,
         flags=RE_STANDARD_FLAGS,
     )
 
     # shouldn't happen
     if s is None:
-        logger.error("No term text in expansion: %s, %s", original_term, text)
+        logger.error("No term text in expansion: %s, %s", term, text)
         return None
 
     char_to_tok_idx = {t.idx: t.i for t in text_doc}
 
     # starting index of the string (we're only looking forward)
     start_idx = char_to_tok_idx.get(s.start())
-    appox_orig_len = len(original_term.split(" "))
+    appox_orig_len = len(term.split(" "))
 
     # check -1 in case of hyphenated term in text
     # TODO: [number average molecular weight]×[content mass ratio] (content)
@@ -134,7 +134,7 @@ def expand_term(original_term: str, text: str, text_doc: Doc) -> str | None:
         start_idx = char_to_tok_idx.get(s.start() - 1)
 
     if start_idx is None:
-        logger.error("start_idx none for %s\n%s", original_term, text)
+        logger.error("start_idx none for %s\n%s", term, text)
         return None
     doc = text_doc[start_idx:]
 

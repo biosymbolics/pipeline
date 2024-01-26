@@ -48,7 +48,7 @@ def get_indication_source_map(records: Sequence[dict]) -> dict:
     }
 
 
-def get_intervention_source_map(records: Sequence[dict]) -> dict:
+def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
     i_recs = [InterventionIntermediate(**r) for r in records]
     return {
         rec.intervention: {
@@ -61,7 +61,6 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict:
                     "synonyms": compact([rec.generic_name, rec.brand_name]),
                     **rec.__dict__,
                 }
-                for rec in i_recs
             },
             # active ingredients for combination drugs
             **{
@@ -69,7 +68,6 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict:
                     "default_type": BiomedicalEntityType.COMPOUND,
                     "synonyms": [ai],
                 }
-                for rec in i_recs
                 for ai in rec.active_ingredients
                 if len(rec.active_ingredients) > 1
             },
@@ -77,11 +75,10 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict:
             **{
                 pc.name: {
                     # set top sorted pharmacologic class as "preferred"
-                    "is_preferred": i == 0,
+                    "is_priority": i == 0,
                     "default_type": BiomedicalEntityType.MECHANISM,
                     "synonyms": [pc.name],
                 }
-                for rec in i_recs
                 for i, pc in enumerate(PharmaClass.sort(rec.pharmacologic_classes))
             },
         }
@@ -163,7 +160,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     "lower(prod.product_name) as brand_name",
                     "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
                     "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
-                    "JSON_AGG(pharma_class.*) as pharmacologic_classes",
+                    "JSON_AGG(distinct pharma_class.*) as pharmacologic_classes",
                 ]
             ),
         )

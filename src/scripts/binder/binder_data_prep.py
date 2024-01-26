@@ -2,6 +2,7 @@
 Utils for transforming data into binder format
 """
 
+import asyncio
 import regex as re
 import sys
 import polars as pl
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_annotations():
+async def get_annotations():
     """
     Get annotations for binder model
     Takes ~2 min as of 10/10/23
@@ -38,7 +39,7 @@ def get_annotations():
             ELSE concat(substring(abstract from 0 for 2000), '\n', title)
             END
         ) as text, -- switching title + abs and abs + title to improve generalizability
-        s.publication_number as publication_number, original_term as term, domain
+        s.publication_number as publication_number, term, domain
         FROM
         (
             select ba.publication_number, array_agg(distinct domain) as domains
@@ -59,7 +60,7 @@ def get_annotations():
         and domain not in ('assignees', 'attributes', 'dosage_forms', 'roas', 'research_tools', 'behavioral_interventions')
         limit 400000 -- 829,812
     """
-    records = client.select(query)
+    records = await client.select(query)
     logger.info("Got % s annotations", len(records))
     df = pl.DataFrame(records)
     return df
@@ -168,7 +169,7 @@ def format_into_binder(df: pl.DataFrame, tokenizer):
     return formatted
 
 
-def create_binder_data():
+async def create_binder_data():
     """
     Create training data for binder model
 
@@ -190,7 +191,7 @@ def create_binder_data():
 
     # --do_predict=true --model_name_or_path="/tmp/biosym/checkpoint-2200/pytorch_model.bin" --dataset_name=BIOSYM --output_dir=/tmp/biosym
     """
-    annotations = get_annotations()
+    annotations = await get_annotations()
     tokenizer = AutoTokenizer.from_pretrained(DEFAULT_BASE_TRANSFORMER_MODEL)
     logger.info("Getting entity indices for %s annotations", annotations.shape[0])
     df = annotations.with_columns(
@@ -211,4 +212,4 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    create_binder_data()
+    asyncio.run(create_binder_data())
