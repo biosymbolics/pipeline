@@ -149,7 +149,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             source_map (dict): map of "term" to source record for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
         canonical_map = self._generate_lookup_map(terms_to_canonicalize or terms)
-        print(canonical_map)
         entity_recs = self._generate_upsert_records(terms, source_map, canonical_map)
 
         await batch_update(
