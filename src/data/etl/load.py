@@ -7,10 +7,10 @@ from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
 async def load_all():
     # copy umls data
-    await UmlsLoader().copy_all()
+    # await UmlsLoader().copy_all()
 
     # # copy all biomedical entities (from all doc types)
-    # await BiomedicalEntityLoader().copy_all()
+    await BiomedicalEntityLoader().copy_all()
 
     # # copy owner data (across all documents)
     # await OwnerLoader().copy_all()

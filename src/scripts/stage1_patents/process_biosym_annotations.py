@@ -69,27 +69,27 @@ async def remove_substrings():
     """
     temp_table = "names_to_remove"
     query = rf"""
-        SELECT t1.publication_number AS publication_number, t2.original_term AS removal_term
+        SELECT t1.publication_number AS publication_number, t2.term AS removal_term
         FROM {WORKING_TABLE} t1
         JOIN {WORKING_TABLE} t2
         ON t1.publication_number = t2.publication_number
-        WHERE t2.original_term<>t1.original_term
-        AND t1.original_term ~* CONCAT('.*', escape_regex_chars(t2.original_term), '.*')
-        AND length(t1.original_term) > length(t2.original_term)
-        AND array_length(regexp_split_to_array(t2.original_term, '\s+'), 1) < 3
-        ORDER BY length(t2.original_term) DESC
+        WHERE t2.term<>t1.term
+        AND t1.term ~* CONCAT('.*', escape_regex_chars(t2.term), '.*')
+        AND length(t1.term) > length(t2.term)
+        AND array_length(regexp_split_to_array(t2.term, '\s+'), 1) < 3
+        ORDER BY length(t2.term) DESC
     """
 
     delete_query = f"""
         DELETE FROM {WORKING_TABLE}
-        WHERE ARRAY[publication_number, original_term] IN (
+        WHERE ARRAY[publication_number, term] IN (
             SELECT ARRAY[publication_number, removal_term]
             FROM {temp_table}
         )
     """
 
     logger.info("Removing substrings")
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
 
     await client.create_from_select(query, temp_table)
     await client.execute_query(delete_query)
@@ -98,7 +98,7 @@ async def remove_substrings():
 
 TermMap = TypedDict(
     "TermMap",
-    {"original_term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
+    {"term": str, "cleaned_term": str, "publication_number": NotRequired[str]},
 )
 
 
@@ -109,23 +109,23 @@ async def expand_annotations(
     """
     Expands annotations in cases where NER only recognizes (say) "inhibitor" where "inhibitors of XYZ" is present.
     """
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
     prefix_re = get_or_re(
         prefix_terms, "*", enforce_word_boundaries=True, word_boundary_char=r"\y"
     )
     terms_re = get_or_re(base_terms_to_expand)
     records = await client.select(
         rf"""
-        SELECT original_term, concat(title, '. ', abstract) as text, app.publication_number
+        SELECT term, concat(title, '. ', abstract) as text, app.publication_number
         FROM biosym_annotations ann, applications app
         where ann.publication_number = app.publication_number
-        AND length(original_term) > 1
-        AND original_term  ~* '^{prefix_re}[ ]?{terms_re}[ \.;-]*$'
-        AND array_length(string_to_array(original_term, ' '), 1) <= {POTENTIAL_EXPANSION_MAX_TOKENS}
+        AND length(term) > 1
+        AND term  ~* '^{prefix_re}[ ]?{terms_re}[ \.;-]*$'
+        AND array_length(string_to_array(term, ' '), 1) <= {POTENTIAL_EXPANSION_MAX_TOKENS}
         AND (
-            concat(title, '. ', abstract) ~* concat('.*', escape_regex_chars(original_term), ' {EXPAND_CONNECTING_RE}.*')
+            concat(title, '. ', abstract) ~* concat('.*', escape_regex_chars(term), ' {EXPAND_CONNECTING_RE}.*')
             OR
-            concat(title, '. ', abstract) ~* concat('.*{TARGET_PARENS} ', escape_regex_chars(original_term), '.*') -- e.g. '(sstr4) agonists', which NER has a prob with
+            concat(title, '. ', abstract) ~* concat('.*{TARGET_PARENS} ', escape_regex_chars(term), '.*') -- e.g. '(sstr4) agonists', which NER has a prob with
         )
         AND domain not in ('attributes', 'assignees')
         """
@@ -144,24 +144,21 @@ async def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
     nlp = Spacy.get_instance(disable=["ner"])
 
     def fix_term(record: dict, doc_map: dict[str, Doc]) -> TermMap | None:
-        original_term = record["original_term"].strip(" -")
+        term = record["term"].strip(" -")
         publication_number = record["publication_number"]
         text = record["text"]
         text_doc = doc_map[publication_number]
 
         # check for hyphenated term edge-case
-        fixed_term = expand_parens_term(record["text"], record["original_term"])
+        fixed_term = expand_parens_term(record["text"], record["term"])
 
         if not fixed_term:
-            fixed_term = expand_term(original_term, text, text_doc)
+            fixed_term = expand_term(term, text, text_doc)
 
-        if (
-            fixed_term is not None
-            and fixed_term.lower() != record["original_term"].lower()
-        ):
+        if fixed_term is not None and fixed_term.lower() != record["term"].lower():
             return {
                 "publication_number": publication_number,
-                "original_term": original_term,
+                "term": term,
                 "cleaned_term": fixed_term,
             }
         else:
@@ -182,7 +179,7 @@ async def _expand_annotations(batched_records: Sequence[Sequence[dict]]):
 
 
 async def _update_annotation_values(term_to_fixed_term: list[TermMap]):
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
 
     # check publication_number if we have it
     check_id = (
@@ -195,9 +192,9 @@ async def _update_annotation_values(term_to_fixed_term: list[TermMap]):
 
     sql = f"""
         UPDATE {WORKING_TABLE}
-        SET original_term = tt.cleaned_term
+        SET term = tt.cleaned_term
         FROM {temp_table_name} tt
-        WHERE {WORKING_TABLE}.original_term = tt.original_term
+        WHERE {WORKING_TABLE}.term = tt.term
         {f"AND {WORKING_TABLE}.publication_number = tt.publication_number" if check_id else ""}
     """
 
@@ -206,21 +203,21 @@ async def _update_annotation_values(term_to_fixed_term: list[TermMap]):
 
 
 async def remove_trailing_leading(removal_terms: dict[str, WordPlace]):
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
     records = await client.select(
-        f"SELECT distinct original_term FROM {WORKING_TABLE} where length(original_term) > 1"
+        f"SELECT distinct term FROM {WORKING_TABLE} where length(term) > 1"
     )
-    terms: list[str] = [r["original_term"] for r in records]
+    terms: list[str] = [r["term"] for r in records]
     cleaned_term = _remove_trailing_leading(terms, removal_terms)
 
     await _update_annotation_values(
         [
             {
-                "original_term": original_term,
+                "term": term,
                 "cleaned_term": cleaned_term,
             }
-            for original_term, cleaned_term in zip(terms, cleaned_term)
-            if cleaned_term != original_term
+            for term, cleaned_term in zip(terms, cleaned_term)
+            if cleaned_term != term
         ]
     )
 
@@ -233,48 +230,20 @@ async def clean_up_junk():
 
     queries = [
         # removes everything after a newline (add to EntityCleaner?)
-        rf"update {WORKING_TABLE} set original_term= regexp_replace(original_term, '\.?\s*\n.*', '') where  original_term ~ '.*\n.*'",
+        rf"update {WORKING_TABLE} set term= regexp_replace(term, '\.?\s*\n.*', '') where  term ~ '.*\n.*'",
         # unwrap (done in EntityCleaner too)
         f"update {WORKING_TABLE} "
-        + r"set original_term=(REGEXP_REPLACE(original_term, '[)(]', '', 'g')) where original_term ~ '^[(][^)(]+[)]$'",
-        rf"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '^\"', '')) where original_term ~ '^\"'",
+        + r"set term=(REGEXP_REPLACE(term, '[)(]', '', 'g')) where term ~ '^[(][^)(]+[)]$'",
+        rf"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '^\"', '')) where term ~ '^\"'",
         # orphaned closing parens
-        f"update {WORKING_TABLE} set original_term=(REGEXP_REPLACE(original_term, '[)]', '')) "
-        + "where original_term ~ '.*[)]' and not original_term ~ '.*[(].*';",
+        f"update {WORKING_TABLE} set term=(REGEXP_REPLACE(term, '[)]', '')) "
+        + "where term ~ '.*[)]' and not term ~ '.*[(].*';",
         # leading/trailing whitespace (done in EntityCleaner too)
-        rf"update {WORKING_TABLE} set original_term=trim(BOTH from original_term) where trim(original_term) <> original_term",
+        rf"update {WORKING_TABLE} set term=trim(BOTH from term) where trim(term) <> term",
     ]
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
     for sql in queries:
         await client.execute_query(sql)
-
-
-async def fix_unmatched():
-    """
-    Example: 3 -d]pyrimidine derivatives -> Pyrrolo [2, 3 -d]pyrimidine derivatives
-    """
-
-    logger.info("Fixing unmatched parens")
-
-    # bis(thio-hydrazide amides"
-
-    def get_query(field, char_set):
-        sql = f"""
-            UPDATE {WORKING_TABLE} ab
-            set original_term=substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')'))
-            from applications a
-            WHERE ab.publication_number=a.publication_number
-            AND substring(a.{field}, CONCAT('(?i)([^ ]*{char_set[0]}.*', escape_regex_chars(original_term), ')')) is not null
-            AND original_term ~* '.*{char_set[1]}.*' AND not original_term ~* '.*{char_set[0]}.*'
-            AND {field} ~* '.*{char_set[0]}.*{char_set[1]}.*'
-        """
-        return sql
-
-    client = DatabaseClient()
-    for field in TEXT_FIELDS:
-        for char_set in [(r"\[", r"\]"), (r"\(", r"\)")]:
-            sql = get_query(field, char_set)
-            await client.execute_query(sql)
 
 
 async def remove_common_terms():
@@ -282,7 +251,7 @@ async def remove_common_terms():
     Remove common original terms
     """
     logger.info("Removing common terms")
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
     common_terms = [
         *DELETION_TERMS,
         *INTERVENTION_BASE_TERMS,
@@ -290,8 +259,8 @@ async def remove_common_terms():
     ]
 
     del_term_re = get_hacky_stem_re(common_terms)
-    result = await client.select(f"select distinct original_term from {WORKING_TABLE}")
-    terms = pl.Series([(r.get("original_term") or "").lower() for r in result])
+    result = await client.select(f"select distinct term from {WORKING_TABLE}")
+    terms = pl.Series([(r.get("term") or "").lower() for r in result])
 
     delete_terms = terms.filter(terms.str.contains(del_term_re)).to_list()
     logger.info("Found %s terms to delete from %s", len(delete_terms), del_term_re)
@@ -299,12 +268,12 @@ async def remove_common_terms():
 
     del_query = rf"""
         delete from {WORKING_TABLE}
-        where lower(original_term)=ANY(%s)
-        or original_term is null
-        or original_term = ''
-        or length(trim(original_term)) < 3
-        or (length(original_term) > 150 and original_term ~* '\y(?:and|or)\y') -- del if sentence
-        or (length(original_term) > 150 and original_term ~* '.*[.;] .*') -- del if sentence
+        where lower(term)=ANY(%s)
+        or term is null
+        or term = ''
+        or length(trim(term)) < 3
+        or (length(term) > 150 and term ~* '\y(?:and|or)\y') -- del if sentence
+        or (length(term) > 150 and term ~* '.*[.;] .*') -- del if sentence
     """
     await DatabaseClient().execute_query(del_query, (delete_terms,))
 
@@ -315,7 +284,7 @@ async def normalize_domains():
         - by rules
         - if the same term is used for multiple domains, pick the most common one
     """
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
 
     compounds_re = rf".*\y{get_or_re(COMPOUND_BASE_TERMS)}.*"
     biologics_re = rf".*\y{get_or_re(BIOLOGIC_BASE_TERMS)}.*"  # TODO: break into intervention vs general biological thing
@@ -328,20 +297,20 @@ async def normalize_domains():
     process_re = get_or_re(PROCESS_RES)
 
     queries = [
-        f"update {WORKING_TABLE} set domain='compounds' where domain<>'compounds' AND original_term ~* '{compounds_re}$'",
-        f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND original_term ~* '{biologics_re}$'",
-        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND original_term ~* '{mechanism_re}$'",
-        f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND original_term ~* '^{procedure_re}$'",
-        f"update {WORKING_TABLE} set domain='processes' where domain<>'processes' AND original_term ~* '^{process_re}$'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not original_term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
-        f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND original_term ~* '^{research_re}$'",
-        f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND original_term ~* '^{behavioral_re}$'",
-        f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND original_term ~* '^{DOSAGE_FORM_RE}$'",
-        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND original_term ~* '^{ROA_RE}$'",
-        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND original_term ~* '^{device_re}$'",
-        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND original_term ~* '^{diagnostic_re}$'",
-        f"update {WORKING_TABLE} set domain='diseases' where original_term ~* '.* (?:disease|disorder|syndrome|dysfunction|degenerat(?:ion|ive))s?$' and domain<>'diseases' and not original_term ~* '(?:compounds?|compositions?|reagent|anti|agent|immuni[zs]ing|drug for|imag|treat)'",
-        f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not original_term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
+        f"update {WORKING_TABLE} set domain='compounds' where domain<>'compounds' AND term ~* '{compounds_re}$'",
+        f"update {WORKING_TABLE} set domain='biologics' where domain<>'biologics' AND term ~* '{biologics_re}$'",
+        f"update {WORKING_TABLE} set domain='mechanisms' where domain<>'mechanisms' AND term ~* '{mechanism_re}$'",
+        f"update {WORKING_TABLE} set domain='procedures' where domain<>'procedures' AND term ~* '^{procedure_re}$'",
+        f"update {WORKING_TABLE} set domain='processes' where domain<>'processes' AND term ~* '^{process_re}$'",
+        f"update {WORKING_TABLE} set domain='diseases' where term ~* '(?:cancer.?|disease|disorder|syndrome|autism|condition|perforation|psoriasis|stiffness|malfunction|proliferation|carcinoma|obesity|hypertension|neurofibromatosis|tumou?r|glaucoma|virus|arthritis|seizure|bald|leukemia|huntington|osteo|melanoma|schizophrenia)s?$' and not term ~* '(?:treat(?:ing|ment|s)?|alleviat|anti|inhibit|modul|target|therapy|diagnos)' and domain<>'diseases'",
+        f"update {WORKING_TABLE} set domain='research_tools' where domain<>'research_tools' AND term ~* '^{research_re}$'",
+        f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND term ~* '^{behavioral_re}$'",
+        f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND term ~* '^{DOSAGE_FORM_RE}$'",
+        f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND term ~* '^{ROA_RE}$'",
+        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND term ~* '^{device_re}$'",
+        f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND term ~* '^{diagnostic_re}$'",
+        f"update {WORKING_TABLE} set domain='diseases' where term ~* '.* (?:disease|disorder|syndrome|dysfunction|degenerat(?:ion|ive))s?$' and domain<>'diseases' and not term ~* '(?:compounds?|compositions?|reagent|anti|agent|immuni[zs]ing|drug for|imag|treat)'",
+        f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",
     ]
 
     for sql in queries:
@@ -350,11 +319,11 @@ async def normalize_domains():
     normalize_sql = f"""
         WITH ranked_domains AS (
             SELECT
-                lower(original_term) as lot,
+                lower(term) as lot,
                 domain,
-                ROW_NUMBER() OVER (PARTITION BY lower(original_term) ORDER BY COUNT(*) DESC) as rank
+                ROW_NUMBER() OVER (PARTITION BY lower(term) ORDER BY COUNT(*) DESC) as rank
             FROM {WORKING_TABLE}
-            GROUP BY lower(original_term), domain
+            GROUP BY lower(term), domain
         )
         , max_domain AS (
             SELECT
@@ -366,7 +335,7 @@ async def normalize_domains():
         UPDATE {WORKING_TABLE} ut
         SET domain = md.new_domain
         FROM max_domain md
-        WHERE lower(ut.original_term) = md.lot and ut.domain <> md.new_domain;
+        WHERE lower(ut.term) = md.lot and ut.domain <> md.new_domain;
     """
 
     await client.execute_query(normalize_sql)
@@ -377,57 +346,57 @@ async def populate_working_biosym_annotations():
     - Copies biosym annotations from source table
     - Performs various cleanups and deletions
     """
-    client = DatabaseClient()
+    client = DatabaseClient("patents")
     logger.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    await client.create_from_select(
-        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-        WORKING_TABLE,
-    )
+    # await client.create_from_select(
+    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+    #     WORKING_TABLE,
+    # )
+    await client.execute_query(f"DROP TABLE IF EXISTS {WORKING_TABLE}")
+    await client.execute_query(f"CREATE TABLE {WORKING_TABLE} AS TABLE {SOURCE_TABLE}")
 
     # add indices after initial load
     await client.create_indices(
         [
             {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "original_term", "is_tgrm": True},
+            {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
             {"table": WORKING_TABLE, "column": "domain"},
         ]
     )
 
-    await fix_unmatched()
     await clean_up_junk()
 
     # round 1 (leaves in stuff used by for/of)
     await remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    await remove_substrings()  # less specific terms in set with more specific terms # keeping substrings until we have ancestor search
-    # after remove_substrings to avoid expanding substrings into something (potentially) mangled
+    # await remove_substrings()  # less specific terms in set with more specific terms
     await expand_annotations()
 
     # round 2 (removes trailing "compound" etc)
     await remove_trailing_leading(REMOVAL_WORDS_POST)
 
     # clean up junk again (e.g. leading ws)
-    # check: select * from biosym_annotations where original_term ~* '^[ ].*[ ]$';
+    # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
     await clean_up_junk()
 
     # big updates are much faster w/o this index, and it isn't needed from here on out anyway
     await client.execute_query(
         """
-        drop index trgm_index_biosym_annotations_original_term;
+        drop index trgm_index_biosym_annotations_term;
         drop index index_biosym_annotations_domain;
         """,
         ignore_error=True,
     )
 
     await remove_common_terms()  # remove one-off generic terms
-    await normalize_domains()
+    # await normalize_domains()
 
     await client.create_index(
         {
             "table": WORKING_TABLE,
-            "column": "original_term",
+            "column": "term",
             "is_lower": True,
         }
     )
@@ -437,14 +406,14 @@ if __name__ == "__main__":
     """
     Checks:
 
-    select original_term, count(*) from biosym_annotations group by original_term order by count(*) desc limit 2000;
-    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc limit 1000) s;
+    select term, count(*) from biosym_annotations group by term order by count(*) desc limit 2000;
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
     (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 777,772)
-    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' group by lower(original_term) order by count(*) desc offset 10000) s;
+    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
     (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138 -> 4,866,248)
-    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'' and array_length(regexp_split_to_array(original_term, ' '), 1) > 1;
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
     (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690 -> 5,445,856)
-    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and original_term<>'';
+    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
     (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403 -> 6,749,193)
     select domain, count(*) from biosym_annotations group by domain;
     attributes | 3721861
@@ -456,17 +425,17 @@ if __name__ == "__main__":
     compounds  | 2332852
     diseases   |  810242
     mechanisms | 3606099
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 100) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
     (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493 -> 21,758)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc limit 1000) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
     (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696 -> 55,104)
-    select sum(count) from (select original_term, count(*)  as count from biosym_annotations where original_term ilike '%inhibit%' group by original_term order by count(*) desc offset 1000) s;
+    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
     (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443 -> 119,331)
     """
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m scripts.patents.process_biosym_annotations
+            Usage: python3 -m scripts.stage1_patents.process_biosym_annotations
             Imports/cleans biosym_annotations (followed by a subsequent stage)
             """
         )

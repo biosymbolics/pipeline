@@ -274,4 +274,4 @@ if __name__ == "__main__":
         asyncio.run(export_bq_tables())
 
     if "-import" in sys.argv:
-        asyncio.run(import_into_psql(yesterday))
+        asyncio.run(import_into_psql("20240124"))
