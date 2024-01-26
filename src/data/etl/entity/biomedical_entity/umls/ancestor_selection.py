@@ -1,5 +1,6 @@
 from typing import Sequence
 import logging
+from networkx import DiGraph
 from prisma.enums import OntologyLevel
 
 from clients.low_level.prisma import prisma_client
@@ -10,20 +11,23 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
+from data.etl.entity.biomedical_entity.umls.types import get_next_ontology_level
 from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_DEPTH = 2
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     "isa",
     "inverse_isa",
     "mapped_from",
     "mapped_to",
 )
+INSTANCE_THRESHOLD = 25
+MAX_DEPTH = 2
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -32,7 +36,8 @@ class AncestorUmlsGraph(UmlsGraph):
     """
 
     def __init__(self, doc_type: DocType = DocType.patent):
-        super().__init__()
+        # initialize superclass with _add_level_info transform
+        super().__init__(transform_graph=AncestorUmlsGraph._add_level_info)
         self.doc_type = doc_type
 
     @staticmethod
@@ -155,6 +160,107 @@ class AncestorUmlsGraph(UmlsGraph):
         client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
         return [EdgeRecord(**r) for r in results]
+
+    @staticmethod
+    def _propagate_counts(G: DiGraph) -> DiGraph:
+        """
+        Propagate counts up the tree
+            - assumes leafs have counts
+            - assumes edges are directed from child to parent
+            - has parent counts = sum of children counts
+
+        See distribution of counts:
+        ```
+        import seaborn as sns
+        from data.etl.entity.biomedical_entity.umls.ancestor_selection import AncestorUmlsGraph
+        g = await AncestorUmlsGraph.create()
+        data = [v["count"] for v in g.nodes.values()]
+        sns.displot(data, kde=True, aspect=10/4)
+        ```
+        """
+        logger.info("Recursively propagating counts up the tree")
+
+        def _propagate(g: DiGraph, node: NodeRecord):
+            children = g.successors(node)
+
+            # for children with no counts, aka non-leaf nodes, recurse
+            # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
+            # so we recurse to set Parent1 and Parent2 counts based on their children
+            for child in children:
+                if g.nodes[child].get("count") is None:
+                    _propagate(g, child)
+
+            # set count to sum of all children counts
+            g.nodes[node]["count"] = sum(g.nodes[child]["count"] for child in children)
+
+        # take all nodes with no *incoming* edges, i.e. root nodes
+        for node in [n for n, d in G.in_degree() if d == 0]:
+            _propagate(G, node)
+
+        return G
+
+    @staticmethod
+    def _add_level_info(G: DiGraph) -> DiGraph:
+        """
+        Add ontology level to nodes
+
+        Calls _propagate_counts to set counts on all nodes first.
+        """
+        logger.info("Recursively propagating counts up the tree")
+
+        def set_level(_G: DiGraph, node, prev_node: dict | None = None):
+            parents = _G.predecessors(node)
+            max_parent_count = (
+                max([_G.nodes[p]["count"] for p in parents]) if parents else None
+            )
+            prev_count = prev_node["count"] if prev_node else 0
+            current_count = node["count"]
+
+            if prev_node is None:
+                """
+                leaf node. level it INSTANCE if sufficiently common.
+                """
+                if node["count"] < INSTANCE_THRESHOLD:
+                    level = OntologyLevel.SUBINSTANCE
+                else:
+                    level = OntologyLevel.INSTANCE
+            elif max_parent_count is None:
+                """
+                root node. level it one higher than prev node.
+                """
+                level = get_next_ontology_level(prev_node["level"])
+            else:
+                """
+                compare rate of change (in count / cumulative docs) between:
+                    - prev node and current node
+                    - current node and max parent node
+                """
+
+                dcdprev = current_count - prev_count
+                dparentdc = max_parent_count - current_count
+
+                # e.g. 100 150 175 -> 50, 25 -> 0.5 ... slow, plateauing
+                # so it isn't that meaningful to delineate this (vs the next) level
+                if dparentdc / dcdprev < 2:
+                    level = OntologyLevel.NA
+                # e.g. 5 50 1000 -> 45, 950 -> 21 ... fast growth
+                # so it's meaningful to delineate this level
+                else:
+                    level = get_next_ontology_level(prev_node["level"])
+
+            _G.nodes[node]["level"] = level
+
+            for parent in parents:
+                set_level(_G, parent, node)
+
+        # propogate counts up the tree
+        new_g = AncestorUmlsGraph._propagate_counts(G.copy().to_directed())
+
+        # take all nodes with no *outgoing* edges, i.e. leaf nodes
+        for node in [n for n, d in new_g.out_degree() if d == 0]:
+            set_level(new_g, node)
+
+        return new_g
 
     def get_ontology_level(self, cui: str) -> OntologyLevel:
         """

@@ -71,7 +71,7 @@ class UmlsAncestorTransformer:
         """
         self.umls_graph = await AncestorUmlsGraph.create()
 
-        # generate all the level info first
+        # generate level info first
         self.level_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
@@ -94,10 +94,10 @@ class UmlsAncestorTransformer:
         - otherwise prefer just based on level (e.g. L1_CATEGORY, L2_CATEGORY, INSTANCE)
 
         Args:
-            record (Umls): UMLS record
+            record (UmlsInfo): UMLS info
             ancestors (tuple[UmlsInfo]): ordered list of ancestors
 
-        Returns (str): ancestor id, or "" if none found
+        Returns (str): ancestor id
 
         TODO:
         - prefer family rollups - e.g. serotonin for 5-HTXY receptors
@@ -108,7 +108,10 @@ class UmlsAncestorTransformer:
             such as "least common subsumer" and information-based mutual information measures
         """
 
-        def choose_by_type(_ancestors: tuple[UmlsInfo, ...]) -> str | None:
+        def choose_by_type(
+            record: UmlsInfo,
+            _ancestors: tuple[UmlsInfo, ...],
+        ) -> str | None:
             """
             based on record types, find desireable ancestor type(s)
             """
@@ -126,9 +129,9 @@ class UmlsAncestorTransformer:
             if len(good_ancestors) == 0:
                 return None
 
-            return choose_by_level(tuple(good_ancestors))
+            return choose_by_level(record, tuple(good_ancestors))
 
-        def choose_by_level(_ancestors: tuple[UmlsInfo, ...]) -> str:
+        def choose_by_level(record: UmlsInfo, _ancestors: tuple[UmlsInfo, ...]) -> str:
             """
             based on record level, find the best ancestor
             """
@@ -141,15 +144,15 @@ class UmlsAncestorTransformer:
                 if compare_ontology_level(a.level, record.level) > 0
             ]
 
-            # if no ok ancestors, return ""
+            # if no ok ancestors, return self
             if len(ok_ancestors) == 0:
-                return ""
+                return record.id
 
             # otherwise, use the first matching ancestor
             return ok_ancestors[0].id
 
-        # prefer type-preferred ancestor, otherwise just go by level
-        return choose_by_type(ancestors) or choose_by_level(ancestors)
+        # prefer type ancestor, otherwise just go by level
+        return choose_by_type(record, ancestors) or choose_by_level(record, ancestors)
 
     def transform(self, partial_record: Umls) -> UmlsUpdateInput:
         """
@@ -165,10 +168,8 @@ class UmlsAncestorTransformer:
             ]
         )
 
-        # add level info so it can be used for update and choose_best_ancestor
-        record = UmlsInfo.from_umls(
-            partial_record, level=self.level_lookup[partial_record.id].level
-        )
+        # get record with updated level info
+        record = self.level_lookup[partial_record.id]
 
         return UmlsUpdateInput(
             level=record.level,
