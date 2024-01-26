@@ -14,7 +14,7 @@ generator client {
 
 model BiomedicalEntity {
     id            Int                      @id @default(autoincrement())
-    canonical_id  String?                  @unique
+    canonical_id  String                   @unique
     children      BiomedicalEntity[]       @relation("entity_to_parent")
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")

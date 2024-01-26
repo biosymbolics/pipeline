@@ -71,12 +71,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-    ) -> list[BiomedicalEntityUpdateInput]:
+    ) -> list[BiomedicalEntityCreateInput]:
         """
         Create record dicts for entity insert
         """
 
-        def create_input(orig_name: str) -> BiomedicalEntityUpdateInput:
+        def create_input(orig_name: str) -> BiomedicalEntityCreateInput:
             """
             Form create input for a given term
             """
@@ -92,19 +92,20 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             }
 
             if canonical is not None:
-                canonical_dependent_fields = BiomedicalEntityUpdateInput(
-                    canonical_id=canonical.id,
+                canonical_dependent_fields = BiomedicalEntityCreateInput(
+                    canonical_id=canonical.id or canonical.name.lower(),
                     entity_type=source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type,
                     is_priority=source_rec.get("is_priority") or False,
                     name=canonical.name.lower(),
                     sources=[Source.UMLS],
-                    umls_entities={
-                        "connect": [{"id": id} for id in canonical.ids or []]
-                    },
+                    # An operation failed because it depends on one or more records that were required but not found.
+                    # umls_entities={
+                    #     "connect": [{"id": id} for id in canonical.ids or []]
+                    # },
                 )
             else:
-                canonical_dependent_fields = BiomedicalEntityUpdateInput(
-                    canonical_id=None,
+                canonical_dependent_fields = BiomedicalEntityCreateInput(
+                    canonical_id=orig_name,
                     entity_type=(
                         source_rec.get(DEFAULT_TYPE_FIELD)
                         or BiomedicalEntityType.UNKNOWN
@@ -114,7 +115,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     sources=[self.non_canonical_source],
                 )
 
-            return BiomedicalEntityUpdateInput(
+            return BiomedicalEntityCreateInput(
                 **canonical_dependent_fields,
                 **relation_fields,
             )
@@ -124,7 +125,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         grouped_recs = group_by(flat_recs, "canonical_id")
         upsert_records = flatten(
             [
-                [BiomedicalEntityUpdateInput(**merge_nested(*groups))]
+                [BiomedicalEntityCreateInput(**merge_nested(*groups))]  # type: ignore
                 if canonical_id is None
                 else groups
                 for canonical_id, groups in grouped_recs.items()
@@ -148,16 +149,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             source_map (dict): map of "term" to source record for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
         canonical_map = self._generate_lookup_map(terms_to_canonicalize or terms)
+        print(canonical_map)
         entity_recs = self._generate_upsert_records(terms, source_map, canonical_map)
 
         await batch_update(
             entity_recs,
             update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
                 data=BiomedicalEntityUpsertInput(
-                    create=BiomedicalEntityCreateInput(**r),  # type: ignore
-                    update=BiomedicalEntityUpdateInput(**r),
+                    create=r,
+                    update=BiomedicalEntityUpdateInput(**r),  # type: ignore
                 ),
-                where={"name": r["name"]},  # type: ignore
+                where={"canonical_id": r["canonical_id"]},
             ),
             batch_size=1000,
         )
@@ -231,7 +233,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             client = await prisma_client(300)
             results = await client.query_raw(query)
             records = [
-                BiomedicalEntityUpdateInput(
+                BiomedicalEntityCreateInput(
                     canonical_id=r["canonical_id"],
                     # # a problem in a txn?
                     children={"connect": [{"id": r["child_id"]}]},
@@ -247,10 +249,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 records,
                 update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
                     data={
-                        "create": BiomedicalEntityCreateInput(**r.__dict__),
-                        "update": r,
+                        "create": r,
+                        "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
                     },
-                    where={"canonical_id": r["canonical_id"]},  # type: ignore
+                    where={"canonical_id": r["canonical_id"]},
                 ),
                 batch_size=1000,
             )
