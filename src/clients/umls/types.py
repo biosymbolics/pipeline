@@ -4,8 +4,8 @@ from prisma.enums import OntologyLevel
 
 class NodeRecord(BaseModel):
     id: str
-    count: int
-    level: OntologyLevel
+    count: int | None = None
+    level: OntologyLevel = OntologyLevel.UNKNOWN
 
 
 class EdgeRecord(BaseModel):

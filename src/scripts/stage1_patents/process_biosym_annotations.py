@@ -275,7 +275,7 @@ async def remove_common_terms():
         or (length(term) > 150 and term ~* '\y(?:and|or)\y') -- del if sentence
         or (length(term) > 150 and term ~* '.*[.;] .*') -- del if sentence
     """
-    await DatabaseClient().execute_query(del_query, (delete_terms,))
+    await DatabaseClient("patents").execute_query(del_query, (delete_terms,))
 
 
 async def normalize_domains():
@@ -354,41 +354,43 @@ async def populate_working_biosym_annotations():
     #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
     #     WORKING_TABLE,
     # )
-    await client.execute_query(f"DROP TABLE IF EXISTS {WORKING_TABLE}")
-    await client.execute_query(f"CREATE TABLE {WORKING_TABLE} AS TABLE {SOURCE_TABLE}")
+    # await client.execute_query(f"DROP TABLE IF EXISTS {WORKING_TABLE}")
+    # await client.execute_query(f"CREATE TABLE {WORKING_TABLE} AS TABLE {SOURCE_TABLE}")
 
-    # add indices after initial load
-    await client.create_indices(
-        [
-            {"table": WORKING_TABLE, "column": "publication_number"},
-            {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
-            {"table": WORKING_TABLE, "column": "domain"},
-        ]
-    )
+    # # add indices after initial load
+    # await client.create_indices(
+    #     [
+    #         {"table": WORKING_TABLE, "column": "publication_number"},
+    #         {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
+    #         {"table": WORKING_TABLE, "column": "domain"},
+    #     ]
+    # )
 
-    await clean_up_junk()
+    # await clean_up_junk()
 
-    # round 1 (leaves in stuff used by for/of)
-    await remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # # round 1 (leaves in stuff used by for/of)
+    # await remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    # await remove_substrings()  # less specific terms in set with more specific terms
-    await expand_annotations()
+    # # less specific terms in set with more specific terms
+    # # await remove_substrings()
 
-    # round 2 (removes trailing "compound" etc)
-    await remove_trailing_leading(REMOVAL_WORDS_POST)
+    # await expand_annotations()
 
-    # clean up junk again (e.g. leading ws)
-    # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
-    await clean_up_junk()
+    # # round 2 (removes trailing "compound" etc)
+    # await remove_trailing_leading(REMOVAL_WORDS_POST)
 
-    # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    await client.execute_query(
-        """
-        drop index trgm_index_biosym_annotations_term;
-        drop index index_biosym_annotations_domain;
-        """,
-        ignore_error=True,
-    )
+    # # clean up junk again (e.g. leading ws)
+    # # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
+    # await clean_up_junk()
+
+    # # big updates are much faster w/o this index, and it isn't needed from here on out anyway
+    # await client.execute_query(
+    #     """
+    #     drop index trgm_index_biosym_annotations_term;
+    #     drop index index_biosym_annotations_domain;
+    #     """,
+    #     ignore_error=True,
+    # )
 
     await remove_common_terms()  # remove one-off generic terms
     # await normalize_domains()

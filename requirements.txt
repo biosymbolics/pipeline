@@ -16,6 +16,7 @@ psycopg[binary,pool]
 pyarrow
 pydash
 pydantic
+pytest-asyncio
 python-dotenv
 regex
 requests
