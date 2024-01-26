@@ -5,7 +5,7 @@ Utils for lists/arrays
 
 from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar, cast
 import numpy as np
-from pydash import compact, uniq
+from pydash import compact, merge_with, uniq
 import polars as pl
 
 T = TypeVar("T")
@@ -119,3 +119,23 @@ def uniq_compact(array: Iterable[T | None]) -> list[T]:
     Compact and deduplicate an array
     """
     return uniq(compact(array))
+
+
+MT = TypeVar("MT")
+
+
+def merge_nested(a: MT, *sources: MT) -> Any:
+    """
+    Merge two nested structures (dicts, lists, etc.)
+    Lists are concatenated, dicts are merged
+    """
+
+    def handle_merge(a: MT, *sources: MT):
+        if isinstance(a, dict) and all([isinstance(s, dict) for s in sources]):
+            return merge_with(a, *sources, handle_merge)
+        elif isinstance(a, list) and all([isinstance(s, list) for s in sources]):
+            return a + sum([s for s in sources if isinstance(s, list)], [])
+        else:
+            return a
+
+    return merge_with(a, *sources, handle_merge)
