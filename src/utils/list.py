@@ -124,17 +124,17 @@ def uniq_compact(array: Iterable[T | None]) -> list[T]:
 MT = TypeVar("MT")
 
 
-def merge_nested(a: MT, *sources: MT) -> Any:
+def merge_nested(a: MT, *sources: MT) -> MT:
     """
     Merge two nested structures (dicts, lists, etc.)
     Lists are concatenated, dicts are merged
     """
 
-    def handle_merge(a: MT, *sources: MT):
-        if isinstance(a, dict) and all([isinstance(s, dict) for s in sources]):
-            return merge_with(a, *sources, handle_merge)
-        elif isinstance(a, list) and all([isinstance(s, list) for s in sources]):
-            return a + sum([s for s in sources if isinstance(s, list)], [])
+    def handle_merge(a: MT, b: MT):
+        if isinstance(a, dict) and isinstance(b, dict):
+            return merge_with(a, b, handle_merge)
+        elif isinstance(a, list) and isinstance(b, list):
+            return a + b
         else:
             return a
 

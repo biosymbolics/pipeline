@@ -14,6 +14,10 @@ class TestUmlsUtils(unittest.TestCase):
     def setUp(self):
         pass
 
+    def test_tuis_to_entity_type(self):
+        # see test_CanonicalEntity_type
+        pass
+
     def test_clean_umls_name(self):
         test_cases = [
             {
