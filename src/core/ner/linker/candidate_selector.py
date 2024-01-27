@@ -117,6 +117,10 @@ class CandidateSelector(AbstractCandidateSelector):
         return top_canonical, score
 
     @overrides(AbstractCandidateSelector)
+    def select_candidate_from_entity(self, entity: DocEntity) -> EntityWithScore | None:
+        return self.select_candidate(entity.term)
+
+    @overrides(AbstractCandidateSelector)
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts

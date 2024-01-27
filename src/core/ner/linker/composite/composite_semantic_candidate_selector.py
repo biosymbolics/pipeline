@@ -6,7 +6,7 @@ import torch
 
 from core.ner.linker.semantic_candidate_selector import SemanticCandidateSelector
 from core.ner.linker.types import EntityWithScoreVector
-from core.ner.linker.utils import join_punctuated_tokens
+from core.ner.linker.utils import combine_vectors, join_punctuated_tokens
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 
@@ -16,6 +16,8 @@ from .utils import form_composite_entity, is_composite_eligible
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+EMPTY = (None, 0.0, None)
 
 
 class CompositeSemanticCandidateSelector(
@@ -104,17 +106,24 @@ class CompositeSemanticCandidateSelector(
         """
         Generate a composite candidate from a doc entity
         """
-        if not entity.spacy_doc:
-            raise ValueError("Entity must have a vector")
 
-        # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
-        tokens = join_punctuated_tokens(entity.spacy_doc)
+        if not entity.spacy_doc:
+            doc = self.nlp(entity.normalized_term)
+            tokens = join_punctuated_tokens(doc)
+            vectors = [
+                combine_vectors(
+                    torch.tensor(t.vector), torch.tensor(entity.vector), 0.9
+                )
+                for t in tokens
+            ]
+        else:
+            # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
+            tokens = join_punctuated_tokens(entity.spacy_doc)
+            vectors = [torch.tensor(t.vector) for t in tokens]
 
         ngram_entity_map = {
-            t.text: self.select_candidate(
-                t.text, torch.tensor(t.vector), torch.tensor(entity.spacy_doc.vector)
-            )
-            for t in tokens
+            t.text: self.select_candidate(t.text, vector)
+            for t, vector in zip(tokens, vectors)
             if len(t) > 1  # avoid weird matches for single characters/nums
         }
         return self._generate_composite_from_ngrams(
@@ -132,37 +141,23 @@ class CompositeSemanticCandidateSelector(
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        if not entity.spacy_doc:
-            raise ValueError("Entity must have a vector")
-
         # get initial non-composite match
-        match, match_score, _ = super().select_candidate_from_entity(entity) or (
-            None,
-            0.0,
-            None,
-        )
+        match, match_score, _ = super().select_candidate_from_entity(entity) or EMPTY
 
-        # if score is sufficient, or if it's not a composite candidate, return
+        # if high enough score, or not a composite candidate, return
         if match_score >= self.min_similarity or not is_composite_eligible(entity):
             return match
 
-        # otherwise, try to generate a composite candidate
-        res = self.generate_candidate(entity)
-        comp_match, comp_score, _ = res or (None, 0.0, None)
-
-        # loss = cosine_dist(entity.vector, match_vector)
+        # else, generate a composite candidate
+        comp_match, comp_score, _ = self.generate_candidate(entity) or EMPTY
 
         if comp_score > match_score:
-            logger.info(
-                "Returning composite match with higher score (%s vs %s)",
-                comp_score,
-                match_score,
+            logger.debug(
+                "Composite has higher score (%s vs %s)", comp_score, match_score
             )
             return comp_match
 
-        logger.info(
-            "Returning non-composite match with higher score (%s vs %s)",
-            match_score,
-            comp_score,
+        logger.debug(
+            "Non-composite has higher score (%s vs %s)", match_score, comp_score
         )
         return match

@@ -169,8 +169,8 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
-        # get initial non-composite match
-        res = self.select_candidate(entity.normalized_term)
+        # attempt direct/non-composite match
+        res = self.select_candidate_from_entity(entity)
 
         if res is None:
             match, match_score = None, 0.0
@@ -183,24 +183,21 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         ):
             return match
 
+        # generate composite candidate
         res = self.generate_candidate(entity)
         comp_match, comp_score = res or (None, 0.0)
 
+        # if composite and direct matches are 0, no match.
         if comp_score == 0.0 and match_score == 0.0:
-            # no match, composite or direct
             return None
 
         if comp_score > match_score:
             logger.debug(
-                "Returning composite match with higher score (%s vs %s)",
-                comp_score,
-                match_score,
+                "Composite has higher score (%s vs %s)", comp_score, match_score
             )
             return comp_match
 
         logger.debug(
-            "Returning non-composite match with higher score (%s vs %s)",
-            match_score,
-            comp_score,
+            "Non-composite has higher score (%s vs %s)", match_score, comp_score
         )
         return match

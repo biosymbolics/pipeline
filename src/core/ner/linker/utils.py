@@ -89,6 +89,18 @@ def l1_regularize(vector: torch.Tensor) -> torch.Tensor:
     return F.normalize(vector, p=1, dim=0)
 
 
+def combine_vectors(
+    a: torch.Tensor, b: torch.Tensor, a_weight: float = 0.8
+) -> torch.Tensor:
+    """
+    Weighted combination of two vectors, regularized
+    """
+    b_weight = 1 - a_weight
+    vector = (1 - a_weight) * a + b_weight * b
+    norm_vector = l1_regularize(vector)
+    return norm_vector
+
+
 def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
     """
     Torch implementation of TruncatedSVD

@@ -83,6 +83,21 @@ class DocEntity(Dataclass):
             canonical_entity=canonical_entity,
         )
 
+    def copy(
+        self,
+        **kwargs,
+    ):
+        return DocEntity(
+            term=kwargs.get("term", self.term),
+            start_char=kwargs.get("start_char", self.start_char),
+            end_char=kwargs.get("end_char", self.end_char),
+            normalized_term=kwargs.get("normalized_term", self.normalized_term),
+            type=kwargs.get("type", self.type),
+            vector=kwargs.get("vector", self.vector),
+            spacy_doc=kwargs.get("spacy_doc", self.spacy_doc),
+            canonical_entity=kwargs.get("canonical_entity", self.canonical_entity),
+        )
+
     @property
     def id(self) -> Optional[str]:
         if self.canonical_entity is None:

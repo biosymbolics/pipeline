@@ -1,10 +1,7 @@
 import time
 from typing import Sequence
 from annoy import AnnoyIndex
-from scispacy.candidate_generation import (
-    CandidateGenerator,
-    MentionCandidate,
-)
+from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 import torch
 import logging
 
@@ -15,16 +12,15 @@ from utils.classes import overrides
 
 from .types import AbstractCandidateSelector, EntityWithScoreVector
 from .utils import (
-    score_semantic_candidate as score_candidate,
-    l1_regularize,
     apply_umls_word_overrides,
     candidate_to_canonical,
+    l1_regularize,
+    score_semantic_candidate,
 )
 
 DEFAULT_K = 20
 MIN_SIMILARITY = 1.1
 UMLS_KB = None
-DOC_VECTOR_WEIGHT = 0.2
 WORD_EMBEDDING_LENGTH = 768
 
 
@@ -58,9 +54,9 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         self.vector_length = vector_length
         self.nlp = get_transformer_nlp()
 
-    def batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
+    def _batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
         """
-        Vectorize a text
+        Vectorize texts
         """
         docs = list(self.nlp.pipe(texts))
         bert_vecs = [
@@ -87,7 +83,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         Create an Annoy index for a list of candidates
         """
         start = time.monotonic()
-        # other metrics don't work well
+        # metrics other than 'angular' work horribly
         umls_ann = AnnoyIndex(self.vector_length, metric="angular")
 
         canonical_names = [
@@ -101,7 +97,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         # because otherwise terms are totally without disambiguating context
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        vectors = self.batch_vectorize(canonical_names + types)
+        vectors = self._batch_vectorize(canonical_names + types)
         cn_vectors = vectors[0 : len(canonical_names)]
         type_vectors = vectors[len(canonical_names) :]
 
@@ -121,7 +117,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         syntactic_similarity: float,
         semantic_distance: float,
     ) -> float:
-        return score_candidate(
+        return score_semantic_candidate(
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
@@ -133,7 +129,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         )
 
     def _get_best_canonical(
-        self, vector: torch.Tensor, candidates: Sequence[MentionCandidate]
+        self, mention_vector: torch.Tensor, candidates: Sequence[MentionCandidate]
     ) -> EntityWithScoreVector | None:
         """
         Get best candidate by semantic similarity
@@ -142,18 +138,19 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             logger.warning("get_best_canoical called with no candidates")
             return None
 
-        if len(vector) == 0:
+        if len(mention_vector) == 0:
             logger.warning(
                 "No vector for %s, probably OOD (%s)",
                 candidates[0].aliases[0],
-                vector,
+                mention_vector,
             )
             return None
 
+        norm_vector = l1_regularize(mention_vector)
         umls_ann = self.create_ann_index(candidates)
 
         ids, distances = umls_ann.get_nns_by_vector(
-            vector.tolist(), 10, search_k=-1, include_distances=True
+            norm_vector.tolist(), 10, search_k=-1, include_distances=True
         )
 
         if len(ids) == 0:
@@ -166,7 +163,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
                     candidates[id],
                     self._score_candidate(
                         candidates[id].concept_id,
-                        vector,
+                        norm_vector,
                         candidate_vector=torch.tensor(umls_ann.get_item_vector(id)),
                         syntactic_similarity=candidates[id].similarities[0],
                         semantic_distance=distances[i],
@@ -190,53 +187,33 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             torch.tensor(top_vector),
         )
 
-    def normalize_mention_vector(
-        self, mention_vector: torch.Tensor, doc_vector: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        Standard normalization of mention vector
-        - weighted combination of entity and doc vector
-        - l1 normalize
-        """
-        vector = (
-            1 - DOC_VECTOR_WEIGHT
-        ) * mention_vector + DOC_VECTOR_WEIGHT * doc_vector
-
-        norm_vector = l1_regularize(vector)
-        return norm_vector
-
     @overrides(AbstractCandidateSelector)
     def select_candidate(
         self,
         term: str,
         mention_vector: torch.Tensor,
-        doc_vector: torch.Tensor,
     ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        norm_vector = self.normalize_mention_vector(mention_vector, doc_vector)
         candidates = self._get_candidates(term)
-        return self._get_best_canonical(norm_vector, candidates)
+        return self._get_best_canonical(mention_vector, candidates)
 
     def select_candidate_from_entity(
         self, entity: DocEntity
     ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
+
+        Args:
+            entity (DocEntity): entity to link
         """
-        if not entity.spacy_doc:
-            raise ValueError("Spacy doc required")
+        if not entity.vector:
+            raise ValueError("Vector required")
 
-        # if entity.vector == entity.spacy_doc.vector:
-        #     logger.warning("Vector and spacy doc are the same")
-
-        norm_vector = self.normalize_mention_vector(
-            torch.tensor(entity.vector), torch.tensor(entity.spacy_doc.vector)
+        return self.select_candidate(
+            entity.normalized_term, torch.tensor(entity.vector)
         )
-        candidates = self._get_candidates(entity.normalized_term)
-
-        return self._get_best_canonical(norm_vector, candidates)
 
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
