@@ -32,6 +32,13 @@ class AbstractCandidateSelector(object):
         pass
 
     @abstractmethod
+    def select_candidate_from_entity(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
+        """
+        Generate & select candidates for a mention text, returning best candidate & score
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def select_candidate(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
         """
         Generate & select candidates for a mention text, returning best candidate & score
