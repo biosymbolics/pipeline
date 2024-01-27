@@ -51,12 +51,14 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         self.relation_id_field_map = relation_id_field_map
         self.non_canonical_source = non_canonical_source
 
-    def _generate_lookup_map(self, terms: Sequence[str]) -> dict[str, CanonicalEntity]:
+    def _generate_lookup_map(
+        self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
+    ) -> dict[str, CanonicalEntity]:
         """
         Generate canonical map for source terms
         """
 
-        lookup_docs = self.normalizer.normalize_strings(terms)
+        lookup_docs = self.normalizer.normalize_strings(terms, vectors)
 
         # map for quick lookup of canonical entities
         lookup_map = {
@@ -138,6 +140,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         self,
         terms: Sequence[str],
         terms_to_canonicalize: Sequence[str],
+        vectors_to_canonicalize: Sequence[Sequence[float]] | None,
         source_map: dict[str, dict],
     ):
         """
@@ -148,7 +151,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             terms_to_canonicalize (Sequence[str]): terms to canonicalize, if different than terms
             source_map (dict): map of "term" to source record for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
-        canonical_map = self._generate_lookup_map(terms_to_canonicalize or terms)
+        canonical_map = self._generate_lookup_map(
+            terms_to_canonicalize or terms, vectors_to_canonicalize
+        )
         entity_recs = self._generate_upsert_records(terms, source_map, canonical_map)
 
         await batch_update(

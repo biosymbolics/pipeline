@@ -39,7 +39,7 @@ class AbstractCandidateSelector(object):
         raise NotImplementedError
 
     @abstractmethod
-    def select_candidate(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
+    def select_candidate(self, text: str, vector: torch.Tensor | None = None) -> ST | None:  # type: ignore # TODO
         """
         Generate & select candidates for a mention text, returning best candidate & score
         """

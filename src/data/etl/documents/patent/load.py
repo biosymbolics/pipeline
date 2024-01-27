@@ -5,7 +5,6 @@ import sys
 import asyncio
 import logging
 from typing import Sequence
-from prisma import Prisma
 from prisma.enums import BiomedicalEntityType
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput
@@ -130,7 +129,7 @@ class PatentLoader(BaseDocumentEtl):
             domains: domains to copy
         """
         biosym_sql = f"""
-            SELECT distinct lower(term) as term
+            SELECT distinct lower(term) as term, vector
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
         """
@@ -139,7 +138,7 @@ class PatentLoader(BaseDocumentEtl):
             # add in gpr annotations (that is, annotations from google; we only kept diseases)
             sql = f"""
                 SELECT distinct term from (
-                    SELECT distinct lower(preferred_name) as term
+                    SELECT distinct lower(preferred_name) as term, null as vector
                     FROM {GPR_ANNOTATIONS_TABLE}
                     WHERE domain='diseases'
 
@@ -155,27 +154,37 @@ class PatentLoader(BaseDocumentEtl):
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
                     "type": BiomedicalEntityType.DISEASE,
+                    # "vector": rec["vector"],
                 }
                 for rec in recs
             },
+            get_terms_to_canonicalize=lambda sm: (
+                list(sm.keys()),
+                None,  # [sm[t]["vector"] for t in sm],
+            ),
             sql=PatentLoader.get_entity_sql(["diseases"]),
         )
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
                     "default_type": BiomedicalEntityType.OTHER,
+                    # "vector": rec["vector"],
                 }
                 for rec in recs
             },
+            get_terms_to_canonicalize=lambda sm: (
+                list(sm.keys()),
+                None,  # [sm[t]["vector"] for t in sm],
+            ),
             sql=PatentLoader.get_entity_sql(INTERVENTION_DOMAINS),
         )
         return [indication_spec, intervention_spec]

@@ -199,6 +199,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         candidates = self._get_candidates(term)
         return self._get_best_canonical(mention_vector, candidates)
 
+    @overrides(AbstractCandidateSelector)
     def select_candidate_from_entity(
         self, entity: DocEntity
     ) -> EntityWithScoreVector | None:

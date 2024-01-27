@@ -94,9 +94,9 @@ class BiomedicalEntityLoadSpec(Dataclass):
     get_source_map: Callable[[Sequence[dict]], dict] = default_get_source_map
     additional_cleaners: Sequence[CleanFunction] = field(default_factory=list)
     get_terms: Callable[[dict], Sequence[str]] = lambda sm: list(sm.keys())
-    get_terms_to_canonicalize: Callable[[dict], Sequence[str]] = lambda sm: list(
-        sm.keys()
-    )
+    get_terms_to_canonicalize: Callable[
+        [dict], tuple[Sequence[str], Sequence[Sequence[float]] | None]
+    ] = lambda sm: (list(sm.keys()), None)
     non_canonical_source: Source = Source.BIOSYM
     # operates on source_map
     relation_id_field_map: RelationIdFieldMap = RelationIdFieldMap(

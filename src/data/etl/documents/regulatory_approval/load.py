@@ -151,9 +151,10 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     source_field="synonyms", dest_field="term", connect_type="create"
                 ),
             ),
-            get_terms_to_canonicalize=lambda sm: [
-                k for k, v in sm.items() if v != BiomedicalEntityType.COMBINATION
-            ],
+            get_terms_to_canonicalize=lambda sm: (
+                [k for k, v in sm.items() if v != BiomedicalEntityType.COMBINATION],
+                None,
+            ),
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
                 [
