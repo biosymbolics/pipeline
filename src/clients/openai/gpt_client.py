@@ -131,18 +131,21 @@ class GptApiClient:
         )
 
         response_schemas = [
-            ResponseSchema(name="stage", description="e.g. Phase 1"),
+            ResponseSchema(name="stage", description="e.g. Phase 1", type="string"),
             ResponseSchema(
                 name="offset",
                 description="equal to cumulative median duration of previous stages, 0 for the first stage.",
+                type="number",
             ),
             ResponseSchema(
                 name="median_duration",
                 description="median duration of this stage in years (e.g. 2.5)",
+                type="number",
             ),
             ResponseSchema(
                 name="iqr",
                 description="interquartile range of this stage's duration in years (e.g. 0.8)",
+                type="number",
             ),
         ]
 
