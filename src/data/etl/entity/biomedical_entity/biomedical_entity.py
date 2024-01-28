@@ -2,6 +2,7 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
+import uuid
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
@@ -20,6 +21,7 @@ from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
 from typings.documents.common import ENTITY_MAP_TABLES
+from utils.file import save_json_as_file
 from utils.list import merge_nested
 
 from .umls.load import UmlsLoader
@@ -154,10 +156,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         canonical_map = self._generate_lookup_map(
             terms_to_canonicalize or terms, vectors_to_canonicalize
         )
-        entity_recs = self._generate_upsert_records(terms, source_map, canonical_map)
+        upsert_recs = self._generate_upsert_records(terms, source_map, canonical_map)
+
+        # save as file in case something goes wrong
+        save_json_as_file(
+            upsert_recs, f"biomedical_upsert_recs-{str(uuid.uuid4())}.json"
+        )
 
         await batch_update(
-            entity_recs,
+            upsert_recs,
             update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
                 data=BiomedicalEntityUpsertInput(
                     create=r,

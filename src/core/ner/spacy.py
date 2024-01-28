@@ -76,7 +76,7 @@ class Spacy:
         # Delegate attribute access to the underlying Language instance
         return getattr(self._nlp, name)
 
-    def __call__(self, text: str) -> Any:
+    def __call__(self, text: str) -> Doc:
         return self._nlp(text)
 
     @classmethod

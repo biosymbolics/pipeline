@@ -129,7 +129,7 @@ class PatentLoader(BaseDocumentEtl):
             domains: domains to copy
         """
         biosym_sql = f"""
-            SELECT distinct lower(term) as term, vector
+            SELECT distinct lower(term) as term --, vector
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
         """
@@ -138,7 +138,7 @@ class PatentLoader(BaseDocumentEtl):
             # add in gpr annotations (that is, annotations from google; we only kept diseases)
             sql = f"""
                 SELECT distinct term from (
-                    SELECT distinct lower(preferred_name) as term, null as vector
+                    SELECT distinct lower(preferred_name) as term --, null as vector
                     FROM {GPR_ANNOTATIONS_TABLE}
                     WHERE domain='diseases'
 

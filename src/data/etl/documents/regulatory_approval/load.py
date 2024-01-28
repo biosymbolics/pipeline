@@ -148,7 +148,10 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     connect_type="connect",
                 ),
                 synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", connect_type="create"
+                    # todo: connectOrCreate when supported
+                    source_field="synonyms",
+                    dest_field="term",
+                    connect_type="create",
                 ),
             ),
             get_terms_to_canonicalize=lambda sm: (

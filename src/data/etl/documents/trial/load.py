@@ -205,10 +205,10 @@ class TrialLoader(BaseDocumentEtl):
             sql=get_sql(
                 "browse_interventions",
                 "interventions",
-                [f"AND NOT interventions.name ~* '{get_or_re(CONTROL_TERMS)}'"],
+                [f"NOT name ~* '{get_or_re(CONTROL_TERMS)}'"],
             ),
         )
-        return [indication_spec, intervention_spec]
+        return [intervention_spec]  # indication_spec
 
     @staticmethod
     def transform(record: dict) -> TrialCreateWithoutRelationsInput:

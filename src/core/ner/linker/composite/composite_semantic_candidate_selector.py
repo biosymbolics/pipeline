@@ -107,19 +107,34 @@ class CompositeSemanticCandidateSelector(
         Generate a composite candidate from a doc entity
         """
 
-        if not entity.spacy_doc:
+        def get_tokens_and_vectors(
+            entity: DocEntity,
+        ) -> tuple[list[Token | Span], list[torch.Tensor]]:
+            # if we have a spacy doc, generate tokens & vectors from that
+            if entity.spacy_doc is not None:
+                tokens = join_punctuated_tokens(entity.spacy_doc)
+                vectors = [torch.tensor(t.vector) for t in tokens]
+                return tokens, vectors
+
+            # otherwise, generate doc from normalized term
             doc = self.nlp(entity.normalized_term)
             tokens = join_punctuated_tokens(doc)
-            vectors = [
-                combine_vectors(
-                    torch.tensor(t.vector), torch.tensor(entity.vector), 0.9
-                )
-                for t in tokens
-            ]
-        else:
-            # join tokens presumed to be joined by punctuation, e.g. ['non', '-', 'competitive'] -> "non-competitive"
-            tokens = join_punctuated_tokens(entity.spacy_doc)
-            vectors = [torch.tensor(t.vector) for t in tokens]
+
+            # if the entity has a vector, combine with newly created token vectors
+            # to add context for semantic similarity comparison
+            if entity.vector is not None:
+                vectors = [
+                    combine_vectors(
+                        torch.tensor(t.vector), torch.tensor(entity.vector), 0.9
+                    )
+                    for t in tokens
+                ]
+            else:
+                vectors = [torch.tensor(t.vector) for t in tokens]
+
+            return tokens, vectors
+
+        tokens, vectors = get_tokens_and_vectors(entity)
 
         ngram_entity_map = {
             t.text: self.select_candidate(t.text, vector)

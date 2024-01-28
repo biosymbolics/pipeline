@@ -33,7 +33,7 @@ class BiomedicalEntityLoader:
             source_map = spec.get_source_map(records)
             terms = spec.get_terms(source_map)
             to_canonicalize = spec.get_terms_to_canonicalize(source_map)
-            logger.info("ETLing %s terms", len(to_canonicalize))
+            logger.info("ETLing %s terms", len(to_canonicalize[0]))
             await BiomedicalEntityEtl(
                 candidate_selector=spec.candidate_selector,
                 relation_id_field_map=spec.relation_id_field_map,

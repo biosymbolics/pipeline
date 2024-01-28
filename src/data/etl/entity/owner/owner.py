@@ -101,6 +101,7 @@ class BaseOwnerEtl(BaseEntityEtl):
             update_func=lambda r, tx: Owner.prisma(tx).update(
                 where={"name": r["name"]},
                 data=OwnerUpdateInput(
+                    # todo: connectOrCreate when supported
                     synonyms={"create": [{"term": s} for s in uniq(r["synonyms"])]},
                 ),
             ),
