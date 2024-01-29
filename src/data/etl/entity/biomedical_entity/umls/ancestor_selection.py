@@ -145,25 +145,25 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN working_terms wt ON wt.head = tail_id
                 JOIN umls as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
-                where wt.depth <= {MAX_DEPTH}
-                and (
+                WHERE wt.depth <= {MAX_DEPTH}
+                AND (
                     relationship is null
                     OR relationship in {considered_relationships}
                 )
-                and head_entity.type_ids && $1
-                and tail_entity.type_ids && $1
-                and head_id not in {cui_suppressions}
-                and tail_id not in {cui_suppressions}
-                and ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
-                and ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
-                and not head_entity.name ~* '\y{get_or_re(name_suppressions, permit_plural=False)}\y'
-                and not tail_entity.name ~* '\y{get_or_re(name_suppressions, permit_plural=False)}\y'
+                AND head_entity.type_ids && $1
+                AND tail_entity.type_ids && $1
+                AND head_id not in {cui_suppressions}
+                AND tail_id not in {cui_suppressions}
+                AND head_id<>tail_id
+                AND ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
+                AND ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
+                AND NOT head_entity.name ~* '\y{get_or_re(name_suppressions, permit_plural=False)}\y'
+                AND NOT tail_entity.name ~* '\y{get_or_re(name_suppressions, permit_plural=False)}\y'
             )
             SELECT DISTINCT head, tail
             FROM working_terms
             """
 
-        print(query)
         client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
         logger.info("Edge query returned %s results", len(results))
