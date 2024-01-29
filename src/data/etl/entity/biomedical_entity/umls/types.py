@@ -40,6 +40,8 @@ def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
         return OntologyLevel.L1_CATEGORY
     if level == OntologyLevel.L1_CATEGORY:
         return OntologyLevel.L2_CATEGORY
+    if level == OntologyLevel.L2_CATEGORY:
+        return OntologyLevel.L2_CATEGORY
 
     raise ValueError(f"Cannot increment level {level}")
 

@@ -2,7 +2,6 @@
 Patent graph reports
 """
 
-from functools import partial
 import time
 from typing import Sequence
 import logging

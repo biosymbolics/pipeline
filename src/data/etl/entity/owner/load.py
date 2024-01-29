@@ -107,6 +107,10 @@ class OwnerLoader:
         public_companies = self.load_public_companies()
         await BaseOwnerEtl().copy_all(names, public_companies)
 
+    @staticmethod
+    async def post_doc_finalize():
+        await BaseOwnerEtl.post_doc_finalize()
+
 
 def main():
     asyncio.run(OwnerLoader().copy_all())

@@ -2,7 +2,6 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
-import uuid
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
@@ -21,7 +20,6 @@ from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
 from typings.documents.common import ENTITY_MAP_TABLES
-from utils.file import save_json_as_file
 from utils.list import merge_nested
 
 from .umls.load import UmlsLoader
@@ -158,11 +156,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         )
         upsert_recs = self._generate_upsert_records(terms, source_map, canonical_map)
 
-        # save as file in case something goes wrong
-        save_json_as_file(
-            upsert_recs, f"biomedical_upsert_recs-{str(uuid.uuid4())}.json"
-        )
-
         await batch_update(
             upsert_recs,
             update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
@@ -235,7 +228,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
                     umls_parent.type_ids AS tuis
-                FROM biomedical_entity, umls, _entity_to_umls etu, umls_parent
+                FROM biomedical_entity, umls, _entity_to_umls etu, umls as umls_parent
                 WHERE
                     etu."A"=biomedical_entity.id
                     AND umls.id=etu."B"
@@ -326,6 +319,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
 
         def get_query(table: str, filters: list[str] = []) -> str:
+            # simple because all the logic is in how rollup_id is set.
             return f"""
                 UPDATE {table}
                 SET
@@ -394,8 +388,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
-        await BiomedicalEntityEtl.link_to_documents()
-        await BiomedicalEntityEtl.add_counts()
+        # await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.add_counts()
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         await UmlsLoader.update_with_ontology_level()

@@ -21,15 +21,16 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
-    "isa",
-    "inverse_isa",
-    "mapped_from",
-    "mapped_to",
+    "isa",  # head/parent->tail/child, e.g. Meningeal Melanoma -> Adult Meningeal Melanoma
+    "mapped_to",  # head-parent -> tail-child, e.g. Melanomas -> Uveal Melanoma
+    "has_mechanism_of_action",  # head/MoA->tail/drug
+    "has_target",  # head/target->tail/drug
 )
 INSTANCE_THRESHOLD = 25
 MAX_DEPTH = 2
 MIN_PREV_COUNT = 5
 OVERRIDE_DELTA = 500
+MAX_DEPTH_NX = 6
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -98,7 +99,7 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         Query edges from umls
         - non-null hierarchy (good idea??)
-        - only isa/inverse_isa/mapped_from/mapped_to or no relationship
+        - only {considered_relationships} or no relationship
         - limits types to biomedical
         - applies some naming restrictions (via 'suppressions')
         - suppresses entities whose name is also a type (indicates overly general)
@@ -139,12 +140,12 @@ class AncestorUmlsGraph(UmlsGraph):
                 SELECT
                     head_id as head,
                     tail_id as tail,
-                    ut.depth + 1
+                    wt.depth + 1 as depth
                 FROM umls_graph
-                JOIN working_terms ut ON ut.tail = head_id
+                JOIN working_terms wt ON wt.head = tail_id
                 JOIN umls as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
-                where ut.depth <= {MAX_DEPTH}
+                where wt.depth <= {MAX_DEPTH}
                 and (
                     relationship is null
                     OR relationship in {considered_relationships}
@@ -159,11 +160,13 @@ class AncestorUmlsGraph(UmlsGraph):
                 and not tail_entity.name ~* '\y{get_or_re(name_suppressions, permit_plural=False)}\y'
             )
             SELECT DISTINCT head, tail
-            FROM working_terms;
+            FROM working_terms
             """
 
+        print(query)
         client = await prisma_client(300)
         results = await client.query_raw(query, considered_tuis)
+        logger.info("Edge query returned %s results", len(results))
         return [EdgeRecord(**r) for r in results]
 
     @staticmethod
@@ -185,24 +188,25 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         logger.info("Recursively propagating counts up the tree")
 
-        def _propagate(g: DiGraph, node_id: str):
+        def _propagate(g: DiGraph, node_id: str, depth: int = 0):
             child_ids: list[str] = list(g.successors(node_id))
 
-            # for children with no counts, aka non-leaf nodes, recurse
-            # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
-            # so we recurse to set Parent1 and Parent2 counts based on their children
-            for child_id in child_ids:
-                if g.nodes[child_id].get("count") is None:
-                    _propagate(g, child_id)
+            if depth < MAX_DEPTH_NX:
+                # for children with no counts, aka non-leaf nodes, recurse
+                # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
+                # so we recurse to set Parent1 and Parent2 counts based on their children
+                for child_id in child_ids:
+                    if g.nodes[child_id].get("count") is None:
+                        _propagate(g, child_id, depth + 1)
 
             # set count to sum of all children counts
             g.nodes[node_id]["count"] = sum(
-                g.nodes[child_id]["count"] for child_id in child_ids
+                g.nodes[child_id].get("count", 0) for child_id in child_ids
             )
 
         # take all nodes with no *incoming* edges, i.e. root nodes
         for node_id in [n for n, d in G.in_degree() if d == 0]:
-            _propagate(G, node_id)
+            _propagate(G, node_id, 0)
 
         return G
 
@@ -263,14 +267,18 @@ class AncestorUmlsGraph(UmlsGraph):
             node: NodeRecord,
             prev_node: NodeRecord | None = None,
             last_level: OntologyLevel | None = None,
+            depth: int = 0,
         ) -> None:
             """
             Set level on node, and recurse through parents
             (mutation!)
             """
+            # logger.info("Setting level, depth %s", depth)
             parent_ids = list(_G.predecessors(node.id))
             max_parent_count = (
-                max([_G.nodes[p]["count"] for p in parent_ids]) if parent_ids else None
+                max([_G.nodes[p].get("count", 0) for p in parent_ids])
+                if parent_ids
+                else None
             )
             prev_count = prev_node.count if prev_node else None
             level = get_level(node, prev_count, last_level, max_parent_count)
@@ -280,18 +288,34 @@ class AncestorUmlsGraph(UmlsGraph):
             new_last_level = level if level != OntologyLevel.NA else last_level
 
             # recurse through parents
-            for parent_id in parent_ids:
-                parent = NodeRecord(**_G.nodes[parent_id])
-                set_level(_G, parent, NodeRecord(**_G.nodes[node.id]), new_last_level)
+            if depth < MAX_DEPTH_NX:
+                for parent_id in parent_ids:
+                    parent = NodeRecord(**_G.nodes[parent_id])
+                    if parent.level == OntologyLevel.UNKNOWN:
+                        set_level(
+                            _G,
+                            parent,
+                            NodeRecord(**_G.nodes[node.id]),
+                            new_last_level,
+                            depth + 1,
+                        )
+                    else:
+                        logger.info(
+                            "Parent %s already has level (%s)", parent_id, parent.level
+                        )
 
         logger.info("Recursively propagating counts up the tree")
 
         # propogate counts up the tree
         new_g = AncestorUmlsGraph._propagate_counts(G.copy().to_directed())
 
+        logger.info("Propagating levels down the tree")
         # take all nodes with no *outgoing* edges, i.e. leaf nodes
         for node_id in [n for n, d in new_g.out_degree() if d == 0]:
             node = new_g.nodes[node_id]
+            if node.get("id") is None:
+                logger.warning("Node %s has no id", node_id)
+                node["id"] = node_id
             set_level(new_g, NodeRecord(**node))
 
         return new_g

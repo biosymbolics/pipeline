@@ -169,8 +169,8 @@ class BaseOwnerEtl(BaseEntityEtl):
             SET
                 owner_id=owner_synonym.owner_id,
                 canonical_name=owner.name,
-                instance_rollup=biomedical_entity.name -- todo,
-                category_rollup=biomedical_entity.name -- todo
+                instance_rollup=owner.name, -- todo
+                category_rollup=owner.name -- todo
             FROM owner_synonym, owner
             WHERE ownable.name=owner_synonym.term
             AND owner_synonym.owner_id=owner.id;

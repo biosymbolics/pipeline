@@ -4,6 +4,8 @@ from typing import Callable
 import networkx as nx
 import logging
 
+from pydash import uniq
+
 
 from .types import EdgeRecord, NodeRecord
 
@@ -62,8 +64,23 @@ class UmlsGraph(object):
         if len(edges) == 0:
             raise ValueError("No edges found")
 
+        # add nodes
         G.add_nodes_from([(n.id, n) for n in nodes])
+
+        # temp hack: add nodes for edge ids that don't have nodes
+        node_ids = [n.id for n in nodes]
+        edge_node_ids = uniq([e.head for e in edges] + [e.tail for e in edges])
+        new_nodes = [id for id in edge_node_ids if id not in node_ids]
+        logger.info("Adding %s nodes from edges", len(new_nodes))
+        G.add_nodes_from([(id, {"id": id}) for id in new_nodes])
+
+        # add edges
         G.add_edges_from([(e.head, e.tail) for e in edges])
+
+        if nx.is_directed_acyclic_graph(G) == False:
+            cycles = nx.find_cycle(G)
+            logger.error("Graph is cyclic! e.g. %s", cycles[0:10])
+            raise ValueError("Graph is cyclic")
 
         if self.transform_graph:
             G = self.transform_graph(G)

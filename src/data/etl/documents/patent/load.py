@@ -69,6 +69,9 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
                 min(character_offset_start) as mention_index
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
+            -- temp hack
+            AND publication_number in
+                (select publication_number from applications where publication_number={WORKING_BIOSYM_ANNOTATIONS_TABLE}.publication_number)
             GROUP BY publication_number, lower(term)
         """
     if "diseases" in domains:

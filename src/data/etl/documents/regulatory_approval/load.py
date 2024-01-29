@@ -52,6 +52,8 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
     i_recs = [InterventionIntermediate(**r) for r in records]
     return {
         rec.intervention: {
+            "active_ingredeints": rec.active_ingredients,
+            "pharmacologic_classes": rec.pharmacologic_classes,
             # drugs broken out by combo (more than one active ingredient) or single/compound
             **{
                 rec.generic_name: {
@@ -138,6 +140,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             get_source_map=get_intervention_source_map,
             relation_id_field_map=RelationIdFieldMap(
                 comprised_of=RelationConnectInfo(
+                    # "active ingredients" not in source?
                     source_field="active_ingredients",
                     dest_field="canonical_id",
                     connect_type="connect",
@@ -155,7 +158,13 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 ),
             ),
             get_terms_to_canonicalize=lambda sm: (
-                [k for k, v in sm.items() if v != BiomedicalEntityType.COMBINATION],
+                [
+                    k
+                    for sub in sm.values()
+                    if isinstance(sub, dict)  # is dict, therefore a parent spec
+                    for k, v in sub.items()
+                    if v != BiomedicalEntityType.COMBINATION
+                ],
                 None,
             ),
             non_canonical_source=Source.FDA,
@@ -168,7 +177,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 ]
             ),
         )
-        return [intervention_spec, indication_spec]
+        return [intervention_spec]  # indication_spec
 
     async def copy_documents(self):
         """
