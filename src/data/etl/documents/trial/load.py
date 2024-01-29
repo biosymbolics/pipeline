@@ -33,6 +33,7 @@ from utils.re import get_or_re
 from .constants import CONTROL_TERMS
 from .enums import (
     ComparisonTypeParser,
+    DropoutReasonParser,
     HypothesisTypeParser,
     InterventionTypeParser,
     TerminationReasonParser,
@@ -45,6 +46,7 @@ from .enums import (
     TrialStatusParser,
     calc_duration,
 )
+from .types import DropoutReasonCount
 
 from ..base_document import BaseDocumentEtl
 
@@ -75,7 +77,6 @@ def get_source_fields() -> list[str]:
         "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
         "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
         "drop_withdrawals.dropout_count": "dropout_count",
-        "drop_withdrawals.reasons": "dropout_reasons",
         "outcome_analyses.non_inferiority_types": "hypothesis_types",
     }
 
@@ -97,6 +98,7 @@ def get_source_fields() -> list[str]:
         + multi_fields_sql
         + [
             "JSON_AGG(outcomes.*) as outcomes",
+            "JSON_AGG(json_build_object('reason', drop_withdrawals.reason, 'count', drop_withdrawals.count)) as dropout_reasons",
             """
             array_remove(array_cat(
                 array_agg(distinct lower(conditions.name)),
@@ -239,7 +241,13 @@ class TrialLoader(BaseDocumentEtl):
                     trial["arm_types"] or [], trial["interventions"], design
                 ),
                 "design": design,
-                "dropout_reasons": trial.dropout_reasons or [],
+                "dropout_reasons": [
+                    DropoutReasonCount(
+                        reason=DropoutReasonParser.find(dr.reason), count=dr.count
+                    )
+                    for dr in trial.dropout_reasons
+                ]
+                or [],
                 "duration": calc_duration(trial["start_date"], trial["end_date"]),  # type: ignore
                 "max_timeframe": extract_max_timeframe(trial["time_frames"]),
                 "hypothesis_type": HypothesisTypeParser.find(trial["hypothesis_types"]),
