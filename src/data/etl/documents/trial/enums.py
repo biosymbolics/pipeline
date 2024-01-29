@@ -6,6 +6,7 @@ import re
 from prisma.enums import (
     BiomedicalEntityType,
     ComparisonType,
+    DropoutReason,
     HypothesisType,
     OwnerType,
     TerminationReason,
@@ -18,12 +19,18 @@ from prisma.enums import (
 )
 
 from core.ner.classifier import classify_string
-from data.domain.biomedical.trials import TERMINATION_KEYWORD_MAP
+from data.domain.biomedical.trials import (
+    DROPOUT_REASON_KEYWORD_MAP,
+    TERMINATION_KEYWORD_MAP,
+)
 from typings.core import Dataclass
 from typings.documents.trials import TrialStatusGroup
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
 from utils.re import get_or_re
+
+from .types import DropoutReasonRaw
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,7 +47,7 @@ class BaseTrial(Dataclass):
     arm_count: int
     arm_types: list[str]
     dropout_count: int
-    dropout_reasons: list[str]
+    dropout_reasons: list[DropoutReasonRaw]
     end_date: datetime
     enrollment: int
     hypothesis_types: list[str]
@@ -177,6 +184,19 @@ class InterventionTypeParser:
         if len(intervention_types) == 0:
             return BiomedicalEntityType.UNKNOWN
         return intervention_types[0]
+
+
+class DropoutReasonParser:
+    @staticmethod
+    def find(value: str | None):
+        if value is None:
+            return DropoutReason.NA
+        reason = classify_string(
+            value,
+            DROPOUT_REASON_KEYWORD_MAP,
+            DropoutReason.OTHER,
+        )
+        return reason[0]
 
 
 class TrialMaskingParser:
