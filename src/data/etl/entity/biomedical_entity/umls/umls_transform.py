@@ -172,6 +172,7 @@ class UmlsAncestorTransformer:
         record = self.level_lookup[partial_record.id]
 
         return UmlsUpdateInput(
+            count=partial_record.count,
             level=record.level,
             rollup_id=UmlsAncestorTransformer.choose_best_ancestor(record, ancestors),
         )
