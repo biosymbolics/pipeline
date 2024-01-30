@@ -3,9 +3,9 @@ import time
 from typing import Callable
 import networkx as nx
 import logging
-
 from pydash import uniq
 
+from utils.file import maybe_load_pickle, save_as_pickle
 
 from .types import EdgeRecord, NodeRecord
 
@@ -29,9 +29,20 @@ class UmlsGraph(object):
         """
         self.transform_graph = transform_graph
 
-    async def load(self):
-        self.G = await self.load_graph()
-        self.nodes: dict[str, dict] = dict(self.G.nodes.data())
+    async def load(self, filename: str | None = None):
+        g = None
+        if filename is not None:
+            logger.info("Attempting to load graph from %s", filename)
+            g = maybe_load_pickle(filename)
+
+        if g is None:
+            logger.info("Loading graph from database")
+            g = await self.load_graph()
+            if filename is not None:
+                save_as_pickle(g, filename)
+
+        self.G = g
+        self.nodes: dict[str, dict] = dict(g.nodes.data())
 
     @abstractmethod
     async def get_edges(self) -> list[EdgeRecord]:
@@ -79,8 +90,8 @@ class UmlsGraph(object):
 
         if nx.is_directed_acyclic_graph(G) == False:
             cycles = nx.find_cycle(G)
-            logger.error("Graph is cyclic! e.g. %s", cycles[0:10])
-            raise ValueError("Graph is cyclic")
+            logger.error("Graph is cyclic: %s", cycles[0:10])
+            G.remove_edges_from(cycles)
 
         if self.transform_graph:
             G = self.transform_graph(G)
