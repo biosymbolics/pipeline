@@ -4,6 +4,7 @@ from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateManyNestedWithoutRelationsInput as BiomedicalEntityRelationInput,
 )
+from pydash import uniq
 
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
@@ -43,10 +44,12 @@ class RelationConnectInfo(Dataclass):
             { "create": [{ "term": "foo" }] }
             { "connect": [{ "canonical_id": "foo" }] }
         """
-        vals = [
-            self._get_relation_val(val, canonical_map)
-            for val in source_rec.get(self.source_field) or []
-        ]
+        vals = uniq(
+            [
+                self._get_relation_val(val, canonical_map)
+                for val in source_rec.get(self.source_field) or []
+            ]
+        )
         if vals is None:
             return {}
 

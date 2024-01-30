@@ -2,7 +2,6 @@
 Abstract document ETL class
 """
 from abc import abstractmethod
-from prisma import Prisma
 import logging
 
 from system import initialize

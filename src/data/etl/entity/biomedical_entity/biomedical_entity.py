@@ -6,10 +6,11 @@ from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateInput,
+    BiomedicalEntityCreateWithoutRelationsInput,
     BiomedicalEntityUpdateInput,
-    BiomedicalEntityUpsertInput,
+    BiomedicalEntityWhereUniqueInput,
 )
-from pydash import flatten, group_by
+from pydash import flatten, group_by, omit
 
 from clients.low_level.prisma import batch_update, prisma_client
 from constants.umls import UMLS_DISEASE_TYPES, UMLS_TARGET_TYPES
@@ -68,12 +69,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         }
         return lookup_map
 
-    def _generate_upsert_records(
+    def _generate_records(
         self,
         terms_to_insert: Sequence[str],
         source_map: dict[str, dict],
         canonical_map: dict[str, CanonicalEntity],
-    ) -> list[BiomedicalEntityCreateInput]:
+    ) -> tuple[
+        list[BiomedicalEntityCreateWithoutRelationsInput],
+        list[BiomedicalEntityUpdateInput],
+    ]:
         """
         Create record dicts for entity insert
         """
@@ -125,16 +129,39 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # merge records with same canonical id
         flat_recs = [create_input(name) for name in terms_to_insert]
         grouped_recs = group_by(flat_recs, "canonical_id")
-        upsert_records = flatten(
+        update_records = flatten(
             [
-                [BiomedicalEntityCreateInput(**merge_nested(*groups))]  # type: ignore
+                [BiomedicalEntityUpdateInput(**merge_nested(*groups))]  # type: ignore
                 if canonical_id is None
                 else groups
                 for canonical_id, groups in grouped_recs.items()
             ]
         )
 
-        return upsert_records
+        # without the relationships
+        create_records = [
+            BiomedicalEntityCreateWithoutRelationsInput(
+                **omit(r, *list(self.relation_id_field_map.keys()))  # type: ignore
+            )
+            for r in update_records
+        ]
+
+        return create_records, update_records
+
+    @staticmethod
+    def get_update_where(
+        rec: BiomedicalEntityUpdateInput,
+    ) -> BiomedicalEntityWhereUniqueInput:
+        """
+        Get where clause for update
+        - prefer canonical_id, but use name if not available
+        """
+        if rec.get("canonical_id") is not None:
+            return {"canonical_id": rec.get("canonical_id") or ""}
+        elif rec.get("name") is not None:
+            return {"name": rec.get("name") or ""}
+
+        raise ValueError("Must have canonical_id or name")
 
     async def copy_all(
         self,
@@ -154,16 +181,21 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         canonical_map = self._generate_lookup_map(
             terms_to_canonicalize or terms, vectors_to_canonicalize
         )
-        upsert_recs = self._generate_upsert_records(terms, source_map, canonical_map)
+        create_recs, upsert_recs = self._generate_records(
+            terms, source_map, canonical_map
+        )
+
+        client = await prisma_client(600)
+        await BiomedicalEntity.prisma(client).create_many(
+            data=create_recs,
+            skip_duplicates=True,
+        )
 
         await batch_update(
             upsert_recs,
-            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
-                data=BiomedicalEntityUpsertInput(
-                    create=r,
-                    update=BiomedicalEntityUpdateInput(**r),  # type: ignore
-                ),
-                where={"canonical_id": r["canonical_id"]},
+            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).update(
+                data=BiomedicalEntityUpdateInput(**r),
+                where=self.get_update_where(r),
             ),
             batch_size=1000,
         )
