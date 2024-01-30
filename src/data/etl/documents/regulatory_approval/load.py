@@ -50,28 +50,34 @@ def get_indication_source_map(records: Sequence[dict]) -> dict:
 
 def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
     i_recs = [InterventionIntermediate(**r) for r in records]
-    return {
-        rec.intervention: {
-            "active_ingredeints": rec.active_ingredients,
-            "pharmacologic_classes": rec.pharmacologic_classes,
+
+    def create_sm_entry(rec: InterventionIntermediate):
+        is_combo = len(rec.active_ingredients) > 1
+        combo_ingredients = rec.active_ingredients if is_combo else []
+        main_default_type = (
+            BiomedicalEntityType.COMBINATION
+            if is_combo
+            else BiomedicalEntityType.COMPOUND
+        )
+
+        return {
+            "active_ingredients": combo_ingredients,
+            "pharmacologic_classes": [pc.name for pc in rec.pharmacologic_classes],
             # drugs broken out by combo (more than one active ingredient) or single/compound
             **{
                 rec.generic_name: {
-                    "default_type": BiomedicalEntityType.COMBINATION
-                    if len(rec.active_ingredients) > 1
-                    else BiomedicalEntityType.COMPOUND,
+                    "default_type": main_default_type,
                     "synonyms": compact([rec.generic_name, rec.brand_name]),
                     **rec.__dict__,
                 }
             },
             # active ingredients for combination drugs
             **{
-                ai: {
+                ci: {
                     "default_type": BiomedicalEntityType.COMPOUND,
-                    "synonyms": [ai],
+                    "synonyms": [ci],
                 }
-                for ai in rec.active_ingredients
-                if len(rec.active_ingredients) > 1
+                for ci in combo_ingredients
             },
             # mechanisms / pharmacologic classes
             **{
@@ -84,8 +90,8 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
                 for i, pc in enumerate(PharmaClass.sort(rec.pharmacologic_classes))
             },
         }
-        for rec in i_recs
-    }
+
+    return {rec.intervention: create_sm_entry(rec) for rec in i_recs}
 
 
 class RegulatoryApprovalLoader(BaseDocumentEtl):
