@@ -49,6 +49,7 @@ def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
 class UmlsInfo(BaseModel, object):
     id: str
     name: str
+    count: int
     level: OntologyLevel
     type_ids: list[str] = []
 
@@ -59,6 +60,7 @@ class UmlsInfo(BaseModel, object):
         return UmlsInfo(
             id=_umls.id,
             name=_umls.name,
+            count=_umls.count,
             level=umls.level,
             type_ids=_umls.type_ids,
         )

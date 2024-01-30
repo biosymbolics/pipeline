@@ -56,31 +56,39 @@ class UmlsAncestorTransformer:
     Class for transforming UMLS records
     """
 
+    def __init__(
+        self, umls_graph: AncestorUmlsGraph, level_lookup: dict[str, UmlsInfo]
+    ):
+        self.umls_graph = umls_graph
+        self.level_lookup: dict[str, UmlsInfo] = level_lookup
+
     @staticmethod
     async def create(records: Sequence[Umls]) -> "UmlsAncestorTransformer":
         """
         Factory for UmlsAncestorTransformer
         """
-        ult = UmlsAncestorTransformer()
-        await ult.load(records)
-        return ult
+        g, level_lookup = await UmlsAncestorTransformer.load(records)
+        return UmlsAncestorTransformer(g, level_lookup)
 
-    async def load(self, records: Sequence[Umls]):
+    @staticmethod
+    async def load(
+        records: Sequence[Umls],
+    ) -> tuple[AncestorUmlsGraph, dict[str, UmlsInfo]]:
         """
-        Load UMLS graph
+        Load UMLS graph & level lookup info
         """
-        self.umls_graph = await AncestorUmlsGraph.create()
-
-        # generate level info first
-        self.level_lookup = {
+        g = await AncestorUmlsGraph.create()
+        level_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
                 name=r.name,
-                level=self.umls_graph.get_ontology_level(r.id),
+                count=g.get_count(r.id) or 0,
+                level=g.get_ontology_level(r.id),
                 type_ids=r.type_ids,
             )
             for r in records
         }
+        return g, level_lookup
 
     @staticmethod
     def choose_best_ancestor(
@@ -172,7 +180,7 @@ class UmlsAncestorTransformer:
         record = self.level_lookup[partial_record.id]
 
         return UmlsUpdateInput(
-            count=partial_record.count,
+            count=record.count,
             level=record.level,
             rollup_id=UmlsAncestorTransformer.choose_best_ancestor(record, ancestors),
         )

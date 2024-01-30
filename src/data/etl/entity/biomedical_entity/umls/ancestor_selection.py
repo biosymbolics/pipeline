@@ -21,16 +21,19 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
+    # process_involves_gene head/gene -> tail/process
+    # gene_associated_with_disease head/disease -> tail/gene
     "isa",  # head/parent->tail/child, e.g. Meningeal Melanoma -> Adult Meningeal Melanoma
     "mapped_to",  # head-parent -> tail-child, e.g. Melanomas -> Uveal Melanoma
     "has_mechanism_of_action",  # head/MoA->tail/drug
     "has_target",  # head/target->tail/drug
 )
 INSTANCE_THRESHOLD = 25
-MAX_DEPTH = 2
+MAX_DEPTH = 4
 MIN_PREV_COUNT = 5
 OVERRIDE_DELTA = 500
 MAX_DEPTH_NX = 6
+DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -47,12 +50,12 @@ class AncestorUmlsGraph(UmlsGraph):
         self.doc_type = doc_type
 
     @classmethod
-    async def create(cls, doc_type: DocType = DocType.patent):
+    async def create(cls, doc_type: DocType = DocType.patent) -> "AncestorUmlsGraph":
         """
         Factory for AncestorUmlsGraph
         """
         aug = cls(doc_type)
-        await aug.load()
+        await aug.load(filename=DEFAULT_ANCESTOR_FILE)
         return aug
 
     @overrides(UmlsGraph)
@@ -147,8 +150,8 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
                 WHERE wt.depth <= {MAX_DEPTH}
                 AND (
-                    relationship is null
-                    OR relationship in {considered_relationships}
+                    -- relationship is null
+                    relationship in {considered_relationships}
                 )
                 AND head_entity.type_ids && $1
                 AND tail_entity.type_ids && $1
