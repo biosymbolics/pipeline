@@ -24,3 +24,4 @@ binder_training_data.json
 mps/**
 umls_betweenness.json
 yfinance.cache
+umls_ancestors.json
