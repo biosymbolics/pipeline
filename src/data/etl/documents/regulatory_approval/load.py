@@ -82,8 +82,8 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
             # mechanisms / pharmacologic classes
             **{
                 pc.name: {
-                    # set top sorted pharmacologic class as "preferred"
-                    "is_priority": i == 0,
+                    # set top sorted pharmacologic class as priority
+                    "is_priority": i == 0,  # todo - not actually used
                     "default_type": BiomedicalEntityType.MECHANISM,
                     "synonyms": [pc.name],
                 }
