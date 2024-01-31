@@ -63,8 +63,10 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
-                UmlsInfo(**test["record"], name=test["record"]["id"]),
-                tuple([UmlsInfo(**a, name=a["id"]) for a in test["ancestors"]]),
+                UmlsInfo(**test["record"], count=0, name=test["record"]["id"]),
+                tuple(
+                    [UmlsInfo(**a, count=0, name=a["id"]) for a in test["ancestors"]]
+                ),
             )
             self.assertEqual(result, expected_output)
 
