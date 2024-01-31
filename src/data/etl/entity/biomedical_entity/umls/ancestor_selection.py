@@ -29,11 +29,11 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     "has_mechanism_of_action",  # head/MoA->tail/drug
     "has_target",  # head/target->tail/drug
 )
-INSTANCE_THRESHOLD = 25
-MAX_DEPTH = 4
-MIN_PREV_COUNT = 5
-OVERRIDE_DELTA = 500
-MAX_DEPTH_NX = 6
+LEVEL_INSTANCE_THRESHOLD = 25
+LEVEL_OVERRIDE_DELTA = 500
+LEVEL_MIN_PREV_COUNT = 5
+MAX_DEPTH_QUERY = 4
+MAX_DEPTH_NETWORK = 6
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
 
 
@@ -42,28 +42,48 @@ class AncestorUmlsGraph(UmlsGraph):
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
     """
 
-    def __init__(self, doc_type: DocType = DocType.patent):
+    def __init__(
+        self,
+        doc_type: DocType,
+        instance_threshold: int,
+        previous_threshold: int,
+        current_override_threshold: int,
+    ):
         """
         ***Either use a factory method in the subclass, or call load() after init***
         """
         # initialize superclass with _add_level_info transform
-        super().__init__(transform_graph=AncestorUmlsGraph._add_level_info)
+        super().__init__(transform_graph=self._add_level_info)
         self.doc_type = doc_type
+        self.instance_threshold = instance_threshold
+        self.previous_threshold = previous_threshold
+        self.current_override_threshold = current_override_threshold
 
     @classmethod
     async def create(
         cls,
-        doc_type: DocType = DocType.patent,
         filename: str | None = DEFAULT_ANCESTOR_FILE,
+        doc_type: DocType = DocType.patent,
+        instance_threshold: int = LEVEL_INSTANCE_THRESHOLD,
+        previous_threshold: int = LEVEL_MIN_PREV_COUNT,
+        current_override_threshold: int = LEVEL_OVERRIDE_DELTA,
     ) -> "AncestorUmlsGraph":
         """
         Factory for AncestorUmlsGraph
 
         Args:
-            doc_type: doc type to use for graph
             filename: filename to load from (if None, it will not load from nor save to a file)
+            doc_type: doc type to use for graph
+            instance_threshold: threshold for UMLS entry to be considered INSTANCE vs SUBINSTANCE
+            previous_threshold: threshold for considering multiplier on prev count as criteria for level ++
+            current_override_threshold: if the absolute change in counts between prev and current is greater than this, level ++
         """
-        aug = cls(doc_type)
+        aug = cls(
+            doc_type,
+            instance_threshold=instance_threshold,
+            previous_threshold=previous_threshold,
+            current_override_threshold=current_override_threshold,
+        )
         await aug.load(filename=filename)
         return aug
 
@@ -155,7 +175,7 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN working_terms wt ON wt.head = tail_id
                 JOIN umls as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
-                WHERE wt.depth <= {MAX_DEPTH}
+                WHERE wt.depth <= {MAX_DEPTH_QUERY}
                 AND (
                     -- relationship is null
                     relationship in {considered_relationships}
@@ -201,7 +221,7 @@ class AncestorUmlsGraph(UmlsGraph):
         def _propagate(g: DiGraph, node_id: str, depth: int = 0):
             child_ids: list[str] = list(g.successors(node_id))
 
-            if depth < MAX_DEPTH_NX:
+            if depth < MAX_DEPTH_NETWORK:
                 # for children with no counts, aka non-leaf nodes, recurse
                 # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
                 # so we recurse to set Parent1 and Parent2 counts based on their children
@@ -220,8 +240,7 @@ class AncestorUmlsGraph(UmlsGraph):
 
         return G
 
-    @staticmethod
-    def _add_level_info(G: DiGraph) -> DiGraph:
+    def _add_level_info(self, G: DiGraph) -> DiGraph:
         """
         Add ontology level to nodes
 
@@ -240,7 +259,7 @@ class AncestorUmlsGraph(UmlsGraph):
                 """
                 leaf node. level it INSTANCE if sufficiently common.
                 """
-                if current_count < INSTANCE_THRESHOLD:
+                if current_count < self.instance_threshold:
                     return OntologyLevel.SUBINSTANCE
 
                 return OntologyLevel.INSTANCE
@@ -264,9 +283,10 @@ class AncestorUmlsGraph(UmlsGraph):
             parent_current_delta = max_parent_count - current_count
             current_prev_delta = current_count - prev_count
 
-            if current_prev_delta > OVERRIDE_DELTA or (
+            if current_prev_delta > self.current_override_threshold or (
                 parent_current_delta > current_prev_delta
-                and prev_count > MIN_PREV_COUNT  # avoid big changes in small numbers
+                and prev_count
+                > self.previous_threshold  # avoid big changes in small numbers
             ):
                 return increment_ontology_level(last_level)
 
@@ -298,21 +318,18 @@ class AncestorUmlsGraph(UmlsGraph):
             new_last_level = level if level != OntologyLevel.NA else last_level
 
             # recurse through parents
-            if depth < MAX_DEPTH_NX:
+            if depth < MAX_DEPTH_NETWORK:
                 for parent_id in parent_ids:
                     parent = NodeRecord(**_G.nodes[parent_id])
-                    if parent.level == OntologyLevel.UNKNOWN:
-                        set_level(
-                            _G,
-                            parent,
-                            NodeRecord(**_G.nodes[node.id]),
-                            new_last_level,
-                            depth + 1,
-                        )
-                    else:
-                        logger.info(
-                            "Parent %s already has level (%s)", parent_id, parent.level
-                        )
+                    # TODO: THIS MAY LOOP FOR A VERY LONG TIME
+                    # (but doing a level=UNKNOWN check breaks logic)
+                    set_level(
+                        _G,
+                        parent,
+                        NodeRecord(**_G.nodes[node.id]),
+                        new_last_level,
+                        depth + 1,
+                    )
 
         logger.info("Recursively propagating counts up the tree")
 

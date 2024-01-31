@@ -4,12 +4,32 @@ import pytest
 
 from clients.umls.types import EdgeRecord, NodeRecord
 from data.etl.entity.biomedical_entity.umls import AncestorUmlsGraph
+from typings import DocType
 from utils.classes import overrides
 
 pytest_plugins = ("pytest_asyncio",)
 
+LEVEL_INSTANCE_THRESHOLD = 25
+LEVEL_OVERRIDE_DELTA = 500
+LEVEL_MIN_PREV_COUNT = 5
+
 
 class MockAncestorUmlsGraph(AncestorUmlsGraph):
+    @overrides(AncestorUmlsGraph)
+    @classmethod
+    async def create(
+        cls,
+        doc_type: DocType = DocType.patent,
+    ) -> "AncestorUmlsGraph":
+        aug = cls(
+            doc_type,
+            instance_threshold=LEVEL_INSTANCE_THRESHOLD,
+            previous_threshold=LEVEL_MIN_PREV_COUNT,
+            current_override_threshold=LEVEL_INSTANCE_THRESHOLD,
+        )
+        await aug.load()
+        return aug
+
     @overrides(AncestorUmlsGraph)
     async def get_nodes(
         self,
@@ -20,7 +40,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
         nodes = [
             NodeRecord(
                 id="PARENT1_CHILD1",
-                count=5,
+                count=5,  # subinstance
             ),
             NodeRecord(
                 id="PARENT1_CHILD2",
@@ -36,11 +56,11 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
             ),
             NodeRecord(
                 id="PARENT3_ONLY_CHILD",
-                count=5,
+                count=5,  # subinstance
             ),
             NodeRecord(
                 id="GRANDPARENT2_DIRECT_CHILD",
-                count=1,
+                count=1,  # tiny subinstance
             ),
             NodeRecord(id="PARENT1"),
             NodeRecord(id="PARENT2"),
@@ -104,7 +124,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
 @pytest.mark.asyncio
 async def test_ancestor_counts():
     tc = unittest.TestCase()
-    graph = await MockAncestorUmlsGraph.create(filename=None)
+    graph = await MockAncestorUmlsGraph.create()
     p1_count = graph.get_count("PARENT1")
     p2_count = graph.get_count("PARENT2")
     p3_count = graph.get_count("PARENT3")
@@ -116,16 +136,27 @@ async def test_ancestor_counts():
     tc.assertEqual(gp1_count, 3005)
     tc.assertEqual(gp2_count, 6)
 
+    print([(n["id"], n["level"]) for n in graph.nodes.values()])
+
     tc.assertEqual(
         graph.get_ontology_level("PARENT1_CHILD1"), OntologyLevel.SUBINSTANCE
+    )
+    tc.assertEqual(
+        graph.get_ontology_level("PARENT3_ONLY_CHILD"), OntologyLevel.SUBINSTANCE
+    )
+    tc.assertEqual(
+        graph.get_ontology_level("GRANDPARENT2_DIRECT_CHILD"), OntologyLevel.SUBINSTANCE
     )
     tc.assertEqual(graph.get_ontology_level("PARENT1_CHILD2"), OntologyLevel.INSTANCE)
     tc.assertEqual(graph.get_ontology_level("PARENT2_CHILD1"), OntologyLevel.INSTANCE)
     tc.assertEqual(graph.get_ontology_level("PARENT2_CHILD2"), OntologyLevel.INSTANCE)
 
-    tc.assertEqual(graph.get_ontology_level("PARENT1"), OntologyLevel.L1_CATEGORY)
+    tc.assertEqual(
+        graph.get_ontology_level("PARENT1"), OntologyLevel.L1_CATEGORY
+    )  # L1?
     tc.assertEqual(graph.get_ontology_level("PARENT2"), OntologyLevel.L1_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("PARENT3"), OntologyLevel.NA)
 
+    # L2?
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT1"), OntologyLevel.L2_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT2"), OntologyLevel.INSTANCE)
