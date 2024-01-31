@@ -1,8 +1,9 @@
 """
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
-from typing import Literal
+from typing import Literal, Sequence
 from prisma.enums import BiomedicalEntityType
+from pydash import flatten
 
 # TODO: maybe choose NCI as canonical name
 # rewrites preferred name
@@ -253,6 +254,25 @@ BIOSYM_UMLS_TFIDF_PATH = (
     "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
 )
 
+# casting wide net on disease types
+UMLS_EXTENDED_DISEASE = {
+    **UMLS_DISEASE_TYPES,
+    **UMLS_PHENOTYPE_TYPES,
+    "T040": "Organism Function",
+    "T041": "Mental Process",
+    "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
+    "T039": "Physiologic Function",  # e.g. Menopause
+    # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
+    "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
+}
+
+# casting wide net on compound types
+UMLS_EXTENDED_COMPOUND = {
+    **UMLS_COMPOUND_TYPES,
+    "T167": "Substance",
+    "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
+}
+
 """
 ENTITY_TO_UMLS_TYPE
 
@@ -274,16 +294,7 @@ ENTITY_TO_UMLS_TYPE = {
     BiomedicalEntityType.DEVICE: {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"},
     BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
     # includes phenotypes for the sake of typing; phenotype category not ideal for matching since it is very broad
-    BiomedicalEntityType.DISEASE: {
-        **UMLS_DISEASE_TYPES,
-        **UMLS_PHENOTYPE_TYPES,
-        "T040": "Organism Function",
-        "T041": "Mental Process",
-        "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
-        "T039": "Physiologic Function",  # e.g. Menopause
-        # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
-        "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
-    },
+    BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE,
     BiomedicalEntityType.DIAGNOSTIC: UMLS_DIAGNOSTIC_TYPES,
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
@@ -313,10 +324,25 @@ NER_ENTITY_TYPES = frozenset(
 )
 
 
-DESIREABLE_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+BEST_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
     **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_DISEASE_TYPES.keys()},
     **{
         k: list(UMLS_TARGET_TYPES.keys())
+        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+    },
+}
+
+BETTER_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{k: list(UMLS_EXTENDED_DISEASE.keys()) for k in UMLS_EXTENDED_DISEASE.keys()},
+    **{
+        k: list(UMLS_MECHANISM_TYPES.keys())
+        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+    },
+}
+
+FAIR_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{
+        k: list(UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
         for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }
