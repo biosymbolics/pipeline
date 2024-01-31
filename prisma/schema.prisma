@@ -120,8 +120,8 @@ model Trial {
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
-    dropout_count           Int?
-    dropout_reasons         String[]
+    dropout_count           Int?                 @default(-1)
+    dropout_reasons         Json[]
     duration                Int?
     end_date                DateTime?
     enrollment              Int?
