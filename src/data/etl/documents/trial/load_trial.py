@@ -210,7 +210,7 @@ class TrialLoader(BaseDocumentEtl):
                 [f"NOT name ~* '{get_or_re(CONTROL_TERMS)}'"],
             ),
         )
-        return [intervention_spec]  # indication_spec
+        return [indication_spec, intervention_spec]
 
     @staticmethod
     def transform(record: dict) -> TrialCreateWithoutRelationsInput:
@@ -269,6 +269,14 @@ class TrialLoader(BaseDocumentEtl):
         )
 
     @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        """
+        Delete all trial records
+        """
+        client = await prisma_client(600)
+        await Trial.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Copy data from Postgres (drugcentral) to Postgres (patents)
@@ -283,7 +291,7 @@ class TrialLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # # create owner records (aka sponsors)
+            # create owner records (aka sponsors)
             await Ownable.prisma(client).create_many(
                 data=[
                     {
@@ -298,7 +306,7 @@ class TrialLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # # create "indicatable" records, those that map approval to a canonical indication
+            # create "indicatable" records, those that map approval to a canonical indication
             await Indicatable.prisma(client).create_many(
                 data=[
                     {
@@ -352,18 +360,16 @@ class TrialLoader(BaseDocumentEtl):
         )
 
 
-def main():
-    asyncio.run(TrialLoader(document_type="trial").copy_all())
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.trial.load
+            Usage: python3 -m data.etl.documents.trial.load [--update]
             Copies ctgov to patents
         """
         )
         sys.exit()
 
-    main()
+    is_update = "--update" in sys.argv
+
+    asyncio.run(TrialLoader(document_type="trial").copy_all(is_update))

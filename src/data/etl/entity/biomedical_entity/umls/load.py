@@ -159,10 +159,6 @@ class UmlsLoader:
         await UmlsLoader.create_umls_lookup()
         await UmlsLoader.copy_relationships()
 
-    @staticmethod
-    async def update_all():
-        await UmlsLoader.update_with_ontology_level()
-
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
@@ -175,4 +171,3 @@ if __name__ == "__main__":
         sys.exit()
 
     asyncio.run(UmlsLoader.copy_all())
-    # asyncio.run(UmlsLoader.update_all())

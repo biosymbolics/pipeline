@@ -5,24 +5,33 @@ from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
 
-async def load_all():
+async def load_all(is_update: bool = False):
+    """
+    Central script for stage 2 of ETL (local dbs -> biosym)
+
+    NOTE: py-prisma lacks upsertMany, so loaders use "createMany" (with skipDuplicates=True)
+    In order to get updated data, the records must first be deleted.
+    """
     # copy umls data
     await UmlsLoader().copy_all()
 
-    # # copy all biomedical entities (from all doc types)
+    # copy all biomedical entities (from all doc types)
+    # Takes 3+ hours!!
     await BiomedicalEntityLoader().copy_all()
 
-    # # copy owner data (across all documents)
+    # copy owner data (across all documents)
     await OwnerLoader().copy_all()
 
     # copy patent data
-    await PatentLoader(document_type="patent").copy_all()
+    await PatentLoader(document_type="patent").copy_all(is_update)
 
     # copy data about approvals
-    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all()
+    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
+        is_update
+    )
 
     # copy trial data
-    await TrialLoader(document_type="trial").copy_all()
+    await TrialLoader(document_type="trial").copy_all(is_update)
 
     # do final biomedical entity stuff that requires everything else be in place
     await BiomedicalEntityLoader().post_doc_finalize()
@@ -41,4 +50,6 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    asyncio.run(load_all())
+    is_update = "--update" in sys.argv
+
+    asyncio.run(load_all(is_update))

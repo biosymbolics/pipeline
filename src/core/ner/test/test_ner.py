@@ -2,7 +2,7 @@ import unittest
 import pytest
 
 from core.ner import NerTagger
-from data.etl.documents.patent.load import INTERVENTION_DOMAINS
+from data.etl.documents.patent.load_patents import INTERVENTION_DOMAINS
 
 
 # Good random test cases.

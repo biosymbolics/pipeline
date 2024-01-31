@@ -1,3 +1,3 @@
-from .load import TrialLoader
+from .load_trial import TrialLoader
 
 __all__ = ["TrialLoader"]

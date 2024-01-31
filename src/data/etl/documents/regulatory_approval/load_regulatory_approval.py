@@ -15,11 +15,13 @@ from prisma.models import (
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from clients.low_level.prisma import prisma_client
 from data.etl.types import (
     BiomedicalEntityLoadSpec,
     RelationConnectInfo,
     RelationIdFieldMap,
 )
+from utils.classes import overrides
 
 from .types import InterventionIntermediate, PharmaClass
 
@@ -123,6 +125,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         GROUP BY prod.product_name
     """
 
+    @overrides(BaseDocumentEtl)
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         """
@@ -183,8 +186,14 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 ]
             ),
         )
-        return [intervention_spec]  # indication_spec
+        return [intervention_spec, indication_spec]
 
+    @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        client = await prisma_client(600)
+        await RegulatoryApproval.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Create regulatory approval records
@@ -204,8 +213,10 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             query=RegulatoryApprovalLoader.get_source_sql(fields)
         )
 
+        client = await prisma_client(600)
+
         # create approval records
-        await RegulatoryApproval.prisma().create_many(
+        await RegulatoryApproval.prisma(client).create_many(
             data=[
                 {
                     "id": a["id"],
@@ -246,22 +257,20 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         )
 
 
-async def main():
-    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.regulatory_approval.load
+            Usage: python3 -m data.etl.documents.regulatory_approval.load [--update]
             Copies approvals data to postgres
             """
         )
         sys.exit()
 
-    asyncio.run(main())
+    is_update = "--update" in sys.argv
 
-
-# update trials set pharmacologic_class=a.pharmacologic_class from regulatory_approvals a where lower(a.generic_name)=lower(trials.intervention);
-# update annotations set instance_rollup=a.pharmacologic_class from regulatory_approvals a where lower(term)=lower(a.generic_name);
+    asyncio.run(
+        RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
+            is_update
+        )
+    )

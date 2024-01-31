@@ -18,6 +18,7 @@ from constants.core import (
 )
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
+from utils.classes import overrides
 
 from ..base_document import BaseDocumentEtl
 
@@ -154,6 +155,7 @@ class PatentLoader(BaseDocumentEtl):
 
         return biosym_sql
 
+    @overrides(BaseDocumentEtl)
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
@@ -192,6 +194,16 @@ class PatentLoader(BaseDocumentEtl):
         )
         return [indication_spec, intervention_spec]
 
+    @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        """
+        Delete all patent records (which should cascade)
+        """
+
+        client = await prisma_client(600)
+        await Patent.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Create regulatory approval records
@@ -230,6 +242,7 @@ class PatentLoader(BaseDocumentEtl):
             )
 
             # sigh https://github.com/prisma/prisma/issues/18442
+            # TODO: batch
             for p in batch:
                 async with client.tx() as tx:
                     await tx.execute_raw(
@@ -313,18 +326,16 @@ class PatentLoader(BaseDocumentEtl):
         )
 
 
-async def main():
-    await PatentLoader(document_type="patent").copy_all()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.patent.load
+            Usage: python3 -m data.etl.documents.patent.load [--update]
             Copies patents data to biosym
             """
         )
         sys.exit()
 
-    asyncio.run(main())
+    is_update = "--update" in sys.argv
+
+    asyncio.run(PatentLoader(document_type="patent").copy_all(is_update))

@@ -27,8 +27,15 @@ class BaseDocumentEtl:
         raise NotImplementedError
 
     @abstractmethod
-    async def copy_documents(self):
+    async def delete_documents(self):
         raise NotImplementedError
 
-    async def copy_all(self):
-        await self.copy_documents()
+    @abstractmethod
+    async def copy_documents(self, is_update: bool = False):
+        raise NotImplementedError
+
+    async def copy_all(self, is_update: bool = False):
+        if is_update:
+            logger.info("Deleting documents in order to re-create")
+            await self.delete_documents()
+        await self.copy_documents(is_update)
