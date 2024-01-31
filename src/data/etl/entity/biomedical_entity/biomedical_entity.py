@@ -10,7 +10,8 @@ from prisma.types import (
     BiomedicalEntityUpdateInput,
     BiomedicalEntityWhereUniqueInput,
 )
-from pydash import flatten, group_by, omit
+from pydash import compact, flatten, group_by, omit
+import logging
 
 from clients.low_level.prisma import batch_update, prisma_client
 from core.ner.cleaning import CleanFunction
@@ -27,6 +28,9 @@ from ..base_entity_etl import BaseEntityEtl
 
 DEFAULT_TYPE_FIELD = "default_type"
 OVERRIDE_TYPE_FIELD = "type"
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class BiomedicalEntityEtl(BaseEntityEtl):
@@ -81,7 +85,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         Create record dicts for entity insert
         """
 
-        def create_input(orig_name: str) -> BiomedicalEntityCreateInput:
+        def create_input(orig_name: str) -> BiomedicalEntityCreateInput | None:
             """
             Form create input for a given term
             """
@@ -97,7 +101,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             }
 
             if canonical is not None:
-                canonical_dependent_fields = BiomedicalEntityCreateInput(
+                canonical_fields = BiomedicalEntityCreateInput(
                     canonical_id=canonical.id or canonical.name.lower(),
                     entity_type=source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type,
                     is_priority=source_rec.get("is_priority") or False,
@@ -109,7 +113,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     # },
                 )
             else:
-                canonical_dependent_fields = BiomedicalEntityCreateInput(
+                canonical_fields = BiomedicalEntityCreateInput(
                     canonical_id=orig_name,
                     entity_type=(
                         source_rec.get(DEFAULT_TYPE_FIELD)
@@ -120,13 +124,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     sources=[self.non_canonical_source],
                 )
 
-            return BiomedicalEntityCreateInput(
-                **canonical_dependent_fields,
-                **relation_fields,
-            )
+            # if the entity type is unknown, don't create the record
+            if canonical_fields["entity_type"] == BiomedicalEntityType.UNKNOWN:
+                logger.info("Skipping unknown entity type: %s", orig_name)
+                return None
+
+            return BiomedicalEntityCreateInput(**canonical_fields, **relation_fields)
 
         # merge records with same canonical id
-        flat_recs = [create_input(name) for name in terms_to_insert]
+        flat_recs = compact([create_input(name) for name in terms_to_insert])
         grouped_recs = group_by(flat_recs, "canonical_id")
         update_records: list[BiomedicalEntityUpdateInput] = flatten(
             [
