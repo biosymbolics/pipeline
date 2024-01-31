@@ -89,6 +89,10 @@ UMLS_WORD_OVERRIDES = {
     "modulators": "C0005525",
     "binder": "C1145667",  # "Binding action"
     "binders": "C1145667",
+    "inhibitor": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
 }
 
 UMLS_COMPOUND_TYPES = {
