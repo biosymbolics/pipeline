@@ -364,7 +364,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.trial.load [--update]
+            Usage: python3 -m data.etl.documents.trial.load_trial [--update]
             Copies ctgov to patents
         """
         )

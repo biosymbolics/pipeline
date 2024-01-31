@@ -261,7 +261,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.regulatory_approval.load [--update]
+            Usage: python3 -m data.etl.documents.regulatory_approval.load_regulatory_approval [--update]
             Copies approvals data to postgres
             """
         )
