@@ -104,8 +104,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
 @pytest.mark.asyncio
 async def test_ancestor_counts():
     tc = unittest.TestCase()
-    graph = await MockAncestorUmlsGraph.create()
-    print(graph.nodes)
+    graph = await MockAncestorUmlsGraph.create(filename=None)
     p1_count = graph.get_count("PARENT1")
     p2_count = graph.get_count("PARENT2")
     p3_count = graph.get_count("PARENT3")

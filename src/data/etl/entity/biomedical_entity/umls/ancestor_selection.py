@@ -51,12 +51,20 @@ class AncestorUmlsGraph(UmlsGraph):
         self.doc_type = doc_type
 
     @classmethod
-    async def create(cls, doc_type: DocType = DocType.patent) -> "AncestorUmlsGraph":
+    async def create(
+        cls,
+        doc_type: DocType = DocType.patent,
+        filename: str | None = DEFAULT_ANCESTOR_FILE,
+    ) -> "AncestorUmlsGraph":
         """
         Factory for AncestorUmlsGraph
+
+        Args:
+            doc_type: doc type to use for graph
+            filename: filename to load from (if None, it will not load from nor save to a file)
         """
         aug = cls(doc_type)
-        await aug.load(filename=DEFAULT_ANCESTOR_FILE)
+        await aug.load(filename=filename)
         return aug
 
     @overrides(UmlsGraph)
