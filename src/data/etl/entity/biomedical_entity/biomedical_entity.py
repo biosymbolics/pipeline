@@ -262,14 +262,14 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 if n > 0
                 else ""
             )
-            query = """
+            query = f"""
                 SELECT
                     biomedical_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
                     umls_parent.type_ids AS tuis
                 FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity
-                {has_children_restriction}
+                {has_children_restriction} -- NOTE: untested as of 2024-01-30
                 WHERE
                     etu."A"=biomedical_entity.id
                     AND umls.id=etu."B"
@@ -280,7 +280,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             records = [
                 BiomedicalEntityCreateInput(
                     canonical_id=r["canonical_id"],
-                    # # a problem in a txn?
                     children={"connect": [{"id": r["child_id"]}]},
                     entity_type=tuis_to_entity_type(r["tuis"]),
                     name=r["name"],
@@ -327,10 +326,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         - Link mapping tables "intervenable" and "indicatable" to canonical entities
         - add instance_rollup and category_rollups
-
-        TODO: add UMLS to biomedical_entity hierarchy; select rollups from there
-            (which will include the MoAs we add in approvals load)
-            Also, remember to use approval MoAs as nucleators.
         """
 
         def get_query(table: str) -> str:
