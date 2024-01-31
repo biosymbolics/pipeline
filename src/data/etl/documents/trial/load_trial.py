@@ -2,21 +2,21 @@
 Load script for Trial etl
 """
 import asyncio
-import json
 import re
 import sys
 import logging
 from typing import Sequence
-from pydash import omit, uniq
+from pydash import uniq
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
     Indicatable,
     Intervenable,
     Ownable,
     Trial,
+    TrialDropoutReason,
     TrialOutcome,
 )
-from prisma.types import TrialCreateWithoutRelationsInput
+from prisma.types import TrialCreateWithoutRelationsInput, TrialDropoutReasonCreateInput
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
@@ -274,51 +274,33 @@ class TrialLoader(BaseDocumentEtl):
         masking = TrialMaskingParser.find(trial.masking)
 
         return TrialCreateWithoutRelationsInput(
-            **{
-                **omit(
-                    trial,
-                    "arm_types",
-                    "hypothesis_types",
-                    "indications",
-                    "interventions",
-                    "intervention_types",
-                    "outcomes",
-                    "sponsor",
-                    "time_frames",
-                ),  # type: ignore
-                "comparison_type": ComparisonTypeParser.find(
-                    trial["arm_types"] or [], trial["interventions"], design
-                ),
-                "design": design,
-                "dropout_count": int(trial.dropout_count or 0),
-                "dropout_reasons": [
-                    json.dumps(
-                        {
-                            "reason": DropoutReasonParser.find(str(dr["reason"])).name,
-                            "count": int(dr["count"]),
-                        }
-                    )
-                    for dr in trial.dropout_reasons or []
-                    if "reason" in dr and "count" in dr
-                ],
-                "duration": calc_duration(trial["start_date"], trial["end_date"]),  # type: ignore
-                "max_timeframe": extract_max_timeframe(trial["time_frames"]),
-                "hypothesis_type": HypothesisTypeParser.find(trial["hypothesis_types"]),
-                "intervention_type": InterventionTypeParser.find(
-                    trial["intervention_types"]
-                ),
-                "masking": masking,
-                "phase": TrialPhaseParser.find(trial.phase),
-                "purpose": TrialPurposeParser.find(trial.purpose),
-                "randomization": TrialRandomizationParser.find(
-                    trial.randomization, design
-                ),
-                "status": TrialStatusParser.find(trial.status),
-                "termination_reason": TerminationReasonParser.find(
-                    trial.termination_description
-                ),
-                "url": f"https://clinicaltrials.gov/study/{trial.id}",
-            },
+            id=trial.id,
+            acronym=trial.acronym,
+            arm_count=int(trial.arm_count or 0),
+            comparison_type=ComparisonTypeParser.find(
+                trial["arm_types"] or [], trial["interventions"], design
+            ),
+            design=design,
+            dropout_count=int(trial.dropout_count or 0),
+            duration=calc_duration(trial.start_date, trial.end_date),
+            end_date=trial.end_date,
+            enrollment=int(trial.enrollment or 0),
+            hypothesis_type=HypothesisTypeParser.find(trial.hypothesis_types),
+            intervention_type=InterventionTypeParser.find(trial.intervention_types),
+            last_updated_date=trial.last_updated_date,
+            masking=masking,
+            max_timeframe=extract_max_timeframe(trial["time_frames"]),
+            phase=TrialPhaseParser.find(trial.phase),
+            purpose=TrialPurposeParser.find(trial.purpose).name,
+            randomization=TrialRandomizationParser.find(trial.randomization, design),
+            start_date=trial.start_date,
+            status=TrialStatusParser.find(trial.status),
+            termination_reason=TerminationReasonParser.find(
+                trial.termination_description
+            ),
+            termination_description=trial.termination_description,
+            title=trial.title,
+            url=f"https://clinicaltrials.gov/study/{trial.id}",
         )
 
     @overrides(BaseDocumentEtl)
@@ -410,6 +392,20 @@ class TrialLoader(BaseDocumentEtl):
                     for t in rows
                     for o in t["outcomes"] or []
                     if o is not None
+                ],
+                skip_duplicates=True,
+            )
+
+            await TrialDropoutReason.prisma(client).create_many(
+                data=[
+                    TrialDropoutReasonCreateInput(
+                        reason=DropoutReasonParser.find(str(dr["reason"])),
+                        count=int(dr["count"]),
+                        trial_id=t["id"],
+                    )
+                    for t in rows
+                    for dr in t["dropout_reasons"] or []
+                    if "reason" in dr and "count" in dr
                 ],
                 skip_duplicates=True,
             )

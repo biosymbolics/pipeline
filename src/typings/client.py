@@ -30,6 +30,7 @@ DEFAULT_REGULATORY_APPROVAL_INCLUDE: RegulatoryApprovalInclude = {
     "indications": True,
 }
 DEFAULT_TRIAL_INCLUDE: TrialInclude = {
+    "dropout_reasons": True,
     "interventions": True,
     "indications": True,
     "outcomes": True,

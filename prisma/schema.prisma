@@ -112,6 +112,17 @@ model RegulatoryApproval {
     @@map("regulatory_approval")
 }
 
+model TrialDropoutReason {
+    id       Int           @id @default(autoincrement())
+    count    Int
+    reason   DropoutReason
+    trial_id String
+    trial    Trial         @relation(fields: [trial_id], references: [id])
+
+    @@index([trial_id], name: "trial_dropout_reason_trial_id")
+    @@map("trial_dropout_reason")
+}
+
 model Trial {
     id                      String               @id @unique
     abstract                String?
@@ -121,7 +132,7 @@ model Trial {
     comparison_type         ComparisonType
     design                  TrialDesign
     dropout_count           Int?                 @default(-1)
-    dropout_reasons         Json[]
+    dropout_reasons         TrialDropoutReason[]
     duration                Int?
     end_date                DateTime?
     enrollment              Int?
