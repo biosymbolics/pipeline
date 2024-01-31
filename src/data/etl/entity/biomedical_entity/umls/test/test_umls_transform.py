@@ -152,6 +152,7 @@ class TestTrialUtils(unittest.TestCase):
                 UmlsInfo(
                     id=test["record"]["id"],
                     name="athing",
+                    count=0,
                     level=test["record"]["level"],
                     type_ids=[],
                 ),
