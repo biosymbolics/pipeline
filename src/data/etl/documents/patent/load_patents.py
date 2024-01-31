@@ -201,6 +201,15 @@ class PatentLoader(BaseDocumentEtl):
         """
 
         client = await prisma_client(600)
+        await Ownable.prisma(client).query_raw(
+            "DELETE FROM ownable WHERE patent_id IS NOT NULL or inventor_patent_id IS NOT NULL"
+        )
+        await Intervenable.prisma(client).query_raw(
+            "DELETE FROM intervenable WHERE patent_id IS NOT NULL"
+        )
+        await Indicatable.prisma(client).query_raw(
+            "DELETE FROM indicatable WHERE patent_id IS NOT NULL"
+        )
         await Patent.prisma(client).delete_many()
 
     @overrides(BaseDocumentEtl)

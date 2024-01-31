@@ -274,6 +274,16 @@ class TrialLoader(BaseDocumentEtl):
         Delete all trial records
         """
         client = await prisma_client(600)
+        await TrialOutcome.prisma(client).delete_many()
+        await Ownable.prisma(client).query_raw(
+            "DELETE FROM ownable WHERE trial_id IS NOT NULL"
+        )
+        await Intervenable.prisma(client).query_raw(
+            "DELETE FROM intervenable WHERE trial_id IS NOT NULL"
+        )
+        await Indicatable.prisma(client).query_raw(
+            "DELETE FROM indicatable WHERE trial_id IS NOT NULL"
+        )
         await Trial.prisma(client).delete_many()
 
     @overrides(BaseDocumentEtl)

@@ -38,4 +38,4 @@ class BaseDocumentEtl:
         if is_update:
             logger.info("Deleting documents in order to re-create")
             await self.delete_documents()
-        await self.copy_documents(is_update)
+        await self.copy_documents()
