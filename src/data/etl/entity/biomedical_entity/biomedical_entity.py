@@ -128,7 +128,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # merge records with same canonical id
         flat_recs = [create_input(name) for name in terms_to_insert]
         grouped_recs = group_by(flat_recs, "canonical_id")
-        update_records = flatten(
+        update_records: list[BiomedicalEntityUpdateInput] = flatten(
             [
                 [BiomedicalEntityUpdateInput(**merge_nested(*groups))]  # type: ignore
                 if canonical_id is None
@@ -350,6 +350,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         Set instance_rollup and category_rollup for map tables (intervenable, indicatable)
         intentional denormalization for reporting (faster than recursive querying)
+
+        TODO
+            - type-based selection??
+            - is_priority-based selection??
         """
 
         def get_query(table: str) -> str:
@@ -362,12 +366,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 FROM biomedical_entity
                 JOIN _entity_to_parent as etp on etp."B"=biomedical_entity.id -- "B" is child
                 JOIN biomedical_entity as parent_entity on parent_entity.id=etp."A" -- "A" is parent
-                LEFT JOIN _entity_to_parent as ptgp ON ptgp."A"=parent_entity.id
-                LEFT JOIN biomedical_entity as grandparent_entity ON grandparent_entity.id=ptgp."B"
+                LEFT JOIN _entity_to_parent as ptgp ON etp."A"=ptgp."B"
+                LEFT JOIN biomedical_entity as grandparent_entity ON grandparent_entity.id=ptgp."A"
                 WHERE {table}.entity_id=biomedical_entity.id
             """
 
-        # execute the spec
         client = await prisma_client(600)
         for table in ["intervenable", "indicatable"]:
             query = get_query(table)
@@ -392,11 +395,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
-        # await BiomedicalEntityEtl.link_to_documents()
-        # await BiomedicalEntityEtl.add_counts()
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
-        # await UmlsLoader.update_with_ontology_level()
+        await UmlsLoader.update_with_ontology_level()
 
         # recursively add UMLS as biomedical entity parents
         await BiomedicalEntityEtl._umls_to_biomedical_entity()
