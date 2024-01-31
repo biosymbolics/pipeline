@@ -156,6 +156,8 @@ class TestTrialUtils(unittest.TestCase):
                     level=test["record"]["level"],
                     type_ids=[],
                 ),
-                tuple([UmlsInfo(**a, name=a["id"]) for a in test["ancestors"]]),
+                tuple(
+                    [UmlsInfo(**a, count=0, name=a["id"]) for a in test["ancestors"]]
+                ),
             )
             self.assertEqual(result, expected_output)
