@@ -208,7 +208,7 @@ class PsqlDatabaseClient(DatabaseClient):
                 return self.handle_error(conn, e, ignore_error=ignore_error)
 
     @overrides(DatabaseClient)
-    def _insert(self, table_name: str, records: list[M]) -> ExecuteResult:
+    async def _insert(self, table_name: str, records: list[M]) -> ExecuteResult:
         columns = [c for c in list(records[0].keys())]
         insert_cols = ", ".join([f'"{c}"' for c in columns])
         query = f"INSERT INTO {table_name} ({insert_cols}) VALUES ({(', ').join(['%s' for _ in range(len(columns)) ])})"

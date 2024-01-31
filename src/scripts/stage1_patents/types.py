@@ -10,15 +10,8 @@ class BaseTermRecord(TypedDict):
 
 class TermRecord(BaseTermRecord):
     domain: str
-    original_term: Optional[str]
 
 
 class AggregatedTermRecord(BaseTermRecord):
     domains: list[str]
     synonyms: list[str]
-
-
-Ancestors = TypedDict(
-    "Ancestors",
-    {"instance_rollup": Optional[str], "category_rollup": Optional[str]},
-)

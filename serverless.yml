@@ -217,7 +217,15 @@ functions:
     handler: src.handlers.trials.search
     layers:
       - Ref: PythonRequirementsLambdaLayer
-
+  chat:
+    events:
+      - http:
+          path: chat
+          method: get
+          cors: true
+    handler: src.handlers.chat.chat
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 plugins:
   - serverless-python-requirements
   - serverless-offline

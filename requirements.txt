@@ -7,6 +7,7 @@ google.cloud.bigquery
 google.cloud.storage
 kneed
 langchain
+langchain_openai
 nmslib @ git+https://github.com/nmslib/nmslib.git@ade4bcdc9dd3719990de2503871450b8a62df4a5#subdirectory=python_bindings
 annoy
 openai
@@ -16,6 +17,7 @@ psycopg[binary,pool]
 pyarrow
 pydash
 pydantic
+pytest-asyncio
 python-dotenv
 regex
 requests
@@ -25,6 +27,7 @@ spacy
 spacy-lookups-data
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==2.1.2+cpu
+torch_geometric
 pytorch-ignite
 requests_cache
 transformers

@@ -1,8 +1,8 @@
 import unittest
+from prisma.enums import OntologyLevel
 
-from typings.umls import OntologyLevel
 
-from data.etl.entity.biomedical_entity.umls.transform import (
+from data.etl.entity.biomedical_entity.umls.umls_transform import (
     UmlsInfo,
     UmlsAncestorTransformer,
 )
@@ -14,74 +14,48 @@ class TestTrialUtils(unittest.TestCase):
             {
                 "description": "select target type ancestor for intervention type",
                 "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "C123123123",
+                    "level": OntologyLevel.SUBINSTANCE,
+                    "id": "SELF_ID",
                     "type_ids": ["T121"],  # "Pharmacologic Substance"
                 },
                 "ancestors": tuple(
                     [
                         {
                             "level": OntologyLevel.INSTANCE,
-                            "id": "C444444",
+                            "id": "T121_ANCESTOR",
                             "type_ids": ["T121"],  # "Pharmacologic Substance"
                         },
                         {
                             "level": OntologyLevel.INSTANCE,
-                            "id": "C555555",
+                            "id": "TARGET_ANCESTOR",
                             "type_ids": ["T116"],  # "Amino Acid, Peptide, or Protein"
                         },
                     ]
                 ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C555555",
+                "expected": "TARGET_ANCESTOR",
             },
             {
                 "description": "select indication type ancestor for indication type",
                 "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "C123123123",
+                    "level": OntologyLevel.SUBINSTANCE,
+                    "id": "SELF_ID",
                     "type_ids": ["T047"],  # "Disease or Syndrome"
                 },
                 "ancestors": tuple(
                     [
                         {
                             "level": OntologyLevel.INSTANCE,
-                            "id": "C444444",
-                            "type_ids": ["T047"],  # "Disease or Syndrome"
-                        },
-                        {
-                            "level": OntologyLevel.INSTANCE,
                             "id": "C555555",
                             "type_ids": ["T116"],  # "Amino Acid, Peptide, or Protein"
                         },
-                    ]
-                ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C444444",
-            },
-            {
-                "description": "choose based on level of no type match (furthest LEVEL ancestor)",
-                "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "C123123123",
-                    "type_ids": ["T121"],  # "Pharmacologic Substance"
-                },
-                "ancestors": tuple(
-                    [
                         {
                             "level": OntologyLevel.INSTANCE,
                             "id": "C444444",
-                            "type_ids": ["T121"],  # "Pharmacologic Substance"
-                        },
-                        {
-                            "level": OntologyLevel.INSTANCE,
-                            "id": "C555555",
-                            "type_ids": ["T121"],  # "Pharmacologic Substance"
+                            "type_ids": ["T047"],  # "Disease or Syndrome"
                         },
                     ]
                 ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C555555",
+                "expected": "C444444",
             },
         ]
 
@@ -89,86 +63,56 @@ class TestTrialUtils(unittest.TestCase):
             expected_output = test["expected"]
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
-                UmlsInfo(
-                    id=test["record"]["id"],
-                    level=test["record"]["level"],
-                    type_ids=test["record"]["type_ids"],
+                UmlsInfo(**test["record"], count=0, name=test["record"]["id"]),
+                tuple(
+                    [UmlsInfo(**a, count=0, name=a["id"]) for a in test["ancestors"]]
                 ),
-                test["levels"],
-                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
             )
             self.assertEqual(result, expected_output)
 
     def test_choose_best_ancestor_from_level(self):
         test_cases = [
             {
-                "description": "finds distant instance ancestor",
+                "description": "skips over NA ancestors",
                 "record": {
-                    "level": OntologyLevel.INSTANCE,
+                    "level": OntologyLevel.SUBINSTANCE,
                     "id": "C1415265|C4721408",
                     "canonical_name": "gpr84 antagonist",
                 },
                 "ancestors": tuple(
                     [
-                        {"level": OntologyLevel.INSTANCE, "id": "bb8"},
-                        {"level": OntologyLevel.INSTANCE, "id": "cc7"},
+                        {"level": OntologyLevel.NA, "id": "bb8"},
+                        {"level": OntologyLevel.NA, "id": "cc7"},
                         {
                             "level": OntologyLevel.INSTANCE,
-                            "id": "C1415265",
+                            "id": "FIRST_INSTANCE_ANCESTOR",
                             "canonical_name": "gpr84",
                         },
                         {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
                     ]
                 ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C1415265",
-            },
-            {
-                "description": "takes self if no ancestors",
-                "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "VERY SPECIFIC THING",
-                },
-                "ancestors": tuple(
-                    [
-                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                    ]
-                ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "VERY SPECIFIC THING",
+                "expected": "FIRST_INSTANCE_ANCESTOR",
             },
             {
                 "description": "finds L1_CATEGORY ancestor",
                 "record": {
                     "level": OntologyLevel.INSTANCE,
-                    "id": "VERY SPECIFIC THING",
+                    "id": "SELF_ANCESTOR",
                 },
                 "ancestors": tuple(
                     [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
-                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
+                        {"level": OntologyLevel.INSTANCE, "id": "SAME_LEVEL_ANCESTOR"},
+                        {
+                            "level": OntologyLevel.L1_CATEGORY,
+                            "id": "L1_CATEGORY_ANCESTOR",
+                        },
+                        {
+                            "level": OntologyLevel.L2_CATEGORY,
+                            "id": "L2_CATEGORY_ANCESTOR",
+                        },
                     ]
                 ),
-                "levels": [OntologyLevel.L1_CATEGORY],
-                "expected": "dd6",
-            },
-            {
-                "description": "finds L2_CATEGORY ancestor",
-                "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "VERY SPECIFIC THING",
-                },
-                "ancestors": tuple(
-                    [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
-                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
-                    ]
-                ),
-                "levels": [OntologyLevel.L2_CATEGORY],
-                "expected": "ee5",
+                "expected": "L1_CATEGORY_ANCESTOR",
             },
             {
                 "description": "Takes self as ancestor if already at level",
@@ -178,82 +122,28 @@ class TestTrialUtils(unittest.TestCase):
                 },
                 "ancestors": tuple(
                     [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
-                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
+                        {"level": OntologyLevel.INSTANCE, "id": "INSTANCE_ANCESTOR"},
+                        {
+                            "level": OntologyLevel.L1_CATEGORY,
+                            "id": "L1_CATEGORY_ANCESTOR",
+                        },
+                        {
+                            "level": OntologyLevel.L2_CATEGORY,
+                            "id": "L2_CATEGORY_ANCESTOR",
+                        },
                     ]
                 ),
-                "levels": [OntologyLevel.L2_CATEGORY],
                 "expected": "ALREADY_L2_CATEGORY",
             },
             {
-                "description": "Takes self as INSTANCE ancestor even if no ancestors",
+                "description": "Takes self as INSTANCE ancestor if no ancestors",
                 "record": {
                     "level": OntologyLevel.INSTANCE,
-                    "id": "C1415265a",
+                    "id": "SELF_ANCESTOR",
                     "canonical_name": "GPR84 gene",
                 },
                 "ancestors": tuple([]),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C1415265a",
-            },
-            {
-                "description": "returns '' if no matching ancestors above INSTANCE",
-                "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "C1415265b",
-                    "canonical_name": "GPR84 gene",
-                },
-                "ancestors": tuple([]),
-                "levels": [OntologyLevel.L1_CATEGORY],
-                "expected": "",
-            },
-            {
-                "description": "use self if no ancestors at the desired level, and self is at or above desired level",
-                "record": {
-                    "level": OntologyLevel.L2_CATEGORY,
-                    "id": "C2987634",
-                    "canonical_name": "agonist",
-                },
-                "ancestors": tuple(
-                    [
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "C0450442"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "C1254372"},
-                    ]
-                ),
-                "levels": [OntologyLevel.INSTANCE],
-                "expected": "C2987634",
-            },
-            {
-                "description": "does not go to lower level",
-                "record": {
-                    "level": OntologyLevel.L2_CATEGORY,
-                    "id": "anl2cat",
-                },
-                "ancestors": tuple(
-                    [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
-                        {"level": OntologyLevel.L1_CATEGORY, "id": "dd6"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
-                    ]
-                ),
-                "levels": [OntologyLevel.L1_CATEGORY],
-                "expected": "anl2cat",
-            },
-            {
-                "description": "multiple",
-                "record": {
-                    "level": OntologyLevel.INSTANCE,
-                    "id": "anl2cat",
-                },
-                "ancestors": tuple(
-                    [
-                        {"level": OntologyLevel.INSTANCE, "id": "aa9"},
-                        {"level": OntologyLevel.L2_CATEGORY, "id": "ee5"},
-                    ]
-                ),
-                "levels": [OntologyLevel.L1_CATEGORY, OntologyLevel.L2_CATEGORY],
-                "expected": "ee5",
+                "expected": "SELF_ANCESTOR",
             },
         ]
 
@@ -262,9 +152,14 @@ class TestTrialUtils(unittest.TestCase):
 
             result = UmlsAncestorTransformer.choose_best_ancestor(
                 UmlsInfo(
-                    id=test["record"]["id"], level=test["record"]["level"], type_ids=[]
+                    id=test["record"]["id"],
+                    name="athing",
+                    count=0,
+                    level=test["record"]["level"],
+                    type_ids=[],
                 ),
-                test["levels"],
-                tuple([UmlsInfo(**a) for a in test["ancestors"]]),
+                tuple(
+                    [UmlsInfo(**a, count=0, name=a["id"]) for a in test["ancestors"]]
+                ),
             )
             self.assertEqual(result, expected_output)

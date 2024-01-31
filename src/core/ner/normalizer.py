@@ -77,12 +77,24 @@ class TermNormalizer:
 
         return cleaned_entities
 
-    def normalize_strings(self, terms: Sequence[str]) -> list[DocEntity]:
-        # uniqify since all we have is terms and no context/doc
-        # (therefore identical terms are identical entities)
-        uniq_terms = list(set(terms))
+    def normalize_strings(
+        self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
+    ) -> list[DocEntity]:
+        """
+        Normalize and link terms to canonical entities
 
-        if self.candidate_selector not in [
+        Args:
+            terms (Sequence[str]): list of terms to normalize
+            vectors (Sequence[Sequence[float]]): list of vectors for each term - optional.
+
+        TODO: uniqify terms, when possible?
+        """
+
+        if vectors is not None and len(terms) != len(vectors):
+            raise ValueError("terms and vectors must be the same length")
+
+        # if no vectors AND candidate selectors are semantic, generate docs / vectors
+        if not vectors and self.candidate_selector not in [
             "CandidateSelector",
             "CompositeCandidateSelector",
         ]:
@@ -90,10 +102,10 @@ class TermNormalizer:
                 raise ValueError(
                     "nlp model required for vectorization-based candidate selection"
                 )
-            docs = self.nlp.pipe(uniq_terms)
+            docs = self.nlp.pipe(terms)
         else:
             logger.info("No nlp model required for CandidateSelector")
-            docs = [None for _ in uniq_terms]
+            docs = [None for _ in terms]
 
         doc_ents = [
             DocEntity.create(
@@ -102,15 +114,15 @@ class TermNormalizer:
                 start_char=0,
                 end_char=0,
                 normalized_term=term,
+                vector=vector,  # required for comparing semantic similarity of potential matches
                 spacy_doc=doc,  # required for comparing semantic similarity of potential matches
             )
-            for term, doc in zip(uniq_terms, docs)
+            for term, vector, doc in zip(terms, vectors or [None for _ in terms], docs)
         ]
 
         logger.info("Normalizing %s terms (%s non-unique)", len(doc_ents), len(terms))
         normalized = self.normalize(doc_ents)
-        normalized_map = {n.term: n for n in normalized}
-        return [normalized_map[t] for t in terms]
+        return normalized
 
     def __call__(self, *args, **kwargs) -> list[DocEntity]:
         return self.normalize(*args, **kwargs)

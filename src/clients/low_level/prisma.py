@@ -74,9 +74,14 @@ async def batch_update(
     client = await prisma_client(timeout)
     batches = batch(records, batch_size)
     for b in batches:
-        async with client.tx() as tx:
+        try:
+            async with client.tx() as tx:
+                for r in b:
+                    await update_func(r, tx)
+        except Exception as e:
+            logger.warning("Error in update tx; attempting one-off inserts (%s)", e)
             for r in b:
                 try:
-                    await update_func(r, tx)
+                    await update_func(r, client)
                 except Exception as e:
-                    logger.warning("Error encountered in update: %s", e)
+                    logger.warning("Error in one-off update: %s, %s", e, r)

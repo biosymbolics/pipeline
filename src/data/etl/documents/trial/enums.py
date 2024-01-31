@@ -6,6 +6,7 @@ import re
 from prisma.enums import (
     BiomedicalEntityType,
     ComparisonType,
+    DropoutReason,
     HypothesisType,
     OwnerType,
     TerminationReason,
@@ -18,12 +19,16 @@ from prisma.enums import (
 )
 
 from core.ner.classifier import classify_string
-from data.domain.biomedical.trials import TERMINATION_KEYWORD_MAP
+from data.domain.biomedical.trials import (
+    DROPOUT_REASON_KEYWORD_MAP,
+    TERMINATION_KEYWORD_MAP,
+)
 from typings.core import Dataclass
 from typings.documents.trials import TrialStatusGroup
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
 from utils.re import get_or_re
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,7 +45,7 @@ class BaseTrial(Dataclass):
     arm_count: int
     arm_types: list[str]
     dropout_count: int
-    dropout_reasons: list[str]
+    dropout_reasons: list[dict[str, str | int]]
     end_date: datetime
     enrollment: int
     hypothesis_types: list[str]
@@ -160,7 +165,7 @@ class InterventionTypeParser:
             "Procedure": BiomedicalEntityType.PROCEDURE,
             "Radiation": BiomedicalEntityType.PROCEDURE,
         }
-        intervention_types = [intervention_type_term_map[v] for v in values]
+        intervention_types = [intervention_type_term_map[v] for v in values or []]
         if BiomedicalEntityType.PHARMACOLOGICAL in intervention_types:
             return BiomedicalEntityType.PHARMACOLOGICAL
         if BiomedicalEntityType.DEVICE in intervention_types:
@@ -177,6 +182,19 @@ class InterventionTypeParser:
         if len(intervention_types) == 0:
             return BiomedicalEntityType.UNKNOWN
         return intervention_types[0]
+
+
+class DropoutReasonParser:
+    @staticmethod
+    def find(value: str | None):
+        if value is None:
+            return DropoutReason.NA
+        reason = classify_string(
+            value,
+            DROPOUT_REASON_KEYWORD_MAP,
+            DropoutReason.OTHER,
+        )
+        return reason[0]
 
 
 class TrialMaskingParser:
@@ -351,7 +369,7 @@ class ComparisonTypeParser:
         def is_match(pattern, it):
             return re.search(pattern, it, re.IGNORECASE) is not None
 
-        return any([is_match(pattern, it) for it in intervention_names])
+        return any([is_match(pattern, it) for it in intervention_names or []])
 
     @staticmethod
     def find_from_interventions(
@@ -388,10 +406,13 @@ class ComparisonTypeParser:
 
     @staticmethod
     def find(
-        arm_types: list[str],
+        arm_types: list[str] | None,
         interventions: list[str],
         design: TrialDesign | None = None,
     ) -> ComparisonType:
+        if arm_types is None:
+            return ComparisonType.UNKNOWN
+
         if not isinstance(arm_types, Sequence):
             logger.warning("Comparison type is not a sequence: %s", arm_types)
             return ComparisonType.UNKNOWN

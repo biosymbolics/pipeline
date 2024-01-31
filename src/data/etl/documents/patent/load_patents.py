@@ -5,7 +5,6 @@ import sys
 import asyncio
 import logging
 from typing import Sequence
-from prisma import Prisma
 from prisma.enums import BiomedicalEntityType
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput
@@ -19,6 +18,7 @@ from constants.core import (
 )
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
+from utils.classes import overrides
 
 from ..base_document import BaseDocumentEtl
 
@@ -66,11 +66,14 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
     biosym_sql = f"""
             SELECT
                 publication_number as id,
-                lower(original_term) as term,
+                lower(term) as term,
                 min(character_offset_start) as mention_index
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
-            GROUP BY publication_number, lower(original_term)
+            -- temp hack
+            AND publication_number in
+                (select publication_number from applications where publication_number={WORKING_BIOSYM_ANNOTATIONS_TABLE}.publication_number)
+            GROUP BY publication_number, lower(term)
         """
     if "diseases" in domains:
         sql = f"""
@@ -106,7 +109,7 @@ class PatentLoader(BaseDocumentEtl):
             LEFT JOIN (
                 SELECT
                     publication_number,
-                    array_agg(original_term) as attributes
+                    array_agg(term) as attributes
                 from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
                 where domain='attributes'
                 group by publication_number
@@ -114,7 +117,7 @@ class PatentLoader(BaseDocumentEtl):
             LEFT JOIN (
                 SELECT
                     publication_number,
-                    array_agg(original_term) as annotations
+                    array_agg(term) as annotations
                 from {SOURCE_BIOSYM_ANNOTATIONS_TABLE}
                 where domain<>'attributes'
                 group by publication_number
@@ -130,7 +133,7 @@ class PatentLoader(BaseDocumentEtl):
             domains: domains to copy
         """
         biosym_sql = f"""
-            SELECT distinct lower(original_term) as term
+            SELECT distinct lower(term) as term --, vector
             FROM {WORKING_BIOSYM_ANNOTATIONS_TABLE}
             WHERE domain in ('{"','".join(domains)}')
         """
@@ -139,7 +142,7 @@ class PatentLoader(BaseDocumentEtl):
             # add in gpr annotations (that is, annotations from google; we only kept diseases)
             sql = f"""
                 SELECT distinct term from (
-                    SELECT distinct lower(preferred_name) as term
+                    SELECT distinct lower(preferred_name) as term --, null as vector
                     FROM {GPR_ANNOTATIONS_TABLE}
                     WHERE domain='diseases'
 
@@ -152,34 +155,64 @@ class PatentLoader(BaseDocumentEtl):
 
         return biosym_sql
 
+    @overrides(BaseDocumentEtl)
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
                     "type": BiomedicalEntityType.DISEASE,
+                    # "vector": rec["vector"],
                 }
                 for rec in recs
             },
+            get_terms_to_canonicalize=lambda sm: (
+                list(sm.keys()),
+                None,  # [sm[t]["vector"] for t in sm],
+            ),
             sql=PatentLoader.get_entity_sql(["diseases"]),
         )
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
                     "synonyms": [rec["term"]],
                     "default_type": BiomedicalEntityType.OTHER,
+                    # "vector": rec["vector"],
                 }
                 for rec in recs
             },
+            get_terms_to_canonicalize=lambda sm: (
+                list(sm.keys()),
+                None,  # [sm[t]["vector"] for t in sm],
+            ),
             sql=PatentLoader.get_entity_sql(INTERVENTION_DOMAINS),
         )
         return [indication_spec, intervention_spec]
 
+    @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        """
+        Delete all patent records (which should cascade)
+        """
+
+        client = await prisma_client(600)
+        await Ownable.prisma(client).query_raw(
+            "DELETE FROM ownable WHERE patent_id IS NOT NULL or inventor_patent_id IS NOT NULL"
+        )
+        await Intervenable.prisma(client).query_raw(
+            "DELETE FROM intervenable WHERE patent_id IS NOT NULL"
+        )
+        await Indicatable.prisma(client).query_raw(
+            "DELETE FROM indicatable WHERE patent_id IS NOT NULL"
+        )
+        await Patent.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Create regulatory approval records
@@ -218,6 +251,7 @@ class PatentLoader(BaseDocumentEtl):
             )
 
             # sigh https://github.com/prisma/prisma/issues/18442
+            # TODO: batch
             for p in batch:
                 async with client.tx() as tx:
                     await tx.execute_raw(
@@ -301,18 +335,16 @@ class PatentLoader(BaseDocumentEtl):
         )
 
 
-async def main():
-    await PatentLoader(document_type="patent").copy_all()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.patent.load
+            Usage: python3 -m data.etl.documents.patent.load_patents [--update]
             Copies patents data to biosym
             """
         )
         sys.exit()
 
-    asyncio.run(main())
+    is_update = "--update" in sys.argv
+
+    asyncio.run(PatentLoader(document_type="patent").copy_all(is_update))

@@ -76,7 +76,7 @@ class Spacy:
         # Delegate attribute access to the underlying Language instance
         return getattr(self._nlp, name)
 
-    def __call__(self, text: str) -> Any:
+    def __call__(self, text: str) -> Doc:
         return self._nlp(text)
 
     @classmethod
@@ -93,7 +93,7 @@ class Spacy:
         if args_hash not in cls._instances:
             logger.info("Returning UNCACHED nlp model (%s)", model)
             cls._instances[args_hash] = cls(model, **kwargs)
-        logger.info(
+        logger.debug(
             "Returning nlp model (%s) (all models: %s)", model, cls._instances.keys()
         )
         return cls._instances[args_hash]

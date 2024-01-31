@@ -55,6 +55,7 @@ class CandidateSelector(AbstractCandidateSelector):
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
+            self.kb.cui_to_entity[concept_id].aliases,
             syntactic_similarity=similarity,
         )
 
@@ -114,6 +115,10 @@ class CandidateSelector(AbstractCandidateSelector):
         candidate, score = res
         top_canonical = candidate_to_canonical(candidate, self.kb)
         return top_canonical, score
+
+    @overrides(AbstractCandidateSelector)
+    def select_candidate_from_entity(self, entity: DocEntity) -> EntityWithScore | None:
+        return self.select_candidate(entity.term)
 
     @overrides(AbstractCandidateSelector)
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:

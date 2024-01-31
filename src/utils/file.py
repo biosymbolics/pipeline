@@ -32,32 +32,46 @@ def load_file(filename: str) -> Any:
         return file.read()
 
 
-PICKLE_BASE = "data/pickles/"
-
-
-def save_as_pickle(
-    obj: Any, filename: Optional[str] = None, use_uuid: bool = True
-) -> str:
+def save_as_pickle(obj: Any, filename: str) -> str:
     """
     Saves obj as pickle
     """
-    if not filename or use_uuid:
-        filename = PICKLE_BASE + (filename or "") + str(uuid.uuid4()) + ".txt"
     with open(filename, "wb") as file:
         pickle.dump(obj, file)
 
     return filename
 
 
+def maybe_load_pickle(filename: str) -> Any:
+    """
+    Loads pickle from file if it exists
+    """
+    if is_pickle_exists(filename):
+        try:
+            return load_pickle(filename)
+        except Exception as e:
+            logger.warning("Failure to load pickle %s: %s", filename, e)
+            return None
+    else:
+        return None
+
+
+def is_pickle_exists(filename: str) -> bool:
+    """
+    Checks if pickle exists
+    """
+    return os.path.exists(filename)
+
+
 def load_pickle(filename: str) -> Any:
     """
     Loads pickle from file
     """
-    with open(PICKLE_BASE + filename, "rb") as file:
+    with open(filename, "rb") as file:
         return pickle.load(file)
 
 
-def load_pickles(directory: str = PICKLE_BASE) -> dict[str, Any]:
+def load_pickles(directory: str = "/data/pickles") -> dict[str, Any]:
     """
     Loads all pickles from directory
 

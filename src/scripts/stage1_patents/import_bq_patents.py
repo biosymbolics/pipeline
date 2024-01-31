@@ -3,11 +3,11 @@ import json
 import logging
 import sys
 from typing import Any, Sequence, TypeGuard
-from google.cloud import storage
 from datetime import datetime, timedelta
 import polars as pl
 from pydash import compact
 import logging
+import google.cloud.storage as storage
 
 import system
 
@@ -15,7 +15,7 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import PUBLICATION_NUMBER_MAP_TABLE
+from constants.core import PUBLICATION_NUMBER_MAP_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -34,15 +34,6 @@ APPLICATIONS_TABLE = "applications"
 
 
 def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
-    """
-    Checks if an object is a list of dicts
-
-    Args:
-        obj (Any): object to check
-
-    Returns:
-        bool: True if the object is a list of dicts
-    """
     return isinstance(obj, list) and all(isinstance(x, dict) for x in obj)
 
 
@@ -68,24 +59,27 @@ PATENT_APPLICATION_FIELDS = [
 ]
 
 EXPORT_TABLES = {
-    "biosym_annotations_source": {
-        "column": "domain",
-        "values": ["attributes", "compounds", "diseases", "mechanisms"],
-    },
-    "applications": {
-        "column": "priority_date",
-        "size": timedelta(days=730),
-        "transform": lambda x: int(x.strftime("%Y%m%d")),
-        "starting_value": datetime(2000, 1, 1),
-        "ending_value": datetime(2023, 1, 1),
-    },
-    GPR_ANNOTATIONS_TABLE: {
-        "column": "confidence",
-        "size": 0.0125,
-        "starting_value": 0.774,
-        "ending_value": 0.91,  # max 0.90
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE: {
+        "column": "character_offset_end",
+        "size": 5,
+        "starting_value": 0,
+        "ending_value": 2000,
         "transform": lambda x: x,
     },
+    # "applications": {
+    #     "column": "priority_date",
+    #     "size": timedelta(days=730),
+    #     "transform": lambda x: int(x.strftime("%Y%m%d")),
+    #     "starting_value": datetime(2000, 1, 1),
+    #     "ending_value": datetime(2023, 1, 1),
+    # },
+    # GPR_ANNOTATIONS_TABLE: {
+    #     "column": "confidence",
+    #     "size": 0.0125,
+    #     "starting_value": 0.774,
+    #     "ending_value": 0.91,  # max 0.90
+    #     "transform": lambda x: x,
+    # },
 }
 
 GCS_BUCKET = "biosym-patents"
@@ -117,47 +111,41 @@ async def shared_and_export(
     """
     Create a shared table, export to GCS and delete
     """
-    await db_client.create_from_select(shard_query, shared_table_name)
-    destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
-    db_client.export_table_to_storage(shared_table_name, destination_uri)
-    await db_client.delete_table(shared_table_name)
+    today = datetime.now().strftime("%Y%m%d")
+    try:
+        await db_client.create_from_select(shard_query, shared_table_name)
+        destination_uri = f"gs://{GCS_BUCKET}/{today}/{table}_shard_{value}.json"
+        db_client.export_table_to_storage(shared_table_name, destination_uri)
+        await db_client.delete_table(shared_table_name)
+    except Exception as e:
+        logging.error("Error exporting %s: %s", table, e)
 
 
 async def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
+    raise Exception("This costs too much money to run")
     logging.info("Exporting BigQuery tables to GCS")
     await create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
-        if shard_spec is None:
-            destination_uri = f"gs://{GCS_BUCKET}/{table}.csv"
-            db_client.export_table_to_storage(table, destination_uri)
-        if "values" in shard_spec:
-            for value in shard_spec["values"]:
-                shared_table_name = f"{table}_shard_tmp"
-                shard_query = f"""
-                    SELECT * FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {shard_spec["column"]} = '{value}'
-                """
-                await shared_and_export(shard_query, shared_table_name, table, value)
-        else:
-            shared_table_name = f"{table}_shard_tmp"
-            current_shard = shard_spec["starting_value"]
-            while current_shard < shard_spec["ending_value"]:
-                shard_end = current_shard + shard_spec["size"]
+        shared_table_name = f"{table}_shard_tmp"
+        current_shard = shard_spec["starting_value"]
+        while current_shard < shard_spec["ending_value"]:
+            shard_end = current_shard + shard_spec["size"]
 
-                # Construct the SQL for exporting the shard
-                shard_query = f"""
-                    SELECT *
-                    FROM `{BQ_DATASET_ID}.{table}`
-                    WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
-                    AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
-                """
-                await shared_and_export(
-                    shard_query, shared_table_name, table, current_shard
-                )
+            # Construct the SQL for exporting the shard
+            shard_query = f"""
+                SELECT *
+                FROM `{BQ_DATASET_ID}.{table}`
+                WHERE {shard_spec["column"]} >= {shard_spec["transform"](current_shard)}
+                AND {shard_spec["column"]} < {shard_spec["transform"](shard_end)}
+            """
+            await shared_and_export(
+                shard_query, shared_table_name, table, current_shard
+            )
+            current_shard = shard_end
 
 
 async def import_into_psql(today: str):
@@ -165,7 +153,7 @@ async def import_into_psql(today: str):
     Load data from a JSON file into a psql table
     """
     logging.info("Importing applications table (etc) into postgres")
-    client = PsqlDatabaseClient()
+    client = PsqlDatabaseClient("patents")
 
     # truncate table copy in postgres
     for table in EXPORT_TABLES.keys():
@@ -181,6 +169,7 @@ async def import_into_psql(today: str):
         elif (isinstance(value, list) or isinstance(value, pl.Series)) and len(
             value
         ) > 0:
+            # also a hack (first value of each dict)
             if is_dict_list(value):
                 return [compact(v.values())[0] for v in value if len(value) > 0]
         return value
@@ -188,9 +177,9 @@ async def import_into_psql(today: str):
     async def load_data_from_json(file_blob: storage.Blob, table_name: str):
         lines = file_blob.download_as_text()
         records = [json.loads(line) for line in lines.split("\n") if line]
-        df = pl.DataFrame(records)
+        df = pl.DataFrame(records).drop("embeddings")
         df = df.select(
-            *[pl.col(c).apply(lambda s: transform(s, c)) for c in df.columns]
+            *[pl.col(c).map_elements(lambda s: transform(s, c)) for c in df.columns]
         )
 
         first_record = records[0]
@@ -259,35 +248,13 @@ async def copy_bq_to_psql():
                 "is_uniq": True,
             },
             {
-                "table": APPLICATIONS_TABLE,
-                "column": "abstract",
-                "is_tgrm": True,
-            },
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "title",
-                "is_tgrm": True,
-            },
-            # As long as this date is used for the order by, DO NOT index it - it will ironically kill perf
-            # https://dba.stackexchange.com/questions/110636/poor-performance-on-query-with-limit-when-i-add-an-order-by
-            # {
-            #     "table": APPLICATIONS_TABLE,
-            #     "column": "priority_date",
-            # },
-            {
-                "table": APPLICATIONS_TABLE,
-                "column": "all_base_publication_numbers",
-                "is_gin": True,
-            },
-        ]
-    )
-
-    await client.create_indices(
-        [
-            {
                 "table": GPR_ANNOTATIONS_TABLE,
                 "column": "preferred_term",
                 "is_lower": True,
+            },
+            {
+                "table": GPR_ANNOTATIONS_TABLE,
+                "column": "domain",
             },
             {"table": GPR_ANNOTATIONS_TABLE, "column": "publication_number"},
         ]
@@ -296,13 +263,15 @@ async def copy_bq_to_psql():
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
-        print("Usage: python3 -m scripts.patents.bq_to_psql -export -import")
+        print(
+            "Usage: python3 -m scripts.stage1_patents.import_bq_patents -export -import"
+        )
         sys.exit()
 
-    today = datetime.now().strftime("%Y%m%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
     if "-export" in sys.argv:
         asyncio.run(export_bq_tables())
 
     if "-import" in sys.argv:
-        asyncio.run(import_into_psql(today))
+        asyncio.run(import_into_psql("20240124"))

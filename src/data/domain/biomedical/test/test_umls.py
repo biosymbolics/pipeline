@@ -14,6 +14,10 @@ class TestUmlsUtils(unittest.TestCase):
     def setUp(self):
         pass
 
+    def test_tuis_to_entity_type(self):
+        # see test_CanonicalEntity_type
+        pass
+
     def test_clean_umls_name(self):
         test_cases = [
             {
@@ -38,6 +42,17 @@ class TestUmlsUtils(unittest.TestCase):
                     "G protein-coupled receptor 84, human",
                 ],
                 "expected": "GPR84 a human protein",
+            },
+            {
+                "description": "prefer no [Meta]",
+                "cui": "C2757011",
+                "canonical_name": "Tyrosine Kinase Inhibitors [MoA]",
+                "aliases": [
+                    "Tyrosine Kinase Inhibitors [MoA]",
+                    "Tyrosine Kinase Inhibitors",
+                    "Tyrosine Kinase Inhibitors [MoA]",
+                ],
+                "expected": "Tyrosine Kinase Inhibitors",
             },
             {
                 "description": "do not choose ridiculously short alias",

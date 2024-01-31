@@ -14,7 +14,7 @@ generator client {
 
 model BiomedicalEntity {
     id            Int                      @id @default(autoincrement())
-    canonical_id  String?                  @unique
+    canonical_id  String                   @unique
     children      BiomedicalEntity[]       @relation("entity_to_parent")
     comprised_of  BiomedicalEntity[]       @relation("entity_comprised_of")
     comprises     BiomedicalEntity[]       @relation("entity_comprised_of")
@@ -22,6 +22,7 @@ model BiomedicalEntity {
     entity_type   BiomedicalEntityType
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
+    is_priority   Boolean                  @default(false)
     name          String                   @unique
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
@@ -119,8 +120,8 @@ model Trial {
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
-    dropout_count           Int?
-    dropout_reasons         String[]
+    dropout_count           Int?                 @default(-1)
+    dropout_reasons         Json[]
     duration                Int?
     end_date                DateTime?
     enrollment              Int?
@@ -276,9 +277,7 @@ model Indicatable {
 model Umls {
     id                  String             @id @unique
     biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    category_rollup_id  String?
     hierarchy           String?
-    instance_rollup_id  String // TODO: add as biomedical parent
     l0_ancestor         String?
     l1_ancestor         String?
     l2_ancestor         String?
@@ -289,10 +288,12 @@ model Umls {
     l7_ancestor         String?
     l8_ancestor         String?
     l9_ancestor         String?
+    count               Int                @default(0)
     level               OntologyLevel
     name                String
     num_descendants     Int
     preferred_name      String
+    rollup_id           String // TODO: add as biomedical parent
     synonyms            String[]
     type_ids            String[]
     type_names          String[]
@@ -474,6 +475,7 @@ enum ContextOfUse {
 }
 
 enum OntologyLevel {
+    SUBINSTANCE
     INSTANCE
     L1_CATEGORY
     L2_CATEGORY
@@ -486,4 +488,26 @@ enum Source {
     CTGOV
     FDA
     UMLS
+}
+
+enum DropoutReason {
+    ADVERSE_EVENT
+    COMPLIANCE
+    DEATH
+    EFFICACY
+    INELIGABLE
+    INVESTIGATOR
+    LOGISTICS
+    LOST_TO_FOLLOWUP
+    MILD_ADVERSE_EVENT
+    PHYSICIAN
+    PREGNANCY
+    PROGRESSION
+    PER_PROTOCOL
+    PROTOCOL_VIOLATION
+    SUBJECT
+    TERMINATION
+    OTHER
+    NA
+    UNKNOWN
 }

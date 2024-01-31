@@ -6,19 +6,19 @@ from typing import (
     Any,
     Callable,
     Collection,
-    List,
     Mapping,
     Optional,
     TypeGuard,
     TypedDict,
     Union,
 )
+from pydash import compact
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
 
-from constants.umls import UMLS_TO_ENTITY_TYPE
+from data.domain.biomedical.umls import tuis_to_entity_type
 from typings.core import Dataclass
 
 
@@ -41,15 +41,13 @@ class CanonicalEntity(Dataclass):
 
     @property
     def type(self) -> BiomedicalEntityType:
-        if len(self.types) == 0 or self.types[0] not in UMLS_TO_ENTITY_TYPE:
-            return BiomedicalEntityType.UNKNOWN
+        # if any already BiomedicalEntityTypes, return one
+        bets = compact([BiomedicalEntityType.__members__.get(t) for t in self.types])
 
-        # if it is already a BiomedicalEntityType, return it
-        if BiomedicalEntityType.__members__.get(self.types[0]):
-            return BiomedicalEntityType[self.types[0]]
+        if len(bets) > 0:
+            return bets[0]
 
-        # otherwise assume it is a TUI (UMLS) type and do a lookup
-        return UMLS_TO_ENTITY_TYPE[self.types[0]]
+        return tuis_to_entity_type(self.types)
 
 
 @dataclass(frozen=True)
@@ -83,6 +81,21 @@ class DocEntity(Dataclass):
             vector=vector or (spacy_doc.vector.tolist() if spacy_doc else None),
             spacy_doc=spacy_doc,
             canonical_entity=canonical_entity,
+        )
+
+    def copy(
+        self,
+        **kwargs,
+    ):
+        return DocEntity(
+            term=kwargs.get("term", self.term),
+            start_char=kwargs.get("start_char", self.start_char),
+            end_char=kwargs.get("end_char", self.end_char),
+            normalized_term=kwargs.get("normalized_term", self.normalized_term),
+            type=kwargs.get("type", self.type),
+            vector=kwargs.get("vector", self.vector),
+            spacy_doc=kwargs.get("spacy_doc", self.spacy_doc),
+            canonical_entity=kwargs.get("canonical_entity", self.canonical_entity),
         )
 
     @property

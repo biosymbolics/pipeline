@@ -116,7 +116,7 @@ def extract_max_timeframe(timeframe_descs: list[str]) -> int | None:
     times = compact(
         [
             extract_timeframe(timeframe_desc)
-            for timeframe_desc in compact(timeframe_descs)
+            for timeframe_desc in compact(timeframe_descs or [])
         ]
     )
     return max(times) if len(times) > 0 else None

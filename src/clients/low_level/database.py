@@ -161,7 +161,7 @@ class DatabaseClient:
         if truncate_if_exists and not exists_ok:
             raise Exception("Cannot truncate if exists if exists_ok is False")
 
-        if self.is_table_exists(table_name):
+        if await self.is_table_exists(table_name):
             if truncate_if_exists:
                 await self.truncate_table(table_name)
             elif not exists_ok:
@@ -194,7 +194,7 @@ class DatabaseClient:
         Args:
             table_name (str): name of the table
         """
-        exists = self.is_table_exists(table_name)
+        exists = await self.is_table_exists(table_name)
         if not exists:
             logger.warning(
                 "Table %s does not exist and thus not truncating", table_name

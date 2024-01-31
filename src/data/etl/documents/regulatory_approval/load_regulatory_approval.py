@@ -1,7 +1,6 @@
 """
 Regulatory approval ETL script
 """
-import re
 import sys
 import asyncio
 import logging
@@ -16,15 +15,15 @@ from prisma.models import (
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
+from clients.low_level.prisma import prisma_client
 from data.etl.types import (
     BiomedicalEntityLoadSpec,
     RelationConnectInfo,
     RelationIdFieldMap,
 )
-from utils.re import get_or_re
+from utils.classes import overrides
 
-from .types import InterventionIntermediate
+from .types import InterventionIntermediate, PharmaClass
 
 from ..base_document import BaseDocumentEtl
 
@@ -43,41 +42,6 @@ SUPPRESSION_APPROVAL_TYPES = tuple(
 )
 
 
-def get_preferred_pharmacologic_class(pharmacologic_classes: list[dict]) -> str | None:
-    """
-    Temporary/hack solution for getting the preferred pharmacologic class
-    """
-
-    def get_priority(pc: dict) -> int:
-        score = 0
-        if (
-            re.match(
-                f".*{get_or_re(list(PRIMARY_MECHANISM_BASE_TERMS.values()))}.*",
-                pc["name"],
-                flags=re.IGNORECASE,
-            )
-            is not None
-        ):
-            score += 10
-        if pc["type"] == "MoA":
-            score += 3
-        elif pc["type"] == "EPC":
-            score += 2
-        elif pc["type"] == "MESH":
-            score += 1
-
-        return score
-
-    prioritized = sorted(
-        [pa for pa in pharmacologic_classes if (pa or {}).get("name") is not None],
-        key=get_priority,
-        reverse=True,
-    )
-    if len(prioritized) == 0:
-        return None
-    return prioritized[0]["name"].lower()
-
-
 def get_indication_source_map(records: Sequence[dict]) -> dict:
     return {
         i: {"synonyms": [i], "default_type": BiomedicalEntityType.DISEASE}
@@ -86,43 +50,50 @@ def get_indication_source_map(records: Sequence[dict]) -> dict:
     }
 
 
-def get_intervention_source_map(records: Sequence[dict]) -> dict:
+def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
     i_recs = [InterventionIntermediate(**r) for r in records]
-    return {
-        rec["intervention"]: {
+
+    def create_sm_entry(rec: InterventionIntermediate):
+        is_combo = len(rec.active_ingredients) > 1
+        combo_ingredients = rec.active_ingredients if is_combo else []
+        main_default_type = (
+            BiomedicalEntityType.COMBINATION
+            if is_combo
+            else BiomedicalEntityType.COMPOUND
+        )
+
+        return {
+            "active_ingredients": combo_ingredients,
+            "pharmacologic_classes": [pc.name for pc in rec.pharmacologic_classes],
             # drugs broken out by combo (more than one active ingredient) or single/compound
             **{
                 rec.generic_name: {
-                    "default_type": BiomedicalEntityType.COMBINATION
-                    if len(rec.active_ingredients) > 1
-                    else BiomedicalEntityType.COMPOUND,
+                    "default_type": main_default_type,
                     "synonyms": compact([rec.generic_name, rec.brand_name]),
-                    **rec,
+                    **rec.__dict__,
                 }
-                for rec in i_recs
             },
             # active ingredients for combination drugs
             **{
-                ai: {
+                ci: {
                     "default_type": BiomedicalEntityType.COMPOUND,
-                    "synonyms": [ai],
+                    "synonyms": [ci],
                 }
-                for rec in i_recs
-                for ai in rec.active_ingredients
-                if len(rec.active_ingredients) > 1
+                for ci in combo_ingredients
             },
             # mechanisms / pharmacologic classes
             **{
-                pc: {
+                pc.name: {
+                    # set top sorted pharmacologic class as priority
+                    "is_priority": i == 0,  # todo - not actually used
                     "default_type": BiomedicalEntityType.MECHANISM,
-                    "synonyms": [pc],
+                    "synonyms": [pc.name],
                 }
-                for rec in i_recs
-                for pc in rec.pharmacologic_classes
+                for i, pc in enumerate(PharmaClass.sort(rec.pharmacologic_classes))
             },
         }
-        for rec in i_recs
-    }
+
+    return {rec.intervention: create_sm_entry(rec) for rec in i_recs}
 
 
 class RegulatoryApprovalLoader(BaseDocumentEtl):
@@ -154,6 +125,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         GROUP BY prod.product_name
     """
 
+    @overrides(BaseDocumentEtl)
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         """
@@ -177,34 +149,57 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             get_source_map=get_intervention_source_map,
             relation_id_field_map=RelationIdFieldMap(
                 comprised_of=RelationConnectInfo(
+                    # "active ingredients" not in source?
                     source_field="active_ingredients",
                     dest_field="canonical_id",
-                    input_type="set",
+                    connect_type="connect",
                 ),
                 parents=RelationConnectInfo(
                     source_field="pharmacologic_classes",
                     dest_field="canonical_id",
-                    input_type="set",
+                    connect_type="connect",
                 ),
                 synonyms=RelationConnectInfo(
-                    source_field="synonyms", dest_field="term", input_type="create"
+                    # todo: connectOrCreate when supported
+                    source_field="synonyms",
+                    dest_field="term",
+                    connect_type="create",
                 ),
             ),
-            get_terms_to_canonicalize=lambda sm: [
-                k for k, v in sm.items() if v != BiomedicalEntityType.COMBINATION
-            ],
+            get_terms_to_canonicalize=lambda sm: (
+                [
+                    k
+                    for sub in sm.values()
+                    if isinstance(sub, dict)  # is dict, therefore a parent spec
+                    for k, v in sub.items()
+                    if v != BiomedicalEntityType.COMBINATION
+                ],
+                None,
+            ),
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
                 [
                     "lower(prod.product_name) as brand_name",
                     "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
                     "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
-                    "ARRAY_REMOVE(ARRAY_AGG(distinct lower(pharma_class.name)), NULL)::text[] as pharmacologic_classes",
+                    "JSON_AGG(distinct pharma_class.*) as pharmacologic_classes",
                 ]
             ),
         )
-        return [indication_spec, intervention_spec]
+        return [intervention_spec, indication_spec]
 
+    @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        client = await prisma_client(600)
+        await Intervenable.prisma(client).query_raw(
+            "DELETE FROM intervenable WHERE regulatory_approval_id IS NOT NULL"
+        )
+        await Indicatable.prisma(client).query_raw(
+            "DELETE FROM indicatable WHERE regulatory_approval_id IS NOT NULL"
+        )
+        await RegulatoryApproval.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Create regulatory approval records
@@ -218,15 +213,16 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "MAX(approval.approval)::TIMESTAMP as approval_date",
             "MAX(approval.type) as agency",
             "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
-            "JSON_AGG(pharma_class.*) as pharmacologic_classes",
             "MAX(label.pdf_url) as url",
         ]
         approvals = await PsqlDatabaseClient(SOURCE_DB).select(
             query=RegulatoryApprovalLoader.get_source_sql(fields)
         )
 
+        client = await prisma_client(600)
+
         # create approval records
-        await RegulatoryApproval.prisma().create_many(
+        await RegulatoryApproval.prisma(client).create_many(
             data=[
                 {
                     "id": a["id"],
@@ -267,22 +263,20 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         )
 
 
-async def main():
-    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all()
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.regulatory_approval.load
+            Usage: python3 -m data.etl.documents.regulatory_approval.load_regulatory_approval [--update]
             Copies approvals data to postgres
             """
         )
         sys.exit()
 
-    asyncio.run(main())
+    is_update = "--update" in sys.argv
 
-
-# update trials set pharmacologic_class=a.pharmacologic_class from regulatory_approvals a where lower(a.generic_name)=lower(trials.intervention);
-# update annotations set instance_rollup=a.pharmacologic_class from regulatory_approvals a where lower(term)=lower(a.generic_name);
+    asyncio.run(
+        RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
+            is_update
+        )
+    )

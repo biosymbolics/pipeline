@@ -63,7 +63,7 @@ async def get_docs_by_entity_id(
     entity_map_type: EntityMapType,
 ) -> list[EntWithDocResult]:
     """
-    Gets documents by entity
+    Gets entities for a set of doc ids
     """
     query = f"""
         SELECT

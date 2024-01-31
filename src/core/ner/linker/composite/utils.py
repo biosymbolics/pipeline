@@ -1,4 +1,5 @@
 from typing import Sequence
+from pydash import flatten
 from spacy.kb import KnowledgeBase
 
 from constants.patterns.iupac import is_iupac
@@ -57,6 +58,9 @@ def form_composite_entity(
     # sorted for the sake of consist composite ids
     ids = sorted([m.id for m in members if m.id is not None])
 
+    # types (CanonicalEntity class will infer single type from UMLS TUIs)
+    types = flatten([m.types for m in members])
+
     # form name from comprising candidates
     name = form_composite_name(members, kb)
 
@@ -64,6 +68,7 @@ def form_composite_entity(
         id="|".join(ids),
         ids=ids,
         name=name,
+        types=types,
         # description=..., # TODO: composite description
         # aliases=... # TODO: all permutations
     )

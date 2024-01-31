@@ -2,7 +2,6 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
-from prisma import Prisma
 from pydash import flatten, group_by, omit, uniq
 import logging
 from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
@@ -101,6 +100,7 @@ class BaseOwnerEtl(BaseEntityEtl):
             update_func=lambda r, tx: Owner.prisma(tx).update(
                 where={"name": r["name"]},
                 data=OwnerUpdateInput(
+                    # todo: connectOrCreate when supported
                     synonyms={"create": [{"term": s} for s in uniq(r["synonyms"])]},
                 ),
             ),
@@ -168,8 +168,8 @@ class BaseOwnerEtl(BaseEntityEtl):
             SET
                 owner_id=owner_synonym.owner_id,
                 canonical_name=owner.name,
-                instance_rollup=biomedical_entity.name -- todo,
-                category_rollup=biomedical_entity.name -- todo
+                instance_rollup=owner.name, -- todo
+                category_rollup=owner.name -- todo
             FROM owner_synonym, owner
             WHERE ownable.name=owner_synonym.term
             AND owner_synonym.owner_id=owner.id;

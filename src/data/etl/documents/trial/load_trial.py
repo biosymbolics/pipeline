@@ -2,6 +2,7 @@
 Load script for Trial etl
 """
 import asyncio
+import json
 import re
 import sys
 import logging
@@ -33,6 +34,7 @@ from utils.re import get_or_re
 from .constants import CONTROL_TERMS
 from .enums import (
     ComparisonTypeParser,
+    DropoutReasonParser,
     HypothesisTypeParser,
     InterventionTypeParser,
     TerminationReasonParser,
@@ -74,37 +76,19 @@ def get_source_fields() -> list[str]:
         "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
         "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
         "designs.masking": "masking",  # None (Open Label), Single (Outcomes Assessor), Double (Participant, Outcomes Assessor), Triple (Participant, Care Provider, Investigator), Quadruple (Participant, Care Provider, Investigator, Outcomes Assessor)
-        "drop_withdrawals.dropout_count": "dropout_count",
-        "drop_withdrawals.reasons": "dropout_reasons",
         "outcome_analyses.non_inferiority_types": "hypothesis_types",
+        "dropout_count": "dropout_count",
+        "time_frames": "time_frames",  # needed for max_timeframe calc
+        "interventions": "interventions",
+        "intervention_types": "intervention_types",
+        "indications": "indications",
+        "arm_types": "arm_types",
+        "primary_outcomes": "outcomes",
+        "dropout_reasons": "dropout_reasons",
     }
 
-    multi_fields = {
-        "design_groups.group_type": "arm_types",
-        "interventions.name": "interventions",  # needed for determining comparison type
-        "interventions.intervention_type": "intervention_types",  # needed to determine overall intervention type
-        "outcomes.time_frame": "time_frames",  # needed for max_timeframe calc
-    }
-
-    single_fields_sql = [f"max({f}) as {new_f}" for f, new_f in single_fields.items()]
-    multi_fields_sql = [
-        f"array_remove(array_agg(distinct {f}), NULL) as {new_f}"
-        for f, new_f in multi_fields.items()
-    ]
-
-    return (
-        single_fields_sql
-        + multi_fields_sql
-        + [
-            "JSON_AGG(outcomes.*) as outcomes",
-            """
-            array_remove(array_cat(
-                array_agg(distinct lower(conditions.name)),
-                array_agg(distinct lower(mesh_conditions.mesh_term))
-            ), NULL) as indications
-            """,
-        ]
-    )
+    fields_sql = [f"{f} as {new_f}" for f, new_f in single_fields.items()]
+    return fields_sql
 
 
 class TrialLoader(BaseDocumentEtl):
@@ -120,36 +104,102 @@ class TrialLoader(BaseDocumentEtl):
         source_sql = f"""
             SELECT {", ".join(fields)}
             FROM designs, studies
-            JOIN conditions on conditions.nct_id = studies.nct_id
-            LEFT JOIN browse_interventions as mesh_interventions on mesh_interventions.nct_id = studies.nct_id
-                AND mesh_interventions.mesh_type = 'mesh-list'
-            JOIN interventions on interventions.nct_id = studies.nct_id
-                AND intervention_type in (
-                    'Biological', 'Combination Product', 'Drug',
-                    'Dietary Supplement', 'Genetic', 'Other', 'Procedure'
-                )
-                AND interventions.name is not null
-                AND NOT interventions.name ~* '{get_or_re(CONTROL_TERMS)}'
-            LEFT JOIN design_groups on design_groups.nct_id = studies.nct_id
-            LEFT JOIN browse_conditions as mesh_conditions on mesh_conditions.nct_id = studies.nct_id
-                AND mesh_conditions.mesh_type='mesh-list'
-            LEFT JOIN outcomes on outcomes.nct_id = studies.nct_id
-                AND outcomes.outcome_type = 'Primary'
             LEFT JOIN (
-                select nct_id, sum(count) as dropout_count, array_agg(distinct reason) as reasons
-                from drop_withdrawals
-                group by nct_id
+                SELECT
+                    nct_id,
+                    ARRAY_AGG(group_type) as arm_types
+                FROM design_groups
+                GROUP BY nct_id
+            ) design_groups on design_groups.nct_id = studies.nct_id
+            LEFT JOIN (
+                SELECT
+                    nct_id,
+                    ARRAY_AGG(name) as indications
+                FROM (
+                    SELECT
+                        nct_id,
+                        ARRAY_AGG(distinct lower(mesh_term)) as names
+                    FROM browse_conditions
+                    WHERE mesh_type = 'mesh-list'
+                    GROUP BY nct_id
+
+                    UNION
+
+                    SELECT
+                        nct_id,
+                        ARRAY_AGG(distinct lower(name)) as names
+                    FROM conditions
+                    GROUP BY nct_id
+                ) s,
+                UNNEST(names) as name
+                GROUP BY nct_id
+            ) conditions on conditions.nct_id = studies.nct_id
+            LEFT JOIN (
+                SELECT
+                    nct_id,
+                    ARRAY_AGG(name) as interventions,
+                    ARRAY_AGG(intervention_type) as intervention_types
+                FROM (
+                    SELECT
+                        nct_id,
+                        ARRAY_AGG(distinct lower(mesh_term)) as names,
+                        ARRAY[]::text[] as intervention_types
+                    FROM browse_interventions
+                    WHERE mesh_type = 'mesh-list'
+                    GROUP BY nct_id
+
+                    UNION
+
+                    SELECT
+                        nct_id,
+                        ARRAY_AGG(distinct lower(name)) as names,
+                        ARRAY_AGG(distinct intervention_type) as intervention_types
+                    FROM interventions
+                    WHERE intervention_type in (
+                        'Biological', 'Combination Product', 'Drug',
+                        'Dietary Supplement', 'Genetic', 'Other', 'Procedure'
+                    )
+                    AND name IS NOT null
+                    AND NOT name ~* '{get_or_re(CONTROL_TERMS)}'
+                    GROUP BY nct_id
+                ) s,
+                UNNEST(names) as name,
+                UNNEST(intervention_types) as intervention_type
+                GROUP BY nct_id
+            ) interventions on interventions.nct_id = studies.nct_id
+            LEFT JOIN (
+                SELECT
+                    nct_id,
+                    JSON_AGG(outcomes.*) as primary_outcomes,
+                    ARRAY_AGG(time_frame) as time_frames
+                FROM outcomes
+                WHERE outcomes.outcome_type = 'Primary'
+                GROUP BY nct_id
+            ) outcomes on outcomes.nct_id = studies.nct_id
+            LEFT JOIN (
+                SELECT
+                    nct_id,
+                    sum(count) as dropout_count,
+                    JSON_AGG(json_build_object('reason', reason, 'count', count)) as dropout_reasons
+                FROM (
+                    SELECT
+                        nct_id,
+                        sum(count) as count,
+                        reason
+                    FROM drop_withdrawals
+                    GROUP BY nct_id, reason
+                ) s
+                GROUP BY nct_id
             ) drop_withdrawals on drop_withdrawals.nct_id = studies.nct_id
             LEFT JOIN (
-                select
-                nct_id,
-                array_agg(distinct non_inferiority_type) as non_inferiority_types
-                from outcome_analyses
-                group by nct_id
+                SELECT
+                    nct_id,
+                    ARRAY_AGG(distinct non_inferiority_type) as non_inferiority_types
+                FROM outcome_analyses
+                GROUP BY nct_id
             ) outcome_analyses on outcome_analyses.nct_id = studies.nct_id
             WHERE study_type = 'Interventional'
             AND designs.nct_id = studies.nct_id
-            GROUP BY studies.nct_id
         """
         return source_sql
 
@@ -205,7 +255,7 @@ class TrialLoader(BaseDocumentEtl):
             sql=get_sql(
                 "browse_interventions",
                 "interventions",
-                [f"AND NOT interventions.name ~* '{get_or_re(CONTROL_TERMS)}'"],
+                [f"NOT name ~* '{get_or_re(CONTROL_TERMS)}'"],
             ),
         )
         return [indication_spec, intervention_spec]
@@ -227,6 +277,7 @@ class TrialLoader(BaseDocumentEtl):
             **{
                 **omit(
                     trial,
+                    "arm_types",
                     "hypothesis_types",
                     "indications",
                     "interventions",
@@ -239,7 +290,17 @@ class TrialLoader(BaseDocumentEtl):
                     trial["arm_types"] or [], trial["interventions"], design
                 ),
                 "design": design,
-                "dropout_reasons": trial.dropout_reasons or [],
+                "dropout_count": int(trial.dropout_count or 0),
+                "dropout_reasons": [
+                    json.dumps(
+                        {
+                            "reason": DropoutReasonParser.find(str(dr["reason"])).name,
+                            "count": int(dr["count"]),
+                        }
+                    )
+                    for dr in trial.dropout_reasons or []
+                    if "reason" in dr and "count" in dr
+                ],
                 "duration": calc_duration(trial["start_date"], trial["end_date"]),  # type: ignore
                 "max_timeframe": extract_max_timeframe(trial["time_frames"]),
                 "hypothesis_type": HypothesisTypeParser.find(trial["hypothesis_types"]),
@@ -261,6 +322,24 @@ class TrialLoader(BaseDocumentEtl):
         )
 
     @overrides(BaseDocumentEtl)
+    async def delete_documents(self):
+        """
+        Delete all trial records
+        """
+        client = await prisma_client(600)
+        await TrialOutcome.prisma(client).delete_many()
+        await Ownable.prisma(client).query_raw(
+            "DELETE FROM ownable WHERE trial_id IS NOT NULL"
+        )
+        await Intervenable.prisma(client).query_raw(
+            "DELETE FROM intervenable WHERE trial_id IS NOT NULL"
+        )
+        await Indicatable.prisma(client).query_raw(
+            "DELETE FROM indicatable WHERE trial_id IS NOT NULL"
+        )
+        await Trial.prisma(client).delete_many()
+
+    @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
         Copy data from Postgres (drugcentral) to Postgres (patents)
@@ -275,7 +354,7 @@ class TrialLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # # create owner records (aka sponsors)
+            # create owner records (aka sponsors)
             await Ownable.prisma(client).create_many(
                 data=[
                     {
@@ -290,7 +369,7 @@ class TrialLoader(BaseDocumentEtl):
                 skip_duplicates=True,
             )
 
-            # # create "indicatable" records, those that map approval to a canonical indication
+            # create "indicatable" records, those that map approval to a canonical indication
             await Indicatable.prisma(client).create_many(
                 data=[
                     {
@@ -299,7 +378,7 @@ class TrialLoader(BaseDocumentEtl):
                         "trial_id": t["id"],
                     }
                     for t in rows
-                    for i in uniq(t["indications"])
+                    for i in uniq(t["indications"] or [])
                 ],
                 skip_duplicates=True,
             )
@@ -314,7 +393,7 @@ class TrialLoader(BaseDocumentEtl):
                         "trial_id": t["id"],
                     }
                     for t in rows
-                    for i in uniq(t["interventions"])
+                    for i in uniq(t["interventions"] or [])
                 ],
                 skip_duplicates=True,
             )
@@ -329,7 +408,7 @@ class TrialLoader(BaseDocumentEtl):
                         "trial_id": t["id"],
                     }
                     for t in rows
-                    for o in t["outcomes"]
+                    for o in t["outcomes"] or []
                     if o is not None
                 ],
                 skip_duplicates=True,
@@ -339,23 +418,21 @@ class TrialLoader(BaseDocumentEtl):
 
         await PsqlDatabaseClient(SOURCE_DB).execute_query(
             query=self.get_source_sql(),
-            batch_size=5000,
+            batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore
         )
-
-
-def main():
-    asyncio.run(TrialLoader(document_type="trial").copy_all())
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.documents.trial.load
+            Usage: python3 -m data.etl.documents.trial.load_trial [--update]
             Copies ctgov to patents
         """
         )
         sys.exit()
 
-    main()
+    is_update = "--update" in sys.argv
+
+    asyncio.run(TrialLoader(document_type="trial").copy_all(is_update))

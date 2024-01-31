@@ -80,6 +80,7 @@ UMLS_NAME_SUPPRESSIONS = [
     "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
     "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
     "product",  # e.g. gene product / https://uts.nlm.nih.gov/uts/umls/concept/C3828300
+    "wt",  # wt allele (prefer gene record)
 ]
 
 # sets canonical based on word
@@ -268,6 +269,18 @@ LegacyDomainType = Literal[
     "procedures",
     "mechanisms",
 ]
+
+
+NER_ENTITY_TYPES = frozenset(
+    [
+        "biologics",
+        "compounds",
+        "devices",
+        "diseases",
+        "mechanisms",
+        "procedures",
+    ]
+)
 
 
 DESIREABLE_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {

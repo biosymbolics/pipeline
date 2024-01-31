@@ -6,7 +6,6 @@ import sys
 import logging
 from prisma.models import UmlsGraph, Umls
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
-from data.domain.biomedical.umls import clean_umls_name
 
 from system import initialize
 
@@ -17,8 +16,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
-from .constants import MAX_DENORMALIZED_ANCESTORS
-from .transform import UmlsAncestorTransformer, UmlsTransformer
+from .umls_transform import UmlsAncestorTransformer, UmlsTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,24 +34,15 @@ class UmlsLoader:
         Creates a table of UMLS entities: id, name, ancestor ids
         """
 
-        ANCESTOR_FIELDS = [
-            f"'' as l{i}_ancestor" for i in range(MAX_DENORMALIZED_ANCESTORS)
-        ]
-
         source_sql = f"""
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
-                TRIM(max(ancestors.ptr)) as hierarchy,
-                array_agg(distinct semantic_types.tui::text) as type_ids,
-                array_agg(distinct semantic_types.sty::text) as type_names,
+                COALESCE(TRIM(max(ancestors.ptr)), '') as hierarchy,
+                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
+                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
                 COALESCE(max(descendants.count), 0) as num_descendants,
-                max(synonyms.terms) as synonyms,
-                {", ".join(ANCESTOR_FIELDS)},
-                '' as preferred_name,
-                '' as level,
-                '' as instance_rollup_id,
-                '' as category_rollup_id
+                COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
             FROM mrconso as entities
             LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
             LEFT JOIN (
@@ -87,10 +76,11 @@ class UmlsLoader:
 
         client = await prisma_client(600)
 
-        async def handle_batch(batch):
+        async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
+            insert_data = [transform(r) for r in batch]
             await Umls.prisma(client).create_many(
-                data=[transform(r) for r in batch],
+                data=insert_data,
                 skip_duplicates=True,
             )
 
@@ -106,17 +96,20 @@ class UmlsLoader:
         Run *after* BiomedicalEntityEtl
         """
         client = await prisma_client(600)
-        records = await Umls.prisma(client).find_many(where={"instance_rollup_id": ""})
+
+        # TODO: initial filter on valid UMLS values??
+        all_umls = await Umls.prisma(client).find_many()
 
         # might be slow, if doing betweenness centrality calc.
-        ult = await UmlsAncestorTransformer.create(records)
+        ult = await UmlsAncestorTransformer.create(all_umls)
 
-        await batch_update(
-            records,
-            update_func=lambda r, tx: Umls.prisma(tx).update(
-                data=ult.transform(r), where={"id": r.id}
-            ),
-        )
+        async def maybe_update(r: Umls, tx):
+            # update only if transformed is non null
+            tr = ult.transform(r)
+            if tr is not None:
+                await Umls.prisma(tx).update(data=tr, where={"id": r.id})
+
+        await batch_update(all_umls, update_func=maybe_update, batch_size=5000)
 
     @staticmethod
     async def copy_relationships():
@@ -165,10 +158,6 @@ class UmlsLoader:
         """
         await UmlsLoader.create_umls_lookup()
         await UmlsLoader.copy_relationships()
-
-    @staticmethod
-    async def update_all():
-        await UmlsLoader.update_with_ontology_level()
 
 
 if __name__ == "__main__":
