@@ -6,7 +6,7 @@ from prisma.types import (
     UmlsCreateWithoutRelationsInput as UmlsCreateInput,
     UmlsUpdateInput,
 )
-from pydash import flatten
+from pydash import compact, flatten
 
 from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name
@@ -78,6 +78,8 @@ class UmlsAncestorTransformer:
         Load UMLS graph & level lookup info
         """
         g = await AncestorUmlsGraph.create()
+
+        # only includes known nodes
         level_lookup = {
             r.id: UmlsInfo(
                 id=r.id,
@@ -87,6 +89,7 @@ class UmlsAncestorTransformer:
                 type_ids=r.type_ids,
             )
             for r in records
+            if g.has_node(r.id)
         }
         return g, level_lookup
 
@@ -162,7 +165,7 @@ class UmlsAncestorTransformer:
         # prefer type ancestor, otherwise just go by level
         return choose_by_type(record, ancestors) or choose_by_level(record, ancestors)
 
-    def transform(self, partial_record: Umls) -> UmlsUpdateInput:
+    def transform(self, partial_record: Umls) -> UmlsUpdateInput | None:
         """
         Transform a single UMLS record with updates (level, rollup_id)
         """
@@ -170,14 +173,19 @@ class UmlsAncestorTransformer:
             raise ValueError("level_lookup is not initialized")
 
         ancestors = tuple(
-            [
-                self.level_lookup[partial_record.__dict__[f"l{i}_ancestor"]]
-                for i in range(MAX_DENORMALIZED_ANCESTORS)
-            ]
+            compact(
+                [
+                    self.level_lookup.get(partial_record.__dict__[f"l{i}_ancestor"])
+                    for i in range(MAX_DENORMALIZED_ANCESTORS)
+                ]
+            )
         )
 
         # get record with updated level info
-        record = self.level_lookup[partial_record.id]
+        record = self.level_lookup.get(partial_record.id)
+
+        if not record:
+            return None  # irrelevant record
 
         return UmlsUpdateInput(
             count=record.count,

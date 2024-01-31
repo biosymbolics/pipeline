@@ -36,7 +36,7 @@ class UmlsGraph(object):
             g = maybe_load_pickle(filename)
 
         if g is None:
-            logger.info("Loading graph from database")
+            logger.info("Loading graph from database (%s)", filename or "no filename")
             g = await self.load_graph()
             if filename is not None:
                 save_as_pickle(g, filename)

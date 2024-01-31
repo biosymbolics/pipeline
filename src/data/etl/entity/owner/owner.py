@@ -2,7 +2,6 @@
 Class for biomedical entity etl
 """
 from typing import Sequence
-from prisma import Prisma
 from pydash import flatten, group_by, omit, uniq
 import logging
 from prisma.models import FinancialSnapshot, Owner, OwnerSynonym

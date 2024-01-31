@@ -13,7 +13,6 @@ from prisma.types import (
 from pydash import flatten, group_by, omit
 
 from clients.low_level.prisma import batch_update, prisma_client
-from constants.umls import UMLS_DISEASE_TYPES, UMLS_TARGET_TYPES
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -251,16 +250,26 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         Args:
             n_depth (int): numer of iterations / recursion depth
                 e.g. iteration 1, we get parents. iteration 2, we get parents of parents, etc.
+
+        TODO: turn this into an in-memory function and insert only once
         """
 
-        async def execute():
+        async def execute(n):
+            # restrict iteration >=1 to entries with parents
+            # (since that is a superset of any possible additions)
+            has_children_restriction = (
+                """JOIN _entity_to_parent on etp."A"=biomedical_entity.id"""
+                if n > 0
+                else ""
+            )
             query = """
                 SELECT
                     biomedical_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
                     umls_parent.type_ids AS tuis
-                FROM biomedical_entity, umls, _entity_to_umls etu, umls as umls_parent
+                FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity
+                {has_children_restriction}
                 WHERE
                     etu."A"=biomedical_entity.id
                     AND umls.id=etu."B"
@@ -290,11 +299,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     },
                     where={"canonical_id": r["canonical_id"]},
                 ),
-                batch_size=1000,
+                batch_size=5000,
             )
 
-        for _ in range(n_depth):
-            await execute()
+        for n in range(n_depth):
+            await execute(n)
 
     @staticmethod
     async def add_counts():
@@ -345,61 +354,29 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     async def add_rollups():
         """
         Set instance_rollup and category_rollup for map tables (intervenable, indicatable)
-        intentional denormalization for reporting (faster than querying biomedical_entity or umls)
-
-        TODO: look only at biomedical_entity & parent/child relationships
+        intentional denormalization for reporting (faster than recursive querying)
         """
 
-        def get_query(table: str, filters: list[str] = []) -> str:
+        def get_query(table: str) -> str:
             # simple because all the logic is in how rollup_id is set.
             return f"""
                 UPDATE {table}
                 SET
-                    category_rollup=lower(umls_category_rollup.preferred_name),
-                    instance_rollup=lower(umls_instance_rollup.preferred_name)
-                FROM biomedical_entity, _entity_to_umls as etu, umls
-                JOIN umls as umls_rollup on umls_rollup.id=umls.rollup_id
-                LEFT JOIN umls as umls_category_rollup on umls_category_rollup.id=umls_instance_rollup.rollup_id
+                    category_rollup=lower(grandparent_entity.name),
+                    instance_rollup=lower(parent_entity.name)
+                FROM biomedical_entity
+                JOIN _entity_to_parent as etp on etp."B"=biomedical_entity.id -- "B" is child
+                JOIN biomedical_entity as parent_entity on parent_entity.id=etp."A" -- "A" is parent
+                LEFT JOIN _entity_to_parent as ptgp ON ptgp."A"=parent_entity.id
+                LEFT JOIN biomedical_entity as grandparent_entity ON grandparent_entity.id=ptgp."B"
                 WHERE {table}.entity_id=biomedical_entity.id
-                AND biomedical_entity.id=etu."A"
-                AND umls.id=etu."B"
-                {'AND ' + ' AND '.join(filters) if filters else ''}
             """
-
-        # specification for linking docs to ents & umls
-        spec = {
-            "intervenable": [
-                {
-                    # prefer target types (protein/gene)
-                    "filters": [
-                        f"umls.type_ids && ARRAY{list(UMLS_TARGET_TYPES.keys())}"
-                    ],
-                },
-                {
-                    # then, only update those not yet updated
-                    "filters": ["instance_rollup = ''"],
-                },
-            ],
-            "indicatable": [
-                {
-                    # prefer disease types
-                    "filters": [
-                        f"umls.type_ids && ARRAY{list(UMLS_DISEASE_TYPES.keys())}"
-                    ],
-                },
-                {
-                    # then, only update those not yet updated
-                    "filters": ["instance_rollup = ''"],
-                },
-            ],
-        }
 
         # execute the spec
         client = await prisma_client(600)
-        for table, specs in spec.items():
-            for spec in specs:
-                query = get_query(table, spec["filters"])
-                await client.execute_raw(query)
+        for table in ["intervenable", "indicatable"]:
+            query = get_query(table)
+            await client.execute_raw(query)
 
     @staticmethod
     async def pre_doc_finalize():
@@ -424,9 +401,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # await BiomedicalEntityEtl.add_counts()
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
-        await UmlsLoader.update_with_ontology_level()
+        # await UmlsLoader.update_with_ontology_level()
 
-        # recursively add parents from UMLS
+        # recursively add UMLS as biomedical entity parents
         await BiomedicalEntityEtl._umls_to_biomedical_entity()
 
         # add instance & category rollups

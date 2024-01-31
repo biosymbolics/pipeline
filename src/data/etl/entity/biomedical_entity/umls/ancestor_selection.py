@@ -24,6 +24,7 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     # process_involves_gene head/gene -> tail/process
     # gene_associated_with_disease head/disease -> tail/gene
     "isa",  # head/parent->tail/child, e.g. Meningeal Melanoma -> Adult Meningeal Melanoma
+    "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
     "mapped_to",  # head-parent -> tail-child, e.g. Melanomas -> Uveal Melanoma
     "has_mechanism_of_action",  # head/MoA->tail/drug
     "has_target",  # head/target->tail/drug
@@ -70,7 +71,7 @@ class AncestorUmlsGraph(UmlsGraph):
             SELECT umls.id as id, count(*) as count
             FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
             WHERE biomedical_entity.id=intervenable.entity_id
-            AND etu."A"=intervenable.id
+            AND etu."A"=biomedical_entity.id
             AND umls.id=etu."B"
             AND umls.type_ids && $1
             GROUP BY umls.id
@@ -81,7 +82,7 @@ class AncestorUmlsGraph(UmlsGraph):
             SELECT umls.id as id, count(*) as count
             FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
             WHERE biomedical_entity.id=indicatable.entity_id
-            AND etu."A"=indicatable.id
+            AND etu."A"=biomedical_entity.id
             AND umls.id=etu."B"
             AND umls.type_ids && $1
             GROUP BY umls.id
@@ -106,8 +107,6 @@ class AncestorUmlsGraph(UmlsGraph):
         - limits types to biomedical
         - applies some naming restrictions (via 'suppressions')
         - suppresses entities whose name is also a type (indicates overly general)
-
-        Query took 4.51 minutes (depth < 3)
         """
         # head == parent, tail == child
         query = rf"""
@@ -119,7 +118,7 @@ class AncestorUmlsGraph(UmlsGraph):
                     1 AS depth
                 FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
                 WHERE biomedical_entity.id=intervenable.entity_id
-                AND etu."A"=intervenable.id
+                AND etu."A"=biomedical_entity.id
                 AND umls.id=etu."B"
                 AND umls.type_ids && $1
 
@@ -132,7 +131,7 @@ class AncestorUmlsGraph(UmlsGraph):
                     1 AS depth
                 FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
                 WHERE biomedical_entity.id=indicatable.entity_id
-                AND etu."A"=indicatable.id
+                AND etu."A"=biomedical_entity.id
                 AND umls.id=etu."B"
                 AND umls.type_ids && $1
 
@@ -185,7 +184,7 @@ class AncestorUmlsGraph(UmlsGraph):
         import seaborn as sns
         from data.etl.entity.biomedical_entity.umls.ancestor_selection import AncestorUmlsGraph
         g = await AncestorUmlsGraph.create()
-        data = [v["count"] for v in g.nodes.values()]
+        data = [v.get("count", 0) for v in list(g.nodes.values())]
         sns.displot(data, kde=True, aspect=10/4)
         ```
         """
@@ -329,7 +328,7 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         if not cui in self.nodes:
             logger.warning("%s not in graph", cui)
-            return OntologyLevel.UNKNOWN
+            return OntologyLevel.NA
 
         node = NodeRecord(**self.nodes[cui])
 
@@ -346,3 +345,9 @@ class AncestorUmlsGraph(UmlsGraph):
         node = NodeRecord(**self.nodes[cui])
 
         return node.count
+
+    def has_node(self, cui: str) -> bool:
+        """
+        See if cui is in graph
+        """
+        return cui in self.nodes

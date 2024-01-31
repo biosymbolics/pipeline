@@ -96,18 +96,20 @@ class UmlsLoader:
         Run *after* BiomedicalEntityEtl
         """
         client = await prisma_client(600)
+
+        # TODO: initial filter on valid UMLS values??
         all_umls = await Umls.prisma(client).find_many()
 
         # might be slow, if doing betweenness centrality calc.
         ult = await UmlsAncestorTransformer.create(all_umls)
 
-        await batch_update(
-            all_umls,
-            update_func=lambda r, tx: Umls.prisma(tx).update(
-                data=ult.transform(r), where={"id": r.id}
-            ),
-            batch_size=1000,  # gets mad if more than 1000 or so
-        )
+        async def maybe_update(r: Umls, tx):
+            # update only if transformed is non null
+            tr = ult.transform(r)
+            if tr is not None:
+                await Umls.prisma(tx).update(data=tr, where={"id": r.id})
+
+        await batch_update(all_umls, update_func=maybe_update, batch_size=5000)
 
     @staticmethod
     async def copy_relationships():

@@ -84,4 +84,4 @@ async def batch_update(
                 try:
                     await update_func(r, client)
                 except Exception as e:
-                    logger.warning("Error in one-off update (%s)", e)
+                    logger.warning("Error in one-off update: %s, %s", e, r)
