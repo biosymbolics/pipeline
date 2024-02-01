@@ -17,6 +17,19 @@ UMLS_NAME_OVERRIDES = {
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
 }
 
+# sets canonical based on word
+UMLS_WORD_OVERRIDES = {
+    "modulator": "C0005525",  # "Biological Response Modifiers"
+    "modulators": "C0005525",
+    "binder": "C1145667",  # binding action
+    "binders": "C1145667",  # binding action
+    "binding": "C1145667",  # binding action
+    "inhibitor": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+}
+
 
 UMLS_CUI_SUPPRESSIONS = {
     "C0243083": "associated disease",
@@ -84,17 +97,6 @@ UMLS_NAME_SUPPRESSIONS = [
     "wt",  # wt allele (prefer gene record)
 ]
 
-# sets canonical based on word
-UMLS_WORD_OVERRIDES = {
-    "modulator": "C0005525",  # "Biological Response Modifiers"
-    "modulators": "C0005525",
-    "binder": "C1145667",  # "Binding action"
-    "binders": "C1145667",
-    "inhibitor": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
-    "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
-    "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
-    "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
-}
 
 UMLS_COMPOUND_TYPES = {
     "T103": "Chemical",
