@@ -43,6 +43,7 @@ model EntitySynonym {
 
     @@unique([term, entity_id]) // TODO: should be on term
     @@index([term], name: "entity_synonym_term")
+    @@index([entity_id], name: "entity_synonym_entity_id")
     @@map("entity_synonym")
 }
 
