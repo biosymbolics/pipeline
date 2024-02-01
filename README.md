@@ -52,6 +52,69 @@ PYTHONPATH=$(pwd)/src:$(pwd)/:./binder:/opt/homebrew/lib/python3.11/site-package
 - `screen` - `ctrl-a d` to detach, `screen -r`` to reattach
 - `python3 -m scripts.stage1_patents.extract_entities WO-2004078070-A3` (or whatever)
 
+### Running on server for linking
+```
+pg_dump --no-owner aact \
+  -t studies \
+  -t outcomes \
+  -t designs \
+  -t design_groups \
+  -t browse_conditions \
+  -t conditions \
+  -t interventions \
+  -t browse_interventions \
+  -t drop_withdrawals \
+  -t outcome_analyses > ct.sql
+zip ct.sql.zip ct.sql
+pg_dump --no-owner drugcentral \
+    -t pharma_class \
+    -t approval \
+    -t active_ingredient \
+    -t product \
+    -t prd2label \
+    -t label \
+    -t structures \
+    -t omop_relationship > drugcentral.sql
+zip drugcentral.sql.zip drugcentral.sql
+pg_dump --no-owner patents -t biosym_annotations -t gpr_annotations > patents.sql
+zip patents.sql.zip patents.sql
+** start uploading biosym.psql.zip **
+git clone https://github.com/biosymbolics/pipeline
+cd pipeline
+python3 -m pip install -r requirements.txt
+sudo apt install postgresql postgresql-contrib screen unzip gcc make
+sudo apt install postgresql-server-dev-14
+cd /tmp
+git clone --branch v0.6.0 https://github.com/pgvector/pgvector.git
+cd pgvector
+make
+make install # may need sudo
+pg_lsclusters
+pg_ctlcluster 14 main start
+su - postgres
+psql
+create role biosym with password 'ok';
+alter role biosym with superuser;
+create database biosym;
+create database patents;
+create database drugcentral;
+create database aact;
+create schema ctgov;
+CREATE EXTENSION vector;
+exit
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+pip install -U prisma
+prisma db push
+adduser biosym
+unzip patents.sql.zip
+unzip drugcentral.sql.zip
+unzip ct.sql.zip
+sudo -u biosym psql aact < ct.sql
+sudo -u biosym psql drugcentral < drugcentral.sql
+sudo -u biosym psql patents < patents.sql
+python -m spacy download en_core_web_trf
+. .pythonenv
+```
 
 ### Running locally
 - `sls offline`
@@ -79,15 +142,6 @@ serverless invoke local --function search-patents
 ```
 
 ### Running
-
-#### Patents
-
-##### NER
-
-- `. .pythonenv`
-- `source ~/.bashrc`
-- `gcloud auth application-default login`
-- `python3 src/scripts/patents/ner.py`
 
 ### Testing
 
@@ -170,8 +224,8 @@ importlib.reload(common.ner.ner)
 
 #### Database
 ```
-export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym?connection_limit=50
-create role biosym with password '';
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+create role biosym with password 'ok';
 alter role biosym with superuser;
 prisma db push
 ```

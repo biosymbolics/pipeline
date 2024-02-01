@@ -20,19 +20,34 @@ from utils.re import get_or_re
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+"""
+Debugging
+select be.canonical_id, be.name, be.count, parent_be.name from biomedical_entity be, _entity_to_parent etp, biomedical_entity parent_be where etp."B"=be.id and etp."A"=parent_be.id and be.name ilike 'cd3 antigens';
+select * from umls_graph where tail_id='C0108779' and relationship in ('isa', 'mapped_to', 'classified_as', 'has_mechanism_of_action', 'has_target', 'has_active_ingredient', 'tradename_of', 'has_phenotype');
+"""
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
-    # process_involves_gene head/gene -> tail/process
-    # gene_associated_with_disease head/disease -> tail/gene
+    ### GENERAL ###
     "isa",  # head/parent->tail/child, e.g. Meningeal Melanoma -> Adult Meningeal Melanoma
-    "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
     "mapped_to",  # head-parent -> tail-child, e.g. Melanomas -> Uveal Melanoma
+    "classified_as",  # head/parent -> tail/child, e.g. APPENDECTOMY -> Laparoscopic Appendectomy
+    ### INTERVENTION ###
     "has_mechanism_of_action",  # head/MoA->tail/drug
     "has_target",  # head/target->tail/drug
+    "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE
+    "tradename_of",  # Amoxycillin -> Amoxil
+    ### DISEASE ###
+    "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
+    ### INTERESTING BUT NOT FOR NOW ###
+    # has_manifestation # e.g. Pains, Abdominal -> fabrys disease   (not suitable)
+    # gene_associated_with_disease # e.g. Alzheimers Diseases -> PSEN1 Gene (interesting in future)
+    # process_involves_gene # e.g. ABCB1 Gene -> Ligand Binding (questionable for this purpose)
+    # biological_process_involves_gene_product / gene_product_plays_role_in_biological_process # questionable
+    # has_doseformgroup # e.g. Injectables -> Buprenex Injectable Product (not helpful)
 )
 LEVEL_INSTANCE_THRESHOLD = 25
 LEVEL_OVERRIDE_DELTA = 500
 LEVEL_MIN_PREV_COUNT = 5
-MAX_DEPTH_QUERY = 4
+MAX_DEPTH_QUERY = 5
 MAX_DEPTH_NETWORK = 6
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
 
@@ -176,10 +191,7 @@ class AncestorUmlsGraph(UmlsGraph):
                 JOIN umls as head_entity on head_entity.id = umls_graph.head_id
                 JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
                 WHERE wt.depth <= {MAX_DEPTH_QUERY}
-                AND (
-                    -- relationship is null
-                    relationship in {considered_relationships}
-                )
+                AND relationship in {considered_relationships}
                 AND head_entity.type_ids && $1
                 AND tail_entity.type_ids && $1
                 AND head_id not in {cui_suppressions}

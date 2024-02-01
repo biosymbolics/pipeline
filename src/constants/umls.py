@@ -4,6 +4,16 @@ Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 from typing import Literal
 from prisma.enums import BiomedicalEntityType
 
+LegacyDomainType = Literal[
+    "compounds",
+    "biologics",
+    "devices",
+    "diagnostics",
+    "diseases",
+    "procedures",
+    "mechanisms",
+]
+
 # TODO: maybe choose NCI as canonical name
 # rewrites preferred name
 UMLS_NAME_OVERRIDES = {
@@ -14,6 +24,19 @@ UMLS_NAME_OVERRIDES = {
     # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
+}
+
+# sets canonical based on (single!) word
+UMLS_WORD_OVERRIDES = {
+    "modulator": "C0005525",  # "Biological Response Modifiers"
+    "modulators": "C0005525",
+    "binder": "C1145667",  # binding action
+    "binders": "C1145667",  # binding action
+    "binding": "C1145667",  # binding action
+    "inhibitor": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
+    "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
 }
 
 
@@ -61,6 +84,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1413336": "cel gene",  # matches cell
     "C0815040": "acidic amino acid",  # matches amino acid
     "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
+    "C0008109": "chimera",
 }
 
 
@@ -83,17 +107,6 @@ UMLS_NAME_SUPPRESSIONS = [
     "wt",  # wt allele (prefer gene record)
 ]
 
-# sets canonical based on word
-UMLS_WORD_OVERRIDES = {
-    "modulator": "C0005525",  # "Biological Response Modifiers"
-    "modulators": "C0005525",
-    "binder": "C1145667",  # "Binding action"
-    "binders": "C1145667",
-    "inhibitor": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
-    "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
-    "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
-    "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
-}
 
 UMLS_COMPOUND_TYPES = {
     "T103": "Chemical",
@@ -139,7 +152,6 @@ UMLS_BIOLOGIC_TYPES = {
 }
 
 
-# TODO: move to bio????
 UMLS_MECHANISM_TYPES = {
     "T120": "Mechanism",  # "Chemical Viewed Functionally",
     "T121": "Pharmacologic Substance",  # TODO: here or in compound???
@@ -147,7 +159,6 @@ UMLS_MECHANISM_TYPES = {
     "T195": "Antibiotic",
 }
 
-# not necessarily all interventions.
 UMLS_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_COMPOUND_TYPES,
     **UMLS_BIOLOGIC_TYPES,
@@ -174,7 +185,6 @@ UMLS_INTERVENTION_TYPES = {
 }
 
 UMLS_PATHOGEN_TYPES = {
-    "T001": "Organism",  # includes "pathogenic organism"
     "T004": "Fungus",
     "T005": "Virus",
     "T007": "Bacterium",
@@ -197,15 +207,12 @@ UMLS_DISEASE_TYPES = {
 }
 
 
+# phenotypic abnormality
+
 UMLS_PHENOTYPE_TYPES = {
-    "T022": "Body System",
-    "T024": "Tissue",
-    "T025": "Cell",  # 16000
-    "T026": "Cell Component",
-    "T031": "Body Substance",  # includes plaque, atherosclerotic
-    "T033": "Finding",  # includes Hypotension, Tachycardia, Overweight but a lot of junk too. # 112007 unknowns.
-    "T042": "Organ or Tissue Function",  # includes "graft rejection" # 17578
-    "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation,
+    "T031": "Body Substance",  # includes plaque, atherosclerotic, Amniotic Fluid (bad)
+    "T033": "Finding",  # includes Hypotension, Tachycardia, Overweight but a lot of junk too, e.g. retraction (finding)
+    "T042": "Organ or Tissue Function",  # includes "graft rejection", but also "Natural regeneration"
     # "T101": "Patient or Disabled Group",
 }
 
@@ -224,6 +231,8 @@ UMLS_OTHER_TYPES = {
     # "T068": "Human-caused Phenomenon or Process",  # ??
     "T196": "Element",  # "Element, Ion, or Isotope",
     "T169": "Functional Concept",
+    "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation, dehydrogenation
+    # "T001": "Organism",  # includes "pathogenic organism" -could be disease or biologic?
 }
 
 # UMLS ents of these types will be included in the UMLS load
@@ -249,9 +258,43 @@ MOST_PREFERRED_UMLS_TYPES = {
 }
 
 
-BIOSYM_UMLS_TFIDF_PATH = (
-    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
-)
+# casting wide net on disease types (includes the less-preferred types)
+UMLS_EXTENDED_DISEASE_TYPES = {
+    **UMLS_DISEASE_TYPES,
+    **UMLS_PHENOTYPE_TYPES,
+    "T040": "Organism Function",  # Positive Regulation of Angiogenesis
+    "T041": "Mental Process",
+    "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
+    "T039": "Physiologic Function",  # e.g. Menopause
+    # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
+    "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
+}
+
+# casting wide net on compound types (includes the less-preferred types)
+UMLS_EXTENDED_COMPOUND_TYPES = {
+    **UMLS_COMPOUND_TYPES,
+    "T167": "Substance",
+    "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
+}
+
+# casting wide net on biologic types (includes the less-preferred types)
+UMLS_EXTENDED_BIOLOGIC_TYPES = {
+    **UMLS_BIOLOGIC_TYPES,
+    "T022": "Body System",
+    "T024": "Tissue",
+    "T025": "Cell",
+    "T026": "Cell Component",
+}
+
+# casting wide net on pharma intervention types (includes the less-preferred types)
+UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES = {
+    **UMLS_EXTENDED_COMPOUND_TYPES,
+    **UMLS_EXTENDED_BIOLOGIC_TYPES,
+    **UMLS_MECHANISM_TYPES,
+}
+
+UMLS_EXTENDED_DEVICE_TYPES = {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"}
+
 
 """
 ENTITY_TO_UMLS_TYPE
@@ -264,41 +307,18 @@ where umls.id=canonical_id and entity_type='UNKNOWN' order by count desc limit 1
 ```
 """
 ENTITY_TO_UMLS_TYPE = {
-    BiomedicalEntityType.COMPOUND: {
-        **UMLS_COMPOUND_TYPES,
-        "T167": "Substance",
-        "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
-    },
-    BiomedicalEntityType.BIOLOGIC: UMLS_BIOLOGIC_TYPES,
-    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
-    BiomedicalEntityType.DEVICE: {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"},
-    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
+    BiomedicalEntityType.BIOLOGIC: UMLS_EXTENDED_BIOLOGIC_TYPES,
+    BiomedicalEntityType.COMPOUND: UMLS_EXTENDED_COMPOUND_TYPES,
+    BiomedicalEntityType.DEVICE: UMLS_EXTENDED_DEVICE_TYPES,
     # includes phenotypes for the sake of typing; phenotype category not ideal for matching since it is very broad
-    BiomedicalEntityType.DISEASE: {
-        **UMLS_DISEASE_TYPES,
-        **UMLS_PHENOTYPE_TYPES,
-        "T040": "Organism Function",
-        "T041": "Mental Process",
-        "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
-        "T039": "Physiologic Function",  # e.g. Menopause
-        # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
-        "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
-    },
+    BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE_TYPES,
     BiomedicalEntityType.DIAGNOSTIC: UMLS_DIAGNOSTIC_TYPES,
+    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
+    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
-
-LegacyDomainType = Literal[
-    "compounds",
-    "biologics",
-    "devices",
-    "diagnostics",
-    "diseases",
-    "procedures",
-    "mechanisms",
-]
 
 
 NER_ENTITY_TYPES = frozenset(
@@ -313,10 +333,28 @@ NER_ENTITY_TYPES = frozenset(
 )
 
 
-DESIREABLE_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_DISEASE_TYPES.keys()},
+BEST_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_EXTENDED_DISEASE_TYPES.keys()},
     **{
         k: list(UMLS_TARGET_TYPES.keys())
+        for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+    },
+}
+
+BETTER_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{
+        k: list(UMLS_EXTENDED_DISEASE_TYPES.keys())
+        for k in UMLS_EXTENDED_DISEASE_TYPES.keys()
+    },
+    **{
+        k: list(UMLS_MECHANISM_TYPES.keys())
         for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+    },
+}
+
+FAIR_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
+    **{
+        k: list(UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+        for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }

@@ -23,15 +23,14 @@ model BiomedicalEntity {
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
     is_priority   Boolean                  @default(false)
-    name          String                   @unique
+    name          String
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      EntitySynonym[]
     umls_entities Umls[]                   @relation("entity_to_umls")
 
-    // @@unique([name, entity_type]) // probably more suitable than just name, but will require some code changes
-
+    @@unique([name, entity_type])
     @@index([entity_type], name: "biomedical_entity_type")
     @@map("biomedical_entity")
 }
@@ -44,6 +43,7 @@ model EntitySynonym {
 
     @@unique([term, entity_id]) // TODO: should be on term
     @@index([term], name: "entity_synonym_term")
+    @@index([entity_id], name: "entity_synonym_entity_id")
     @@map("entity_synonym")
 }
 

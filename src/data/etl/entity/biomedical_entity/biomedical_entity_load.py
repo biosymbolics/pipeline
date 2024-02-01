@@ -1,9 +1,10 @@
 import asyncio
 import sys
 import logging
+import httpx
+import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from clients.low_level.prisma import prisma_context
 from data.etl.documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
 
@@ -47,18 +48,16 @@ class BiomedicalEntityLoader:
         await BiomedicalEntityEtl.post_doc_finalize()
 
 
-def main():
-    prisma_context(300)
-    asyncio.run(BiomedicalEntityLoader().copy_all())
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.biomedical_entity.load
+            Usage: python3 -m data.etl.entity.biomedical_entity.biomedical_entity_load [--post-doc-finalize]
             """
         )
         sys.exit()
 
-    main()
+    if "--post-doc-finalize" in sys.argv:
+        asyncio.run(BiomedicalEntityLoader().post_doc_finalize())
+    else:
+        asyncio.run(BiomedicalEntityLoader().copy_all())

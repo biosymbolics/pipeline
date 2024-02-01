@@ -1,6 +1,7 @@
 import re
 from pydantic import BaseModel
 from pydash import compact
+from prisma.enums import BiomedicalEntityType
 
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 from utils.re import get_or_re
@@ -48,8 +49,22 @@ class InterventionIntermediate(BaseModel):
     pharmacologic_classes: list[PharmaClass]
 
     @property
-    def intervention(self) -> str:
+    def name(self) -> str:
         return self.generic_name or self.brand_name
+
+    @property
+    def is_combo(self) -> bool:
+        return len(self.active_ingredients) > 1
+
+    @property
+    def default_type(self) -> BiomedicalEntityType:
+        if self.is_combo:
+            return BiomedicalEntityType.COMBINATION
+        return BiomedicalEntityType.COMPOUND
+
+    @property
+    def combo_ingredients(self) -> list[str]:
+        return self.active_ingredients if self.is_combo else []
 
     def __init__(self, pharmacologic_classes, **kwargs):
         """

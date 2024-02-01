@@ -96,9 +96,6 @@ class TrialLoader(BaseDocumentEtl):
     Load trials and associated entities
     """
 
-    def __init__(self, document_type: str):
-        self.document_type = document_type
-
     @staticmethod
     def get_source_sql(fields: list[str] = get_source_fields()) -> str:
         source_sql = f"""

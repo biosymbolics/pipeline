@@ -4,12 +4,13 @@ from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateManyNestedWithoutRelationsInput as BiomedicalEntityRelationInput,
 )
-from pydash import uniq
+from pydash import is_empty
 
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
+from utils.list import uniq_compact
 
 
 @dataclass(frozen=True)
@@ -44,16 +45,16 @@ class RelationConnectInfo(Dataclass):
             { "create": [{ "term": "foo" }] }
             { "connect": [{ "canonical_id": "foo" }] }
         """
-        vals = uniq(
+        vals = uniq_compact(
             [
                 self._get_relation_val(val, canonical_map)
                 for val in source_rec.get(self.source_field) or []
             ]
         )
-        if vals is None:
+        if len(vals) == 0:
             return {}
 
-        relation_inputs = [{self.dest_field: str(val)} for val in vals]
+        relation_inputs = [{self.dest_field: val} for val in vals]
 
         if self.connect_type == "connect":
             return BiomedicalEntityRelationInput(connect=relation_inputs)  # type: ignore
@@ -65,8 +66,22 @@ class RelationConnectInfo(Dataclass):
 
 @dataclass(frozen=True)
 class RelationIdFieldMap(Dataclass):
+    # field to connect info
+    @property
     def items(self) -> list[tuple[str, RelationConnectInfo]]:
-        return [(field.name, getattr(self, field.name)) for field in fields(self)]
+        return [
+            (field.name, getattr(self, field.name))
+            for field in fields(self)
+            if getattr(self, field.name) is not None
+        ]
+
+    @property
+    def fields(self) -> list[str]:
+        return [
+            field.name
+            for field in fields(self)
+            if getattr(self, field.name) is not None
+        ]
 
     comprised_of: RelationConnectInfo | None = None
     parents: RelationConnectInfo | None = None

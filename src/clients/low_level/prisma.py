@@ -66,7 +66,8 @@ async def batch_update(
     records: Sequence[T],
     update_func: Callable[[T, Prisma], Awaitable],
     batch_size: int = 1000,
-    timeout: int | None = 300,
+    timeout: int | None = 100,  # in seconds?
+    transaction_timeout: int = 300 * 1000,  # in millis
 ):
     """
     Batch update records (in a transaction, for performance)
@@ -75,7 +76,7 @@ async def batch_update(
     batches = batch(records, batch_size)
     for b in batches:
         try:
-            async with client.tx() as tx:
+            async with client.tx(timeout=transaction_timeout) as tx:
                 for r in b:
                     await update_func(r, tx)
         except Exception as e:

@@ -89,18 +89,19 @@ class UmlsLoader:
         )
 
     @staticmethod
-    async def update_with_ontology_level():
+    async def set_ontology_levels():
         """
         Adds ontology levels (heavy, with dependencies)
 
         Run *after* BiomedicalEntityEtl
         """
+        logger.info("Updating UMLS with levels")
         client = await prisma_client(600)
 
         # TODO: initial filter on valid UMLS values??
         all_umls = await Umls.prisma(client).find_many()
 
-        # might be slow, if doing betweenness centrality calc.
+        # might be slow-ish, if creating a new graph
         ult = await UmlsAncestorTransformer.create(all_umls)
 
         async def maybe_update(r: Umls, tx):

@@ -35,6 +35,24 @@ class TestTrialUtils(unittest.TestCase):
                 "expected": "TARGET_ANCESTOR",
             },
             {
+                "description": "select less optimal target type ancestor for intervention type",
+                "record": {
+                    "level": OntologyLevel.SUBINSTANCE,
+                    "id": "SELF_ID",
+                    "type_ids": ["T121"],  # "Pharmacologic Substance"
+                },
+                "ancestors": tuple(
+                    [
+                        {
+                            "level": OntologyLevel.INSTANCE,
+                            "id": "TARGET_ANCESTOR",
+                            "type_ids": ["T121"],  # "Pharmacologic Substance"
+                        },
+                    ]
+                ),
+                "expected": "TARGET_ANCESTOR",
+            },
+            {
                 "description": "select indication type ancestor for indication type",
                 "record": {
                     "level": OntologyLevel.SUBINSTANCE,

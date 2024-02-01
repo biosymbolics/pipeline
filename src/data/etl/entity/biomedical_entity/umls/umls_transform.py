@@ -8,7 +8,11 @@ from prisma.types import (
 )
 from pydash import compact, flatten
 
-from constants.umls import DESIREABLE_ANCESTOR_TYPE_MAP
+from constants.umls import (
+    BEST_ANCESTOR_TYPE_MAP,
+    BETTER_ANCESTOR_TYPE_MAP,
+    FAIR_ANCESTOR_TYPE_MAP,
+)
 from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
@@ -95,14 +99,14 @@ class UmlsAncestorTransformer:
 
     @staticmethod
     def choose_best_ancestor(
-        record: UmlsInfo,
+        child: UmlsInfo,
         ancestors: tuple[UmlsInfo, ...],
     ) -> str:
         """
-        Choose the best ancestor for the record
+        Choose the best ancestor for the child
         - prefer ancestors that are *specific* genes/proteins/receptors, aka the drug's target, e.g. gpr83 (for instance)
         - avoid suppressed UMLS records
-        - otherwise prefer just based on level (e.g. L1_CATEGORY, L2_CATEGORY, INSTANCE)
+        - require level be higher than child
 
         Args:
             record (UmlsInfo): UMLS info
@@ -119,51 +123,45 @@ class UmlsAncestorTransformer:
             such as "least common subsumer" and information-based mutual information measures
         """
 
-        def choose_by_type(
-            record: UmlsInfo,
-            _ancestors: tuple[UmlsInfo, ...],
-        ) -> str | None:
+        def filter_ancestors(
+            _child: UmlsInfo, ancestors: Sequence[UmlsInfo]
+        ) -> list[UmlsInfo]:
             """
-            based on record types, find desireable ancestor type(s)
+            Look for the best ancestor type, descending through layers of preferrability
             """
-            good_ancestor_types = flatten(
-                [
-                    DESIREABLE_ANCESTOR_TYPE_MAP.get(type_id, [])
-                    for type_id in record.type_ids
+            for match_map in [
+                BEST_ANCESTOR_TYPE_MAP,
+                BETTER_ANCESTOR_TYPE_MAP,
+                FAIR_ANCESTOR_TYPE_MAP,
+            ]:
+                ok_ancestor_types = flatten(
+                    [match_map.get(type_id, []) for type_id in _child.type_ids]
+                )
+
+                # ancestors eligible if
+                # - type intersection, or child has no type_ids
+                # - and the level is higher than child
+                eligible_ancestors = [
+                    a
+                    for a in ancestors
+                    if (
+                        len(_child.type_ids) == 0
+                        or has_intersection(a.type_ids, ok_ancestor_types)
+                    )
+                    and compare_ontology_level(a.level, _child.level) > 0
                 ]
-            )
-            good_ancestors = [
-                a
-                for a in _ancestors
-                if has_intersection(a.type_ids, good_ancestor_types)
-            ]
-            if len(good_ancestors) == 0:
-                return None
+                if len(eligible_ancestors) > 0:
+                    return eligible_ancestors
 
-            return choose_by_level(record, tuple(good_ancestors))
+            return []
 
-        def choose_by_level(record: UmlsInfo, _ancestors: tuple[UmlsInfo, ...]) -> str:
-            """
-            based on record level, find the best ancestor
-            """
-            # ancestors ABOVE the current level
-            # e.g. L1_CATEGORY if record.level == INSTANCE
-            # e.g. L2_CATEGORY if record.level == L1_CATEGORY
-            ok_ancestors = [
-                a
-                for a in _ancestors
-                if compare_ontology_level(a.level, record.level) > 0
-            ]
+        eligible_ancestors = filter_ancestors(child, ancestors)
 
-            # if no ok ancestors, return self
-            if len(ok_ancestors) == 0:
-                return record.id
+        # if no eligible ancestors, return self
+        if len(eligible_ancestors) == 0:
+            return child.id
 
-            # otherwise, use the first matching ancestor
-            return ok_ancestors[0].id
-
-        # prefer type ancestor, otherwise just go by level
-        return choose_by_type(record, ancestors) or choose_by_level(record, ancestors)
+        return eligible_ancestors[0].id
 
     def transform(self, partial_record: Umls) -> UmlsUpdateInput | None:
         """
