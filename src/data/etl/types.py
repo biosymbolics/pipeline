@@ -103,16 +103,6 @@ def default_get_source_map(records: Sequence[dict]) -> dict:
     }
 
 
-def is_relation_empty(rel: BiomedicalEntityRelationInput | None) -> bool:
-    """
-    Helper to check if relation is empty
-    """
-    if rel is None:
-        return True
-
-    return is_empty(rel.get("connect")) and is_empty(rel.get("create"))
-
-
 @dataclass(frozen=True)
 class BiomedicalEntityLoadSpec(Dataclass):
     database: str
