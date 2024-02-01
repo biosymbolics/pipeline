@@ -1,6 +1,7 @@
 """
 Regulatory approval ETL script
 """
+from functools import reduce
 import sys
 import asyncio
 import logging
@@ -50,28 +51,21 @@ def get_indication_source_map(records: Sequence[dict]) -> dict:
     }
 
 
-def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
-    i_recs = [InterventionIntermediate(**r) for r in records]
+def get_intervention_source_map(
+    records: Sequence[dict],
+) -> dict[str, dict[str, list[str] | str | bool | BiomedicalEntityType]]:
+    """
+    Create source map for interventions
+    """
 
-    def create_sm_entry(rec: InterventionIntermediate):
-        is_combo = len(rec.active_ingredients) > 1
-        combo_ingredients = rec.active_ingredients if is_combo else []
-        main_default_type = (
-            BiomedicalEntityType.COMBINATION
-            if is_combo
-            else BiomedicalEntityType.COMPOUND
-        )
-
+    def create_entry(rec: InterventionIntermediate):
         return {
-            "active_ingredients": combo_ingredients,
-            "pharmacologic_classes": [pc.name for pc in rec.pharmacologic_classes],
-            # drugs broken out by combo (more than one active ingredient) or single/compound
-            **{
-                rec.generic_name: {
-                    "default_type": main_default_type,
-                    "synonyms": compact([rec.generic_name, rec.brand_name]),
-                    **rec.__dict__,
-                }
+            # main intervention
+            rec.name: {
+                "active_ingredients": rec.combo_ingredients,
+                "pharmacologic_classes": [pc.name for pc in rec.pharmacologic_classes],
+                "default_type": rec.default_type,
+                "synonyms": compact([rec.generic_name, rec.brand_name]),
             },
             # active ingredients for combination drugs
             **{
@@ -79,13 +73,13 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
                     "default_type": BiomedicalEntityType.COMPOUND,
                     "synonyms": [ci],
                 }
-                for ci in combo_ingredients
+                for ci in rec.combo_ingredients
             },
             # mechanisms / pharmacologic classes
             **{
                 pc.name: {
                     # set top sorted pharmacologic class as priority
-                    "is_priority": i == 0,  # todo - not actually used
+                    "is_priority": i == 0,
                     "default_type": BiomedicalEntityType.MECHANISM,
                     "synonyms": [pc.name],
                 }
@@ -93,7 +87,10 @@ def get_intervention_source_map(records: Sequence[dict]) -> dict[str, dict]:
             },
         }
 
-    return {rec.intervention: create_sm_entry(rec) for rec in i_recs}
+    return reduce(
+        lambda a, b: {**a, **b},
+        [create_entry(InterventionIntermediate(**r)) for r in records],
+    )
 
 
 class RegulatoryApprovalLoader(BaseDocumentEtl):

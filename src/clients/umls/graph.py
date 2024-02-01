@@ -32,11 +32,11 @@ class UmlsGraph(object):
     async def load(self, filename: str | None = None):
         g = None
         if filename is not None:
-            logger.info("Attempting to load graph from %s", filename)
             g = maybe_load_pickle(filename)
+            logger.info("Loaded graph from %s: %s", filename, g is not None)
 
         if g is None:
-            logger.info("Loading graph from database (%s)", filename or "no filename")
+            logger.info("Loading graph from database")
             g = await self.load_graph()
             if filename is not None:
                 save_as_pickle(g, filename)
@@ -63,7 +63,6 @@ class UmlsGraph(object):
         Load UMLS graph from database
         """
         start = time.monotonic()
-        logger.info("Loading graph")
         G = nx.DiGraph()
 
         nodes = await self.get_nodes()
