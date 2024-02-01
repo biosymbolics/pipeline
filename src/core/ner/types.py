@@ -41,6 +41,8 @@ class CanonicalEntity(Dataclass):
 
     @property
     def type(self) -> BiomedicalEntityType:
+        # TODO: should take into consideration type in DocEntity, when thusly instantiated.
+        # (UMLS is an ok proxy for type, but it gets messy, e.g. bacteria - intervention or disease? context tells us.)
         # if any already BiomedicalEntityTypes, return one
         bets = compact([BiomedicalEntityType.__members__.get(t) for t in self.types])
 

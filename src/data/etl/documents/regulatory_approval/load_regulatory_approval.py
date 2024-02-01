@@ -146,7 +146,6 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             get_source_map=get_intervention_source_map,
             relation_id_field_map=RelationIdFieldMap(
                 comprised_of=RelationConnectInfo(
-                    # "active ingredients" not in source?
                     source_field="active_ingredients",
                     dest_field="canonical_id",
                     connect_type="connect",

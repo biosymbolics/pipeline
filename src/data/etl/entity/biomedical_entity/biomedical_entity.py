@@ -193,7 +193,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             terms_to_canonicalize (Sequence[str]): terms to canonicalize
             vectors_to_canonicalize (Sequence[Sequence[float]]): vectors to canonicalize, if we have them
             source_map (dict): map of "term" to source record for additional fields, e.g. synonyms, "active_ingredients", etc.
-            force_update (bool): force update of records (otherwise just create & incidental updates for relationships)
         """
         canonical_map = self._generate_lookup_map(
             terms_to_canonicalize or terms, vectors_to_canonicalize
@@ -351,7 +350,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     async def link_to_documents():
         """
         - Link mapping tables "intervenable" and "indicatable" to canonical entities
-        - add instance_rollup and category_rollups
         """
 
         def get_query(table: str) -> str:
@@ -392,6 +390,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 WHERE {table}.entity_id=entity.id
             """
 
+        # much faster with temp tables
         initialize_queries = [
             "drop table if exists _rollups",
             """
@@ -450,7 +449,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: this will use a filesystem-cached graph if available, which could be stale.
-        # await UmlsLoader.set_ontology_levels()
+        await UmlsLoader.set_ontology_levels()
 
         # recursively add biomedical entity parents (from UMLS)
         # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()

@@ -26,7 +26,7 @@ UMLS_NAME_OVERRIDES = {
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
 }
 
-# sets canonical based on word
+# sets canonical based on (single!) word
 UMLS_WORD_OVERRIDES = {
     "modulator": "C0005525",  # "Biological Response Modifiers"
     "modulators": "C0005525",
@@ -84,6 +84,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1413336": "cel gene",  # matches cell
     "C0815040": "acidic amino acid",  # matches amino acid
     "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
+    "C0008109": "chimera",
 }
 
 
@@ -184,7 +185,6 @@ UMLS_INTERVENTION_TYPES = {
 }
 
 UMLS_PATHOGEN_TYPES = {
-    "T001": "Organism",  # includes "pathogenic organism"
     "T004": "Fungus",
     "T005": "Virus",
     "T007": "Bacterium",
@@ -207,10 +207,12 @@ UMLS_DISEASE_TYPES = {
 }
 
 
+# phenotypic abnormality
+
 UMLS_PHENOTYPE_TYPES = {
-    "T031": "Body Substance",  # includes plaque, atherosclerotic
-    "T033": "Finding",  # includes Hypotension, Tachycardia, Overweight but a lot of junk too. # 112007 unknowns.
-    "T042": "Organ or Tissue Function",  # includes "graft rejection" # 17578
+    "T031": "Body Substance",  # includes plaque, atherosclerotic, Amniotic Fluid (bad)
+    "T033": "Finding",  # includes Hypotension, Tachycardia, Overweight but a lot of junk too, e.g. retraction (finding)
+    "T042": "Organ or Tissue Function",  # includes "graft rejection", but also "Natural regeneration"
     # "T101": "Patient or Disabled Group",
 }
 
@@ -230,6 +232,7 @@ UMLS_OTHER_TYPES = {
     "T196": "Element",  # "Element, Ion, or Isotope",
     "T169": "Functional Concept",
     "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation, dehydrogenation
+    # "T001": "Organism",  # includes "pathogenic organism" -could be disease or biologic?
 }
 
 # UMLS ents of these types will be included in the UMLS load
@@ -259,7 +262,7 @@ MOST_PREFERRED_UMLS_TYPES = {
 UMLS_EXTENDED_DISEASE_TYPES = {
     **UMLS_DISEASE_TYPES,
     **UMLS_PHENOTYPE_TYPES,
-    "T040": "Organism Function",
+    "T040": "Organism Function",  # Positive Regulation of Angiogenesis
     "T041": "Mental Process",
     "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
     "T039": "Physiologic Function",  # e.g. Menopause
@@ -279,7 +282,7 @@ UMLS_EXTENDED_BIOLOGIC_TYPES = {
     **UMLS_BIOLOGIC_TYPES,
     "T022": "Body System",
     "T024": "Tissue",
-    "T025": "Cell",  # 16000
+    "T025": "Cell",
     "T026": "Cell Component",
 }
 
