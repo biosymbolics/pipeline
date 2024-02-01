@@ -272,26 +272,30 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         TODO: turn this into an in-memory function and insert only once
         """
 
-        async def execute(n: int):
-            # restrict iteration >=1 to entries with parents
-            # (since that is a superset of any possible additions)
-            has_children_restriction = (
-                """AND umls.id in (select "A" from _entity_to_parent where "A" = umls.id)"""
-                if n > 0
-                else ""
-            )
+        async def execute():
+            # as of 2024-02-01, not sure if this works properly
+            is_nx_restriction = """
+                -- parent doesn't already exist OR it exists but without this child
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM biomedical_entity possible_parent_entity, _entity_to_parent etp
+                    WHERE possible_parent_entity.id=etp."A"
+                    AND child_entity.id=etp."B"
+                    AND canonical_id=umls_parent.id
+                )
+            """
             query = f"""
                 SELECT
-                    biomedical_entity.id AS child_id,
+                    child_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
                     umls_parent.type_ids AS tuis
-                FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity
+                FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity as child_entity
                 WHERE
-                    etu."A"=biomedical_entity.id
+                    etu."A"=child_entity.id
                     AND umls.id=etu."B"
                     AND umls_parent.id=umls.rollup_id
-                    {has_children_restriction}
+                    {is_nx_restriction}
             """
             client = await prisma_client(300)
             results = await client.query_raw(query)
@@ -321,7 +325,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         for n in range(n_depth):
             logger.info("Adding UMLS as biomedical entity parents, depth %s", n)
-            await execute(n)
+            await execute()
 
     @staticmethod
     async def add_counts():
@@ -432,7 +436,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # await UmlsLoader.set_ontology_levels()
 
         # recursively add biomedical entity parents (from UMLS)
-        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
+        # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
         await BiomedicalEntityEtl.set_rollups()
