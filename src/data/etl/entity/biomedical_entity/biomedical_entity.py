@@ -257,6 +257,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             JOIN umls ON umls.id = s.cid
             ON CONFLICT DO NOTHING;
         """
+        logger.info("Mapping entities to UMLS concepts")
         client = await prisma_client(600)
         await client.execute_raw(query)
 
@@ -331,7 +332,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     async def add_counts():
         """
         add counts to biomedical_entity (used for autocomplete ordering)
+        TODO: counts from UMLS
         """
+        logger.info("Adding biomedical counts")
         client = await prisma_client(6)
         # add counts to biomedical_entity & owner
         for table in ENTITY_MAP_TABLES:
@@ -363,6 +366,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 AND entity_synonym.entity_id=biomedical_entity.id
             """
 
+        logger.info("Linking mapping tables to canonical entities")
         client = await prisma_client(600)
         for table in ["intervenable", "indicatable"]:
             query = get_query(table)
@@ -408,6 +412,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             "DROP TABLE IF EXISTS category_rollup",
         ]
 
+        logger.info("Setting rollups for mapping tables")
+
         client = await prisma_client(600)
         for query in initialize_queries:
             await client.execute_raw(query)
@@ -439,8 +445,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
         logger.info("Finalizing biomedical entity etl")
-        # await BiomedicalEntityEtl.link_to_documents()
-        # await BiomedicalEntityEtl.add_counts()
+        await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.add_counts() # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: this will use a filesystem-cached graph if available, which could be stale.
@@ -450,4 +456,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
-        await BiomedicalEntityEtl.set_rollups()
+        # await BiomedicalEntityEtl.set_rollups()
+
+        logger.info("Biomedical entity post_doc_finalize complete")

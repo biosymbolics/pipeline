@@ -20,6 +20,11 @@ from utils.re import get_or_re
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+"""
+Debugging
+select be.canonical_id, be.name, be.count, parent_be.name from biomedical_entity be, _entity_to_parent etp, biomedical_entity parent_be where etp."B"=be.id and etp."A"=parent_be.id and be.name ilike 'cd3 antigens';
+select * from umls_graph where tail_id='C0108779' and relationship in ('isa', 'mapped_to', 'classified_as', 'has_mechanism_of_action', 'has_target', 'has_active_ingredient', 'tradename_of', 'has_phenotype');
+"""
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     ### GENERAL ###
     "isa",  # head/parent->tail/child, e.g. Meningeal Melanoma -> Adult Meningeal Melanoma
