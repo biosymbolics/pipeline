@@ -82,8 +82,6 @@ zip patents.sql.zip patents.sql
 git clone https://github.com/biosymbolics/pipeline
 cd pipeline
 python3 -m pip install -r requirements.txt
-pip install -U prisma
-prisma generate
 sudo apt install postgresql postgresql-contrib screen unzip gcc make
 sudo apt install postgresql-server-dev-14
 cd /tmp
@@ -95,7 +93,7 @@ pg_lsclusters
 pg_ctlcluster 14 main start
 su - postgres
 psql
-create role biosym with password '';
+create role biosym with password 'ok';
 alter role biosym with superuser;
 create database biosym;
 create database patents;
@@ -104,13 +102,17 @@ create database aact;
 create schema ctgov;
 CREATE EXTENSION vector;
 exit
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+pip install -U prisma
+prisma db push
 adduser biosym
 unzip patents.sql.zip
 unzip drugcentral.sql.zip
 unzip ct.sql.zip
 sudo -u biosym psql aact < ct.sql
-sudo -u biosym psql < drugcentral.sql
-sudo -u biosym psql < patents.sql
+sudo -u biosym psql drugcentral < drugcentral.sql
+sudo -u biosym psql patents < patents.sql
+python -m spacy download en_core_web_trf
 . .pythonenv
 ```
 
@@ -222,7 +224,7 @@ importlib.reload(common.ner.ner)
 
 #### Database
 ```
-export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym?connection_limit=50
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
 create role biosym with password 'ok';
 alter role biosym with superuser;
 prisma db push
