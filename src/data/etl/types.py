@@ -1,12 +1,10 @@
 from dataclasses import dataclass, field, fields
-from typing import Any, Callable, Literal, Sequence
+from typing import Callable, Literal, Sequence
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
-    BiomedicalEntityUpdateInput,
-    BiomedicalEntityCreateInput,
     BiomedicalEntityCreateManyNestedWithoutRelationsInput as BiomedicalEntityRelationInput,
 )
-from pydash import is_empty, uniq
+from pydash import is_empty
 
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
