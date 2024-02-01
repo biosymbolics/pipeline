@@ -375,37 +375,48 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         intentional denormalization for reporting (faster than recursive querying)
         """
 
-        def get_query(table: str) -> str:
+        def get_update(table: str) -> str:
             # logic is in how rollup_id is set (umls etl / ancestor_selector)
             return f"""
                 UPDATE {table}
                 SET
-                    instance_rollup=lower(instance_rollup_name),
-                    category_rollup=lower(category_rollup_name)
-                FROM biomedical_entity as main_entity
-                JOIN (
-                    SELECT
-                        etp."B" as main_entity_id,
-                        max(id order by is_priority desc) as id,
-                        max(name order by is_priority desc) as instance_rollup_name
-                    FROM _entity_to_parent etp
-                    JOIN biomedical_entity ON id=etp."A" -- "A" is parent
-                    GROUP BY etp."B" -- "B" is child
-                ) instance_rollup ON main_entity_id=main_entity.id
-                LEFT JOIN (
-                    SELECT
-                        etp."B" as instance_rollup_id,
-                        max(name order by is_priority desc) as category_rollup_name
-                    FROM _entity_to_parent etp
-                    JOIN biomedical_entity ON id=etp."A" -- "A" is parent
-                    GROUP BY etp."B" -- "B" is child
-                ) category_rollup ON instance_rollup_id=instance_rollup.id
-                WHERE {table}.entity_id=main_entity.id
+                    instance_rollup=lower(instance_rollup.parent_name),
+                    category_rollup=lower(category_rollup.parent_name)
+                FROM biomedical_entity as entity
+                JOIN _rollups as instance_rollup ON instance_rollup.child_id=entity.id
+                LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
+                WHERE {table}.entity_id=entity.id
             """
 
+        initialize_queries = [
+            "drop table if exists _rollups",
+            """
+            CREATE TABLE _rollups AS
+                SELECT
+                    etp."B" as child_id,
+                    max(id order by is_priority desc) as parent_id,
+                    max(name order by is_priority desc) as parent_name
+                FROM _entity_to_parent etp
+                JOIN biomedical_entity ON id=etp."A" -- "A" is parent
+                GROUP BY etp."B" -- "B" is child
+            """,
+            "create index _rollups_child_id on _rollups(child_id)",
+            "create index _rollups_parent_id on _rollups(parent_id)",
+        ]
+        cleanup_queries = [
+            "DROP TABLE IF EXISTS instance_rollup",
+            "DROP TABLE IF EXISTS category_rollup",
+        ]
+
         client = await prisma_client(600)
+        for query in initialize_queries:
+            await client.execute_raw(query)
+
         for table in ["intervenable", "indicatable"]:
-            query = get_query(table)
+            query = get_update(table)
+            await client.execute_raw(query)
+
+        for query in cleanup_queries:
             await client.execute_raw(query)
 
     @staticmethod
