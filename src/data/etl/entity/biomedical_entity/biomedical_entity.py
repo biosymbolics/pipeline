@@ -163,12 +163,18 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     ) -> BiomedicalEntityWhereUniqueInput:
         """
         Get where clause for update
-        - prefer canonical_id, but use name if not available
+        - prefer canonical_id, but use name/type if not available
         """
         if rec.get("canonical_id") is not None:
             return {"canonical_id": rec.get("canonical_id") or ""}
         elif rec.get("name") is not None:
-            return {"name": rec.get("name") or ""}
+            return {
+                "name_entity_type": {
+                    "name": rec.get("name") or "",
+                    "entity_type": rec.get("entity_type")
+                    or BiomedicalEntityType.UNKNOWN,
+                }
+            }
 
         raise ValueError("Must have canonical_id or name")
 
@@ -255,9 +261,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await client.execute_raw(query)
 
     @staticmethod
-    async def _umls_to_biomedical_entity(n_depth: int = 3):
+    async def _create_biomedical_entity_ancestors(n_depth: int = 3):
         """
-        Create biomedical entity records for UMLS parents.
+        Create ancestor biomedical entities from UMLS
 
         Args:
             n_depth (int): numer of iterations / recursion depth
@@ -266,7 +272,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         TODO: turn this into an in-memory function and insert only once
         """
 
-        async def execute(n):
+        async def execute(n: int):
             # restrict iteration >=1 to entries with parents
             # (since that is a superset of any possible additions)
             has_children_restriction = (
@@ -310,7 +316,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     },
                     where=BiomedicalEntityEtl.get_update_where(r),
                 ),
-                batch_size=5000,
+                batch_size=10000,
             )
 
         for n in range(n_depth):
@@ -363,25 +369,34 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         Set instance_rollup and category_rollup for map tables (intervenable, indicatable)
         intentional denormalization for reporting (faster than recursive querying)
-
-        TODO
-            - type-based selection??
-            - is_priority-based selection??
         """
 
         def get_query(table: str) -> str:
-            # simple because all the logic is in how rollup_id is set.
+            # logic is in how rollup_id is set (umls etl / ancestor_selector)
             return f"""
                 UPDATE {table}
                 SET
-                    category_rollup=lower(grandparent_entity.name),
-                    instance_rollup=lower(parent_entity.name)
-                FROM biomedical_entity
-                JOIN _entity_to_parent as etp on etp."B"=biomedical_entity.id -- "B" is child
-                JOIN biomedical_entity as parent_entity on parent_entity.id=etp."A" -- "A" is parent
-                LEFT JOIN _entity_to_parent as ptgp ON etp."A"=ptgp."B"
-                LEFT JOIN biomedical_entity as grandparent_entity ON grandparent_entity.id=ptgp."A"
-                WHERE {table}.entity_id=biomedical_entity.id
+                    instance_rollup=lower(instance_rollup_name),
+                    category_rollup=lower(category_rollup_name)
+                FROM biomedical_entity as main_entity
+                JOIN (
+                    SELECT
+                        etp."B" as main_entity_id,
+                        max(id order by is_priority desc) as id,
+                        max(name order by is_priority desc) as instance_rollup_name
+                    FROM _entity_to_parent etp
+                    JOIN biomedical_entity ON id=etp."A" -- "A" is parent
+                    GROUP BY etp."B" -- "B" is child
+                ) instance_rollup ON main_entity_id=main_entity.id
+                LEFT JOIN (
+                    SELECT
+                        etp."B" as instance_rollup_id,
+                        max(name order by is_priority desc) as category_rollup_name
+                    FROM _entity_to_parent etp
+                    JOIN biomedical_entity ON id=etp."A" -- "A" is parent
+                    GROUP BY etp."B" -- "B" is child
+                ) category_rollup ON instance_rollup_id=instance_rollup.id
+                WHERE {table}.entity_id=main_entity.id
             """
 
         client = await prisma_client(600)
@@ -414,10 +429,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: this will use a filesystem-cached graph if available, which could be stale.
-        await UmlsLoader.set_ontology_levels()
+        # await UmlsLoader.set_ontology_levels()
 
-        # recursively add UMLS as biomedical entity parents
-        await BiomedicalEntityEtl._umls_to_biomedical_entity()
+        # recursively add biomedical entity parents (from UMLS)
+        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
         await BiomedicalEntityEtl.set_rollups()
