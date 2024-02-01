@@ -1,9 +1,18 @@
 """
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
-from typing import Literal, Sequence
+from typing import Literal
 from prisma.enums import BiomedicalEntityType
-from pydash import flatten
+
+LegacyDomainType = Literal[
+    "compounds",
+    "biologics",
+    "devices",
+    "diagnostics",
+    "diseases",
+    "procedures",
+    "mechanisms",
+]
 
 # TODO: maybe choose NCI as canonical name
 # rewrites preferred name
@@ -142,7 +151,6 @@ UMLS_BIOLOGIC_TYPES = {
 }
 
 
-# TODO: move to bio????
 UMLS_MECHANISM_TYPES = {
     "T120": "Mechanism",  # "Chemical Viewed Functionally",
     "T121": "Pharmacologic Substance",  # TODO: here or in compound???
@@ -150,7 +158,6 @@ UMLS_MECHANISM_TYPES = {
     "T195": "Antibiotic",
 }
 
-# not necessarily all interventions.
 UMLS_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_COMPOUND_TYPES,
     **UMLS_BIOLOGIC_TYPES,
@@ -201,14 +208,9 @@ UMLS_DISEASE_TYPES = {
 
 
 UMLS_PHENOTYPE_TYPES = {
-    "T022": "Body System",
-    "T024": "Tissue",
-    "T025": "Cell",  # 16000
-    "T026": "Cell Component",
     "T031": "Body Substance",  # includes plaque, atherosclerotic
     "T033": "Finding",  # includes Hypotension, Tachycardia, Overweight but a lot of junk too. # 112007 unknowns.
     "T042": "Organ or Tissue Function",  # includes "graft rejection" # 17578
-    "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation,
     # "T101": "Patient or Disabled Group",
 }
 
@@ -227,6 +229,7 @@ UMLS_OTHER_TYPES = {
     # "T068": "Human-caused Phenomenon or Process",  # ??
     "T196": "Element",  # "Element, Ion, or Isotope",
     "T169": "Functional Concept",
+    "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation, dehydrogenation
 }
 
 # UMLS ents of these types will be included in the UMLS load
@@ -252,12 +255,8 @@ MOST_PREFERRED_UMLS_TYPES = {
 }
 
 
-BIOSYM_UMLS_TFIDF_PATH = (
-    "https://biosym-umls-tfidf.s3.amazonaws.com/tfidf_vectorizer.joblib"
-)
-
-# casting wide net on disease types
-UMLS_EXTENDED_DISEASE = {
+# casting wide net on disease types (includes the less-preferred types)
+UMLS_EXTENDED_DISEASE_TYPES = {
     **UMLS_DISEASE_TYPES,
     **UMLS_PHENOTYPE_TYPES,
     "T040": "Organism Function",
@@ -268,12 +267,31 @@ UMLS_EXTENDED_DISEASE = {
     "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
 }
 
-# casting wide net on compound types
-UMLS_EXTENDED_COMPOUND = {
+# casting wide net on compound types (includes the less-preferred types)
+UMLS_EXTENDED_COMPOUND_TYPES = {
     **UMLS_COMPOUND_TYPES,
     "T167": "Substance",
     "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
 }
+
+# casting wide net on biologic types (includes the less-preferred types)
+UMLS_EXTENDED_BIOLOGIC_TYPES = {
+    **UMLS_BIOLOGIC_TYPES,
+    "T022": "Body System",
+    "T024": "Tissue",
+    "T025": "Cell",  # 16000
+    "T026": "Cell Component",
+}
+
+# casting wide net on pharma intervention types (includes the less-preferred types)
+UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES = {
+    **UMLS_EXTENDED_COMPOUND_TYPES,
+    **UMLS_EXTENDED_BIOLOGIC_TYPES,
+    **UMLS_MECHANISM_TYPES,
+}
+
+UMLS_EXTENDED_DEVICE_TYPES = {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"}
+
 
 """
 ENTITY_TO_UMLS_TYPE
@@ -286,32 +304,18 @@ where umls.id=canonical_id and entity_type='UNKNOWN' order by count desc limit 1
 ```
 """
 ENTITY_TO_UMLS_TYPE = {
-    BiomedicalEntityType.COMPOUND: {
-        **UMLS_COMPOUND_TYPES,
-        "T167": "Substance",
-        "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
-    },
-    BiomedicalEntityType.BIOLOGIC: UMLS_BIOLOGIC_TYPES,
-    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
-    BiomedicalEntityType.DEVICE: {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"},
-    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
+    BiomedicalEntityType.BIOLOGIC: UMLS_EXTENDED_BIOLOGIC_TYPES,
+    BiomedicalEntityType.COMPOUND: UMLS_EXTENDED_COMPOUND_TYPES,
+    BiomedicalEntityType.DEVICE: UMLS_EXTENDED_DEVICE_TYPES,
     # includes phenotypes for the sake of typing; phenotype category not ideal for matching since it is very broad
-    BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE,
+    BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE_TYPES,
     BiomedicalEntityType.DIAGNOSTIC: UMLS_DIAGNOSTIC_TYPES,
+    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
+    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
-
-LegacyDomainType = Literal[
-    "compounds",
-    "biologics",
-    "devices",
-    "diagnostics",
-    "diseases",
-    "procedures",
-    "mechanisms",
-]
 
 
 NER_ENTITY_TYPES = frozenset(
@@ -327,15 +331,18 @@ NER_ENTITY_TYPES = frozenset(
 
 
 BEST_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_DISEASE_TYPES.keys()},
+    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_EXTENDED_DISEASE_TYPES.keys()},
     **{
         k: list(UMLS_TARGET_TYPES.keys())
-        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+        for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }
 
 BETTER_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{k: list(UMLS_EXTENDED_DISEASE.keys()) for k in UMLS_EXTENDED_DISEASE.keys()},
+    **{
+        k: list(UMLS_EXTENDED_DISEASE_TYPES.keys())
+        for k in UMLS_EXTENDED_DISEASE_TYPES.keys()
+    },
     **{
         k: list(UMLS_MECHANISM_TYPES.keys())
         for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
@@ -344,7 +351,7 @@ BETTER_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
 
 FAIR_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
     **{
-        k: list(UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
-        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
+        k: list(UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+        for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }
