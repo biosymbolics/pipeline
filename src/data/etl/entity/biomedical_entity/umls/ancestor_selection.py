@@ -11,7 +11,10 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
-from data.etl.entity.biomedical_entity.umls.types import increment_ontology_level
+from data.etl.entity.biomedical_entity.umls.types import (
+    compare_ontology_level,
+    increment_ontology_level,
+)
 from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
@@ -242,7 +245,7 @@ class AncestorUmlsGraph(UmlsGraph):
                         _propagate(g, child_id, depth + 1)
 
             # set count to sum of all children counts
-            g.nodes[node_id]["count"] = sum(
+            g.nodes[node_id]["count"] = g.nodes[node_id].get("count", 0) + sum(
                 g.nodes[child_id].get("count", 0) for child_id in child_ids
             )
 
@@ -323,8 +326,18 @@ class AncestorUmlsGraph(UmlsGraph):
                 else None
             )
             prev_count = prev_node.count if prev_node else None
+            existing_level = _G.nodes[node.id]["level"] or OntologyLevel.UNKNOWN
             level = get_level(node, prev_count, last_level, max_parent_count)
-            _G.nodes[node.id]["level"] = level
+
+            # it may have already been set, and if so we don't want to set it lower.
+            if compare_ontology_level(level, existing_level) > 0:
+                _G.nodes[node.id]["level"] = level
+            else:
+                logger.warning(
+                    "Not setting level lower (%s vs %s)",
+                    level,
+                    existing_level,
+                )
 
             # last real level as basis for inc
             new_last_level = level if level != OntologyLevel.NA else last_level
