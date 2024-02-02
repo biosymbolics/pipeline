@@ -119,6 +119,11 @@ class BiomedicalEntityLoadSpec(Dataclass):
     # operates on source_map
     relation_id_field_map: RelationIdFieldMap = RelationIdFieldMap(
         synonyms=RelationConnectInfo(
-            source_field="synonyms", dest_field="term", connect_type="create"
+            # ideally connectOrCreate, because otherwise updates will fail
+            # https://github.com/RobertCraigie/prisma-client-py/issues/754
+            source_field="synonyms",
+            dest_field="term",
+            connect_type="create",
         ),
     )
+    # checksum: Callable | None = None # future for specific per loader

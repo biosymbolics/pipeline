@@ -2,7 +2,7 @@ from typing import Sequence
 from prisma.enums import BiomedicalEntityType
 
 from constants.umls import (
-    PREFERRED_UMLS_TYPES,
+    MOST_PREFERRED_UMLS_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
@@ -20,7 +20,7 @@ def clean_umls_name(
     canonical_name: str,
     aliases: Sequence[str],
     type_ids: Sequence[str],
-    is_composite: bool,
+    is_composite: bool = False,
     overrides: dict[str, str] = UMLS_NAME_OVERRIDES,
 ) -> str:
     """
@@ -34,6 +34,8 @@ def clean_umls_name(
         cui (str): cui
         canonical_name (str): canonical name
         aliases (list[str]): aliases
+        type_ids (list[str]): type ids
+        is_composite (bool, optional): whether the name is composite. Defaults to False.
         overrides (dict[str, str], optional): overrides. Defaults to UMLS_NAME_OVERRIDES.
     """
     if cui in overrides:
@@ -118,7 +120,7 @@ def tuis_to_entity_type(tuis: Sequence[str]) -> BiomedicalEntityType:
         return BiomedicalEntityType.UNKNOWN
 
     # chose preferred tuis
-    preferred_tuis = [tui for tui in known_tuis if tui in PREFERRED_UMLS_TYPES]
+    preferred_tuis = [tui for tui in known_tuis if tui in MOST_PREFERRED_UMLS_TYPES]
 
     # if no preferred types, return first known tui
     if len(preferred_tuis) == 0:

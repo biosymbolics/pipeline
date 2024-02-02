@@ -69,7 +69,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         lookup_map = {
             on: de.canonical_entity
             for on, de in zip(terms, lookup_docs)
-            if de.canonical_entity is not None
+            if de.canonical_entity is not None  # shouldn't happen
         }
         return lookup_map
 
@@ -96,34 +96,38 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             Form create input for a given term
             """
             source_rec = source_map[orig_name]
-            canonical = canonical_map.get(orig_name)
+            canonical = canonical_map.get(orig_name) or CanonicalEntity(
+                orig_name.lower(), orig_name.lower()
+            )
 
-            if canonical is not None:
-                core_fields = BiomedicalEntityCreateInput(
-                    canonical_id=canonical.id or canonical.name.lower(),
-                    entity_type=source_rec.get(OVERRIDE_TYPE_FIELD) or canonical.type,
-                    is_priority=source_rec.get("is_priority") or False,
-                    name=canonical.name.lower(),
-                    sources=[Source.UMLS],
+            entity_type = (
+                source_rec.get(OVERRIDE_TYPE_FIELD)
+                or (
+                    canonical.type
+                    if canonical.type != BiomedicalEntityType.UNKNOWN
+                    else source_rec.get(DEFAULT_TYPE_FIELD)
                 )
-            else:
-                core_fields = BiomedicalEntityCreateInput(
-                    canonical_id=orig_name,
-                    entity_type=(
-                        source_rec.get(DEFAULT_TYPE_FIELD)
-                        or BiomedicalEntityType.UNKNOWN
-                    ),
-                    is_priority=source_rec.get("is_priority") or False,
-                    name=orig_name,
-                    sources=[self.non_canonical_source],
-                )
+                or BiomedicalEntityType.UNKNOWN
+            )
 
-            # if the entity type is unknown, don't create the record
-            if core_fields["entity_type"] == BiomedicalEntityType.UNKNOWN:
-                logger.info("Skipping unknown entity type: %s", orig_name)
+            # if it is UMLS and we don't have an entity type, skip it (garbage removal)
+            if not canonical.is_fake and entity_type == BiomedicalEntityType.UNKNOWN:
+                logger.info("Skipping unknown entity type for %s", orig_name)
                 return None
 
+            core_fields = BiomedicalEntityCreateInput(
+                canonical_id=canonical.id or canonical.name.lower(),
+                entity_type=entity_type,
+                is_priority=source_rec.get("is_priority") or False,
+                name=canonical.name.lower(),
+                sources=[
+                    self.non_canonical_source if canonical.is_fake else Source.UMLS
+                ],
+            )
+
             # create input for N-to-N relationships (synonyms, comprised_of, parents)
+            # TODO: really need connectOrCreate for synonyms!
+            # https://github.com/RobertCraigie/prisma-client-py/issues/754
             relation_fields = {
                 field: spec.form_prisma_relation(source_rec, canonical_map)
                 for field, spec in self.relation_id_field_map.items
@@ -171,13 +175,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         if rec.get("canonical_id") is not None:
             return {"canonical_id": rec.get("canonical_id") or ""}
         elif rec.get("name") is not None:
-            return {
-                "name_entity_type": {
-                    "name": rec.get("name") or "",
-                    "entity_type": rec.get("entity_type")
-                    or BiomedicalEntityType.UNKNOWN,
-                }
-            }
+            return {"name": rec.get("name") or ""}
 
         raise ValueError("Must have canonical_id or name")
 
@@ -292,7 +290,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     child_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
-                    umls_parent.type_ids AS tuis
+                    umls_parent.type_ids AS type_ids
                 FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity as child_entity
                 WHERE
                     etu."A"=child_entity.id
@@ -306,8 +304,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 BiomedicalEntityCreateInput(
                     canonical_id=r["canonical_id"],
                     children={"connect": [{"id": r["child_id"]}]},
-                    entity_type=tuis_to_entity_type(r["tuis"]),
-                    name=r["name"],
+                    entity_type=tuis_to_entity_type(r["type_ids"]),
+                    name=r["preferred_name"],
                     sources=[Source.UMLS],
                     umls_entities={"connect": [{"id": r["canonical_id"]}]},
                 )

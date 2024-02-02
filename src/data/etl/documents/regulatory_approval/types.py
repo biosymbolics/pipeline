@@ -71,7 +71,7 @@ class InterventionIntermediate(BaseModel):
         Init with only name and type (both then lowered)
         """
         pcs = [
-            PharmaClass(name=pa["name"], type=pa["type"])
+            PharmaClass(name=pa["name"].lower(), type=pa["type"].lower())
             for pa in compact(pharmacologic_classes)
         ]
         super().__init__(pharmacologic_classes=pcs, **kwargs)
