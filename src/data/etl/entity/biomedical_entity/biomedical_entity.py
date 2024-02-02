@@ -444,12 +444,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
         logger.info("Finalizing biomedical entity etl")
-        await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.link_to_documents()
         # await BiomedicalEntityEtl.add_counts() # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
-        # NOTE: this will use a filesystem-cached graph if available, which could be stale.
-        await UmlsLoader.set_ontology_levels()
+        # NOTE: will use data/umls_ancestors.json if available, which could be stale.
+        await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
         # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()

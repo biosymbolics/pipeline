@@ -55,7 +55,11 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
                 count=1000,
             ),
             NodeRecord(
-                id="PARENT1and2_CHILD2",
+                id="PARENT1and2_CHILD1",
+                count=1000,
+            ),
+            NodeRecord(
+                id="PARENT1and4_CHILD1",
                 count=1000,
             ),
             NodeRecord(
@@ -69,9 +73,11 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
             NodeRecord(id="PARENT1"),
             NodeRecord(id="PARENT2"),
             NodeRecord(id="PARENT3"),
+            NodeRecord(id="PARENT4"),
             NodeRecord(id="GRANDPARENT1"),
             # GRANDPARENT2_DIRECT_CHILD & PARENT3's parent
             NodeRecord(id="GRANDPARENT2"),
+            NodeRecord(id="GRANDPARENT3"),
         ]
 
         return nodes
@@ -107,11 +113,19 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
             ),
             EdgeRecord(
                 head="PARENT1",
-                tail="PARENT1and2_CHILD2",
+                tail="PARENT1and2_CHILD1",
             ),
             EdgeRecord(
                 head="PARENT2",
-                tail="PARENT1and2_CHILD2",
+                tail="PARENT1and2_CHILD1",
+            ),
+            EdgeRecord(
+                head="PARENT1",
+                tail="PARENT1and4_CHILD1",
+            ),
+            EdgeRecord(
+                head="PARENT4",
+                tail="PARENT1and4_CHILD1",
             ),
             EdgeRecord(
                 head="GRANDPARENT1",
@@ -129,6 +143,10 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
                 head="GRANDPARENT2",
                 tail="GRANDPARENT2_DIRECT_CHILD",
             ),
+            EdgeRecord(
+                head="GRANDPARENT3",
+                tail="PARENT4",
+            ),
         ]
         return edges
 
@@ -140,13 +158,17 @@ async def test_ancestor_counts():
     p1_count = graph.get_count("PARENT1")
     p2_count = graph.get_count("PARENT2")
     p3_count = graph.get_count("PARENT3")
+    p4_count = graph.get_count("PARENT4")
     gp1_count = graph.get_count("GRANDPARENT1")
     gp2_count = graph.get_count("GRANDPARENT2")
-    tc.assertEqual(p1_count, 2005)
+    gp3_count = graph.get_count("GRANDPARENT3")
+    tc.assertEqual(p1_count, 3005)
     tc.assertEqual(p2_count, 3000)
     tc.assertEqual(p3_count, 5)
-    tc.assertEqual(gp1_count, 5005)  # should be 4005
+    tc.assertEqual(p4_count, 1000)
+    tc.assertEqual(gp1_count, 6005)  # should be 5005
     tc.assertEqual(gp2_count, 6)
+    tc.assertEqual(gp3_count, 1000)
 
     print([(n["id"], n["level"]) for n in graph.nodes.values()])
 
@@ -163,12 +185,9 @@ async def test_ancestor_counts():
     tc.assertEqual(graph.get_ontology_level("PARENT2_CHILD1"), OntologyLevel.INSTANCE)
     tc.assertEqual(graph.get_ontology_level("PARENT2_CHILD2"), OntologyLevel.INSTANCE)
 
-    tc.assertEqual(
-        graph.get_ontology_level("PARENT1"), OntologyLevel.L1_CATEGORY
-    )  # L1?
+    tc.assertEqual(graph.get_ontology_level("PARENT1"), OntologyLevel.L1_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("PARENT2"), OntologyLevel.L1_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("PARENT3"), OntologyLevel.NA)
 
-    # L2?
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT1"), OntologyLevel.L2_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT2"), OntologyLevel.INSTANCE)

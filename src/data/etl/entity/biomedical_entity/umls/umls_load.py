@@ -1,9 +1,11 @@
 """
 Utils for ETLing UMLs data
 """
+
 import asyncio
 import sys
 import logging
+import time
 from prisma.models import UmlsGraph, Umls
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
 
@@ -91,10 +93,11 @@ class UmlsLoader:
     @staticmethod
     async def set_ontology_levels():
         """
-        Adds ontology levels (heavy, with dependencies)
+        Adds ontology levels
 
         Run *after* BiomedicalEntityEtl
         """
+        start = time.monotonic()
         logger.info("Updating UMLS with levels")
         client = await prisma_client(600)
 
@@ -111,6 +114,10 @@ class UmlsLoader:
                 await Umls.prisma(tx).update(data=tr, where={"id": r.id})
 
         await batch_update(all_umls, update_func=maybe_update, batch_size=5000)
+        logger.info(
+            "Finished updating UMLS with levels in %s seconds",
+            round(time.monotonic() - start),
+        )
 
     @staticmethod
     async def copy_relationships():

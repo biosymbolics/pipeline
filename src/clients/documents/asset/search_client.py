@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from functools import partial
 import time
 from typing import Sequence
-from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
 from pydantic import BaseModel
@@ -15,15 +14,13 @@ from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
 from typings.client import (
     AssetSearchParams,
-    DocumentSearchCriteria,
     DocumentSearchParams,
     PatentSearchParams as PatentParams,
-    QueryType,
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
 from typings.core import Dataclass
-from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
+from typings.documents.common import EntityMapType, TermField
 from typings.assets import Asset
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 from utils.string import get_id
@@ -56,7 +53,6 @@ class EntWithDocResult(DocResults):
 
 
 async def get_docs_by_entity_id(
-    client: Prisma,
     doc_ids: Sequence[str],
     rollup_field: TermField,
     child_field: TermField | None,
@@ -65,6 +61,8 @@ async def get_docs_by_entity_id(
     """
     Gets entities for a set of doc ids
     """
+    client = await prisma_client(120)
+
     query = f"""
         SELECT
             {rollup_field.name} as name,
@@ -120,7 +118,6 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
     Internal search for documents grouped by entity
     """
     start = time.monotonic()
-    client = await prisma_client(120)
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(p)
@@ -129,7 +126,6 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
 
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
-        client,
         doc_ids,
         TermField.instance_rollup,
         TermField.canonical_name,
