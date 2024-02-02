@@ -119,27 +119,33 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
         Asset.create(
             id=rollup,
             name=ewds[0].name,
-            children=[
-                Asset.create(
-                    id=rollup + ewd.child,
-                    name=ewd.child,
-                    children=[],
-                    end_year=p.end_year,
-                    patents=compact(
-                        [docs_by_type.patents.get(id) for id in ewd.patents]
-                    ),
-                    regulatory_approvals=compact(
-                        [
-                            docs_by_type.regulatory_approvals.get(id)
-                            for id in ewd.regulatory_approvals
-                        ]
-                    ),
-                    start_year=p.start_year,
-                    trials=compact([docs_by_type.trials.get(id) for id in ewd.trials]),
-                )
-                for ewd in ewds
-                if ewd.child
-            ],
+            children=sorted(
+                [
+                    Asset.create(
+                        id=rollup + ewd.child,
+                        name=ewd.child,
+                        children=[],
+                        end_year=p.end_year,
+                        patents=compact(
+                            [docs_by_type.patents.get(id) for id in ewd.patents]
+                        ),
+                        regulatory_approvals=compact(
+                            [
+                                docs_by_type.regulatory_approvals.get(id)
+                                for id in ewd.regulatory_approvals
+                            ]
+                        ),
+                        start_year=p.start_year,
+                        trials=compact(
+                            [docs_by_type.trials.get(id) for id in ewd.trials]
+                        ),
+                    )
+                    for ewd in ewds
+                    if ewd.child
+                ],
+                key=lambda e: e.record_count,
+                reverse=True,
+            ),
             end_year=p.end_year,
             patents=compact(
                 [
