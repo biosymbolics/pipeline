@@ -330,9 +330,9 @@ resources:
           Status: Enabled
         LifecycleConfiguration:
           Rules:
-            - Id: DeleteAfter30Days
+            - Id: DeleteAfter3Days
               Status: 'Enabled'
-              ExpirationInDays: 30
+              ExpirationInDays: 3
     StackRouteTable:
       Type: AWS::EC2::RouteTable
       Properties:
