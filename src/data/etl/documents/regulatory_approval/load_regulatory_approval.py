@@ -1,6 +1,7 @@
 """
 Regulatory approval ETL script
 """
+
 from functools import reduce
 import sys
 import asyncio
@@ -217,7 +218,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
 
         client = await prisma_client(600)
 
-        # create approval records
+        logger.info("Creating %s regulatory approval records", len(approvals))
         await RegulatoryApproval.prisma(client).create_many(
             data=[
                 {
@@ -232,7 +233,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             skip_duplicates=True,
         )
 
-        # create "indicatable" records, those that map approval to a canonical indication
+        logger.info("Creating regulatory approval indicatable records")
         await Indicatable.prisma().create_many(
             data=[
                 {
@@ -245,7 +246,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             ]
         )
 
-        # create "intervenable" records, those that map approval to a canonical intervention
+        logger.info("Creating regulatory approval intervenable records")
         await Intervenable.prisma().create_many(
             data=[
                 {

@@ -1,6 +1,7 @@
 """
 Class for biomedical entity etl
 """
+
 from typing import Sequence
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
@@ -139,9 +140,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         grouped_recs = group_by(flat_recs, "canonical_id")
         update_data: list[BiomedicalEntityUpdateInput] = flatten(
             [
-                [BiomedicalEntityUpdateInput(**merge_nested(*groups))]  # type: ignore
-                if canonical_id is None
-                else groups
+                (
+                    [BiomedicalEntityUpdateInput(**merge_nested(*groups))]  # type: ignore
+                    if canonical_id is None
+                    else groups
+                )
                 for canonical_id, groups in grouped_recs.items()
             ]
         )
@@ -444,17 +447,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
         logger.info("Finalizing biomedical entity etl")
-        # await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.link_to_documents()
         # await BiomedicalEntityEtl.add_counts() # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
-        await UmlsLoader.post_doc_finalize()
+        # await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
-        # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
+        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
-        # await BiomedicalEntityEtl.set_rollups()
+        await BiomedicalEntityEtl.set_rollups()
 
         logger.info("Biomedical entity post_doc_finalize complete")
