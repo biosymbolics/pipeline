@@ -1,14 +1,13 @@
 """
 Asset client
 """
+
 import asyncio
-from dataclasses import dataclass
 from functools import partial
 import time
 from typing import Sequence
 from pydash import compact, flatten, group_by
 import logging
-from pydantic import BaseModel
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
@@ -19,37 +18,19 @@ from typings.client import (
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
-from typings.core import Dataclass
 from typings.documents.common import EntityMapType, TermField
 from typings.assets import Asset
-from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 from utils.string import get_id
 
 from .. import approvals as regulatory_approval_client
 from .. import patents as patent_client
 from .. import trials as trial_client
 
+from .types import DocsByType, EntWithDocResult
+
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-@dataclass(frozen=True)
-class DocsByType(Dataclass):
-    patents: dict[str, ScoredPatent]
-    regulatory_approvals: dict[str, ScoredRegulatoryApproval]
-    trials: dict[str, ScoredTrial]
-
-
-class DocResults(BaseModel):
-    patents: list[str] = []
-    regulatory_approvals: list[str] = []
-    trials: list[str] = []
-
-
-class EntWithDocResult(DocResults):
-    # id: int
-    name: str
-    child: str | None = None
 
 
 async def get_docs_by_entity_id(
