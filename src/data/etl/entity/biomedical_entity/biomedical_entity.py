@@ -274,29 +274,29 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
 
         async def execute():
-            # as of 2024-02-01, not sure if this works properly
-            is_nx_restriction = """
-                -- parent doesn't already exist OR it exists but without this child
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM biomedical_entity possible_parent_entity, _entity_to_parent etp
-                    WHERE possible_parent_entity.id=etp."A"
-                    AND child_entity.id=etp."B"
-                    AND canonical_id=umls_parent.id
-                )
-            """
             query = f"""
                 SELECT
                     child_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
                     umls_parent.type_ids AS type_ids
-                FROM umls, _entity_to_umls etu, umls as umls_parent, biomedical_entity as child_entity
+                FROM
+                    umls,
+                    _entity_to_umls etu,
+                    umls as umls_parent,
+                    biomedical_entity as child_entity
                 WHERE
                     etu."A"=child_entity.id
                     AND umls.id=etu."B"
                     AND umls_parent.id=umls.rollup_id
-                    {is_nx_restriction}
+                    -- only get records for which a parent with this child doesn't yet exist
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM biomedical_entity possible_parent_entity, _entity_to_parent etp
+                        WHERE possible_parent_entity.id=etp."A"
+                        AND child_entity.id=etp."B"
+                        AND canonical_id=umls_parent.id
+                    )
             """
             client = await prisma_client(300)
             results = await client.query_raw(query)
@@ -305,13 +305,18 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     canonical_id=r["canonical_id"],
                     children={"connect": [{"id": r["child_id"]}]},
                     entity_type=tuis_to_entity_type(r["type_ids"]),
-                    name=r["preferred_name"],
+                    name=r["name"],
                     sources=[Source.UMLS],
                     umls_entities={"connect": [{"id": r["canonical_id"]}]},
                 )
                 for r in results
             ]
 
+            # TODO: will error on duplicated names, which is exacerbated by the fact that we adjust the default UMLS name
+            # e.g. "icam2", matching https://uts.nlm.nih.gov/uts/umls/concept/C1317964 and https://uts.nlm.nih.gov/uts/umls/concept/C1334075
+            # also pla2g2a, fcgr3b.
+            # maybe we want a 1<>many relationship between biomedical_entity and umls
+            # or in this situation, we could do a WHERE on name if it fails the first time
             await batch_update(
                 records,
                 update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
@@ -445,7 +450,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
         logger.info("Finalizing biomedical entity etl")
-        await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.link_to_documents()
         # await BiomedicalEntityEtl.add_counts() # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
