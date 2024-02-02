@@ -31,7 +31,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
         return aug
 
     @overrides(AncestorUmlsGraph)
-    async def get_nodes(
+    async def load_nodes(
         self,
     ) -> list[NodeRecord]:
         """
@@ -55,6 +55,10 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
                 count=1000,
             ),
             NodeRecord(
+                id="PARENT1and2_CHILD2",
+                count=1000,
+            ),
+            NodeRecord(
                 id="PARENT3_ONLY_CHILD",
                 count=5,  # subinstance
             ),
@@ -73,7 +77,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
         return nodes
 
     @overrides(AncestorUmlsGraph)
-    async def get_edges(
+    async def load_edges(
         self,
     ) -> list[EdgeRecord]:
         edges = [
@@ -100,6 +104,14 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
             EdgeRecord(
                 head="PARENT3",
                 tail="PARENT3_ONLY_CHILD",
+            ),
+            EdgeRecord(
+                head="PARENT1",
+                tail="PARENT1and2_CHILD2",
+            ),
+            EdgeRecord(
+                head="PARENT2",
+                tail="PARENT1and2_CHILD2",
             ),
             EdgeRecord(
                 head="GRANDPARENT1",
@@ -130,10 +142,10 @@ async def test_ancestor_counts():
     p3_count = graph.get_count("PARENT3")
     gp1_count = graph.get_count("GRANDPARENT1")
     gp2_count = graph.get_count("GRANDPARENT2")
-    tc.assertEqual(p1_count, 1005)
-    tc.assertEqual(p2_count, 2000)
+    tc.assertEqual(p1_count, 2005)
+    tc.assertEqual(p2_count, 3000)
     tc.assertEqual(p3_count, 5)
-    tc.assertEqual(gp1_count, 3005)
+    tc.assertEqual(gp1_count, 5005)  # should be 4005
     tc.assertEqual(gp2_count, 6)
 
     print([(n["id"], n["level"]) for n in graph.nodes.values()])
