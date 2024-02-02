@@ -55,6 +55,10 @@ MAX_DEPTH_NETWORK = 10
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
 
 
+# maxed signed int size
+MAX_COUNT = 2147483647
+
+
 class AncestorUmlsGraph(UmlsGraph):
     """
     Extends abstract UmlsGraph class, to make this suitable for ancestor selection
@@ -238,17 +242,18 @@ class AncestorUmlsGraph(UmlsGraph):
             child_ids: list[str] = list(g.successors(node_id))
 
             # we want to recurse longer from root -> leaf, otherwise risk missing counts
-            if depth < MAX_DEPTH_NETWORK * 2:
+            if depth < MAX_DEPTH_NETWORK * 1.5:
                 # for children with no counts, aka non-leaf nodes, recurse
                 # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
                 # so we recurse to set Parent1 and Parent2 counts based on their children
                 for child_id in child_ids:
-                    if g.nodes[child_id].get("count") is None:
-                        _propagate(g, child_id, depth + 1)
+                    _propagate(g, child_id, depth + 1)
 
             # set count to sum of all children counts
-            g.nodes[node_id]["count"] = (g.nodes[node_id].get("count") or 0) + sum(
-                g.nodes[child_id].get("count", 0) for child_id in child_ids
+            g.nodes[node_id]["count"] = min(
+                (g.nodes[node_id].get("count") or 0)
+                + sum(g.nodes[child_id].get("count", 0) for child_id in child_ids),
+                MAX_COUNT,
             )
 
         # take all nodes with no *incoming* edges, i.e. root nodes

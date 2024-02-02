@@ -13,6 +13,9 @@ LEVEL_INSTANCE_THRESHOLD = 25
 LEVEL_OVERRIDE_DELTA = 500
 LEVEL_MIN_PREV_COUNT = 5
 
+# g.get_count("C1333196") should be approx sum(list([g.get_count(id) or 0 for id in list(g.G.successors("C1333196"))]))
+# = approx 19228
+
 
 class MockAncestorUmlsGraph(AncestorUmlsGraph):
     @overrides(AncestorUmlsGraph)
@@ -67,6 +70,10 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
                 count=5,  # subinstance
             ),
             NodeRecord(
+                id="PARENT_WITH_COUNT_CHILD",
+                count=2,  # subinstance
+            ),
+            NodeRecord(
                 id="GRANDPARENT2_DIRECT_CHILD",
                 count=1,  # tiny subinstance
             ),
@@ -74,6 +81,7 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
             NodeRecord(id="PARENT2"),
             NodeRecord(id="PARENT3"),
             NodeRecord(id="PARENT4"),
+            NodeRecord(id="PARENT_WITH_COUNT", count=5),
             NodeRecord(id="GRANDPARENT1"),
             # GRANDPARENT2_DIRECT_CHILD & PARENT3's parent
             NodeRecord(id="GRANDPARENT2"),
@@ -144,6 +152,10 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
                 tail="GRANDPARENT2_DIRECT_CHILD",
             ),
             EdgeRecord(
+                head="PARENT_WITH_COUNT",
+                tail="PARENT_WITH_COUNT_CHILD",
+            ),
+            EdgeRecord(
                 head="GRANDPARENT3",
                 tail="PARENT4",
             ),
@@ -159,6 +171,7 @@ async def test_ancestor_counts():
     p2_count = graph.get_count("PARENT2")
     p3_count = graph.get_count("PARENT3")
     p4_count = graph.get_count("PARENT4")
+    p5_count = graph.get_count("PARENT_WITH_COUNT")
     gp1_count = graph.get_count("GRANDPARENT1")
     gp2_count = graph.get_count("GRANDPARENT2")
     gp3_count = graph.get_count("GRANDPARENT3")
@@ -166,6 +179,7 @@ async def test_ancestor_counts():
     tc.assertEqual(p2_count, 3000)
     tc.assertEqual(p3_count, 5)
     tc.assertEqual(p4_count, 1000)
+    tc.assertEqual(p5_count, 7)
     tc.assertEqual(gp1_count, 6005)  # should be 5005
     tc.assertEqual(gp2_count, 6)
     tc.assertEqual(gp3_count, 1000)
