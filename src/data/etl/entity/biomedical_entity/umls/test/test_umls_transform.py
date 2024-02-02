@@ -8,7 +8,7 @@ from data.etl.entity.biomedical_entity.umls.umls_transform import (
 )
 
 
-class TestTrialUtils(unittest.TestCase):
+class TestUmlsUtils(unittest.TestCase):
     def test_choose_best_ancestor_from_type(self):
         test_cases = [
             {

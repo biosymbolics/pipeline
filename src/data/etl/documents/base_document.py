@@ -1,6 +1,7 @@
 """
 Abstract document ETL class
 """
+
 from abc import abstractmethod
 import asyncio
 import logging
@@ -43,6 +44,7 @@ class BaseDocumentEtl:
         if is_update:
             logger.info("Deleting documents in order to re-create")
             await self.delete_documents()
+        logger.info("Coping documents...")
         await self.copy_documents()
         await self.checksum()
 
@@ -53,13 +55,13 @@ class BaseDocumentEtl:
         """
         client = await prisma_client(300)
         checksums = {
-            self.document_type: "SELECT COUNT(*) FROM {self.document_type}",
-            "owners": "SELECT COUNT(*) FROM ownable WHERE {self.document_type}_id IS NOT NULL",
-            "indications": "SELECT COUNT(*) FROM indicatable WHERE {self.document_type}_id IS NOT NULL",
-            "interventions": "SELECT COUNT(*) FROM intervenable WHERE {self.document_type}_id IS NOT NULL",
+            self.document_type: f"SELECT COUNT(*) FROM {self.document_type}",
+            "owners": f"SELECT COUNT(*) FROM ownable WHERE {self.document_type}_id IS NOT NULL",
+            "indications": f"SELECT COUNT(*) FROM indicatable WHERE {self.document_type}_id IS NOT NULL",
+            "interventions": f"SELECT COUNT(*) FROM intervenable WHERE {self.document_type}_id IS NOT NULL",
         }
         results = await asyncio.gather(
             *[client.query_raw(query) for query in checksums.values()]
         )
         for key, result in zip(checksums.keys(), results):
-            logger.info(f"Trial load checksum {key}: {result[0]}")
+            logger.warning(f"{self.document_type} load checksum {key}: {result[0]}")

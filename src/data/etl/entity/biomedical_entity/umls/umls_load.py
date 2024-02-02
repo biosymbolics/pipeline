@@ -1,9 +1,11 @@
 """
 Utils for ETLing UMLs data
 """
+
 import asyncio
 import sys
 import logging
+import time
 from prisma.models import UmlsGraph, Umls
 from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
 
@@ -91,10 +93,11 @@ class UmlsLoader:
     @staticmethod
     async def set_ontology_levels():
         """
-        Adds ontology levels (heavy, with dependencies)
+        Adds ontology levels
 
         Run *after* BiomedicalEntityEtl
         """
+        start = time.monotonic()
         logger.info("Updating UMLS with levels")
         client = await prisma_client(600)
 
@@ -110,7 +113,11 @@ class UmlsLoader:
             if tr is not None:
                 await Umls.prisma(tx).update(data=tr, where={"id": r.id})
 
-        await batch_update(all_umls, update_func=maybe_update, batch_size=5000)
+        await batch_update(all_umls, update_func=maybe_update, batch_size=10000)
+        logger.info(
+            "Finished updating UMLS with levels in %s seconds",
+            round(time.monotonic() - start),
+        )
 
     @staticmethod
     async def copy_relationships():
@@ -160,15 +167,26 @@ class UmlsLoader:
         await UmlsLoader.create_umls_lookup()
         await UmlsLoader.copy_relationships()
 
+    @staticmethod
+    async def post_doc_finalize():
+        """
+        To be run after initial UMLS, biomedical entity, and doc loads
+        (since it depends upon those being present)
+        """
+        await UmlsLoader.set_ontology_levels()
+
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load
-            UMLS etl
-        """
+            UMLS ETL
+            Usage: python3 -m data.etl.entity.biomedical_entity.umls.umls_load [--post-doc-finalize]
+            """
         )
         sys.exit()
+
+    if "--post-doc-finalize" in sys.argv:
+        asyncio.run(UmlsLoader().post_doc_finalize())
 
     asyncio.run(UmlsLoader.copy_all())

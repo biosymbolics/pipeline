@@ -1,6 +1,7 @@
 """
 Regulatory approval ETL script
 """
+
 from functools import reduce
 import sys
 import asyncio
@@ -43,7 +44,9 @@ SUPPRESSION_APPROVAL_TYPES = tuple(
 )
 
 
-def get_indication_source_map(records: Sequence[dict]) -> dict:
+def get_indication_source_map(
+    records: Sequence[dict],
+) -> dict[str, dict[str, list[str] | str | bool | BiomedicalEntityType]]:
     return {
         i: {"synonyms": [i], "default_type": BiomedicalEntityType.DISEASE}
         for rec in records
@@ -111,7 +114,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             structures struct
         LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
         LEFT JOIN omop_relationship metadata on metadata.struct_id = struct.id and metadata.relationship_name = 'indication'
-        WHERE approval.struct_id = struct.id -- TODO: combo drugs??
+        WHERE approval.struct_id = struct.id
         AND active_ingredient.struct_id = struct.id
         AND active_ingredient.ndc_product_code = prod.ndc_product_code
         AND p2l.ndc_product_code = prod.ndc_product_code
@@ -157,6 +160,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                 ),
                 synonyms=RelationConnectInfo(
                     # todo: connectOrCreate when supported
+                    # https://github.com/RobertCraigie/prisma-client-py/issues/754
                     source_field="synonyms",
                     dest_field="term",
                     connect_type="create",
@@ -165,12 +169,10 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             get_terms_to_canonicalize=lambda sm: (
                 [
                     k
-                    for sub in sm.values()
-                    if isinstance(sub, dict)  # is dict, therefore a parent spec
-                    for k, v in sub.items()
-                    if v != BiomedicalEntityType.COMBINATION
+                    for k, v in sm.items()
+                    if v["default_type"] != BiomedicalEntityType.COMBINATION
                 ],
-                None,
+                None,  # no vectors
             ),
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
@@ -217,7 +219,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
 
         client = await prisma_client(600)
 
-        # create approval records
+        logger.info("Creating %s regulatory approval records", len(approvals))
         await RegulatoryApproval.prisma(client).create_many(
             data=[
                 {
@@ -232,7 +234,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             skip_duplicates=True,
         )
 
-        # create "indicatable" records, those that map approval to a canonical indication
+        logger.info("Creating regulatory approval indicatable records")
         await Indicatable.prisma().create_many(
             data=[
                 {
@@ -245,7 +247,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             ]
         )
 
-        # create "intervenable" records, those that map approval to a canonical intervention
+        logger.info("Creating regulatory approval intervenable records")
         await Intervenable.prisma().create_many(
             data=[
                 {

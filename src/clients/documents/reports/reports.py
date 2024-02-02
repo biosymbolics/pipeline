@@ -53,12 +53,11 @@ class XYReport:
         return XYReport._get_entity_subquery("'NX'", doc_type, filter)
 
     @staticmethod
-    def get_query(
+    def _form_query(
         x: str,
         y: str | None,
-        term_fields: Sequence[
-            TermField
-        ],  # field against which to search, e.g. canonical_name or instance_rollup
+        # field against which to search, e.g. canonical_name or instance_rollup
+        term_fields: Sequence[TermField],
         aggregation: Aggregation,
         doc_type: DocType,
         filter: str | None = None,
@@ -138,8 +137,10 @@ class XYReport:
         if y_dimension and y_dimension not in Y_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
+        lowered_terms = [t.lower() for t in search_params.terms]
+
         client = await prisma_client(120)
-        query = XYReport.get_query(
+        query = XYReport._form_query(
             x_dimension,
             y_dimension,
             term_fields=search_params.term_fields,
@@ -148,10 +149,10 @@ class XYReport:
             doc_type=doc_type,
         )
         logger.debug("Running query for xy report: %s", query)
-        results = await client.query_raw(query, search_params.terms)
+        results = await client.query_raw(query, lowered_terms)
 
         if len(results) == 0:
-            logger.warning("No results for query: %s", query)
+            logger.warning("No results for query: %s, params: %s", query, lowered_terms)
             return DocumentReport(
                 data=[], x=x_title or x_dimension, y=y_title or y_dimension
             )

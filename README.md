@@ -78,12 +78,12 @@ pg_dump --no-owner drugcentral \
 zip drugcentral.sql.zip drugcentral.sql
 pg_dump --no-owner patents -t biosym_annotations -t gpr_annotations > patents.sql
 zip patents.sql.zip patents.sql
-** start uploading biosym.psql.zip **
+** start zips **
 git clone https://github.com/biosymbolics/pipeline
 cd pipeline
+sudo apt install postgresql postgresql-contrib screen unzip gcc g++ make postgresql-server-dev-14
 python3 -m pip install -r requirements.txt
-sudo apt install postgresql postgresql-contrib screen unzip gcc make
-sudo apt install postgresql-server-dev-14
+python -m spacy download en_core_web_trf
 cd /tmp
 git clone --branch v0.6.0 https://github.com/pgvector/pgvector.git
 cd pgvector
@@ -95,6 +95,7 @@ su - postgres
 psql
 create role biosym with password 'ok';
 alter role biosym with superuser;
+ALTER ROLE "biosym" WITH LOGIN;
 create database biosym;
 create database patents;
 create database drugcentral;
@@ -102,17 +103,16 @@ create database aact;
 create schema ctgov;
 CREATE EXTENSION vector;
 exit
+adduser biosym
 export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
 pip install -U prisma
 prisma db push
-adduser biosym
 unzip patents.sql.zip
 unzip drugcentral.sql.zip
 unzip ct.sql.zip
 sudo -u biosym psql aact < ct.sql
 sudo -u biosym psql drugcentral < drugcentral.sql
 sudo -u biosym psql patents < patents.sql
-python -m spacy download en_core_web_trf
 . .pythonenv
 ```
 

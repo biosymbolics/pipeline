@@ -39,52 +39,52 @@ MIN_NODE_DEGREE = 2
 MAX_TAILS = 50
 MAX_HEADS = 20
 
+
+# IMPORTANT: these only make sense if "head" is a *parent* and not a child of the document.
+# I.E. less specific, not more specific.
+RELATIONSHIPS_OF_INTEREST_MAP = {
+    "DISEASE": [
+        "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
+        "has_manifestation",  # Pains, Abdominal -> fabrys disease
+        "may_treat",  # Pains, Abdominal -> ALOSETRON HYDROCHLORIDE
+        "gene_involved_in_molecular_abnormality",  # Philadelphia Chromosome -> BCR/ABL FUSION GENE
+        "gene_involved_in_pathogenesis_of_disease",
+    ],
+    "MECHANISM": [
+        "has_physiologic_effect",  # head/effect -> tail/drug, e.g. Increased Glycolysis [PE]  -> PIOGLITAZONE
+        "has_mechanism_of_action",  # head/MoA->tail/drug
+        "has_therapeutic_class",  # e.g. Antihelmintics -> ALBENDAZOLE
+        "negatively_regulates",  # neurotransmitter uptake -> negative regulation of neurotransmitter uptake
+        "positively_regulates",  # neurotransmitter uptake -> positive regulation of neurotransmitter uptake
+        "chemical_or_drug_has_mechanism_of_action",  # Regulation, Gene Expression -> RESVERATROL
+        "chemical_or_drug_has_physiologic_effect",
+        "regulates",
+        "gene_plays_role_in_process",  # Acetylations -> NAT2 Gene
+        "gene_product_plays_role_in_process",
+    ],
+    "BIOLOGIC": [
+        "has_target",
+        "allelic_variant_of",  # REL Gene -> REL, IVS5DS, G-A, +1
+        "pathogenesis_of_disease_involves_gene",  # TP53 Genes -> Colorectal Carcinomas
+        "molecular_abnormality_involves_gene",  # TP53 Genes -> TP53 Deleterious Gene Mutation
+        "pathogenesis_of_disease_involves_gene",
+        "process_involves_gene",
+        "related_to_genetic_biomarker",  # BCL2 Gene -> BCL2 Overexpression Positive
+        "gene_product_encoded_by_gene",  # MHC Class II Genes -> HLA-DP Antigens
+        "gene_product_variant_of_gene_product",  # TP53 protein, human -> TP53 NP_000537.3:p.Y220C
+    ],
+    # this goes from non-specific to very specific (thus not included with rest of RELATIONSHIPS_OF_INTEREST)
+    "COMPOUND": [
+        "may_be_treated_by",  # ALOSETRON HYDROCHLORIDE -> Pains, Abdominal
+        "mechanism_of_action_of",  # PIOGLITAZONE -> Increased Glycolysis
+        "therapeutic_class_of",  # ALBENDAZOLE -> Antihelmintics
+    ],
+}
+
 RELATIONSHIPS_OF_INTEREST = [
-    "allelic_variant_of",
-    "biological_process_involves_gene_product",
-    "chemical_or_drug_has_mechanism_of_action",
-    "chemical_or_drug_has_physiologic_effect",
-    # "genetic_biomarker_related_to",
-    "gene_involved_in_molecular_abnormality",
-    "gene_plays_role_in_process",
-    "gene_product_encoded_by_gene",
-    "gene_product_has_biochemical_function",
-    "gene_encodes_gene_product",
-    "gene_is_element_in_pathway",
-    "gene_product_plays_role_in_process",
-    "gene_involved_in_pathogenesis_of_disease",
-    "gene_product_variant_of_gene_product",
-    "gene_product_has_gene_product_variant",
-    "has_allelic_variant",
-    # "has_phenotype",
-    # "has_manifestation",
-    "has_gene_product_element",
-    "has_therapeutic_class",
-    "has_mechanism_of_action",
-    "has_physiologic_effect",
-    "has_target",
-    # "is_mechanism_of_action_of_chemical_or_drug",
-    # "is_physiologic_effect_of_chemical_or_drug",
-    "is_target",
-    # "is_target_of",
-    # "may_treat",
-    # "may_be_treated_by",
-    # "manifestation_of",
-    # "mechanism_of_action_of",
-    # "molecular_abnormality_involves_gene",
-    "negatively_regulates",
-    "negatively_regulated_by",
-    "pathogenesis_of_disease_involves_gene",
-    "pathway_has_gene_element",
-    # "phenotype_of",
-    # "physiologic_effect_of",
-    "positively_regulates",
-    "positively_regulated_by",
-    "process_involves_gene",
-    "related_to_genetic_biomarker",
-    "regulated_by",
-    "regulates",
-    "therapeutic_class_of",
+    *RELATIONSHIPS_OF_INTEREST_MAP["DISEASE"],
+    *RELATIONSHIPS_OF_INTEREST_MAP["MECHANISM"],
+    *RELATIONSHIPS_OF_INTEREST_MAP["BIOLOGIC"],
 ]
 
 ENTITY_GROUP = "entity"
@@ -313,7 +313,7 @@ async def _aggregate_document_relationships(
             JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
                 {f"AND biomedical_entity.entity_types in {tuple(entity_types)} " if entity_types else ""}
             JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
-            JOIN umls_graph ON umls_graph.head_id = etu."B"
+            JOIN umls_graph ON umls_graph.tail_id = etu."B" -- note matching umls *tail_id* to entity, thus looking for heads.
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         AND head_id<>tail_id
         AND umls_graph.relationship in {tuple(relationships)}

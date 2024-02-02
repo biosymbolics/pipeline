@@ -23,14 +23,14 @@ model BiomedicalEntity {
     indications   Indicatable[] // backref
     interventions Intervenable[] // backref
     is_priority   Boolean                  @default(false)
-    name          String
+    name          String                   @unique
     parents       BiomedicalEntity[]       @relation("entity_to_parent")
     search        Unsupported("tsvector")?
     sources       Source[]
     synonyms      EntitySynonym[]
     umls_entities Umls[]                   @relation("entity_to_umls")
 
-    @@unique([name, entity_type])
+    // @@unique([name, entity_type]) // results in dups when we change entity_type logic
     @@index([entity_type], name: "biomedical_entity_type")
     @@map("biomedical_entity")
 }

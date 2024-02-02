@@ -6,19 +6,15 @@ from prisma.types import (
     UmlsCreateWithoutRelationsInput as UmlsCreateInput,
     UmlsUpdateInput,
 )
-from pydash import compact, flatten
+from pydash import compact
 
-from constants.umls import (
-    BEST_ANCESTOR_TYPE_MAP,
-    BETTER_ANCESTOR_TYPE_MAP,
-    FAIR_ANCESTOR_TYPE_MAP,
-)
+from constants.umls import PREFERRED_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name
-from utils.list import has_intersection
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
 from .types import UmlsInfo, compare_ontology_level
+from .utils import choose_best_available_ancestor
 
 
 logger = logging.getLogger(__name__)
@@ -123,45 +119,27 @@ class UmlsAncestorTransformer:
             such as "least common subsumer" and information-based mutual information measures
         """
 
-        def filter_ancestors(
-            _child: UmlsInfo, ancestors: Sequence[UmlsInfo]
-        ) -> list[UmlsInfo]:
-            """
-            Look for the best ancestor type, descending through layers of preferrability
-            """
-            for match_map in [
-                BEST_ANCESTOR_TYPE_MAP,
-                BETTER_ANCESTOR_TYPE_MAP,
-                FAIR_ANCESTOR_TYPE_MAP,
-            ]:
-                ok_ancestor_types = flatten(
-                    [match_map.get(type_id, []) for type_id in _child.type_ids]
-                )
-
-                # ancestors eligible if
-                # - type intersection, or child has no type_ids
-                # - and the level is higher than child
-                eligible_ancestors = [
-                    a
-                    for a in ancestors
-                    if (
-                        len(_child.type_ids) == 0
-                        or has_intersection(a.type_ids, ok_ancestor_types)
-                    )
-                    and compare_ontology_level(a.level, _child.level) > 0
-                ]
-                if len(eligible_ancestors) > 0:
-                    return eligible_ancestors
-
-            return []
-
-        eligible_ancestors = filter_ancestors(child, ancestors)
+        # ancestors eligible if the level is higher than child
+        eligible_ancestors = [
+            a for a in ancestors if compare_ontology_level(a.level, child.level) > 0
+        ]
 
         # if no eligible ancestors, return self
         if len(eligible_ancestors) == 0:
             return child.id
 
-        return eligible_ancestors[0].id
+        # if no type_ids, return first eligible ancestor
+        if len(child.type_ids) == 0:
+            return eligible_ancestors[0].id
+
+        best_ancestor = choose_best_available_ancestor(
+            child.type_ids, eligible_ancestors
+        )
+
+        if best_ancestor is None:
+            return child.id
+
+        return best_ancestor.id
 
     def transform(self, partial_record: Umls) -> UmlsUpdateInput | None:
         """

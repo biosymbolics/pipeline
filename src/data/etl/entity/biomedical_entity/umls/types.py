@@ -2,15 +2,7 @@ from pydantic import BaseModel
 from prisma.enums import OntologyLevel
 from prisma.models import Umls
 
-
-ONTOLOGY_LEVEL_MAP = {
-    OntologyLevel.SUBINSTANCE: 0,
-    OntologyLevel.INSTANCE: 1,
-    OntologyLevel.L1_CATEGORY: 2,
-    OntologyLevel.L2_CATEGORY: 3,
-    # OntologyLevel.NA: -1, # excluded
-    # OntologyLevel.UNKNOWN: -1, # excluded
-}
+from .constants import ONTOLOGY_LEVEL_MAP
 
 
 def compare_ontology_level(a: OntologyLevel, b: OntologyLevel) -> int:
@@ -31,19 +23,6 @@ def compare_ontology_level(a: OntologyLevel, b: OntologyLevel) -> int:
     if b not in ONTOLOGY_LEVEL_MAP:
         return 1
     return ONTOLOGY_LEVEL_MAP[a] - ONTOLOGY_LEVEL_MAP[b]
-
-
-def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
-    if level == OntologyLevel.SUBINSTANCE:
-        return OntologyLevel.INSTANCE
-    if level == OntologyLevel.INSTANCE:
-        return OntologyLevel.L1_CATEGORY
-    if level == OntologyLevel.L1_CATEGORY:
-        return OntologyLevel.L2_CATEGORY
-    if level == OntologyLevel.L2_CATEGORY:
-        return OntologyLevel.L2_CATEGORY
-
-    raise ValueError(f"Cannot increment level {level}")
 
 
 class UmlsInfo(BaseModel, object):

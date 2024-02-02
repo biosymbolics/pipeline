@@ -1,62 +1,39 @@
 """
 Asset client
 """
+
 import asyncio
-from dataclasses import dataclass
 from functools import partial
 import time
 from typing import Sequence
-from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
-from pydantic import BaseModel
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
 from typings.client import (
     AssetSearchParams,
-    DocumentSearchCriteria,
     DocumentSearchParams,
     PatentSearchParams as PatentParams,
-    QueryType,
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
-from typings.core import Dataclass
-from typings.documents.common import ENTITY_MAP_TABLES, EntityMapType, TermField
+from typings.documents.common import EntityMapType, TermField
 from typings.assets import Asset
-from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 from utils.string import get_id
 
 from .. import approvals as regulatory_approval_client
 from .. import patents as patent_client
 from .. import trials as trial_client
 
+from .types import DocsByType, EntWithDocResult
+
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-@dataclass(frozen=True)
-class DocsByType(Dataclass):
-    patents: dict[str, ScoredPatent]
-    regulatory_approvals: dict[str, ScoredRegulatoryApproval]
-    trials: dict[str, ScoredTrial]
-
-
-class DocResults(BaseModel):
-    patents: list[str] = []
-    regulatory_approvals: list[str] = []
-    trials: list[str] = []
-
-
-class EntWithDocResult(DocResults):
-    # id: int
-    name: str
-    child: str | None = None
-
-
 async def get_docs_by_entity_id(
-    client: Prisma,
     doc_ids: Sequence[str],
     rollup_field: TermField,
     child_field: TermField | None,
@@ -65,6 +42,8 @@ async def get_docs_by_entity_id(
     """
     Gets entities for a set of doc ids
     """
+    client = await prisma_client(120)
+
     query = f"""
         SELECT
             {rollup_field.name} as name,
@@ -120,7 +99,6 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
     Internal search for documents grouped by entity
     """
     start = time.monotonic()
-    client = await prisma_client(120)
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(p)
@@ -129,7 +107,6 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
 
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
-        client,
         doc_ids,
         TermField.instance_rollup,
         TermField.canonical_name,
@@ -142,27 +119,33 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
         Asset.create(
             id=rollup,
             name=ewds[0].name,
-            children=[
-                Asset.create(
-                    id=rollup + ewd.child,
-                    name=ewd.child,
-                    children=[],
-                    end_year=p.end_year,
-                    patents=compact(
-                        [docs_by_type.patents.get(id) for id in ewd.patents]
-                    ),
-                    regulatory_approvals=compact(
-                        [
-                            docs_by_type.regulatory_approvals.get(id)
-                            for id in ewd.regulatory_approvals
-                        ]
-                    ),
-                    start_year=p.start_year,
-                    trials=compact([docs_by_type.trials.get(id) for id in ewd.trials]),
-                )
-                for ewd in ewds
-                if ewd.child
-            ],
+            children=sorted(
+                [
+                    Asset.create(
+                        id=rollup + ewd.child,
+                        name=ewd.child,
+                        children=[],
+                        end_year=p.end_year,
+                        patents=compact(
+                            [docs_by_type.patents.get(id) for id in ewd.patents]
+                        ),
+                        regulatory_approvals=compact(
+                            [
+                                docs_by_type.regulatory_approvals.get(id)
+                                for id in ewd.regulatory_approvals
+                            ]
+                        ),
+                        start_year=p.start_year,
+                        trials=compact(
+                            [docs_by_type.trials.get(id) for id in ewd.trials]
+                        ),
+                    )
+                    for ewd in ewds
+                    if ewd.child
+                ],
+                key=lambda e: e.record_count,
+                reverse=True,
+            ),
             end_year=p.end_year,
             patents=compact(
                 [

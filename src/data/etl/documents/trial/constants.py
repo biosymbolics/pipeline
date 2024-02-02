@@ -4,7 +4,12 @@ CONTROL_TERMS = [
     "best supportive care",
     "standard",
     "usual care",
+    "treatment as usual",
+    "care as usual",
+    "sugar pill",
+    "routine",  # e.g. "routine care"
     "comparator",
+    "best practice",
     "no treatment",
     "saline solution",
     "conventional",
