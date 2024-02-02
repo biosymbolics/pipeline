@@ -1,16 +1,16 @@
 from dataclasses import dataclass
-from datetime import date
 from typing import Any, Sequence
-from pydash import compact, count_by, flatten, group_by, uniq
+from pydash import compact, count_by, flatten, group_by
 from prisma.enums import TrialPhase, TrialStatus
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass, EntityBase
-from .documents.patents import MAX_PATENT_LIFE, AvailabilityLikelihood
+from .documents.patents import AvailabilityLikelihood
 
 OWNERS_LIMIT = 10
+MAX_DATA_YEAR = 2022
 
 
 @dataclass(frozen=True)
@@ -57,12 +57,12 @@ class Asset(EntityBase):
         Load from storage
         """
         asset = Asset(
-            most_recent_patent=ScoredPatent(**most_recent_patent)
-            if most_recent_patent
-            else None,
-            most_recent_trial=ScoredTrial(**most_recent_trial)
-            if most_recent_trial
-            else None,
+            most_recent_patent=(
+                ScoredPatent(**most_recent_patent) if most_recent_patent else None
+            ),
+            most_recent_trial=(
+                ScoredTrial(**most_recent_trial) if most_recent_trial else None
+            ),
             children=[Asset.load(**c) for c in children],
             **kwargs
         )
@@ -198,7 +198,7 @@ class Asset(EntityBase):
             )
             + [a.approval_date for a in regulatory_approvals]
         )
-        return [dates.count(y) for y in range(start_year, end_year)]
+        return [dates.count(y) for y in range(start_year, min(MAX_DATA_YEAR, end_year))]
 
     @classmethod
     def get_detailed_activity(
@@ -223,9 +223,11 @@ class Asset(EntityBase):
         trial_map = dict(
             group_by(
                 trials,
-                lambda t: t.start_date.year
-                if t.start_date is not None
-                else t.last_updated_date.year,
+                lambda t: (
+                    t.start_date.year
+                    if t.start_date is not None
+                    else t.last_updated_date.year
+                ),
             )
         )
 
