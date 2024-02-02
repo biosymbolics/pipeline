@@ -45,14 +45,14 @@ class UmlsGraph(object):
         self.nodes: dict[str, dict] = dict(g.nodes.data())
 
     @abstractmethod
-    async def get_edges(self) -> list[EdgeRecord]:
+    async def load_edges(self) -> list[EdgeRecord]:
         """
         Query edges from umls
         """
         raise NotImplementedError
 
     @abstractmethod
-    async def get_nodes(self) -> list[NodeRecord]:
+    async def load_nodes(self) -> list[NodeRecord]:
         """
         Query nodes from umls
         """
@@ -65,8 +65,8 @@ class UmlsGraph(object):
         start = time.monotonic()
         G = nx.DiGraph()
 
-        nodes = await self.get_nodes()
-        edges = await self.get_edges()
+        nodes = await self.load_nodes()
+        edges = await self.load_edges()
 
         if len(nodes) == 0:
             raise ValueError("No nodes found")

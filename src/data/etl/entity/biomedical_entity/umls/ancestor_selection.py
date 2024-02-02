@@ -51,7 +51,7 @@ LEVEL_INSTANCE_THRESHOLD = 25
 LEVEL_OVERRIDE_DELTA = 500
 LEVEL_MIN_PREV_COUNT = 5
 MAX_DEPTH_QUERY = 5
-MAX_DEPTH_NETWORK = 6
+MAX_DEPTH_NETWORK = 10
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
 
 
@@ -106,7 +106,7 @@ class AncestorUmlsGraph(UmlsGraph):
         return aug
 
     @overrides(UmlsGraph)
-    async def get_nodes(
+    async def load_nodes(
         self,
         considered_tuis: list[str] = list(MOST_PREFERRED_UMLS_TYPES.keys()),
     ) -> list[NodeRecord]:
@@ -139,7 +139,7 @@ class AncestorUmlsGraph(UmlsGraph):
         return [NodeRecord(**r) for r in results]
 
     @overrides(UmlsGraph)
-    async def get_edges(
+    async def load_edges(
         self,
         considered_relationships: tuple[str, ...] = DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS,
         considered_tuis: tuple[str, ...] = tuple(MOST_PREFERRED_UMLS_TYPES.keys()),
@@ -199,6 +199,7 @@ class AncestorUmlsGraph(UmlsGraph):
                 AND tail_entity.type_ids && $1
                 AND head_id not in {cui_suppressions}
                 AND tail_id not in {cui_suppressions}
+                AND NOT head_name = ANY(head_entity.type_names) -- excludes uselessly broad entities like Pharmacologic Substance
                 AND head_id<>tail_id
                 AND ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
                 AND ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
@@ -236,7 +237,8 @@ class AncestorUmlsGraph(UmlsGraph):
         def _propagate(g: DiGraph, node_id: str, depth: int = 0):
             child_ids: list[str] = list(g.successors(node_id))
 
-            if depth < MAX_DEPTH_NETWORK:
+            # we want to recurse longer from root -> leaf, otherwise risk missing counts
+            if depth < MAX_DEPTH_NETWORK * 2:
                 # for children with no counts, aka non-leaf nodes, recurse
                 # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
                 # so we recurse to set Parent1 and Parent2 counts based on their children
@@ -245,7 +247,7 @@ class AncestorUmlsGraph(UmlsGraph):
                         _propagate(g, child_id, depth + 1)
 
             # set count to sum of all children counts
-            g.nodes[node_id]["count"] = g.nodes[node_id].get("count", 0) + sum(
+            g.nodes[node_id]["count"] = (g.nodes[node_id].get("count") or 0) + sum(
                 g.nodes[child_id].get("count", 0) for child_id in child_ids
             )
 
@@ -318,23 +320,25 @@ class AncestorUmlsGraph(UmlsGraph):
             Set level on node, and recurse through parents
             (mutation!)
             """
-            # logger.info("Setting level, depth %s", depth)
-            parent_ids = list(_G.predecessors(node.id))
+            parent_ids = list(G.predecessors(node.id))
             max_parent_count = (
                 max([_G.nodes[p].get("count", 0) for p in parent_ids])
                 if parent_ids
                 else None
             )
             prev_count = prev_node.count if prev_node else None
-            existing_level = _G.nodes[node.id]["level"] or OntologyLevel.UNKNOWN
+            existing_level = _G.nodes[node.id].get("level") or OntologyLevel.UNKNOWN
             level = get_level(node, prev_count, last_level, max_parent_count)
 
             # it may have already been set, and if so we don't want to set it lower.
-            if compare_ontology_level(level, existing_level) > 0:
+            if (
+                compare_ontology_level(level, existing_level) >= 0
+                or existing_level == OntologyLevel.UNKNOWN
+            ):
                 _G.nodes[node.id]["level"] = level
             else:
                 logger.warning(
-                    "Not setting level lower (%s vs %s)",
+                    "Not setting level lower (new: %s vs existing: %s)",
                     level,
                     existing_level,
                 )
@@ -346,8 +350,6 @@ class AncestorUmlsGraph(UmlsGraph):
             if depth < MAX_DEPTH_NETWORK:
                 for parent_id in parent_ids:
                     parent = NodeRecord(**_G.nodes[parent_id])
-                    # TODO: THIS MAY LOOP FOR A VERY LONG TIME
-                    # (but doing a level=UNKNOWN check breaks logic)
                     set_level(
                         _G,
                         parent,
