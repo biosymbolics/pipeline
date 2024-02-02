@@ -78,12 +78,12 @@ pg_dump --no-owner drugcentral \
 zip drugcentral.sql.zip drugcentral.sql
 pg_dump --no-owner patents -t biosym_annotations -t gpr_annotations > patents.sql
 zip patents.sql.zip patents.sql
-** start uploading biosym.psql.zip **
+** start zips **
 git clone https://github.com/biosymbolics/pipeline
 cd pipeline
+sudo apt install postgresql postgresql-contrib screen unzip gcc g++ make postgresql-server-dev-14
 python3 -m pip install -r requirements.txt
-sudo apt install postgresql postgresql-contrib screen unzip gcc make
-sudo apt install postgresql-server-dev-14
+python -m spacy download en_core_web_trf
 cd /tmp
 git clone --branch v0.6.0 https://github.com/pgvector/pgvector.git
 cd pgvector
@@ -112,7 +112,6 @@ unzip ct.sql.zip
 sudo -u biosym psql aact < ct.sql
 sudo -u biosym psql drugcentral < drugcentral.sql
 sudo -u biosym psql patents < patents.sql
-python -m spacy download en_core_web_trf
 . .pythonenv
 ```
 
