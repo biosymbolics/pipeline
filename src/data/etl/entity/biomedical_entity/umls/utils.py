@@ -5,23 +5,18 @@ from prisma.enums import OntologyLevel
 
 from constants.umls import PREFERRED_ANCESTOR_TYPE_MAP
 
-from .types import UmlsInfo
+from .types import UmlsInfo, compare_ontology_level
 
 
-def decrement_ontology_level(level: OntologyLevel) -> OntologyLevel:
-    """
-    Decrement an ontology level
-    """
-    if level == OntologyLevel.SUBINSTANCE:
-        return OntologyLevel.SUBINSTANCE
-    if level == OntologyLevel.INSTANCE:
-        return OntologyLevel.SUBINSTANCE
-    if level == OntologyLevel.L1_CATEGORY:
-        return OntologyLevel.INSTANCE
-    if level == OntologyLevel.L2_CATEGORY:
-        return OntologyLevel.L1_CATEGORY
+def choose_max_ontology_level(
+    a: OntologyLevel | None, b: OntologyLevel | None
+) -> OntologyLevel | None:
+    if a is None:
+        return b
+    if b is None:
+        return a
 
-    raise ValueError(f"Cannot increment level {level}")
+    return a if compare_ontology_level(a, b) >= 0 else b
 
 
 def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:

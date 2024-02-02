@@ -95,6 +95,7 @@ su - postgres
 psql
 create role biosym with password 'ok';
 alter role biosym with superuser;
+ALTER ROLE "biosym" WITH LOGIN;
 create database biosym;
 create database patents;
 create database drugcentral;
@@ -102,10 +103,10 @@ create database aact;
 create schema ctgov;
 CREATE EXTENSION vector;
 exit
+adduser biosym
 export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
 pip install -U prisma
 prisma db push
-adduser biosym
 unzip patents.sql.zip
 unzip drugcentral.sql.zip
 unzip ct.sql.zip

@@ -16,8 +16,8 @@ from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
-from .types import choose_max_ontology_level, compare_ontology_level
-from .utils import decrement_ontology_level, increment_ontology_level
+from .types import compare_ontology_level
+from .utils import choose_max_ontology_level, increment_ontology_level
 
 
 logger = logging.getLogger(__name__)
@@ -278,18 +278,10 @@ class AncestorUmlsGraph(UmlsGraph):
         child_ids = list(G.successors(node.id))
         child_levels = sorted(
             [G.nodes[c].get("level", OntologyLevel.UNKNOWN) for c in child_ids],
-            key=lambda x: ONTOLOGY_LEVEL_MAP[x],
+            key=lambda x: ONTOLOGY_LEVEL_MAP.get(x, 0),
         )
         max_child_level = child_levels[-1] if child_levels else None
-        last_level = choose_max_ontology_level(max_child_level, last_level)
-
-        # ensure current node is not more specific than its children
-        # (if only 1 path was ever followed, node.level == UNKNOWN)
-        if compare_ontology_level(node.level, last_level or OntologyLevel.UNKNOWN) >= 0:
-            return last_level
-
-        # otherwise return one less than the current level (a guess)
-        return decrement_ontology_level(node.level)
+        return choose_max_ontology_level(max_child_level, last_level)
 
     def set_level(
         self,
