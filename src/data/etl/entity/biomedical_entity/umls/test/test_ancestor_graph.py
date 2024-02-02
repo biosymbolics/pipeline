@@ -4,6 +4,9 @@ import pytest
 
 from clients.umls.types import EdgeRecord, NodeRecord
 from data.etl.entity.biomedical_entity.umls import AncestorUmlsGraph
+from data.etl.entity.biomedical_entity.umls.utils import (
+    choose_best_available_ancestor_type,
+)
 from typings import DocType
 from utils.classes import overrides
 
@@ -206,3 +209,78 @@ async def test_ancestor_counts():
 
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT1"), OntologyLevel.L2_CATEGORY)
     tc.assertEqual(graph.get_ontology_level("GRANDPARENT2"), OntologyLevel.INSTANCE)
+
+
+@pytest.mark.asyncio
+async def test_choose_best_available_ancestor_type():
+    tc = unittest.TestCase()
+
+    simple_test_cases = [
+        {
+            "child_types": ["T047"],  # disease or syndrome
+            "ancestor_types": ["T031", "T047"],
+            "expected": "T047",
+        },
+        {
+            "child_types": ["T103"],  # compound
+            "ancestor_types": ["T103", "T116"],  # T116 is target type
+            "expected": "T116",
+        },
+        {
+            "child_types": ["T103"],  # compound
+            "ancestor_types": ["T103", "T126", "T116"],  # T126 is enzyme
+            "expected": "T116",  # target should still be preferred
+        },
+        {
+            "child_types": ["T103"],  # compound
+            "ancestor_types": ["T103", "T126"],  # T126 is enzyme
+            "expected": "T126",  # now enzyme
+        },
+        {
+            "child_types": ["T120"],  # MoA
+            "ancestor_types": ["T120", "T116"],  # T116 is target
+            "expected": "T116",  # target
+        },
+        {
+            "child_types": ["T103"],  # compound
+            "ancestor_types": ["T120", "T116", "T103"],  # T116 is MoA
+            "expected": "T116",  # target
+        },
+    ]
+
+    multiple_child_type_tests = [
+        {
+            "child_types": ["T103", "T120"],  # compound, MoA
+            "ancestor_types": ["T120", "T116", "T103", "T116"],  # T116 is MoA
+            "expected": "T116",  # target
+        },
+        {
+            # compound, MoA, research activity
+            "child_types": [
+                "T063",
+                "T103",
+                "T120",
+            ],
+            "ancestor_types": ["T120", "T116", "T103"],
+            "expected": "T116",  # target
+        },
+        {
+            "child_types": [
+                "T007",  # pathogen
+                "T047",  # disease
+                "TRANDOM",
+            ],
+            "ancestor_types": ["T005", "T007", "T191"],  # T191 is cancer
+            "expected": "T191",  # target
+        },
+    ]
+
+    test_cases = simple_test_cases + multiple_child_type_tests
+
+    for test in test_cases:
+        expected_output = test["expected"]
+
+        result = choose_best_available_ancestor_type(
+            test["child_types"], test["ancestor_types"]
+        )
+        tc.assertEqual(result, expected_output)

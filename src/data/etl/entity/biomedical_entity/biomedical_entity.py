@@ -305,7 +305,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     canonical_id=r["canonical_id"],
                     children={"connect": [{"id": r["child_id"]}]},
                     entity_type=tuis_to_entity_type(r["type_ids"]),
-                    name=r["name"],
+                    name=r["name"].lower(),
                     sources=[Source.UMLS],
                     umls_entities={"connect": [{"id": r["canonical_id"]}]},
                 )
@@ -383,18 +383,24 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         intentional denormalization for reporting (faster than recursive querying)
         """
 
-        def get_update(table: str) -> str:
-            # logic is in how rollup_id is set (umls etl / ancestor_selector)
-            return f"""
-                UPDATE {table}
-                SET
-                    instance_rollup=lower(instance_rollup.parent_name),
-                    category_rollup=lower(category_rollup.parent_name)
-                FROM biomedical_entity as entity
-                JOIN _rollups as instance_rollup ON instance_rollup.child_id=entity.id
-                LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
-                WHERE {table}.entity_id=entity.id
-            """
+        def get_update_queries(table: str) -> list[str]:
+            return [
+                # clear existing rollups
+                f"DROP INDEX IF EXISTS {table}_instance_rollup",  # improve speed
+                f"DROP INDEX IF EXISTS {table}_category_rollup",  # improve speed
+                f"UPDATE {table} SET instance_rollup='', category_rollup=''",
+                # logic is in how rollup_id is set (umls etl / ancestor_selector)
+                f"""
+                    UPDATE {table}
+                    SET
+                        instance_rollup=lower(instance_rollup.parent_name),
+                        category_rollup=lower(category_rollup.parent_name)
+                    FROM biomedical_entity as entity
+                    JOIN _rollups as instance_rollup ON instance_rollup.child_id=entity.id
+                    LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
+                    WHERE {table}.entity_id=entity.id
+                """,
+            ]
 
         # much faster with temp tables
         initialize_queries = [
@@ -409,8 +415,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 JOIN biomedical_entity ON id=etp."A" -- "A" is parent
                 GROUP BY etp."B" -- "B" is child
             """,
-            "create index _rollups_child_id on _rollups(child_id)",
-            "create index _rollups_parent_id on _rollups(parent_id)",
+            "CREATE INDEX _rollups_child_id on _rollups(child_id)",
+            "CREATE INDEX _rollups_parent_id on _rollups(parent_id)",
         ]
         cleanup_queries = [
             "DROP TABLE IF EXISTS instance_rollup",
@@ -424,11 +430,16 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             await client.execute_raw(query)
 
         for table in ["intervenable", "indicatable"]:
-            query = get_update(table)
-            await client.execute_raw(query)
+            update_queries = get_update_queries(table)
+            for query in update_queries:
+                await client.execute_raw(query)
 
         for query in cleanup_queries:
             await client.execute_raw(query)
+
+        logger.warning(
+            "Completed set_rollups. Be sure to re-apply indices (prisma db push)"
+        )
 
     @staticmethod
     async def pre_doc_finalize():
@@ -450,17 +461,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
         """
         logger.info("Finalizing biomedical entity etl")
-        await BiomedicalEntityEtl.link_to_documents()
-        await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
+        # await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
         await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
-        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
+        # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
-        await BiomedicalEntityEtl.set_rollups()
+        # await BiomedicalEntityEtl.set_rollups()
 
         logger.info("Biomedical entity post_doc_finalize complete")

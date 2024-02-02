@@ -11,13 +11,12 @@ from constants.umls import (
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
-from data.etl.entity.biomedical_entity.umls.types import (
-    compare_ontology_level,
-    increment_ontology_level,
-)
 from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
+
+from .types import compare_ontology_level
+from .utils import increment_ontology_level
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +26,8 @@ logger.setLevel(logging.INFO)
 Debugging
 select be.canonical_id, be.name, be.count, parent_be.name from biomedical_entity be, _entity_to_parent etp, biomedical_entity parent_be where etp."B"=be.id and etp."A"=parent_be.id and be.name ilike 'cd3 antigens';
 select * from umls_graph where tail_id='C0108779' and relationship in ('isa', 'mapped_to', 'classified_as', 'has_mechanism_of_action', 'has_target', 'has_active_ingredient', 'tradename_of', 'has_phenotype');
+
+select umls.count, umls.level, be.name, be2.name from biomedical_entity be, biomedical_entity be2, _entity_to_parent etp, umls  where etp."A"=be.id and etp."B"=be2.id and umls.id=be.canonical_id and be2.canonical_id='C0246631' order by umls.count desc;
 """
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     ### GENERAL ###
@@ -271,13 +272,16 @@ class AncestorUmlsGraph(UmlsGraph):
 
         def get_level(
             current_node: NodeRecord,
-            prev_count: int | None = None,
             last_level: OntologyLevel | None = None,
+            prev_count: int | None = None,
             max_parent_count: int | None = None,
         ) -> OntologyLevel:
+            """
+            Determine level of current node
+            """
             current_count = current_node.count or 0
 
-            if prev_count is None:
+            if prev_count is None or last_level is None:
                 """
                 leaf node. level it INSTANCE if sufficiently common.
                 """
@@ -285,11 +289,6 @@ class AncestorUmlsGraph(UmlsGraph):
                     return OntologyLevel.SUBINSTANCE
 
                 return OntologyLevel.INSTANCE
-
-            if last_level is None:
-                raise ValueError(
-                    "last_level must be provided if prev_count is provided"
-                )
 
             if max_parent_count is None:
                 """
@@ -332,23 +331,23 @@ class AncestorUmlsGraph(UmlsGraph):
                 else None
             )
             prev_count = prev_node.count if prev_node else None
-            existing_level = _G.nodes[node.id].get("level") or OntologyLevel.UNKNOWN
-            level = get_level(node, prev_count, last_level, max_parent_count)
+            level = get_level(node, last_level, prev_count, max_parent_count)
 
-            # it may have already been set, and if so we don't want to set it lower.
             if (
-                compare_ontology_level(level, existing_level) >= 0
-                or existing_level == OntologyLevel.UNKNOWN
+                last_level is not None
+                and level != OntologyLevel.NA
+                and compare_ontology_level(level, last_level) < 0
             ):
-                _G.nodes[node.id]["level"] = level
-            else:
                 logger.warning(
-                    "Not setting level lower (new: %s vs existing: %s)",
+                    "SHOULD NOT HAPPEN: %s level to %s, from %s",
+                    node.id,
                     level,
-                    existing_level,
+                    last_level,
                 )
 
-            # last real level as basis for inc
+            _G.nodes[node.id]["level"] = level
+
+            # last real level as basis for increments
             new_last_level = level if level != OntologyLevel.NA else last_level
 
             # recurse through parents
@@ -368,7 +367,7 @@ class AncestorUmlsGraph(UmlsGraph):
         # propogate counts up the tree
         new_g = AncestorUmlsGraph._propagate_counts(G.copy().to_directed())
 
-        logger.info("Propagating levels down the tree")
+        logger.info("Propagating levels up the tree")
         # take all nodes with no *outgoing* edges, i.e. leaf nodes
         for node_id in [n for n, d in new_g.out_degree() if d == 0]:
             node = new_g.nodes[node_id]

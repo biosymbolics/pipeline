@@ -1,6 +1,7 @@
 """
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
+
 from typing import Literal
 from prisma.enums import BiomedicalEntityType
 
@@ -85,6 +86,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0815040": "acidic amino acid",  # matches amino acid
     "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
     "C0008109": "chimera",
+    "C0043335": "xenobiotic",
 }
 
 
@@ -112,17 +114,17 @@ UMLS_COMPOUND_TYPES = {
     "T103": "Chemical",
     "T104": "Chemical Viewed Structurally",
     "T109": "Organic Chemical",
-    "T121": "Compound",  # "Pharmacologic Substance",  # in mech too
+    "T121": "Pharmacologic Substance",
     "T127": "Vitamin",
     "T197": "Inorganic Chemical",
     "T200": "Clinical Drug",
 }
 
-UMLS_IRRELEVANT_TYPES = {
-    "T080": "Qualitative Concept",  # 23313
-    "T098": "Population Group",  # 9664 pregnant women, healthy volunteeers, living donors
-    "T082": "Spatial Concept",
+UMLS_MAYBE_COMPOUND_TYPES = {
+    "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
+    "T167": "Substance",
 }
+
 
 UMLS_GENE_PROTEIN_TYPES = {
     "T028": "Gene or Genome",
@@ -138,7 +140,7 @@ UMLS_BIOLOGIC_TYPES = {
     **UMLS_TARGET_TYPES,
     "T038": "Biologic Function",  # activation, inhibition, induction, etc
     "T043": "Cell Function",  # regulation, inhibition, transport, secretion, transduction
-    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity
+    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity. also "Opioid mu-Receptor Agonists" (MECHANISM!)
     "T045": "Genetic Function",  # lots of integration, methylation, acetylation, transcription, etc
     # "T085": "Molecular Sequence", # this has 12 entries...
     "T086": "Nucleotide Sequence",  # SNPs, repeats, codons, etc (< 500 entries)
@@ -151,13 +153,23 @@ UMLS_BIOLOGIC_TYPES = {
     "T192": "Receptor",  # only 198 of 5655 are NOT also in UMLS_GENE_PROTEIN_TYPES
 }
 
+UMLS_MAYBE_BIOLOGIC_TYPES = {
+    "T022": "Body System",
+    "T024": "Tissue",
+    "T025": "Cell",
+    "T026": "Cell Component",
+}
+
 
 UMLS_MECHANISM_TYPES = {
     "T120": "Mechanism",  # "Chemical Viewed Functionally",
-    "T121": "Pharmacologic Substance",  # TODO: here or in compound???
+    # "T121": "Pharmacologic Substance",  # in combound
     "T123": "Pharmacologic effect",  # "Biologically Active Substance",  # e.g. inhibitor, agonist, antagonist
     "T195": "Antibiotic",
+    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity. also "Opioid mu-Receptor Agonists" (BIOLOGIC!)
 }
+
+UMLS_MAYBE_MECHANISM_TYPES: dict[str, str] = {}
 
 UMLS_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_COMPOUND_TYPES,
@@ -165,23 +177,46 @@ UMLS_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_MECHANISM_TYPES,
 }
 
+# maybe / on-the-fence pharmacologic intervention types
+UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES = {
+    **UMLS_MAYBE_COMPOUND_TYPES,
+    **UMLS_MAYBE_BIOLOGIC_TYPES,
+    **UMLS_MAYBE_MECHANISM_TYPES,
+}
+
 UMLS_DEVICE_TYPES = {
     "T074": "Medical Device",
     "T075": "Research Device",
     "T203": "Drug Delivery Device",
 }
+UMLS_MAYBE_DEVICE_TYPES = {"T073": "Manufactured Object"}
 
 UMLS_PROCEDURE_TYPES = {
     "T058": "Health Care Activity",
     "T059": "Laboratory Procedure",
     "T061": "Therapeutic or Preventive Procedure",
 }
+UMLS_MAYBE_PROCEDURE_TYPES: dict[str, str] = {}
 
-UMLS_INTERVENTION_TYPES = {
-    **UMLS_PHARMACOLOGIC_INTERVENTION_TYPES,
+UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_DEVICE_TYPES,
     **UMLS_PROCEDURE_TYPES,
     "T168": "Food",
+}
+
+UMLS_INTERVENTION_TYPES = {
+    **UMLS_PHARMACOLOGIC_INTERVENTION_TYPES,
+    **UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES,
+}
+
+UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES = {
+    **UMLS_MAYBE_DEVICE_TYPES,
+    **UMLS_MAYBE_PROCEDURE_TYPES,
+}
+
+UMLS_MAYBE_INTERVENTION_TYPES = {
+    **UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES,
+    **UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES,
 }
 
 UMLS_PATHOGEN_TYPES = {
@@ -191,23 +226,28 @@ UMLS_PATHOGEN_TYPES = {
     "T204": "Eukaryote",  # includes parasites
 }
 
-UMLS_DISEASE_TYPES = {
-    **UMLS_PATHOGEN_TYPES,
+UMLS_CORE_DISEASE_TYPES = {
+    "T047": "Disease or Syndrome",
+    "T048": "Mental or Behavioral Dysfunction",
+    "T191": "Cancer",  # "Neoplastic Process",  # e.g. 'Mantle cell lymphoma'
+}
+
+UMLS_NON_PATHOGEN_DISEASE_TYPES = {
+    **UMLS_CORE_DISEASE_TYPES,
     "T019": "Congenital Abnormality",
     "T020": "Acqjuired Abnormality",
     "T037": "Injury or Poisoning",
     "T046": "Pathology",  # "Pathologic Function",
-    "T047": "Disease or Syndrome",
-    "T048": "Mental or Behavioral Dysfunction",
     "T050": "Experimental Model of Disease",
     # "T091": "Occupation", # can include theurapeutic areas
     "T184": "Symptom",  # "Sign or Symptom",
     "T190": "Anatomical Abnormality",
-    "T191": "Cancer",  # "Neoplastic Process",  # e.g. 'Mantle cell lymphoma'
 }
 
-
-# phenotypic abnormality
+UMLS_DISEASE_TYPES = {
+    **UMLS_NON_PATHOGEN_DISEASE_TYPES,
+    **UMLS_PATHOGEN_TYPES,
+}
 
 UMLS_PHENOTYPE_TYPES = {
     "T031": "Body Substance",  # includes plaque, atherosclerotic, Amniotic Fluid (bad)
@@ -216,16 +256,32 @@ UMLS_PHENOTYPE_TYPES = {
     # "T101": "Patient or Disabled Group",
 }
 
+
+# umls types that might be diseases
+UMLS_MAYBE_DISEASE_TYPES = {
+    **UMLS_PHENOTYPE_TYPES,
+    "T040": "Organism Function",  # Positive Regulation of Angiogenesis
+    "T041": "Mental Process",
+    "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
+    "T039": "Physiologic Function",  # e.g. Menopause
+    # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
+    "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
+}
+
+
 UMLS_DIAGNOSTIC_TYPES = {
     "T034": "laboratory or test result",
     "T060": "Diagnostic Procedure",
     "T130": "Indicator, Reagent, or Diagnostic Aid",
 }
 
+UMLS_MAYBE_DIAGNOSTIC_TYPES: dict[str, str] = {}
+
 UMLS_RESEARCH_TYPES = {
     "T062": "Research Activity",
     "T063": "research activity",
 }
+UMLS_MAYBE_RESEARCH_TYPES: dict[str, str] = {}
 
 UMLS_OTHER_TYPES = {
     # "T068": "Human-caused Phenomenon or Process",  # ??
@@ -233,6 +289,9 @@ UMLS_OTHER_TYPES = {
     "T169": "Functional Concept",
     "T067": "Process",  # "Phenomenon or Process" includes Emergency Situation, dehydrogenation
     # "T001": "Organism",  # includes "pathogenic organism" -could be disease or biologic?
+    "T080": "Qualitative Concept",  # 23313
+    "T098": "Population Group",  # 9664 pregnant women, healthy volunteeers, living donors
+    "T082": "Spatial Concept",
 }
 
 # UMLS ents of these types will be included in the UMLS load
@@ -258,43 +317,30 @@ MOST_PREFERRED_UMLS_TYPES = {
 }
 
 
-# casting wide net on disease types (includes the less-preferred types)
-UMLS_EXTENDED_DISEASE_TYPES = {
-    **UMLS_DISEASE_TYPES,
-    **UMLS_PHENOTYPE_TYPES,
-    "T040": "Organism Function",  # Positive Regulation of Angiogenesis
-    "T041": "Mental Process",
-    "T049": "Molecular Dysfunction",  # "Cell or Molecular Dysfunction" # e.g. DNA Strand Break
-    "T039": "Physiologic Function",  # e.g. Menopause
-    # "T032": "Organism Attribute" # Multi-Drug Resistance, Hair Color
-    "T131": "Hazardous Substance",  # "Hazardous or Poisonous Substance",
-}
-
-# casting wide net on compound types (includes the less-preferred types)
-UMLS_EXTENDED_COMPOUND_TYPES = {
-    **UMLS_COMPOUND_TYPES,
-    "T167": "Substance",
-    "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
-}
-
-# casting wide net on biologic types (includes the less-preferred types)
+# wider net UMLS types
+UMLS_EXTENDED_DISEASE_TYPES = {**UMLS_DISEASE_TYPES, **UMLS_MAYBE_DISEASE_TYPES}
+UMLS_EXTENDED_COMPOUND_TYPES = {**UMLS_COMPOUND_TYPES, **UMLS_MAYBE_COMPOUND_TYPES}
 UMLS_EXTENDED_BIOLOGIC_TYPES = {
     **UMLS_BIOLOGIC_TYPES,
-    "T022": "Body System",
-    "T024": "Tissue",
-    "T025": "Cell",
-    "T026": "Cell Component",
+    **UMLS_MAYBE_BIOLOGIC_TYPES,
 }
-
-# casting wide net on pharma intervention types (includes the less-preferred types)
 UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_EXTENDED_COMPOUND_TYPES,
     **UMLS_EXTENDED_BIOLOGIC_TYPES,
     **UMLS_MECHANISM_TYPES,
 }
-
-UMLS_EXTENDED_DEVICE_TYPES = {**UMLS_DEVICE_TYPES, "T073": "Manufactured Object"}
-
+UMLS_EXTENDED_DEVICE_TYPES = {**UMLS_DEVICE_TYPES, **UMLS_MAYBE_DEVICE_TYPES}
+UMLS_EXTENDED_DIAGNOSTIC_TYPES = {
+    **UMLS_DIAGNOSTIC_TYPES,
+    **UMLS_MAYBE_DIAGNOSTIC_TYPES,
+}
+UMLS_EXTENDED_DIAGNOSTIC_TYPES = {
+    **UMLS_DIAGNOSTIC_TYPES,
+    **UMLS_MAYBE_DIAGNOSTIC_TYPES,
+}
+UMLS_EXTENDED_MECHANISM_TYPES = {**UMLS_MECHANISM_TYPES, **UMLS_MAYBE_MECHANISM_TYPES}
+UMLS_EXTENDED_PROCEDURE_TYPES = {**UMLS_PROCEDURE_TYPES, **UMLS_MAYBE_PROCEDURE_TYPES}
+UMLS_UMLS_RESEARCH_TYPES = {**UMLS_RESEARCH_TYPES, **UMLS_MAYBE_RESEARCH_TYPES}
 
 """
 ENTITY_TO_UMLS_TYPE
@@ -312,9 +358,9 @@ ENTITY_TO_UMLS_TYPE = {
     BiomedicalEntityType.DEVICE: UMLS_EXTENDED_DEVICE_TYPES,
     # includes phenotypes for the sake of typing; phenotype category not ideal for matching since it is very broad
     BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE_TYPES,
-    BiomedicalEntityType.DIAGNOSTIC: UMLS_DIAGNOSTIC_TYPES,
-    BiomedicalEntityType.MECHANISM: UMLS_MECHANISM_TYPES,
-    BiomedicalEntityType.PROCEDURE: UMLS_PROCEDURE_TYPES,
+    BiomedicalEntityType.DIAGNOSTIC: UMLS_EXTENDED_DIAGNOSTIC_TYPES,
+    BiomedicalEntityType.MECHANISM: UMLS_EXTENDED_MECHANISM_TYPES,
+    BiomedicalEntityType.PROCEDURE: UMLS_EXTENDED_PROCEDURE_TYPES,
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
 
@@ -333,28 +379,31 @@ NER_ENTITY_TYPES = frozenset(
 )
 
 
-BEST_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{k: list(UMLS_DISEASE_TYPES.keys()) for k in UMLS_EXTENDED_DISEASE_TYPES.keys()},
+PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
     **{
-        k: list(UMLS_TARGET_TYPES.keys())
-        for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
-    },
-}
-
-BETTER_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{
-        k: list(UMLS_EXTENDED_DISEASE_TYPES.keys())
+        k: {
+            **{dt: 4 for dt in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
+            **{dt: 3 for dt in list(UMLS_PATHOGEN_TYPES.keys())},
+            **{dt: 2 for dt in list(UMLS_NON_PATHOGEN_DISEASE_TYPES.keys())},
+            **{dt: 1 for dt in list(UMLS_CORE_DISEASE_TYPES.keys())},
+        }
         for k in UMLS_EXTENDED_DISEASE_TYPES.keys()
     },
     **{
-        k: list(UMLS_MECHANISM_TYPES.keys())
-        for k in UMLS_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
-    },
-}
-
-FAIR_ANCESTOR_TYPE_MAP: dict[str, list[str]] = {
-    **{
-        k: list(UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+        k: {
+            **{
+                dt: 7
+                for dt in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+            },
+            **{
+                dt: 6 for dt in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+            },
+            **{dt: 5 for dt in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+            **{dt: 4 for dt in list(UMLS_COMPOUND_TYPES.keys())},
+            **{dt: 3 for dt in list(UMLS_BIOLOGIC_TYPES.keys())},
+            **{dt: 2 for dt in list(UMLS_MECHANISM_TYPES.keys())},
+            **{dt: 1 for dt in list(UMLS_TARGET_TYPES.keys())},
+        }
         for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }
