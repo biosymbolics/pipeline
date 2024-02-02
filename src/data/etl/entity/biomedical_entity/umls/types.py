@@ -25,6 +25,17 @@ def compare_ontology_level(a: OntologyLevel, b: OntologyLevel) -> int:
     return ONTOLOGY_LEVEL_MAP[a] - ONTOLOGY_LEVEL_MAP[b]
 
 
+def choose_max_ontology_level(
+    a: OntologyLevel | None, b: OntologyLevel | None
+) -> OntologyLevel | None:
+    if a is None:
+        return b
+    if b is None:
+        return a
+
+    return a if compare_ontology_level(a, b) >= 0 else b
+
+
 class UmlsInfo(BaseModel, object):
     id: str
     name: str

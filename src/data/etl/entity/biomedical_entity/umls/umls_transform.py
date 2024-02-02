@@ -124,6 +124,10 @@ class UmlsAncestorTransformer:
             a for a in ancestors if compare_ontology_level(a.level, child.level) > 0
         ]
 
+        # if no eligible ancestors, return self
+        if len(eligible_ancestors) == 0:
+            return child.id
+
         # if no type_ids, return first eligible ancestor
         if len(child.type_ids) == 0:
             return eligible_ancestors[0].id

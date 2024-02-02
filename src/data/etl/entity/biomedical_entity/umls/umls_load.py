@@ -113,7 +113,7 @@ class UmlsLoader:
             if tr is not None:
                 await Umls.prisma(tx).update(data=tr, where={"id": r.id})
 
-        await batch_update(all_umls, update_func=maybe_update, batch_size=5000)
+        await batch_update(all_umls, update_func=maybe_update, batch_size=10000)
         logger.info(
             "Finished updating UMLS with levels in %s seconds",
             round(time.monotonic() - start),
