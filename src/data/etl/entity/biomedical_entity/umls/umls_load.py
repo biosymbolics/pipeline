@@ -43,17 +43,9 @@ class UmlsLoader:
                 COALESCE(TRIM(max(ancestors.ptr)), '') as hierarchy,
                 COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
                 COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
-                COALESCE(max(descendants.count), 0) as num_descendants,
                 COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
             FROM mrconso as entities
             LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
-            LEFT JOIN (
-                SELECT cui1 as parent_cui, count(*) as count
-                FROM mrrel
-                WHERE rel in ('RN', 'CHD') -- narrower, child
-                AND (rela is null or rela = 'isa') -- no specified relationship, or 'is a' rel
-                GROUP BY parent_cui
-            ) descendants ON descendants.parent_cui = entities.cui
             LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
             LEFT JOIN (
                 select array_agg(distinct(lower(str))) as terms, cui as id from mrconso

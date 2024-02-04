@@ -302,7 +302,6 @@ model Umls {
     count               Int                @default(0)
     level               OntologyLevel
     name                String
-    num_descendants     Int
     preferred_name      String
     rollup_id           String // TODO: add as biomedical parent
     synonyms            String[]
