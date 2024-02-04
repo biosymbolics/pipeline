@@ -168,12 +168,29 @@ class UmlsLoader:
         await UmlsLoader.copy_relationships()
 
     @staticmethod
+    async def post_doc_finalize_checksum():
+        """
+        Quick UMLS checksum
+        """
+        client = await prisma_client(300)
+        checksums = {
+            "levels": f"SELECT level, COUNT(*) FROM umls group by level",
+        }
+        results = await asyncio.gather(
+            *[client.query_raw(query) for query in checksums.values()]
+        )
+        for key, result in zip(checksums.keys(), results):
+            logger.warning(f"UMLS Load checksum {key}: {result[0]}")
+        return
+
+    @staticmethod
     async def post_doc_finalize():
         """
         To be run after initial UMLS, biomedical entity, and doc loads
         (since it depends upon those being present)
         """
         await UmlsLoader.set_ontology_levels()
+        await UmlsLoader.post_doc_finalize_checksum()
 
 
 if __name__ == "__main__":

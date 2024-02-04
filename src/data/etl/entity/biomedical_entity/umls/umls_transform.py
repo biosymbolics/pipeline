@@ -127,7 +127,7 @@ class UmlsAncestorTransformer:
             and (i == 0 or compare_ontology_level(a.level, ancestors[i - 1].level) >= 0)
         ]
 
-        logger.info("Eligible ancestors for %s: %s", child.id, eligible_ancestors)
+        logger.debug("Eligible ancestors for %s: %s", child.id, eligible_ancestors)
 
         # if no eligible ancestors, return self
         if len(eligible_ancestors) == 0:

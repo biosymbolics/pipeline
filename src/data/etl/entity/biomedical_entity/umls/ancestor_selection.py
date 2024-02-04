@@ -54,14 +54,10 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
 )
 LEVEL_INSTANCE_THRESHOLD = 50
 LEVEL_OVERRIDE_DELTA = 500
-LEVEL_MIN_PREV_COUNT = 5
+LEVEL_MIN_DELTA = 20
 MAX_DEPTH_QUERY = 5
 MAX_DEPTH_NETWORK = 15
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
-
-
-# maxed signed int size
-MAX_COUNT = 2147483647
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -73,8 +69,8 @@ class AncestorUmlsGraph(UmlsGraph):
         self,
         doc_type: DocType,
         instance_threshold: int,
-        previous_threshold: int,
-        current_override_threshold: int,
+        delta_threshold: int,
+        override_threshold: int,
     ):
         """
         ***Either use a factory method in the subclass, or call load() after init***
@@ -83,8 +79,8 @@ class AncestorUmlsGraph(UmlsGraph):
         super().__init__(transform_graph=self._add_level_info)
         self.doc_type = doc_type
         self.instance_threshold = instance_threshold
-        self.previous_threshold = previous_threshold
-        self.current_override_threshold = current_override_threshold
+        self.delta_threshold = delta_threshold
+        self.override_threshold = override_threshold
 
     @classmethod
     async def create(
@@ -92,8 +88,8 @@ class AncestorUmlsGraph(UmlsGraph):
         filename: str | None = DEFAULT_ANCESTOR_FILE,
         doc_type: DocType = DocType.patent,
         instance_threshold: int = LEVEL_INSTANCE_THRESHOLD,
-        previous_threshold: int = LEVEL_MIN_PREV_COUNT,
-        current_override_threshold: int = LEVEL_OVERRIDE_DELTA,
+        delta_threshold: int = LEVEL_MIN_DELTA,
+        override_threshold: int = LEVEL_OVERRIDE_DELTA,
     ) -> "AncestorUmlsGraph":
         """
         Factory for AncestorUmlsGraph
@@ -102,14 +98,14 @@ class AncestorUmlsGraph(UmlsGraph):
             filename: filename to load from (if None, it will not load from nor save to a file)
             doc_type: doc type to use for graph
             instance_threshold: threshold for UMLS entry to be considered INSTANCE vs SUBINSTANCE
-            previous_threshold: threshold for considering multiplier on prev count as criteria for level ++
-            current_override_threshold: if the absolute change in counts between prev and current is greater than this, level ++
+            delta_threshold: threshold for considering multiplier on prev count as criteria for level ++
+            override_threshold: if the absolute change in counts between prev and current is greater than this, level ++
         """
         aug = cls(
             doc_type,
             instance_threshold=instance_threshold,
-            previous_threshold=previous_threshold,
-            current_override_threshold=current_override_threshold,
+            delta_threshold=delta_threshold,
+            override_threshold=override_threshold,
         )
         await aug.load(filename=filename)
         return aug
@@ -123,7 +119,15 @@ class AncestorUmlsGraph(UmlsGraph):
         Query nodes from umls
         """
         query = rf"""
-            SELECT umls.id as id, count(*) as count
+            SELECT
+                umls.id as id,
+                count(*) as count,
+                CASE
+                    -- T200 / Clinical Drug is always SUBINSTANCE
+                    WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
+                    THEN 'SUBINSTANCE'
+                    ELSE null
+                    END AS level_override
             FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
             WHERE biomedical_entity.id=intervenable.entity_id
             AND etu."A"=biomedical_entity.id
@@ -134,7 +138,7 @@ class AncestorUmlsGraph(UmlsGraph):
             UNION
 
             -- indication-mapped UMLS terms associated with docs, if preferred type
-            SELECT umls.id as id, count(*) as count
+            SELECT umls.id as id, count(*) as count, null as level_override
             FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
             WHERE biomedical_entity.id=indicatable.entity_id
             AND etu."A"=biomedical_entity.id
@@ -297,11 +301,16 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         Determine level of current node
         """
+
+        # i.e. for Clinical Drug / T200 -> SUBINSTANCE
+        if current_node.level_override is not None:
+            return current_node.level_override
+
         current_count = current_node.count or 0
 
-        if last_level == OntologyLevel.UNKNOWN:
+        if prev_count == 0 or last_level == OntologyLevel.UNKNOWN:
             """
-            leaf node. level it INSTANCE if sufficiently common.
+            leaf node, or effective leaf node (i.e. previous had no count)
             """
             if current_count < self.instance_threshold:
                 return OntologyLevel.SUBINSTANCE
@@ -322,10 +331,9 @@ class AncestorUmlsGraph(UmlsGraph):
         parent_current_delta = max_parent_count - current_count
         current_prev_delta = current_count - prev_count
 
-        if current_prev_delta > self.current_override_threshold or (
+        if current_prev_delta > self.override_threshold or (
             parent_current_delta > current_prev_delta
-            and prev_count
-            > self.previous_threshold  # ignore big changes in small numbers
+            and current_prev_delta > self.delta_threshold
         ):
             return increment_ontology_level(last_level)
 
