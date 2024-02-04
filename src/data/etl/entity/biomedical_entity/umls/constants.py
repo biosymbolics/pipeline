@@ -9,6 +9,9 @@ ONTOLOGY_LEVEL_MAP = {
     OntologyLevel.INSTANCE: 1,
     OntologyLevel.L1_CATEGORY: 2,
     OntologyLevel.L2_CATEGORY: 3,
-    # OntologyLevel.NA: -1, # excluded
-    # OntologyLevel.UNKNOWN: -1, # excluded
+    OntologyLevel.L3_CATEGORY: 4,
+    OntologyLevel.L4_CATEGORY: 5,
+    OntologyLevel.L5_CATEGORY: 6,
+    OntologyLevel.NA: -1,
+    OntologyLevel.UNKNOWN: -2,
 }

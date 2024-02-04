@@ -8,7 +8,6 @@ from prisma.types import (
 )
 from pydash import compact
 
-from constants.umls import PREFERRED_ANCESTOR_TYPE_MAP
 from data.domain.biomedical.umls import clean_umls_name
 
 from .ancestor_selection import AncestorUmlsGraph
@@ -121,8 +120,14 @@ class UmlsAncestorTransformer:
 
         # ancestors eligible if the level is higher than child
         eligible_ancestors = [
-            a for a in ancestors if compare_ontology_level(a.level, child.level) > 0
+            a
+            for i, a in enumerate(ancestors)
+            if compare_ontology_level(a.level, child.level) > 0
+            # only consider monotonic levels (avoiding a confused random SUBINSTANCE from being chosen if type == NA)
+            and (i == 0 or compare_ontology_level(a.level, ancestors[i - 1].level) >= 0)
         ]
+
+        logger.info("Eligible ancestors for %s: %s", child.id, eligible_ancestors)
 
         # if no eligible ancestors, return self
         if len(eligible_ancestors) == 0:
@@ -130,11 +135,16 @@ class UmlsAncestorTransformer:
 
         # if no type_ids, return first eligible ancestor
         if len(child.type_ids) == 0:
+            logger.info(
+                "No type Ids for %s; returning %s", child.id, eligible_ancestors[0].id
+            )
             return eligible_ancestors[0].id
 
         best_ancestor = choose_best_available_ancestor(
             child.type_ids, eligible_ancestors
         )
+
+        logger.debug("Best available ancestor for %s: %s", child.id, best_ancestor)
 
         if best_ancestor is None:
             return child.id

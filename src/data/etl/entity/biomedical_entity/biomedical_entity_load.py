@@ -33,6 +33,7 @@ async def entity_checksum():
     )
     for key, result in zip(checksums.keys(), results):
         logger.warning(f"Load checksum {key}: {result[0]}")
+    return
 
 
 class BiomedicalEntityLoader:

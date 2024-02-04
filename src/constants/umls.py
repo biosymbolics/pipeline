@@ -42,6 +42,7 @@ UMLS_WORD_OVERRIDES = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C1704222": "genome encoded entity",
     "C0243083": "associated disease",
     "C3263722": "Traumatic AND/OR non-traumatic injury",
     "C1706082": "Compound",
@@ -107,6 +108,10 @@ UMLS_NAME_SUPPRESSIONS = [
     "miscellaneous",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C0301555
     "product",  # e.g. gene product / https://uts.nlm.nih.gov/uts/umls/concept/C3828300
     "wt",  # wt allele (prefer gene record)
+    "mesh",  # e.g. MeSH Russian
+    "headings",  # e.g. Medical Subject Headings Norwegian
+    "category",  # e.g. Chemicals and Drugs (MeSH Category)
+    "schedule",  # e.g. schedule II opium and derivatives
 ]
 
 
@@ -163,10 +168,10 @@ UMLS_MAYBE_BIOLOGIC_TYPES = {
 
 UMLS_MECHANISM_TYPES = {
     "T120": "Mechanism",  # "Chemical Viewed Functionally",
-    # "T121": "Pharmacologic Substance",  # in combound
+    "T121": "Pharmacologic Substance",  # in compount too, but has a lot of important MoAs
     "T123": "Pharmacologic effect",  # "Biologically Active Substance",  # e.g. inhibitor, agonist, antagonist
     "T195": "Antibiotic",
-    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity. also "Opioid mu-Receptor Agonists" (BIOLOGIC!)
+    "T044": "Molecular Function",  # lots of XYZ process, XYZ activity. also "Opioid mu-Receptor Agonists". Incompletely dups "Pharmacologic Substance"
 }
 
 UMLS_MAYBE_MECHANISM_TYPES: dict[str, str] = {}

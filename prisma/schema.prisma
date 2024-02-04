@@ -490,6 +490,9 @@ enum OntologyLevel {
     INSTANCE
     L1_CATEGORY
     L2_CATEGORY
+    L3_CATEGORY
+    L4_CATEGORY
+    L5_CATEGORY
     NA
     UNKNOWN
 }
