@@ -67,7 +67,9 @@ class UmlsLoader:
             logger.info("Creating %s UMLS records", len(batch))
             insert_data = [
                 UmlsCreateInput(
-                    **r,  # type: ignore
+                    **r,
+                    id=r["id"],
+                    name=r["name"],
                     rollup_id=r["id"],  # start with self as rollup
                     preferred_name=clean_umls_name(
                         r["id"], r["name"], r["synonyms"], r["type_ids"], False
