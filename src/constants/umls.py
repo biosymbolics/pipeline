@@ -384,6 +384,22 @@ NER_ENTITY_TYPES = frozenset(
 )
 
 
+CANDIDATE_TYPE_WEIGHT_MAP = {
+    **{t: 1 for t in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+    **{t: 1 for t in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+    **{t: 1 for t in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
+    **{t: 1 for t in list(UMLS_PATHOGEN_TYPES.keys())},
+    **{t: 1 for t in list(UMLS_NON_PATHOGEN_DISEASE_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_COMPOUND_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_BIOLOGIC_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_MECHANISM_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_TARGET_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_CORE_DISEASE_TYPES.keys())},
+    "T200": 0.7,  # Clinical Drug - too specific. avoid matching.
+}
+
+
 PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
     **{
         k: {
