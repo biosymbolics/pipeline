@@ -48,11 +48,7 @@ def choose_best_available_ancestor(
     # create a map of all possible parent types
     possible_ancestor_types = {
         type_id: a
-        # sorted so that closer ancestors are preferred
-        for type_id, a in sorted(
-            [(type_id, a) for a in ancestors for type_id in a.type_ids],
-            reverse=True,
-        )
+        for type_id, a in [(type_id, a) for a in ancestors for type_id in a.type_ids]
     }
 
     best_type = choose_best_available_ancestor_type(

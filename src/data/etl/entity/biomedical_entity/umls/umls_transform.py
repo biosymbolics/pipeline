@@ -2,11 +2,10 @@ from typing import Sequence
 import logging
 from prisma.models import Umls
 from prisma.types import UmlsUpdateInput
-from pydash import compact
+from pydash import compact, flatten, omit
 
 
 from .ancestor_selection import AncestorUmlsGraph
-from .constants import MAX_DENORMALIZED_ANCESTORS
 from .types import UmlsInfo, compare_ontology_level
 from .utils import choose_best_available_ancestor
 
@@ -20,47 +19,21 @@ class UmlsAncestorTransformer:
     Class for transforming UMLS records
     """
 
-    def __init__(
-        self, umls_graph: AncestorUmlsGraph, level_lookup: dict[str, UmlsInfo]
-    ):
+    def __init__(self, umls_graph: AncestorUmlsGraph):
         self.umls_graph = umls_graph
-        self.level_lookup: dict[str, UmlsInfo] = level_lookup
 
     @staticmethod
-    async def create(records: Sequence[Umls]) -> "UmlsAncestorTransformer":
+    async def create() -> "UmlsAncestorTransformer":
         """
         Factory for UmlsAncestorTransformer
         """
-        g, level_lookup = await UmlsAncestorTransformer.load(records)
-        return UmlsAncestorTransformer(g, level_lookup)
-
-    @staticmethod
-    async def load(
-        records: Sequence[Umls],
-    ) -> tuple[AncestorUmlsGraph, dict[str, UmlsInfo]]:
-        """
-        Load UMLS graph & level lookup info
-        """
         g = await AncestorUmlsGraph.create()
-
-        # only includes known nodes
-        level_lookup = {
-            r.id: UmlsInfo(
-                id=r.id,
-                name=r.name,
-                count=g.get_count(r.id) or 0,
-                level=g.get_ontology_level(r.id),
-                type_ids=r.type_ids,
-            )
-            for r in records
-            if g.has_node(r.id)
-        }
-        return g, level_lookup
+        return UmlsAncestorTransformer(g)
 
     @staticmethod
     def choose_best_ancestor(
         child: UmlsInfo,
-        ancestors: tuple[UmlsInfo, ...],
+        ancestors: Sequence[UmlsInfo],
     ) -> str:
         """
         Choose the best ancestor for the child
@@ -69,7 +42,7 @@ class UmlsAncestorTransformer:
         - require level be higher than child
 
         Args:
-            record (UmlsInfo): UMLS info
+            child (UmlsInfo): UMLS info
             ancestors (tuple[UmlsInfo]): ordered list of ancestors
 
         Returns (str): ancestor id
@@ -85,11 +58,7 @@ class UmlsAncestorTransformer:
 
         # ancestors eligible if the level is higher than child
         eligible_ancestors = [
-            a
-            for i, a in enumerate(ancestors)
-            if compare_ontology_level(a.level, child.level) > 0
-            # only consider monotonic levels (avoiding a confused random SUBINSTANCE from being chosen if type == NA)
-            and (i == 0 or compare_ontology_level(a.level, ancestors[i - 1].level) >= 0)
+            a for a in ancestors if compare_ontology_level(a.level, child.level) > 0
         ]
 
         logger.debug("Eligible ancestors for %s: %s", child.id, eligible_ancestors)
@@ -116,30 +85,38 @@ class UmlsAncestorTransformer:
 
         return best_ancestor.id
 
-    def transform(self, partial_record: Umls) -> UmlsUpdateInput | None:
+    def transform(self, record: Umls) -> UmlsUpdateInput | None:
         """
         Transform a single UMLS record with updates (level, rollup_id)
         """
-        if self.level_lookup is None:
-            raise ValueError("level_lookup is not initialized")
 
-        ancestors = tuple(
-            compact(
-                [
-                    self.level_lookup.get(partial_record.__dict__[f"l{i}_ancestor"])
-                    for i in range(MAX_DENORMALIZED_ANCESTORS)
-                ]
-            )
+        G = self.umls_graph.G
+
+        parent_ids = list(G.predecessors(record.id))
+        grandparent_ids = flatten(
+            [list(G.predecessors(parent_id)) for parent_id in parent_ids]
+        )
+        ancestor_ids = parent_ids + grandparent_ids
+
+        ancestors = compact(
+            [UmlsInfo(**G.nodes[ancestor_id]) for ancestor_id in ancestor_ids]
         )
 
-        # get record with updated level info
-        record = self.level_lookup.get(partial_record.id)
-
-        if not record:
+        if not G.nodes.get(record.id):
             return None  # irrelevant record
 
+        # get record with updated level info
+        try:
+            updated_record = UmlsInfo(**omit(G.nodes[record.id], "level_override"))
+        except Exception as e:
+            logger.error("Record missing info: %s (%s)", G.nodes[record.id], e)
+            raise e
+
         return UmlsUpdateInput(
-            count=record.count,
-            level=record.level,
-            rollup_id=UmlsAncestorTransformer.choose_best_ancestor(record, ancestors),
+            id=record.id,
+            count=updated_record.count,
+            level=updated_record.level,
+            rollup_id=UmlsAncestorTransformer.choose_best_ancestor(
+                updated_record, ancestors
+            ),
         )

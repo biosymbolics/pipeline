@@ -78,6 +78,7 @@ RELATIONSHIPS_OF_INTEREST_MAP = {
         "may_be_treated_by",  # ALOSETRON HYDROCHLORIDE -> Pains, Abdominal
         "mechanism_of_action_of",  # PIOGLITAZONE -> Increased Glycolysis
         "therapeutic_class_of",  # ALBENDAZOLE -> Antihelmintics
+        "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE
     ],
 }
 

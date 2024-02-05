@@ -13,6 +13,7 @@ from prisma.types import (
     BiomedicalEntityUpdateInput,
     BiomedicalEntityCreateWithoutRelationsInput,
     OwnerCreateWithoutRelationsInput,
+    UmlsUpdateInput,
 )
 
 
@@ -43,4 +44,5 @@ AllModelTypes = Union[
     Trial,
     TrialOutcome,
     Umls,
+    UmlsUpdateInput,
 ]

@@ -430,6 +430,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             await client.execute_raw(query)
 
         for table in ["intervenable", "indicatable"]:
+            logger.info("Setting rollups for %s", table)
             update_queries = get_update_queries(table)
             for query in update_queries:
                 await client.execute_raw(query)
@@ -438,7 +439,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             await client.execute_raw(query)
 
         logger.warning(
-            "Completed set_rollups. Be sure to re-apply indices (prisma db push)"
+            "Completed set_rollups. ***Be sure to re-apply indices!! (prisma db push)***"
         )
 
     @staticmethod
@@ -466,7 +467,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
-        # await UmlsLoader.post_doc_finalize()
+        await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
         await BiomedicalEntityEtl._create_biomedical_entity_ancestors()

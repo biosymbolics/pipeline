@@ -75,8 +75,8 @@ class AncestorUmlsGraph(UmlsGraph):
         """
         ***Either use a factory method in the subclass, or call load() after init***
         """
-        # initialize superclass with _add_level_info transform
-        super().__init__(transform_graph=self._add_level_info)
+        # initialize superclass with _add_hierarchy_info transform
+        super().__init__(transform_graph=self._add_hierarchy_info)
         self.doc_type = doc_type
         self.instance_threshold = instance_threshold
         self.delta_threshold = delta_threshold
@@ -121,30 +121,48 @@ class AncestorUmlsGraph(UmlsGraph):
         query = rf"""
             SELECT
                 umls.id as id,
-                count(*) as count,
+                umls.name as name,
+                COALESCE(SUM(docs.count), 0) as count,
+                CASE
+                    -- T200 / Clinical Drug is always SUBINSTANCE
+                    WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
+                        THEN 'SUBINSTANCE'
+                    ELSE null
+                    END AS level_override,
+                umls.type_ids as type_ids
+            FROM umls, _entity_to_umls AS etu
+            LEFT JOIN (
+                SELECT entity_id, sum(count) as count
+                FROM (
+                    SELECT entity_id, count(*) as count
+                    FROM intervenable
+                    GROUP BY entity_id
+
+                    UNION ALL
+
+                    SELECT entity_id, count(*) as count
+                    FROM indicatable
+                    GROUP BY entity_id
+                ) int GROUP BY entity_id
+            ) docs ON docs.entity_id=etu."A"
+            WHERE umls.id=etu."B"
+            GROUP BY umls.id
+
+            UNION
+
+            SELECT
+                id,
+                name,
+                0 as count,
                 CASE
                     -- T200 / Clinical Drug is always SUBINSTANCE
                     WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
                     THEN 'SUBINSTANCE'
                     ELSE null
-                    END AS level_override
-            FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
-            WHERE biomedical_entity.id=intervenable.entity_id
-            AND etu."A"=biomedical_entity.id
-            AND umls.id=etu."B"
-            AND umls.type_ids && $1
-            GROUP BY umls.id
-
-            UNION
-
-            -- indication-mapped UMLS terms associated with docs, if preferred type
-            SELECT umls.id as id, count(*) as count, null as level_override
-            FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
-            WHERE biomedical_entity.id=indicatable.entity_id
-            AND etu."A"=biomedical_entity.id
-            AND umls.id=etu."B"
-            AND umls.type_ids && $1
-            GROUP BY umls.id
+                    END AS level_override,
+                umls.type_ids as type_ids
+            FROM umls
+            WHERE id not in (SELECT "B" FROM _entity_to_umls where "B"=id)
             """
 
         client = await prisma_client(300)
@@ -403,9 +421,8 @@ class AncestorUmlsGraph(UmlsGraph):
                     new_last_level,
                     depth + 1,
                 )
-                # time.sleep(5)
 
-    def _add_level_info(self, G: DiGraph) -> DiGraph:
+    def _add_hierarchy_info(self, G: DiGraph) -> DiGraph:
         """
         Add ontology level to nodes
 

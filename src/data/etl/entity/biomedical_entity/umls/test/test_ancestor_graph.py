@@ -282,6 +282,27 @@ async def test_choose_best_available_ancestor_type():
             "ancestor_types": ["T109", "T121", "T131", "T044", "T121"],
             "expected": "T121",  # pharmacologic substance
         },
+        {
+            # case of C3192263 / vemurafenib
+            "child_types": [
+                "T109",  # "Organic Chemical"
+                "T121",  # "Pharmacologic Substance",
+            ],
+            "ancestor_types": [
+                "T043",
+                "T044",
+                "T059",
+                "T061",
+                "T109",
+                "T116",
+                "T120",
+                "T121",
+                "T123",
+                "T191",
+                "T200",
+            ],
+            "expected": "T116",  # target
+        },
     ]
 
     test_cases = simple_test_cases + multiple_child_type_tests
