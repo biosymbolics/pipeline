@@ -1,14 +1,9 @@
 from typing import Sequence
 import logging
-from prisma.enums import OntologyLevel
 from prisma.models import Umls
-from prisma.types import (
-    UmlsCreateWithoutRelationsInput as UmlsCreateInput,
-    UmlsUpdateInput,
-)
+from prisma.types import UmlsUpdateInput
 from pydash import compact
 
-from data.domain.biomedical.umls import clean_umls_name
 
 from .ancestor_selection import AncestorUmlsGraph
 from .constants import MAX_DENORMALIZED_ANCESTORS
@@ -18,36 +13,6 @@ from .utils import choose_best_available_ancestor
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class UmlsTransformer:
-    def __init__(self, aui_lookup: dict[str, str]):
-        # aui -> cui lookup (since hierarchy is stored as aui)
-        self.aui_lookup: dict[str, str] = aui_lookup
-
-    def __call__(self, r: dict) -> UmlsCreateInput:
-        """
-        Transform a single UMLS record for create
-        """
-        # reverse to get nearest ancestor first
-        ancestors = r["hierarchy"].split(".")[::-1]
-        ancestor_cuis = [self.aui_lookup.get(aui, "") for aui in ancestors]
-        preferred_name = clean_umls_name(
-            r["id"], r["name"], r["synonyms"], r["type_ids"], False
-        )
-
-        return UmlsCreateInput(
-            **{
-                **r,
-                **{
-                    f"l{i}_ancestor": ancestor_cuis[i] if i < len(ancestor_cuis) else ""
-                    for i in range(MAX_DENORMALIZED_ANCESTORS)
-                },  # type: ignore
-            },
-            rollup_id=r["id"],  # start with self as rollup
-            preferred_name=preferred_name,
-            level=OntologyLevel.UNKNOWN,
-        )
 
 
 class UmlsAncestorTransformer:

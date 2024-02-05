@@ -6,8 +6,13 @@ import asyncio
 import sys
 import logging
 import time
+from prisma.enums import OntologyLevel
 from prisma.models import UmlsGraph, Umls
-from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
+from prisma.types import (
+    UmlsCreateWithoutRelationsInput as UmlsCreateInput,
+    UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
+)
+from data.domain.biomedical.umls import clean_umls_name
 
 from system import initialize
 
@@ -18,7 +23,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 
-from .umls_transform import UmlsAncestorTransformer, UmlsTransformer
+from .umls_transform import UmlsAncestorTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,12 +45,10 @@ class UmlsLoader:
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
-                COALESCE(TRIM(max(ancestors.ptr)), '') as hierarchy,
                 COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
                 COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
                 COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
             FROM mrconso as entities
-            LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
             LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
             LEFT JOIN (
                 select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
@@ -58,21 +61,21 @@ class UmlsLoader:
             GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
         """
 
-        umls_db = f"{BASE_DATABASE_URL}/umls"
-        aui_lookup = {
-            r["aui"]: r["cui"]
-            for r in await PsqlDatabaseClient(umls_db).select(
-                "select TRIM(aui) aui, TRIM(cui) cui from mrconso"
-            )
-        }
-
-        transform = UmlsTransformer(aui_lookup)
-
         client = await prisma_client(600)
 
         async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
-            insert_data = [transform(r) for r in batch]
+            insert_data = [
+                UmlsCreateInput(
+                    **r,  # type: ignore
+                    rollup_id=r["id"],  # start with self as rollup
+                    preferred_name=clean_umls_name(
+                        r["id"], r["name"], r["synonyms"], r["type_ids"], False
+                    ),
+                    level=OntologyLevel.UNKNOWN,
+                )
+                for r in batch
+            ]
             await Umls.prisma(client).create_many(
                 data=insert_data,
                 skip_duplicates=True,
@@ -172,7 +175,7 @@ class UmlsLoader:
             *[client.query_raw(query) for query in checksums.values()]
         )
         for key, result in zip(checksums.keys(), results):
-            logger.warning(f"UMLS Load checksum {key}: {result[0]}")
+            logger.warning(f"UMLS Load checksum {key}: {result}")
         return
 
     @staticmethod
