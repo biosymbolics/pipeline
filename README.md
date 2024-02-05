@@ -78,10 +78,16 @@ pg_dump --no-owner drugcentral \
 zip drugcentral.sql.zip drugcentral.sql
 pg_dump --no-owner patents -t biosym_annotations -t gpr_annotations > patents.sql
 zip patents.sql.zip patents.sql
-** start zips **
+aws s3 cp patents.sql.zip s3://biosym-patents-dev
+### other machine
+sudo apt install postgresql postgresql-contrib screen unzip gcc g++ make postgresql-server-dev-14
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+source ~/.bashrc
+aws s3 cp s3://biosym-patents-dev/patents.sql.zip .
 git clone https://github.com/biosymbolics/pipeline
 cd pipeline
-sudo apt install postgresql postgresql-contrib screen unzip gcc g++ make postgresql-server-dev-14
 python3 -m pip install -r requirements.txt
 python -m spacy download en_core_web_trf
 cd /tmp
@@ -104,7 +110,7 @@ create schema ctgov;
 CREATE EXTENSION vector;
 exit
 adduser biosym
-export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
+export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym?max_connections=50
 pip install -U prisma
 prisma db push
 unzip patents.sql.zip
