@@ -209,5 +209,5 @@ if __name__ == "__main__":
 
     if "--post-doc-finalize" in sys.argv:
         asyncio.run(UmlsLoader().post_doc_finalize())
-
-    asyncio.run(UmlsLoader.copy_all())
+    else:
+        asyncio.run(UmlsLoader.copy_all())

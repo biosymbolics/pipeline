@@ -57,6 +57,13 @@ class TermSearchCriteria(BaseModel):
         list[TermField], Field(validate_default=True)
     ] = DEFAULT_TERM_FIELDS
 
+    @field_validator("term_fields", mode="before")
+    def term_fields_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        term_fields = [t.strip() for t in (v.split(";") if v else [])]
+        return term_fields
+
 
 class DocumentSearchCriteria(TermSearchCriteria):
     """

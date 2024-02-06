@@ -94,6 +94,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0544791": "Inflammatory fistula",
     "C4085054": "particl",  # matches particle
     "C0596611": "Gene Mutation",
+    "C0543419": "Sequela of disorder",
 }
 
 

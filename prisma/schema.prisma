@@ -189,6 +189,7 @@ model FinancialSnapshot {
     symbol                     String   @unique
     total_debt                 Float?
 
+    @@index([owner_id], name: "financial_snapshot_owner_id")
     @@map("financials")
 }
 
