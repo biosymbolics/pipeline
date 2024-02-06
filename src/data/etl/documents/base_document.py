@@ -56,9 +56,18 @@ class BaseDocumentEtl:
         client = await prisma_client(300)
         checksums = {
             self.document_type: f"SELECT COUNT(*) FROM {self.document_type}",
-            "owners": f"SELECT COUNT(*) FROM ownable WHERE {self.document_type}_id IS NOT NULL",
-            "indications": f"SELECT COUNT(*) FROM indicatable WHERE {self.document_type}_id IS NOT NULL",
-            "interventions": f"SELECT COUNT(*) FROM intervenable WHERE {self.document_type}_id IS NOT NULL",
+            "owners": f"""
+                SELECT COUNT(*) as count, COUNT(distinct owner_id) as distinct_count
+                FROM ownable WHERE {self.document_type}_id IS NOT NULL
+            """,
+            "indications": f"""
+                SELECT COUNT(*) as count, COUNT(distinct entity_id) as distinct_count
+                FROM indicatable WHERE {self.document_type}_id IS NOT NULL
+            """,
+            "interventions": f"""
+                SELECT COUNT(*) as count, COUNT(distinct entity_id) as distinct_count
+                FROM intervenable WHERE {self.document_type}_id IS NOT NULL
+            """,
         }
         results = await asyncio.gather(
             *[client.query_raw(query) for query in checksums.values()]
