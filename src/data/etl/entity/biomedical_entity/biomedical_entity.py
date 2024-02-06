@@ -23,6 +23,7 @@ from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
 from typings.documents.common import ENTITY_MAP_TABLES
+from utils.file import save_json_as_file
 from utils.list import merge_nested
 
 from .umls.umls_load import UmlsLoader
@@ -72,6 +73,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             for on, de in zip(terms, lookup_docs)
             if de.canonical_entity is not None  # shouldn't happen
         }
+        save_json_as_file(lookup_map, "canonical_map.json")
         return lookup_map
 
     def _generate_crud(
@@ -491,11 +493,26 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
 
+        Misc:
+            update biomedical_entity set name=regexp_replace(name, ' (?:useful|capable|$', '')
+            where name ~* ' useful$'
+            and regexp_replace(name, ' useful$', '') not in
+                (select name from biomedical_entity where name=regexp_replace(name, ' useful$', ''));
+            update intervenable set canonical_name=regexp_replace(canonical_name, ' useful$', '') where canonical_name ~* ' useful$';
+
         To (partly) recreate _entity_to_umls:
-            insert into _entity_to_parent ("A", "B") select parent.id, child.id
-            from biomedical_entity parent, biomedical_entity child, _entity_to_umls etu, umls
-            where umls.rollup_id=parent.canonical_id and etu."A"=child.id and etu."B"=umls.id
-            on conflict do nothing;
+            UPDATE biomedical_entity set is_priority=true
+                FROM umls, _entity_to_umls etu
+                WHERE umls.id=etu."B"
+                AND etu."A"=biomedical_entity.id
+                AND ARRAY['T028', 'T116', 'T114', 'T047'] && umls.type_ids;
+
+            INSERT into _entity_to_parent ("A", "B")
+                SELECT child.id, max(parent.id order by parent.is_priority desc)
+                FROM biomedical_entity parent, biomedical_entity child, _entity_to_umls etu, umls
+                WHERE umls.rollup_id=parent.canonical_id AND etu."A"=child.id and etu."B"=umls.id
+                GROUP BY child.id
+                ON CONFLICT DO NOTHING;
         """
         logger.info("Finalizing biomedical entity etl")
         # await BiomedicalEntityEtl.link_to_documents()
