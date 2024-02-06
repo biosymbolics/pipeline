@@ -14,7 +14,7 @@ pytest_plugins = ("pytest_asyncio",)
 
 LEVEL_INSTANCE_THRESHOLD = 25
 LEVEL_OVERRIDE_DELTA = 500
-LEVEL_MIN_PREV_COUNT = 5
+LEVEL_MIN_DELTA = 25
 
 # if we ever want an auto-test for UMLS, use this example.
 # g.get_count("C1333196") should be approx sum(list([g.get_count(id) or 0 for id in list(g.G.successors("C1333196"))]))
@@ -31,8 +31,8 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
         aug = cls(
             doc_type,
             instance_threshold=LEVEL_INSTANCE_THRESHOLD,
-            previous_threshold=LEVEL_MIN_PREV_COUNT,
-            current_override_threshold=LEVEL_INSTANCE_THRESHOLD,
+            delta_threshold=LEVEL_MIN_DELTA,
+            override_threshold=LEVEL_INSTANCE_THRESHOLD,
         )
         await aug.load()
         return aug
@@ -183,8 +183,8 @@ async def test_ancestor_counts():
     tc.assertEqual(p2_count, 3000)
     tc.assertEqual(p3_count, 5)
     tc.assertEqual(p4_count, 1000)
-    tc.assertEqual(p5_count, 7)
-    tc.assertEqual(gp1_count, 6005)  # should be 5005
+    tc.assertEqual(p5_count, 7)  # if less, parent counts not considered
+    tc.assertEqual(gp1_count, 5005)  # if more, double counting is occurring
     tc.assertEqual(gp2_count, 6)
     tc.assertEqual(gp3_count, 1000)
 
@@ -272,6 +272,36 @@ async def test_choose_best_available_ancestor_type():
             ],
             "ancestor_types": ["T005", "T007", "T191"],  # T191 is cancer
             "expected": "T191",  # target
+        },
+        {
+            # case of C0246631 / remifentanil
+            "child_types": [
+                "T109",  # "Organic Chemical"
+                "T121",  # "Pharmacologic Substance",
+            ],
+            "ancestor_types": ["T109", "T121", "T131", "T044", "T121"],
+            "expected": "T121",  # pharmacologic substance
+        },
+        {
+            # case of C3192263 / vemurafenib
+            "child_types": [
+                "T109",  # "Organic Chemical"
+                "T121",  # "Pharmacologic Substance",
+            ],
+            "ancestor_types": [
+                "T043",
+                "T044",
+                "T059",
+                "T061",
+                "T109",
+                "T116",
+                "T120",
+                "T121",
+                "T123",
+                "T191",
+                "T200",
+            ],
+            "expected": "T116",  # target
         },
     ]
 

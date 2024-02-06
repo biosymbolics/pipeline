@@ -1,6 +1,7 @@
 """
 Patent client
 """
+
 from datetime import datetime
 from functools import partial
 import logging
@@ -140,6 +141,7 @@ async def search(
         )
 
     if p.skip_cache == True:
+        logger.info("Skipping cache for %s", key)
         patents = await _search(limit=p.limit)
         return patents
 

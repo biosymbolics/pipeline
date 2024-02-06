@@ -43,6 +43,7 @@ class UmlsGraph(object):
 
         self.G = g
         self.nodes: dict[str, dict] = dict(g.nodes.data())
+        self.edges: list[tuple[str, str]] = g.edges.data()
 
     @abstractmethod
     async def load_edges(self) -> list[EdgeRecord]:
@@ -78,11 +79,11 @@ class UmlsGraph(object):
         G.add_nodes_from([(n.id, n) for n in nodes])
 
         # temp hack: add nodes for edge ids that don't have nodes
-        node_ids = [n.id for n in nodes]
         edge_node_ids = uniq([e.head for e in edges] + [e.tail for e in edges])
-        new_nodes = [id for id in edge_node_ids if id not in node_ids]
-        logger.info("Adding %s nodes from edges", len(new_nodes))
-        G.add_nodes_from([(id, {"id": id}) for id in new_nodes])
+        new_nodes = [id for id in edge_node_ids if id not in G.nodes()]
+        if len(new_nodes) > 0:
+            raise ValueError("New nodes found: %s", new_nodes)
+        # G.add_nodes_from([(id, {"id": id}) for id in new_nodes])
 
         # add edges
         G.add_edges_from([(e.head, e.tail) for e in edges])

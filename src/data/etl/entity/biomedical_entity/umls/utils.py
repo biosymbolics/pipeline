@@ -2,21 +2,14 @@ from functools import reduce
 from typing import Mapping, Sequence
 from pydash import compact
 from prisma.enums import OntologyLevel
+import logging
 
 from constants.umls import PREFERRED_ANCESTOR_TYPE_MAP
 
-from .types import UmlsInfo, compare_ontology_level
+from .types import UmlsInfo
 
-
-def choose_max_ontology_level(
-    a: OntologyLevel | None, b: OntologyLevel | None
-) -> OntologyLevel | None:
-    if a is None:
-        return b
-    if b is None:
-        return a
-
-    return a if compare_ontology_level(a, b) >= 0 else b
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
@@ -30,9 +23,16 @@ def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
     if level == OntologyLevel.L1_CATEGORY:
         return OntologyLevel.L2_CATEGORY
     if level == OntologyLevel.L2_CATEGORY:
-        return OntologyLevel.L2_CATEGORY
+        return OntologyLevel.L3_CATEGORY
+    if level == OntologyLevel.L3_CATEGORY:
+        return OntologyLevel.L4_CATEGORY
+    if level == OntologyLevel.L4_CATEGORY:
+        return OntologyLevel.L5_CATEGORY
+    if level == OntologyLevel.L5_CATEGORY:
+        return OntologyLevel.L5_CATEGORY
 
-    raise ValueError(f"Cannot increment level {level}")
+    logger.warning(f"Cannot increment level {level}, returning UNKNOWN")
+    return OntologyLevel.UNKNOWN
 
 
 def choose_best_available_ancestor(
@@ -48,11 +48,7 @@ def choose_best_available_ancestor(
     # create a map of all possible parent types
     possible_ancestor_types = {
         type_id: a
-        # sorted so that closer ancestors are preferred
-        for type_id, a in sorted(
-            [(type_id, a) for a in ancestors for type_id in a.type_ids],
-            reverse=True,
-        )
+        for type_id, a in [(type_id, a) for a in ancestors for type_id in a.type_ids]
     }
 
     best_type = choose_best_available_ancestor_type(
@@ -79,6 +75,7 @@ def choose_best_available_ancestor_type(
     preferred_type_map: Mapping[str, int] = reduce(
         lambda a, b: {**a, **b},
         compact([PREFERRED_ANCESTOR_TYPE_MAP.get(ct) for ct in child_types]),
+        {},
     )
     # sort possible parent types by preference
     types_by_preference = sorted(

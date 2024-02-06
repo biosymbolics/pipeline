@@ -10,14 +10,11 @@ import logging
 from scispacy.candidate_generation import MentionCandidate, KnowledgeBase
 
 from constants.umls import (
-    MOST_PREFERRED_UMLS_TYPES,
-    PREFERRED_UMLS_TYPES,
-    PREFERRED_UMLS_TYPES,
+    CANDIDATE_TYPE_WEIGHT_MAP,
     UMLS_WORD_OVERRIDES,
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
-from utils.list import has_intersection
 
 
 logger = logging.getLogger(__name__)
@@ -224,37 +221,18 @@ def score_candidate(
     if is_umls_suppressed(candidate_id, candidate_canonical_name):
         return 0.0
 
-    def type_score():
-        """
-        Compute a score based on the UMLS type (tui) of the candidate
-        """
-        is_preferred_type = has_intersection(
-            candidate_type_ids, list(PREFERRED_UMLS_TYPES.keys())
-        )
+    # give candidates with more aliases a higher score, as proxy for # ontologies in which it is represented.
+    alias_score = 1.1 if len(candidate_aliases) >= 8 else 1.0
 
-        if not is_preferred_type:
-            return 0.8
-
-        is_most_preferred_type = has_intersection(
-            candidate_type_ids, list(MOST_PREFERRED_UMLS_TYPES.keys())
-        )
-
-        if not is_most_preferred_type:
-            return 1.0
-
-        return 1.1
-
-    # give candidates with more aliases a higher score, as proxy for number of ontologies in which it is represented.
-    # log base 4 - roughly 10% of entries have 5+ aliases. lower bounds at 0.5
-    alias_score = max(
-        0.5,
-        (math.log(len(candidate_aliases), 4) if len(candidate_aliases) > 1 else 0.0),
+    # score based on the UMLS type (tui) of the candidate
+    type_score = max(
+        [CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.8) for ct in candidate_type_ids]
     )
 
     if syntactic_similarity is not None:
-        return type_score() * alias_score * syntactic_similarity
+        return round(type_score * alias_score * syntactic_similarity, 3)
 
-    return type_score() * alias_score
+    return round(type_score * alias_score, 3)
 
 
 def score_semantic_candidate(

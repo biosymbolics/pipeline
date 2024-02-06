@@ -70,19 +70,28 @@ async def get_docs_by_entity_id(
     return ents_with_docs
 
 
+ASSET_DOC_LIMIT = 10000
+
+
 async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     """
     Gets docs by type, matching doc_ids
     """
 
     regulatory_approvals = asyncio.create_task(
-        regulatory_approval_client.search(ApprovalParams.parse(p, include=None))
+        regulatory_approval_client.search(
+            ApprovalParams.parse(p, include=None, limit=ASSET_DOC_LIMIT)
+        )
     )
     patents = asyncio.create_task(
-        patent_client.search(PatentParams.parse(p, include={"assignees": True}))
+        patent_client.search(
+            PatentParams.parse(p, include={"assignees": True}, limit=ASSET_DOC_LIMIT)
+        )
     )
     trials = asyncio.create_task(
-        trial_client.search(TrialParams.parse(p, include={"sponsor": True}))
+        trial_client.search(
+            TrialParams.parse(p, include={"sponsor": True}, limit=ASSET_DOC_LIMIT)
+        )
     )
 
     await asyncio.gather(regulatory_approvals, patents, trials)

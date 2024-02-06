@@ -1,6 +1,7 @@
 """
 Patents ETL script
 """
+
 import sys
 import asyncio
 import logging
@@ -221,7 +222,7 @@ class PatentLoader(BaseDocumentEtl):
         client = await prisma_client(600)
 
         async def handle_batch(batch: list[dict]) -> bool:
-            # create patent records
+            logger.info("Creating %s patent records", len(batch))
             await Patent.prisma(client).create_many(
                 data=[
                     PatentCreateInput(

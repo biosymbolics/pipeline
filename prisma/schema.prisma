@@ -288,21 +288,9 @@ model Indicatable {
 model Umls {
     id                  String             @id @unique
     biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    hierarchy           String?
-    l0_ancestor         String?
-    l1_ancestor         String?
-    l2_ancestor         String?
-    l3_ancestor         String?
-    l4_ancestor         String?
-    l5_ancestor         String?
-    l6_ancestor         String?
-    l7_ancestor         String?
-    l8_ancestor         String?
-    l9_ancestor         String?
     count               Int                @default(0)
     level               OntologyLevel
     name                String
-    num_descendants     Int
     preferred_name      String
     rollup_id           String // TODO: add as biomedical parent
     synonyms            String[]
@@ -490,6 +478,9 @@ enum OntologyLevel {
     INSTANCE
     L1_CATEGORY
     L2_CATEGORY
+    L3_CATEGORY
+    L4_CATEGORY
+    L5_CATEGORY
     NA
     UNKNOWN
 }

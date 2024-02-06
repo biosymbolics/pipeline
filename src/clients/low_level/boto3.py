@@ -1,6 +1,7 @@
 """
 Boto3 client
 """
+
 import json
 import os
 import time
@@ -149,6 +150,10 @@ async def retrieve_with_cache_check(
             Body=encode(data),  # type: ignore
             ContentType="application/json",
         )
-        logger.info("Cache put took %s seconds", round(time.monotonic() - start))
+        logger.info(
+            "Cache put for %s took %s seconds",
+            cache_key,
+            round(time.monotonic() - start),
+        )
 
         return cast(T, data)

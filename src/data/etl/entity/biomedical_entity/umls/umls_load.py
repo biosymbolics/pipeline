@@ -6,8 +6,13 @@ import asyncio
 import sys
 import logging
 import time
+from prisma.enums import OntologyLevel
 from prisma.models import UmlsGraph, Umls
-from prisma.types import UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord
+from prisma.types import (
+    UmlsCreateWithoutRelationsInput as UmlsCreateInput,
+    UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
+)
+from pydash import compact
 
 from system import initialize
 
@@ -15,10 +20,10 @@ initialize()
 
 from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
+from data.domain.biomedical.umls import clean_umls_name
 
-from .umls_transform import UmlsAncestorTransformer, UmlsTransformer
+from .umls_transform import UmlsAncestorTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,20 +45,10 @@ class UmlsLoader:
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
-                COALESCE(TRIM(max(ancestors.ptr)), '') as hierarchy,
                 COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
                 COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
-                COALESCE(max(descendants.count), 0) as num_descendants,
                 COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
             FROM mrconso as entities
-            LEFT JOIN mrhier as ancestors on ancestors.cui = entities.cui
-            LEFT JOIN (
-                SELECT cui1 as parent_cui, count(*) as count
-                FROM mrrel
-                WHERE rel in ('RN', 'CHD') -- narrower, child
-                AND (rela is null or rela = 'isa') -- no specified relationship, or 'is a' rel
-                GROUP BY parent_cui
-            ) descendants ON descendants.parent_cui = entities.cui
             LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
             LEFT JOIN (
                 select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
@@ -66,21 +61,25 @@ class UmlsLoader:
             GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
         """
 
-        umls_db = f"{BASE_DATABASE_URL}/umls"
-        aui_lookup = {
-            r["aui"]: r["cui"]
-            for r in await PsqlDatabaseClient(umls_db).select(
-                "select TRIM(aui) aui, TRIM(cui) cui from mrconso"
-            )
-        }
-
-        transform = UmlsTransformer(aui_lookup)
-
         client = await prisma_client(600)
 
         async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
-            insert_data = [transform(r) for r in batch]
+            insert_data = [
+                UmlsCreateInput(
+                    id=r["id"],
+                    name=r["name"],
+                    rollup_id=r["id"],  # start with self as rollup
+                    preferred_name=clean_umls_name(
+                        r["id"], r["name"], r["synonyms"], r["type_ids"], False
+                    ),
+                    synonyms=r["synonyms"],
+                    type_ids=r["type_ids"],
+                    type_names=r["type_names"],
+                    level=OntologyLevel.UNKNOWN,
+                )
+                for r in batch
+            ]
             await Umls.prisma(client).create_many(
                 data=insert_data,
                 skip_duplicates=True,
@@ -101,19 +100,24 @@ class UmlsLoader:
         logger.info("Updating UMLS with levels")
         client = await prisma_client(600)
 
-        # TODO: initial filter on valid UMLS values??
+        # TODO: just grab nodes from graph
         all_umls = await Umls.prisma(client).find_many()
 
         # might be slow-ish, if creating a new graph
-        ult = await UmlsAncestorTransformer.create(all_umls)
+        ult = await UmlsAncestorTransformer.create()
 
-        async def maybe_update(r: Umls, tx):
-            # update only if transformed is non null
-            tr = ult.transform(r)
-            if tr is not None:
-                await Umls.prisma(tx).update(data=tr, where={"id": r.id})
+        async def update(record, tx):
+            if "id" not in record:
+                raise ValueError(f"Record missing id: {record}")
 
-        await batch_update(all_umls, update_func=maybe_update, batch_size=10000)
+            return await Umls.prisma(tx).update(data=record, where={"id": record["id"]})
+
+        update_records = compact([ult.transform(r) for r in all_umls])
+        await batch_update(
+            update_records,
+            update_func=update,
+            batch_size=10000,
+        )
         logger.info(
             "Finished updating UMLS with levels in %s seconds",
             round(time.monotonic() - start),
@@ -168,12 +172,29 @@ class UmlsLoader:
         await UmlsLoader.copy_relationships()
 
     @staticmethod
+    async def post_doc_finalize_checksum():
+        """
+        Quick UMLS checksum
+        """
+        client = await prisma_client(300)
+        checksums = {
+            "levels": f"SELECT level, COUNT(*) FROM umls group by level",
+        }
+        results = await asyncio.gather(
+            *[client.query_raw(query) for query in checksums.values()]
+        )
+        for key, result in zip(checksums.keys(), results):
+            logger.warning(f"UMLS Load checksum {key}: {result}")
+        return
+
+    @staticmethod
     async def post_doc_finalize():
         """
         To be run after initial UMLS, biomedical entity, and doc loads
         (since it depends upon those being present)
         """
         await UmlsLoader.set_ontology_levels()
+        await UmlsLoader.post_doc_finalize_checksum()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,8 @@ from constants.umls import (
 from utils.list import has_intersection
 
 
-BAD_NAME_CHARS = [",", ")", "(", "[", "]"]
+# can be any single char
+BAD_NAME_CHARS = [",", ")", "(", "[", "]", "-"]
 
 
 def clean_umls_name(

@@ -1,23 +1,25 @@
+import time
 from typing import Sequence
 import logging
 from networkx import DiGraph
+import networkx as nx
 from prisma.enums import OntologyLevel
+from pydash import flatten
 
 from clients.low_level.prisma import prisma_client
 from clients.umls.graph import UmlsGraph
 from clients.umls.types import EdgeRecord, NodeRecord
 from constants.umls import (
-    MOST_PREFERRED_UMLS_TYPES,
+    PERMITTED_ANCESTOR_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
-from data.etl.entity.biomedical_entity.umls.constants import ONTOLOGY_LEVEL_MAP
+from data.etl.entity.biomedical_entity.umls.types import compare_ontology_level
 from typings.documents.common import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
-from .types import compare_ontology_level
-from .utils import choose_max_ontology_level, increment_ontology_level
+from .utils import increment_ontology_level
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ select be.canonical_id, be.name, be.count, parent_be.name from biomedical_entity
 select * from umls_graph where tail_id='C0108779' and relationship in ('isa', 'mapped_to', 'classified_as', 'has_mechanism_of_action', 'has_target', 'has_active_ingredient', 'tradename_of', 'has_phenotype');
 
 select umls.count, umls.level, be.name, be2.name from biomedical_entity be, biomedical_entity be2, _entity_to_parent etp, umls  where etp."A"=be.id and etp."B"=be2.id and umls.id=be.canonical_id and be2.canonical_id='C0246631' order by umls.count desc;
+select umls.id, umls.count, umls.level, umls.name ,  umlsp.id as parent_id, umlsp.count as parent_count, umlsp.level as parent_level, umlsp.name as parent_name from umls, umls umlsp, umls_graph ug where ug.head_id=umlsp.id and ug.tail_id=umls.id and relationship in ('isa', 'mapped_to', 'classified_as', 'has_mechanism_of_action', 'has_target', 'has_active_ingredient', 'tradename_of') and umls.id='C0246631' order by count desc limit 50;
 """
 DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     ### GENERAL ###
@@ -36,10 +39,10 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     "mapped_to",  # head-parent -> tail-child, e.g. Melanomas -> Uveal Melanoma
     "classified_as",  # head/parent -> tail/child, e.g. APPENDECTOMY -> Laparoscopic Appendectomy
     ### INTERVENTION ###
-    "has_mechanism_of_action",  # head/MoA->tail/drug
+    "has_mechanism_of_action",  # head/MoA->tail/drug, e.g. Hormone Receptor Agonists [MoA] -> Lutropin Alpha
     "has_target",  # head/target->tail/drug
-    "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE
-    "tradename_of",  # Amoxycillin -> Amoxil
+    "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE (important for clinical drugs)
+    "tradename_of",  # Amoxycillin -> Amoxil; gatifloxacin 5 MG/ML Ophthalmic Solution -> gatifloxacin 5 MG/ML Ophthalmic Solution [Zymaxid]
     ### DISEASE ###
     "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
     ### INTERESTING BUT NOT FOR NOW ###
@@ -49,16 +52,13 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     # biological_process_involves_gene_product / gene_product_plays_role_in_biological_process # questionable
     # has_doseformgroup # e.g. Injectables -> Buprenex Injectable Product (not helpful)
 )
-LEVEL_INSTANCE_THRESHOLD = 100
-LEVEL_OVERRIDE_DELTA = 2000
-LEVEL_MIN_PREV_COUNT = 5
+LEVEL_INSTANCE_THRESHOLD = 50
+LEVEL_OVERRIDE_DELTA = 500
+LEVEL_MIN_DELTA = 20
 MAX_DEPTH_QUERY = 5
-MAX_DEPTH_NETWORK = 10
+MAX_DEPTH_NETWORK = 15
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
-
-
-# maxed signed int size
-MAX_COUNT = 2147483647
+LEAF_KEY = "leaf"
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -70,18 +70,20 @@ class AncestorUmlsGraph(UmlsGraph):
         self,
         doc_type: DocType,
         instance_threshold: int,
-        previous_threshold: int,
-        current_override_threshold: int,
+        delta_threshold: int,
+        override_threshold: int,
+        considered_tuis: list[str] = PERMITTED_ANCESTOR_TYPES,
     ):
         """
         ***Either use a factory method in the subclass, or call load() after init***
         """
-        # initialize superclass with _add_level_info transform
-        super().__init__(transform_graph=self._add_level_info)
+        # initialize superclass with _add_hierarchy_info transform
+        super().__init__(transform_graph=self._add_hierarchy_info)
         self.doc_type = doc_type
         self.instance_threshold = instance_threshold
-        self.previous_threshold = previous_threshold
-        self.current_override_threshold = current_override_threshold
+        self.delta_threshold = delta_threshold
+        self.override_threshold = override_threshold
+        self.considered_tuis = considered_tuis
 
     @classmethod
     async def create(
@@ -89,8 +91,8 @@ class AncestorUmlsGraph(UmlsGraph):
         filename: str | None = DEFAULT_ANCESTOR_FILE,
         doc_type: DocType = DocType.patent,
         instance_threshold: int = LEVEL_INSTANCE_THRESHOLD,
-        previous_threshold: int = LEVEL_MIN_PREV_COUNT,
-        current_override_threshold: int = LEVEL_OVERRIDE_DELTA,
+        delta_threshold: int = LEVEL_MIN_DELTA,
+        override_threshold: int = LEVEL_OVERRIDE_DELTA,
     ) -> "AncestorUmlsGraph":
         """
         Factory for AncestorUmlsGraph
@@ -99,56 +101,78 @@ class AncestorUmlsGraph(UmlsGraph):
             filename: filename to load from (if None, it will not load from nor save to a file)
             doc_type: doc type to use for graph
             instance_threshold: threshold for UMLS entry to be considered INSTANCE vs SUBINSTANCE
-            previous_threshold: threshold for considering multiplier on prev count as criteria for level ++
-            current_override_threshold: if the absolute change in counts between prev and current is greater than this, level ++
+            delta_threshold: threshold for considering multiplier on prev count as criteria for level ++
+            override_threshold: if the absolute change in counts between prev and current is greater than this, level ++
         """
         aug = cls(
             doc_type,
             instance_threshold=instance_threshold,
-            previous_threshold=previous_threshold,
-            current_override_threshold=current_override_threshold,
+            delta_threshold=delta_threshold,
+            override_threshold=override_threshold,
         )
         await aug.load(filename=filename)
         return aug
 
     @overrides(UmlsGraph)
-    async def load_nodes(
-        self,
-        considered_tuis: list[str] = list(MOST_PREFERRED_UMLS_TYPES.keys()),
-    ) -> list[NodeRecord]:
+    async def load_nodes(self) -> list[NodeRecord]:
         """
         Query nodes from umls
         """
         query = rf"""
-            SELECT umls.id as id, count(*) as count
-            FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
-            WHERE biomedical_entity.id=intervenable.entity_id
-            AND etu."A"=biomedical_entity.id
-            AND umls.id=etu."B"
-            AND umls.type_ids && $1
+            SELECT
+                umls.id AS id,
+                umls.name AS name,
+                COALESCE(SUM(docs.count), 0) AS count,
+                CASE
+                    -- T200 / Clinical Drug is always SUBINSTANCE
+                    WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
+                        THEN 'SUBINSTANCE'
+                    ELSE null
+                    END AS level_override,
+                umls.type_ids AS type_ids
+            FROM umls, _entity_to_umls AS etu
+            LEFT JOIN (
+                SELECT entity_id, sum(count) AS count
+                FROM (
+                    SELECT entity_id, count(*) AS count
+                    FROM intervenable
+                    GROUP BY entity_id
+
+                    UNION
+
+                    SELECT entity_id, count(*) AS count
+                    FROM indicatable
+                    GROUP BY entity_id
+                ) int GROUP BY entity_id
+            ) docs ON docs.entity_id=etu."A"
+            WHERE umls.id=etu."B"
             GROUP BY umls.id
 
             UNION
 
-            -- indication-mapped UMLS terms associated with docs, if preferred type
-            SELECT umls.id as id, count(*) as count
-            FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
-            WHERE biomedical_entity.id=indicatable.entity_id
-            AND etu."A"=biomedical_entity.id
-            AND umls.id=etu."B"
-            AND umls.type_ids && $1
-            GROUP BY umls.id
+            SELECT
+                id,
+                name,
+                0 AS count,
+                CASE
+                    -- T200 / Clinical Drug is always SUBINSTANCE
+                    WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
+                    THEN 'SUBINSTANCE'
+                    ELSE null
+                    END AS level_override,
+                umls.type_ids AS type_ids
+            FROM umls
+            WHERE id NOT IN (SELECT "B" FROM _entity_to_umls where "B"=id)
             """
 
         client = await prisma_client(300)
-        results = await client.query_raw(query, considered_tuis)
+        results = await client.query_raw(query, self.considered_tuis)
         return [NodeRecord(**r) for r in results]
 
     @overrides(UmlsGraph)
     async def load_edges(
         self,
         considered_relationships: tuple[str, ...] = DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS,
-        considered_tuis: tuple[str, ...] = tuple(MOST_PREFERRED_UMLS_TYPES.keys()),
         name_suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS,
         cui_suppressions: Sequence[str] = tuple(UMLS_CUI_SUPPRESSIONS.keys()),
     ) -> list[EdgeRecord]:
@@ -165,47 +189,39 @@ class AncestorUmlsGraph(UmlsGraph):
             -- patent to umls edges
             WITH RECURSIVE working_terms AS (
                 SELECT
-                    distinct umls.id as head,
-                    'leaf' as tail,
+                    distinct umls.id AS head,
+                    '{LEAF_KEY}' AS tail,
                     1 AS depth
-                FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
-                WHERE biomedical_entity.id=intervenable.entity_id
-                AND etu."A"=biomedical_entity.id
-                AND umls.id=etu."B"
-                AND umls.type_ids && $1
+                FROM umls, _entity_to_umls AS etu
+                LEFT JOIN (
+                    SELECT distinct entity_id
+                    FROM intervenable
 
-                UNION
+                    UNION
 
-                -- indication-mapped UMLS terms associated with docs, if preferred type
-                SELECT
-                    distinct umls.id as head,
-                    'leaf' as tail,
-                    1 AS depth
-                FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
-                WHERE biomedical_entity.id=indicatable.entity_id
-                AND etu."A"=biomedical_entity.id
-                AND umls.id=etu."B"
-                AND umls.type_ids && $1
+                    SELECT distinct entity_id
+                    FROM indicatable
+                ) docs ON docs.entity_id=etu."A"
+                WHERE umls.id=etu."B"
 
                 UNION
 
                 -- UMLS to UMLS relationships
                 -- e.g. C12345 & C67890
                 SELECT
-                    head_id as head,
-                    tail_id as tail,
-                    wt.depth + 1 as depth
+                    head_id AS head,
+                    tail_id AS tail,
+                    wt.depth + 1 AS depth
                 FROM umls_graph
                 JOIN working_terms wt ON wt.head = tail_id
-                JOIN umls as head_entity on head_entity.id = umls_graph.head_id
-                JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
+                JOIN umls AS head_entity ON head_entity.id = umls_graph.head_id
+                JOIN umls AS tail_entity ON tail_entity.id = umls_graph.tail_id
                 WHERE wt.depth <= {MAX_DEPTH_QUERY}
-                AND relationship in {considered_relationships}
                 AND head_entity.type_ids && $1
                 AND tail_entity.type_ids && $1
-                AND head_id not in {cui_suppressions}
-                AND tail_id not in {cui_suppressions}
-                AND NOT head_name = ANY(head_entity.type_names) -- excludes uselessly broad entities like Pharmacologic Substance
+                AND relationship IN {considered_relationships}
+                AND head_id NOT IN {cui_suppressions}
+                AND tail_id NOT IN {cui_suppressions}
                 AND head_id<>tail_id
                 AND ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
                 AND ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
@@ -216,15 +232,20 @@ class AncestorUmlsGraph(UmlsGraph):
             FROM working_terms
             """
 
+        print(query)
+
         client = await prisma_client(300)
-        results = await client.query_raw(query, considered_tuis)
-        logger.info("Edge query returned %s results", len(results))
-        return [EdgeRecord(**r) for r in results]
+        results = await client.query_raw(query, self.considered_tuis)
+
+        # omit source edges (cui -> LEAF_KEY ("leaf"))
+        edges = [EdgeRecord(**r) for r in results if r["tail"] != LEAF_KEY]
+        logger.info("Returning %s edges", len(edges))
+        return edges
 
     @staticmethod
-    def _propagate_counts(G: DiGraph) -> DiGraph:
+    def set_counts(G: DiGraph) -> DiGraph:
         """
-        Propagate counts up the tree
+        Sets counts recursively up the tree
             - assumes leafs have counts
             - assumes edges are directed from child to parent
             - has parent counts = sum of children counts
@@ -238,57 +259,104 @@ class AncestorUmlsGraph(UmlsGraph):
         sns.displot(data, kde=True, aspect=10/4)
         ```
         """
-        logger.info("Recursively propagating counts up the tree")
+        logger.info("Recursively setting counts")
 
-        def _propagate(g: DiGraph, node_id: str, depth: int = 0):
-            child_ids: list[str] = list(g.successors(node_id))
+        def collect_counts(
+            g: DiGraph, node_id: str, depth: int = 0
+        ) -> list[tuple[str, int]]:
+            # count all descendants (children, grandchildren, etc)
+            # to avoiding the double counting issue occurring with a cascade approach
+            descendent_ids = nx.descendants(g, node_id)
 
-            # we want to recurse longer from root -> leaf, otherwise risk missing counts
-            if depth < MAX_DEPTH_NETWORK * 1.5:
-                # for children with no counts, aka non-leaf nodes, recurse
-                # e.g. if we're on Grandparent1, Parent1 and Parent2 have no counts,
-                # so we recurse to set Parent1 and Parent2 counts based on their children
-                for child_id in child_ids:
-                    _propagate(g, child_id, depth + 1)
-
-            # set count to sum of all children counts
-            g.nodes[node_id]["count"] = min(
-                (g.nodes[node_id].get("count") or 0)
-                + sum(g.nodes[child_id].get("count", 0) for child_id in child_ids),
-                MAX_COUNT,
+            # in case parent has its own count, i.e. biomedical ents link directly to it.
+            existing_count = int(g.nodes[node_id].get("count") or 0)
+            count = (
+                sum(
+                    g.nodes[descendent_id].get("count") or 0
+                    for descendent_id in descendent_ids
+                )
+                + existing_count
             )
 
+            if depth < MAX_DEPTH_NETWORK:
+                child_counts = flatten(
+                    [
+                        collect_counts(g, child_id, depth + 1)
+                        for child_id in g.successors(node_id)
+                    ]
+                )
+            else:
+                child_counts = []
+
+            return [(node_id, count)] + child_counts
+
         # take all nodes with no *incoming* edges, i.e. root nodes
-        for node_id in [n for n, d in G.in_degree() if d == 0]:
-            _propagate(G, node_id, 0)
+        count_map = dict(
+            flatten(
+                [
+                    collect_counts(G, node_id, 0)
+                    for node_id in [n for n, d in G.in_degree() if d == 0]
+                ]
+            )
+        )
+        nx.set_node_attributes(G, count_map, "count")
 
         return G
 
-    @staticmethod
-    def get_true_last_level(
-        G: DiGraph, node: NodeRecord, last_level: OntologyLevel | None = None
-    ) -> OntologyLevel | None:
+    def get_level(
+        self,
+        current_node: NodeRecord,
+        prev_count: int,
+        last_level: OntologyLevel,
+        max_parent_count: int | None = None,
+    ) -> OntologyLevel:
         """
-        Get the true last level for a node
+        Determine level of current node
+        """
 
-        Takes into account:
-        - the last level as per the path it took
-        - the levels of its children
-        """
-        child_ids = list(G.successors(node.id))
-        child_levels = sorted(
-            [G.nodes[c].get("level", OntologyLevel.UNKNOWN) for c in child_ids],
-            key=lambda x: ONTOLOGY_LEVEL_MAP.get(x, 0),
-        )
-        max_child_level = child_levels[-1] if child_levels else None
-        return choose_max_ontology_level(max_child_level, last_level)
+        # i.e. for Clinical Drug / T200 -> SUBINSTANCE
+        if current_node.level_override is not None:
+            return current_node.level_override
+
+        current_count = current_node.count or 0
+
+        if prev_count == 0 or last_level == OntologyLevel.UNKNOWN:
+            """
+            leaf node, or effective leaf node (i.e. previous had no count)
+            """
+            if current_count < self.instance_threshold:
+                return OntologyLevel.SUBINSTANCE
+
+            return OntologyLevel.INSTANCE
+
+        if max_parent_count is None:
+            """
+            root node. increment level
+            """
+            return increment_ontology_level(last_level)
+
+        # Else, we're in the middle of the tree and will increment the ancestor level if:
+        # 1) the absolute change in counts between prev and current is greater than OVERRIDE_DELTA, or
+        # 2) the rate of change is *increasing*
+        #       reasoning: if rate of change ↓↓↓, grandparent isn't so different than the parent
+        #       tl;dr we're trying to get rid of the useless middle managers of the UMLS ontology
+        parent_current_delta = max_parent_count - current_count
+        current_prev_delta = current_count - prev_count
+
+        if current_prev_delta > self.override_threshold or (
+            parent_current_delta > current_prev_delta
+            and current_prev_delta > self.delta_threshold
+        ):
+            return increment_ontology_level(last_level)
+
+        return OntologyLevel.NA
 
     def set_level(
         self,
         G: DiGraph,
         node: NodeRecord,
         prev_node: NodeRecord | None = None,
-        last_level: OntologyLevel | None = None,
+        last_level: OntologyLevel = OntologyLevel.UNKNOWN,
         depth: int = 0,
     ) -> None:
         """
@@ -304,78 +372,36 @@ class AncestorUmlsGraph(UmlsGraph):
             depth: int: depth in the tree
         """
 
-        def get_level(
-            current_node: NodeRecord,
-            prev_count: int,
-            last_level: OntologyLevel | None = None,
-            max_parent_count: int | None = None,
-        ) -> OntologyLevel:
-            """
-            Determine level of current node
-            """
-            current_count = current_node.count or 0
-
-            if last_level is None:
-                """
-                leaf node. level it INSTANCE if sufficiently common.
-                """
-                if current_count < self.instance_threshold:
-                    return OntologyLevel.SUBINSTANCE
-
-                return OntologyLevel.INSTANCE
-
-            if max_parent_count is None:
-                """
-                root node. increment level
-                """
-                return increment_ontology_level(last_level)
-
-            # Else, we're in the middle of the tree and will increment the ancestor level if:
-            # 1) the absolute change in counts between prev and current is greater than OVERRIDE_DELTA, or
-            # 2) the rate of change is *increasing*
-            #       reasoning: if rate of change ↓↓↓, grandparent isn't so different than the parent
-            #       tl;dr we're trying to get rid of the useless middle managers of the UMLS ontology
-            parent_current_delta = max_parent_count - current_count
-            current_prev_delta = current_count - prev_count
-
-            if current_prev_delta > self.current_override_threshold or (
-                parent_current_delta > current_prev_delta
-                and prev_count
-                > self.previous_threshold  # ignore big changes in small numbers
-            ):
-                return increment_ontology_level(last_level)
-
-            return OntologyLevel.NA
-
         prev_count = prev_node.count if prev_node else 0
 
         parent_ids = list(G.predecessors(node.id))
-        max_parent_count = (
+        max_parent_count: int | None = (
             max([G.nodes[p].get("count", 0) for p in parent_ids])
             if parent_ids
             else None
         )
 
-        # considers path and children
-        true_last_level = AncestorUmlsGraph.get_true_last_level(G, node, last_level)
-        level = get_level(node, prev_count or 0, true_last_level, max_parent_count)
+        level = self.get_level(node, prev_count or 0, last_level, max_parent_count)
 
-        if (
-            last_level is not None
-            and level != OntologyLevel.NA
-            and compare_ontology_level(level, last_level) < 0
-        ):
-            logger.warning(
-                "SHOULD NOT HAPPEN: %s level to %s, from %s, %s",
-                node.id,
-                level,
-                last_level,
-                prev_node,
-            )
+        # level may have already been set via a different path
+        existing_level = G.nodes[node.id].get("level") or OntologyLevel.UNKNOWN
+
+        # if level is lower (e.g. L1_CATEGORY) than existing level (e.g. L2_CATEGORY), keep existing level
+        if compare_ontology_level(level, existing_level) <= 0:
+            level = existing_level
 
         G.nodes[node.id]["level"] = level
+        logger.debug(
+            "Setting level for %s from %s to %s (existing %s)",
+            node.id,
+            last_level,
+            level,
+            existing_level,
+        )
 
-        # last real level as basis for increments
+        # last non-NA level as basis for increments
+        # if last_level == L1_CATEGORY, level == NA, last_level == L1_CATEGORY
+        # so level can be set to L2_CATEGORY in future iterations
         new_last_level = level if level != OntologyLevel.NA else last_level
 
         # recurse through parents
@@ -390,17 +416,15 @@ class AncestorUmlsGraph(UmlsGraph):
                     depth + 1,
                 )
 
-    def _add_level_info(self, G: DiGraph) -> DiGraph:
+    def _add_hierarchy_info(self, G: DiGraph) -> DiGraph:
         """
         Add ontology level to nodes
 
         Calls _propagate_counts to set counts on all nodes first.
         """
 
-        logger.info("Recursively propagating counts up the tree")
-
-        # propogate counts up the tree
-        new_g = AncestorUmlsGraph._propagate_counts(G.copy().to_directed())
+        # set counts on all nodes
+        new_g = AncestorUmlsGraph.set_counts(G.copy().to_directed())
 
         logger.info("Propagating levels up the tree")
         # take all nodes with no *outgoing* edges, i.e. leaf nodes
