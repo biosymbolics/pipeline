@@ -25,6 +25,8 @@ UMLS_NAME_OVERRIDES = {
     # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
+    "C0025080": "Device",  # vs "Medical Device"
+    "C0348078": "Form",  # qualitative form
 }
 
 # sets canonical based on (single!) word
@@ -95,6 +97,14 @@ UMLS_CUI_SUPPRESSIONS = {
     "C4085054": "particl",  # matches particle
     "C0596611": "Gene Mutation",
     "C0543419": "Sequela of disorder",
+    "C0033684": "proteins",  # fix ancestory, get rid of this.
+    "C1335532": "protein family",
+    "C1148560": "molecular_function",
+    "C0012854": "DNA",  # fix ancestory, get rid of this.
+    "C0450442": "Agent",
+    # "C5235658": "Targeted therapy agent",  # maybe re-enable; it has some utility.
+    "C0079429": "gene a",
+    "C1260969": "ring device",
 }
 
 
