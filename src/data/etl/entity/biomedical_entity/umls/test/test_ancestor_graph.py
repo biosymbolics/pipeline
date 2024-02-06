@@ -47,49 +47,58 @@ class MockAncestorUmlsGraph(AncestorUmlsGraph):
         nodes = [
             NodeRecord(
                 id="PARENT1_CHILD1",
+                name="PARENT1_CHILD1",
                 count=5,  # subinstance
             ),
             NodeRecord(
                 id="PARENT1_CHILD2",
+                name="PARENT1_CHILD2",
                 count=1000,
             ),
             NodeRecord(
                 id="PARENT2_CHILD1",
+                name="PARENT2_CHILD1",
                 count=1000,
             ),
             NodeRecord(
                 id="PARENT2_CHILD2",
+                name="PARENT2_CHILD2",
                 count=1000,
             ),
             NodeRecord(
                 id="PARENT1and2_CHILD1",
+                name="PARENT1and2_CHILD1",
                 count=1000,
             ),
             NodeRecord(
                 id="PARENT1and4_CHILD1",
+                name="PARENT1and4_CHILD1",
                 count=1000,
             ),
             NodeRecord(
                 id="PARENT3_ONLY_CHILD",
+                name="PARENT3_ONLY_CHILD",
                 count=5,  # subinstance
             ),
             NodeRecord(
                 id="PARENT_WITH_COUNT_CHILD",
+                name="PARENT_WITH_COUNT_CHILD",
                 count=2,  # subinstance
             ),
             NodeRecord(
                 id="GRANDPARENT2_DIRECT_CHILD",
+                name="GRANDPARENT2_DIRECT_CHILD",
                 count=1,  # tiny subinstance
             ),
-            NodeRecord(id="PARENT1"),
-            NodeRecord(id="PARENT2"),
-            NodeRecord(id="PARENT3"),
-            NodeRecord(id="PARENT4"),
-            NodeRecord(id="PARENT_WITH_COUNT", count=5),
-            NodeRecord(id="GRANDPARENT1"),
+            NodeRecord(id="PARENT1", name="PARENT1"),
+            NodeRecord(id="PARENT2", name="PARENT2"),
+            NodeRecord(id="PARENT3", name="PARENT3"),
+            NodeRecord(id="PARENT4", name="PARENT4"),
+            NodeRecord(id="PARENT_WITH_COUNT", name="PARENT_WITH_COUNT", count=5),
+            NodeRecord(id="GRANDPARENT1", name="GRANDPARENT1"),
             # GRANDPARENT2_DIRECT_CHILD & PARENT3's parent
-            NodeRecord(id="GRANDPARENT2"),
-            NodeRecord(id="GRANDPARENT3"),
+            NodeRecord(id="GRANDPARENT2", name="GRANDPARENT2"),
+            NodeRecord(id="GRANDPARENT3", name="GRANDPARENT3"),
         ]
 
         return nodes
