@@ -106,11 +106,7 @@ class UmlsAncestorTransformer:
             return None  # irrelevant record
 
         # get record with updated level info
-        try:
-            updated_record = UmlsInfo(**omit(G.nodes[record.id], "level_override"))
-        except Exception as e:
-            logger.error("Record missing info: %s (%s)", G.nodes[record.id], e)
-            raise e
+        updated_record = UmlsInfo(**omit(G.nodes[record.id], "level_override"))
 
         return UmlsUpdateInput(
             id=record.id,

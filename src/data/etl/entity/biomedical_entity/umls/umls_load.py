@@ -13,7 +13,6 @@ from prisma.types import (
     UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
 )
 from pydash import compact
-from data.domain.biomedical.umls import clean_umls_name
 
 from system import initialize
 
@@ -21,8 +20,8 @@ initialize()
 
 from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import BASE_DATABASE_URL
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
+from data.domain.biomedical.umls import clean_umls_name
 
 from .umls_transform import UmlsAncestorTransformer
 
@@ -68,13 +67,15 @@ class UmlsLoader:
             logger.info("Creating %s UMLS records", len(batch))
             insert_data = [
                 UmlsCreateInput(
-                    **r,
                     id=r["id"],
                     name=r["name"],
                     rollup_id=r["id"],  # start with self as rollup
                     preferred_name=clean_umls_name(
                         r["id"], r["name"], r["synonyms"], r["type_ids"], False
                     ),
+                    synonyms=r["synonyms"],
+                    type_ids=r["type_ids"],
+                    type_names=r["type_names"],
                     level=OntologyLevel.UNKNOWN,
                 )
                 for r in batch

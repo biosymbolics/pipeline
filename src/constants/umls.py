@@ -88,6 +88,11 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
     "C0008109": "chimera",
     "C0043335": "xenobiotic",
+    "C1257890": "population group",  # matches group
+    "C0443933": "Sjogren's syndrome B antibody",  # matches monoclonal antibody (not necessary if semantic matching)
+    "C1254351": "pharmacological Substance",
+    "C0544791": "Inflammatory fistula",
+    "C4085054": "particl",  # matches particle
 }
 
 
@@ -428,3 +433,7 @@ PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
         for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
 }
+
+PERMITTED_ANCESTOR_TYPES = list(
+    set([k for v in PREFERRED_ANCESTOR_TYPE_MAP.values() for k in v.keys()])
+)

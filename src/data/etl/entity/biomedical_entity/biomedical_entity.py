@@ -2,6 +2,7 @@
 Class for biomedical entity etl
 """
 
+import asyncio
 from typing import Sequence
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
@@ -170,12 +171,13 @@ class BiomedicalEntityEtl(BaseEntityEtl):
     ) -> BiomedicalEntityWhereUniqueInput:
         """
         Get where clause for update
-        - prefer canonical_id, but use name/type if not available
+        - prefer name (so we can update canonical_id if better match)
+        - otherwise, use canonical_id
         """
+        if rec.get("name") is not None:
+            return {"name": rec.get("name") or ""}
         if rec.get("canonical_id") is not None:
             return {"canonical_id": rec.get("canonical_id") or ""}
-        elif rec.get("name") is not None:
-            return {"name": rec.get("name") or ""}
 
         raise ValueError("Must have canonical_id or name")
 
@@ -262,7 +264,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await client.execute_raw(query)
 
     @staticmethod
-    async def _create_biomedical_entity_ancestors(n_depth: int = 3):
+    async def _create_biomedical_entity_ancestors(n_depth: int = 2):
         """
         Create ancestor biomedical entities from UMLS
 
@@ -358,8 +360,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         - Link mapping tables "intervenable" and "indicatable" to canonical entities
         """
 
-        def get_query(table: str) -> str:
-            return f"""
+        def get_queries(table: str) -> list[str]:
+            return [
+                f"DROP INDEX IF EXISTS {table}_canonical_name",  # update perf
+                f"DROP INDEX IF EXISTS {table}_entity_id",  # update perf
+                f"""
                 UPDATE {table}
                 SET
                     entity_id=entity_synonym.entity_id,
@@ -368,13 +373,18 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 FROM entity_synonym, biomedical_entity
                 WHERE {table}.name=entity_synonym.term
                 AND entity_synonym.entity_id=biomedical_entity.id
-            """
+                """,
+            ]
 
         logger.info("Linking mapping tables to canonical entities")
         client = await prisma_client(600)
         for table in ["intervenable", "indicatable"]:
-            query = get_query(table)
-            await client.execute_raw(query)
+            for query in get_queries(table):
+                await client.execute_raw(query)
+
+        logger.warning(
+            "Completed link_to_documents. ***Be sure to re-apply indices!! (prisma db push)***"
+        )
 
     @staticmethod
     async def set_rollups():
@@ -386,8 +396,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         def get_update_queries(table: str) -> list[str]:
             return [
                 # clear existing rollups
-                f"DROP INDEX IF EXISTS {table}_instance_rollup",  # improve speed
-                f"DROP INDEX IF EXISTS {table}_category_rollup",  # improve speed
+                f"DROP INDEX IF EXISTS {table}_instance_rollup",  # update perf
+                f"DROP INDEX IF EXISTS {table}_category_rollup",  # update perf
                 f"UPDATE {table} SET instance_rollup='', category_rollup=''",
                 # logic is in how rollup_id is set (umls etl / ancestor_selector)
                 f"""
@@ -418,10 +428,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             "CREATE INDEX _rollups_child_id on _rollups(child_id)",
             "CREATE INDEX _rollups_parent_id on _rollups(parent_id)",
         ]
-        cleanup_queries = [
-            "DROP TABLE IF EXISTS instance_rollup",
-            "DROP TABLE IF EXISTS category_rollup",
-        ]
+        cleanup_queries = ["DROP TABLE IF EXISTS _rollups"]
 
         logger.info("Setting rollups for mapping tables")
 
@@ -443,7 +450,27 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         )
 
     @staticmethod
-    async def pre_doc_finalize():
+    async def checksum():
+        """
+        Quick entity checksum
+        """
+        client = await prisma_client(300)
+        checksums = {
+            "comprised_of": f"SELECT COUNT(*) FROM _entity_comprised_of",
+            "parents": f"SELECT COUNT(*) FROM _entity_to_parent",
+            "biomedical_entities": f"SELECT COUNT(*) FROM biomedical_entity",
+            "priority_biomedical_entities": f"SELECT COUNT(*) FROM biomedical_entity where is_priority=true",
+            "umls_biomedical_entities": f"SELECT COUNT(*) FROM biomedical_entity, umls where umls.id=biomedical_entity.canonical_id",
+        }
+        results = await asyncio.gather(
+            *[client.query_raw(query) for query in checksums.values()]
+        )
+        for key, result in zip(checksums.keys(), results):
+            logger.warning(f"Load checksum {key}: {result[0]}")
+        return
+
+    @staticmethod
+    async def pre_finalize():
         """
         Finalize etl
         """
@@ -453,13 +480,22 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # populate search index with name & syns
         await BiomedicalEntityEtl._update_search_index()
 
+        # checksum
+        await BiomedicalEntityEtl.checksum()
+
     @staticmethod
-    async def post_doc_finalize():
+    async def post_finalize():
         """
         Run after:
             1) UMLS is loaded
             2) all biomedical entities are loaded
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
+
+        To (partly) recreate _entity_to_umls:
+            insert into _entity_to_parent ("A", "B") select parent.id, child.id
+            from biomedical_entity parent, biomedical_entity child, _entity_to_umls etu, umls
+            where umls.rollup_id=parent.canonical_id and etu."A"=child.id and etu."B"=umls.id
+            on conflict do nothing;
         """
         logger.info("Finalizing biomedical entity etl")
         # await BiomedicalEntityEtl.link_to_documents()
@@ -467,7 +503,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
-        await UmlsLoader.post_doc_finalize()
+        # await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
         await BiomedicalEntityEtl._create_biomedical_entity_ancestors()

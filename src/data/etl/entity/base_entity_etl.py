@@ -1,6 +1,7 @@
 """
 Abstract document ETL class
 """
+
 from abc import abstractmethod
 import logging
 
@@ -21,7 +22,7 @@ class BaseEntityEtl:
         raise NotImplementedError
 
     @staticmethod
-    async def pre_doc_finalize():
+    async def pre_finalize():
         pass
 
     @staticmethod
@@ -34,5 +35,5 @@ class BaseEntityEtl:
         raise NotImplementedError
 
     @classmethod
-    async def post_doc_finalize(cls):
+    async def post_finalize(cls):
         raise NotImplementedError

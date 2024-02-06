@@ -79,6 +79,7 @@ RELATIONSHIPS_OF_INTEREST_MAP = {
         "mechanism_of_action_of",  # PIOGLITAZONE -> Increased Glycolysis
         "therapeutic_class_of",  # ALBENDAZOLE -> Antihelmintics
         "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE
+        "has_active_moiety",  # glucoses -> glucose 50 MG/ML Injection
     ],
 }
 

@@ -10,7 +10,7 @@ from clients.low_level.prisma import prisma_client
 from clients.umls.graph import UmlsGraph
 from clients.umls.types import EdgeRecord, NodeRecord
 from constants.umls import (
-    MOST_PREFERRED_UMLS_TYPES,
+    PERMITTED_ANCESTOR_TYPES,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_NAME_SUPPRESSIONS,
 )
@@ -41,7 +41,7 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     ### INTERVENTION ###
     "has_mechanism_of_action",  # head/MoA->tail/drug, e.g. Hormone Receptor Agonists [MoA] -> Lutropin Alpha
     "has_target",  # head/target->tail/drug
-    "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE
+    "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE (important for clinical drugs)
     "tradename_of",  # Amoxycillin -> Amoxil; gatifloxacin 5 MG/ML Ophthalmic Solution -> gatifloxacin 5 MG/ML Ophthalmic Solution [Zymaxid]
     ### DISEASE ###
     "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
@@ -58,6 +58,7 @@ LEVEL_MIN_DELTA = 20
 MAX_DEPTH_QUERY = 5
 MAX_DEPTH_NETWORK = 15
 DEFAULT_ANCESTOR_FILE = "data/umls_ancestors.json"
+LEAF_KEY = "leaf"
 
 
 class AncestorUmlsGraph(UmlsGraph):
@@ -71,6 +72,7 @@ class AncestorUmlsGraph(UmlsGraph):
         instance_threshold: int,
         delta_threshold: int,
         override_threshold: int,
+        considered_tuis: list[str] = PERMITTED_ANCESTOR_TYPES,
     ):
         """
         ***Either use a factory method in the subclass, or call load() after init***
@@ -81,6 +83,7 @@ class AncestorUmlsGraph(UmlsGraph):
         self.instance_threshold = instance_threshold
         self.delta_threshold = delta_threshold
         self.override_threshold = override_threshold
+        self.considered_tuis = considered_tuis
 
     @classmethod
     async def create(
@@ -111,36 +114,33 @@ class AncestorUmlsGraph(UmlsGraph):
         return aug
 
     @overrides(UmlsGraph)
-    async def load_nodes(
-        self,
-        considered_tuis: list[str] = list(MOST_PREFERRED_UMLS_TYPES.keys()),
-    ) -> list[NodeRecord]:
+    async def load_nodes(self) -> list[NodeRecord]:
         """
         Query nodes from umls
         """
         query = rf"""
             SELECT
-                umls.id as id,
-                umls.name as name,
-                COALESCE(SUM(docs.count), 0) as count,
+                umls.id AS id,
+                umls.name AS name,
+                COALESCE(SUM(docs.count), 0) AS count,
                 CASE
                     -- T200 / Clinical Drug is always SUBINSTANCE
                     WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
                         THEN 'SUBINSTANCE'
                     ELSE null
                     END AS level_override,
-                umls.type_ids as type_ids
+                umls.type_ids AS type_ids
             FROM umls, _entity_to_umls AS etu
             LEFT JOIN (
-                SELECT entity_id, sum(count) as count
+                SELECT entity_id, sum(count) AS count
                 FROM (
-                    SELECT entity_id, count(*) as count
+                    SELECT entity_id, count(*) AS count
                     FROM intervenable
                     GROUP BY entity_id
 
-                    UNION ALL
+                    UNION
 
-                    SELECT entity_id, count(*) as count
+                    SELECT entity_id, count(*) AS count
                     FROM indicatable
                     GROUP BY entity_id
                 ) int GROUP BY entity_id
@@ -153,27 +153,26 @@ class AncestorUmlsGraph(UmlsGraph):
             SELECT
                 id,
                 name,
-                0 as count,
+                0 AS count,
                 CASE
                     -- T200 / Clinical Drug is always SUBINSTANCE
                     WHEN array_length(umls.type_ids, 1)=1 AND umls.type_ids[1]='T200'
                     THEN 'SUBINSTANCE'
                     ELSE null
                     END AS level_override,
-                umls.type_ids as type_ids
+                umls.type_ids AS type_ids
             FROM umls
-            WHERE id not in (SELECT "B" FROM _entity_to_umls where "B"=id)
+            WHERE id NOT IN (SELECT "B" FROM _entity_to_umls where "B"=id)
             """
 
         client = await prisma_client(300)
-        results = await client.query_raw(query, considered_tuis)
+        results = await client.query_raw(query, self.considered_tuis)
         return [NodeRecord(**r) for r in results]
 
     @overrides(UmlsGraph)
     async def load_edges(
         self,
         considered_relationships: tuple[str, ...] = DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS,
-        considered_tuis: tuple[str, ...] = tuple(MOST_PREFERRED_UMLS_TYPES.keys()),
         name_suppressions: Sequence[str] = UMLS_NAME_SUPPRESSIONS,
         cui_suppressions: Sequence[str] = tuple(UMLS_CUI_SUPPRESSIONS.keys()),
     ) -> list[EdgeRecord]:
@@ -190,46 +189,39 @@ class AncestorUmlsGraph(UmlsGraph):
             -- patent to umls edges
             WITH RECURSIVE working_terms AS (
                 SELECT
-                    distinct umls.id as head,
-                    'leaf' as tail,
+                    distinct umls.id AS head,
+                    '{LEAF_KEY}' AS tail,
                     1 AS depth
-                FROM biomedical_entity, intervenable, _entity_to_umls AS etu, umls
-                WHERE biomedical_entity.id=intervenable.entity_id
-                AND etu."A"=biomedical_entity.id
-                AND umls.id=etu."B"
-                AND umls.type_ids && $1
+                FROM umls, _entity_to_umls AS etu
+                LEFT JOIN (
+                    SELECT distinct entity_id
+                    FROM intervenable
 
-                UNION
+                    UNION
 
-                -- indication-mapped UMLS terms associated with docs, if preferred type
-                SELECT
-                    distinct umls.id as head,
-                    'leaf' as tail,
-                    1 AS depth
-                FROM biomedical_entity, indicatable, _entity_to_umls AS etu, umls
-                WHERE biomedical_entity.id=indicatable.entity_id
-                AND etu."A"=biomedical_entity.id
-                AND umls.id=etu."B"
-                AND umls.type_ids && $1
+                    SELECT distinct entity_id
+                    FROM indicatable
+                ) docs ON docs.entity_id=etu."A"
+                WHERE umls.id=etu."B"
 
                 UNION
 
                 -- UMLS to UMLS relationships
                 -- e.g. C12345 & C67890
                 SELECT
-                    head_id as head,
-                    tail_id as tail,
-                    wt.depth + 1 as depth
+                    head_id AS head,
+                    tail_id AS tail,
+                    wt.depth + 1 AS depth
                 FROM umls_graph
                 JOIN working_terms wt ON wt.head = tail_id
-                JOIN umls as head_entity on head_entity.id = umls_graph.head_id
-                JOIN umls as tail_entity on tail_entity.id = umls_graph.tail_id
+                JOIN umls AS head_entity ON head_entity.id = umls_graph.head_id
+                JOIN umls AS tail_entity ON tail_entity.id = umls_graph.tail_id
                 WHERE wt.depth <= {MAX_DEPTH_QUERY}
-                AND relationship in {considered_relationships}
                 AND head_entity.type_ids && $1
                 AND tail_entity.type_ids && $1
-                AND head_id not in {cui_suppressions}
-                AND tail_id not in {cui_suppressions}
+                AND relationship IN {considered_relationships}
+                AND head_id NOT IN {cui_suppressions}
+                AND tail_id NOT IN {cui_suppressions}
                 AND head_id<>tail_id
                 AND ts_lexize('english_stem', head_entity.type_names[1]) <> ts_lexize('english_stem', head_name)  -- exclude entities with a name that is also the type
                 AND ts_lexize('english_stem', tail_entity.type_names[1]) <> ts_lexize('english_stem', tail_name)
@@ -240,18 +232,20 @@ class AncestorUmlsGraph(UmlsGraph):
             FROM working_terms
             """
 
-        client = await prisma_client(300)
-        results = await client.query_raw(query, considered_tuis)
+        print(query)
 
-        # omit source edges (cui -> "leaf")
-        edges = [EdgeRecord(**r) for r in results if r["tail"] != "leaf"]
+        client = await prisma_client(300)
+        results = await client.query_raw(query, self.considered_tuis)
+
+        # omit source edges (cui -> LEAF_KEY ("leaf"))
+        edges = [EdgeRecord(**r) for r in results if r["tail"] != LEAF_KEY]
         logger.info("Returning %s edges", len(edges))
         return edges
 
     @staticmethod
     def set_counts(G: DiGraph) -> DiGraph:
         """
-        Propagate counts up the tree
+        Sets counts recursively up the tree
             - assumes leafs have counts
             - assumes edges are directed from child to parent
             - has parent counts = sum of children counts
@@ -265,7 +259,7 @@ class AncestorUmlsGraph(UmlsGraph):
         sns.displot(data, kde=True, aspect=10/4)
         ```
         """
-        logger.info("Recursively propagating counts up the tree")
+        logger.info("Recursively setting counts")
 
         def collect_counts(
             g: DiGraph, node_id: str, depth: int = 0
@@ -429,8 +423,6 @@ class AncestorUmlsGraph(UmlsGraph):
         Calls _propagate_counts to set counts on all nodes first.
         """
 
-        logger.info("Recursively propagating counts up the tree")
-
         # set counts on all nodes
         new_g = AncestorUmlsGraph.set_counts(G.copy().to_directed())
 
@@ -438,7 +430,6 @@ class AncestorUmlsGraph(UmlsGraph):
         # take all nodes with no *outgoing* edges, i.e. leaf nodes
         for node_id in [n for n, d in new_g.out_degree() if d == 0]:
             node = NodeRecord(**new_g.nodes[node_id])
-            logger.info("Setting level for %s", node_id)
             self.set_level(new_g, node)
 
         return new_g

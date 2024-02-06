@@ -11,14 +11,10 @@ from scispacy.candidate_generation import MentionCandidate, KnowledgeBase
 
 from constants.umls import (
     CANDIDATE_TYPE_WEIGHT_MAP,
-    MOST_PREFERRED_UMLS_TYPES,
-    PREFERRED_UMLS_TYPES,
-    PREFERRED_UMLS_TYPES,
     UMLS_WORD_OVERRIDES,
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
-from utils.list import has_intersection
 
 
 logger = logging.getLogger(__name__)

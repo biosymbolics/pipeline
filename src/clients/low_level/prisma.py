@@ -40,7 +40,7 @@ def prisma_context(timeout: int | None) -> Prisma:
     global PRISMA_CLIENT
 
     if PRISMA_CLIENT is None:
-        logger.info("Registering Prisma client")
+        logger.debug("Registering Prisma client")
         client = Prisma(
             log_queries=False,
             http={"limits": Limits(max_connections=50), "timeout": timeout},
