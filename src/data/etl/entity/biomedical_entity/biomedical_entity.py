@@ -513,6 +513,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 WHERE umls.rollup_id=parent.canonical_id AND etu."A"=child.id and etu."B"=umls.id
                 GROUP BY child.id
                 ON CONFLICT DO NOTHING;
+
+        Other
+            select i.name, i.instance_rollup, be.name, be.entity_type, count(*) from intervenable i, biomedical_entity be where i.entity_id=be.id and be.entity_type='UNKNOWN' group by i.name, i.instance_rollup, be.entity_type, be.name order by count(*) desc limit 500;
+            delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
         """
         logger.info("Finalizing biomedical entity etl")
         # await BiomedicalEntityEtl.link_to_documents()

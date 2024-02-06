@@ -44,7 +44,7 @@ class BiomedicalEntityLoader:
         logger.info("Biomedical entity load complete")
 
     @staticmethod
-    async def post_doc_finalize():
+    async def post_finalize():
         await BiomedicalEntityEtl.post_finalize()
 
 
@@ -58,6 +58,6 @@ if __name__ == "__main__":
         sys.exit()
 
     if "--post-doc-finalize" in sys.argv:
-        asyncio.run(BiomedicalEntityLoader().post_doc_finalize())
+        asyncio.run(BiomedicalEntityLoader().post_finalize())
     else:
         asyncio.run(BiomedicalEntityLoader().copy_all())

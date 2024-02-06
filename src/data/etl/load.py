@@ -35,14 +35,10 @@ async def load_all(force_update: bool = False):
     await TrialLoader(document_type="trial").copy_all(force_update)
 
     # do final biomedical entity stuff that requires everything else be in place
-    await BiomedicalEntityLoader().post_doc_finalize()
+    await BiomedicalEntityLoader().post_finalize()
 
     # finally, link owners
-    await OwnerLoader().post_doc_finalize()
-
-    # Fixes
-    # select i.name, i.instance_rollup, be.name, be.entity_type, count(*) from intervenable i, biomedical_entity be where i.entity_id=be.id and be.entity_type='UNKNOWN' group by i.name, i.instance_rollup, be.entity_type, be.name order by count(*) desc limit 500;
-    # delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
+    await OwnerLoader().post_finalize()
 
 
 if __name__ == "__main__":

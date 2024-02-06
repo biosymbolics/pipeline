@@ -93,6 +93,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1254351": "pharmacological Substance",
     "C0544791": "Inflammatory fistula",
     "C4085054": "particl",  # matches particle
+    "C0596611": "Gene Mutation",
 }
 
 

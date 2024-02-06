@@ -1,6 +1,7 @@
 """
 Class for biomedical entity etl
 """
+
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
@@ -13,6 +14,7 @@ from core.ner.normalizer import TermNormalizer
 from data.etl.entity.base_entity_etl import BaseEntityEtl
 from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
+from utils.classes import overrides
 
 from .transform import clean_owners, OwnerTypeParser, transform_financials
 
@@ -130,16 +132,19 @@ class BaseOwnerEtl(BaseEntityEtl):
             skip_duplicates=True,
         )
 
+    @overrides(BaseEntityEtl)
     async def copy_all(
         self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
     ):
         await self.create_records(names)
         await self.load_financials(public_companies)
 
+    @overrides(BaseEntityEtl)
     @staticmethod
-    async def pre_doc_finalize():
+    async def pre_finalize():
         pass
 
+    @overrides(BaseEntityEtl)
     @staticmethod
     async def add_counts():
         """
@@ -155,6 +160,7 @@ class BaseOwnerEtl(BaseEntityEtl):
         )
         await client.execute_raw("DROP TABLE IF EXISTS temp_count")
 
+    @overrides(BaseEntityEtl)
     @staticmethod
     async def link_to_documents():
         """
@@ -176,8 +182,9 @@ class BaseOwnerEtl(BaseEntityEtl):
             """
         )
 
+    @overrides(BaseEntityEtl)
     @staticmethod
-    async def post_doc_finalize():
+    async def post_finalize():
         """
         Run after:
             1) all biomedical entities are loaded
