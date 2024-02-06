@@ -127,8 +127,8 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
         doc_id_map,
+        TermField.category_rollup,
         TermField.instance_rollup,
-        TermField.canonical_name,
         EntityMapType.intervention,
     )
 

@@ -2,7 +2,6 @@
 Report constants
 """
 
-
 from typings.documents.common import DocType
 
 from .types import DimensionInfo
@@ -12,18 +11,21 @@ X_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
+        "category_rollup": DimensionInfo(is_entity=True),
     },
     DocType.patent: {
         "attributes": DimensionInfo(),
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
+        "category_rollup": DimensionInfo(is_entity=True),
         "similar_patents": DimensionInfo(),
     },
     DocType.trial: {
         "name": DimensionInfo(is_entity=True),
         "canonical_name": DimensionInfo(is_entity=True),
         "instance_rollup": DimensionInfo(is_entity=True),
+        "category_rollup": DimensionInfo(is_entity=True),
     },
 }
 

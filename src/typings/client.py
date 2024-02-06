@@ -71,12 +71,13 @@ class DocumentSearchCriteria(TermSearchCriteria):
     """
 
     end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
+    # TODO: HACK!!
     include: Annotated[
         Union[
             Annotated[PatentInclude, Tag("patent_include")],
             Annotated[RegulatoryApprovalInclude, Tag("regulatory_approval_include")],
             Annotated[TrialInclude, Tag("trial_include")],
-            Annotated[None, Tag("no_include")],
+            Annotated[dict, Tag("no_include")],
         ],
         Discriminator(include_discriminator),
     ]
@@ -88,6 +89,13 @@ class DocumentSearchCriteria(TermSearchCriteria):
             return v
         terms = [t.strip() for t in (v.split(";") if v else [])]
         return terms
+
+    @field_validator("include", mode="before")
+    def include_from_string(cls, i):
+        if isinstance(i, dict):
+            return i
+        includes = [t.strip() for t in (i.split(";") if i else [])]
+        return {i: True for i in includes}
 
     @classmethod
     def parse(cls, params: "DocumentSearchCriteria", **kwargs):

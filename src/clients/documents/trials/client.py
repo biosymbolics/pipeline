@@ -1,10 +1,11 @@
 """
 Approvals client
 """
+
 import logging
 import time
 from typing import Optional
-from prisma.models import Trial
+from prisma.partials import TrialDto
 from prisma.types import (
     TrialWhereInput,
     TrialWhereUniqueInput,
@@ -37,7 +38,7 @@ async def find_many(
     start = time.monotonic()
 
     client = await prisma_client(120)
-    trials = await Trial.prisma(client).find_many(
+    trials = await TrialDto.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )
 

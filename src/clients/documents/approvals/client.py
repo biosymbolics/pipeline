@@ -1,10 +1,11 @@
 """
 Approvals client
 """
+
 import logging
 import time
 from typing import Optional
-from prisma.models import RegulatoryApproval
+from prisma.partials import RegulatoryApprovalDto
 from prisma.types import (
     RegulatoryApprovalWhereInput,
     RegulatoryApprovalWhereUniqueInput,
@@ -39,7 +40,7 @@ async def find_many(
     start = time.monotonic()
 
     client = await prisma_client(120)
-    approvals = await RegulatoryApproval.prisma(client).find_many(
+    approvals = await RegulatoryApprovalDto.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )
 

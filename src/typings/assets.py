@@ -15,10 +15,10 @@ MAX_DATA_YEAR = 2022
 
 @dataclass(frozen=True)
 class AssetActivity(Dataclass):
-    # ids
-    patents: list[str]
-    regulatory_approvals: list[str]
-    trials: list[str]
+    # id lists are too big
+    patent_count: int
+    regulatory_approval_count: int
+    trial_count: int
     year: int
 
 
@@ -234,9 +234,11 @@ class Asset(EntityBase):
         return [
             AssetActivity(
                 year=y,
-                patents=[p.id for p in patent_map.get(y, [])],
-                regulatory_approvals=[a.id for a in regulatory_approval_map.get(y, [])],
-                trials=[t.id for t in trial_map.get(y, [])],
+                patent_count=len([p.id for p in patent_map.get(y, [])]),
+                regulatory_approval_count=len(
+                    [a.id for a in regulatory_approval_map.get(y, [])]
+                ),
+                trial_count=len([t.id for t in trial_map.get(y, [])]),
             )
             for y in range(start_year, end_year)
         ]

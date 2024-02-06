@@ -1,12 +1,12 @@
 import random
-from prisma.models import Trial
+from prisma.partials import TrialDto
 from prisma.enums import TerminationReason, TrialStatus
 
 from typings.core import EntityBase
 from utils.classes import ByDefinitionOrderEnum
 
 
-class ScoredTrial(Trial, EntityBase):
+class ScoredTrial(TrialDto, EntityBase):
     @property
     def dropout_percent(self) -> float | None:
         if self.enrollment is None or self.dropout_count is None:
