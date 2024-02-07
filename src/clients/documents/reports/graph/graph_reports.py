@@ -13,6 +13,7 @@ from prisma.enums import BiomedicalEntityType
 from clients.documents.constants import DOC_CLIENT_LOOKUP
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_client
+from constants.core import SEARCH_TABLE
 from typings import (
     DOMAINS_OF_INTEREST,
     DocType,
@@ -94,29 +95,6 @@ ENTITY_GROUP = "entity"
 DOCUMENT_GROUP = "patent"
 
 
-def get_entity_subquery(term_field: TermField, doc_type: DocType) -> str:
-    """
-    Subquery to use if the term_field is an entity (indicatable, intervenable)
-
-    Args:
-        term_field (TermField): term field
-        doc_type (DocType): doc type
-    """
-    return f"""
-        (
-            select {doc_type.name}_id, entity_id, canonical_type, {term_field.name}
-            from intervenable
-            where {doc_type.name}_id is not null
-
-            UNION ALL
-
-            select {doc_type.name}_id, entity_id, canonical_type, {term_field.name}
-            from indicatable
-            where {doc_type.name}_id is not null
-        )
-    """
-
-
 def generate_graph(
     relationships: Sequence[dict], max_nodes: int = MAX_NODES
 ) -> nx.Graph:
@@ -196,12 +174,9 @@ async def graph_document_relationships(
             count(*) as weight,
             '{DOCUMENT_GROUP}' as group
         FROM {doc_type.name}
-            JOIN {get_entity_subquery(TermField.canonical_name, doc_type)} entities
-                ON entities.{doc_type.name}_id = {doc_type.name}.id
-            JOIN biomedical_entity ON
-                biomedical_entity.id = entities.canonical_id
-                AND biomedical_entity.entity_types in {tuple(DOMAINS_OF_INTEREST)}
-            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN {SEARCH_TABLE} ON {SEARCH_TABLE}.{doc_type.name}_id = {doc_type.name}.id
+                AND types in {tuple(DOMAINS_OF_INTEREST)}
+            JOIN _entity_to_umls as etu ON etu."A"={SEARCH_TABLE}.entity_id
             JOIN umls ON umls.id = etu."B"
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         GROUP BY {head_sql}, umls.name
@@ -285,7 +260,6 @@ async def _aggregate_document_relationships(
     head_field_info = Y_DIMENSIONS[doc_type][head_field]
     head_sql = head_field_info.transform(head_field)
 
-    entity_sq = get_entity_subquery(TermField.canonical_name, doc_type)
     sql = f"""
         -- document to entity relationships
         SELECT
@@ -294,11 +268,9 @@ async def _aggregate_document_relationships(
             count(*) as count,
             array_agg(distinct {doc_type.name}.id) as documents
         FROM {doc_type.name}
-            JOIN {entity_sq} entities
-                ON entities.{doc_type.name}_id = {doc_type.name}.id
-            JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
-                {f"AND biomedical_entity.entity_types in {tuple(entity_types)} " if entity_types else ""}
-            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN {SEARCH_TABLE} ON {SEARCH_TABLE}.{doc_type.name}_id = {doc_type.name}.id
+                {f"AND types in {tuple(entity_types)} " if entity_types else ""}
+            JOIN _entity_to_umls as etu ON etu."A"={SEARCH_TABLE}.entity_id
             JOIN umls ON umls.id = etu."B"
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         GROUP BY {head_sql}, concept
@@ -312,10 +284,9 @@ async def _aggregate_document_relationships(
             count(*) as count,
             array_agg(distinct {doc_type.name}.id) as documents
         FROM {doc_type.name}
-            JOIN {entity_sq} entities ON entities.{doc_type.name}_id = {doc_type.name}.id
-            JOIN biomedical_entity ON biomedical_entity.id = entities.entity_id
-                {f"AND biomedical_entity.entity_types in {tuple(entity_types)} " if entity_types else ""}
-            JOIN _entity_to_umls as etu ON etu."A"=biomedical_entity.id
+            JOIN {SEARCH_TABLE} ON {SEARCH_TABLE}.{doc_type.name}_id = {doc_type.name}.id
+                {f"AND types in {tuple(entity_types)} " if entity_types else ""}
+            JOIN _entity_to_umls as etu ON etu."A"={SEARCH_TABLE}.entity_id
             JOIN umls_graph ON umls_graph.tail_id = etu."B" -- note matching umls *tail_id* to entity, thus looking for heads.
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         AND head_id<>tail_id

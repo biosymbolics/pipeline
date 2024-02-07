@@ -14,7 +14,7 @@ from prisma.types import (
     RegulatoryApprovalScalarFieldKeys,
 )
 
-from clients.low_level.prisma import prisma_client, prisma_context
+from clients.low_level.prisma import prisma_client
 from typings import ScoredRegulatoryApproval
 
 

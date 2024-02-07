@@ -41,7 +41,7 @@ async def _summarize(raw_event: dict, context):
         summaries = await XYReport.group_by_xy_for_filters(
             search_params=p,
             x_dimension=TermField.category_rollup.name,
-            filters={d: f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST},
+            filters={d: f"type in ('{d}')" for d in DOMAINS_OF_INTEREST},
         )
     except Exception as e:
         message = f"Error reporting on patents: {e}"

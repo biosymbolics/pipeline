@@ -31,17 +31,17 @@ def get_entity_map_matview_query() -> list[str]:
         f"""
         CREATE MATERIALIZED VIEW IF NOT EXISTS {SEARCH_TABLE} AS
             (
-                SELECT {', '.join(fields)}, canonical_type as type
+                SELECT {', '.join(fields)}, canonical_type as type, entity_id
                 FROM intervenable
 
                 UNION ALL
 
-                SELECT {', '.join(fields)}, canonical_type as type
+                SELECT {', '.join(fields)}, canonical_type as type, entity_id
                 FROM indicatable
 
                 UNION ALL
 
-                SELECT {', '.join(fields)}, 'OWNER' as type
+                SELECT {', '.join(fields)}, 'OWNER' as type, owner_id as entity_id
                 FROM ownable
             )
         """,
