@@ -36,7 +36,6 @@ Y_DIMENSIONS: dict[DocType, dict[str, DimensionInfo]] = {
     },
     DocType.patent: {
         "id": DimensionInfo(transform=lambda y: f"patent.{y}"),
-        "country_code": DimensionInfo(),
         "priority_date": DimensionInfo(transform=lambda y: f"DATE_PART('Year', {y})"),
     },
     DocType.trial: {

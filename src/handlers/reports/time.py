@@ -1,6 +1,7 @@
 """
 Handler for patent timewise reports
 """
+
 import json
 import logging
 import traceback
@@ -39,7 +40,7 @@ async def _aggregate_over_time(raw_event: dict, context):
 
     try:
         summaries = await XYReport.group_by_xy_for_filters(
-            filters={d: f"canonical_type in ('{d}')" for d in DOMAINS_OF_INTEREST},
+            filters={d: f"type in ('{d}')" for d in DOMAINS_OF_INTEREST},
             search_params=p,
             x_dimension="canonical_name",  # keyof typeof X_DIMENSIONS
             y_dimension="priority_date",

@@ -155,3 +155,4 @@ class DocumentCharacteristicParams(DocumentSearchParams):
 
     doc_type: DocType = DocType.patent
     head_field: str = "priority_date"
+    include: Annotated[None, Field()] = None

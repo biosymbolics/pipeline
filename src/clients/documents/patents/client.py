@@ -41,7 +41,6 @@ async def find_many(
     """
     start = time.monotonic()
     client = await prisma_client(120)
-    logger.info("PATENTS with include %s", include)
     patents = await PatentDto.prisma(client).find_many(
         take, skip, where, cursor, include, order, distinct
     )

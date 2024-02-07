@@ -24,40 +24,11 @@ logger.setLevel(logging.INFO)
 
 class XYReport:
     @staticmethod
-    def _get_entity_subquery(x: str, doc_type: DocType, filter: str) -> str:
-        """
-        Subquery to use if the x dimension is an entity (indicatable, intervenable, ownable)
-        """
-        return f"""
-            (
-                select {doc_type.name}_id, canonical_type, {x}
-                from intervenable
-                where {doc_type.name}_id is not null AND {filter}
-
-                UNION ALL
-
-                select {doc_type.name}_id, canonical_type, {x}
-                from indicatable
-                where {doc_type.name}_id is not null AND {filter}
-
-                UNION ALL
-
-                select {doc_type.name}_id, 'OWNER' as canonical_type, {x}
-                from ownable
-                where {doc_type.name}_id is not null AND {filter}
-            )
-        """
-
-    @staticmethod
-    def _get_search_subquery(doc_type: DocType, filter: str) -> str:
-        return XYReport._get_entity_subquery("'NX'", doc_type, filter)
-
-    @staticmethod
     def _form_query(
         x: str,
         y: str | None,
         # field against which to search, e.g. canonical_name or instance_rollup
-        term_fields: Sequence[TermField],
+        # term_fields: Sequence[TermField],
         aggregation: Aggregation,
         doc_type: DocType,
         filter: str | None = None,
@@ -70,20 +41,16 @@ class XYReport:
         x_t = x_info.transform(x)
         y_t = y_info.transform(y or "") if y_info else None
 
-        # if x is an entity (indicatable, intervenable, ownable), we need a subquery to access that info
+        entity_map_mv = f"{doc_type.name}_entity_map"
+
+        # if x is an entity (indicatable, intervenable, ownable), use materialized view (created by ETL)
         if x_info.is_entity:
-            entity_sq = XYReport._get_entity_subquery(
-                x, doc_type, f"coalesce(length({x}), 0) > 0"
-            )
-            entity_join = f"LEFT JOIN {entity_sq} entities on entities.{doc_type.name}_id={doc_type.name}.id"
+            entity_join = f"JOIN {entity_map_mv} as entities on entities.{doc_type.name}_id={doc_type.name}.id"
+            x_t = f"entities.{x_t}"
+            filter = f"WHERE entities.{filter}" if filter else ""
         else:
             entity_join = ""
-
-        # search join to determine result set over which the report is generated
-        # TODO: make identical to search
-        search_sq = XYReport._get_search_subquery(
-            doc_type, " OR ".join([f"{tf.name} = ANY($1)" for tf in term_fields])
-        )
+            filter = f"WHERE {filter}" if filter else ""
 
         return f"""
             SELECT
@@ -92,13 +59,9 @@ class XYReport:
                 {f', {y_t} as y' if y_t else ''}
             FROM {doc_type.name}
                 {entity_join}
-            WHERE
-                {doc_type.name}_id IN (
-                    SELECT id
-                    FROM {doc_type.name}
-                    JOIN {search_sq} context_entities ON {doc_type.name}.id=context_entities.{doc_type.name}_id
-                )
-                {f'AND {filter}' if filter else ''}
+            JOIN {entity_map_mv} as entity_search on entity_search.{doc_type.name}_id={doc_type.name}.id
+                        AND entity_search.search @@ plainto_tsquery('english', $1)
+            {filter}
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
         """
@@ -137,22 +100,23 @@ class XYReport:
         if y_dimension and y_dimension not in Y_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
-        lowered_terms = [t.lower() for t in search_params.terms]
+        # TODO
+        term_query = " ".join([t.lower() for t in search_params.terms])
 
         client = await prisma_client(120)
         query = XYReport._form_query(
             x_dimension,
             y_dimension,
-            term_fields=search_params.term_fields,
+            # term_fields=search_params.term_fields,
             filter=filter,
             aggregation=aggregation,
             doc_type=doc_type,
         )
-        logger.debug("Running query for xy report: %s", query)
-        results = await client.query_raw(query, lowered_terms)
+        logger.info("Running query for xy report: %s", query)
+        results = await client.query_raw(query, term_query)
 
         if len(results) == 0:
-            logger.warning("No results for query: %s, params: %s", query, lowered_terms)
+            logger.warning("No results for query: %s, params: %s", query, term_query)
             return DocumentReport(
                 data=[], x=x_title or x_dimension, y=y_title or y_dimension
             )
