@@ -27,24 +27,25 @@ def get_entity_map_matview_query(doc_type: DocType) -> list[str]:
     return [
         f"""
         CREATE MATERIALIZED VIEW IF NOT EXISTS {doc_type.name}_entity_map AS
-        (
-            SELECT {', '.join(fields)}, canonical_type as type
-            FROM intervenable
-            WHERE {doc_type.name}_id is not null
+            (
+                SELECT {', '.join(fields)}, canonical_type as type
+                FROM intervenable
+                WHERE {doc_type.name}_id is not null
 
-            UNION ALL
+                UNION ALL
 
-            SELECT {', '.join(fields)}, canonical_type as type
-            FROM indicatable
-            WHERE {doc_type.name}_id is not null
+                SELECT {', '.join(fields)}, canonical_type as type
+                FROM indicatable
+                WHERE {doc_type.name}_id is not null
 
-            UNION ALL
+                UNION ALL
 
-            SELECT {', '.join(fields)}, 'OWNER' as type
-            FROM ownable
-            WHERE {doc_type.name}_id is not null
-        )
-    """
+                SELECT {', '.join(fields)}, 'OWNER' as type
+                FROM ownable
+                WHERE {doc_type.name}_id is not null
+            )
+        """,
+        f"CREATE INDEX idx_{doc_type.name}_entity_map ON {doc_type.name}_entity_map USING GIN(search)",
     ]
 
 
@@ -85,9 +86,8 @@ async def load_all(force_update: bool = False):
 
     # create some materialized views for reporting
     for doc_type in DocType:
-        await PsqlDatabaseClient("biosym").execute_query(
-            get_entity_map_matview_query(doc_type)
-        )
+        for query in get_entity_map_matview_query(doc_type):
+            await PsqlDatabaseClient("biosym").execute_query(query)
 
 
 if __name__ == "__main__":
