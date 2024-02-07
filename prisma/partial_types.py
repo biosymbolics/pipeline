@@ -17,6 +17,12 @@ from prisma.models import (
 Indicatable.create_partial(
     "IndicatableDto",
     exclude={
+        "id",
+        "canonical_name",
+        "entity",
+        "entity_id",
+        "instance_rollup",
+        "category_rollup",
         "is_primary",
         "mention_index",
         "patent_id",
@@ -31,6 +37,12 @@ Indicatable.create_partial(
 Intervenable.create_partial(
     "IntervenableDto",
     exclude={
+        "id",
+        "canonical_name",
+        "entity",
+        "entity_id",
+        "instance_rollup",
+        "category_rollup",
         "is_primary",
         "mention_index",
         "patent_id",
@@ -45,6 +57,10 @@ Intervenable.create_partial(
 Ownable.create_partial(
     "OwnableDto",
     exclude={
+        "id",
+        # "canonical_name", # used in assets
+        "instance_rollup",
+        "category_rollup",
         "is_primary",
         "patent_id",
         "assignee_patent",
@@ -59,7 +75,7 @@ Ownable.create_partial(
 
 Patent.create_partial(
     "PatentDto",
-    exclude={"claims", "ipc_codes", "other_ids"},
+    exclude={"application_number", "claims", "country_code", "ipc_codes", "other_ids"},
     relations={
         "assignees": "OwnableDto",
         "interventions": "IntervenableDto",

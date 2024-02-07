@@ -494,21 +494,21 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             3) all documents are loaded with corresponding mapping tables (intervenable, indicatable)
 
         Misc:
-            update biomedical_entity set name=regexp_replace(name, ' (?:useful|capable|$', '')
-            where name ~* ' useful$'
-            and regexp_replace(name, ' useful$', '') not in
-                (select name from biomedical_entity where name=regexp_replace(name, ' useful$', ''));
-            update intervenable set canonical_name=regexp_replace(canonical_name, ' useful$', '') where canonical_name ~* ' useful$';
+            update biomedical_entity set name=regexp_replace(name, '\ygene a\y', 'gene')
+            where name ~* '\ygene a\y'
+            and regexp_replace(name, '\ygene a\y', 'gene') not in
+                (select name from biomedical_entity where name=regexp_replace(name, '\ygene a\y', 'gene'));
+            update intervenable set canonical_name=regexp_replace(canonical_name, '\ygene a\y', 'gene') where canonical_name ~* '\ygene a\y';
 
         To (partly) recreate _entity_to_umls:
             UPDATE biomedical_entity set is_priority=true
                 FROM umls, _entity_to_umls etu
                 WHERE umls.id=etu."B"
                 AND etu."A"=biomedical_entity.id
-                AND ARRAY['T028', 'T116', 'T114', 'T047'] && umls.type_ids;
+                AND ARRAY['T028', 'T116', 'T047'] && umls.type_ids;
 
             INSERT into _entity_to_parent ("A", "B")
-                SELECT child.id, max(parent.id order by parent.is_priority desc)
+                SELECT max(parent.id order by parent.is_priority desc), child.id,
                 FROM biomedical_entity parent, biomedical_entity child, _entity_to_umls etu, umls
                 WHERE umls.rollup_id=parent.canonical_id AND etu."A"=child.id and etu."B"=umls.id
                 GROUP BY child.id
@@ -527,7 +527,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
-        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
+        # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
         await BiomedicalEntityEtl.set_rollups()

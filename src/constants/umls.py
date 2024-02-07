@@ -27,6 +27,7 @@ UMLS_NAME_OVERRIDES = {
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
     "C0025080": "Device",  # vs "Medical Device"
     "C0348078": "Form",  # qualitative form
+    "C0005515": "Biological Factors",
 }
 
 # sets canonical based on (single!) word
@@ -105,6 +106,9 @@ UMLS_CUI_SUPPRESSIONS = {
     # "C5235658": "Targeted therapy agent",  # maybe re-enable; it has some utility.
     "C0079429": "gene a",
     "C1260969": "ring device",
+    "C0282636": "cell respiration",  # matches respiration
+    "C0456386": "Medicament",
+    "C0023172": "lupus cell",
 }
 
 
@@ -129,6 +133,7 @@ UMLS_NAME_SUPPRESSIONS = [
     "headings",  # e.g. Medical Subject Headings Norwegian
     "category",  # e.g. Chemicals and Drugs (MeSH Category)
     "schedule",  # e.g. schedule II opium and derivatives
+    "affecting",  # C2697974 Agent Affecting Respiratory System
 ]
 
 
