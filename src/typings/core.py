@@ -78,20 +78,7 @@ class EntityBase(BaseModel):
     def serialize(self) -> dict[str, Any]:
         """
         Prep for JSON serialization of the object, including properties
-        """
-        base_model_keys = BaseModel.__dict__.keys()
-        properties = {
-            key: getattr(self, key)
-            for key, value in inspect.getmembers(self.__class__)
-            if isinstance(value, property) and key not in base_model_keys
-        }
 
-        o = self.model_dump()
-        return {**o, **properties}
-
-    def storage_serialize(self) -> dict[str, Any]:
-        """
-        Prep for JSON serialization of the object, WITHOUT properties (ie expects to be reconstituted into dataclass)
         """
         return self.model_dump()
 
