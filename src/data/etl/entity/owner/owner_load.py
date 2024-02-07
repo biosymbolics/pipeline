@@ -19,7 +19,7 @@ ASSIGNEE_PATENT_THRESHOLD = 20
 
 class OwnerLoader:
     @staticmethod
-    async def get_owner_names():
+    async def get_owner_names() -> list[str]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
@@ -80,8 +80,10 @@ class OwnerLoader:
                 for db, query in db_owner_query_map.items()
             ]
         )
-        stock_names = [record["name"] for record in OwnerLoader.load_public_companies()]
-        names = uniq([row["name"] for row in rows]) + stock_names
+        stock_names = [
+            record["name"].lower() for record in OwnerLoader.load_public_companies()
+        ]
+        names = uniq([row["name"] for row in rows] + stock_names)
         return names
 
     @staticmethod
