@@ -60,6 +60,8 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
         "cell le",
     ],
     "C0242781": ["transmission"],  # "disease transmission"
+    "C0010124": ["compound b", "b compounds"],  # "corticosterone"
+    "C1421222": ["connectin"],  # TTN gene
 }
 
 UMLS_CUI_SUPPRESSIONS = {
