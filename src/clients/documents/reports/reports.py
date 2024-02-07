@@ -1,22 +1,20 @@
 """
-Patent reports
+Document report client
 """
 
 import asyncio
 import logging
 import polars as pl
 
-from clients.documents.patents.types import (
-    DocumentReport,
-    DocumentReportRecord,
-)
+
+from clients.documents.reports.utils import apply_dimension_limit
 from clients.low_level.prisma import prisma_client
 from constants.core import SEARCH_TABLE
 from typings.client import DocumentSearchParams
-from typings.documents.common import DocType, TermField
+from typings.documents.common import DocType
 
 from .constants import X_DIMENSIONS, Y_DIMENSIONS
-from .types import Aggregation
+from .types import Aggregation, CartesianDimension, DocumentReport, DocumentReportRecord
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -75,6 +73,8 @@ class XYReport:
         doc_type: DocType = DocType.patent,
         filter: str | None = None,
         impute_missing: bool = True,
+        limit: int | None = None,
+        limit_dimension: CartesianDimension = "x",
     ) -> DocumentReport:
         """
         Group summary stats by x and optionally y dimension
@@ -136,6 +136,9 @@ class XYReport:
         else:
             data = [DocumentReportRecord(**r) for r in results]
 
+        if limit:
+            data = apply_dimension_limit(data, limit_dimension, limit)
+
         return DocumentReport(
             data=data,
             x=x_title or x_dimension,
@@ -148,6 +151,8 @@ class XYReport:
         search_params: DocumentSearchParams,
         x_dimension: str,  # keyof typeof X_DIMENSIONS
         y_dimension: str | None = None,  # keyof typeof Y_DIMENSIONS
+        limit: int | None = None,
+        limit_dimension: CartesianDimension = "x",
     ) -> list[DocumentReport]:
         """
         A helper function that returns a report for each filter
@@ -161,6 +166,8 @@ class XYReport:
                     x_title=title,
                     y_dimension=y_dimension,
                     filter=filter,
+                    limit=limit,
+                    limit_dimension=limit_dimension,
                 )
             )
             for title, filter in filters.items()

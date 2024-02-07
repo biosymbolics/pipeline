@@ -44,6 +44,8 @@ async def _aggregate_over_time(raw_event: dict, context):
             search_params=p,
             x_dimension="canonical_name",  # keyof typeof X_DIMENSIONS
             y_dimension="priority_date",
+            limit=10,
+            limit_dimension="x",
         )
     except Exception as e:
         message = f"Error generating patent reports: {e}"
