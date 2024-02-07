@@ -62,6 +62,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0242781": ["transmission"],  # "disease transmission"
     "C0010124": ["compound b", "b compounds"],  # "corticosterone"
     "C1421222": ["connectin"],  # TTN gene
+    "C1418824": ["inhibitor 1", "i1"],  # PPP1R1A
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -125,6 +126,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1260969": "ring device",
     "C0282636": "cell respiration",  # matches respiration
     "C0456386": "Medicament",
+    "C1167622": "binding",
 }
 
 
