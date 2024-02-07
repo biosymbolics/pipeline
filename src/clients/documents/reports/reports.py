@@ -4,7 +4,6 @@ Patent reports
 
 import asyncio
 import logging
-from typing import Sequence
 import polars as pl
 
 from clients.documents.patents.types import (
@@ -12,6 +11,7 @@ from clients.documents.patents.types import (
     DocumentReportRecord,
 )
 from clients.low_level.prisma import prisma_client
+from constants.core import SEARCH_TABLE
 from typings.client import DocumentSearchParams
 from typings.documents.common import DocType, TermField
 
@@ -36,7 +36,6 @@ class XYReport:
         """
         Get the query for the report
         """
-        search_table = "doc_entity_search"
         x_info = X_DIMENSIONS[doc_type][x]
         y_info = Y_DIMENSIONS[doc_type][y] if y else None
         x_t = x_info.transform(x)
@@ -44,7 +43,7 @@ class XYReport:
 
         # if x is an entity (indicatable, intervenable, ownable), use materialized view (created by ETL)
         if x_info.is_entity:
-            entity_join = f"JOIN {search_table} as entities on entities.{doc_type.name}_id={doc_type.name}.id"
+            entity_join = f"JOIN {SEARCH_TABLE} as entities on entities.{doc_type.name}_id={doc_type.name}.id"
             x_t = f"entities.{x_t}"
             filter = f"WHERE entities.{filter}" if filter else ""
         else:
@@ -58,8 +57,8 @@ class XYReport:
                 {f', {y_t} as y' if y_t else ''}
             FROM {doc_type.name}
                 {entity_join}
-            JOIN {search_table} on {search_table}.{doc_type.name}_id={doc_type.name}.id
-                        AND {search_table}.search @@ plainto_tsquery('english', $1)
+            JOIN {SEARCH_TABLE} on {SEARCH_TABLE}.{doc_type.name}_id={doc_type.name}.id
+                        AND {SEARCH_TABLE}.search @@ plainto_tsquery('english', $1)
             {filter}
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
@@ -99,7 +98,7 @@ class XYReport:
         if y_dimension and y_dimension not in Y_DIMENSIONS[doc_type]:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
-        # TODO
+        # TODO - AND/OR
         term_query = " ".join([t.lower() for t in search_params.terms])
 
         client = await prisma_client(120)
@@ -111,7 +110,7 @@ class XYReport:
             aggregation=aggregation,
             doc_type=doc_type,
         )
-        logger.info("Running query for xy report: %s", query)
+        logger.debug("Running query for xy report: %s", query)
         results = await client.query_raw(query, term_query)
 
         if len(results) == 0:

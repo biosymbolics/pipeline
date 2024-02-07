@@ -2,6 +2,7 @@ import asyncio
 import sys
 
 from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import SEARCH_TABLE
 from typings.documents.common import DocType
 from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
@@ -10,8 +11,9 @@ from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 def get_entity_map_matview_query() -> list[str]:
     """
     Create query for search matterialized view
+
+    TODO: Move
     """
-    table_name = "doc_entity_search"
     name_fields = [
         "name",
         "canonical_name",
@@ -27,7 +29,7 @@ def get_entity_map_matview_query() -> list[str]:
     ]
     return [
         f"""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS {table_name} AS
+        CREATE MATERIALIZED VIEW IF NOT EXISTS {SEARCH_TABLE} AS
             (
                 SELECT {', '.join(fields)}, canonical_type as type
                 FROM intervenable
@@ -43,12 +45,12 @@ def get_entity_map_matview_query() -> list[str]:
                 FROM ownable
             )
         """,
-        f"CREATE INDEX IF NOT EXISTS idx_{table_name}_search ON {table_name} USING GIN(search)",
+        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_search ON {SEARCH_TABLE} USING GIN(search)",
         *[
-            f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{doc_type.name}_id ON {table_name} ({doc_type.name}_id)"
+            f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
             for doc_type in DocType
         ],
-        f"CREATE INDEX IF NOT EXISTS idx_{table_name}_type ON {table_name} (type)",
+        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
     ]
 
 
