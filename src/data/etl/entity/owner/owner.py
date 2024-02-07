@@ -25,7 +25,7 @@ logger.setLevel(logging.INFO)
 DEFAULT_TYPE_FIELD = "default_type"
 
 
-class BaseOwnerEtl(BaseEntityEtl):
+class OwnerEtl(BaseEntityEtl):
     """
     Class for owner etl
 
@@ -156,7 +156,7 @@ class BaseOwnerEtl(BaseEntityEtl):
             f"INSERT INTO temp_count (id, count) SELECT owner_id as id, count(*) FROM ownable GROUP BY owner_id"
         )
         await client.execute_raw(
-            "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+            "UPDATE owner ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
         )
         await client.execute_raw("DROP TABLE IF EXISTS temp_count")
 
@@ -182,6 +182,30 @@ class BaseOwnerEtl(BaseEntityEtl):
             """
         )
 
+    @staticmethod
+    async def _update_search_index():
+        """
+        update search index
+        """
+        client = await prisma_client(300)
+        await client.execute_raw("DROP INDEX IF EXISTS owner_search_idx")
+        await client.execute_raw(
+            f"""
+            WITH synonym as (
+                SELECT owner_id, array_agg(term) as terms
+                FROM owner_synonym
+                GROUP BY owner_id
+            )
+            UPDATE owner SET search = to_tsvector('english', name || ' ' || array_to_string(synonym.terms, ' '))
+                FROM synonym
+                WHERE owner_id=owner.id
+                AND array_length(synonym.terms, 1) < 100000; -- dumb categorization error check
+            """
+        )
+        await client.execute_raw(
+            "CREATE INDEX owner_search_idx ON biomedical_entity USING GIN(search)"
+        )
+
     @overrides(BaseEntityEtl)
     @staticmethod
     async def post_finalize():
@@ -191,5 +215,6 @@ class BaseOwnerEtl(BaseEntityEtl):
             2) all documents are loaded
             3) UMLS is loaded
         """
-        await BaseOwnerEtl.link_to_documents()
-        await BaseOwnerEtl.add_counts()
+        await OwnerEtl.link_to_documents()
+        await OwnerEtl.add_counts()
+        await OwnerEtl._update_search_index()

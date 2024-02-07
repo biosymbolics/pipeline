@@ -10,7 +10,7 @@ from constants.company import COMPANY_INDICATORS
 from typings.companies import CompanyInfo
 from utils.re import get_or_re
 
-from .owner import BaseOwnerEtl
+from .owner import OwnerEtl
 
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
@@ -105,11 +105,11 @@ class OwnerLoader:
     async def copy_all(self):
         names = await self.get_owner_names()
         public_companies = self.load_public_companies()
-        await BaseOwnerEtl().copy_all(names, public_companies)
+        await OwnerEtl().copy_all(names, public_companies)
 
     @staticmethod
     async def post_finalize():
-        await BaseOwnerEtl.post_finalize()
+        await OwnerEtl.post_finalize()
 
 
 def main():
