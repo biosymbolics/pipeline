@@ -1,11 +1,12 @@
 """
-Handler for patents autocomplete
+Handler for terms autocomplete
 """
+
 import json
 import logging
 from pydantic import BaseModel
 
-from clients.documents import patents as patent_client
+from clients import terms as terms_client
 from handlers.utils import handle_async
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ async def _autocomplete(raw_event: dict, context):
         logger.info("Term too short, skipping autocomplete")
         return {"statusCode": 200, "body": json.dumps([])}
 
-    terms = await patent_client.autocomplete(p.string, p.limit)
+    terms = await terms_client.autocomplete(p.string, p.limit)
 
     return {"statusCode": 200, "body": json.dumps(terms)}
 

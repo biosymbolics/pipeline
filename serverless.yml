@@ -140,7 +140,7 @@ functions:
           path: autocomplete
           method: get
           cors: true
-    handler: src.handlers.patents.autocomplete
+    handler: src.handlers.terms.autocomplete
     layers:
       - Ref: PythonRequirementsLambdaLayer
   summarize-documents:
@@ -195,7 +195,7 @@ functions:
           path: terms/describe
           method: get
           cors: true
-    handler: src.handlers.patents.describe
+    handler: src.handlers.terms.describe
     layers:
       - Ref: PythonRequirementsLambdaLayer
   predict-clindev:

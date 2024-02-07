@@ -1,13 +1,14 @@
 from typing import Sequence
 from prisma.models import Owner, Ownable
 from prisma.types import OwnableInclude, OwnableWhereInput, StringFilter
-from functools import lru_cache
+import logging
 
 from pydash import uniq_by
-from clients.low_level.prisma import prisma_context
 
 from typings.companies import CompanyFinancials
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 ID_FIELDS = {k: v for k, v in OwnableWhereInput.__annotations__.items() if "id" in k}
 

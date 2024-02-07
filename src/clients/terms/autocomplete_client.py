@@ -1,11 +1,11 @@
 """
 Patent client
 """
+
 import logging
 import time
-from prisma.models import BiomedicalEntity
 
-from clients.low_level.prisma import prisma_client, prisma_context
+from clients.low_level.prisma import prisma_client
 
 
 from .types import AutocompleteResult

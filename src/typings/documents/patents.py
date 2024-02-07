@@ -5,11 +5,14 @@ Patent types
 from typing import Any, Sequence, TypedDict
 from pydash import compact
 from prisma.partials import PatentDto
+import logging
 
 from typings.companies import CompanyFinancials
 from typings.core import EntityBase
 from utils.classes import ByDefinitionOrderEnum
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 STALE_YEARS = 5
 MAX_PATENT_LIFE = 20
@@ -67,12 +70,9 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         Find availability likelihood from record
         """
 
-        names = [o["name"] for o in record.get("assignees") or []]
+        names = [o["canonical_name"] for o in record.get("assignees") or []]
 
-        return cls.find(
-            names,
-            financial_map,
-        )
+        return cls.find(names, financial_map)
 
     @classmethod
     def find(
