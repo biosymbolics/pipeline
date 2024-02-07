@@ -18,7 +18,7 @@ Indicatable.create_partial(
     "IndicatableDto",
     exclude={
         "id",
-        "canonical_name",
+        # "canonical_name", # used in doc modals
         "entity",
         "entity_id",
         "instance_rollup",
@@ -38,7 +38,7 @@ Intervenable.create_partial(
     "IntervenableDto",
     exclude={
         "id",
-        "canonical_name",
+        # "canonical_name", # used in doc modals
         "entity",
         "entity_id",
         "instance_rollup",

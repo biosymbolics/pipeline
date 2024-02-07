@@ -17,9 +17,9 @@ MAX_DATA_YEAR = 2022
 @dataclass(frozen=True)
 class AssetActivity(Dataclass):
     # id lists are too big
-    patent_count: int
-    regulatory_approval_count: int
-    trial_count: int
+    patents: int
+    regulatory_approvals: int
+    trials: int
     year: int
 
 
@@ -80,20 +80,28 @@ class Asset(EntityBase):
         regulatory_approvals: list[ScoredRegulatoryApproval],
         start_year: int,
         trials: list[ScoredTrial],
+        is_child: bool = False,
     ) -> "Asset":
         maybe_available_ids = cls.get_maybe_available_ids(patents)
         return Asset(
             id=id,
             name=name,
-            activity=cls.get_activity(
-                start_year, end_year, patents, regulatory_approvals, trials
+            activity=(
+                cls.get_activity(
+                    start_year, end_year, patents, regulatory_approvals, trials
+                )
             ),
             average_trial_dropout=cls.get_average_trial_dropout(trials),
             average_trial_duration=cls.get_average_trial_duration(trials),
             average_trial_enrollment=cls.get_average_trial_enrollment(trials),
             children=children,
-            detailed_activity=cls.get_detailed_activity(
-                start_year, end_year, patents, regulatory_approvals, trials
+            # detailed_activity gets large, so don't include it for children.
+            detailed_activity=(
+                cls.get_detailed_activity(
+                    start_year, end_year, patents, regulatory_approvals, trials
+                )
+                if not is_child
+                else []
             ),
             maybe_available_count=len(maybe_available_ids),
             maybe_available_ids=maybe_available_ids,
@@ -245,11 +253,11 @@ class Asset(EntityBase):
         return [
             AssetActivity(
                 year=y,
-                patent_count=len([p.id for p in patent_map.get(y, [])]),
-                regulatory_approval_count=len(
+                patents=len([p.id for p in patent_map.get(y, [])]),
+                regulatory_approvals=len(
                     [a.id for a in regulatory_approval_map.get(y, [])]
                 ),
-                trial_count=len([t.id for t in trial_map.get(y, [])]),
+                trials=len([t.id for t in trial_map.get(y, [])]),
             )
             for y in range(start_year, end_year)
         ]

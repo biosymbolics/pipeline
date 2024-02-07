@@ -31,7 +31,7 @@ from data.prediction.utils import (
     decode_output,
     split_train_and_test,
 )
-from clients.documents.trials import client as trial_client
+from clients.documents.trials import trials_client as trial_client
 from typings.client import DEFAULT_TRIAL_INCLUDE
 from typings.documents.trials import ScoredTrial
 from utils.list import batch
