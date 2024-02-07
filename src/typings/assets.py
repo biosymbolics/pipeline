@@ -3,12 +3,16 @@ from typing import Any, Sequence
 from pydantic import Field, computed_field
 from pydash import compact, count_by, flatten, group_by
 from prisma.enums import TrialPhase, TrialStatus
+import logging
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
 from .core import Dataclass, EntityBase
 from .documents.patents import AvailabilityLikelihood
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 OWNERS_LIMIT = 10
 MAX_DATA_YEAR = 2022

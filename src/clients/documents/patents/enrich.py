@@ -4,7 +4,7 @@ Patent client
 
 from functools import reduce
 import time
-from typing import Any, Sequence, TypedDict
+from typing import Sequence, TypedDict
 import polars as pl
 import logging
 from prisma.partials import PatentDto
