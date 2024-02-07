@@ -3,6 +3,7 @@ from prisma.enums import BiomedicalEntityType
 
 from constants.umls import (
     MOST_PREFERRED_UMLS_TYPES,
+    UMLS_CUI_ALIAS_SUPPRESSIONS,
     UMLS_CUI_SUPPRESSIONS,
     UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
@@ -90,7 +91,9 @@ def clean_umls_name(
     return aliases[0]
 
 
-def is_umls_suppressed(id: str, canonical_name: str) -> bool:
+def is_umls_suppressed(
+    id: str, canonical_name: str, matching_aliases: Sequence[str]
+) -> bool:
     """
     Whether a UMLS concept should be suppressed from candidate linking / ancestors /etc
 
@@ -102,6 +105,15 @@ def is_umls_suppressed(id: str, canonical_name: str) -> bool:
         return True
 
     if has_intersection(canonical_name.split(" "), UMLS_NAME_SUPPRESSIONS):
+        return True
+
+    # suppress if matching alias is suppressed for that cui
+    # which is useful to avoid, for example, "ice" matching methamphetamine (see https://uts.nlm.nih.gov/uts/umls/concept/C0025611)
+    if (
+        len(matching_aliases) > 0
+        and id in UMLS_CUI_ALIAS_SUPPRESSIONS
+        and has_intersection(matching_aliases, UMLS_CUI_ALIAS_SUPPRESSIONS[id])
+    ):
         return True
 
     return False

@@ -43,6 +43,26 @@ UMLS_WORD_OVERRIDES = {
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
 }
 
+UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1843354": ["base"],  # "bpifa4p",  # matches base
+    "C1427122": ["tube"],  # "tube1",  # matches tube
+    "C1823381": ["hole"],  # TMEM121 - hole
+    "C0035287": ["re system"],  # "Reticuloendothelial System"
+    "C0025611": ["ice", "speed", "crystal"],  # "methamphetamine"
+    "C0017374": ["synthetic gene"],  # matches synthetic gene
+    "C0044729": ["a compound"],  # "11-dehydrocorticosterone"
+    "C0023172": [
+        "le cell",
+        "le cells",
+        "cells, le",
+        "cell, le",
+        "cells le",
+        "cell le",
+    ],
+    "C0242781": ["transmission"],  # "disease transmission"
+    "C0010124": ["compound b", "b compounds"],  # "corticosterone"
+    "C1421222": ["connectin"],  # TTN gene
+}
 
 UMLS_CUI_SUPPRESSIONS = {
     "C1704222": "genome encoded entity",
@@ -66,7 +86,6 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0596316": "chemical group",
     "C1173729": "SPES herbal extract",
     "C0233656": "mental condensation",  # matches condensation
-    "C0242781": "disease transmission",  # transmission
     "C0012634": "disease",  # useless
     "C0012359": "Pathological Dilatation",
     "C0234985": "Mental deterioration",
@@ -80,7 +99,6 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0599156": "Transition Mutation",
     "C1136365": "gene component",  # matches too much stuff
     "C1704681": "gene probe",  # matches 'probe'
-    "C0017374": "synthetic gene",  # matches 'synthetic'
     "C0597357": "receptor",  # TODO: we don't want to suppress this so much as make it unimportant
     "C0243076": "antagonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "C0243192": "agonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C2987634
@@ -88,7 +106,6 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0243072": "derivative",  # useless
     "C1413336": "cel gene",  # matches cell
     "C0815040": "acidic amino acid",  # matches amino acid
-    "C0044729": "11-dehydrocorticosterone",  # matches "a compound"
     "C0008109": "chimera",
     "C0043335": "xenobiotic",
     "C1257890": "population group",  # matches group
@@ -108,7 +125,6 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1260969": "ring device",
     "C0282636": "cell respiration",  # matches respiration
     "C0456386": "Medicament",
-    "C0023172": "lupus cell",
 }
 
 

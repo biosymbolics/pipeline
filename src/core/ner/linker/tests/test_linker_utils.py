@@ -9,15 +9,16 @@ class TestLinkerUtils(unittest.TestCase):
             {
                 "description": "vanilla test",
                 "input": {
-                    "candidate_id": "C0025202",
-                    "candidate_canonical_name": "Melanoma",
-                    "candidate_type_ids": ["T047"],
-                    "candidate_aliases": [
+                    "id": "C0025202",
+                    "canonical_name": "Melanoma",
+                    "type_ids": ["T047"],
+                    "aliases": [
                         "melanoma",
                         "melanomas",
                         "malignant melanoma",
                         "Malignant melanoma (disorder)",
                     ],
+                    "matching_aliases": ["melanoma"],
                     "syntactic_similarity": 1.0,
                 },
                 "expected_output": 1.1,
@@ -28,10 +29,10 @@ class TestLinkerUtils(unittest.TestCase):
                     and not high match based on large alias count
                 """,
                 "input": {
-                    "candidate_id": "C0979252",
-                    "candidate_canonical_name": "paclitaxel 6 MG/ML Injectable Solution",
-                    "candidate_type_ids": ["T200"],
-                    "candidate_aliases": [
+                    "id": "C0979252",
+                    "canonical_name": "paclitaxel 6 MG/ML Injectable Solution",
+                    "type_ids": ["T200"],
+                    "aliases": [
                         "paclitaxel 100 mg per 16.7 ml injectable solution",
                         "paclitaxel 100mg/17ml inj,conc",
                         "paclitaxel 100mg/17ml vil inj,conc",
@@ -51,6 +52,7 @@ class TestLinkerUtils(unittest.TestCase):
                         "paclitaxel 6 mg/ml injectable solution",
                         "paclitaxel 6mg/ml inj,conc,iv",
                     ],
+                    "matching_aliases": ["paclitaxel 6 mg/ml injectable solution"],
                     "syntactic_similarity": 1.0,
                 },
                 "expected_output": 0.77,
@@ -58,14 +60,15 @@ class TestLinkerUtils(unittest.TestCase):
             {
                 "description": "cui suppression test (C1704222 is suppressed)",
                 "input": {
-                    "candidate_id": "C1704222",
-                    "candidate_canonical_name": "genome encoded entity",
-                    "candidate_type_ids": ["T114"],
-                    "candidate_aliases": [
+                    "id": "C1704222",
+                    "canonical_name": "genome encoded entity",
+                    "type_ids": ["T114"],
+                    "aliases": [
                         "Genome Encoded Entity",
                         "gene product",
                         "Genome Encoded Entity",
                     ],
+                    "matching_aliases": [],
                     "syntactic_similarity": 1.0,
                 },
                 "expected_output": 0.0,
@@ -73,14 +76,15 @@ class TestLinkerUtils(unittest.TestCase):
             {
                 "description": "name suppression test ('rat' is suppressed)",
                 "input": {
-                    "candidate_id": "C1566744",
-                    "candidate_canonical_name": "CYP2F4, rat",
-                    "candidate_type_ids": ["T116"],
-                    "candidate_aliases": [
+                    "id": "C1566744",
+                    "canonical_name": "CYP2F4, rat",
+                    "type_ids": ["T116"],
+                    "aliases": [
                         "CYP2F4, rat",
                         "cytochrome P-450 2F4, rat",
                         "Cyp2f2 protein, rat",
                     ],
+                    "matching_aliases": [],
                     "syntactic_similarity": 1.0,
                 },
                 "expected_output": 0.0,

@@ -1,6 +1,6 @@
 import unittest
 
-from data.domain.biomedical.umls import clean_umls_name
+from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 
 
 UMLS_NAME_OVERRIDES = {
@@ -13,6 +13,55 @@ UMLS_NAME_OVERRIDES = {
 class TestUmlsUtils(unittest.TestCase):
     def setUp(self):
         pass
+
+    def test_is_umls_suppressed(self):
+        test_cases = [
+            {
+                "description": "is suppressed due CUI",
+                "cui": "C1704222",
+                "canonical_name": "gene encoded entity",
+                "matching_aliases": [],
+                "expected": True,
+            },
+            {
+                "description": "is suppressed based on name",
+                "cui": "C5197009",
+                "canonical_name": "ZEB1 protein, rat",
+                "matching_aliases": ["ZEB-1 protein, rat"],
+                "expected": True,
+            },
+            {
+                "description": "is suppressed due to synonym",
+                "cui": "C0025611",
+                "canonical_name": "methamphetamine",
+                "matching_aliases": ["ice"],
+                "expected": True,
+            },
+            {
+                "description": "not suppressed since no matching synonyms match",
+                "cui": "C0025611",
+                "canonical_name": "methamphetamine",
+                "matching_aliases": ["methamphetamine", "amphetamine"],
+                "expected": False,
+            },
+            {
+                "description": "suppressed due to a variation matching",
+                "cui": "C0023172",
+                "canonical_name": "Lupus erythematosus cell",
+                # first not in the override, but second is.
+                "matching_aliases": [
+                    "l.e. cell",
+                    "le cells",
+                ],
+                "expected": True,
+            },
+        ]
+
+        for test in test_cases:
+            result = is_umls_suppressed(
+                test["cui"], test["canonical_name"], test["matching_aliases"]
+            )
+            self.assertEqual(result, test["expected"])
 
     def test_tuis_to_entity_type(self):
         # see test_CanonicalEntity_type
