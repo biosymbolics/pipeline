@@ -43,6 +43,13 @@ UMLS_WORD_OVERRIDES = {
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
 }
 
+UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1843354": ["base"],  # "bpifa4p",  # matches base
+    "C1427122": ["tube"],  # "tube1",  # matches tube
+    "C1823381": ["hole"],  # TMEM121 - hole
+    "C0035287": ["re system"],  # "Reticuloendothelial System"
+    "C0025611": ["ice", "speed", "crystal"],  # "methamphetamine"
+}
 
 UMLS_CUI_SUPPRESSIONS = {
     "C1704222": "genome encoded entity",

@@ -1,3 +1,4 @@
+from typing import Sequence
 from scispacy.candidate_generation import (
     CandidateGenerator,
     MentionCandidate,
@@ -49,6 +50,7 @@ class CandidateSelector(AbstractCandidateSelector):
     def _score_candidate(
         self,
         concept_id: str,
+        matching_aliases: Sequence[str],
         similarity: float,
     ) -> float:
         return score_candidate(
@@ -56,6 +58,7 @@ class CandidateSelector(AbstractCandidateSelector):
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
             self.kb.cui_to_entity[concept_id].aliases,
+            matching_aliases=matching_aliases,
             syntactic_similarity=similarity,
         )
 
@@ -91,6 +94,7 @@ class CandidateSelector(AbstractCandidateSelector):
                 candidate,
                 self._score_candidate(
                     candidate.concept_id,
+                    candidate.aliases,
                     candidate.similarities[0],
                 ),
             )

@@ -194,10 +194,11 @@ def get_orthogonal_members(
 
 
 def score_candidate(
-    candidate_id: str,
-    candidate_canonical_name: str,
-    candidate_type_ids: Sequence[str],
-    candidate_aliases: Sequence[str],
+    id: str,
+    canonical_name: str,
+    type_ids: Sequence[str],
+    aliases: Sequence[str],
+    matching_aliases: Sequence[str],
     syntactic_similarity: float | None = None,
 ) -> float:
     """
@@ -218,16 +219,14 @@ def score_candidate(
             if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
 
-    if is_umls_suppressed(candidate_id, candidate_canonical_name):
+    if is_umls_suppressed(id, canonical_name, matching_aliases):
         return 0.0
 
     # give candidates with more aliases a higher score, as proxy for # ontologies in which it is represented.
-    alias_score = 1.1 if len(candidate_aliases) >= 8 else 1.0
+    alias_score = 1.1 if len(aliases) >= 8 else 1.0
 
     # score based on the UMLS type (tui) of the candidate
-    type_score = max(
-        [CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.8) for ct in candidate_type_ids]
-    )
+    type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.8) for ct in type_ids])
 
     if syntactic_similarity is not None:
         return round(type_score * alias_score * syntactic_similarity, 3)
@@ -236,10 +235,11 @@ def score_candidate(
 
 
 def score_semantic_candidate(
-    candidate_id: str,
-    candidate_canonical_name: str,
-    candidate_types: list[str],
-    candidate_alises: list[str],
+    id: str,
+    canonical_name: str,
+    type_ids: list[str],
+    aliases: list[str],
+    matching_aliases: list[str],
     original_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,
@@ -263,7 +263,11 @@ def score_semantic_candidate(
         semantic_distance (float): semantic distance
     """
     type_score = score_candidate(
-        candidate_id, candidate_canonical_name, candidate_types, candidate_alises
+        id,
+        canonical_name,
+        type_ids=type_ids,
+        aliases=aliases,
+        matching_aliases=matching_aliases,
     )
 
     if type_score == 0:
