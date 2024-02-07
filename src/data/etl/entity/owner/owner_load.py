@@ -108,8 +108,8 @@ class OwnerLoader:
         await BaseOwnerEtl().copy_all(names, public_companies)
 
     @staticmethod
-    async def post_doc_finalize():
-        await BaseOwnerEtl.post_doc_finalize()
+    async def post_finalize():
+        await BaseOwnerEtl.post_finalize()
 
 
 def main():

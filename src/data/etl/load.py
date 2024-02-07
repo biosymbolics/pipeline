@@ -1,8 +1,57 @@
 import asyncio
 import sys
 
+from clients.low_level.postgres import PsqlDatabaseClient
+from constants.core import SEARCH_TABLE
+from typings.documents.common import DocType
 from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
+
+
+def get_entity_map_matview_query() -> list[str]:
+    """
+    Create query for search matterialized view
+
+    TODO: Move
+    """
+    name_fields = [
+        "name",
+        "canonical_name",
+        "instance_rollup",
+        "category_rollup",
+    ]
+    search_or = "|| ' ' || ".join(name_fields)
+    search = f"to_tsvector('english', {search_or} )"
+    fields = [
+        *[f"{doc_type.name}_id" for doc_type in DocType],
+        f"{search} as search",
+        *name_fields,
+    ]
+    return [
+        f"""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS {SEARCH_TABLE} AS
+            (
+                SELECT {', '.join(fields)}, canonical_type as type, entity_id
+                FROM intervenable
+
+                UNION ALL
+
+                SELECT {', '.join(fields)}, canonical_type as type, entity_id
+                FROM indicatable
+
+                UNION ALL
+
+                SELECT {', '.join(fields)}, 'OWNER' as type, owner_id as entity_id
+                FROM ownable
+            )
+        """,
+        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_search ON {SEARCH_TABLE} USING GIN(search)",
+        *[
+            f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
+            for doc_type in DocType
+        ],
+        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
+    ]
 
 
 async def load_all(force_update: bool = False):
@@ -35,14 +84,14 @@ async def load_all(force_update: bool = False):
     await TrialLoader(document_type="trial").copy_all(force_update)
 
     # do final biomedical entity stuff that requires everything else be in place
-    await BiomedicalEntityLoader().post_doc_finalize()
+    await BiomedicalEntityLoader().post_finalize()
 
     # finally, link owners
-    await OwnerLoader().post_doc_finalize()
+    await OwnerLoader().post_finalize()
 
-    # Fixes
-    # select i.name, i.instance_rollup, be.name, be.entity_type, count(*) from intervenable i, biomedical_entity be where i.entity_id=be.id and be.entity_type='UNKNOWN' group by i.name, i.instance_rollup, be.entity_type, be.name order by count(*) desc limit 500;
-    # delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
+    # create some materialized views for reporting
+    for query in get_entity_map_matview_query():
+        await PsqlDatabaseClient("biosym").execute_query(query)
 
 
 if __name__ == "__main__":

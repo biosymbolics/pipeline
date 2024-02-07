@@ -1,3 +1,3 @@
-from .search_client import search
+from .asset_search import search
 
 __all__ = ["search"]

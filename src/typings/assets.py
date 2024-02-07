@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Sequence
+from pydantic import Field, computed_field
 from pydash import compact, count_by, flatten, group_by
 from prisma.enums import TrialPhase, TrialStatus
 
@@ -15,10 +16,10 @@ MAX_DATA_YEAR = 2022
 
 @dataclass(frozen=True)
 class AssetActivity(Dataclass):
-    # ids
-    patents: list[str]
-    regulatory_approvals: list[str]
-    trials: list[str]
+    # id lists are too big
+    patents: int
+    regulatory_approvals: int
+    trials: int
     year: int
 
 
@@ -37,8 +38,8 @@ class Asset(EntityBase):
     patent_count: int
     patent_ids: list[str]
     percent_trials_stopped: float
-    most_recent_patent: ScoredPatent | None
-    most_recent_trial: ScoredTrial | None
+    most_recent_patent: ScoredPatent | None = Field(exclude=True)
+    most_recent_trial: ScoredTrial | None = Field(exclude=True)
     regulatory_approval_count: int
     regulatory_approval_ids: list[str]
     trial_count: int
@@ -79,20 +80,28 @@ class Asset(EntityBase):
         regulatory_approvals: list[ScoredRegulatoryApproval],
         start_year: int,
         trials: list[ScoredTrial],
+        is_child: bool = False,
     ) -> "Asset":
         maybe_available_ids = cls.get_maybe_available_ids(patents)
         return Asset(
             id=id,
             name=name,
-            activity=cls.get_activity(
-                start_year, end_year, patents, regulatory_approvals, trials
+            activity=(
+                cls.get_activity(
+                    start_year, end_year, patents, regulatory_approvals, trials
+                )
             ),
             average_trial_dropout=cls.get_average_trial_dropout(trials),
             average_trial_duration=cls.get_average_trial_duration(trials),
             average_trial_enrollment=cls.get_average_trial_enrollment(trials),
             children=children,
-            detailed_activity=cls.get_detailed_activity(
-                start_year, end_year, patents, regulatory_approvals, trials
+            # detailed_activity gets large, so don't include it for children.
+            detailed_activity=(
+                cls.get_detailed_activity(
+                    start_year, end_year, patents, regulatory_approvals, trials
+                )
+                if not is_child
+                else []
             ),
             maybe_available_count=len(maybe_available_ids),
             maybe_available_ids=maybe_available_ids,
@@ -109,10 +118,12 @@ class Asset(EntityBase):
             trial_ids=[t.id for t in trials],
         )
 
+    @computed_field  # type: ignore # https://github.com/python/mypy/issues/14461
     @property
-    def child_count(self):
+    def child_count(self) -> int:
         return len(self.children)
 
+    @computed_field  # type: ignore
     @property
     def investment_level(self) -> str:
         if self.total_trial_enrollment > 5000:
@@ -123,28 +134,33 @@ class Asset(EntityBase):
             return "medium"
         return "low"
 
+    @computed_field  # type: ignore
     @property
     def is_approved(self) -> bool:
         return self.regulatory_approval_count > 0
 
+    @computed_field  # type: ignore
     @property
     def last_priority_year(self) -> int | None:
         if not self.most_recent_patent:
             return None
         return self.most_recent_patent.priority_date.year
 
+    @computed_field  # type: ignore
     @property
     def last_status(self) -> TrialStatus | str:
         if not self.most_recent_trial:
             return "??"
         return TrialStatus(self.most_recent_trial.status)
 
+    @computed_field  # type: ignore
     @property
     def last_trial_updated_year(self) -> int | None:
         if not self.most_recent_trial:
             return None
         return self.most_recent_trial.last_updated_date.year
 
+    @computed_field  # type: ignore
     @property
     def last_updated(self) -> int | None:
         p_updated = self.last_priority_year
@@ -155,6 +171,7 @@ class Asset(EntityBase):
 
         return max(compact([p_updated, t_updated]))
 
+    @computed_field  # type: ignore
     @property
     def max_phase(self) -> TrialPhase | str:
         if self.regulatory_approval_count > 0:
@@ -163,10 +180,12 @@ class Asset(EntityBase):
             return TrialPhase.PRECLINICAL
         return TrialPhase(self.most_recent_trial.phase)
 
+    @computed_field  # type: ignore
     @property
     def owner_count(self) -> int:
         return len(self.owners)
 
+    @computed_field  # type: ignore
     @property
     def record_count(self) -> int:
         return self.patent_count + self.regulatory_approval_count + self.trial_count
@@ -234,9 +253,11 @@ class Asset(EntityBase):
         return [
             AssetActivity(
                 year=y,
-                patents=[p.id for p in patent_map.get(y, [])],
-                regulatory_approvals=[a.id for a in regulatory_approval_map.get(y, [])],
-                trials=[t.id for t in trial_map.get(y, [])],
+                patents=len([p.id for p in patent_map.get(y, [])]),
+                regulatory_approvals=len(
+                    [a.id for a in regulatory_approval_map.get(y, [])]
+                ),
+                trials=len([t.id for t in trial_map.get(y, [])]),
             )
             for y in range(start_year, end_year)
         ]
@@ -350,7 +371,6 @@ class Asset(EntityBase):
     def serialize(self) -> dict[str, Any]:
         """
         Custom serialization for entity
-        TODO: have trials/patents/approvals be pulled individually, maybe use Prisma
         """
         return {
             **super().serialize(),

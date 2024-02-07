@@ -3,7 +3,6 @@ Patent client
 """
 
 from datetime import datetime
-from functools import partial
 import logging
 from typing import Sequence
 from prisma.client import Prisma
@@ -19,11 +18,10 @@ from typings.client import (
     DocumentSearchCriteria,
     DocumentSearchParams,
     PatentSearchParams,
-    QueryType,
 )
 from utils.string import get_id
 
-from .client import find_many
+from .patents_client import find_many
 
 from ..utils import get_term_clause
 

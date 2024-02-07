@@ -1,6 +1,7 @@
 """
 Handler for patent graph reports
 """
+
 import json
 import logging
 
@@ -27,7 +28,6 @@ async def _document_characteristics(raw_event: dict, context):
     p = DocumentCharacteristicParams(
         **{
             **raw_event["queryStringParameters"],
-            "include": None,
             **DEFAULT_REPORT_PARAMS,
         }
     )

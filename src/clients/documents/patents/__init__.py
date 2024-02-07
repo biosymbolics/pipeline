@@ -1,8 +1,8 @@
 from .autocomplete_client import (
     autocomplete,
 )
-from .client import find_many
-from .search_client import search
+from .patents_client import find_many
+from .patents_search import search
 from .types import AutocompleteMode, RelevancyThreshold
 
 __all__ = [

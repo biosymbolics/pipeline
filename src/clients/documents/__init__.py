@@ -1,7 +1,7 @@
 from .approvals import search as approval_search
 from .asset import search as asset_search
 from .constants import DOC_CLIENT_LOOKUP
-from .patents import search as patent_search, client as patent_client
+from .patents import patents_client as patent_client, search as patent_search
 from .trials import search as trial_search
 
 __all__ = [

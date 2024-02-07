@@ -40,7 +40,7 @@ def prisma_context(timeout: int | None) -> Prisma:
     global PRISMA_CLIENT
 
     if PRISMA_CLIENT is None:
-        logger.debug("Registering Prisma client")
+        logger.info("Creating Prisma client (PRISMA_CLIENT is None)")
         client = Prisma(
             log_queries=False,
             http={"limits": Limits(max_connections=50), "timeout": timeout},
@@ -54,7 +54,7 @@ def prisma_context(timeout: int | None) -> Prisma:
             logger.debug("Registering prisma client")
             register(client)
         except Exception as e:
-            logger.debug("Error registering prisma client, perhaps a race condition")
+            logger.debug("Error registering prisma client")
 
     return client
 

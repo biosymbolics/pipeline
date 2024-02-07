@@ -13,7 +13,7 @@ ID_FIELDS = {k: v for k, v in OwnableWhereInput.__annotations__.items() if "id" 
 
 
 async def get_owner_map(
-    ids: Sequence[str], id_field: str = "patent_id"
+    doc_ids: Sequence[str], id_field: str = "patent_id"
 ) -> dict[str, Owner]:
     """
     Fetch companies matching names.
@@ -21,13 +21,13 @@ async def get_owner_map(
     Cached.
 
     Args:
-        ids: ids for which to fetch associated owners
+        doc_ids: ids for which to fetch associated owners
         id_field: field to use for id matching (e.g. "patent_id")
     """
     if id_field not in ID_FIELDS:
         raise ValueError(f"Invalid id_field: {id_field}; must be one of {ID_FIELDS}")
 
-    where = OwnableWhereInput(**{id_field: StringFilter({"in": list(ids)})})  # type: ignore
+    where = OwnableWhereInput(**{id_field: {"in": list(doc_ids)}})  # type: ignore
 
     ownables = await Ownable.prisma().find_many(
         where=where,
@@ -40,7 +40,7 @@ async def get_owner_map(
 
 
 async def get_financial_map(
-    ids: Sequence[str], id_field: str = "patent_id"
+    doc_ids: Sequence[str], id_field: str = "patent_id"
 ) -> dict[str, CompanyFinancials]:
     """
     Fetch companies matching names.
@@ -51,7 +51,7 @@ async def get_financial_map(
         ids: ids for which to fetch associated owners
         id_field: field to use for id matching (e.g. "patent_id")
     """
-    owner_map = await get_owner_map(tuple(ids), id_field)
+    owner_map = await get_owner_map(tuple(doc_ids), id_field)
     return {
         owner.name: CompanyFinancials(**owner.financial_snapshot.model_dump())
         for owner in owner_map.values()

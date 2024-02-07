@@ -143,7 +143,7 @@ class PatentLoader(BaseDocumentEtl):
             # add in gpr annotations (that is, annotations from google; we only kept diseases)
             sql = f"""
                 SELECT distinct term from (
-                    SELECT distinct lower(preferred_name) as term --, null as vector
+                    SELECT distinct lower(preferred_name) as term --, ARRAY[]::float[] as vector
                     FROM {GPR_ANNOTATIONS_TABLE}
                     WHERE domain='diseases'
 

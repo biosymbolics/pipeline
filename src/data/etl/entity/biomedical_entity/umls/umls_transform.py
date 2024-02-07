@@ -93,10 +93,10 @@ class UmlsAncestorTransformer:
         G = self.umls_graph.G
 
         parent_ids = list(G.predecessors(record.id))
-        grandparent_ids = flatten(
-            [list(G.predecessors(parent_id)) for parent_id in parent_ids]
-        )
-        ancestor_ids = parent_ids + grandparent_ids
+        # grandparent_ids = flatten(
+        #     [list(G.predecessors(parent_id)) for parent_id in parent_ids]
+        # )
+        ancestor_ids = parent_ids  # + grandparent_ids
 
         ancestors = compact(
             [UmlsInfo(**G.nodes[ancestor_id]) for ancestor_id in ancestor_ids]

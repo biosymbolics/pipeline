@@ -4,7 +4,7 @@ Patent types
 
 from typing import Any, Sequence, TypedDict
 from pydash import compact
-from prisma.models import Patent
+from prisma.partials import PatentDto
 
 from typings.companies import CompanyFinancials
 from typings.core import EntityBase
@@ -105,7 +105,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
-class ScoredPatent(Patent, EntityBase):
+class ScoredPatent(PatentDto, EntityBase):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str

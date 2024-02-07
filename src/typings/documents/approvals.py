@@ -1,7 +1,7 @@
-from prisma.models import RegulatoryApproval
+from prisma.partials import RegulatoryApprovalDto
 
 from typings.core import EntityBase
 
 
-class ScoredRegulatoryApproval(RegulatoryApproval, EntityBase):
+class ScoredRegulatoryApproval(RegulatoryApprovalDto, EntityBase):
     pass

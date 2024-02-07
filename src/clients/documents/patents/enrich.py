@@ -1,12 +1,13 @@
 """
 Patent client
 """
+
 from functools import reduce
 import time
 from typing import Any, Sequence, TypedDict
 import polars as pl
 import logging
-from prisma.models import Patent
+from prisma.partials import PatentDto
 
 from typings import ScoredPatent
 from typings.companies import CompanyFinancials
@@ -31,7 +32,7 @@ def filter_terms_by_domain(rec: TermDict, domain: str) -> list[str]:
 
 
 def enrich_search_result(
-    results: Sequence[Patent], financial_map: dict[str, CompanyFinancials]
+    results: Sequence[PatentDto], financial_map: dict[str, CompanyFinancials]
 ) -> list[ScoredPatent]:
     """
     Enrich patent with scores, patent years, etc.

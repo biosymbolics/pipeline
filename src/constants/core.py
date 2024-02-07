@@ -36,3 +36,6 @@ DEFAULT_NLP_MODEL_ARGS = {
     "padding": "max_length",
     "truncation": True,
 }
+
+
+SEARCH_TABLE = "doc_entity_search"

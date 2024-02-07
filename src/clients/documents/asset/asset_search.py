@@ -5,7 +5,7 @@ Asset client
 import asyncio
 from functools import partial
 import time
-from typing import Sequence
+from typing import Mapping
 from pydash import compact, flatten, group_by
 import logging
 
@@ -34,7 +34,7 @@ logger.setLevel(logging.INFO)
 
 
 async def get_docs_by_entity_id(
-    doc_ids: Sequence[str],
+    doc_id_map: Mapping[str, list[str]],
     rollup_field: TermField,
     child_field: TermField | None,
     entity_map_type: EntityMapType,
@@ -54,8 +54,8 @@ async def get_docs_by_entity_id(
         FROM {entity_map_type.value} -- intervenable or indicatable
         WHERE (
             patent_id = ANY($1)
-            OR regulatory_approval_id = ANY($1)
-            OR trial_id = ANY($1)
+            OR regulatory_approval_id = ANY($2)
+            OR trial_id = ANY($3)
         )
         AND entity_id is not NULL
         AND instance_rollup<>'' -- TODO?
@@ -63,14 +63,19 @@ async def get_docs_by_entity_id(
             {rollup_field.name},
             {f'{child_field.name}' if child_field else ''}
         """
-    result = await client.query_raw(query, doc_ids)
+    result = await client.query_raw(
+        query,
+        doc_id_map["patents"],
+        doc_id_map["regulatory_approvals"],
+        doc_id_map["trials"],
+    )
 
     ents_with_docs = [EntWithDocResult(**r) for r in result]
 
     return ents_with_docs
 
 
-ASSET_DOC_LIMIT = 10000
+ASSET_DOC_LIMIT = 20000
 
 
 async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
@@ -78,19 +83,24 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     Gets docs by type, matching doc_ids
     """
 
+    common_params = {
+        "limit": ASSET_DOC_LIMIT,
+        "skip_cache": True,
+    }
+
     regulatory_approvals = asyncio.create_task(
         regulatory_approval_client.search(
-            ApprovalParams.parse(p, include=None, limit=ASSET_DOC_LIMIT)
+            ApprovalParams.parse(p, include=None, **common_params)
         )
     )
     patents = asyncio.create_task(
         patent_client.search(
-            PatentParams.parse(p, include={"assignees": True}, limit=ASSET_DOC_LIMIT)
+            PatentParams.parse(p, include={"assignees": True}, **common_params)
         )
     )
     trials = asyncio.create_task(
         trial_client.search(
-            TrialParams.parse(p, include={"sponsor": True}, limit=ASSET_DOC_LIMIT)
+            TrialParams.parse(p, include={"sponsor": True}, **common_params)
         )
     )
 
@@ -112,13 +122,13 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(p)
 
-    doc_ids: list[str] = [k for d in flatten(docs_by_type.values()) for k in d.keys()]
+    doc_id_map = {k: list(v.keys()) for k, v in docs_by_type.items()}
 
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
-        doc_ids,
+        doc_id_map,
+        TermField.category_rollup,
         TermField.instance_rollup,
-        TermField.canonical_name,
         EntityMapType.intervention,
     )
 
@@ -148,6 +158,7 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
                         trials=compact(
                             [docs_by_type.trials.get(id) for id in ewd.trials]
                         ),
+                        is_child=True,
                     )
                     for ewd in ewds
                     if ewd.child
