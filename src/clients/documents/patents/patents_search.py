@@ -21,7 +21,7 @@ from typings.client import (
 )
 from utils.string import get_id
 
-from .client import find_many
+from .patents_client import find_many
 
 from ..utils import get_term_clause
 

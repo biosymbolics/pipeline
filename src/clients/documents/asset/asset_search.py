@@ -5,7 +5,7 @@ Asset client
 import asyncio
 from functools import partial
 import time
-from typing import Mapping, Sequence
+from typing import Mapping
 from pydash import compact, flatten, group_by
 import logging
 
@@ -158,6 +158,7 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
                         trials=compact(
                             [docs_by_type.trials.get(id) for id in ewd.trials]
                         ),
+                        is_child=True,
                     )
                     for ewd in ewds
                     if ewd.child

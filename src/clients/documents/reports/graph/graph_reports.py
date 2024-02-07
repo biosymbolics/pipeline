@@ -342,7 +342,7 @@ async def aggregate_document_relationships(
             return []
 
         return await _aggregate_document_relationships(
-            ids=[d.id for d in documents],
+            ids=[d.id for d in documents],  # TODO: switch to direct search
             head_field=p.head_field,
             entity_types=None,
             relationships=RELATIONSHIPS_OF_INTEREST,

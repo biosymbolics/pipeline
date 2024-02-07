@@ -1,4 +1,4 @@
-from .client import find_many
-from .search_client import search
+from .approvals_client import find_many
+from .approvals_search import search
 
 __all__ = ["find_many", "search"]
