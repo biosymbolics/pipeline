@@ -36,16 +36,15 @@ class XYReport:
         """
         Get the query for the report
         """
+        search_table = "doc_entity_search"
         x_info = X_DIMENSIONS[doc_type][x]
         y_info = Y_DIMENSIONS[doc_type][y] if y else None
         x_t = x_info.transform(x)
         y_t = y_info.transform(y or "") if y_info else None
 
-        entity_map_mv = f"{doc_type.name}_entity_map"
-
         # if x is an entity (indicatable, intervenable, ownable), use materialized view (created by ETL)
         if x_info.is_entity:
-            entity_join = f"JOIN {entity_map_mv} as entities on entities.{doc_type.name}_id={doc_type.name}.id"
+            entity_join = f"JOIN {search_table} as entities on entities.{doc_type.name}_id={doc_type.name}.id"
             x_t = f"entities.{x_t}"
             filter = f"WHERE entities.{filter}" if filter else ""
         else:
@@ -59,8 +58,8 @@ class XYReport:
                 {f', {y_t} as y' if y_t else ''}
             FROM {doc_type.name}
                 {entity_join}
-            JOIN {entity_map_mv} as entity_search on entity_search.{doc_type.name}_id={doc_type.name}.id
-                        AND entity_search.search @@ plainto_tsquery('english', $1)
+            JOIN {search_table} on {search_table}.{doc_type.name}_id={doc_type.name}.id
+                        AND {search_table}.search @@ plainto_tsquery('english', $1)
             {filter}
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
