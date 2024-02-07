@@ -1,6 +1,7 @@
 """
-Handler for patents autocomplete
+Handler for terms autocomplete
 """
+
 import json
 import logging
 from pydantic import BaseModel
