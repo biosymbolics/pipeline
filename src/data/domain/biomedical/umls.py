@@ -109,12 +109,10 @@ def is_umls_suppressed(
 
     # suppress if matching alias is suppressed for that cui
     # which is useful to avoid, for example, "ice" matching methamphetamine (see https://uts.nlm.nih.gov/uts/umls/concept/C0025611)
-    # only looks at the first alias, because they're sorted & filtered by syntactic similarity
-    # e.g. ["methamphetamine", "ice"] isn't going to happen
     if (
         len(matching_aliases) > 0
         and id in UMLS_CUI_ALIAS_SUPPRESSIONS
-        and matching_aliases[0] in UMLS_CUI_ALIAS_SUPPRESSIONS[id]
+        and has_intersection(matching_aliases, UMLS_CUI_ALIAS_SUPPRESSIONS[id])
     ):
         return True
 

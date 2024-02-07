@@ -38,11 +38,22 @@ class TestUmlsUtils(unittest.TestCase):
                 "expected": True,
             },
             {
-                "description": "not suppressed since first synonym is not suppressed",
+                "description": "not suppressed since no matching synonyms match",
                 "cui": "C0025611",
                 "canonical_name": "methamphetamine",
-                "matching_aliases": ["methamphetamine", "amphetamine", "ice"],
+                "matching_aliases": ["methamphetamine", "amphetamine"],
                 "expected": False,
+            },
+            {
+                "description": "suppressed due to a variation matching",
+                "cui": "C0023172",
+                "canonical_name": "Lupus erythematosus cell",
+                # first not in the override, but second is.
+                "matching_aliases": [
+                    "l.e. cell",
+                    "le cells",
+                ],
+                "expected": True,
             },
         ]
 
