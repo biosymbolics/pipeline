@@ -101,11 +101,12 @@ model Patent {
 model RegulatoryApproval {
     id               String         @id @unique
     agency           String
+    applicant_id     Int?           @unique
+    applicant        Ownable?
     application_type String
     approval_date    DateTime
     indications      Indicatable[]
     interventions    Intervenable[]
-    owners           Ownable[]
     url              String
 
     @@index([approval_date], name: "approval_date")
@@ -207,7 +208,7 @@ model Ownable {
     instance_rollup        String?             @default("") // denormalized from biomedical entity
     category_rollup        String?             @default("") // denormalized from biomedical entity
     regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?
+    regulatory_approval_id String?             @unique
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     trial_id               String?             @unique
 

@@ -45,7 +45,7 @@ def get_term_clause(
     elif return_type == TrialWhereInput or return_type == TrialWhereInputRecursive1:
         mapping_tables = {**base_mapping_tables, "sponsor": "is"}
     elif return_type == RegulatoryApprovalWhereInput:
-        mapping_tables = base_mapping_tables
+        mapping_tables = {**base_mapping_tables, "applicant": "is"}
     else:
         raise ValueError(f"Unsupported return type: {return_type}")
 

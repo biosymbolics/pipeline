@@ -114,17 +114,16 @@ class OwnerLoader:
         await OwnerEtl.post_finalize()
 
 
-def main():
-    asyncio.run(OwnerLoader().copy_all())
-
-
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.owner.load
+            Usage: python3 -m data.etl.entity.owner.load [--post-finalize]
             """
         )
         sys.exit()
 
-    main()
+    if "--post-finalize" in sys.argv:
+        asyncio.run(OwnerLoader().post_finalize())
+    else:
+        asyncio.run(OwnerLoader().copy_all())

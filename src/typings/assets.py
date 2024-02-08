@@ -111,7 +111,7 @@ class Asset(EntityBase):
             maybe_available_ids=maybe_available_ids,
             most_recent_patent=cls.get_most_recent_patent(patents),
             most_recent_trial=cls.get_most_recent_trial(trials),
-            owners=cls.get_owners(patents, trials),
+            owners=cls.get_owners(patents, regulatory_approvals, trials),
             patent_count=len(patents),
             patent_ids=[p.id for p in patents],
             percent_trials_stopped=cls.get_percent_trials_stopped(trials),
@@ -342,7 +342,10 @@ class Asset(EntityBase):
 
     @classmethod
     def get_owners(
-        cls, patents: Sequence[ScoredPatent], trials: Sequence[ScoredTrial]
+        cls,
+        patents: Sequence[ScoredPatent],
+        regulatory_approvals: Sequence[ScoredRegulatoryApproval],
+        trials: Sequence[ScoredTrial],
     ) -> list[str]:
         # count and sort owners
         sorted_owners: list[tuple[str, int]] = sorted(
@@ -351,6 +354,11 @@ class Asset(EntityBase):
                     flatten(
                         [a.canonical_name for p in patents for a in p.assignees or []]
                     )
+                    + [
+                        a.applicant.canonical_name
+                        for a in regulatory_approvals
+                        if a.applicant is not None
+                    ]
                     + [
                         t.sponsor.canonical_name
                         for t in trials

@@ -12,6 +12,7 @@ from prisma.enums import BiomedicalEntityType, Source
 from prisma.models import (
     Indicatable,
     Intervenable,
+    Ownable,
     RegulatoryApproval,
 )
 
@@ -112,16 +113,16 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             prd2label p2l,
             label,
             structures struct
-        LEFT JOIN pharma_class on pharma_class.struct_id = struct.id
-        LEFT JOIN omop_relationship metadata on metadata.struct_id = struct.id and metadata.relationship_name = 'indication'
+        LEFT JOIN pharma_class ON pharma_class.struct_id = struct.id
+        LEFT JOIN omop_relationship metadata ON metadata.struct_id = struct.id AND metadata.relationship_name = 'indication'
         WHERE approval.struct_id = struct.id
         AND active_ingredient.struct_id = struct.id
         AND active_ingredient.ndc_product_code = prod.ndc_product_code
         AND p2l.ndc_product_code = prod.ndc_product_code
         AND p2l.label_id = label.id
-        AND lower(prod.marketing_status) not in {SUPPRESSION_APPROVAL_TYPES}
-        AND approval.approval is not null
-        AND prod.product_name is not null
+        AND lower(prod.marketing_status) NOT IN {SUPPRESSION_APPROVAL_TYPES}
+        AND approval.approval IS NOT NULL
+        AND prod.product_name IS NOT NULL
         GROUP BY prod.product_name
     """
 
@@ -138,7 +139,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
                 [
-                    "array_remove(ARRAY_AGG(distinct lower(metadata.concept_name)), NULL) as indications"
+                    "ARRAY_REMOVE(ARRAY_AGG(DISTINCT LOWER(metadata.concept_name)), NULL) AS indications"
                 ]
             ),
         )
@@ -177,10 +178,10 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             non_canonical_source=Source.FDA,
             sql=RegulatoryApprovalLoader.get_source_sql(
                 [
-                    "lower(prod.product_name) as brand_name",
-                    "lower(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
-                    "ARRAY_AGG(distinct lower(struct.name))::text[] as active_ingredients",
-                    "JSON_AGG(distinct pharma_class.*) as pharmacologic_classes",
+                    "LOWER(prod.product_name) AS brand_name",
+                    "LOWER(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) AS generic_name",
+                    "ARRAY_AGG(DISTINCT LOWER(struct.name))::text[] AS active_ingredients",
+                    "JSON_AGG(DISTINCT pharma_class.*) AS pharmacologic_classes",
                 ]
             ),
         )
@@ -195,6 +196,9 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         await Indicatable.prisma(client).query_raw(
             "DELETE FROM indicatable WHERE regulatory_approval_id IS NOT NULL"
         )
+        await Ownable.prisma(client).query_raw(
+            "DELETE FROM ownable WHERE regulatory_approval_id IS NOT NULL"
+        )
         await RegulatoryApproval.prisma(client).delete_many()
 
     @overrides(BaseDocumentEtl)
@@ -203,15 +207,16 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         Create regulatory approval records
         """
         fields = [
-            "MAX(prod.ndc_product_code) as id",
-            "prod.product_name as brand_name",
-            "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) as generic_name",
-            "ARRAY_AGG(distinct struct.name)::text[] as active_ingredients",
-            "MAX(prod.marketing_status) as application_type",
-            "MAX(approval.approval)::TIMESTAMP as approval_date",
-            "MAX(approval.type) as agency",
-            "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) as indications",
-            "MAX(label.pdf_url) as url",
+            "MAX(prod.ndc_product_code) AS id",
+            "prod.product_name AS brand_name",
+            "LOWER(MAX(approval.applicant)) AS applicant",
+            "(ARRAY_TO_STRING(ARRAY_AGG(distinct struct.name), ' / ')) AS generic_name",
+            "ARRAY_AGG(distinct struct.name)::text[] AS active_ingredients",
+            "MAX(prod.marketing_status) AS application_type",
+            "MAX(approval.approval)::TIMESTAMP AS approval_date",
+            "MAX(approval.type) AS agency",
+            "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) AS indications",
+            "MAX(label.pdf_url) AS url",
         ]
         approvals = await PsqlDatabaseClient(SOURCE_DB).select(
             query=RegulatoryApprovalLoader.get_source_sql(fields)
@@ -228,6 +233,20 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     "approval_date": a["approval_date"],
                     "application_type": a["application_type"],
                     "url": a["url"],
+                }
+                for a in approvals
+            ],
+            skip_duplicates=True,
+        )
+
+        # create owner records (aka applicants)
+        await Ownable.prisma(client).create_many(
+            data=[
+                {
+                    "name": (a["applicant"] or "unknown").lower(),
+                    "canonical_name": (a["applicant"] or "unknown").lower(),
+                    "instance_rollup": (a["applicant"] or "unknown").lower(),
+                    "regulatory_approval_id": a["id"],
                 }
                 for a in approvals
             ],

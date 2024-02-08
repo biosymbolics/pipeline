@@ -90,7 +90,7 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
 
     regulatory_approvals = asyncio.create_task(
         regulatory_approval_client.search(
-            ApprovalParams.parse(p, include=None, **common_params)
+            ApprovalParams.parse(p, include={"applicant": True}, **common_params)
         )
     )
     patents = asyncio.create_task(
