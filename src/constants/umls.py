@@ -28,6 +28,8 @@ UMLS_NAME_OVERRIDES = {
     "C0025080": "Device",  # vs "Medical Device"
     "C0348078": "Form",  # qualitative form
     "C0005515": "Biological Factors",
+    "C0030281": "Beta Cell",  # Structure of beta Cell of islet
+    "C4521924": "CFTR potentiator",  # https://uts.nlm.nih.gov/uts/umls/concept/C4521924
 }
 
 # sets canonical based on (single!) word
@@ -71,6 +73,9 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0072402": ["stk"],  # Protein-Serine-Threonine Kinases # ??
     "C0007578": ["cam"],  # cell-adhesion molecule
     "C0069515": ["neu"],  # erbB-2 Receptor
+    "C1422833": ["suppressin"],  # DEAF1
+    "C1414085": ["dm"],  # DMPK gene
+    "C1413365": ["cf"],  # CFTR gene
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -140,6 +145,16 @@ UMLS_CUI_SUPPRESSIONS = {
     # "C1709058": "modified release dosage form",
     "C2699893": "Molecular Targeted Therapy",  # ??
     "C0004793": "base sequence",  # ??
+    "C0728990": "clinical use template",  # template
+}
+
+UMLS_WITH_NO_ANCESTORS = {
+    "C0041242": "Trypsin Inhibitors",  # should be C0033607/Protease Inhibitors
+    "C4319541": "Apolipoprotein L1",  # should be C4319541/Apolipoproteins L
+    "C3850068": "Cytochrome P-450 CYP1A2 Inhibitors",  # should be C3850070/Cytochrome P-450 Enzyme Inhibitors (rel blank)
+    "C3494341": "NAV1.8 Voltage-Gated Sodium Channel",  # should be C3494197/Voltage-Gated Sodium Channels (rel blank)
+    "C3494197": "Voltage-Gated Sodium Channels",  # should be C0037492/Sodium Channels (rel blank)
+    "C1524094": "Recombinant Cytokines",  # should be C0079189/cytokines (but rel doesn't exist; it does however have isa rels)
 }
 
 

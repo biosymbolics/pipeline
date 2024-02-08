@@ -537,3 +537,4 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await BiomedicalEntityEtl.set_rollups()
 
         logger.info("Biomedical entity post_doc_finalize complete")
+        return
