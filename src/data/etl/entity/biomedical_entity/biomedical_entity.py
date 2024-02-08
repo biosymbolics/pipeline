@@ -505,10 +505,14 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 FROM umls, _entity_to_umls etu
                 WHERE umls.id=etu."B"
                 AND etu."A"=biomedical_entity.id
-                AND ARRAY['T028', 'T116', 'T047'] && umls.type_ids;
+                AND (
+                    ARRAY['T028', 'T116', 'T047'] && umls.type_ids
+                    OR
+                    biomedical_entity.name ~* '.* (?:agonists?|antagonists?|modulators?|inhibitors?)$'
+                )
 
             INSERT into _entity_to_parent ("A", "B")
-                SELECT max(parent.id order by parent.is_priority desc), child.id,
+                SELECT max(parent.id order by parent.is_priority desc), child.id
                 FROM biomedical_entity parent, biomedical_entity child, _entity_to_umls etu, umls
                 WHERE umls.rollup_id=parent.canonical_id AND etu."A"=child.id and etu."B"=umls.id
                 GROUP BY child.id
@@ -519,15 +523,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
         """
         logger.info("Finalizing biomedical entity etl")
-        # await BiomedicalEntityEtl.link_to_documents()
-        # await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
-        # await UmlsLoader.post_doc_finalize()
+        await UmlsLoader.post_doc_finalize()
 
         # recursively add biomedical entity parents (from UMLS)
-        # await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
+        await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
 
         # set instance & category rollups
         await BiomedicalEntityEtl.set_rollups()

@@ -22,11 +22,11 @@ class BiomedicalEntityLoader:
 
         NOTE: is slow due to UMLS linking (5-8 hours?)
         """
-        # patent_specs = PatentLoader.entity_specs()
+        patent_specs = PatentLoader.entity_specs()
         regulatory_approval_specs = RegulatoryApprovalLoader.entity_specs()
-        # trial_specs = TrialLoader.entity_specs()
+        trial_specs = TrialLoader.entity_specs()
 
-        specs = regulatory_approval_specs  # + patent_specs + trial_specs
+        specs = regulatory_approval_specs + patent_specs + trial_specs
 
         for spec in specs:
             records = await PsqlDatabaseClient(spec.database).select(spec.sql)
@@ -52,12 +52,12 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.biomedical_entity.biomedical_entity_load [--post-doc-finalize]
+            Usage: python3 -m data.etl.entity.biomedical_entity.biomedical_entity_load [--post-finalize]
             """
         )
         sys.exit()
 
-    if "--post-doc-finalize" in sys.argv:
+    if "--post-finalize" in sys.argv:
         asyncio.run(BiomedicalEntityLoader().post_finalize())
     else:
         asyncio.run(BiomedicalEntityLoader().copy_all())

@@ -86,6 +86,7 @@ Patent.create_partial(
 RegulatoryApproval.create_partial(
     "RegulatoryApprovalDto",
     relations={
+        "applicant": "OwnableDto",
         "interventions": "IntervenableDto",
         "indications": "IndicatableDto",
     },

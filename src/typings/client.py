@@ -26,6 +26,7 @@ DEFAULT_PATENT_INCLUDE: PatentInclude = {
     "indications": True,
 }
 DEFAULT_REGULATORY_APPROVAL_INCLUDE: RegulatoryApprovalInclude = {
+    "applicant": True,
     "interventions": True,
     "indications": True,
 }
