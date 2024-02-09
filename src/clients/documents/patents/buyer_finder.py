@@ -21,6 +21,7 @@ DEFAULT_K = 1000
 
 
 class BuyerRecord(ResultBase):
+    id: int
     name: str
     ids: list[str]
     count: int
@@ -68,17 +69,20 @@ async def find_buyers(
 
     query = rf"""
             select
+                owner.id as id,
                 owner.name as name,
                 ARRAY_AGG(patent.id) AS ids,
                 COUNT(title) AS count,
                 ARRAY_AGG(title) AS titles,
                 MIN({current_year}-date_part('year', priority_date))::int AS min_age,
-                ROUND(avg({current_year}-date_part('year', priority_date))) AS avg_age,
-                MAX(1 - (vector <=> '{vector}')) AS max_relevance_score,
-                (1 - (AVG(vector) <=> '{vector}')) AS avg_relevance_score,
-                SUM(
-                    POW((1 - (vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
-                    * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
+                ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age,
+                ROUND(POW(MAX(1 - (vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 3) AS max_relevance_score,
+                ROUND(POW((1 - (AVG(vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 3) AS avg_relevance_score,
+                ROUND(
+                    SUM(
+                        POW((1 - (vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
+                        * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
+                    )::numeric, 2
                 ) AS score
             FROM ownable, owner, patent
             WHERE ownable.patent_id=patent.id
@@ -96,12 +100,16 @@ async def find_buyers(
                 ) embed
                 GROUP BY embed.title
             )
-            GROUP BY owner.name
+            GROUP BY owner.name, owner.id
         """
 
     records = await client.query_raw(query)
 
-    potential_buyers = [BuyerRecord(**record) for record in records]
+    potential_buyers = sorted(
+        [BuyerRecord(**record) for record in records],
+        key=lambda x: x.score,
+        reverse=True,
+    )
 
     logger.info(
         "Find took %s seconds (%s)",
