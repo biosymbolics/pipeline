@@ -226,6 +226,15 @@ functions:
     handler: src.handlers.chat.chat
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  find-buyers:
+    events:
+      - http:
+          path: patents/buyers
+          method: get
+          cors: true
+    handler: src.handlers.patents.find_buyers
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 plugins:
   - serverless-python-requirements
   - serverless-offline

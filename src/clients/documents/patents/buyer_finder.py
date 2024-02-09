@@ -1,15 +1,16 @@
 """
-Patent client
+Buyer finder client
 """
 
 from datetime import date
 import logging
 import time
 
-from pydantic import BaseModel
 
 from clients.low_level.prisma import prisma_client
+from clients.openai.gpt_client import GptApiClient
 from core.ner.spacy import get_transformer_nlp
+from typings.core import ResultBase
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ SIMILARITY_EXAGGERATION_FACTOR = 100
 DEFAULT_K = 1000
 
 
-class BuyerRecord(BaseModel):
+class BuyerRecord(ResultBase):
     name: str
     ids: list[str]
     count: int
@@ -32,15 +33,30 @@ class BuyerRecord(BaseModel):
     score: float
 
 
-async def find_buyers(query: str, k: int = DEFAULT_K) -> list[BuyerRecord]:
+async def find_buyers(
+    description: str, k: int = DEFAULT_K, use_gpt_expansion: bool = False
+) -> list[BuyerRecord]:
     """
     A specific method to find potential buyers for IP
+
+    Does a cosine similarity search on the description and returns the top k
+        with scoring based on recency and relevance
+
+    Args:
+        description: description of the IP
+        k: number of nearest neighbors to consider
+        use_gpt_expansion: whether to use GPT to expand the description (mostly for testing)
     """
     start = time.monotonic()
     client = await prisma_client(120)
     nlp = get_transformer_nlp()
-    query_doc = nlp(query)
-    vector = query_doc.vector.tolist()
+
+    if use_gpt_expansion:
+        gpt_client = GptApiClient()
+        description = await gpt_client.generate_ip_description(description)
+
+    description_doc = nlp(description)
+    vector = description_doc.vector.tolist()
 
     current_year = date.today().year
 

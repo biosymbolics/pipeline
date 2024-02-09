@@ -74,7 +74,7 @@ class Dataclass:
         return self.asdict()
 
 
-class EntityBase(BaseModel):
+class ResultBase(BaseModel):
     """
     Base class to add to Prisma entities
     """

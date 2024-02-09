@@ -1,6 +1,7 @@
 """
 Client stub for GPT
 """
+
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
@@ -115,6 +116,17 @@ class GptApiClient:
         query = (
             "Return a good, succinct name for the topic described by the following words:\n"
             + "\n".join(topic_features)
+        )
+        return self.query(query)
+
+    async def generate_ip_description(self, short_description: str) -> str:
+        """
+        Generate a description of IP based on a short sentence
+        (for testing with buyer_finder)
+        """
+        query = (
+            "Please expand the following into a 2-3 paragraph technical description of a biomedical invention:\n"
+            + short_description
         )
         return self.query(query)
 

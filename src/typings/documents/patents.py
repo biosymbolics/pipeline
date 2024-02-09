@@ -8,7 +8,7 @@ from prisma.partials import PatentDto
 import logging
 
 from typings.companies import CompanyFinancials
-from typings.core import EntityBase
+from typings.core import ResultBase
 from utils.classes import ByDefinitionOrderEnum
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class AvailabilityLikelihood(ByDefinitionOrderEnum):
         return (AvailabilityLikelihood.UNKNOWN, "N/A")  # type: ignore
 
 
-class ScoredPatent(PatentDto, EntityBase):
+class ScoredPatent(PatentDto, ResultBase):
     adj_patent_years: int
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str

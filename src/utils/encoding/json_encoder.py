@@ -3,7 +3,7 @@ import decimal
 from enum import Enum
 from datetime import date
 
-from typings.core import Dataclass, EntityBase
+from typings.core import Dataclass, ResultBase
 
 
 class DataclassJSONEncoder(json.JSONEncoder):
@@ -18,7 +18,7 @@ class DataclassJSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, Dataclass):
             return o.serialize()
-        if isinstance(o, EntityBase):
+        if isinstance(o, ResultBase):
             # pydantic base model for prisma entities
             return o.serialize()
         if dataclasses.is_dataclass(o):

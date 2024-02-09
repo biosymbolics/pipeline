@@ -54,9 +54,9 @@ def include_discriminator(v: Any) -> str:
 class TermSearchCriteria(BaseModel):
     query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
     terms: Annotated[list[str], Field(validate_default=True)] = []
-    term_fields: Annotated[
-        list[TermField], Field(validate_default=True)
-    ] = DEFAULT_TERM_FIELDS
+    term_fields: Annotated[list[TermField], Field(validate_default=True)] = (
+        DEFAULT_TERM_FIELDS
+    )
 
     @field_validator("term_fields", mode="before")
     def term_fields_from_string(cls, v):
@@ -111,9 +111,9 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 class PatentSearchParams(DocumentSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
-    include: Annotated[
-        Union[PatentInclude, None], Field(validate_default=True)
-    ] = DEFAULT_PATENT_INCLUDE
+    include: Annotated[Union[PatentInclude, dict], Field(validate_default=True)] = (
+        DEFAULT_PATENT_INCLUDE
+    )
 
     @field_validator("exemplar_patents", mode="before")
     def exemplar_patents_from_string(cls, v):
@@ -125,22 +125,22 @@ class PatentSearchParams(DocumentSearchParams):
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
     include: Annotated[
-        Union[RegulatoryApprovalInclude, None], Field(validate_default=True)
+        Union[RegulatoryApprovalInclude, dict], Field(validate_default=True)
     ] = DEFAULT_REGULATORY_APPROVAL_INCLUDE
 
 
 class TrialSearchParams(DocumentSearchParams):
-    include: Annotated[
-        Union[TrialInclude, None], Field(validate_default=True)
-    ] = DEFAULT_TRIAL_INCLUDE
+    include: Annotated[Union[TrialInclude, dict], Field(validate_default=True)] = (
+        DEFAULT_TRIAL_INCLUDE
+    )
 
 
 class AssetSearchParams(DocumentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_map_type: Annotated[
-        EntityMapType, Field(validate_default=True)
-    ] = EntityMapType.intervention
-    include: Annotated[None, Field()] = None
+    entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
+        EntityMapType.intervention
+    )
+    include: Annotated[dict, Field()] = {}
 
     @field_validator("entity_map_type", mode="before")
     def entity_map_type_from_string(cls, v):
@@ -157,3 +157,12 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     doc_type: DocType = DocType.patent
     head_field: str = "priority_date"
     include: Annotated[dict, Field()] = {}
+
+
+class BuyerFinderParams(BaseModel):
+    """
+    Parameters for finding potential buyers
+    """
+
+    description: Annotated[str, Field(validate_default=True)]
+    k: Annotated[int, Field(validate_default=True)] = 1000
