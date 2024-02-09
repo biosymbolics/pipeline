@@ -15,7 +15,7 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import PUBLICATION_NUMBER_MAP_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
+from constants.core import APPLICATIONS_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
 
 from .constants import (
     GPR_ANNOTATIONS_TABLE,
@@ -29,8 +29,6 @@ db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-APPLICATIONS_TABLE = "applications"
 
 
 def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:
@@ -59,31 +57,31 @@ PATENT_APPLICATION_FIELDS = [
 ]
 
 EXPORT_TABLES = {
-    SOURCE_BIOSYM_ANNOTATIONS_TABLE: {
-        "column": "character_offset_end",
-        "size": 5,
-        "starting_value": 0,
-        "ending_value": 2000,
-        "transform": lambda x: x,
-    },
-    # "applications": {
-    #     "column": "priority_date",
-    #     "size": timedelta(days=730),
-    #     "transform": lambda x: int(x.strftime("%Y%m%d")),
-    #     "starting_value": datetime(2000, 1, 1),
-    #     "ending_value": datetime(2023, 1, 1),
-    # },
-    # GPR_ANNOTATIONS_TABLE: {
-    #     "column": "confidence",
-    #     "size": 0.0125,
-    #     "starting_value": 0.774,
-    #     "ending_value": 0.91,  # max 0.90
+    # EXPENSIVE!! don't do it.
+    # SOURCE_BIOSYM_ANNOTATIONS_TABLE: {
+    #     "column": "character_offset_end",
+    #     "size": 5,
+    #     "starting_value": 0,
+    #     "ending_value": 2000,
     #     "transform": lambda x: x,
     # },
+    APPLICATIONS_TABLE: {
+        "column": "priority_date",
+        "size": timedelta(days=730),
+        "transform": lambda x: int(x.strftime("%Y%m%d")),
+        "starting_value": datetime(2000, 1, 1),
+        "ending_value": datetime(2023, 1, 1),
+    },
+    GPR_ANNOTATIONS_TABLE: {
+        "column": "confidence",
+        "size": 0.0125,
+        "starting_value": 0.774,
+        "ending_value": 0.91,  # max 0.90
+        "transform": lambda x: x,
+    },
 }
 
 GCS_BUCKET = "biosym-patents"
-# adjust this based on how large you want each shard to be
 
 
 async def create_patent_applications_table():
@@ -125,11 +123,13 @@ async def export_bq_tables():
     """
     Export tables from BigQuery to GCS
     """
-    raise Exception("This costs too much money to run")
     logging.info("Exporting BigQuery tables to GCS")
     await create_patent_applications_table()
 
     for table, shard_spec in EXPORT_TABLES.items():
+        if table == SOURCE_BIOSYM_ANNOTATIONS_TABLE:
+            raise Exception("This costs too much money to run")
+
         shared_table_name = f"{table}_shard_tmp"
         current_shard = shard_spec["starting_value"]
         while current_shard < shard_spec["ending_value"]:
@@ -206,29 +206,6 @@ async def import_into_psql(today: str):
         await load_data_from_json(blob, table_name)
 
 
-async def create_derived_tables(client: PsqlDatabaseClient):
-    """
-    Create derived tables
-    """
-    # create mapping between the main publication number (WPO) and all other publication numbers
-    await client.create_from_select(
-        f"select publication_number, unnest(all_base_publication_numbers) as other_publication_number from {APPLICATIONS_TABLE}",
-        PUBLICATION_NUMBER_MAP_TABLE,
-    )
-    await client.create_indices(
-        [
-            {
-                "table": PUBLICATION_NUMBER_MAP_TABLE,
-                "column": "publication_number",
-            },
-            {
-                "table": PUBLICATION_NUMBER_MAP_TABLE,
-                "column": "other_publication_number",
-            },
-        ]
-    )
-
-
 async def copy_bq_to_psql():
     """
     Copy data from BigQuery to psql + create index
@@ -237,10 +214,7 @@ async def copy_bq_to_psql():
     await export_bq_tables()
     await import_into_psql(today)
 
-    client = PsqlDatabaseClient()
-    await create_derived_tables(client)
-
-    await client.create_indices(
+    await PsqlDatabaseClient().create_indices(
         [
             {
                 "table": APPLICATIONS_TABLE,

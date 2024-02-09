@@ -136,6 +136,39 @@ In order to deploy the example, you need to run the following command:
 $ serverless deploy
 ```
 
+#### Copying data
+```
+# from local machine
+pg_dump --no-owner biosym > biosym.psql
+zip biosym.psql.zip biosym.psql
+aws s3 mv s3://biosympatentsdb/biosym.psql.zip s3://biosympatentsdb/biosym.psql.zip.back-$(date +%Y-%m-%d)
+aws s3 cp biosym.psql.zip s3://biosympatentsdb/biosym.psql.zip
+rm biosym.psql*
+
+# then proceeding in ec2
+aws configure sso
+aws s3 cp s3://biosympatentsdb/biosym.psql.zip biosym.psql.zip
+unzip biosym.psql.zip
+y
+export PASSWORD=$(aws ssm get-parameter --name /biosymbolics/pipeline/database/patents/main_password --with-decryption --query Parameter.Value --output text)
+echo "
+CREATE ROLE readaccess;
+GRANT USAGE ON SCHEMA public TO readaccess;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO readaccess;
+GRANT CONNECT ON DATABASE patents TO readaccess;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO readaccess;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readaccess;
+CREATE USER patents with password '$PASSWORD';
+GRANT readaccess TO patents;
+create extension vector; -- todo: move to beginning
+    " >> biosym.psql
+echo $PASSWORD
+dropdb biosym --force  -h 172.31.55.68 -p 5432 --username postgres
+createdb biosym -h 172.31.55.68 -p 5432 --username postgres
+psql -d biosym -h 172.31.55.68 -p 5432 --username postgres --password -f biosym.psql
+rm biosym.psql*
+```
+
 #### Invocation
 
 After successful deployment, you can invoke the deployed function by using the following command:

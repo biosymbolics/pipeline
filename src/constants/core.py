@@ -5,11 +5,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+APPLICATIONS_TABLE = "applications"
 SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
+PATENT_VECTOR_TABLE = "patent_vectors"
 REGULATORY_APPROVAL_TABLE = "regulatory_approval"
+SEARCH_TABLE = "doc_entity_search"
 TRIALS_TABLE = "trial"
-PUBLICATION_NUMBER_MAP_TABLE = "publication_number_map"
 
 
 logger.info("Environment is: %s", os.environ.get("ENV", "local"))
@@ -36,6 +38,3 @@ DEFAULT_NLP_MODEL_ARGS = {
     "padding": "max_length",
     "truncation": True,
 }
-
-
-SEARCH_TABLE = "doc_entity_search"

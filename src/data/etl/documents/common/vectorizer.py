@@ -29,7 +29,6 @@ class DocumentVectorizer:
     def __init__(
         self,
         database: str,
-        source_table: str,
         dest_table: str,
         text_fields: Sequence[str],
         id_field: str,
@@ -43,7 +42,6 @@ class DocumentVectorizer:
         self.processed_docs_file = processed_docs_file
         self.batch_size = batch_size
         self.text_fields = text_fields
-        self.source_table = source_table
         self.dest_table = dest_table
         self.id_field = id_field
         self.nlp = get_transformer_nlp()

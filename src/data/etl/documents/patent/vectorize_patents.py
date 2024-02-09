@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 from typing import Optional, TypedDict
+from constants.core import APPLICATIONS_TABLE, PATENT_VECTOR_TABLE
 
 
 from data.etl.documents.common.vectorizer import DocumentVectorizer
@@ -30,8 +31,7 @@ class PatentVectorizer(DocumentVectorizer):
         """
         super().__init__(
             database="patents",
-            source_table="applications",
-            dest_table="patent_embeddings",
+            dest_table=PATENT_VECTOR_TABLE,
             text_fields=["title", "abstract"],
             id_field="publication_number",
             processed_docs_file=VECTORIZED_PROCESSED_DOCS_FILE,
@@ -49,7 +49,7 @@ class PatentVectorizer(DocumentVectorizer):
 
         query = f"""
             SELECT publication_number, title, abstract
-            FROM applications
+            FROM {APPLICATIONS_TABLE}
             WHERE 1 = 1
             {pagination_where}
             ORDER BY {self.id_field} ASC

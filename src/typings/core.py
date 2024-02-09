@@ -19,6 +19,10 @@ Primitive = bool | str | int | float | None
 
 @dataclass(frozen=True)
 class Dataclass:
+    """
+    TODO: get rid of this in favor of pydantic
+    """
+
     def __getitem__(self, item):
         # e.g. e[0], *e[0:6]
         if isinstance(item, int) or isinstance(item, slice):

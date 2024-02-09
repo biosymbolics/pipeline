@@ -346,6 +346,11 @@ if __name__ == "__main__":
         )
         sys.exit()
 
+    if True:
+        raise Exception(
+            "Switch to postgres before running again, lest we pay $400 again for export"
+        )
+
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
     # enricher = PatentClassifier() # only use if wanting to re-classify (comparatively fast)
