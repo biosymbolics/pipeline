@@ -6,6 +6,7 @@ logger.setLevel(logging.INFO)
 
 
 APPLICATIONS_TABLE = "applications"
+GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
 PATENT_VECTOR_TABLE = "patent_vectors"

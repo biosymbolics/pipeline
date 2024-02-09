@@ -14,6 +14,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.core import (
     ETL_BASE_DATABASE_URL,
+    GPR_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
@@ -22,8 +23,6 @@ from data.etl.types import BiomedicalEntityLoadSpec
 from utils.classes import overrides
 
 from ..base_document import BaseDocumentEtl
-
-GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 
 
 logger = logging.getLogger(__name__)
@@ -342,6 +341,8 @@ if __name__ == "__main__":
             """
             Usage: python3 -m data.etl.documents.patent.load_patents [--update]
             Copies patents data to biosym
+
+            Has many dependencies (see stage1_patents)
             """
         )
         sys.exit()
