@@ -37,6 +37,7 @@ async def create_funcs():
         SELECT ARRAY[a,b] FROM (SELECT unnest($1) AS a, unnest($2) AS b) x;
         $func$;
     """
+
     await PsqlDatabaseClient().execute_query(re_escape_sql)
     return
 
