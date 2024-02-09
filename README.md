@@ -225,6 +225,26 @@ import importlib
 importlib.reload(common.ner.ner)
 ```
 
+#### Debugging memory leak
+I think there is a memory leak somewhere around spacy transformers, or in this code.
+Related? https://github.com/explosion/spaCy/discussions/12093
+Debugging:
+```
+gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
+import tracemalloc
+
+tracemalloc.start()
+
+# ... run your application ...
+
+snapshot = tracemalloc.take_snapshot()
+top_stats = snapshot.statistics('lineno')
+
+print("[ Top 10 ]")
+for stat in top_stats[:10]:
+    print(stat)
+```
+
 #### Redis
 - `redis-cli -h redis-12973.c1.us-west-2-2.ec2.cloud.redislabs.com -p 12973`
 - `FLUSHALL`

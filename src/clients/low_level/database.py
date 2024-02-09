@@ -75,9 +75,7 @@ class DatabaseClient:
         """
         logger.debug("Running query: %s (%s)", query, values)
         results = await self.execute_query(query, values)
-        records = [dict(row) for row in results["data"]]
-
-        return records
+        return [dict(row) for row in results["data"]]
 
     async def select_insert_into_table(self, select_query: str, table_name: str):
         """

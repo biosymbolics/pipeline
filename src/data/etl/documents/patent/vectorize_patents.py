@@ -2,10 +2,12 @@ from abc import abstractmethod
 import asyncio
 import logging
 import sys
-from typing import Any, Optional, Sequence, TypedDict
+import time
+from typing import Optional, Sequence, TypedDict
 import polars as pl
 from pydash import uniq
 import hashlib
+
 
 from system import initialize
 
@@ -40,6 +42,7 @@ class DocumentVectorizer:
         Initialize the vectorizer
         """
         self.db = PsqlDatabaseClient("patents")
+        self.nlp = get_transformer_nlp()
         self.processed_docs_file = processed_docs_file
         self.batch_size = batch_size
         self.text_fields = text_fields
@@ -61,7 +64,7 @@ class DocumentVectorizer:
         """
         Persists processing state
         """
-        logger.info(f"Persisting processed ids (%s)", len(ids))
+        logger.debug(f"Persisting processed ids (%s)", len(ids))
         with open(self.processed_docs_file, "a+") as f:
             f.write("\n" + "\n".join(ids))
 
@@ -98,13 +101,12 @@ class DocumentVectorizer:
             )
 
         # vectorize
-        nlp = get_transformer_nlp()
-        vectors = [doc.vector.tolist() for doc in list(nlp.pipe(uniq_documents))]
+        vectors = [doc.vector.tolist() for doc in self.nlp.pipe(uniq_documents)]
 
         # map of content hash to vector
         vectors_map = {
-            hashlib.sha1(c.encode()).hexdigest(): de
-            for c, de in zip(uniq_documents, vectors)
+            hashlib.sha1(c.encode()).hexdigest(): v
+            for c, v in zip(uniq_documents, vectors)
         }
 
         # return vectors for all provided documents (even dups)
@@ -124,7 +126,8 @@ class DocumentVectorizer:
         df = pl.DataFrame(documents)
 
         # remove already processed documents
-        to_process = df.filter(~pl.col(self.id_field).is_in(self._get_processed_docs()))
+        already_processed = self._get_processed_docs()
+        to_process = df.filter(~pl.col(self.id_field).is_in(already_processed))
 
         if len(to_process) == 0:
             logger.info("No documents to process")
@@ -137,29 +140,45 @@ class DocumentVectorizer:
 
         return ids, texts
 
+    async def handle_batch(self, batch: list[dict]) -> None:
+        start = time.monotonic()
+
+        # preprocess, vectorize
+        ids, texts = self._preprocess(batch)
+        vectors = self._vectorize(texts)
+
+        # create inserts
+        inserts = [VectorizedDoc(id=id, vector=v) for id, v in zip(ids, vectors)]
+
+        # persist doc-level embeddings
+        if inserts is not None:
+            await self.db.insert_into_table(inserts, self.dest_table)
+            self._checkpoint(ids)
+
+        logger.info(
+            "Processed %s documents in %s seconds",
+            len(ids),
+            round(time.monotonic() - start),
+        )
+
     async def __call__(self, starting_id: Optional[str] = None) -> None:
         """
         Vectorize & persist documents
         """
         batch = await self._fetch_batch(last_id=starting_id)
+        i = 0
 
         while batch:
-            # get the new last id
+            await self.handle_batch(batch)
             last_id = batch[-1][self.id_field]
-
-            # preprocess, vectorize
-            ids, texts = self._preprocess(batch)
-            vectors = self._vectorize(texts)
-
-            # create inserts
-            inserts = [VectorizedDoc(id=id, vector=v) for id, v in zip(ids, vectors)]
-
-            # persist doc-level embeddings
-            if inserts is not None:
-                await self.db.insert_into_table(inserts, self.dest_table)
-                self._checkpoint(ids)
-
             batch = await self._fetch_batch(last_id=str(last_id))
+
+            # clear vocab to reduce memory utilization & force gc
+            if (i % 10) == 0:
+                logger.info("Clearing vocab (%s)", len(self.nlp.vocab))
+                self.nlp.reset()
+
+            i += 1
 
 
 class PatentVectorizer(DocumentVectorizer):

@@ -8,6 +8,7 @@ import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
 from thinc.api import set_gpu_allocator
+import torch
 
 from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL, DEFAULT_TORCH_DEVICE
 from utils.args import make_hashable
@@ -63,18 +64,31 @@ class Spacy:
 
         # disable additional_pipelines keys to we cana add them
         _exclude = [*exclude, *additional_pipelines.keys()]
-        nlp: Language = spacy.load(self.model, exclude=_exclude, **kwargs)
+        self._nlp: Language = spacy.load(self.model, exclude=_exclude, **kwargs)
+
+        # hack to deal with memory pigginess of spacy vocab
+        # https://github.com/explosion/spaCy/discussions/9369
+        self.inital_model = self._nlp.to_bytes()
+        self.initial_vocab = set(self._nlp.vocab.strings)
 
         for name, args in additional_pipelines.items():
-            nlp.add_pipe(name, **args)
+            self._nlp.add_pipe(name, **args)
             if name == "tok2vec" or name == "transformer":
-                nlp.initialize()
-
-        self._nlp = nlp
+                self._nlp.initialize()
 
     def __getattr__(self, name):
         # Delegate attribute access to the underlying Language instance
         return getattr(self._nlp, name)
+
+    def reset(self) -> None:
+        """
+        Reset the underlying nlp model
+        """
+        # reload from copy
+        self._nlp.from_bytes(self.inital_model)
+
+        # reset vocab
+        self._nlp.vocab.strings._reset_and_load(self.initial_vocab)
 
     def __call__(self, text: str) -> Doc:
         return self._nlp(text)
@@ -103,6 +117,8 @@ def get_transformer_nlp() -> Spacy:
     """
     Get a Spacy NLP model that uses a transformer
     """
+    torch.set_num_threads(1)
+
     nlp = Spacy.get_instance(
         model="en_core_web_trf",
         # parser and tagger don't work with transformer?
