@@ -1,7 +1,7 @@
 from prisma.enums import OwnerType
 
 from constants.company import COMPANY_STRINGS, LARGE_PHARMA_KEYWORDS
-from core.ner.classifier import classify_string, create_lookup_map
+from core.ner.classifier import create_lookup_map
 
 ASSIGNEE_PATENT_THRESHOLD = 20
 

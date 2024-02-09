@@ -59,6 +59,7 @@ model Owner {
     search             Unsupported("tsvector")?
     synonyms           OwnerSynonym[]
 
+    @@index([owner_type], name: "owner_owner_type")
     @@map("owner")
 }
 

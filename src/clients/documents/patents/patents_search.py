@@ -32,33 +32,6 @@ logger.setLevel(logging.INFO)
 EXEMPLAR_SIMILARITY_THRESHOLD = 0.7
 
 
-async def get_exemplar_embeddings(exemplar_patents: Sequence[str]) -> list[str]:
-    """
-    Get embeddings for exemplar patents
-    """
-    async with prisma_context(300) as client:
-        results = await Prisma.query_raw(
-            client,
-            "SELECT embeddings FROM patent WHERE id = ANY($1)",
-            exemplar_patents,
-        )
-
-    # exemplar_embeddings = (
-    #     await get_exemplar_embeddings(exemplar_patents)
-    #     if len(exemplar_patents) > 0
-    #     else []
-    # )
-    # exemplar_criterion = [
-    #     f"(1 - (embeddings <=> '{e}')) > {EXEMPLAR_SIMILARITY_THRESHOLD}"
-    #     for e in exemplar_embeddings
-    # ]
-    # wheres.append(f"AND ({f' {query_type} '.join(exemplar_criterion)})")
-    # cosine_scores = [f"(1 - (embeddings <=> '{e}'))" for e in exemplar_embeddings]
-    # froms.append(f", unnest (ARRAY[{','.join(cosine_scores)}]) cosine_scores")
-    # fields.append("AVG(cosine_scores) as exemplar_similarity")
-    return [r["embeddings"] for r in results]
-
-
 def get_where_clause(p: DocumentSearchCriteria) -> PatentWhereInput:
     is_id_search = any([t.startswith("WO-") for t in p.terms])
 
