@@ -18,6 +18,9 @@ DEFAULT_TEMPERATURE = 0.3
 GptModel = Literal["gpt-3.5-turbo", "gpt-4"]
 DEFAULT_GPT_MODEL: GptModel = "gpt-3.5-turbo"
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 class GptApiClient:
     """
@@ -63,7 +66,7 @@ class GptApiClient:
 
     def _format_answer(self, answer: str, is_array: bool = False) -> Any:
         if self.output_parser:
-            logging.debug("Formatting answer: %s", answer)
+            logger.debug("Formatting answer: %s", answer)
             return parse_answer(
                 answer, cast(OutputParser, self.output_parser), is_array, True
             )
@@ -80,11 +83,11 @@ class GptApiClient:
             client=self.client,
         )
         llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
-        output = llm_chain.run(query)
+        output = llm_chain.invoke(input={"query": query})
         try:
-            return self._format_answer(output, is_array=is_array)
+            return self._format_answer(output["text"], is_array=is_array)
         except Exception as e:
-            logging.warning("Error formatting answer: %s", e)
+            logger.warning("Error formatting answer: %s", e)
             return output
 
     async def describe_terms(
