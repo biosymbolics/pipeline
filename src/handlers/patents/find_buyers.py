@@ -21,7 +21,8 @@ async def _find_buyers(raw_event: dict, context):
 
     Invocation:
     - Local: `serverless invoke local --function find-buyers --param='ENV=local' --data='{"queryStringParameters": { "description":"a lipid-based drug delivery platform" }}'`
-    - Local: `curl http://localhost:3001/dev/patents/buyers?description=a%20lipid-based%20drug%20ldelivery%20lplatform`
+    - Local: `curl http://localhost:3001/dev/patents/buyers?description=a%20lipid-based%20drug%20delivery%20platform`
+    - Local: curl 'http://localhost:3001/dev/patents/buyers?description=a%20lipid-based%20drug%20delivery%20platform&use_gpt_expansion=true'
     """
 
     p = BuyerFinderParams(**raw_event["queryStringParameters"])
@@ -29,10 +30,12 @@ async def _find_buyers(raw_event: dict, context):
     if p.description is None:
         raise ValueError("Description is required")
 
-    logger.info("Fetching buyers for description: %s", p)
+    logger.info("Fetching buyers for parameters: %s", p)
 
     try:
-        results = await find_patent_buyers(description=p.description, k=p.k)
+        results = await find_patent_buyers(
+            description=p.description, k=p.k, use_gpt_expansion=p.use_gpt_expansion
+        )
     except Exception as e:
         message = f"Error finding buyers: {e}"
         logger.error(message)

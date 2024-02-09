@@ -166,3 +166,4 @@ class BuyerFinderParams(BaseModel):
 
     description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = 1000
+    use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False

@@ -33,9 +33,14 @@ class BuyerRecord(ResultBase):
     score: float
 
 
+class FindBuyerResult(ResultBase):
+    buyers: list[BuyerRecord]
+    description: str  # included since it could be a result of expansion
+
+
 async def find_buyers(
     description: str, k: int = DEFAULT_K, use_gpt_expansion: bool = False
-) -> list[BuyerRecord]:
+) -> FindBuyerResult:
     """
     A specific method to find potential buyers for IP
 
@@ -52,6 +57,7 @@ async def find_buyers(
     nlp = get_transformer_nlp()
 
     if use_gpt_expansion:
+        logger.info("Using GPT to expand description")
         gpt_client = GptApiClient()
         description = await gpt_client.generate_ip_description(description)
 
@@ -103,4 +109,4 @@ async def find_buyers(
         len(potential_buyers),
     )
 
-    return potential_buyers
+    return FindBuyerResult(buyers=potential_buyers, description=description)
