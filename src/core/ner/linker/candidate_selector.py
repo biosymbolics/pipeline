@@ -86,6 +86,14 @@ class CandidateSelector(AbstractCandidateSelector):
             logger.debug(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
+            # tfidf vectorizer and/or the UMLS data have inconsistent handling of hyphens
+            if "-" in text:
+                # try replacing - with empty string
+                res = self._get_best_candidate(text.replace("-", ""))
+                if res is None:
+                    # try replacing - with space (which will result in confusion if it separates out single chars)
+                    return self._get_best_candidate(text.replace("-", " "))
+                return res
             return None
 
         # score candidates

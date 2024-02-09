@@ -28,6 +28,8 @@ UMLS_NAME_OVERRIDES = {
     "C0025080": "Device",  # vs "Medical Device"
     "C0348078": "Form",  # qualitative form
     "C0005515": "Biological Factors",
+    "C0030281": "Beta Cell",  # Structure of beta Cell of islet
+    "C4521924": "CFTR potentiator",  # https://uts.nlm.nih.gov/uts/umls/concept/C4521924
 }
 
 # sets canonical based on (single!) word
@@ -63,6 +65,17 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0010124": ["compound b", "b compounds"],  # "corticosterone"
     "C1421222": ["connectin"],  # TTN gene
     "C1418824": ["inhibitor 1", "i1"],  # PPP1R1A
+    "C0019167": ["e antigens", "e antigen", "antigen e"],  # "Hepatitis B e Antigens
+    "C1448132": ["ir"],
+    "C0666364": ["odf"],  # TRANCE protein
+    "C0022709": ["ace"],  # Peptidyl-Dipeptidase A
+    "C5441529": ["er"],  # Estrogen Receptor Family, human
+    "C0072402": ["stk"],  # Protein-Serine-Threonine Kinases # ??
+    "C0007578": ["cam"],  # cell-adhesion molecule
+    "C0069515": ["neu"],  # erbB-2 Receptor
+    "C1422833": ["suppressin"],  # DEAF1
+    "C1414085": ["dm"],  # DMPK gene
+    "C1413365": ["cf"],  # CFTR gene
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -127,6 +140,21 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0282636": "cell respiration",  # matches respiration
     "C0456386": "Medicament",
     "C1167622": "binding",
+    "C0019047": "abnormal hemoglobin",
+    "C1516451": "chemical modifier",
+    # "C1709058": "modified release dosage form",
+    "C2699893": "Molecular Targeted Therapy",  # ??
+    "C0004793": "base sequence",  # ??
+    "C0728990": "clinical use template",  # template
+}
+
+UMLS_WITH_NO_ANCESTORS = {
+    "C0041242": "Trypsin Inhibitors",  # should be C0033607/Protease Inhibitors
+    "C4319541": "Apolipoprotein L1",  # should be C4319541/Apolipoproteins L
+    "C3850068": "Cytochrome P-450 CYP1A2 Inhibitors",  # should be C3850070/Cytochrome P-450 Enzyme Inhibitors (rel blank)
+    "C3494341": "NAV1.8 Voltage-Gated Sodium Channel",  # should be C3494197/Voltage-Gated Sodium Channels (rel blank)
+    "C3494197": "Voltage-Gated Sodium Channels",  # should be C0037492/Sodium Channels (rel blank)
+    "C1524094": "Recombinant Cytokines",  # should be C0079189/cytokines (but rel doesn't exist; it does however have isa rels)
 }
 
 
@@ -152,6 +180,9 @@ UMLS_NAME_SUPPRESSIONS = [
     "category",  # e.g. Chemicals and Drugs (MeSH Category)
     "schedule",  # e.g. schedule II opium and derivatives
     "affecting",  # C2697974 Agent Affecting Respiratory System
+    "drugs",  # e.g. CARDIOVASCULAR SYSTEM DRUGS
+    "various",  #  VARIOUS DRUG CLASSES IN ATC
+    "unspecified",  # e.g. Nitrogen Compounds, Unspecified
 ]
 
 
@@ -165,9 +196,15 @@ UMLS_COMPOUND_TYPES = {
     "T200": "Clinical Drug",
 }
 
-UMLS_MAYBE_COMPOUND_TYPES = {
+UMLS_FORMULATION_TYPES = {
     "T122": "biomedical or dental material",  # e.g. Wetting Agents, Tissue Scaffolds
+}
+UMLS_MAYBE_FORMULATION_TYPES: dict[str, str] = {}
+
+
+UMLS_MAYBE_COMPOUND_TYPES = {
     "T167": "Substance",
+    **UMLS_FORMULATION_TYPES,
 }
 
 
@@ -216,6 +253,7 @@ UMLS_MECHANISM_TYPES = {
 
 UMLS_MAYBE_MECHANISM_TYPES: dict[str, str] = {}
 
+
 UMLS_PHARMACOLOGIC_INTERVENTION_TYPES = {
     **UMLS_COMPOUND_TYPES,
     **UMLS_BIOLOGIC_TYPES,
@@ -235,6 +273,7 @@ UMLS_DEVICE_TYPES = {
     "T203": "Drug Delivery Device",
 }
 UMLS_MAYBE_DEVICE_TYPES = {"T073": "Manufactured Object"}
+
 
 UMLS_PROCEDURE_TYPES = {
     "T058": "Health Care Activity",
@@ -404,9 +443,16 @@ ENTITY_TO_UMLS_TYPE = {
     # includes phenotypes for the sake of typing; phenotype category not ideal for matching since it is very broad
     BiomedicalEntityType.DISEASE: UMLS_EXTENDED_DISEASE_TYPES,
     BiomedicalEntityType.DIAGNOSTIC: UMLS_EXTENDED_DIAGNOSTIC_TYPES,
+    BiomedicalEntityType.DOSAGE_FORM: UMLS_FORMULATION_TYPES,
     BiomedicalEntityType.MECHANISM: UMLS_EXTENDED_MECHANISM_TYPES,
     BiomedicalEntityType.PROCEDURE: UMLS_EXTENDED_PROCEDURE_TYPES,
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
+}
+
+# not used yet
+NAME_TO_UMLS_TYPE = {
+    "dosage form": BiomedicalEntityType.DOSAGE_FORM,
+    "industrial aid": BiomedicalEntityType.INDUSTRIAL,
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}

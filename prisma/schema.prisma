@@ -444,6 +444,7 @@ enum BiomedicalEntityType {
     DIAGNOSTIC
     DIETARY
     DOSAGE_FORM
+    INDUSTRIAL
     MECHANISM
     PROCEDURE
     PROCESS

@@ -208,6 +208,17 @@ class TestUmlsUtils(unittest.TestCase):
                 "is_composite": False,
                 "expected": "PD1 Inhibitor",
             },
+            {
+                "description": "??",
+                "cui": "C0178820",
+                "canonical_name": "Quinoxaline (substance)",
+                "aliases": [
+                    "Quinoxaline (substance)",
+                    "Quinoxaline",
+                ],
+                "is_composite": False,
+                "expected": "Quinoxaline (substance)",  # TODO
+            },
         ]
 
         for test in test_cases:
