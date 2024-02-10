@@ -17,7 +17,7 @@ from clients.finance.financials import CompanyFinancialExtractor
 from constants.company import (
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
-    OWNER_TERM_MAP,
+    OWNER_TERM_NORMALIZATION_MAP,
 )
 from core.ner.classifier import classify_string
 from core.ner.cleaning import RE_FLAGS
@@ -30,7 +30,7 @@ from .constants import OWNER_KEYWORD_MAP
 
 def clean_owners(
     owners: Sequence[str],
-    owner_normalization_map: dict[str, str] = OWNER_TERM_MAP,
+    owner_normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
     owner_suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
 ) -> dict[str, str]:
     """
@@ -64,7 +64,7 @@ def clean_owners(
         Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
         No deduplication, becaues the last step is tfidf + clustering
         """
-        term_map_set = set(OWNER_TERM_MAP.keys())
+        term_map_set = set(OWNER_TERM_NORMALIZATION_MAP.keys())
 
         def _normalize(cleaned: str):
             terms_to_rewrite = list(term_map_set.intersection(cleaned.lower().split()))
@@ -173,14 +173,14 @@ def transform_financials(
 
 OwnerTypePriorityMap = {
     OwnerType.INDUSTRY_LARGE: 1,
-    OwnerType.INDUSTRY: 2,
-    OwnerType.GOVERNMENTAL: 3,
-    OwnerType.HEALTH_SYSTEM: 4,
-    OwnerType.UNIVERSITY: 5,
-    OwnerType.FOUNDATION: 6,
-    OwnerType.INDIVIDUAL: 10,
-    OwnerType.OTHER_ORGANIZATION: 20,
-    OwnerType.OTHER: 100,
+    OwnerType.HEALTH_SYSTEM: 5,
+    OwnerType.UNIVERSITY: 10,
+    OwnerType.INDUSTRY: 20,
+    OwnerType.GOVERNMENTAL: 30,
+    OwnerType.FOUNDATION: 40,
+    OwnerType.INDIVIDUAL: 50,
+    OwnerType.OTHER_ORGANIZATION: 100,
+    OwnerType.OTHER: 1000,
 }
 
 

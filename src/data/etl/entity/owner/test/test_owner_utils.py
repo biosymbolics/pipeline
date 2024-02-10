@@ -33,6 +33,10 @@ class TestPatentScriptUtils(unittest.TestCase):
                 "expected_output": OwnerType.GOVERNMENTAL,
             },
             {
+                "name": "random l.l.c.",
+                "expected_output": OwnerType.INDUSTRY,
+            },
+            {
                 "name": "bristol university research foundation",
                 "expected_output": OwnerType.UNIVERSITY,
             },
