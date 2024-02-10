@@ -171,9 +171,25 @@ def transform_financials(
     return [fetch_financials(record) for record in records]
 
 
+OwnerTypePriorityMap = {
+    OwnerType.INDUSTRY_LARGE: 1,
+    OwnerType.INDUSTRY: 2,
+    OwnerType.GOVERNMENTAL: 3,
+    OwnerType.HEALTH_SYSTEM: 4,
+    OwnerType.UNIVERSITY: 5,
+    OwnerType.FOUNDATION: 6,
+    OwnerType.INDIVIDUAL: 10,
+    OwnerType.OTHER_ORGANIZATION: 20,
+    OwnerType.OTHER: 100,
+}
+
+
 class OwnerTypeParser:
     @staticmethod
     def find(value: str) -> OwnerType:
-        reason = classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER)
+        reason = sorted(
+            classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER),
+            key=lambda x: OwnerTypePriorityMap[x],
+        )
         res = reason[0]
         return res

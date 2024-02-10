@@ -1,9 +1,51 @@
 import unittest
 
-from data.etl.entity.owner.owner import clean_owners
+from prisma.enums import OwnerType
+
+from data.etl.entity.owner.owner import clean_owners, OwnerTypeParser
 
 
 class TestPatentScriptUtils(unittest.TestCase):
+    def test_owner_type_parser(self):
+        test_conditions = [
+            {
+                "name": "mayo clinic",
+                "expected_output": OwnerType.HEALTH_SYSTEM,
+            },
+            {
+                "name": "albert einstein college medicine",
+                "expected_output": OwnerType.UNIVERSITY,
+            },
+            {
+                "name": "wisconsin university",
+                "expected_output": OwnerType.UNIVERSITY,
+            },
+            {
+                "name": "pfizer",
+                "expected_output": OwnerType.INDUSTRY_LARGE,
+            },
+            {
+                "name": "random co, inc",
+                "expected_output": OwnerType.INDUSTRY,
+            },
+            {
+                "name": "us government",
+                "expected_output": OwnerType.GOVERNMENTAL,
+            },
+            {
+                "name": "bristol university research foundation",
+                "expected_output": OwnerType.UNIVERSITY,
+            },
+        ]
+
+        for test in test_conditions:
+            name = test["name"]
+            expected_output = test["expected_output"]
+
+            result = OwnerTypeParser.find(name)
+            print("Actual", result, "expected", expected_output)
+            self.assertEqual(result, expected_output)
+
     def test_clean_assignees(self):
         test_conditions = [
             {
