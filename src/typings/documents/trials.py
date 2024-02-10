@@ -3,11 +3,11 @@ from prisma.partials import TrialDto
 from prisma.enums import TerminationReason, TrialStatus
 from pydantic import computed_field
 
-from typings.core import EntityBase
+from typings.core import ResultBase
 from utils.classes import ByDefinitionOrderEnum
 
 
-class ScoredTrial(TrialDto, EntityBase):
+class ScoredTrial(TrialDto, ResultBase):
     @computed_field  # type: ignore
     @property
     def dropout_percent(self) -> float | None:

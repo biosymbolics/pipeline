@@ -19,6 +19,10 @@ Primitive = bool | str | int | float | None
 
 @dataclass(frozen=True)
 class Dataclass:
+    """
+    TODO: get rid of this in favor of pydantic
+    """
+
     def __getitem__(self, item):
         # e.g. e[0], *e[0:6]
         if isinstance(item, int) or isinstance(item, slice):
@@ -70,7 +74,7 @@ class Dataclass:
         return self.asdict()
 
 
-class EntityBase(BaseModel):
+class ResultBase(BaseModel):
     """
     Base class to add to Prisma entities
     """

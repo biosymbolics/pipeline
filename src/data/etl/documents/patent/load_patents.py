@@ -14,6 +14,8 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.core import (
     ETL_BASE_DATABASE_URL,
+    GPR_ANNOTATIONS_TABLE,
+    PATENT_VECTOR_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
@@ -22,8 +24,6 @@ from data.etl.types import BiomedicalEntityLoadSpec
 from utils.classes import overrides
 
 from ..base_document import BaseDocumentEtl
-
-GPR_ANNOTATIONS_TABLE = "gpr_annotations"
 
 
 logger = logging.getLogger(__name__)
@@ -213,6 +213,30 @@ class PatentLoader(BaseDocumentEtl):
         )
         await Patent.prisma(client).delete_many()
 
+    async def add_vectors(self):
+        """
+        Copy vectors to patent table
+
+        @see vectorize_patents.py
+        """
+        queries = [
+            "DROP INDEX IF EXISTS idx_patent_vector",
+            f"""
+                UPDATE patent set vector = v.vector
+                FROM dblink(
+                    'dbname=patents',
+                    'SELECT id, vector FROM patent_vectors'
+                ) AS v(id TEXT, vector vector(768))
+                WHERE patent.id=v.id
+            """,
+            # TODO: switch to hnsw maybe
+            # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",
+            # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
+            "CREATE INDEX ON patent USING ivfflat (vector vector_cosine_ops) WITH (lists = 1287)",
+        ]
+        for query in queries:
+            await PsqlDatabaseClient(SOURCE_DB).execute_query(query)
+
     @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
@@ -234,7 +258,6 @@ class PatentLoader(BaseDocumentEtl):
                             # assignees (relation)
                             "claims": p["claims"],
                             "country_code": p["country"],
-                            # "embeddings": p["embeddings"], # updated below (https://github.com/prisma/prisma/issues/18442)
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
                             # interventions (relation)
@@ -250,14 +273,6 @@ class PatentLoader(BaseDocumentEtl):
                 ],
                 skip_duplicates=True,
             )
-
-            # sigh https://github.com/prisma/prisma/issues/18442
-            # TODO: batch
-            for p in batch:
-                async with client.tx() as tx:
-                    await tx.execute_raw(
-                        f"UPDATE patent SET embeddings = '{p['embeddings']}' where id = '{p['id']}';"
-                    )
 
             # create assignee owner records
             await Ownable.prisma().create_many(
@@ -342,6 +357,8 @@ if __name__ == "__main__":
             """
             Usage: python3 -m data.etl.documents.patent.load_patents [--update]
             Copies patents data to biosym
+
+            Has many dependencies (see stage1_patents)
             """
         )
         sys.exit()

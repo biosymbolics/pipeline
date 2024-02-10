@@ -3,7 +3,7 @@ from typing import TypedDict
 from prisma.models import FinancialSnapshot
 import logging
 
-from typings.core import EntityBase
+from typings.core import ResultBase
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 CompanyInfo = TypedDict("CompanyInfo", {"name": str, "symbol": str})
 
 
-class CompanyFinancials(FinancialSnapshot, EntityBase):
+class CompanyFinancials(FinancialSnapshot, ResultBase):
     @property
     def is_bad_current_ratio(self) -> bool:
         """

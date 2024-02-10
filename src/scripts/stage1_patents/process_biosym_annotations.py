@@ -1,6 +1,7 @@
 """
 To run after NER is complete
 """
+
 import asyncio
 import sys
 import logging
@@ -350,47 +351,47 @@ async def populate_working_biosym_annotations():
     logger.info(
         "Copying source (%s) to working (%s) table", SOURCE_TABLE, WORKING_TABLE
     )
-    # await client.create_from_select(
-    #     f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
-    #     WORKING_TABLE,
-    # )
-    # await client.execute_query(f"DROP TABLE IF EXISTS {WORKING_TABLE}")
-    # await client.execute_query(f"CREATE TABLE {WORKING_TABLE} AS TABLE {SOURCE_TABLE}")
+    await client.create_from_select(
+        f"SELECT * from {SOURCE_TABLE} where domain<>'attributes'",
+        WORKING_TABLE,
+    )
+    await client.execute_query(f"DROP TABLE IF EXISTS {WORKING_TABLE}")
+    await client.execute_query(f"CREATE TABLE {WORKING_TABLE} AS TABLE {SOURCE_TABLE}")
 
-    # # add indices after initial load
-    # await client.create_indices(
-    #     [
-    #         {"table": WORKING_TABLE, "column": "publication_number"},
-    #         {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
-    #         {"table": WORKING_TABLE, "column": "domain"},
-    #     ]
-    # )
+    # add indices after initial load
+    await client.create_indices(
+        [
+            {"table": WORKING_TABLE, "column": "publication_number"},
+            {"table": WORKING_TABLE, "column": "term", "is_tgrm": True},
+            {"table": WORKING_TABLE, "column": "domain"},
+        ]
+    )
 
-    # await clean_up_junk()
+    await clean_up_junk()
 
-    # # round 1 (leaves in stuff used by for/of)
-    # await remove_trailing_leading(REMOVAL_WORDS_PRE)
+    # round 1 (leaves in stuff used by for/of)
+    await remove_trailing_leading(REMOVAL_WORDS_PRE)
 
-    # # less specific terms in set with more specific terms
-    # # await remove_substrings()
+    # less specific terms in set with more specific terms
+    # await remove_substrings()
 
-    # await expand_annotations()
+    await expand_annotations()
 
-    # # round 2 (removes trailing "compound" etc)
-    # await remove_trailing_leading(REMOVAL_WORDS_POST)
+    # round 2 (removes trailing "compound" etc)
+    await remove_trailing_leading(REMOVAL_WORDS_POST)
 
-    # # clean up junk again (e.g. leading ws)
-    # # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
-    # await clean_up_junk()
+    # clean up junk again (e.g. leading ws)
+    # check: select * from biosym_annotations where term ~* '^[ ].*[ ]$';
+    await clean_up_junk()
 
-    # # big updates are much faster w/o this index, and it isn't needed from here on out anyway
-    # await client.execute_query(
-    #     """
-    #     drop index trgm_index_biosym_annotations_term;
-    #     drop index index_biosym_annotations_domain;
-    #     """,
-    #     ignore_error=True,
-    # )
+    # big updates are much faster w/o this index, and it isn't needed from here on out anyway
+    await client.execute_query(
+        """
+        drop index trgm_index_biosym_annotations_term;
+        drop index index_biosym_annotations_domain;
+        """,
+        ignore_error=True,
+    )
 
     await remove_common_terms()  # remove one-off generic terms
     # await normalize_domains()
@@ -410,29 +411,13 @@ if __name__ == "__main__":
 
     select term, count(*) from biosym_annotations group by term order by count(*) desc limit 2000;
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
-    (556,711 -> 567,398 -> 908,930 -> 1,037,828 -> 777,772)
     select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
-    (2,555,158 -> 2,539,723 -> 3,697,848 -> 5,302,138 -> 4,866,248)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
-    (2,812,965 -> 2,786,428 -> 4,405,141 -> 5,918,690 -> 5,445,856)
     select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
-    (3,748,417 -> 3,748,417 -> 5,552,648 -> 7,643,403 -> 6,749,193)
     select domain, count(*) from biosym_annotations group by domain;
-    attributes | 3721861
-    compounds  | 2572389
-    diseases   |  845771
-    mechanisms | 4225243
-    ------------+---------
-    attributes | 3721861
-    compounds  | 2332852
-    diseases   |  810242
-    mechanisms | 3606099
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
-    (14,910 -> 15,206 -> 37,283 -> 34,083 -> 25,239 -> 22,493 -> 21,758)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
-    (38,315 -> 39,039 -> 76,872 -> 74,050 -> 59,714 -> 54,696 -> 55,104)
     select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
-    (70,439 -> 69,715 -> 103,874 -> 165,806 -> 138,019 -> 118,443 -> 119,331)
     """
     if "-h" in sys.argv:
         print(

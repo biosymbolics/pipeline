@@ -8,7 +8,7 @@ import logging
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
 
-from .core import Dataclass, EntityBase
+from .core import Dataclass, ResultBase
 from .documents.patents import AvailabilityLikelihood
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class AssetActivity(Dataclass):
     year: int
 
 
-class Asset(EntityBase):
+class Asset(ResultBase):
     activity: list[int]
     detailed_activity: list[AssetActivity]
     average_trial_dropout: float
