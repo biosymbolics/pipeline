@@ -28,7 +28,7 @@ from utils.re import get_or_re, sub_extra_spaces
 from .constants import OWNER_KEYWORD_MAP
 
 
-def clean_owners(
+def generate_clean_owner_map(
     owners: Sequence[str],
     owner_normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
     owner_suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
@@ -129,12 +129,13 @@ def clean_owners(
     # maps orig to cleaned
     orig_to_cleaned = {
         **{orig: clean for orig, clean in zip(owners, cleaned)},
-        **override_map,
+        **override_map,  # include overrides (e.g. "pfizer inc" -> "pfizer")
     }
 
     # maps cleaned to clustered
     cleaned_to_cluster = cluster_terms(list(orig_to_cleaned.values()))
 
+    # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }
     return {
         orig: cleaned_to_cluster.get(clean) or clean
         for orig, clean in orig_to_cleaned.items()

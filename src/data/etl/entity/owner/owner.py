@@ -16,7 +16,7 @@ from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
 
-from .transform import clean_owners, OwnerTypeParser, transform_financials
+from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
 
 
 logger = logging.getLogger(__name__)
@@ -71,12 +71,6 @@ class OwnerEtl(BaseEntityEtl):
 
         return merged_recs
 
-    def generate_lookup_map(self, names: Sequence[str]) -> dict[str, str]:
-        """
-        Generate lookup map for names
-        """
-        return clean_owners(names)
-
     async def create_records(self, names: Sequence[str]):
         """
         Create records for entities and relationships
@@ -85,7 +79,7 @@ class OwnerEtl(BaseEntityEtl):
             names: list of names to insert
         """
         client = await prisma_client(600)
-        lookup_map = self.generate_lookup_map(names)
+        lookup_map = generate_clean_owner_map(names)
         insert_recs = self._generate_insert_records(names, lookup_map)
 
         # create flat records
