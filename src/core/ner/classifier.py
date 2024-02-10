@@ -4,12 +4,11 @@ Text classifiers
 
 from enum import Enum
 import regex as re
-from pydash import compact, flatten
+from pydash import compact, flatten, uniq
 from typing import Mapping, TypeVar
 import logging
 
 from core.ner.utils import lemmatize_all
-from utils.list import dedup
 from utils.re import expand_res
 from utils.string import generate_ngrams
 
@@ -59,7 +58,7 @@ def classify_string(
     Classify a string by keywords + lookup map.
     Assumes lookup map has lemmatized keywords.
     Sorts for consistency.
-    Looks at most for 3-grams.
+    Looks at bi- and tri-grams.
     Lower-cases all keywords.
 
     Args:
@@ -68,8 +67,8 @@ def classify_string(
         nx_name (str): name to use for non-matches
     """
 
-    def __extract_ngrams():
-        lemmatized = lemmatize_all(string.lower())
+    def _generate_ngrams(_string: str):
+        lemmatized = lemmatize_all(_string.lower())
         tokens = tuple(lemmatized.split(" "))
         bigrams = generate_ngrams(tokens, 3)
         trigrams = generate_ngrams(tokens, 2)
@@ -78,14 +77,13 @@ def classify_string(
             *[" ".join(ng) for ng in [*bigrams, *trigrams]],
         ]
 
-        no_trailing_punct = [re.sub(r"[.,]$", "", ngram) for ngram in ngrams]
-        return no_trailing_punct
+        # remove trailing punct
+        return [re.sub(r"[.,]$", "", ngram) for ngram in ngrams]
 
-    ngrams = __extract_ngrams()
-    categories = [
-        lookup_map.get(re.sub(r"[.,]$", "", ngram), nx_name) for ngram in ngrams
-    ]
-    return sorted(dedup(compact(categories)))  # type: ignore
+    # generate ngrams
+    ngrams = _generate_ngrams(string)
+    categories = [lookup_map.get(ngram, nx_name) for ngram in ngrams]
+    return sorted(uniq(compact(categories)))  # type: ignore
 
 
 def classify_by_keywords(

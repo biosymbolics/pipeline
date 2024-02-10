@@ -1,6 +1,7 @@
 """
 Utils for the NER pipeline
 """
+
 from functools import partial, reduce
 import logging
 import regex as re
@@ -515,14 +516,16 @@ def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
 
     df = (
         pl.DataFrame({"cluster_id": labels, "name": terms})
+        .filter(pl.col("cluster_id") != -1)
         .group_by("cluster_id")
-        .agg(pl.col("name"))
+        .agg(pl.col("name").unique())
     )
+    print(df)
 
     term_clusters = df.drop("cluster_id").to_series().to_list()
 
     return {
         m: members_terms[0]  # syn to (arbitrarily picked) canonical
         for members_terms in term_clusters
-        for m in members_terms[1:]
+        for m in members_terms[0:]
     }

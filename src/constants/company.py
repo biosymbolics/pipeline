@@ -160,7 +160,7 @@ COMPANY_SUPPRESSIONS = [
 
 UNIVERSITY_SUPPRESSIONS = [
     "regents?",
-    "School Of Medicine",
+    "school of medicine",
     "alumni",
 ]
 
@@ -225,6 +225,7 @@ COMPANY_MAP = {
     "medtronic": "medtronic",
     "sloan kettering": "sloan kettering",
     "sanofis?": "sanofi",
+    "genzyme": "sanofi",
     "basf": "basf",
     "3m": "3m",
     "medical res council": "medical research council",
@@ -246,11 +247,13 @@ COMPANY_MAP = {
     "max planck": "max planck",
     "novartis": "novartis",
     "pfizer": "pfizer",
+    "wyeth": "pfizer",
     "gilead": "gilead",
     "dow": "dow",
     "regeneron": "regeneron",
     "takeda": "takeda",
-    "johnson & johnson": "jnj",
+    "jnj": "johnson & johnson",
+    "johnson & johnson": "johnson & johnson",
     "janssen": "janssen",
     "johns? hopkins?": "johns hopkins",
     "mitsubishi": "mitsubishi",
@@ -265,7 +268,7 @@ COMPANY_MAP = {
     "r and s": "r&s northeast",  # mostly to avoid this over-matching other assignee terms
 }
 
-OWNER_TERM_MAP = {
+OWNER_TERM_NORMALIZATION_MAP = {
     "lab": "laboratory",
     "labs": "laboratories",
     "univ": "university",
