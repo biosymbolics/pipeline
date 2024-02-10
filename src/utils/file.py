@@ -1,12 +1,12 @@
 """
 Utils related to files
 """
+
 import json
 import logging
 import os
 import pickle
-import uuid
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

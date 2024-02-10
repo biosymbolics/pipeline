@@ -4,6 +4,7 @@ Class for biomedical entity etl
 
 import asyncio
 from typing import Sequence
+import uuid
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
@@ -73,7 +74,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             for on, de in zip(terms, lookup_docs)
             if de.canonical_entity is not None  # shouldn't happen
         }
-        save_json_as_file(lookup_map, "canonical_map.json")
+        save_json_as_file(lookup_map, f"canonical_map-{uuid.uuid4()}.json")
         return lookup_map
 
     def _generate_crud(
