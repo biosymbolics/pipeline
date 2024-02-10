@@ -1,6 +1,7 @@
 """
 Text classifiers
 """
+
 from enum import Enum
 import regex as re
 from pydash import compact, flatten

@@ -5,6 +5,7 @@ from core.ner.classifier import create_lookup_map
 
 ASSIGNEE_PATENT_THRESHOLD = 20
 
+
 OWNER_KEYWORD_MAP = create_lookup_map(
     {
         OwnerType.UNIVERSITY: [
@@ -14,6 +15,7 @@ OWNER_KEYWORD_MAP = create_lookup_map(
             "institute?s?",
             "schools?",
             "nyu",
+            "alumni",
             "universitaire?s?",
             # "l'Université",
             # "Université",
