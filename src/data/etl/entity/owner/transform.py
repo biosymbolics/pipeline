@@ -5,17 +5,17 @@ Transformation methods for owner etl
 from datetime import datetime
 from functools import reduce
 import regex as re
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 from pydash import compact
 from prisma.enums import OwnerType
 from prisma.types import (
     FinancialSnapshotCreateWithoutRelationsInput as FinancialSnapshotCreateInput,
 )
+import logging
 
 
 from clients.finance.financials import CompanyFinancialExtractor
 from constants.company import (
-    COMMON_OWNER_WORDS,
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
     OWNER_TERM_NORMALIZATION_MAP,
@@ -29,9 +29,12 @@ from utils.re import get_or_re, sub_extra_spaces
 
 from .constants import OWNER_KEYWORD_MAP
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def generate_clean_owner_map(
-    owners: Sequence[str],
+    names: Sequence[str],
     normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
     overrides: dict[str, str] = COMPANY_MAP,
     suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
@@ -106,6 +109,13 @@ def generate_clean_owner_map(
             return key
         return None
 
+    def sub_punctuation(terms: list[str]) -> Iterable[str]:
+        """
+        Remove punctuation (.,)
+        """
+        for term in terms:
+            yield re.sub(r"[.,]+", "", term, flags=RE_FLAGS)
+
     def generate_override_map(
         orig_names: Sequence[str], override_map: dict[str, str]
     ) -> dict[str, str]:
@@ -127,25 +137,30 @@ def generate_clean_owner_map(
 
         return dict(compact([_map(on) for on in orig_names]))
 
+    logger.info("Generating owner canonicalization map (%s)", len(names))
+
     # apply overrides first
-    override_map = generate_override_map(owners, overrides)
+    override_map = generate_override_map(names, overrides)
 
     # clean the remainder
     cleaning_steps = [
         sub_suppressions,
         normalize_terms,  # order matters
+        sub_punctuation,
         sub_extra_spaces,
         lambda owners: [o.lower() for o in owners],
     ]
-    cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
+    cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, names))
 
     # maps cleaned to clustered
+    logger.info("Clustering owner terms (%s)", len(cleaned))
     cleaned_to_cluster = cluster_terms(cleaned, PLURAL_COMMON_OWNER_WORDS)
 
+    logger.info("Generated owner canonicalization map")
     # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }
     return {
         orig: override_map.get(orig) or cleaned_to_cluster.get(clean) or "other"
-        for orig, clean in zip(owners, cleaned)
+        for orig, clean in zip(names, cleaned)
     }
 
 

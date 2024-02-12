@@ -4,6 +4,7 @@ Utils for the NER pipeline
 
 from functools import partial, reduce
 import logging
+import sys
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -537,17 +538,19 @@ def fit_tfidf_vectorizer(
         stop_words="english",
         ngram_range=ngram_range,
         strip_accents="unicode",
+        min_df=2,  # ??
     )
     vectorizer.fit(terms)
 
     # set IDFs lower for known-common words
-    idfs = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
     vectorizer.idf_ = list(
         {
             k: ((v * common_word_weight) if k in common_words else v)
-            for k, v in idfs.items()
+            for k, v in zip(vectorizer.get_feature_names_out(), vectorizer.idf_)
         }.values()
     )
+
+    logger.info("Fitted TF-IDF vectorizer")
 
     return vectorizer
 
@@ -559,6 +562,8 @@ def cluster_terms(
     Clusters terms using TF-IDF and HDBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair).
 
+    On a machine with 16GB RAM, this function can handle ~50k terms
+
     Args:
         terms (Sequence[str]): list of terms to cluster
 
@@ -569,17 +574,29 @@ def cluster_terms(
     from sklearn.cluster._hdbscan.hdbscan import HDBSCAN
 
     vectorizer = fit_tfidf_vectorizer(terms, common_words=common_words)
-    X = vectorizer.transform(terms)
+    vectorized = vectorizer.transform(terms)
+    logger.info("VECTORIZED approx %s MB", sys.getsizeof(vectorized) / 1024 / 1024)
 
-    clustering = HDBSCAN(
-        min_cluster_size=3,
-        max_cluster_size=100000,
-        # merge clusters that are close
-        # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#selecting-cluster-selection-epsilon
-        cluster_selection_epsilon=0.4,
-        # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#leaf-clustering
-        cluster_selection_method="leaf",
-    ).fit(X)
-    cluster_ids = list(clustering.labels_)
+    logger.info("Starting clustering")
+    try:
+        cluster_ids = (
+            HDBSCAN(
+                min_cluster_size=3,
+                min_samples=3,
+                max_cluster_size=100000,
+                # merge clusters that are close
+                # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#selecting-cluster-selection-epsilon
+                cluster_selection_epsilon=0.4,
+                # leaf_size=200,
+                # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#leaf-clustering
+                cluster_selection_method="leaf",
+                n_jobs=1,
+            )
+            .fit_predict(vectorized)
+            .tolist()
+        )
+    except Exception as e:
+        logger.error("Error in clustering: %s", e)
+        raise e
 
     return _create_cluster_term_map(terms, cluster_ids)

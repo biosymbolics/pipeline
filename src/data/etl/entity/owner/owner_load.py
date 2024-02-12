@@ -6,7 +6,7 @@ from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
-from constants.company import COMMON_OWNER_WORDS
+from constants.company import COMMON_GOVT_WORDS, COMMON_OWNER_WORDS
 from typings.companies import CompanyInfo
 from utils.re import get_or_re
 
@@ -14,7 +14,7 @@ from .owner import OwnerEtl
 
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
-ASSIGNEE_PATENT_THRESHOLD = 20
+ASSIGNEE_PATENT_THRESHOLD = 100
 
 
 class OwnerLoader:
@@ -27,7 +27,7 @@ class OwnerLoader:
         - drugcentral approvals
         """
         org_re = get_or_re(
-            COMMON_OWNER_WORDS,
+            [*COMMON_OWNER_WORDS, *COMMON_GOVT_WORDS],
             enforce_word_boundaries=True,
             permit_plural=True,
             word_boundary_char=r"\y",
@@ -38,32 +38,50 @@ class OwnerLoader:
         db_owner_query_map = {
             # patents db
             "patents": f"""
-                SELECT lower(max(name)) as name
+                -- if fewer than ASSIGNEE_PATENT_THRESHOLD, look for signs that it is an org
+                SELECT lower(max(name)) as name, count(*) as count
                 FROM applications a, unnest(assignees) as name
-                GROUP BY lower(name)
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
-
-                UNION ALL
-
-                -- if fewer than 20 patents, BUT the name looks like an org (company, govt, uni), include it.
-                SELECT lower(max(name)) as name
-                FROM applications a, unnest(assignees) as name
-                WHERE name ~* '{org_re}\\.?'
+                WHERE
+                    (
+                        name ~* '{org_re}\\.?'
+                        OR array_length(regexp_split_to_array(name, ' '), 1) > 5
+                        OR array_length(regexp_split_to_array(name, ' '), 1) < 2
+                    )
                 GROUP BY lower(name)
                 HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
+                AND count(*) > 5
 
-                UNION ALL
+                UNION
 
-                SELECT lower(max(name)) as name
+                -- if greater than ASSIGNEE_PATENT_THRESHOLD, take it.
+                SELECT lower(max(name)) as name, count(*) as count
+                FROM applications a, unnest(assignees) as name
+                GROUP BY lower(name)
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+
+                UNION
+
+                -- if inventors are greater than ASSIGNEE_PATENT_THRESHOLD, take it.
+                SELECT lower(max(name)) as name, count(*) as count
                 FROM applications a, unnest(inventors) as name
                 GROUP BY lower(name)
                 HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
             """,
             # ctgov db
             "aact": """
+                -- fewer than 3, look at name to confirm that this is an org
+                select lower(name) as name, count(*) as count
+                from sponsors
+                WHERE name ~* '{org_re}\\.?'
+                group by lower(name)
+                HAVING count(*) <= 2
+
+                UNION
+
                 select lower(name) as name
                 from sponsors
                 group by lower(name)
+                HAVING count(*) > 2
             """,
             # drugcentral db, with approvals
             # `ob_product`` has 1772 distinct applicants vs `approval` at 1136

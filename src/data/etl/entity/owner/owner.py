@@ -90,6 +90,7 @@ class OwnerEtl(BaseEntityEtl):
             ],
             skip_duplicates=True,
         )
+        logger.info("Created owners")
 
         await batch_update(
             insert_recs,
@@ -101,6 +102,8 @@ class OwnerEtl(BaseEntityEtl):
                 ),
             ),
         )
+
+        logger.info("Updated owners")
 
     @staticmethod
     async def load_financials(public_companies: Sequence[CompanyInfo]):
@@ -130,10 +133,12 @@ class OwnerEtl(BaseEntityEtl):
         """
         Delete all owners
         """
+        logger.info("Deleting all owners")
         client = await prisma_client(600)
         await Ownable.prisma(client).query_raw(
             "UPDATE ownable SET owner_id=NULL WHERE owner_id IS NOT NULL"
         )
+        await FinancialSnapshot.prisma(client).delete_many()
         await OwnerSynonym.prisma(client).delete_many()
         await Owner.prisma(client).delete_many()
 
