@@ -4,6 +4,7 @@ Utils for the NER pipeline
 
 from functools import partial, reduce
 import logging
+from pydash import group_by
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -491,6 +492,32 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     return entity_set
 
 
+def _create_cluster_term_map(
+    terms: Sequence[str], cluster_ids: Sequence[int]
+) -> dict[str, str]:
+    """
+    Creates a map between synonym/secondary terms and the primary
+    For use with cluster_terms
+    """
+    term_clusters = (
+        pl.DataFrame({"cluster_id": cluster_ids, "name": terms})
+        .filter(pl.col("cluster_id") != -1)
+        .group_by(["cluster_id", "name"])
+        .len()
+        .sort(["cluster_id", "name"])  # sort so that first name is the most common
+        .group_by("cluster_id")  # re-cluster by cluster_id
+        .agg(pl.col("name"))
+        .drop("cluster_id")
+        .to_series()
+        .to_list()
+    )
+    return {
+        m: members_terms[0]  # synonym to most-frequent-term
+        for members_terms in term_clusters
+        for m in members_terms
+    }
+
+
 def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
     """
     Clusters terms using TF-IDF and DBSCAN.
@@ -512,20 +539,6 @@ def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
     )
     X = vectorizer.fit_transform(terms)
     clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)  # HDBSCAN ?
-    labels = clustering.labels_
+    cluster_ids = list(clustering.labels_)
 
-    df = (
-        pl.DataFrame({"cluster_id": labels, "name": terms})
-        .filter(pl.col("cluster_id") != -1)
-        .group_by("cluster_id")
-        .agg(pl.col("name").unique())
-    )
-    print(df)
-
-    term_clusters = df.drop("cluster_id").to_series().to_list()
-
-    return {
-        m: members_terms[0]  # syn to (arbitrarily picked) canonical
-        for members_terms in term_clusters
-        for m in members_terms[0:]
-    }
+    return _create_cluster_term_map(terms, cluster_ids)

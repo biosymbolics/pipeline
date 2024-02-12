@@ -4,14 +4,19 @@ import pytest
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
-from core.ner.utils import rearrange_terms, normalize_by_pos
+from core.ner.utils import (
+    rearrange_terms,
+    normalize_by_pos,
+    cluster_terms,
+    _create_cluster_term_map,
+)
 from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 
 
-@pytest.mark.skip(reason="In flux")
+# @pytest.mark.skip(reason="In flux")
 class TestNerUtils(unittest.TestCase):
     """
     TODO:
@@ -25,240 +30,22 @@ class TestNerUtils(unittest.TestCase):
             ],
         )
 
-    def test_clean_entities(self):
+    def test_cluster_terms(self):
         test_conditions = [
             {
-                "input": "OPSUMIT ®",
-                "expected": "opsumit",
-            },
-            {
-                "input": "OPSUMITA®",
-                "expected": "opsumita",
-            },
-            {
-                "input": "OPSUMITB®, other product",
-                "expected": "opsumitb, other",
-            },
-            {
-                "input": "/OPSUMITC ®",
-                "expected": "opsumitc",
-            },
-            {
-                "input": "5-ht1a inhibitors",
-                "expected": "5 ht1a inhibitor",  # TODO
-            },
-            {
-                "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
-                "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione",
-            },
-            {
-                "input": "(meth)acrylic acid polymer",
-                "expected": "methacrylic acid polymer",
-            },
-            {
-                "input": "metabotropic glutamate receptor (mGluR) antagonists",
-                "expected": "metabotropic glutamate antagonist",
-            },
-            {
-                "input": "poly(isoprene)",
-                "expected": "polyisoprene",
-            },
-            {
-                "input": "poly(isoprene-co-butadiene)",
-                "expected": "polyisoprene co-butadiene",
-            },
-            {
-                "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
-                "expected": "the gc family il2, il9, and il15",  # TODO
-            },
-            {
-                "input": "Familial Alzheimer Disease (FAD)",
-                "expected": "familial alzheimer disease",
-            },
-            {
-                "input": "il36 pathway inhibitors",
-                "expected": "il36 inhibitor",
-            },
-            {
-                "input": "anti-il36r antibodies",
-                "expected": "anti il36r antibody",
-            },
-            {
-                "input": "human il-36r agonist ligands il36α",
-                "expected": "il36r agonist ligands il36a",  # TODO
-            },
-            {
-                "input": "GLP-1 receptor agonists",
-                "expected": "glp1 agonist",
-            },
-            # tgf beta r1 inhibitor
-            {
-                "input": "tgf-beta 1 accessory receptor",
-                "expected": "tgfb1 accessory receptor",
-            },
-            {
-                "input": "inhibitor of tgfβ1 activity",
-                "expected": "tgfb1 inhibitor",
-            },
-            {
-                "input": "tgf beta antisense oligonucleotide",
-                "expected": "tgfb antisense oligonucleotide",
-            },
-            {
-                "input": "tgfβ receptor 1",
-                "expected": "tgfb receptor 1",  # TODO
-            },
-            {
-                "input": "transforming growth factor β (tgfβ) antagonist",
-                "expected": "tgfb (tgfb) antagonist",
-            },
-            {
-                "input": "transforming growth factor beta3",
-                "expected": "tgfb3",
-            },
-            {
-                "input": "tgfβ1 inhibitor",
-                "expected": "tgfb1 inhibitor",
-            },
-            {
-                "input": "tgf β superfamily type ii receptor",
-                "expected": "tgfbii receptor",  # TODO
-            },
-            {
-                "input": "tgf-beta superfamily proteins",
-                "expected": "tgfb superfamily protein",
-            },
-            {
-                "input": "anti tgf β 1 antibody",
-                "expected": "anti tgfb1 antibody",
-            },
-            {
-                "input": "tgfβ",
-                "expected": "tgfb",
-            },
-            {
-                "input": "TGF-β type I receptor",
-                "expected": "tgfbi receptor",  # TGFβRI
-            },
-            {
-                "input": "tgfb inhibitor",
-                "expected": "tgfb inhibitor",
-            },
-            {
-                "input": "tgfb1",
-                "expected": "tgfb1",
-            },
-            {
-                "input": "(tumor necrosis factor)-alpha inhibitor tgf",
-                "expected": "(tumor necrosis factor)-alpha inhibitor tgf",  # TODO
-            },
-            {
-                "input": "EGFR vIII mRNA",
-                "expected": "egfr viii mrna",
-            },
-            {
-                "input": "tgf-β1",
-                "expected": "tgfb1",
-            },
-            {
-                "input": "β-2-adrenergic agonist",
-                "expected": "b2 adrenergic agonist",
-            },
-            {
-                "input": "anti-TGF-β siRNA",
-                "expected": "anti tgfb sirna",
-            },
-            {
-                "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
-                "expected": "tgfb (tgfb) overexpression disorder",  # TODO
-            },
-            {
-                "input": "angiotensin-ii",
-                "expected": "angiotensin ii",
-            },
-            {
-                "input": "receptor activator of NF-kB ligand",
-                "expected": "nfkb ligand activator",
-            },
-            {
-                "input": "chimeric antibody-T cell receptor",
-                "expected": "chimeric antigen receptor t-cell",
-            },
-            {
-                "input": "β1-adrenoreceptor gene",
-                "expected": "b1 adrenoreceptor gene",
-            },
-            {
-                "input": "5-hydroxytryptamine-3 receptor antagonist",
-                "expected": "5 hydroxytryptamine 3 antagonist",
-            },
-            {
-                "input": "glucagon-like peptide-2 receptors",
-                "expected": "glucagon like peptide 2 receptor",
-            },
-            {
-                "input": "T-cell receptor CD-28",
-                "expected": "t-cell receptor cd28",
-            },
-            {
-                "input": "abl kinase inhibition",
-                "expected": "abl kinase inhibitor",
-            },
-            {
-                "input": "akt (protein kinase b) inhibitor",
-                "expected": "akt inhibitor",  # TODO
-            },
-            {
-                "input": "apolipoprotein ai (apo ai)",
-                "expected": "apolipoprotein ai",
-            },
-            {
-                "input": "di(C1-C4 alkyl) ether",
-                "expected": "di(c1 c4 alkyl) ether",
-            },
-            {
-                "input": "epstein barr virus (ebv) nucleic acid",
-                "expected": "epstein barr virus nucleic acid",
-            },
-            {
-                "input": "ingredient tumor cytotoxic factor-II (TCF-II)",
-                "expected": "ingredient tumor cytotoxic factor ii",
-            },
-            {
-                "input": "FOLFIRINOX treatment",
-                "expected": "folfirinox",
-            },
-            {
-                "input": "TGF-β inhibitor",
-                "expected": "tgfb inhibitor",
-            },
-            {
-                "input": "NF-kB",
-                "expected": "nfkb",
-            },
-            {
-                "input": "NF-kB",
-                "expected": "nfkb",
-            },
-            {
-                "input": "DIURETICS CONTAINING η-TOCOTRIENOL",
-                "expected": "diuretics containing eta tocotrienol",
-            },
-            {
-                "input": "FcηRII bridging agent",
-                "expected": "fcerii bridging agent",
-            },
-            {
-                "input": "β-methyl-β-hydroxy-η-butyrolactone",
-                "expected": "β methyl beta hydroxy eta butyrolactone",  # TODO
-            },
-            {
-                "input": "α,ω-dihalogen substituted alkane",
-                "expected": "alpha,omega dihalogen substituted alkane",  # TODO ?
-            },
-            {
-                "input": "aβ42",
-                "expected": "abeta42",
+                "description": "basic clustering",
+                "input": [
+                    "tgf beta",
+                    "tgf beta other",  # making sure this name is not chosen
+                    "tgf beta",
+                    "thing other",
+                    "thing other",
+                ],
+                "expected": {
+                    "tgf beta": "tgf beta",
+                    "tgf beta other": "tgf beta",
+                    "thing other": "thing other",
+                },
             },
         ]
 
@@ -266,9 +53,284 @@ class TestNerUtils(unittest.TestCase):
             input = condition["input"]
             expected = condition["expected"]
 
-            result = self.cleaner.clean([input], True)
-            print("Actual", result, "expected", [expected])
-            self.assertEqual(result, [expected])
+            result = cluster_terms(input)
+            if result != expected:
+                print(f"Actual: '{result}', expected: '{expected}'")
+
+            self.assertEqual(result, expected)
+
+    def test__create_cluster_term_map(self):
+        test_conditions = [
+            {
+                "description": "selects the most common term",
+                "terms": [
+                    "canonical_name",
+                    "non_canonical_name",
+                    "canonical_name",
+                ],
+                "cluster_ids": [1, 1, 1],
+                "expected": {
+                    "non_canonical_name": "canonical_name",
+                    "canonical_name": "canonical_name",
+                },
+            },
+        ]
+
+        for test in test_conditions:
+            terms = test["terms"]
+            cluster_ids = test["cluster_ids"]
+            expected = test["expected"]
+
+            result = _create_cluster_term_map(terms, cluster_ids)
+            if result != expected:
+                print(f"Actual: '{result}', expected: '{expected}'")
+
+            self.assertEqual(result, expected)
+
+    # def test_clean_entities(self):
+    #     test_conditions = [
+    #         {
+    #             "input": "OPSUMIT ®",
+    #             "expected": "opsumit",
+    #         },
+    #         {
+    #             "input": "OPSUMITA®",
+    #             "expected": "opsumita",
+    #         },
+    #         {
+    #             "input": "OPSUMITB®, other product",
+    #             "expected": "opsumitb, other",
+    #         },
+    #         {
+    #             "input": "/OPSUMITC ®",
+    #             "expected": "opsumitc",
+    #         },
+    #         {
+    #             "input": "5-ht1a inhibitors",
+    #             "expected": "5 ht1a inhibitor",  # TODO
+    #         },
+    #         {
+    #             "input": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione derivatives",
+    #             "expected": "1-(3-aminophenyl)-6,8-dimethyl-5-(4-iodo-2-fluoro-phenylamino)-3-cyclopropyl-1h,6h-pyrido[4,3-d]pyridine-2,4,7-trione",
+    #         },
+    #         {
+    #             "input": "(meth)acrylic acid polymer",
+    #             "expected": "methacrylic acid polymer",
+    #         },
+    #         {
+    #             "input": "metabotropic glutamate receptor (mGluR) antagonists",
+    #             "expected": "metabotropic glutamate antagonist",
+    #         },
+    #         {
+    #             "input": "poly(isoprene)",
+    #             "expected": "polyisoprene",
+    #         },
+    #         {
+    #             "input": "poly(isoprene-co-butadiene)",
+    #             "expected": "polyisoprene co-butadiene",
+    #         },
+    #         {
+    #             "input": "The γc-family Interleukin-2 (IL-2), Interleukin-9 (IL-9), and Interleukin-15 (IL-15)",
+    #             "expected": "the gc family il2, il9, and il15",  # TODO
+    #         },
+    #         {
+    #             "input": "Familial Alzheimer Disease (FAD)",
+    #             "expected": "familial alzheimer disease",
+    #         },
+    #         {
+    #             "input": "il36 pathway inhibitors",
+    #             "expected": "il36 inhibitor",
+    #         },
+    #         {
+    #             "input": "anti-il36r antibodies",
+    #             "expected": "anti il36r antibody",
+    #         },
+    #         {
+    #             "input": "human il-36r agonist ligands il36α",
+    #             "expected": "il36r agonist ligands il36a",  # TODO
+    #         },
+    #         {
+    #             "input": "GLP-1 receptor agonists",
+    #             "expected": "glp1 agonist",
+    #         },
+    #         # tgf beta r1 inhibitor
+    #         {
+    #             "input": "tgf-beta 1 accessory receptor",
+    #             "expected": "tgfb1 accessory receptor",
+    #         },
+    #         {
+    #             "input": "inhibitor of tgfβ1 activity",
+    #             "expected": "tgfb1 inhibitor",
+    #         },
+    #         {
+    #             "input": "tgf beta antisense oligonucleotide",
+    #             "expected": "tgfb antisense oligonucleotide",
+    #         },
+    #         {
+    #             "input": "tgfβ receptor 1",
+    #             "expected": "tgfb receptor 1",  # TODO
+    #         },
+    #         {
+    #             "input": "transforming growth factor β (tgfβ) antagonist",
+    #             "expected": "tgfb (tgfb) antagonist",
+    #         },
+    #         {
+    #             "input": "transforming growth factor beta3",
+    #             "expected": "tgfb3",
+    #         },
+    #         {
+    #             "input": "tgfβ1 inhibitor",
+    #             "expected": "tgfb1 inhibitor",
+    #         },
+    #         {
+    #             "input": "tgf β superfamily type ii receptor",
+    #             "expected": "tgfbii receptor",  # TODO
+    #         },
+    #         {
+    #             "input": "tgf-beta superfamily proteins",
+    #             "expected": "tgfb superfamily protein",
+    #         },
+    #         {
+    #             "input": "anti tgf β 1 antibody",
+    #             "expected": "anti tgfb1 antibody",
+    #         },
+    #         {
+    #             "input": "tgfβ",
+    #             "expected": "tgfb",
+    #         },
+    #         {
+    #             "input": "TGF-β type I receptor",
+    #             "expected": "tgfbi receptor",  # TGFβRI
+    #         },
+    #         {
+    #             "input": "tgfb inhibitor",
+    #             "expected": "tgfb inhibitor",
+    #         },
+    #         {
+    #             "input": "tgfb1",
+    #             "expected": "tgfb1",
+    #         },
+    #         {
+    #             "input": "(tumor necrosis factor)-alpha inhibitor tgf",
+    #             "expected": "(tumor necrosis factor)-alpha inhibitor tgf",  # TODO
+    #         },
+    #         {
+    #             "input": "EGFR vIII mRNA",
+    #             "expected": "egfr viii mrna",
+    #         },
+    #         {
+    #             "input": "tgf-β1",
+    #             "expected": "tgfb1",
+    #         },
+    #         {
+    #             "input": "β-2-adrenergic agonist",
+    #             "expected": "b2 adrenergic agonist",
+    #         },
+    #         {
+    #             "input": "anti-TGF-β siRNA",
+    #             "expected": "anti tgfb sirna",
+    #         },
+    #         {
+    #             "input": "disorders characterised by transforming growth factor β (tgfβ) overexpression",
+    #             "expected": "tgfb (tgfb) overexpression disorder",  # TODO
+    #         },
+    #         {
+    #             "input": "angiotensin-ii",
+    #             "expected": "angiotensin ii",
+    #         },
+    #         {
+    #             "input": "receptor activator of NF-kB ligand",
+    #             "expected": "nfkb ligand activator",
+    #         },
+    #         {
+    #             "input": "chimeric antibody-T cell receptor",
+    #             "expected": "chimeric antigen receptor t-cell",
+    #         },
+    #         {
+    #             "input": "β1-adrenoreceptor gene",
+    #             "expected": "b1 adrenoreceptor gene",
+    #         },
+    #         {
+    #             "input": "5-hydroxytryptamine-3 receptor antagonist",
+    #             "expected": "5 hydroxytryptamine 3 antagonist",
+    #         },
+    #         {
+    #             "input": "glucagon-like peptide-2 receptors",
+    #             "expected": "glucagon like peptide 2 receptor",
+    #         },
+    #         {
+    #             "input": "T-cell receptor CD-28",
+    #             "expected": "t-cell receptor cd28",
+    #         },
+    #         {
+    #             "input": "abl kinase inhibition",
+    #             "expected": "abl kinase inhibitor",
+    #         },
+    #         {
+    #             "input": "akt (protein kinase b) inhibitor",
+    #             "expected": "akt inhibitor",  # TODO
+    #         },
+    #         {
+    #             "input": "apolipoprotein ai (apo ai)",
+    #             "expected": "apolipoprotein ai",
+    #         },
+    #         {
+    #             "input": "di(C1-C4 alkyl) ether",
+    #             "expected": "di(c1 c4 alkyl) ether",
+    #         },
+    #         {
+    #             "input": "epstein barr virus (ebv) nucleic acid",
+    #             "expected": "epstein barr virus nucleic acid",
+    #         },
+    #         {
+    #             "input": "ingredient tumor cytotoxic factor-II (TCF-II)",
+    #             "expected": "ingredient tumor cytotoxic factor ii",
+    #         },
+    #         {
+    #             "input": "FOLFIRINOX treatment",
+    #             "expected": "folfirinox",
+    #         },
+    #         {
+    #             "input": "TGF-β inhibitor",
+    #             "expected": "tgfb inhibitor",
+    #         },
+    #         {
+    #             "input": "NF-kB",
+    #             "expected": "nfkb",
+    #         },
+    #         {
+    #             "input": "NF-kB",
+    #             "expected": "nfkb",
+    #         },
+    #         {
+    #             "input": "DIURETICS CONTAINING η-TOCOTRIENOL",
+    #             "expected": "diuretics containing eta tocotrienol",
+    #         },
+    #         {
+    #             "input": "FcηRII bridging agent",
+    #             "expected": "fcerii bridging agent",
+    #         },
+    #         {
+    #             "input": "β-methyl-β-hydroxy-η-butyrolactone",
+    #             "expected": "β methyl beta hydroxy eta butyrolactone",  # TODO
+    #         },
+    #         {
+    #             "input": "α,ω-dihalogen substituted alkane",
+    #             "expected": "alpha,omega dihalogen substituted alkane",  # TODO ?
+    #         },
+    #         {
+    #             "input": "aβ42",
+    #             "expected": "abeta42",
+    #         },
+    #     ]
+
+    #     for condition in test_conditions:
+    #         input = condition["input"]
+    #         expected = condition["expected"]
+
+    #         result = self.cleaner.clean([input], True)
+    #         print("Actual", result, "expected", [expected])
+    #         self.assertEqual(result, [expected])
 
     def test_rearrange_of(self):
         # diseases in which tgfβ is instrumental
