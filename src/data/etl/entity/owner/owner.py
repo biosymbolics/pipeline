@@ -5,7 +5,7 @@ Class for biomedical entity etl
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
-from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
+from prisma.models import FinancialSnapshot, Ownable, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
 
 from clients.low_level.prisma import batch_update, prisma_client
@@ -126,10 +126,27 @@ class OwnerEtl(BaseEntityEtl):
             skip_duplicates=True,
         )
 
+    async def delete_owners(self):
+        """
+        Delete all owners
+        """
+        client = await prisma_client(600)
+        await Ownable.prisma(client).query_raw(
+            "UPDATE ownable SET owner_id=NULL WHERE owner_id IS NOT NULL"
+        )
+        await OwnerSynonym.prisma(client).delete_many()
+        await Owner.prisma(client).delete_many()
+
     @overrides(BaseEntityEtl)
     async def copy_all(
-        self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
+        self,
+        names: Sequence[str],
+        public_companies: Sequence[CompanyInfo],
+        is_update: bool = False,
     ):
+        if is_update:
+            await self.delete_owners()
+
         await self.create_records(names)
         await self.load_financials(public_companies)
 

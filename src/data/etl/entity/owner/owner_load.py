@@ -104,10 +104,10 @@ class OwnerLoader:
             for d in pharmas.select(pl.col(["name", "symbol"])).to_dicts()
         ]
 
-    async def copy_all(self):
+    async def copy_all(self, is_force_update: bool = False):
         names = await self.get_owner_names()
         public_companies = self.load_public_companies()
-        await OwnerEtl().copy_all(names, public_companies)
+        await OwnerEtl().copy_all(names, public_companies, is_force_update)
 
     @staticmethod
     async def post_finalize():
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.owner.load [--post-finalize]
+            Usage: python3 -m data.etl.entity.owner.load [--post-finalize] [--force_update]
             """
         )
         sys.exit()
@@ -126,4 +126,5 @@ if __name__ == "__main__":
     if "--post-finalize" in sys.argv:
         asyncio.run(OwnerLoader().post_finalize())
     else:
-        asyncio.run(OwnerLoader().copy_all())
+        is_force_update = "--force_update" in sys.argv
+        asyncio.run(OwnerLoader().copy_all(is_force_update))
