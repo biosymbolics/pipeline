@@ -19,6 +19,7 @@ from constants.company import (
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
     OWNER_TERM_NORMALIZATION_MAP,
+    PLURAL_COMMON_OWNER_WORDS,
 )
 from core.ner.classifier import classify_string
 from core.ner.cleaning import RE_FLAGS
@@ -31,8 +32,9 @@ from .constants import OWNER_KEYWORD_MAP
 
 def generate_clean_owner_map(
     owners: Sequence[str],
-    owner_normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
-    owner_suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
+    normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
+    overrides: dict[str, str] = COMPANY_MAP,
+    suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
 ) -> dict[str, str]:
     """
     Clean owner names
@@ -53,7 +55,7 @@ def generate_clean_owner_map(
             - University Of Alabama At Birmingham  -> University Of Alabama
             - University of Colorado, Denver -> University of Colorado
         """
-        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(owner_suppressions)}\b)"
+        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(suppressions)}\b)"
         pre_suppress_re = "^the\b"
 
         # remove anything in parentheses
@@ -68,7 +70,7 @@ def generate_clean_owner_map(
         Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
         No deduplication, becaues the last step is tfidf + clustering
         """
-        term_map_set = list(owner_normalization_map.keys())
+        term_map_set = list(normalization_map.keys())
         term_map_re = get_or_re(term_map_set, enforce_word_boundaries=True)
 
         def _normalize(_assignee: str):
@@ -86,7 +88,7 @@ def generate_clean_owner_map(
             for rewrite in term_map_set:
                 assignee_copy = re.sub(
                     rf"\b{rewrite}\b",
-                    f" {owner_normalization_map[rewrite]} ",
+                    f" {normalization_map[rewrite]} ",
                     assignee_copy,
                     flags=RE_FLAGS,
                 ).strip()
@@ -105,7 +107,7 @@ def generate_clean_owner_map(
         return None
 
     def generate_override_map(
-        orig_names: Sequence[str], override_map: dict[str, str] = COMPANY_MAP
+        orig_names: Sequence[str], override_map: dict[str, str]
     ) -> dict[str, str]:
         """
         Apply overrides to owner strings, a mapping between original_name and overridden name
@@ -126,7 +128,7 @@ def generate_clean_owner_map(
         return dict(compact([_map(on) for on in orig_names]))
 
     # apply overrides first
-    # override_map = generate_override_map(owners)
+    override_map = generate_override_map(owners, overrides)
 
     # clean the remainder
     cleaning_steps = [
@@ -138,24 +140,12 @@ def generate_clean_owner_map(
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
 
     # maps cleaned to clustered
-    plural_common_words = set(
-        [
-            *COMMON_OWNER_WORDS,
-            *map(lambda x: x + "s", COMMON_OWNER_WORDS),
-        ]
-    )
-    cleaned_to_cluster = cluster_terms(cleaned, plural_common_words)
-
-    # maps orig to cleaned
-    orig_to_cleaned = {
-        **{orig: clean for orig, clean in zip(owners, cleaned)},
-        # **override_map,  # include overrides (e.g. "pfizer inc" -> "pfizer")
-    }
+    cleaned_to_cluster = cluster_terms(cleaned, PLURAL_COMMON_OWNER_WORDS)
 
     # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }
     return {
-        orig: cleaned_to_cluster.get(clean) or "other"
-        for orig, clean in orig_to_cleaned.items()
+        orig: override_map.get(orig) or cleaned_to_cluster.get(clean) or "other"
+        for orig, clean in zip(owners, cleaned)
     }
 
 

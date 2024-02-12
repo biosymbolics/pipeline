@@ -149,6 +149,14 @@ COMMON_OWNER_WORDS = [
     "research",
 ]
 
+# a little messy
+PLURAL_COMMON_OWNER_WORDS = set(
+    [
+        *COMMON_OWNER_WORDS,
+        *map(lambda x: x + "s", COMMON_OWNER_WORDS),
+    ]
+)
+
 COMMON_GOVT_WORDS = [
     "government",
     "govt",
@@ -168,8 +176,33 @@ COMMON_GOVT_WORDS = [
     "authorities",
 ]
 
+# https://en.wikipedia.org/wiki/List_of_largest_pharmaceutical_mergers_and_acquisitions
+MA_MAPPINGS = {
+    "genzyme": "sanofi",
+    "smithkline beecham": "glaxosmithkline",
+    "celgene": "bristol-myers squibb",
+    "aventis": "sanofi",
+    "monsanto": "bayer",
+    "covidien": "medtronic",
+    "pharmacia": "pfizer",
+    "shire": "takeda",
+    "alcon": "novartis",
+    "actelion": "johnson & johnson",
+    "forest laboratory": "allergan",
+    "hospira": "pfizer",
+    "sigma[- ]?aldrich": "merck",
+    "immunex": "amgen",
+    "medimmune": "astrazeneca",
+    "serono": "merck",
+    "kite pharma": "gilead",
+    "bioverativ": "sanofi",
+    "onyx": "amgen",
+    "allergan": "abbvie",
+    "catalent": "novo nordisk",
+}
 
 COMPANY_MAP = {
+    **MA_MAPPINGS,
     "abbott": "abbott",
     "abbvie": "abbvie",
     "allergan": "allergan",
@@ -182,7 +215,6 @@ COMPANY_MAP = {
     "lilly co eli": "eli lilly",
     "lilly": "eli lilly",
     "glaxo": "glaxosmithkline",
-    "smithkline beecham": "glaxosmithkline",
     "merck": "merck",
     "sinai": "mount sinai",
     "medtronic": "medtronic",
@@ -191,6 +223,7 @@ COMPANY_MAP = {
     "genzyme": "sanofi",
     "basf": "basf",
     "3m": "3m",
+    "matsushita": "matsushita",
     "medical res council": "medical research council",
     "mayo": "mayo clinic",  # FPs
     "unilever": "unilever",
@@ -211,6 +244,7 @@ COMPANY_MAP = {
     "novartis": "novartis",
     "pfizer": "pfizer",
     "wyeth": "pfizer",
+    "genentech": "genentech",
     "gilead": "gilead",
     "dow": "dow",
     "procter .{1,4} gamble": "procter and gamble",
@@ -229,7 +263,6 @@ COMPANY_MAP = {
     "celgene": "bristol-myers squibb",
     "samsung": "samsung",
     "ucb": "ucb",
-    "r and s": "r&s northeast",  # mostly to avoid this over-matching other assignee terms
 }
 
 # can be regex. \b is added to the start and end of each term

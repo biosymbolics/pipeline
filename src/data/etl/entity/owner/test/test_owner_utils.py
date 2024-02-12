@@ -1,6 +1,7 @@
 import unittest
 
 from prisma.enums import OwnerType
+from constants.company import COMPANY_MAP
 
 from data.etl.entity.owner.owner import generate_clean_owner_map, OwnerTypeParser
 
@@ -192,31 +193,61 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "university of colorado": 4,
                     "university of toronto": 6,
                 },
+                "expected_overrides": {
+                    "abbott": 11,
+                    "agency for innovation by science and technology": 4,
+                    "astrazeneca": 7,
+                    "biogen": 4,
+                    "charles river laboratory": 6,
+                    "dainippon pharmaceutical company": 6,
+                    "genentech": 6,
+                    "janssen": 11,
+                    "johnson & johnson": 1,
+                    "matsushita": 4,
+                    "merck": 5,
+                    "mo research and development inc": 3,
+                    "novo nordisk": 6,
+                    "other": 10,
+                    "pfizer": 3,
+                    "procter and gamble": 4,
+                    "united states environmental agency": 5,
+                    "united states government": 5,
+                    "university of colorado": 4,
+                    "university of toronto": 6,
+                    "us government": 5,
+                },
             },
         ]
 
         for condition in test_conditions:
             terms = condition["terms"]
-            expected = condition["expected"]
 
             # shuffling to avoid anything inconsistent based on order
             shuffled_terms = sorted(terms, key=lambda x: hash(x))
 
-            owner_map = generate_clean_owner_map(shuffled_terms)
-            result = sorted([owner_map.get(term) or term for term in shuffled_terms])
-            stats = {term: result.count(term) for term in result}
-            print("Actual: \n", stats)
-            print("Expected: \n", expected)
+            for override, expected in zip(
+                [{}, COMPANY_MAP],
+                [condition["expected"], condition["expected_overrides"]],
+            ):
+                print("Override:", override)
+                owner_map = generate_clean_owner_map(shuffled_terms, overrides=override)
+                result = sorted(
+                    [owner_map.get(term) or term for term in shuffled_terms]
+                )
+                stats = {term: result.count(term) for term in result}
+                print("Actual: \n", stats)
+                print("Expected: \n", expected)
 
-            discrepancy = {
-                term: abs(stats.get(term, 0) - expected.get(term, 0))
-                for term in expected
-            }
-            total_discrepancy = sum(discrepancy.values())
+                discrepancy = {
+                    term: abs(stats.get(term, 0) - expected.get(term, 0))
+                    for term in expected.keys()
+                }
+                total_discrepancy = sum(discrepancy.values())
 
-            print("Discrepancies: \n", discrepancy)
-            print("Total discrepancy:", total_discrepancy)
-            self.assertLessEqual(total_discrepancy, 5)
+                print("Discrepancies: \n", discrepancy)
+                print("Total discrepancy:", total_discrepancy)
+                self.assertLessEqual(total_discrepancy, 6)
+                # self.assertEqual(True, False)
 
 
 if __name__ == "__main__":

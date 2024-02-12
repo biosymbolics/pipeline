@@ -118,7 +118,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.owner.load [--post-finalize] [--force_update]
+            Usage: python3 -m data.etl.entity.owner.owner_load [--post-finalize] [--force_update]
             """
         )
         sys.exit()
