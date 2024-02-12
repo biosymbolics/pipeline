@@ -213,13 +213,15 @@ class PatentLoader(BaseDocumentEtl):
         )
         await Patent.prisma(client).delete_many()
 
-    async def add_vectors(self):
+    async def copy_vectors(self):
         """
         Copy vectors to patent table
 
         @see vectorize_patents.py
         """
+        client = await prisma_client(1200)
         queries = [
+            "CREATE EXTENSION IF NOT EXISTS dblink",
             "DROP INDEX IF EXISTS idx_patent_vector",
             f"""
                 UPDATE patent set vector = v.vector
@@ -235,7 +237,7 @@ class PatentLoader(BaseDocumentEtl):
             "CREATE INDEX ON patent USING ivfflat (vector vector_cosine_ops) WITH (lists = 1287)",
         ]
         for query in queries:
-            await PsqlDatabaseClient(SOURCE_DB).execute_query(query)
+            await client.execute_raw(query)
 
     @overrides(BaseDocumentEtl)
     async def copy_documents(self):
@@ -313,6 +315,9 @@ class PatentLoader(BaseDocumentEtl):
             batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore
         )
+
+        # copy vectors to patent table
+        await self.copy_vectors()
 
         # create "indicatable" records, those that map approval to a canonical indication
         indicatable_records = await PsqlDatabaseClient(SOURCE_DB).select(
