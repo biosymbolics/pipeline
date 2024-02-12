@@ -72,7 +72,7 @@ COMMON_COMPANY_WORDS = [
     "corporation",
     "dba",
     "development",
-    "diagnostics",
+    "diagnostic",
     "electronic",
     "eu",
     "global",
@@ -113,9 +113,10 @@ COMMON_COMPANY_WORDS = [
     "properties",
     "services",
     "system",
-    "techonology",
+    "technology",
     "technologies",
     "therapeutic",
+    "venture",
 ]
 
 COMMON_UNIVERSITY_WORDS = [
@@ -143,9 +144,9 @@ COMMON_OWNER_WORDS = [
     "department",
     "foundation",
     "human",
+    "animal",
     "medical",
     "research",
-    "science",
 ]
 
 COMMON_GOVT_WORDS = [
@@ -239,7 +240,7 @@ OWNER_TERM_NORMALIZATION_MAP = {
     "inst": "institute",
     "govt?": "government",
     "nat": "national",
-    "u[ .]?s[.]?(?:a[.]?)?": "united states",
+    "u[ .]?s[ .]?(?:a[.]?)?": "united states",
     "intl?": "international",
     "internat[a-z]*": "international",
     "dept?": "department",
@@ -254,9 +255,11 @@ OWNER_TERM_NORMALIZATION_MAP = {
     "corp": "corporation",
     "hldgs?": "holdings",
     "grp": "group",
+    "serv": "services",
     "found": "foundation",
     "l[ .]?l[ .]?c[.]?": "llc",
     "mfg": "manufacturing",
+    "n[ .]?v[.]?": "nv",
 }
 
 

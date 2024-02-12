@@ -8,6 +8,7 @@ import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
 import polars as pl
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from constants.patterns.iupac import is_iupac
 from utils.re import (
@@ -500,7 +501,7 @@ def _create_cluster_term_map(
     """
     term_clusters = (
         pl.DataFrame({"cluster_id": cluster_ids, "name": terms})
-        # .filter(pl.col("cluster_id") != -1)
+        .filter(pl.col("cluster_id") != -1)
         .group_by(["cluster_id", "name"])
         .len()
         .sort(["len"], descending=True)  # sort so that first name is the most common
@@ -518,6 +519,7 @@ def _create_cluster_term_map(
         .sort(["len"], descending=True)
         .filter(pl.col("name").str.contains("janssen"))
     )
+
     return {
         m: members_terms[0]  # synonym to most-frequent-term
         for members_terms in term_clusters
@@ -525,12 +527,45 @@ def _create_cluster_term_map(
     }
 
 
+def fit_tfidf_vectorizer(
+    terms: Sequence[str],
+    common_words: set[str] = set([]),
+    common_word_weight: float = 0.1,
+    ngram_range: tuple[int, int] = (1, 1),
+) -> TfidfVectorizer:
+    """
+    Fits a TF-IDF vectorizer with a custom IDF for common words
+
+    Args:
+        terms (Sequence[str]): list of terms to fit
+        common_words (set[str]): set of common words to lower the IDF for
+        common_word_weight (float): weight to lower the IDF for common words (default: 0.1)
+    """
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        ngram_range=ngram_range,
+        strip_accents="unicode",
+    )
+    vectorizer.fit(terms)
+
+    # set IDFs lower for known-common words
+    idfs = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
+    vectorizer.idf_ = list(
+        {
+            k: ((v * common_word_weight) if k in common_words else v)
+            for k, v in idfs.items()
+        }.values()
+    )
+
+    return vectorizer
+
+
 def cluster_terms(
     terms: Sequence[str], common_words: set[str] = set([])
 ) -> dict[str, str]:
     """
-    Clusters terms using TF-IDF and DBSCAN.
-    Returns a synonym record mapping between the canonical term and the synonym (one per pair)
+    Clusters terms using TF-IDF and HDBSCAN.
+    Returns a synonym record mapping between the canonical term and the synonym (one per pair).
 
     Args:
         terms (Sequence[str]): list of terms to cluster
@@ -539,26 +574,20 @@ def cluster_terms(
         dict[str, str]: map between synonym/secondary terms and the primary
     """
     # lazy loading
-    from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.cluster._hdbscan.hdbscan import HDBSCAN
 
-    vectorizer = TfidfVectorizer(
-        stop_words="english",
-        ngram_range=(1, 1),
-        strip_accents="unicode",
-    )
-    vectorizer.fit(terms)
-
-    # set IDFs lower for known-common words
-    idfs = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
-    vectorizer.idf_ = list(
-        {k: ((v / 5) if k in common_words else v) for k, v in idfs.items()}.values()
-    )
-
+    vectorizer = fit_tfidf_vectorizer(terms, common_words=common_words)
     X = vectorizer.transform(terms)
-    print(dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_)))
 
-    clustering = HDBSCAN(min_cluster_size=5, max_cluster_size=100000).fit(X)
+    clustering = HDBSCAN(
+        min_cluster_size=3,
+        max_cluster_size=100000,
+        # merge clusters that are close
+        # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#selecting-cluster-selection-epsilon
+        cluster_selection_epsilon=0.4,
+        # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#leaf-clustering
+        cluster_selection_method="leaf",
+    ).fit(X)
     cluster_ids = list(clustering.labels_)
 
     return _create_cluster_term_map(terms, cluster_ids)
