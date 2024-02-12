@@ -511,14 +511,6 @@ def _create_cluster_term_map(
         .to_series()
         .to_list()
     )
-    print(
-        pl.DataFrame({"cluster_id": cluster_ids, "name": terms})
-        .filter(pl.col("cluster_id") != -1)
-        .group_by(["cluster_id", "name"])
-        .len()
-        .sort(["len"], descending=True)
-        .filter(pl.col("name").str.contains("janssen"))
-    )
 
     return {
         m: members_terms[0]  # synonym to most-frequent-term
