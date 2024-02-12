@@ -6,7 +6,7 @@ from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
-from constants.company import COMPANY_INDICATORS
+from constants.company import COMMON_OWNER_WORDS
 from typings.companies import CompanyInfo
 from utils.re import get_or_re
 
@@ -26,10 +26,10 @@ class OwnerLoader:
         - aact (ctgov)
         - drugcentral approvals
         """
-        company_re = get_or_re(
-            COMPANY_INDICATORS,
+        org_re = get_or_re(
+            COMMON_OWNER_WORDS,
             enforce_word_boundaries=True,
-            permit_plural=False,
+            permit_plural=True,
             word_boundary_char=r"\y",
         )
 
@@ -45,10 +45,10 @@ class OwnerLoader:
 
                 UNION ALL
 
-                -- if fewer than 20 patents, BUT the name looks like a company, include it.
+                -- if fewer than 20 patents, BUT the name looks like an org (company, govt, uni), include it.
                 SELECT lower(max(name)) as name
                 FROM applications a, unnest(assignees) as name
-                WHERE name ~* '{company_re}\\.?'
+                WHERE name ~* '{org_re}\\.?'
                 GROUP BY lower(name)
                 HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
 
@@ -83,7 +83,7 @@ class OwnerLoader:
         stock_names = [
             record["name"].lower() for record in OwnerLoader.load_public_companies()
         ]
-        names = uniq([row["name"] for row in rows] + stock_names)
+        names = uniq(stock_names + [row["name"] for row in rows])
         return names
 
     @staticmethod

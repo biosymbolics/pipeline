@@ -24,7 +24,7 @@ from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
 from typings.documents.common import ENTITY_MAP_TABLES
-from utils.file import save_json_as_file
+from utils.file import save_as_pickle
 from utils.list import merge_nested
 
 from .umls.umls_load import UmlsLoader
@@ -74,7 +74,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             for on, de in zip(terms, lookup_docs)
             if de.canonical_entity is not None  # shouldn't happen
         }
-        save_json_as_file(lookup_map, f"canonical_map-{uuid.uuid4()}.json")
+        save_as_pickle(lookup_map, f"canonical_map-{uuid.uuid4()}.pkl")
         return lookup_map
 
     def _generate_crud(

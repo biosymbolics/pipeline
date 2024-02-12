@@ -15,6 +15,7 @@ from prisma.types import (
 
 from clients.finance.financials import CompanyFinancialExtractor
 from constants.company import (
+    COMMON_OWNER_WORDS,
     COMPANY_MAP,
     OWNER_SUPPRESSIONS,
     OWNER_TERM_NORMALIZATION_MAP,
@@ -53,8 +54,11 @@ def generate_clean_owner_map(
             - University of Colorado, Denver -> University of Colorado
         """
         post_suppress_re = rf"(?:(?:\s+|,){get_or_re(owner_suppressions)}\b)"
-        pre_suppress_re = "^the"
-        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|((?:,|at) .*$)|\(.+\))"
+        pre_suppress_re = "^the\b"
+
+        # remove anything in parentheses
+        middle_re = r"\(.+\)"
+        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|{middle_re})"
 
         for term in terms:
             yield re.sub(suppress_re, "", term, flags=RE_FLAGS).rstrip("&[ .,]*")
@@ -64,22 +68,29 @@ def generate_clean_owner_map(
         Normalize terms (e.g. "lab" -> "laboratory", "univ" -> "university")
         No deduplication, becaues the last step is tfidf + clustering
         """
-        term_map_set = set(OWNER_TERM_NORMALIZATION_MAP.keys())
+        term_map_set = list(owner_normalization_map.keys())
+        term_map_re = get_or_re(term_map_set, enforce_word_boundaries=True)
 
-        def _normalize(cleaned: str):
-            terms_to_rewrite = list(term_map_set.intersection(cleaned.lower().split()))
-            if len(terms_to_rewrite) > 0:
-                _assignee = assignee
-                for term in terms_to_rewrite:
-                    _assignee = re.sub(
-                        rf"\b{term}\b",
-                        f" {owner_normalization_map[term.lower()]} ",
-                        cleaned,
-                        flags=RE_FLAGS,
-                    ).strip()
-                return _assignee
+        def _normalize(_assignee: str):
+            assignee_copy = _assignee
 
-            return assignee
+            # replace ampersands (since \b is a problem)
+            assignee_copy = assignee_copy.replace(" & ", " and ")
+
+            has_rewrites = (
+                re.search(term_map_re, assignee_copy, flags=RE_FLAGS) is not None
+            )
+            if not has_rewrites:
+                return assignee_copy
+
+            for rewrite in term_map_set:
+                assignee_copy = re.sub(
+                    rf"\b{rewrite}\b",
+                    f" {owner_normalization_map[rewrite]} ",
+                    assignee_copy,
+                    flags=RE_FLAGS,
+                ).strip()
+            return assignee_copy
 
         for assignee in assignees:
             yield _normalize(assignee)
@@ -88,7 +99,7 @@ def generate_clean_owner_map(
         """
         See if there is an explicit name mapping
         """
-        has_mapping = re.match(rf"\b{key}\b", owner_str, flags=RE_FLAGS) is not None
+        has_mapping = re.search(rf"\b{key}\b", owner_str, flags=RE_FLAGS) is not None
         if has_mapping:
             return key
         return None
@@ -115,29 +126,35 @@ def generate_clean_owner_map(
         return dict(compact([_map(on) for on in orig_names]))
 
     # apply overrides first
-    override_map = generate_override_map(owners)
+    # override_map = generate_override_map(owners)
 
     # clean the remainder
     cleaning_steps = [
         sub_suppressions,
         normalize_terms,  # order matters
         sub_extra_spaces,
-        lambda owners: [t.lower() for t in owners],
+        lambda owners: [o.lower() for o in owners],
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, owners))
+
+    # maps cleaned to clustered
+    plural_common_words = set(
+        [
+            *COMMON_OWNER_WORDS,
+            *map(lambda x: x + "s", COMMON_OWNER_WORDS),
+        ]
+    )
+    cleaned_to_cluster = cluster_terms(cleaned, plural_common_words)
 
     # maps orig to cleaned
     orig_to_cleaned = {
         **{orig: clean for orig, clean in zip(owners, cleaned)},
-        **override_map,  # include overrides (e.g. "pfizer inc" -> "pfizer")
+        # **override_map,  # include overrides (e.g. "pfizer inc" -> "pfizer")
     }
-
-    # maps cleaned to clustered
-    cleaned_to_cluster = cluster_terms(list(orig_to_cleaned.values()))
 
     # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }
     return {
-        orig: cleaned_to_cluster.get(clean) or clean
+        orig: cleaned_to_cluster.get(clean) or "other"
         for orig, clean in orig_to_cleaned.items()
     }
 

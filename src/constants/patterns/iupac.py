@@ -401,10 +401,10 @@ def is_iupac(term: str) -> bool:
 
     TODO: improve! IUPAC_RE is flawed
     """
-    matches_iupac = re.match(IUPAC_RE, term) is not None
+    matches_iupac = re.search(IUPAC_RE, term) is not None
 
     # matches some IUPACs missed by the more complex re.
-    simple_check = len(term.split("-")) > 3 and re.match(r"[0-9]+", term) is not None
+    simple_check = len(term.split("-")) > 3 and re.search(r"[0-9]+", term) is not None
 
     if not matches_iupac and simple_check:
         logging.debug("Term '%s' matches simple check but not IUPAC re", term)

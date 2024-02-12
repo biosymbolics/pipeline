@@ -15,10 +15,13 @@ system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import APPLICATIONS_TABLE, SOURCE_BIOSYM_ANNOTATIONS_TABLE
+from constants.core import (
+    APPLICATIONS_TABLE,
+    GPR_ANNOTATIONS_TABLE,
+    SOURCE_BIOSYM_ANNOTATIONS_TABLE,
+)
 
 from .constants import (
-    GPR_ANNOTATIONS_TABLE,
     GPR_PUBLICATIONS_TABLE,
 )
 from .utils import determine_data_type
@@ -48,7 +51,7 @@ PATENT_APPLICATION_FIELDS = [
     "title",
     "url",
     # **FROM PUBLICATIONS **
-    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",
+    "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",  # TODO: non-harmoized assignees??
     "claims_localized as claims",
     "family_id",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",

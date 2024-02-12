@@ -1,6 +1,7 @@
 """
 NER types
 """
+
 from dataclasses import dataclass, field
 from typing import (
     Any,
@@ -26,7 +27,7 @@ NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group":
 
 
 @dataclass(frozen=True)
-class CanonicalEntity(Dataclass):
+class CanonicalEntity:
     id: str | None
     name: str
     ids: Optional[list[str]] = None

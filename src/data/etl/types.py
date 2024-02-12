@@ -126,4 +126,5 @@ class BiomedicalEntityLoadSpec(Dataclass):
             connect_type="create",
         ),
     )
+    saved_canonical_map_file: str | None = None
     # checksum: Callable | None = None # future for specific per loader

@@ -7,6 +7,7 @@ from typing import Any, Iterator
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
+from spacy.vocab import Vocab
 from thinc.api import set_gpu_allocator
 import torch
 
@@ -80,6 +81,9 @@ class Spacy:
         # Delegate attribute access to the underlying Language instance
         return getattr(self._nlp, name)
 
+    def vocab(self) -> Vocab:
+        return self._nlp.vocab
+
     def reset(self) -> None:
         """
         Reset the underlying nlp model
@@ -99,6 +103,9 @@ class Spacy:
 
     def pipe(self, *args, **kwargs) -> Iterator[Doc]:
         return self._nlp.pipe(*args, **kwargs)
+
+    def load(self, *args, **kwargs) -> Any:
+        return self.get_instance(*args, **kwargs)
 
     @classmethod
     def get_instance(cls, model: str = DEFAULT_MODEL, **kwargs) -> "Spacy":

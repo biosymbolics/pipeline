@@ -4,7 +4,6 @@ Utils for the NER pipeline
 
 from functools import partial, reduce
 import logging
-from pydash import group_by
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -501,15 +500,23 @@ def _create_cluster_term_map(
     """
     term_clusters = (
         pl.DataFrame({"cluster_id": cluster_ids, "name": terms})
-        .filter(pl.col("cluster_id") != -1)
+        # .filter(pl.col("cluster_id") != -1)
         .group_by(["cluster_id", "name"])
         .len()
-        .sort(["cluster_id", "name"])  # sort so that first name is the most common
-        .group_by("cluster_id")  # re-cluster by cluster_id
-        .agg(pl.col("name"))
+        .sort(["len"], descending=True)  # sort so that first name is the most common
+        .group_by("cluster_id", maintain_order=True)  # re-cluster by cluster_id
+        .agg(pl.col("name"), maintain_order=True)
         .drop("cluster_id")
         .to_series()
         .to_list()
+    )
+    print(
+        pl.DataFrame({"cluster_id": cluster_ids, "name": terms})
+        .filter(pl.col("cluster_id") != -1)
+        .group_by(["cluster_id", "name"])
+        .len()
+        .sort(["len"], descending=True)
+        .filter(pl.col("name").str.contains("janssen"))
     )
     return {
         m: members_terms[0]  # synonym to most-frequent-term
@@ -518,27 +525,40 @@ def _create_cluster_term_map(
     }
 
 
-def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
+def cluster_terms(
+    terms: Sequence[str], common_words: set[str] = set([])
+) -> dict[str, str]:
     """
     Clusters terms using TF-IDF and DBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair)
 
-    TODO:
-    - returns one massive group (which it shouldn't because cluster -1 is the catch all)
-    - try with BERT embeddings?
-
     Args:
         terms (Sequence[str]): list of terms to cluster
+
+    Returns:
+        dict[str, str]: map between synonym/secondary terms and the primary
     """
     # lazy loading
     from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.cluster import DBSCAN
+    from sklearn.cluster._hdbscan.hdbscan import HDBSCAN
 
     vectorizer = TfidfVectorizer(
-        stop_words="english", ngram_range=(1, 2), strip_accents="unicode"
+        stop_words="english",
+        ngram_range=(1, 1),
+        strip_accents="unicode",
     )
-    X = vectorizer.fit_transform(terms)
-    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)  # HDBSCAN ?
+    vectorizer.fit(terms)
+
+    # set IDFs lower for known-common words
+    idfs = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
+    vectorizer.idf_ = list(
+        {k: ((v / 5) if k in common_words else v) for k, v in idfs.items()}.values()
+    )
+
+    X = vectorizer.transform(terms)
+    print(dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_)))
+
+    clustering = HDBSCAN(min_cluster_size=5, max_cluster_size=100000).fit(X)
     cluster_ids = list(clustering.labels_)
 
     return _create_cluster_term_map(terms, cluster_ids)
