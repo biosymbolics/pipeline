@@ -5,7 +5,7 @@ Transformation methods for owner etl
 from datetime import datetime
 from functools import reduce
 import regex as re
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Sequence
 from pydash import compact, group_by
 from prisma.enums import OwnerType
 from prisma.types import (
@@ -23,7 +23,8 @@ from constants.company import (
 )
 from core.ner.classifier import classify_string
 from core.ner.cleaning import RE_FLAGS
-from core.ner.utils import cluster_terms
+from core.ner.constants import SOLO_CLUSTER_THRESHOLD
+from core.ner.clustering import cluster_terms
 from typings.companies import CompanyInfo
 from utils.re import get_or_re, sub_extra_spaces
 
@@ -39,6 +40,7 @@ def generate_clean_owner_map(
     normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
     overrides: dict[str, str] = COMPANY_MAP,
     suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
+    solo_cluster_threshold: int = SOLO_CLUSTER_THRESHOLD,
 ) -> dict[str, str]:
     """
     Clean owner names
@@ -103,15 +105,6 @@ def generate_clean_owner_map(
         for assignee in assignees:
             yield _normalize(assignee)
 
-    def find_override(owner_str: str, key: str) -> str | None:
-        """
-        See if there is an explicit name mapping
-        """
-        has_mapping = re.search(rf"\b{key}\b", owner_str, flags=RE_FLAGS) is not None
-        if has_mapping:
-            return key
-        return None
-
     def sub_punctuation(terms: list[str]) -> Iterable[str]:
         """
         Remove punctuation (.,)
@@ -127,7 +120,18 @@ def generate_clean_owner_map(
         e.g. {"pfizer inc": "pfizer"}
         """
 
-        def _map(orig_name: str):
+        def find_override(owner_str: str, key: str) -> str | None:
+            """
+            See if there is an explicit name mapping
+            """
+            has_mapping = (
+                re.search(rf"\b{key}\b", owner_str, flags=RE_FLAGS) is not None
+            )
+            if has_mapping:
+                return key
+            return None
+
+        def _get_first_key(orig_name: str):
             # find (first) key of match (e.g. "johns? hopkins?"), if exists
             override_key = next(
                 filter(
@@ -136,16 +140,14 @@ def generate_clean_owner_map(
                 ),
                 None,
             )
-            return (orig_name, override_map[override_key]) if override_key else None
+            if not override_key:
+                return None
+            return (orig_name, override_map[override_key])
 
-        return dict(compact([_map(on) for on in orig_names]))
+        return dict(compact([_get_first_key(on) for on in orig_names]))
 
     logger.info("Generating owner canonicalization map (%s)", len(names))
 
-    # apply overrides first
-    override_map = generate_override_map(names, overrides)
-
-    # clean the remainder
     cleaning_steps = [
         sub_suppressions,
         normalize_terms,  # order matters
@@ -155,17 +157,27 @@ def generate_clean_owner_map(
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, names))
 
+    # create overrides against cleaned and original names
+    override_map = generate_override_map([*names, *cleaned], overrides)
+
     grouped = group_by(zip(cleaned, counts), lambda x: x[0])
     with_counts = {k: sum([x[1] for x in v]) for k, v in grouped.items()}
 
     # maps cleaned to clustered
     logger.info("Clustering owner terms (%s)", len(cleaned))
-    cleaned_to_cluster = cluster_terms(with_counts, PLURAL_COMMON_OWNER_WORDS)
+    cleaned_to_cluster = cluster_terms(
+        with_counts,
+        common_words=PLURAL_COMMON_OWNER_WORDS,
+        solo_cluster_threshold=solo_cluster_threshold,
+    )
 
     logger.info("Generated owner canonicalization map")
     # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }
     return {
-        orig: override_map.get(orig) or cleaned_to_cluster.get(clean) or "other"
+        orig: override_map.get(orig)
+        or override_map.get(clean)
+        or cleaned_to_cluster.get(clean)
+        or "other"
         for orig, clean in zip(names, cleaned)
     }
 
