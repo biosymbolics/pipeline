@@ -8,7 +8,18 @@ from constants.company import (
 )
 from core.ner.classifier import create_lookup_map
 
-ASSIGNEE_PATENT_THRESHOLD = 20
+
+OwnerTypePriorityMap = {
+    OwnerType.INDUSTRY_LARGE: 1,
+    OwnerType.HEALTH_SYSTEM: 5,
+    OwnerType.UNIVERSITY: 10,
+    OwnerType.INDUSTRY: 20,
+    OwnerType.GOVERNMENTAL: 30,
+    OwnerType.FOUNDATION: 40,
+    OwnerType.INDIVIDUAL: 50,
+    OwnerType.OTHER_ORGANIZATION: 100,
+    OwnerType.OTHER: 1000,
+}
 
 
 OWNER_KEYWORD_MAP = create_lookup_map(
