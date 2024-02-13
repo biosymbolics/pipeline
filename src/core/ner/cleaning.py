@@ -1,6 +1,7 @@
 """
 Utils for the NER pipeline
 """
+
 from abc import abstractmethod
 import time
 from typing import Iterable, Mapping, Sequence, TypeVar, Union, cast
@@ -11,7 +12,6 @@ import html
 from typing_extensions import Protocol
 
 from constants.patterns.intervention import (
-    INTERVENTION_PREFIXES_GENERIC_RE,
     PRIMARY_MECHANISM_BASE_TERMS,
 )
 from constants.patterns.iupac import is_iupac
@@ -42,7 +42,6 @@ SUBSTITUTIONS = {
     r"[.,:;'\"]+$": "",  # trailing punct
     r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
-    # INTERVENTION_PREFIXES_GENERIC_RE: " ",
 }
 
 

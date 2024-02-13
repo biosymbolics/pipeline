@@ -6,7 +6,7 @@ from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
 from constants.core import ETL_BASE_DATABASE_URL
-from constants.company import COMPANY_INDICATORS
+from constants.company import COMMON_GOVT_WORDS, COMMON_OWNER_WORDS
 from typings.companies import CompanyInfo
 from utils.re import get_or_re
 
@@ -14,22 +14,22 @@ from .owner import OwnerEtl
 
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
-ASSIGNEE_PATENT_THRESHOLD = 20
+ASSIGNEE_PATENT_THRESHOLD = 50
 
 
 class OwnerLoader:
     @staticmethod
-    async def get_owner_names() -> list[str]:
+    async def get_owners() -> tuple[list[str], list[int]]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
         - aact (ctgov)
         - drugcentral approvals
         """
-        company_re = get_or_re(
-            COMPANY_INDICATORS,
+        org_re = get_or_re(
+            [*COMMON_OWNER_WORDS, *COMMON_GOVT_WORDS],
             enforce_word_boundaries=True,
-            permit_plural=False,
+            permit_plural=True,
             word_boundary_char=r"\y",
         )
 
@@ -38,37 +38,44 @@ class OwnerLoader:
         db_owner_query_map = {
             # patents db
             "patents": f"""
-                SELECT lower(max(name)) as name
+                -- if fewer than ASSIGNEE_PATENT_THRESHOLD, look for signs that it is an org
+                SELECT lower(max(name)) as name, count(*) as count
                 FROM applications a, unnest(assignees) as name
-                GROUP BY lower(name)
-                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD} -- individuals unlikely to have more patents
-
-                UNION ALL
-
-                -- if fewer than 20 patents, BUT the name looks like a company, include it.
-                SELECT lower(max(name)) as name
-                FROM applications a, unnest(assignees) as name
-                WHERE name ~* '{company_re}\\.?'
+                WHERE
+                    (
+                        name ~* '{org_re}\\.?'
+                        OR array_length(regexp_split_to_array(name, ' '), 1) > 5
+                        OR array_length(regexp_split_to_array(name, ' '), 1) < 2
+                    )
                 GROUP BY lower(name)
                 HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
 
-                UNION ALL
+                UNION
 
-                SELECT lower(max(name)) as name
+                -- if greater than ASSIGNEE_PATENT_THRESHOLD, take it.
+                SELECT lower(max(name)) as name, count(*) as count
+                FROM applications a, unnest(assignees) as name
+                GROUP BY lower(name)
+                HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
+
+                UNION
+
+                -- if inventors are greater than ASSIGNEE_PATENT_THRESHOLD, take it.
+                SELECT lower(max(name)) as name, count(*) as count
                 FROM applications a, unnest(inventors) as name
                 GROUP BY lower(name)
                 HAVING count(*) > {ASSIGNEE_PATENT_THRESHOLD}
             """,
             # ctgov db
             "aact": """
-                select lower(name) as name
+                select lower(name) as name, (count(*) * 2) as count
                 from sponsors
                 group by lower(name)
             """,
             # drugcentral db, with approvals
             # `ob_product`` has 1772 distinct applicants vs `approval` at 1136
             "drugcentral": """
-                select lower(applicant) as name
+                select lower(applicant) as name, (count(*) * 20) as count
                 from ob_product
                 where applicant is not null
                 group by lower(applicant)
@@ -83,8 +90,9 @@ class OwnerLoader:
         stock_names = [
             record["name"].lower() for record in OwnerLoader.load_public_companies()
         ]
-        names = uniq([row["name"] for row in rows] + stock_names)
-        return names
+        names = [row["name"] for row in rows] + stock_names
+        counts = [row["count"] for row in rows] + [1000] * len(stock_names)
+        return names, counts
 
     @staticmethod
     def load_public_companies() -> list[CompanyInfo]:
@@ -104,10 +112,10 @@ class OwnerLoader:
             for d in pharmas.select(pl.col(["name", "symbol"])).to_dicts()
         ]
 
-    async def copy_all(self):
-        names = await self.get_owner_names()
+    async def copy_all(self, is_force_update: bool = False):
+        names, counts = await self.get_owners()
         public_companies = self.load_public_companies()
-        await OwnerEtl().copy_all(names, public_companies)
+        await OwnerEtl().copy_all(names, counts, public_companies, is_force_update)
 
     @staticmethod
     async def post_finalize():
@@ -118,7 +126,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.owner.load [--post-finalize]
+            Usage: python3 -m data.etl.entity.owner.owner_load [--post-finalize] [--force_update]
             """
         )
         sys.exit()
@@ -126,4 +134,5 @@ if __name__ == "__main__":
     if "--post-finalize" in sys.argv:
         asyncio.run(OwnerLoader().post_finalize())
     else:
-        asyncio.run(OwnerLoader().copy_all())
+        is_force_update = "--force_update" in sys.argv
+        asyncio.run(OwnerLoader().copy_all(is_force_update))

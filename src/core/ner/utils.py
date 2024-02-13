@@ -7,7 +7,6 @@ import logging
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
-import polars as pl
 
 from constants.patterns.iupac import is_iupac
 from utils.re import (
@@ -489,43 +488,3 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
         for span in spans
     ]
     return entity_set
-
-
-def cluster_terms(terms: Sequence[str]) -> dict[str, str]:
-    """
-    Clusters terms using TF-IDF and DBSCAN.
-    Returns a synonym record mapping between the canonical term and the synonym (one per pair)
-
-    TODO:
-    - returns one massive group (which it shouldn't because cluster -1 is the catch all)
-    - try with BERT embeddings?
-
-    Args:
-        terms (Sequence[str]): list of terms to cluster
-    """
-    # lazy loading
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.cluster import DBSCAN
-
-    vectorizer = TfidfVectorizer(
-        stop_words="english", ngram_range=(1, 2), strip_accents="unicode"
-    )
-    X = vectorizer.fit_transform(terms)
-    clustering = DBSCAN(eps=0.6, min_samples=2).fit(X)  # HDBSCAN ?
-    labels = clustering.labels_
-
-    df = (
-        pl.DataFrame({"cluster_id": labels, "name": terms})
-        .filter(pl.col("cluster_id") != -1)
-        .group_by("cluster_id")
-        .agg(pl.col("name").unique())
-    )
-    print(df)
-
-    term_clusters = df.drop("cluster_id").to_series().to_list()
-
-    return {
-        m: members_terms[0]  # syn to (arbitrarily picked) canonical
-        for members_terms in term_clusters
-        for m in members_terms[0:]
-    }

@@ -2,10 +2,11 @@
 Class for biomedical entity etl
 """
 
+import asyncio
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
-from prisma.models import FinancialSnapshot, Owner, OwnerSynonym
+from prisma.models import FinancialSnapshot, Ownable, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
 
 from clients.low_level.prisma import batch_update, prisma_client
@@ -71,7 +72,7 @@ class OwnerEtl(BaseEntityEtl):
 
         return merged_recs
 
-    async def create_records(self, names: Sequence[str]):
+    async def create_records(self, names: Sequence[str], counts: Sequence[int]):
         """
         Create records for entities and relationships
 
@@ -79,7 +80,7 @@ class OwnerEtl(BaseEntityEtl):
             names: list of names to insert
         """
         client = await prisma_client(600)
-        lookup_map = generate_clean_owner_map(names)
+        lookup_map = generate_clean_owner_map(names, counts)
         insert_recs = self._generate_insert_records(names, lookup_map)
 
         # create flat records
@@ -90,6 +91,7 @@ class OwnerEtl(BaseEntityEtl):
             ],
             skip_duplicates=True,
         )
+        logger.info("Created owners")
 
         await batch_update(
             insert_recs,
@@ -101,6 +103,8 @@ class OwnerEtl(BaseEntityEtl):
                 ),
             ),
         )
+
+        logger.info("Updated owners")
 
     @staticmethod
     async def load_financials(public_companies: Sequence[CompanyInfo]):
@@ -126,11 +130,31 @@ class OwnerEtl(BaseEntityEtl):
             skip_duplicates=True,
         )
 
+    async def delete_owners(self):
+        """
+        Delete all owners
+        """
+        logger.info("Deleting all owners")
+        client = await prisma_client(600)
+        await Ownable.prisma(client).query_raw(
+            "UPDATE ownable SET owner_id=NULL WHERE owner_id IS NOT NULL"
+        )
+        await FinancialSnapshot.prisma(client).delete_many()
+        await OwnerSynonym.prisma(client).delete_many()
+        await Owner.prisma(client).delete_many()
+
     @overrides(BaseEntityEtl)
     async def copy_all(
-        self, names: Sequence[str], public_companies: Sequence[CompanyInfo]
+        self,
+        names: Sequence[str],
+        counts: Sequence[int],
+        public_companies: Sequence[CompanyInfo],
+        is_update: bool = False,
     ):
-        await self.create_records(names)
+        if is_update:
+            await self.delete_owners()
+
+        await self.create_records(names, counts)
         await self.load_financials(public_companies)
 
     @overrides(BaseEntityEtl)
@@ -200,6 +224,27 @@ class OwnerEtl(BaseEntityEtl):
             "CREATE INDEX owner_search_idx ON biomedical_entity USING GIN(search)"
         )
 
+    @staticmethod
+    async def checksum():
+        """
+        Quick entity checksum
+        """
+        client = await prisma_client(300)
+        checksums = {
+            "owners": "SELECT COUNT(*) FROM owner",
+            "ownable": "SELECT COUNT(*) FROM ownable",
+            "empty_owner_id": "SELECT COUNT(*) FROM ownable WHERE owner_id IS NULL",
+            "other_owner_id": "SELECT COUNT(*) FROM ownable, owner WHERE owner_id=owner.id AND owner.name='other'",
+            "top_owners": "SELECT name, count FROM owner ORDER BY count DESC LIMIT 20",
+            "financial_snapshots": "SELECT COUNT(*) FROM financials where owner_id IS NOT NULL",
+        }
+        results = await asyncio.gather(
+            *[client.query_raw(query) for query in checksums.values()]
+        )
+        for key, result in zip(checksums.keys(), results):
+            logger.warning(f"Load checksum {key}: {result}")
+        return
+
     @overrides(BaseEntityEtl)
     @staticmethod
     async def post_finalize():
@@ -212,3 +257,4 @@ class OwnerEtl(BaseEntityEtl):
         await OwnerEtl.link_to_documents()
         await OwnerEtl.add_counts()
         await OwnerEtl._update_search_index()
+        await OwnerEtl.checksum()

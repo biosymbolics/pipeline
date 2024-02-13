@@ -105,6 +105,7 @@ async def find_buyers(
 
     records = await client.query_raw(query)
 
+    logger.info("BUYER RECS %s", records[0:5])
     potential_buyers = sorted(
         [BuyerRecord(**record) for record in records],
         key=lambda x: x.score,

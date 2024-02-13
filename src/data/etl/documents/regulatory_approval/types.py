@@ -23,7 +23,7 @@ class PharmaClass(BaseModel):
 
         def get_priority(pc: "PharmaClass") -> int:
             score = 0
-            if IS_MECHANISM_RE.match(pc.name.lower()) is not None:
+            if IS_MECHANISM_RE.search(pc.name.lower()) is not None:
                 score += 10
             if pc.type == "moa":
                 score += 3
