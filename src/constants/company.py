@@ -1,3 +1,4 @@
+OTHER_OWNER_NAME = "other"
 LARGE_PHARMA_KEYWORDS = [
     "abbott",
     "abbvie",  # ABBVIE INC
@@ -361,6 +362,7 @@ OWNER_TERM_NORMALIZATION_MAP = {
     "found": "foundation",
     "mfg": "manufacturing",
     "scienc": "science",
+    "scient": "scientific",
 }
 
 

@@ -2,7 +2,7 @@ import unittest
 
 from prisma.enums import OwnerType
 from pydash import group_by
-from constants.company import COMPANY_MAP
+from constants.company import COMPANY_MAP, OTHER_OWNER_NAME
 
 from data.etl.entity.owner.owner import generate_clean_owner_map, OwnerTypeParser
 
@@ -197,7 +197,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "japan pharmaceutical co ltd": 2,
                     "merck co": 2,
                     "novo nordisk": 3,
-                    "other": 28,
+                    OTHER_OWNER_NAME: 28,
                     "procter & gamble": 3,
                     "queen mary and westfield college": 2,
                     "siemens": 3,
@@ -220,7 +220,7 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "matsushita": 3,
                     "merck": 4,
                     "novo nordisk": 4,
-                    "other": 12,
+                    OTHER_OWNER_NAME: 12,
                     "pfizer": 2,
                     "procter and gamble": 3,
                     "queen mary and westfield college": 2,

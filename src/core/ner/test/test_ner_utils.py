@@ -2,6 +2,7 @@ import unittest
 from pydash import group_by
 
 import pytest
+from constants.company import OTHER_OWNER_NAME
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
@@ -47,7 +48,7 @@ class TestNerUtils(unittest.TestCase):
                 "expected": {
                     "tgf beta": "tgf beta",
                     "tgf beta other": "tgf beta",
-                    "thing other": "other",
+                    "thing other": OTHER_OWNER_NAME,
                 },
             },
         ]

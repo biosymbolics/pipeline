@@ -17,6 +17,7 @@ import logging
 from clients.finance.financials import CompanyFinancialExtractor
 from constants.company import (
     COMPANY_MAP,
+    OTHER_OWNER_NAME,
     OWNER_SUPPRESSIONS,
     OWNER_TERM_NORMALIZATION_MAP,
     PLURAL_COMMON_OWNER_WORDS,
@@ -177,7 +178,7 @@ def generate_clean_owner_map(
         orig: override_map.get(orig)
         or override_map.get(clean)
         or cleaned_to_cluster.get(clean)
-        or "other"  # TODO: or clean ?
+        or OTHER_OWNER_NAME  # TODO: or clean ?
         for orig, clean in zip(names, cleaned)
     }
 

@@ -8,6 +8,8 @@ from typing import Mapping, Sequence
 import polars as pl
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from constants.company import OTHER_OWNER_NAME
+
 
 from .constants import MAX_CLUSTER_SIZE, MAX_DISTINCT_TERMS, SOLO_CLUSTER_THRESHOLD
 
@@ -224,7 +226,7 @@ def cluster_terms(
     # turns remaining entries into their own category, if sufficiently large
     # otherwise, marks as "other"
     remaining_cluster_map = {
-        k: (k if v >= solo_cluster_threshold else "other")
+        k: (k if v >= solo_cluster_threshold else OTHER_OWNER_NAME)
         for o in others
         for k, v in o.items()
     }
