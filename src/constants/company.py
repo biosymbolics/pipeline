@@ -97,6 +97,8 @@ COMMON_COMPANY_WORDS = [
     "innovation",
     "intellectual",
     "international",
+    "invest",
+    "investig",
     "lab",
     "laboratory",
     "laboratories",
@@ -144,24 +146,38 @@ COMMON_UNIVERSITY_WORDS = [
     "université",
 ]
 
+COMMON_OTHER_ORGANIZATION_WORDS = [
+    "alliance",
+    "council",
+]
+
+COMMON_FOUNDATION_WORDS = [
+    "found",
+    "foundation",
+    "trust",
+]
+
+
+COMMON_HEALTH_SYSTEM_WORDS = [
+    "healthcare",
+    "(?:medical|cancer|health) (?:center|centre|system|hospital)s?",
+    "clinics?",
+    "districts?",
+]
+
 COMMON_OWNER_WORDS = [
     *COMMON_COMPANY_WORDS,
     *COMMON_UNIVERSITY_WORDS,
+    *COMMON_OTHER_ORGANIZATION_WORDS,
+    *COMMON_FOUNDATION_WORDS,
+    *COMMON_HEALTH_SYSTEM_WORDS,
     "animal",
     "center",
     "centre",
     "care",
-    "commonwealth",
-    "commissariat",
-    "council",
-    "governing",
     "department",
     "fund",
-    "found",
-    "foundation",
     "human",
-    "invest",
-    "investig",
     "medical",
     "publique",
     "res",
@@ -171,6 +187,7 @@ COMMON_OWNER_WORDS = [
     "&",
 ]
 
+
 # a little messy
 PLURAL_COMMON_OWNER_WORDS = set(
     [
@@ -179,19 +196,26 @@ PLURAL_COMMON_OWNER_WORDS = set(
     ]
 )
 
+
+COMMON_INDIVIDUAL_WORDS = [r"m\.?d\.?", r"d\.?r\\.?", r"ph\.?d\.?"]
+
 # not good to suppress
 COMMON_GOVT_WORDS = [
     "city",
     "government",
     "govt",
+    "gov",
     "federal",
     "national",
+    "governing",
+    "commonwealth",
     "state",
     "us health",
     "veterans affairs",
     "nih",
     "nat",
     "va",
+    "commissariat",
     "nasa",
     "prefecture",
     "european organisation",
@@ -249,7 +273,7 @@ COMPANY_MAP = {
     "merck": "merck",
     "sinai": "mount sinai",
     "medtronic": "medtronic",
-    "sloan kettering": "sloan kettering",
+    "kettering": "sloan kettering",
     "sanofis?": "sanofi",
     "basf": "basf",
     "3m": "3m",
