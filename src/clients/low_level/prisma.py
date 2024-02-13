@@ -37,24 +37,21 @@ def prisma_context(timeout: int | None) -> Prisma:
     Centralized with global to avoid re-registering the client (which would fail)
     https://prisma-client-py.readthedocs.io/en/stable/reference/model-actions/
     """
-    global PRISMA_CLIENT
-
-    if PRISMA_CLIENT is None:
-        logger.info("Creating Prisma client (PRISMA_CLIENT is None)")
-        client = Prisma(
-            log_queries=False,
-            http={"limits": Limits(max_connections=50), "timeout": timeout},
-        )
-        PRISMA_CLIENT = client
-    else:
-        client = PRISMA_CLIENT
+    logger.info("Creating Prisma client")
+    client = Prisma(
+        # auto_register=True,
+        log_queries=False,
+        http={"limits": Limits(max_connections=50), "timeout": timeout},
+    )
 
     if not client.is_registered():
         try:
-            logger.debug("Registering prisma client")
+            logger.info("Registering prisma client (%s)", client.is_registered())
             register(client)
         except Exception as e:
-            logger.debug("Error registering prisma client")
+            logger.info("Error registering prisma client: %s", e)
+    else:
+        logger.info("Prisma client already registered")
 
     return client
 

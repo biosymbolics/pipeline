@@ -13,8 +13,8 @@ from prisma.types import (
     RegulatoryApprovalOrderByInput,
     RegulatoryApprovalScalarFieldKeys,
 )
+from clients.low_level.prisma import prisma_context
 
-from clients.low_level.prisma import prisma_client
 from typings import ScoredRegulatoryApproval
 
 
@@ -39,10 +39,10 @@ async def find_many(
     """
     start = time.monotonic()
 
-    client = await prisma_client(120)
-    approvals = await RegulatoryApprovalDto.prisma(client).find_many(
-        take, skip, where, cursor, include, order, distinct
-    )
+    async with prisma_context(300) as db:
+        approvals = await RegulatoryApprovalDto.prisma(db).find_many(
+            take, skip, where, cursor, include, order, distinct
+        )
 
     logger.info(
         "Search took %s seconds (%s)",

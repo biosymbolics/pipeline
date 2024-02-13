@@ -5,7 +5,7 @@ Patent client
 import logging
 import time
 
-from clients.low_level.prisma import prisma_client
+from prisma import Prisma
 
 
 from .types import AutocompleteResult
@@ -25,8 +25,7 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     """
     start = time.monotonic()
 
-    client = await prisma_client(30)
-    results = await client.query_raw(
+    results = await Prisma().query_raw(
         f"""
         SELECT name, count from (
             SELECT name, count
@@ -44,13 +43,6 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
         string,
     )
 
-    results = [
-        AutocompleteResult(
-            id=result["name"], label=f"{result['name']} ({result['count']})"
-        )
-        for result in results
-    ]
-
     logger.info(
         "Autocomplete for string %s took %s seconds (%s)",
         string,
@@ -58,4 +50,9 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
         len(results),
     )
 
-    return results
+    return [
+        AutocompleteResult(
+            id=result["name"], label=f"{result['name']} ({result['count']})"
+        )
+        for result in results
+    ]

@@ -1,6 +1,7 @@
 """
 Handler for patent topic reports
 """
+
 import json
 import logging
 

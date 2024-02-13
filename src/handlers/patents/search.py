@@ -1,6 +1,7 @@
 """
 Handler for patents search
 """
+
 import json
 import logging
 import traceback

@@ -5,29 +5,19 @@ Patent graph reports
 import time
 from typing import Sequence
 import logging
-import networkx as nx
-from pydash import uniq
+from prisma import Prisma
 import polars as pl
 from prisma.enums import BiomedicalEntityType
 
 from clients.documents.constants import DOC_CLIENT_LOOKUP
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import prisma_context
 from constants.core import SEARCH_TABLE
-from typings import (
-    DOMAINS_OF_INTEREST,
-    DocType,
-    TermField,
-)
+from typings import DocType
 from typings.client import DocumentCharacteristicParams
 from utils.string import get_id
 
-from .types import (
-    AggregateDocumentRelationship,
-    Node,
-    Link,
-    SerializableGraph,
-)
+from .types import AggregateDocumentRelationship
 
 from ..constants import Y_DIMENSIONS
 
@@ -95,146 +85,6 @@ ENTITY_GROUP = "entity"
 DOCUMENT_GROUP = "patent"
 
 
-def generate_graph(
-    relationships: Sequence[dict], max_nodes: int = MAX_NODES
-) -> nx.Graph:
-    """
-    Take UMLS query results and turn into a graph
-    """
-    g = nx.Graph()
-    g.add_edges_from(
-        [(r["head"], r["tail"]) for r in relationships if r["head"] != r["tail"]]
-    )
-    node_to_group = {
-        **{r["head"]: r["group"] for r in relationships},
-        **{r["tail"]: ENTITY_GROUP for r in relationships},
-    }
-    nx.set_node_attributes(g, node_to_group, "group")
-
-    if isinstance(g.degree, int):
-        raise Exception("Graph has no nodes")
-
-    degree_map = {n: d for (n, d) in g.degree}
-    nx.set_node_attributes(g, degree_map, "size")
-
-    weights = {
-        (r["head"], r["tail"]): min(degree_map[r["tail"]] / 4, 20)
-        for r in relationships
-    }
-    nx.set_edge_attributes(g, values=weights, name="weight")
-
-    top_nodes = [
-        node
-        for (node, _) in sorted(
-            [(n, d) for (n, d) in g.degree if d >= MIN_NODE_DEGREE],
-            key=lambda x: x[1],
-            reverse=True,
-        )[:max_nodes]
-    ]
-    subgraph = g.subgraph(
-        uniq(
-            [
-                *[n[0] for n in list(g.nodes(data="group")) if n[1] == DOCUMENT_GROUP],  # type: ignore
-                *top_nodes,
-            ]
-        )
-    )
-
-    return subgraph
-
-
-async def graph_document_relationships(
-    ids: Sequence[str],
-    doc_type: DocType = DocType.patent,
-    head_field: str = "priority_date",
-    max_nodes: int = MAX_NODES,
-) -> SerializableGraph:
-    """
-    Graph UMLS ancestory for a set of documents
-
-    - Nodes are UMLS entities
-    - Edges are ancestory relationships OR patent co-occurrences (e.g. PD and anti-alpha-synucleins)
-    - Nodes contain metadata of the relevant documents
-
-    Args:
-        ids (Sequence[str]): doc ids (must correspond to doc_type)
-        doc_type (DocType, optional): doc type. Defaults to DocType.patent.
-        head_field (str, optional): head field. Defaults to "priority_date".
-        max_nodes (int, optional): max nodes. Defaults to MAX_NODES.
-    """
-    head_field_info = Y_DIMENSIONS[doc_type][head_field]
-    head_sql = head_field_info.transform(head_field)
-
-    # TODO: save relationship type, ancestors
-    sql = f"""
-        -- documents-node to entity relationships
-        SELECT
-            {head_sql} as head,
-            umls.name as tail,
-            count(*) as weight,
-            '{DOCUMENT_GROUP}' as group
-        FROM {doc_type.name}
-            JOIN {SEARCH_TABLE} ON {SEARCH_TABLE}.{doc_type.name}_id = {doc_type.name}.id
-                AND types in {tuple(DOMAINS_OF_INTEREST)}
-            JOIN _entity_to_umls as etu ON etu."A"={SEARCH_TABLE}.entity_id
-            JOIN umls ON umls.id = etu."B"
-        WHERE {doc_type.name}.id = ANY(ARRAY{ids})
-        GROUP BY {head_sql}, umls.name
-        ORDER BY weight DESC LIMIT 1000
-    """
-
-    client = await prisma_client(120)
-    relationships = await client.query_raw(sql)
-    g = generate_graph(relationships, max_nodes=max_nodes)
-
-    # create serialized link data
-    link_data = nx.node_link_data(g)
-
-    return SerializableGraph(
-        edges=[
-            Link(source=l["source"], target=l["target"], weight=l["weight"])
-            for l in sorted(link_data["links"], key=lambda x: x["weight"], reverse=True)
-        ],
-        nodes=[
-            Node(
-                id="root",
-                label="root",
-                parent="",
-                size=1,
-                group="",
-            ),
-            Node(
-                id="entity",
-                label="entity",
-                parent="root",
-                size=1,
-                group="root",
-            ),
-            Node(
-                id="patent",
-                label="patent",
-                parent="root",
-                size=1,
-                group="root",
-            ),
-            *sorted(
-                [
-                    Node(
-                        id=n["id"],
-                        label=n["id"],
-                        parent=n["group"],
-                        size=n["size"],
-                        group=n["group"],
-                    )
-                    for n in link_data["nodes"]
-                ],
-                key=lambda x: x.size,
-                reverse=True,
-            ),
-        ],
-    )
-
-
 async def _aggregate_document_relationships(
     ids: Sequence[str],
     head_field: str,
@@ -294,8 +144,8 @@ async def _aggregate_document_relationships(
         GROUP BY {head_sql}, concept
     """
 
-    client = await prisma_client(120)
-    results = await client.query_raw(sql)
+    async with prisma_context(300) as db:
+        results = await db.query_raw(sql)
 
     df = pl.DataFrame(results)
 
@@ -336,11 +186,14 @@ async def aggregate_document_relationships(
     """
 
     async def _run_report() -> list[AggregateDocumentRelationship]:
+        # get the documents
         documents = await DOC_CLIENT_LOOKUP[p.doc_type].search(p)
+
         if len(documents) == 0:
             logging.info("No documents found for terms: %s", p.terms)
             return []
 
+        # do the report aggregation
         return await _aggregate_document_relationships(
             ids=[d.id for d in documents],  # TODO: switch to direct search
             head_field=p.head_field,

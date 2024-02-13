@@ -5,10 +5,11 @@ Document report client
 import asyncio
 import logging
 import polars as pl
+from prisma import Prisma
 
 
 from clients.documents.reports.utils import apply_dimension_limit
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import prisma_context
 from constants.core import SEARCH_TABLE
 from typings.client import DocumentSearchParams
 from typings.documents.common import DocType
@@ -58,6 +59,7 @@ class XYReport:
             JOIN {SEARCH_TABLE} on {SEARCH_TABLE}.{doc_type.name}_id={doc_type.name}.id
                         AND {SEARCH_TABLE}.search @@ plainto_tsquery('english', $1)
             {filter}
+            AND {x_t} is not NULL
             GROUP BY {x_t} {f', {y_t}' if y_t else ''}
             ORDER BY count DESC
         """
@@ -101,7 +103,6 @@ class XYReport:
         # TODO - AND/OR
         term_query = " ".join([t.lower() for t in search_params.terms])
 
-        client = await prisma_client(120)
         query = XYReport._form_query(
             x_dimension,
             y_dimension,
@@ -111,7 +112,9 @@ class XYReport:
             doc_type=doc_type,
         )
         logger.debug("Running query for xy report: %s", query)
-        results = await client.query_raw(query, term_query)
+
+        async with prisma_context(300) as db:
+            results = await db.query_raw(query, term_query)
 
         if len(results) == 0:
             logger.warning("No results for query: %s, params: %s", query, term_query)
