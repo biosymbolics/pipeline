@@ -1,9 +1,9 @@
 from datetime import datetime
-import inspect
 from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
+from clients.documents.patents.constants import DEFAULT_BUYER_K
 from typings.documents.common import DocType
 
 from .documents.common import EntityMapType, TermField
@@ -165,5 +165,5 @@ class BuyerFinderParams(BaseModel):
     """
 
     description: Annotated[str, Field(validate_default=True)]
-    k: Annotated[int, Field(validate_default=True)] = 1000
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_BUYER_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False

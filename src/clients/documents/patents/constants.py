@@ -1,8 +1,11 @@
 """
 Constants for the patents client.
 """
+
 from .types import RelevancyThreshold
 
+
+DEFAULT_BUYER_K = 1000
 
 RELEVANCY_THRESHOLD_MAP: dict[RelevancyThreshold, float] = {
     "very low": 0.0,

@@ -7,6 +7,7 @@ import logging
 import time
 
 from pydash import flatten, group_by
+from clients.documents.patents.constants import DEFAULT_BUYER_K
 
 
 from clients.low_level.prisma import prisma_client
@@ -18,8 +19,7 @@ from typings.core import ResultBase
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SIMILARITY_EXAGGERATION_FACTOR = 25
-DEFAULT_K = 1000
+SIMILARITY_EXAGGERATION_FACTOR = 50
 
 
 class RelevanceByYear(ResultBase):
@@ -37,6 +37,7 @@ class BuyerRecord(ResultBase):
     # terms: list[str]
     min_age: int
     avg_age: float
+    activity: list[float]
     max_relevance_score: float
     avg_relevance_score: float
     relevance_by_year: list[RelevanceByYear]
@@ -49,7 +50,7 @@ class FindBuyerResult(ResultBase):
 
 
 async def find_buyers(
-    description: str, knn: int = DEFAULT_K, use_gpt_expansion: bool = False
+    description: str, knn: int = DEFAULT_BUYER_K, use_gpt_expansion: bool = False
 ) -> FindBuyerResult:
     """
     A specific method to find potential buyers for IP
@@ -145,7 +146,11 @@ async def find_buyers(
 
     potential_buyers = sorted(
         [
-            BuyerRecord(**record, relevance_by_year=report_map[record["id"]])
+            BuyerRecord(
+                **record,
+                activity=[v.relevance for v in report_map[record["id"]]],
+                relevance_by_year=report_map[record["id"]],
+            )
             for record in records
         ],
         key=lambda x: x.score,
