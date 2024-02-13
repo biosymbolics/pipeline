@@ -6,6 +6,8 @@ from datetime import date
 import logging
 import time
 
+from pydash import flatten, group_by
+
 
 from clients.low_level.prisma import prisma_client
 from clients.openai.gpt_client import GptApiClient
@@ -16,8 +18,13 @@ from typings.core import ResultBase
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SIMILARITY_EXAGGERATION_FACTOR = 100
+SIMILARITY_EXAGGERATION_FACTOR = 25
 DEFAULT_K = 1000
+
+
+class RelevanceByYear(ResultBase):
+    year: int
+    relevance: float
 
 
 class BuyerRecord(ResultBase):
@@ -32,6 +39,7 @@ class BuyerRecord(ResultBase):
     avg_age: float
     max_relevance_score: float
     avg_relevance_score: float
+    relevance_by_year: list[RelevanceByYear]
     score: float
 
 
@@ -41,7 +49,7 @@ class FindBuyerResult(ResultBase):
 
 
 async def find_buyers(
-    description: str, k: int = DEFAULT_K, use_gpt_expansion: bool = False
+    description: str, knn: int = DEFAULT_K, use_gpt_expansion: bool = False
 ) -> FindBuyerResult:
     """
     A specific method to find potential buyers for IP
@@ -99,7 +107,7 @@ async def find_buyers(
                         SELECT id, title
                         FROM patent
                         ORDER BY (1 - (vector <=> '{vector}')) DESC
-                        LIMIT {k}
+                        LIMIT {knn}
                 ) embed
                 GROUP BY embed.title
             )
@@ -108,9 +116,38 @@ async def find_buyers(
 
     records = await client.query_raw(query)
 
-    logger.info("BUYER RECS %s", records[0:5])
+    owner_ids = tuple([record["id"] for record in records])
+    patent_ids = tuple(flatten([record["ids"] for record in records]))
+
+    report_query = f"""
+        SELECT
+            owner_id as id,
+            date_part('year', priority_date) as year,
+            count(*) as relevance
+        FROM patent, ownable
+        WHERE patent.id in {patent_ids}
+        AND ownable.owner_id in {owner_ids}
+        AND ownable.patent_id=patent.id
+        GROUP BY owner_id, date_part('year', priority_date)
+    """
+    report = await client.query_raw(report_query)
+    result_map = {
+        k: {v["year"]: RelevanceByYear(**v) for v in vals}
+        for k, vals in group_by(report, "id").items()
+    }
+    report_map = {
+        k: [
+            vals.get(y) or RelevanceByYear(year=y, relevance=0.0)
+            for y in range(2000, 2024)
+        ]
+        for k, vals in result_map.items()
+    }
+
     potential_buyers = sorted(
-        [BuyerRecord(**record) for record in records],
+        [
+            BuyerRecord(**record, relevance_by_year=report_map[record["id"]])
+            for record in records
+        ],
         key=lambda x: x.score,
         reverse=True,
     )
