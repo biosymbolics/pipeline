@@ -229,6 +229,9 @@ OwnerTypePriorityMap = {
 class OwnerTypeParser:
     @staticmethod
     def find(value: str) -> OwnerType:
+        if value == OTHER_OWNER_NAME:
+            return OwnerType.OTHER
+
         reason = sorted(
             classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER),
             key=lambda x: OwnerTypePriorityMap[x],
