@@ -165,6 +165,7 @@ def cluster_terms(
     vectorized = vectorizer.transform(terms)
 
     logger.info("Starting clustering (shape %s)", vectorized.shape)
+    # HDBSCAN is *much better* but a memory pig
     cluster_ids = (
         DBSCAN(eps=0.7, min_samples=2).fit_predict(vectorized, counts).tolist()
     )

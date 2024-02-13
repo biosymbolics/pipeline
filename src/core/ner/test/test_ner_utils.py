@@ -1,14 +1,17 @@
 import unittest
+from pydash import group_by
 
 import pytest
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
 from core.ner.cleaning import EntityCleaner
+from core.ner.clustering import (
+    cluster_terms,
+    _create_cluster_term_map,
+)
 from core.ner.utils import (
     rearrange_terms,
     normalize_by_pos,
-    cluster_terms,
-    _create_cluster_term_map,
 )
 from data.domain.biomedical import (
     remove_trailing_leading,
@@ -44,14 +47,18 @@ class TestNerUtils(unittest.TestCase):
                 "expected": {
                     "tgf beta": "tgf beta",
                     "tgf beta other": "tgf beta",
-                    "thing other": "thing other",
+                    "thing other": "other",
                 },
             },
         ]
 
         for condition in test_conditions:
-            input = condition["input"]
             expected = condition["expected"]
+
+            grouped = group_by(condition["input"], lambda x: x)
+            counts = [len(v) for v in grouped.values()]
+            terms = list(grouped.keys())
+            input = dict(zip(terms, counts))
 
             result = cluster_terms(input)
             if result != expected:
@@ -81,7 +88,9 @@ class TestNerUtils(unittest.TestCase):
             cluster_ids = test["cluster_ids"]
             expected = test["expected"]
 
-            result = _create_cluster_term_map(terms, cluster_ids)
+            result, other = _create_cluster_term_map(
+                terms, [1] * len(terms), cluster_ids
+            )
             if result != expected:
                 print(f"Actual: '{result}', expected: '{expected}'")
 
@@ -543,7 +552,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "(6R,S)-5-formyltetrahydrofolate",
-                "expected": "(6R,S)-5 formyltetrahydrofolate",  # TODO
+                "expected": "(6R,S)-5-formyltetrahydrofolate",  # TODO
             },
             {
                 "input": "mild-to-moderate alzheimer's disease",
@@ -551,7 +560,7 @@ class TestNerUtils(unittest.TestCase):
             },
             {
                 "input": "Anti-cd73, anti-pd-l1 antibodies and chemotherapy for treating tumors",
-                "expected": "Anti cd73, anti pdl1 antibodies and chemotherapy for treating tumors",
+                "expected": "Anti-cd73, anti-pd-l1 antibodies and chemotherapy for treating tumors",
             },
         ]
 
