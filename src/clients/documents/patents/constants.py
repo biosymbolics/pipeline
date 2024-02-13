@@ -1,6 +1,7 @@
 """
 Constants for the patents client.
 """
+
 from .types import RelevancyThreshold
 
 

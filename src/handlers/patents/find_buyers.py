@@ -34,7 +34,7 @@ async def _find_buyers(raw_event: dict, context):
 
     try:
         results = await find_patent_buyers(
-            description=p.description, k=p.k, use_gpt_expansion=p.use_gpt_expansion
+            description=p.description, knn=p.k, use_gpt_expansion=p.use_gpt_expansion
         )
     except Exception as e:
         message = f"Error finding buyers: {e}"

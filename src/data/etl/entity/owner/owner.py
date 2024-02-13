@@ -17,6 +17,7 @@ from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
 
+from .constants import OwnerTypePriorityMap
 from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
 
 
@@ -65,6 +66,12 @@ class OwnerEtl(BaseEntityEtl):
         merged_recs: list[OwnerCreateWithSynonymsInput] = [
             {
                 **groups[0],
+                "owner_type": (
+                    sorted(
+                        [g.get("owner_type") for g in groups],
+                        key=lambda x: OwnerTypePriorityMap[x],
+                    )
+                )[0],
                 "synonyms": uniq(flatten([(g.get("synonyms") or []) for g in groups])),
             }
             for groups in grouped_recs.values()

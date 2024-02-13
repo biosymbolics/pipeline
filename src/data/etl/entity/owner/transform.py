@@ -29,7 +29,7 @@ from core.ner.clustering import cluster_terms
 from typings.companies import CompanyInfo
 from utils.re import get_or_re, sub_extra_spaces
 
-from .constants import OWNER_KEYWORD_MAP
+from .constants import OWNER_KEYWORD_MAP, OwnerTypePriorityMap
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -213,28 +213,15 @@ def transform_financials(
     return [fetch_financials(record) for record in records]
 
 
-OwnerTypePriorityMap = {
-    OwnerType.INDUSTRY_LARGE: 1,
-    OwnerType.HEALTH_SYSTEM: 5,
-    OwnerType.UNIVERSITY: 10,
-    OwnerType.INDUSTRY: 20,
-    OwnerType.GOVERNMENTAL: 30,
-    OwnerType.FOUNDATION: 40,
-    OwnerType.INDIVIDUAL: 50,
-    OwnerType.OTHER_ORGANIZATION: 100,
-    OwnerType.OTHER: 1000,
-}
-
-
 class OwnerTypeParser:
     @staticmethod
     def find(value: str) -> OwnerType:
         if value == OTHER_OWNER_NAME:
             return OwnerType.OTHER
 
-        reason = sorted(
+        reasons = sorted(
             classify_string(value, OWNER_KEYWORD_MAP, OwnerType.OTHER),
             key=lambda x: OwnerTypePriorityMap[x],
         )
-        res = reason[0]
+        res = reasons[0]
         return res
