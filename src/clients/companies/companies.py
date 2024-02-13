@@ -1,10 +1,10 @@
 from typing import Sequence
 from prisma.models import Owner, Ownable
-from prisma.types import OwnableInclude, OwnableWhereInput, StringFilter
+from prisma.types import OwnableInclude, OwnableWhereInput
 import logging
-
 from pydash import uniq_by
 
+from clients.low_level.prisma import prisma_context
 from typings.companies import CompanyFinancials
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,13 @@ async def get_owner_map(
 
     where = OwnableWhereInput(**{id_field: {"in": list(doc_ids)}})  # type: ignore
 
-    ownables = await Ownable.prisma().find_many(
-        where=where,
-        include=OwnableInclude(owner={"include": {"financial_snapshot": True}}),
-    )
+    async with prisma_context(300) as db:
+        logger.info("OWNABLES... about to find.")
+        ownables = await db.ownable.find_many(
+            where=where,
+            include=OwnableInclude(owner={"include": {"financial_snapshot": True}}),
+        )
+        logger.info("OWNABLES..GOT TEM")
 
     owners = uniq_by([o.owner for o in ownables if o.owner is not None], lambda o: o.id)
 
@@ -52,7 +55,9 @@ async def get_financial_map(
         ids: ids for which to fetch associated owners
         id_field: field to use for id matching (e.g. "patent_id")
     """
+    logger.info("OWNER MAP")
     owner_map = await get_owner_map(tuple(doc_ids), id_field)
+    logger.info("GOT OWNER MAP")
     return {
         owner.name: CompanyFinancials(**owner.financial_snapshot.model_dump())
         for owner in owner_map.values()

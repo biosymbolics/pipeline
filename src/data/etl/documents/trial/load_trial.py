@@ -1,6 +1,7 @@
 """
 Load script for Trial etl
 """
+
 import asyncio
 import re
 import sys
@@ -340,6 +341,7 @@ class TrialLoader(BaseDocumentEtl):
                         "name": (t["sponsor"] or "unknown").lower(),
                         "canonical_name": (t["sponsor"] or "unknown").lower(),
                         "instance_rollup": (t["sponsor"] or "unknown").lower(),
+                        "category_rollup": (t["sponsor"] or "unknown").lower(),
                         "is_primary": True,
                         "trial_id": t["id"],
                     }

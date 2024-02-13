@@ -14,7 +14,7 @@ from prisma.types import (
     TrialScalarFieldKeys,
 )
 
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import prisma_context
 from typings import ScoredTrial
 
 
@@ -33,14 +33,13 @@ async def find_many(
 ) -> list[ScoredTrial]:
     """
     Find trials
-    ```
     """
     start = time.monotonic()
 
-    client = await prisma_client(120)
-    trials = await TrialDto.prisma(client).find_many(
-        take, skip, where, cursor, include, order, distinct
-    )
+    async with prisma_context(300) as db:
+        trials = await TrialDto.prisma(db).find_many(
+            take, skip, where, cursor, include, order, distinct
+        )
 
     logger.info(
         "Search took %s seconds (%s)",

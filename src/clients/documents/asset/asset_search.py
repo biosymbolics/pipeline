@@ -6,11 +6,12 @@ import asyncio
 from functools import partial
 import time
 from typing import Mapping
+from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import prisma_context
 from typings.client import (
     AssetSearchParams,
     DocumentSearchParams,
@@ -42,8 +43,6 @@ async def get_docs_by_entity_id(
     """
     Gets entities for a set of doc ids
     """
-    client = await prisma_client(120)
-
     query = f"""
         SELECT
             {rollup_field.name} as name,
@@ -58,19 +57,22 @@ async def get_docs_by_entity_id(
             OR trial_id = ANY($3)
         )
         AND entity_id is not NULL
+        AND {rollup_field.name} is not NULL
         AND instance_rollup<>'' -- TODO?
         GROUP BY
             {rollup_field.name},
             {f'{child_field.name}' if child_field else ''}
         """
-    result = await client.query_raw(
-        query,
-        doc_id_map["patents"],
-        doc_id_map["regulatory_approvals"],
-        doc_id_map["trials"],
-    )
 
-    ents_with_docs = [EntWithDocResult(**r) for r in result]
+    async with prisma_context(300) as db:
+        results = await db.query_raw(
+            query,
+            doc_id_map["patents"],
+            doc_id_map["regulatory_approvals"],
+            doc_id_map["trials"],
+        )
+
+    ents_with_docs = [EntWithDocResult(**r) for r in results]
 
     return ents_with_docs
 

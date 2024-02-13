@@ -1,6 +1,7 @@
 """
 Handler for patent timewise reports
 """
+
 import json
 import logging
 
@@ -49,7 +50,9 @@ async def _x_by_y(raw_event: dict, context):
 
     try:
         report = await XYReport.group_by_xy(
-            search_params=DocumentSearchParams(terms=p.terms, query_type=p.query_type),
+            search_params=DocumentSearchParams(
+                terms=p.terms, query_type=p.query_type, include={}
+            ),
             x_dimension=x_dimension,
             y_dimension=y_dimension,
         )

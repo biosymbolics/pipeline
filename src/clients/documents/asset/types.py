@@ -3,7 +3,7 @@ Asset client
 """
 
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 from typings.core import Dataclass
@@ -26,4 +26,4 @@ class DocResults(BaseModel):
 class EntWithDocResult(DocResults):
     # id: int
     name: str
-    child: str | None = None
+    child: str | None = Field(validate_default=True)

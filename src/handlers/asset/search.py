@@ -1,6 +1,7 @@
 """
 Handler for entities search
 """
+
 import json
 import logging
 import traceback

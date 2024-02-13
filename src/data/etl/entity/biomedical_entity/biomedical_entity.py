@@ -413,6 +413,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
                     WHERE {table}.entity_id=entity.id
                 """,
+                # ensure all records have rollups
+                f"""
+                    UPDATE {table} SET instance_rollup=canonical_name, category_rollup=canonical_name
+                    WHERE instance_rollup=''
+                """,
             ]
 
         # much faster with temp tables

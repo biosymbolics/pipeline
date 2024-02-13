@@ -79,6 +79,7 @@ class DocumentSearchCriteria(TermSearchCriteria):
             Annotated[RegulatoryApprovalInclude, Tag("regulatory_approval_include")],
             Annotated[TrialInclude, Tag("trial_include")],
             Annotated[dict, Tag("no_include")],
+            Annotated[None, Tag("none_include")],
         ],
         Discriminator(include_discriminator),
     ]
@@ -111,7 +112,7 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 class PatentSearchParams(DocumentSearchParams):
     exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
-    include: Annotated[Union[PatentInclude, dict], Field(validate_default=True)] = (
+    include: Annotated[Union[PatentInclude, None], Field(validate_default=True)] = (
         DEFAULT_PATENT_INCLUDE
     )
 
@@ -125,12 +126,12 @@ class PatentSearchParams(DocumentSearchParams):
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
     include: Annotated[
-        Union[RegulatoryApprovalInclude, dict], Field(validate_default=True)
+        Union[RegulatoryApprovalInclude, None], Field(validate_default=True)
     ] = DEFAULT_REGULATORY_APPROVAL_INCLUDE
 
 
 class TrialSearchParams(DocumentSearchParams):
-    include: Annotated[Union[TrialInclude, dict], Field(validate_default=True)] = (
+    include: Annotated[Union[TrialInclude, None], Field(validate_default=True)] = (
         DEFAULT_TRIAL_INCLUDE
     )
 
@@ -140,7 +141,7 @@ class AssetSearchParams(DocumentSearchParams):
     entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
         EntityMapType.intervention
     )
-    include: Annotated[dict, Field()] = {}
+    include: Annotated[None, Field()] = None
 
     @field_validator("entity_map_type", mode="before")
     def entity_map_type_from_string(cls, v):

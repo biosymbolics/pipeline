@@ -1,6 +1,7 @@
 """
 Handler for approvals search
 """
+
 import json
 import logging
 

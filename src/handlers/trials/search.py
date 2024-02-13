@@ -1,6 +1,7 @@
 """
 Handler for trials search
 """
+
 import json
 import logging
 
