@@ -25,6 +25,7 @@ class BuyerRecord(ResultBase):
     name: str
     ids: list[str]
     count: int
+    symbol: str | None
     titles: list[str]
     # terms: list[str]
     min_age: int
@@ -71,6 +72,7 @@ async def find_buyers(
             select
                 owner.id as id,
                 owner.name as name,
+                COALESCE(financials.symbol, '') as symbol,
                 ARRAY_AGG(patent.id) AS ids,
                 COUNT(title) AS count,
                 ARRAY_AGG(title) AS titles,
@@ -84,7 +86,8 @@ async def find_buyers(
                         * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
                     )::numeric, 2
                 ) AS score
-            FROM ownable, owner, patent
+            FROM ownable, patent, owner
+            LEFT JOIN financials ON financials.owner_id=owner.id
             WHERE ownable.patent_id=patent.id
             AND owner.id=ownable.owner_id
             AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')
@@ -100,7 +103,7 @@ async def find_buyers(
                 ) embed
                 GROUP BY embed.title
             )
-            GROUP BY owner.name, owner.id
+            GROUP BY owner.name, owner.id, financials.symbol
         """
 
     records = await client.query_raw(query)
