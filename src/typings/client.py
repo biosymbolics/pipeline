@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
-from clients.documents.patents.constants import DEFAULT_BUYER_K
+from constants.patents import DEFAULT_BUYER_K
 from typings.documents.common import DocType
 
 from .documents.common import EntityMapType, TermField

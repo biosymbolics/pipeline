@@ -7,11 +7,11 @@ import logging
 import time
 
 from pydash import flatten, group_by
-from clients.documents.patents.constants import DEFAULT_BUYER_K
 
 
 from clients.low_level.prisma import prisma_client
 from clients.openai.gpt_client import GptApiClient
+from constants.patents import DEFAULT_BUYER_K
 from core.ner.spacy import get_transformer_nlp
 from typings.core import ResultBase
 
