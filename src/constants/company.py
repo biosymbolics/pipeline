@@ -323,6 +323,8 @@ COMPANY_MAP = {
     "nih": "national institutes of health",
     "walter reed": "walter reed",
     "oxford university": "oxford university",
+    "gore enterprise holdings inc": "gore",
+    "rice university": "rice university",
 }
 
 # can be regex. \b is added to the start and end of each term
