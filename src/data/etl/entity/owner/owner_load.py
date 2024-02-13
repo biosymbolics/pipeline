@@ -19,7 +19,7 @@ ASSIGNEE_PATENT_THRESHOLD = 100
 
 class OwnerLoader:
     @staticmethod
-    async def get_owner_names() -> list[str]:
+    async def get_owners() -> tuple[list[str], list[int]]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
@@ -69,24 +69,14 @@ class OwnerLoader:
             """,
             # ctgov db
             "aact": """
-                -- fewer than 3, look at name to confirm that this is an org
-                select lower(name) as name, count(*) as count
-                from sponsors
-                WHERE name ~* '{org_re}\\.?'
-                group by lower(name)
-                HAVING count(*) <= 2
-
-                UNION
-
-                select lower(name) as name
+                select lower(name) as name, (count(*) * 2) as count
                 from sponsors
                 group by lower(name)
-                HAVING count(*) > 2
             """,
             # drugcentral db, with approvals
             # `ob_product`` has 1772 distinct applicants vs `approval` at 1136
             "drugcentral": """
-                select lower(applicant) as name
+                select lower(applicant) as name, (count(*) * 20) as count
                 from ob_product
                 where applicant is not null
                 group by lower(applicant)
@@ -101,8 +91,9 @@ class OwnerLoader:
         stock_names = [
             record["name"].lower() for record in OwnerLoader.load_public_companies()
         ]
-        names = uniq(stock_names + [row["name"] for row in rows])
-        return names
+        names = [row["name"] for row in rows] + stock_names
+        counts = [row["count"] for row in rows] + [1000] * len(stock_names)
+        return names, counts
 
     @staticmethod
     def load_public_companies() -> list[CompanyInfo]:
@@ -123,9 +114,9 @@ class OwnerLoader:
         ]
 
     async def copy_all(self, is_force_update: bool = False):
-        names = await self.get_owner_names()
+        names, counts = await self.get_owners()
         public_companies = self.load_public_companies()
-        await OwnerEtl().copy_all(names, public_companies, is_force_update)
+        await OwnerEtl().copy_all(names, counts, public_companies, is_force_update)
 
     @staticmethod
     async def post_finalize():

@@ -71,7 +71,7 @@ class OwnerEtl(BaseEntityEtl):
 
         return merged_recs
 
-    async def create_records(self, names: Sequence[str]):
+    async def create_records(self, names: Sequence[str], counts: Sequence[int]):
         """
         Create records for entities and relationships
 
@@ -79,7 +79,7 @@ class OwnerEtl(BaseEntityEtl):
             names: list of names to insert
         """
         client = await prisma_client(600)
-        lookup_map = generate_clean_owner_map(names)
+        lookup_map = generate_clean_owner_map(names, counts)
         insert_recs = self._generate_insert_records(names, lookup_map)
 
         # create flat records
@@ -146,13 +146,14 @@ class OwnerEtl(BaseEntityEtl):
     async def copy_all(
         self,
         names: Sequence[str],
+        counts: Sequence[int],
         public_companies: Sequence[CompanyInfo],
         is_update: bool = False,
     ):
         if is_update:
             await self.delete_owners()
 
-        await self.create_records(names)
+        await self.create_records(names, counts)
         await self.load_financials(public_companies)
 
     @overrides(BaseEntityEtl)

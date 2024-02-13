@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import reduce
 import regex as re
 from typing import Iterable, Mapping, Sequence
-from pydash import compact
+from pydash import compact, group_by
 from prisma.enums import OwnerType
 from prisma.types import (
     FinancialSnapshotCreateWithoutRelationsInput as FinancialSnapshotCreateInput,
@@ -35,6 +35,7 @@ logger.setLevel(logging.INFO)
 
 def generate_clean_owner_map(
     names: Sequence[str],
+    counts: Sequence[int],
     normalization_map: dict[str, str] = OWNER_TERM_NORMALIZATION_MAP,
     overrides: dict[str, str] = COMPANY_MAP,
     suppressions: Sequence[str] = OWNER_SUPPRESSIONS,
@@ -55,18 +56,23 @@ def generate_clean_owner_map(
         Examples:
             - Matsushita Electric Ind Co Ltd -> Matsushita
             - MEDIMMUNE LLC -> Medimmune
-            - University Of Alabama At Birmingham  -> University Of Alabama
-            - University of Colorado, Denver -> University of Colorado
         """
-        post_suppress_re = rf"(?:(?:\s+|,){get_or_re(suppressions)}\b)"
-        pre_suppress_re = "^the\b"
+        other_res = [r"^the\b", r"\(.+\)"]
+        other_re = get_or_re(other_res, enforce_word_boundaries=False, count="?")
+        tail_removal = "[&., ]+"
 
-        # remove anything in parentheses
-        middle_re = r"\(.+\)"
-        suppress_re = rf"(?:{pre_suppress_re}|{post_suppress_re}|{middle_re})"
+        suppress_re = (
+            get_or_re(
+                suppressions,
+                enforce_word_boundaries=True,
+                permit_plural=True,
+                count="*",
+            )
+            + other_re
+        )
 
         for term in terms:
-            yield re.sub(suppress_re, "", term, flags=RE_FLAGS).rstrip("&[ .,]*")
+            yield re.sub(suppress_re, "", term, flags=RE_FLAGS).strip(tail_removal)
 
     def normalize_terms(assignees: list[str]) -> Iterable[str]:
         """
@@ -78,9 +84,6 @@ def generate_clean_owner_map(
 
         def _normalize(_assignee: str):
             assignee_copy = _assignee
-
-            # replace ampersands (since \b is a problem)
-            assignee_copy = assignee_copy.replace(" & ", " and ")
 
             has_rewrites = (
                 re.search(term_map_re, assignee_copy, flags=RE_FLAGS) is not None
@@ -152,9 +155,12 @@ def generate_clean_owner_map(
     ]
     cleaned = list(reduce(lambda x, func: func(x), cleaning_steps, names))
 
+    grouped = group_by(zip(cleaned, counts), lambda x: x[0])
+    with_counts = {k: sum([x[1] for x in v]) for k, v in grouped.items()}
+
     # maps cleaned to clustered
     logger.info("Clustering owner terms (%s)", len(cleaned))
-    cleaned_to_cluster = cluster_terms(cleaned, PLURAL_COMMON_OWNER_WORDS)
+    cleaned_to_cluster = cluster_terms(with_counts, PLURAL_COMMON_OWNER_WORDS)
 
     logger.info("Generated owner canonicalization map")
     # e.g. { "Pfizer Inc": "pfizer", "Biogen Ma": "biogen" }

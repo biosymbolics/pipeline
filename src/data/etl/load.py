@@ -99,7 +99,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.load
+            Usage: python3 -m data.etl.load [--force_update]
             UMLS etl
         """
         )

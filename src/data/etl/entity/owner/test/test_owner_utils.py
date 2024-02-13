@@ -1,6 +1,7 @@
 import unittest
 
 from prisma.enums import OwnerType
+from pydash import group_by
 from constants.company import COMPANY_MAP
 
 from data.etl.entity.owner.owner import generate_clean_owner_map, OwnerTypeParser
@@ -173,67 +174,62 @@ class TestPatentScriptUtils(unittest.TestCase):
                     "US GOV SEC TECH TRANSFER",
                 ],
                 "expected": {
-                    "abbott": 11,
-                    "agency for innovation by science and technology": 4,
-                    "astrazeneca": 7,
-                    "biogen inc": 4,
-                    "charles river laboratory": 6,
-                    "dainippon pharmaceutical company": 6,
-                    "genentech inc": 6,
-                    "janssen": 11,
-                    "matsushita electric ind company ltd": 4,
-                    "merck company": 5,
-                    "mo research and development inc": 3,
-                    "novo nordisk": 6,
-                    "other": 12,
-                    "pfizer inc": 3,
-                    "procter and gamble": 4,
-                    "united states environmental agency": 5,
-                    "united states government": 9,
-                    "university of colorado": 4,
-                    "university of toronto": 6,
+                    "abbott": 6,
+                    "agency for innovation by science and technology": 3,
+                    "astrazeneca": 4,
+                    "biogen": 3,
+                    "charles river laboratory": 4,
+                    "dainippon": 5,
+                    "janssen pharmaceutical": 8,
+                    "japan pharmaceutical": 2,
+                    "merck": 3,
+                    "novo nordisk": 4,
+                    "other": 22,
+                    "pfizer": 2,
+                    "procter & gamble": 3,
+                    "queen mary & westfield college": 2,
+                    "united states environmental agency": 13,
+                    "university of colorado": 3,
+                    "university of toronto": 5,
                 },
                 "expected_overrides": {
-                    "abbott": 11,
-                    "agency for innovation by science and technology": 4,
-                    "astrazeneca": 7,
-                    "biogen": 4,
-                    "charles river laboratory": 6,
-                    "dainippon pharmaceutical company": 6,
-                    "genentech": 6,
-                    "janssen": 11,
+                    "abbott": 7,
+                    "agency for innovation by science and technology": 3,
+                    "astrazeneca": 4,
+                    "biogen": 3,
+                    "charles river laboratory": 4,
+                    "dainippon": 5,
+                    "genentech": 4,
+                    "governing council of the university of toronto": 5,
+                    "janssen": 9,
+                    "japan science & technology": 2,
                     "johnson & johnson": 1,
-                    "matsushita": 4,
-                    "merck": 5,
-                    "mo research and development inc": 3,
-                    "novo nordisk": 6,
+                    "matsushita": 3,
+                    "merck": 4,
+                    "novo nordisk": 4,
                     "other": 10,
-                    "pfizer": 3,
-                    "procter and gamble": 4,
-                    "united states environmental agency": 5,
-                    "united states government": 5,
-                    "university of colorado": 4,
-                    "university of toronto": 6,
+                    "pfizer": 2,
+                    "procter and gamble": 3,
+                    "queen mary and westfield college": 2,
+                    "united states government": 9,
+                    "university of colorado": 3,
                     "us government": 5,
                 },
             },
         ]
 
         for condition in test_conditions:
-            terms = condition["terms"]
-
-            # shuffling to avoid anything inconsistent based on order
-            shuffled_terms = sorted(terms, key=lambda x: hash(x))
+            grouped = group_by(condition["terms"], lambda x: x)
+            counts = [len(v) for v in grouped.values()]
+            terms = list(grouped.keys())
 
             for override, expected in zip(
                 [{}, COMPANY_MAP],
                 [condition["expected"], condition["expected_overrides"]],
             ):
                 print("Override:", override)
-                owner_map = generate_clean_owner_map(shuffled_terms, overrides=override)
-                result = sorted(
-                    [owner_map.get(term) or term for term in shuffled_terms]
-                )
+                owner_map = generate_clean_owner_map(terms, counts, overrides=override)
+                result = sorted([owner_map.get(term) or term for term in terms])
                 stats = {term: result.count(term) for term in result}
                 print("Actual: \n", stats)
                 print("Expected: \n", expected)
@@ -247,7 +243,6 @@ class TestPatentScriptUtils(unittest.TestCase):
                 print("Discrepancies: \n", discrepancy)
                 print("Total discrepancy:", total_discrepancy)
                 self.assertLessEqual(total_discrepancy, 6)
-                # self.assertEqual(True, False)
 
 
 if __name__ == "__main__":
