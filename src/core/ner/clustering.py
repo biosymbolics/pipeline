@@ -2,13 +2,14 @@
 Clustering utils
 """
 
+from functools import reduce
 import logging
 from typing import Mapping, Sequence
 import polars as pl
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-from .constants import MAX_CLUSTER_SIZE, SOLO_CLUSTER_THRESHOLD
+from .constants import MAX_CLUSTER_SIZE, MAX_DISTINCT_TERMS, SOLO_CLUSTER_THRESHOLD
 
 
 logger = logging.getLogger(__name__)
@@ -53,10 +54,19 @@ def _create_cluster_term_map(
     terms: Sequence[str],
     counts: Sequence[int],
     cluster_ids: Sequence[int],
-) -> tuple[dict[str, str], dict[str, int]]:
+    max_cluster_size: int = MAX_CLUSTER_SIZE,
+    max_distinct_terms: int = MAX_DISTINCT_TERMS,
+) -> tuple[dict[str, str], list[dict[str, int]]]:
     """
     Creates a map between synonym/secondary terms and the primary
     For use with cluster_terms
+
+    Args:
+        terms (Sequence[str]): list of terms to cluster
+        counts (Sequence[int]): list of counts for the terms (used for canonical name selection)
+        cluster_ids (Sequence[int]): list of cluster ids
+        max_cluster_size (int): maximum cluster size (default: MAX_CLUSTER_SIZE)
+        max_distinct_terms (int): maximum distinct terms in a cluster (default: MAX_DISTINCT_TERMS)
     """
     df = (
         pl.DataFrame({"cluster_id": cluster_ids, "name": terms, "count": counts})
@@ -64,14 +74,20 @@ def _create_cluster_term_map(
         .agg(
             [
                 pl.col("count").sum().alias("cluster_count"),
+                pl.concat_list(pl.col("name").str.split(" "))
+                .flatten()
+                .unique()
+                .count()
+                .alias("distinct_terms"),
                 pl.col("name"),
                 pl.col("count"),
             ]
         )
         .with_columns(
             is_other=pl.when(
-                pl.col("cluster_count").gt(MAX_CLUSTER_SIZE) | pl.col("cluster_id")
-                == -1
+                pl.col("cluster_count").gt(max_cluster_size)
+                | pl.col("distinct_terms").gt(max_distinct_terms)
+                | pl.col("cluster_id").eq(-1)
             )
             .then(pl.lit(True))
             .otherwise(pl.lit(False))
@@ -90,25 +106,37 @@ def _create_cluster_term_map(
         .to_list()
     )
 
-    other_terms = df.filter(pl.col("is_other") == True)["name"].to_list()
-    other_counts = df.filter(pl.col("is_other") == True)["count"].to_list()
-    other = dict(zip(other_terms, other_counts))
+    # remaining terms, grouped by cluster_id.
+    others = [
+        dict(o.select("name", "count").iter_rows())
+        for o in df.filter(pl.col("is_other") == True).partition_by("cluster_id")
+    ]
 
     return {
         m: members_terms[0]  # synonym to most-frequent-term
         for members_terms in term_clusters
         for m in members_terms
-    }, other
+    }, others
 
 
 def cluster_terms_with_hdbscan(
-    terms: Sequence[str], common_words: set[str] = set([])
+    terms: Sequence[str],
+    counts: Sequence[int],
+    common_words: set[str] = set([]),
+    max_cluster_size: int = MAX_CLUSTER_SIZE,
 ) -> dict[str, str]:
     """
     Clusters terms using TF-IDF and HDBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair).
 
     Is a memory pig but has good accuracy. Used for the remaining terms after DBSCAN.
+
+    Args:
+        terms (Sequence[str]): list of terms to cluster
+        counts (Sequence[int]): list of counts for the terms
+                (used only for canonical name selection, since HDBSCAN impl doesn't support sample weights)
+        common_words (set[str]): set of common words to lower the IDF for (default: set([]))
+        max_cluster_size (int): maximum cluster size (default: MAX_CLUSTER_SIZE)
 
     Returns:
         dict[str, str]: map between synonym/secondary terms and the primary
@@ -128,13 +156,13 @@ def cluster_terms_with_hdbscan(
             # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#leaf-clustering
             cluster_selection_method="leaf",
             min_cluster_size=3,
-            max_cluster_size=20000,
+            max_cluster_size=max_cluster_size,
         )
         .fit_predict(vectorized)
         .tolist()
     )
 
-    result_map, _ = _create_cluster_term_map(terms, [1] * len(terms), cluster_ids)
+    result_map, _ = _create_cluster_term_map(terms, counts, cluster_ids)
     return result_map
 
 
@@ -170,21 +198,34 @@ def cluster_terms(
         DBSCAN(eps=0.7, min_samples=2).fit_predict(vectorized, counts).tolist()
     )
 
-    result_map, other = _create_cluster_term_map(terms, counts, cluster_ids)
+    result_map, others = _create_cluster_term_map(terms, counts, cluster_ids)
+    logger.info("Found %s clusters", len(result_map))
 
     # if true, go through another pass on the remaining terms
     if recluster_remaining:
-        remaining_cluster_map = cluster_terms(
-            other,
-            common_words,
-            recluster_remaining=False,
-            solo_cluster_threshold=solo_cluster_threshold,
+        logger.info("Reclustering remaining terms (%s)", sum(len(o) for o in others))
+        # TODO: use HDSCAN if cluster is sufficiently small (~40k expanded)
+        remaining_cluster_map: dict[str, str] = reduce(
+            lambda x, other: {
+                **x,
+                **cluster_terms(
+                    other,
+                    common_words,
+                    recluster_remaining=False,
+                    solo_cluster_threshold=solo_cluster_threshold,
+                ),
+            },
+            others,
+            {},
         )
+
         return {**result_map, **remaining_cluster_map}
 
     # turns remaining entries into their own category, if sufficiently large
     # otherwise, marks as "other"
     remaining_cluster_map = {
-        k: (k if v >= solo_cluster_threshold else "other") for k, v in other.items()
+        k: (k if v >= solo_cluster_threshold else "other")
+        for o in others
+        for k, v in o.items()
     }
     return {**result_map, **remaining_cluster_map}

@@ -177,7 +177,7 @@ def generate_clean_owner_map(
         orig: override_map.get(orig)
         or override_map.get(clean)
         or cleaned_to_cluster.get(clean)
-        or "other"
+        or "other"  # TODO: or clean ?
         for orig, clean in zip(names, cleaned)
     }
 

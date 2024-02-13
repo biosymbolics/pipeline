@@ -312,13 +312,17 @@ COMPANY_MAP = {
     "harvard": "harvard",
     "u.s. army": "us army",
     "united states army": "us army",
+    "us dept veterans affairs": "us veterans affairs",
     "sun pharmaceutical": "sun pharmaceutical",
     "sun pharma": "sun pharmaceutical",
+    "sun chemical": "sun chemical",
     "advanced cardiovascular system": "advanced cardiovascular systems",
     "va office": "veterans affairs",
     "nyu": "new york university",
     "national institutes of health": "national institutes of health",
     "nih": "national institutes of health",
+    "walter reed": "walter reed",
+    "oxford university": "oxford university",
 }
 
 # can be regex. \b is added to the start and end of each term

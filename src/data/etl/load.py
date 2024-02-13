@@ -64,28 +64,28 @@ async def load_all(force_update: bool = False):
             If update, documents and their relations are first deleted.
     """
     # copy umls data
-    # await UmlsLoader().copy_all()
+    await UmlsLoader().copy_all()
 
     # copy all biomedical entities (from all doc types)
     # Takes 3+ hours!!
-    # await BiomedicalEntityLoader().copy_all()
+    await BiomedicalEntityLoader().copy_all()
 
     # copy owner data (across all documents)
     await OwnerLoader().copy_all(force_update)
 
     # copy patent data
-    # await PatentLoader(document_type="patent").copy_all(force_update)
+    await PatentLoader(document_type="patent").copy_all(force_update)
 
     # copy data about approvals
-    # await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
-    #     force_update
-    # )
+    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
+        force_update
+    )
 
     # copy trial data
-    # await TrialLoader(document_type="trial").copy_all(force_update)
+    await TrialLoader(document_type="trial").copy_all(force_update)
 
     # do final biomedical entity stuff that requires everything else be in place
-    # await BiomedicalEntityLoader().post_finalize()
+    await BiomedicalEntityLoader().post_finalize()
 
     # finally, link owners
     await OwnerLoader().post_finalize()
