@@ -131,10 +131,8 @@ COMMON_UNIVERSITY_WORDS = [
     "alumni",
     "college",
     "education",
-    "health",
-    "healthcare",
-    "hospital",
     "inst",
+    "institut",
     "institute",
     "nyu",
     "school",
@@ -163,6 +161,9 @@ COMMON_HEALTH_SYSTEM_WORDS = [
     "(?:medical|cancer|health) (?:center|centre|system|hospital)s?",
     "clinics?",
     "districts?",
+    "health",
+    "healthcare",
+    "hospital",
 ]
 
 COMMON_OWNER_WORDS = [
