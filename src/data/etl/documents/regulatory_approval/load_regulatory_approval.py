@@ -246,6 +246,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
                     "name": (a["applicant"] or "unknown").lower(),
                     "canonical_name": (a["applicant"] or "unknown").lower(),
                     "instance_rollup": (a["applicant"] or "unknown").lower(),
+                    "category_rollup": (a["applicant"] or "unknown").lower(),
                     "regulatory_approval_id": a["id"],
                 }
                 for a in approvals

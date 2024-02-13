@@ -299,6 +299,7 @@ class PatentLoader(BaseDocumentEtl):
                         "name": i.lower(),
                         "canonical_name": i.lower(),  # may be overwritten later
                         "instance_rollup": i.lower(),  # may be overwritten later
+                        "category_rollup": i.lower(),
                         "is_primary": True,
                         "inventor_patent_id": p["id"],
                     }
