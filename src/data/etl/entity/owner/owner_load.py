@@ -96,6 +96,11 @@ class OwnerLoader:
 
     @staticmethod
     def load_public_companies() -> list[CompanyInfo]:
+        """
+        Load public companies
+
+        @source https://www.nasdaq.com/market-activity/stocks/screener
+        """
         nasdaq = pl.read_csv("data/NASDAQ.csv")
         nyse = pl.read_csv("data/NYSE.csv")
         all = nasdaq.vstack(nyse)
