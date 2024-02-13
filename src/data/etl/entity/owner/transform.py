@@ -59,7 +59,7 @@ def generate_clean_owner_map(
         """
         other_res = [r"^the\b", r"\(.+\)"]
         other_re = get_or_re(other_res, enforce_word_boundaries=False, count="?")
-        tail_removal = "[&., ]+"
+        tail_removal = "[&., )(]+"
 
         suppress_re = (
             get_or_re(

@@ -2,6 +2,7 @@
 Class for biomedical entity etl
 """
 
+import asyncio
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
@@ -223,6 +224,27 @@ class OwnerEtl(BaseEntityEtl):
             "CREATE INDEX owner_search_idx ON biomedical_entity USING GIN(search)"
         )
 
+    @staticmethod
+    async def checksum():
+        """
+        Quick entity checksum
+        """
+        client = await prisma_client(300)
+        checksums = {
+            "owners": "SELECT COUNT(*) FROM owner",
+            "ownable": "SELECT COUNT(*) FROM ownable",
+            "empty_owner_id": "SELECT COUNT(*) FROM ownable WHERE owner_id IS NULL",
+            "other_owner_id": "SELECT COUNT(*) FROM ownable, owner WHERE owner_id=owner.id AND owner.name='other'",
+            "top_owners": "SELECT name, count FROM owner ORDER BY count DESC LIMIT 20",
+            "financial_snapshots": "SELECT COUNT(*) FROM financials where owner_id IS NOT NULL",
+        }
+        results = await asyncio.gather(
+            *[client.query_raw(query) for query in checksums.values()]
+        )
+        for key, result in zip(checksums.keys(), results):
+            logger.warning(f"Load checksum {key}: {result}")
+        return
+
     @overrides(BaseEntityEtl)
     @staticmethod
     async def post_finalize():
@@ -235,3 +257,4 @@ class OwnerEtl(BaseEntityEtl):
         await OwnerEtl.link_to_documents()
         await OwnerEtl.add_counts()
         await OwnerEtl._update_search_index()
+        await OwnerEtl.checksum()

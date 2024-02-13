@@ -5,6 +5,7 @@ Utils for the NER pipeline
 from functools import partial, reduce
 import logging
 import sys
+from pydash import flatten
 import regex as re
 from typing import Iterable, Mapping, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -494,30 +495,38 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
 
 
 def _create_cluster_term_map(
-    terms: Sequence[str], counts: Sequence[int], cluster_ids: Sequence[int]
-) -> dict[str, str]:
+    terms: Sequence[str],
+    counts: Sequence[int],
+    cluster_ids: Sequence[int],
+) -> tuple[dict[str, str], list[str]]:
     """
     Creates a map between synonym/secondary terms and the primary
     For use with cluster_terms
     """
-    term_clusters = (
+    df = (
         pl.DataFrame({"cluster_id": cluster_ids, "name": terms, "count": counts})
-        .filter(pl.col("cluster_id") != -1)
         .group_by(["cluster_id", "name"])
         .agg(pl.col("count").sum().alias("count"))
-        .sort(["count"], descending=True)  # sort so that first name is the most common
-        .group_by("cluster_id", maintain_order=True)  # re-cluster by cluster_id
+        .sort("count", descending=True)  # sort so that first name is the most common
+    )
+    term_clusters = (
+        # re-cluster by cluster_id
+        df.filter(pl.col("cluster_id") != -1)
+        .group_by("cluster_id", maintain_order=True)
         .agg(pl.col("name"), maintain_order=True)
         .drop("cluster_id")
         .to_series()
         .to_list()
     )
 
+    other_dicts = df.filter(pl.col("cluster_id") == -1).to_dicts()
+    others = flatten([[d["name"]] * min(d["count"], 20) for d in other_dicts])
+
     return {
         m: members_terms[0]  # synonym to most-frequent-term
         for members_terms in term_clusters
         for m in members_terms
-    }
+    }, others
 
 
 def fit_tfidf_vectorizer(
@@ -554,18 +563,54 @@ def fit_tfidf_vectorizer(
     return vectorizer
 
 
-def cluster_terms(
-    term_count_map: Mapping[str, int], common_words: set[str] = set([])
+def cluster_terms_with_hdbscan(
+    terms: Sequence[str], common_words: set[str] = set([])
 ) -> dict[str, str]:
     """
     Clusters terms using TF-IDF and HDBSCAN.
     Returns a synonym record mapping between the canonical term and the synonym (one per pair).
 
-    On a machine with 16GB RAM, this function can handle ~50k terms
+    Is a memory pig but has good accuracy. Used for the remaining terms after DBSCAN.
+
+    Returns:
+        dict[str, str]: map between synonym/secondary terms and the primary
+    """
+    # lazy loading
+    from sklearn.cluster._hdbscan.hdbscan import HDBSCAN
+
+    vectorizer = fit_tfidf_vectorizer(terms, common_words=common_words)
+    vectorized = vectorizer.transform(terms)
+
+    logger.info("Starting HDBSCAN clustering (shape %s)", vectorized.shape)
+    cluster_ids = (
+        HDBSCAN(
+            # merge clusters that are close
+            # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#selecting-cluster-selection-epsilon
+            cluster_selection_epsilon=0.4,
+            # https://hdbscan.readthedocs.io/en/latest/parameter_selection.html#leaf-clustering
+            cluster_selection_method="leaf",
+            min_cluster_size=3,
+            max_cluster_size=20000,
+        )
+        .fit_predict(vectorized)
+        .tolist()
+    )
+
+    result_map, _ = _create_cluster_term_map(terms, [1] * len(terms), cluster_ids)
+    return result_map
+
+
+def cluster_terms(
+    term_count_map: Mapping[str, int],
+    common_words: set[str] = set([]),
+    recluster_remaining: bool = True,
+) -> dict[str, str]:
+    """
+    Clusters terms using TF-IDF and DBSCAN. Sends remaining through a HDBSCAN recluster.
+    Returns a synonym record mapping between the canonical term and the synonym (one per pair).
 
     Args:
-        terms (Sequence[str]): list of terms to cluster
-        counts (Sequence[int]): list of counts for each term
+        term_count_map (Mapping[str, int]): map between term and count
         common_words (set[str]): set of common words to lower the IDF for (default: set([]))
 
     Returns:
@@ -580,15 +625,18 @@ def cluster_terms(
     vectorizer = fit_tfidf_vectorizer(terms, common_words=common_words)
     vectorized = vectorizer.transform(terms)
 
-    logger.info("Starting clustering (%s)", vectorized.shape)
-    try:
-        # ideally would be HDBSCAN, but but it doesn't support weighting
-        # (which is necessary to avoid blowing out memory with all instances of all terms)
-        cluster_ids = (
-            DBSCAN(eps=0.95, min_samples=2).fit_predict(vectorized, counts).tolist()
-        )
-    except Exception as e:
-        logger.error("Error in clustering: %s", e)
-        raise e
+    logger.info("Starting clustering (shape %s)", vectorized.shape)
+    cluster_ids = (
+        DBSCAN(eps=0.95, min_samples=2).fit_predict(vectorized, counts).tolist()
+    )
 
-    return _create_cluster_term_map(terms, counts, cluster_ids)
+    result_map, others = _create_cluster_term_map(terms, counts, cluster_ids)
+
+    if recluster_remaining:
+        logger.info("REMAIN %s", others)
+        remaining_cluster_map = cluster_terms_with_hdbscan(
+            others, common_words=common_words
+        )
+        return {**result_map, **remaining_cluster_map}
+
+    return result_map

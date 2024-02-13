@@ -14,7 +14,7 @@ from .owner import OwnerEtl
 
 
 FINANCIAL_KEYS = list(FinancialSnapshot.model_fields.keys())
-ASSIGNEE_PATENT_THRESHOLD = 100
+ASSIGNEE_PATENT_THRESHOLD = 50
 
 
 class OwnerLoader:
@@ -49,7 +49,6 @@ class OwnerLoader:
                     )
                 GROUP BY lower(name)
                 HAVING count(*) <= {ASSIGNEE_PATENT_THRESHOLD}
-                AND count(*) > 5
 
                 UNION
 

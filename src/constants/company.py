@@ -28,32 +28,40 @@ LARGE_PHARMA_KEYWORDS = [
 ]
 
 
-COMMON_COMPANY_ACRONYMS = [
+UNHELPFUL_COMPANY_ACROYNMS = [
     "ab",
     "ag",
     "as",
+    "a/s",
     "bv",
     "b v",
-    "co",
-    "corp",
     "dba",
     "gmbh",
-    "inc",
     "int",
     "ind",
     "intl",
     "ip",
     "kg",
     "kk",
-    "llc",
-    "llp",
-    "lp",
-    "ltd",
     "ltda",
     "nv",
     "n v",
     "sa",
     "s a",
+    "sl",
+    "s l",
+]
+
+COMMON_COMPANY_ACRONYMS = [
+    *UNHELPFUL_COMPANY_ACROYNMS,
+    "co",
+    "corp",
+    "inc",
+    "int",
+    "llc",
+    "llp",
+    "lp",
+    "ltd",
 ]
 
 
@@ -233,12 +241,12 @@ COMPANY_MAP = {
     "lilly co eli": "eli lilly",
     "lilly": "eli lilly",
     "glaxo": "glaxosmithkline",
+    "glaxosmithkline": "glaxosmithkline",  # e.g.  glaxosmithkline biologicals
     "merck": "merck",
     "sinai": "mount sinai",
     "medtronic": "medtronic",
     "sloan kettering": "sloan kettering",
     "sanofis?": "sanofi",
-    "genzyme": "sanofi",
     "basf": "basf",
     "3m": "3m",
     "matsushita": "matsushita",
@@ -256,6 +264,7 @@ COMPANY_MAP = {
     "childrens medical center": "childrens medical center",
     "us gov": "us government",
     "us health": "us government",
+    "us agriculture": "us government",
     "koninkl philips": "philips",
     "koninklijke philips": "philips",
     "max planck": "max planck",
@@ -281,6 +290,8 @@ COMPANY_MAP = {
     "celgene": "bristol-myers squibb",
     "samsung": "samsung",
     "ucb": "ucb",
+    "syngenta": "syngenta",
+    "uop": "honeywell",
 }
 
 # can be regex. \b is added to the start and end of each term
@@ -292,28 +303,35 @@ OWNER_TERM_NORMALIZATION_MAP = {
     "govt?": "government",
     "nat": "national",
     "u[ .]?s[ .]?(?:a[.]?)?": "united states",
+    "corporation": "corp",
+    "chem": "chemical",
+    "hosp": "hospital",
+    "limited": "ltd",
+    "incorporated": "inc",
+    "company": "co",
     "dept?": "department",
     "depart[a-z]*": "department",
     "(?:bio)?pharm[a-z]*": "pharmaceutical",
     "r[ ]?(?:&|and)[ ]?d": "research and development",
     "res": "research",
     "dev": "development",
+    "eng": "engineering",
     "biotech": "biotechnology",
+    "bio[- ]*tech(?:nology)?": "biotechnology",
+    "bio[- ]*pharmaceuticals?": "biopharmaceutical",
+    "biotechnologies": "biotechnology",
     "techn?": "technology",
     "hldgs?": "holdings",
     "grp": "group",
     "serv": "services",
     "found": "foundation",
     "mfg": "manufacturing",
+    "scienc": "science",
 }
 
 
 OWNER_SUPPRESSIONS = [
-    *COMMON_COMPANY_ACRONYMS,
+    *UNHELPFUL_COMPANY_ACROYNMS,
     "internat[a-z]*",
-    "limited",
-    "incorporated",
-    "corporation",
-    "company",
     r"(?:class [a-z]? )?(?:(?:[0-9](?:\.[0-9]*)% )?(?:convertible |american )?(?:common|ordinary|preferred|voting|deposit[ao]ry) (?:stock|share|sh)s?|warrants?).*",
 ]
