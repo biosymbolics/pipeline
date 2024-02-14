@@ -1,9 +1,38 @@
 import unittest
 
-from core.ner.linker.utils import score_candidate
+from core.ner.linker.utils import apply_match_retry_rewrites, score_candidate
 
 
 class TestLinkerUtils(unittest.TestCase):
+    def test_apply_match_retry_rewrites(self):
+        test_conditions = [
+            {
+                "description": "synonym test",
+                "text": "Type I interferon Receptor Antagonist",
+                "expected_output": "Type I interferon Receptor inhibitor",
+            },
+            {
+                "description": "hyphenated test (short next)",
+                "text": "tnf-a modulator",
+                "expected_output": "tnfa modulator",
+            },
+            {
+                "description": "hyphenated test (long next)",
+                "text": "tnf-alpha modulator",
+                "expected_output": "tnf alpha modulator",
+            },
+            {
+                "description": "no rewrite",
+                "text": "nothing to rewrite",
+                "expected_output": None,
+            },
+        ]
+
+        for test in test_conditions:
+            result = apply_match_retry_rewrites(test["text"])
+            print("Actual", result, "expected", test["expected_output"])
+            self.assertEqual(result, test["expected_output"])
+
     def test_score_candidate(self):
         test_conditions = [
             {

@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Sequence, cast
 from pydash import flatten, uniq
 from spacy.tokens import Doc, Span, Token
@@ -15,6 +16,7 @@ from constants.umls import (
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
+from utils.re import get_or_re
 
 
 logger = logging.getLogger(__name__)
@@ -370,3 +372,40 @@ def apply_umls_word_overrides(
             )
         ]
     return candidates
+
+
+MATCH_RETRY_REWRITES = {
+    "inhibitor": "antagonist",
+    "antagonist": "inhibitor",
+    # Rewrite a dash to:
+    # 1) empty string if the next word is less than 3 character, e.g. tnf-a -> tnfa
+    # 2) space if the next word is >= 3 characters, e.g. tnf-alpha -> tnf alpha
+    # Reason: tfidf vectorizer and/or the UMLS data have inconsistent handling of hyphens
+    r"(\w+)-(\w{1,3})": r"\1\2",
+    r"(\w+)-(\w{4,})": r"\1 \2",
+}
+
+MATCH_RETRY_RE = get_or_re(
+    list(MATCH_RETRY_REWRITES.keys()), enforce_word_boundaries=True
+)
+
+
+def apply_match_retry_rewrites(text: str) -> str | None:
+    """
+    Rewrite text before retrying a match
+
+    Returns None if no rewrite is needed
+    """
+    new_text = text
+
+    # look for any overrides (terms -> candidate)
+    match = re.search(MATCH_RETRY_RE, text, re.IGNORECASE)
+
+    if match is not None:
+        for pattern, repl in MATCH_RETRY_REWRITES.items():
+            new_text = re.sub(rf"\b{pattern}s?\b", repl, new_text, flags=re.IGNORECASE)
+
+    if new_text != text:
+        return new_text
+
+    return None

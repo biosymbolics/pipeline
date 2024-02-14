@@ -9,7 +9,12 @@ from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 
 from .types import AbstractCandidateSelector, EntityWithScore
-from .utils import candidate_to_canonical, apply_umls_word_overrides, score_candidate
+from .utils import (
+    apply_match_retry_rewrites,
+    candidate_to_canonical,
+    apply_umls_word_overrides,
+    score_candidate,
+)
 
 MIN_SIMILARITY = 0.85
 UMLS_KB = None
@@ -90,16 +95,10 @@ class CandidateSelector(AbstractCandidateSelector):
             logger.debug(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
-            # tfidf vectorizer and/or the UMLS data have inconsistent handling of hyphens
-            if "-" in text:
-                # try replacing - with empty string
-                res = self._get_best_candidate(text.replace("-", ""), is_composite)
-                if res is None:
-                    # try replacing - with space (which will result in confusion if it separates out single chars)
-                    return self._get_best_candidate(
-                        text.replace("-", " "), is_composite
-                    )
-                return res
+            # apply rewrites and look for another match
+            rewritten_text = apply_match_retry_rewrites(text)
+            if rewritten_text is not None:
+                return self._get_best_candidate(rewritten_text, is_composite)
             return None
 
         # score candidates
