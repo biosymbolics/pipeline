@@ -46,6 +46,8 @@ UMLS_WORD_OVERRIDES = {
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "transporter": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "transporters": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
+    "ch24h": "C0769789",  # cholesterol 24-hydroxylase
+    # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
@@ -81,6 +83,10 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1413365": ["cf"],  # CFTR gene
     "C1421546": ["x3"],
     "C0015230": ["spots"],
+}
+
+UMLS_NON_COMPOSITE_SUPPRESSION = {
+    "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
 }
 
 UMLS_CUI_SUPPRESSIONS = {

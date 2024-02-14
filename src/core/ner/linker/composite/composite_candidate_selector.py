@@ -149,7 +149,9 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
             if len(t) > self.min_word_length
         ]
 
-        token_entity_map = {t: self.select_candidate(t) for t in tokens}
+        token_entity_map = {
+            t: self.select_candidate(t, is_composite=True) for t in tokens
+        }
         composite = self._generate_composite(
             tokens,
             omit_by(
@@ -170,7 +172,7 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
         # attempt direct/non-composite match
-        res = self.select_candidate_from_entity(entity)
+        res = self.select_candidate_from_entity(entity, is_composite=False)
 
         if res is None:
             match, match_score = None, 0.0

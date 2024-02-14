@@ -199,6 +199,7 @@ def score_candidate(
     type_ids: Sequence[str],
     aliases: Sequence[str],
     matching_aliases: Sequence[str],
+    is_composite: bool,
     syntactic_similarity: float | None = None,
 ) -> float:
     """
@@ -219,14 +220,14 @@ def score_candidate(
             if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """
 
-    if is_umls_suppressed(id, canonical_name, matching_aliases):
+    if is_umls_suppressed(id, canonical_name, matching_aliases, is_composite):
         return 0.0
 
-    # give candidates with more aliases a higher score, as proxy for # ontologies in which it is represented.
+    # give candidates with more aliases a higher score, as proxy for num. ontologies in which it is represented.
     alias_score = 1.1 if len(aliases) >= 8 else 1.0
 
     # score based on the UMLS type (tui) of the candidate
-    type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.8) for ct in type_ids])
+    type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.7) for ct in type_ids])
 
     if syntactic_similarity is not None:
         return round(type_score * alias_score * syntactic_similarity, 3)
@@ -244,6 +245,7 @@ def score_semantic_candidate(
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,
     semantic_distance: float,
+    is_composite: bool,
 ) -> float:
     """
     Generate a score for a semantic candidate
@@ -268,6 +270,7 @@ def score_semantic_candidate(
         type_ids=type_ids,
         aliases=aliases,
         matching_aliases=matching_aliases,
+        is_composite=is_composite,
     )
 
     if type_score == 0:
