@@ -2,12 +2,12 @@ from typing import Sequence
 import logging
 from prisma.models import Umls
 from prisma.types import UmlsUpdateInput
-from pydash import compact, flatten, omit
+from pydash import compact, omit
 
 
 from .ancestor_selection import AncestorUmlsGraph
 from .types import UmlsInfo, compare_ontology_level
-from .utils import choose_best_available_ancestor
+from .utils import choose_best_ancestor
 
 
 logger = logging.getLogger(__name__)
@@ -74,9 +74,7 @@ class UmlsAncestorTransformer:
             )
             return eligible_ancestors[0].id
 
-        best_ancestor = choose_best_available_ancestor(
-            child.type_ids, eligible_ancestors
-        )
+        best_ancestor = choose_best_ancestor(child, eligible_ancestors)
 
         logger.debug("Best available ancestor for %s: %s", child.id, best_ancestor)
 
@@ -92,14 +90,12 @@ class UmlsAncestorTransformer:
 
         G = self.umls_graph.G
 
-        parent_ids = list(G.predecessors(record.id))
-        # grandparent_ids = flatten(
-        #     [list(G.predecessors(parent_id)) for parent_id in parent_ids]
-        # )
-        ancestor_ids = parent_ids  # + grandparent_ids
-
+        # just parents (for now)
         ancestors = compact(
-            [UmlsInfo(**G.nodes[ancestor_id]) for ancestor_id in ancestor_ids]
+            [
+                UmlsInfo(**G.nodes[ancestor_id])
+                for ancestor_id in G.predecessors(record.id)
+            ]
         )
 
         if not G.nodes.get(record.id):

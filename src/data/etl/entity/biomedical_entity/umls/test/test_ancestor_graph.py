@@ -1,11 +1,15 @@
+from typing import Sequence
 import unittest
 from prisma.enums import OntologyLevel
+from pydash import flatten
 import pytest
 
 from clients.umls.types import EdgeRecord, NodeRecord
 from data.etl.entity.biomedical_entity.umls import AncestorUmlsGraph
+from data.etl.entity.biomedical_entity.umls.types import UmlsInfo
 from data.etl.entity.biomedical_entity.umls.utils import (
-    choose_best_available_ancestor_type,
+    get_ancestor_type_scorer,
+    choose_best_ancestor,
 )
 from typings import DocType
 from utils.classes import overrides
@@ -221,8 +225,28 @@ async def test_ancestor_counts():
 
 
 @pytest.mark.asyncio
-async def test_choose_best_available_ancestor_type():
+async def test_choose_best_ancestor_type():
     tc = unittest.TestCase()
+
+    def choose_best_ancestor_type(
+        child_types: Sequence[str], ancestor_types: Sequence[str]
+    ) -> str | None:
+        """
+        Test method for finding the best ancestor type
+        """
+        score_ancestor_by_type = get_ancestor_type_scorer(child_types)
+        types_by_preference = flatten(
+            sorted(
+                [[at] for at in ancestor_types],
+                key=score_ancestor_by_type,
+                reverse=True,
+            )
+        )
+
+        if len(types_by_preference) == 0:
+            return None
+
+        return types_by_preference[0]  # type: ignore
 
     simple_test_cases = [
         {
@@ -319,7 +343,94 @@ async def test_choose_best_available_ancestor_type():
     for test in test_cases:
         expected_output = test["expected"]
 
-        result = choose_best_available_ancestor_type(
-            test["child_types"], test["ancestor_types"]
-        )
+        result = choose_best_ancestor_type(test["child_types"], test["ancestor_types"])
         tc.assertEqual(result, expected_output)
+
+
+async def test_choose_best_ancestor():
+    tc = unittest.TestCase()
+
+    test_cases = [
+        {
+            "description": "choose the level-closest ancestor",
+            "child": UmlsInfo(
+                id="C1333196",
+                name="C1333196",
+                count=0,
+                type_ids=["T047"],  # disease or syndrome
+                level=OntologyLevel.INSTANCE,
+            ),
+            "ancestors": [
+                UmlsInfo(
+                    id="C0000768",
+                    name="C0000768",
+                    count=0,
+                    type_ids=["T047"],  # disease or syndrome
+                    level=OntologyLevel.L3_CATEGORY,
+                ),
+                UmlsInfo(
+                    id="C0000768",
+                    name="C0000768",
+                    count=0,
+                    type_ids=["T047"],  # disease or syndrome
+                    level=OntologyLevel.L1_CATEGORY,
+                ),
+            ],
+            "expected_id": "C0000768",
+        },
+        {
+            "description": "choose the best composite ancestor",
+            "child": UmlsInfo(
+                id="CXXXX",
+                name="ACOMPOUND",
+                count=0,
+                type_ids=["T103"],  # chemical
+                level=OntologyLevel.INSTANCE,
+            ),
+            "ancestors": [
+                UmlsInfo(
+                    id="CA11111",
+                    name="CA11111",
+                    count=0,
+                    type_ids=["T103"],  # chemical
+                    level=OntologyLevel.L1_CATEGORY,
+                ),
+                UmlsInfo(
+                    id="CA22222",
+                    name="CA22222",
+                    count=0,
+                    type_ids=["T116"],  # protein (target)
+                    level=OntologyLevel.L2_CATEGORY,
+                ),
+            ],
+            "expected_id": "CA11111",  # level wins
+        },
+        {
+            "description": "disqualify bad ancestors",
+            "child": UmlsInfo(
+                id="CXXXX",
+                name="ACOMPOUND",
+                count=0,
+                type_ids=["T103"],  # chemical
+                level=OntologyLevel.INSTANCE,
+            ),
+            "ancestors": [
+                UmlsInfo(
+                    id="CA11111",
+                    name="CA11111",
+                    count=0,
+                    type_ids=["T047"],  # disease
+                    level=OntologyLevel.L1_CATEGORY,
+                ),
+            ],
+            "expected_id": None,  # no good ancestors; disease not permitted
+        },
+    ]
+
+    for test in test_cases:
+        result = choose_best_ancestor(test["child"], test["ancestors"])
+
+        if result is None:
+            tc.assertEqual(result, test["expected_id"])
+        else:
+            tc.assertEqual(result.id, test["expected_id"])
