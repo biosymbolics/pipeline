@@ -202,7 +202,7 @@ if __name__ == "__main__":
         print(
             """
             UMLS ETL
-            Usage: python3 -m data.etl.entity.biomedical_entity.umls.umls_load [--post-doc-finalize]
+            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load_umls [--post-doc-finalize]
             """
         )
         sys.exit()
