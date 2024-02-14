@@ -11,7 +11,7 @@ from pydash import flatten, group_by
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from constants.documents import MAX_DATA_YEAR
-from constants.patents import DEFAULT_BUYER_K
+from constants.patents import DEFAULT_PATENT_K
 from core.ner.spacy import get_transformer_nlp
 from .types import (
     BuyerRecord,
@@ -62,7 +62,7 @@ async def fetch_buyer_reports(
 
 
 async def find_buyers(
-    description: str, knn: int = DEFAULT_BUYER_K, use_gpt_expansion: bool = False
+    description: str, knn: int = DEFAULT_PATENT_K, use_gpt_expansion: bool = False
 ) -> FindBuyerResult:
     """
     A specific method to find potential buyers for IP

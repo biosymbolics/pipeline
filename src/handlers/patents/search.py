@@ -25,8 +25,8 @@ async def _search(raw_event: dict, context):
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "term_field": "instance_rollup" }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "skip_cache": true }}'`
     - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"WO-2022076289-A1", "skip_cache": true }}'`
-    - Local: `serverless invoke local --function search-patents --param='ENV=local' --data='{"queryStringParameters": { "terms":"melanoma", "exemplar_patents":"WO-2019191008-A1", "skip_cache": true }}'`
     - Remote: `serverless invoke --function search-patents --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension" }}'`
+    - Local: `curl 'http://localhost:3001/dev/patents/search?description=a%20lipid-based%20nanoparticle%20drug%20delivery%20system'`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=asthma`
     - API: `curl https://api.biosymbolics.ai/patents/search?terms=WO-2022076289-A1`
     """
@@ -36,7 +36,9 @@ async def _search(raw_event: dict, context):
     if p.include is None:
         raise ValueError("Include is required")
 
-    if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+    if (
+        len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms])
+    ) and p.description is None:
         logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 

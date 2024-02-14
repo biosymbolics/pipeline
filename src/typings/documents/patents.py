@@ -110,7 +110,7 @@ class ScoredPatent(PatentDto, ResultBase):
     availability_likelihood: AvailabilityLikelihood
     availability_explanation: str
     availability_score: float
-    exemplar_similarity: float | None = None
+    description_similarity: float | None = None
     patent_years: int
     probability_of_success: float
     reformulation_score: float

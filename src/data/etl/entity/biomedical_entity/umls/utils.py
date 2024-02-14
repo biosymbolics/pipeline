@@ -38,7 +38,7 @@ def choose_best_ancestor(
     return best_ancestors[0]
 
 
-def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], int]:
+def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], float]:
     """
     Returns a composite ancestor scorer function
     (higher is better; -1 means disqualified)
@@ -46,12 +46,12 @@ def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], int]:
     Args:
         child (UmlsInfo): child
 
-    Returns (Callable[[UmlsInfo], int]): a function that scores an ancestor by type and level
+    Returns (Callable[[UmlsInfo], float]): a function that scores an ancestor by type and level
     """
     score_ancestor_by_type = get_ancestor_type_scorer(child.type_ids)
     score_ancestor_by_level = get_ancestor_level_scorer(child.level)
 
-    def score_composite(a: UmlsInfo) -> int:
+    def score_composite(a: UmlsInfo) -> float:
         type_score = score_ancestor_by_type(a.type_ids)
         level_score = score_ancestor_by_level(a.level)
 
@@ -59,7 +59,7 @@ def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], int]:
             return -1
 
         # higher is better (but not that much better, thus log)
-        return round(math.log(type_score + 1) + math.log(level_score + 1))
+        return math.log(type_score + 1) + math.log(level_score + 1)
 
     return score_composite
 
