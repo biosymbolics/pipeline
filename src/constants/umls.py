@@ -77,6 +77,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1414085": ["dm"],  # DMPK gene
     "C1413365": ["cf"],  # CFTR gene
     "C1421546": ["x3"],
+    "C0015230": ["spots"],
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -152,6 +153,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0013230": "Investigational new drugs",
     "C0013232": "Drugs, orphan",
     "C0013231": "Drugs, non-prescription",
+    "C1517495": "Gene Feature",
 }
 
 UMLS_WITH_NO_ANCESTORS = {
@@ -459,6 +461,8 @@ ENTITY_TO_UMLS_TYPE = {
 NAME_TO_UMLS_TYPE = {
     "dosage form": BiomedicalEntityType.DOSAGE_FORM,
     "industrial aid": BiomedicalEntityType.INDUSTRIAL,
+    "biofilm": BiomedicalEntityType.BIOLOGIC,
+    "probiotics": BiomedicalEntityType.BIOLOGIC,
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
@@ -504,6 +508,7 @@ PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
     },
     **{
         k: {
+            **{dt: 8 for dt in list(UMLS_PATHOGEN_TYPES.keys())},  # probiotics, etc
             **{
                 dt: 7
                 for dt in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())

@@ -78,10 +78,11 @@ def choose_best_available_ancestor_type(
         {},
     )
     # sort possible parent types by preference
+    # does not include types that are not in the preferred type map (e.g. DISEASE types for interventions)
     types_by_preference = sorted(
         zip(
-            ancestor_types,
-            [preferred_type_map.get(t, 1000) for t in ancestor_types],
+            [t for t in ancestor_types if t in preferred_type_map],
+            [preferred_type_map[t] for t in ancestor_types if t in preferred_type_map],
         ),
         key=lambda x: x[1],
     )
