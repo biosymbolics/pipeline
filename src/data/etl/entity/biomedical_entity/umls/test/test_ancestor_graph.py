@@ -403,7 +403,7 @@ async def test_choose_best_ancestor():
                     level=OntologyLevel.L2_CATEGORY,
                 ),
             ],
-            "expected_id": "CA22222",  # type wins
+            "expected_id": "CA11111",  # level wins
         },
         {
             "description": "disqualify bad ancestors",
