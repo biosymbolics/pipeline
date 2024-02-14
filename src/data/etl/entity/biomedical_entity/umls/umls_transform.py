@@ -2,7 +2,7 @@ from typing import Sequence
 import logging
 from prisma.models import Umls
 from prisma.types import UmlsUpdateInput
-from pydash import compact, flatten, omit
+from pydash import compact, omit
 
 
 from .ancestor_selection import AncestorUmlsGraph
