@@ -32,9 +32,6 @@ def choose_best_ancestor(
         reverse=True,
     )
 
-    print("BEST ANCESTORS", best_ancestors, " FOR ", child.name)
-    print("SCORES", [(a.name, score_composite(a)) for a in ancestors])
-
     if len(best_ancestors) == 0:
         return None
 
