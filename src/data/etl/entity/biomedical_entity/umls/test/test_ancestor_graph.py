@@ -403,7 +403,7 @@ async def test_choose_best_ancestor():
                     level=OntologyLevel.L2_CATEGORY,
                 ),
             ],
-            "expected_id": "CA11111",  # level wins
+            "expected_id": "CA22222",  # type wins
         },
         {
             "description": "disqualify bad ancestors",
@@ -424,6 +424,40 @@ async def test_choose_best_ancestor():
                 ),
             ],
             "expected_id": None,  # no good ancestors; disease not permitted
+        },
+        {
+            "description": "SSRI case",
+            "child": UmlsInfo(
+                id="C0008845",
+                name="citalopram",
+                count=0,
+                type_ids=["T109", "T121"],  # Organic Chemical, Pharmacologic Substance
+                level=OntologyLevel.INSTANCE,
+            ),
+            "ancestors": [
+                UmlsInfo(
+                    id="C0003289",
+                    name="Antidepressive Agents",
+                    count=0,
+                    type_ids=["T121"],  # "Pharmacologic Substance"
+                    level=OntologyLevel.L3_CATEGORY,
+                ),
+                UmlsInfo(
+                    id="C0162758",
+                    name="Uptake Inhibitors, Serotonin",
+                    count=0,
+                    type_ids=["T121"],  # "Pharmacologic Substance"
+                    level=OntologyLevel.L1_CATEGORY,
+                ),
+                UmlsInfo(
+                    id="C2757053",
+                    name="Serotonin Uptake Inhibitors [MoA]",
+                    count=0,
+                    type_ids=["T044"],  # "Molecular Function"
+                    level=OntologyLevel.L2_CATEGORY,
+                ),
+            ],
+            "expected_id": "C0162758",
         },
     ]
 
