@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
-from constants.patents import DEFAULT_BUYER_K
+from constants.patents import DEFAULT_PATENT_K
 from typings.documents.common import DocType
 
 from .documents.common import EntityMapType, TermField
@@ -111,17 +111,11 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 
 class PatentSearchParams(DocumentSearchParams):
-    exemplar_patents: Annotated[list[str], Field(validate_default=True)] = []
-    include: Annotated[Union[PatentInclude, None], Field(validate_default=True)] = (
+    description: Annotated[str | None, Field(validate_default=True)] = None
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
+    include: Annotated[PatentInclude | None, Field(validate_default=True)] = (
         DEFAULT_PATENT_INCLUDE
     )
-
-    @field_validator("exemplar_patents", mode="before")
-    def exemplar_patents_from_string(cls, v):
-        if isinstance(v, list):
-            return v
-        patents = [t.strip() for t in (v.split(";") if v else [])]
-        return patents
 
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
@@ -166,5 +160,5 @@ class BuyerFinderParams(BaseModel):
     """
 
     description: Annotated[str, Field(validate_default=True)]
-    k: Annotated[int, Field(validate_default=True)] = DEFAULT_BUYER_K
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False

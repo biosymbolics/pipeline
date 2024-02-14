@@ -7,7 +7,7 @@ from typings.documents.patents import SuitabilityScoreMap
 BIOMEDICAL_IPC_CODE_PREFIXES = ["A61", "C01", "C07", "C08", "C12"]
 BIOMEDICAL_IPC_CODE_PREFIX_RE = r"^({})".format("|".join(BIOMEDICAL_IPC_CODE_PREFIXES))
 
-DEFAULT_BUYER_K = 1000
+DEFAULT_PATENT_K = 1000
 
 
 def get_patent_attribute_map():

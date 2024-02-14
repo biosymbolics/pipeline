@@ -75,25 +75,23 @@ model OwnerSynonym {
 }
 
 model Patent {
-    id                  String                      @id @unique // publication_number
-    application_number  String
-    abstract            String
-    assignees           Ownable[]                   @relation("assignee_to_patent")
-    attributes          String[]
-    claims              String?
-    country_code        String
-    exemplar_similarity Float? // not stored in db. hack to represent this in the py classes
-    interventions       Intervenable[]
-    indications         Indicatable[]
-    inventors           Ownable[]                   @relation("inventor_to_patent")
-    ipc_codes           String[]
-    other_ids           String[]
-    priority_date       DateTime
-    search_rank         Float? // not stored in db. hack to represent this in the py classes
-    similar_patents     String[]
-    title               String
-    url                 String
-    vector              Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
+    id                 String                      @id @unique // publication_number
+    application_number String
+    abstract           String
+    assignees          Ownable[]                   @relation("assignee_to_patent")
+    attributes         String[]
+    claims             String?
+    country_code       String
+    interventions      Intervenable[]
+    indications        Indicatable[]
+    inventors          Ownable[]                   @relation("inventor_to_patent")
+    ipc_codes          String[]
+    other_ids          String[]
+    priority_date      DateTime
+    similar_patents    String[]
+    title              String
+    url                String
+    vector             Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
 
     @@index([priority_date], name: "patent_priority_date")
     @@map("patent")

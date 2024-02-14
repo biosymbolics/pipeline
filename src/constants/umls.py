@@ -30,6 +30,7 @@ UMLS_NAME_OVERRIDES = {
     "C0005515": "Biological Factors",
     "C0030281": "Beta Cell",  # Structure of beta Cell of islet
     "C4521924": "CFTR potentiator",  # https://uts.nlm.nih.gov/uts/umls/concept/C4521924
+    "C4722064": "Transporter",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
 }
 
 # sets canonical based on (single!) word
@@ -43,6 +44,8 @@ UMLS_WORD_OVERRIDES = {
     "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
     "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "transporter": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
+    "transporters": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
@@ -474,6 +477,7 @@ NAME_TO_UMLS_TYPE = {
     "industrial aid": BiomedicalEntityType.INDUSTRIAL,
     "biofilm": BiomedicalEntityType.BIOLOGIC,
     "probiotics": BiomedicalEntityType.BIOLOGIC,
+    # "agents": irritatingly general
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
