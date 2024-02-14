@@ -6,7 +6,6 @@ import logging
 import time
 from typing import Optional
 from prisma.partials import PatentDto
-from prisma.models import Patent
 from prisma.types import (
     PatentWhereInput,
     PatentWhereUniqueInput,
@@ -42,11 +41,9 @@ async def find_many(
     start = time.monotonic()
 
     async with prisma_context(300) as db:
-        logger.info("AT PATENTS, with context")
         patents = await PatentDto.prisma(db).find_many(
             take, skip, where, cursor, include, order, distinct
         )
-        logger.info("SUCCESSFULLY GOT PATENTS")
 
     logger.info(
         "Find took %s seconds (%s)", round(time.monotonic() - start, 2), len(patents)
