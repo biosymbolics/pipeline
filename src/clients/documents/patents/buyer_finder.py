@@ -6,53 +6,28 @@ from datetime import date
 import logging
 import time
 from typing import Sequence
-from prisma import Prisma
-
 from pydash import flatten, group_by
+
 from clients.low_level.prisma import prisma_context
-
-
 from clients.openai.gpt_client import GptApiClient
+from constants.documents import MAX_DATA_YEAR
 from constants.patents import DEFAULT_BUYER_K
 from core.ner.spacy import get_transformer_nlp
-from typings.core import ResultBase
-
+from .types import (
+    BuyerRecord,
+    FindBuyerResult,
+    RelevanceByYear,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SIMILARITY_EXAGGERATION_FACTOR = 50
-
-
-class RelevanceByYear(ResultBase):
-    year: int
-    relevance: float
-
-
-class BuyerRecord(ResultBase):
-    id: int
-    name: str
-    ids: list[str]
-    count: int
-    symbol: str | None
-    titles: list[str]
-    # terms: list[str]
-    min_age: int
-    avg_age: float
-    activity: list[float]
-    max_relevance_score: float
-    avg_relevance_score: float
-    relevance_by_year: list[RelevanceByYear]
-    score: float
-
-
-class FindBuyerResult(ResultBase):
-    buyers: list[BuyerRecord]
-    description: str  # included since it could be a result of expansion
+MIN_YEAR = 2000
 
 
 async def fetch_buyer_reports(
-    patent_ids: Sequence[str], owner_ids: Sequence[str]
+    patent_ids: Sequence[str], owner_ids: Sequence[str], min_year: int = MIN_YEAR
 ) -> dict[str, list[RelevanceByYear]]:
     """
     Fetches buyer reports for a set of patent and owner ids
@@ -66,6 +41,7 @@ async def fetch_buyer_reports(
         WHERE patent.id in {patent_ids}
         AND ownable.owner_id in {owner_ids}
         AND ownable.patent_id=patent.id
+        AND date_part('year', priority_date) >= {min_year}
         GROUP BY owner_id, date_part('year', priority_date)
     """
 
@@ -79,7 +55,7 @@ async def fetch_buyer_reports(
     return {
         k: [
             vals.get(y) or RelevanceByYear(year=y, relevance=0.0)
-            for y in range(2000, 2024)
+            for y in range(min_year, MAX_DATA_YEAR)
         ]
         for k, vals in result_map.items()
     }

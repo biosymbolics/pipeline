@@ -59,7 +59,7 @@ def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], int]:
             return -1
 
         # higher is better (but not that much better, thus log)
-        return round(math.log(type_score) + math.log(level_score))
+        return round(math.log(type_score + 1) + math.log(level_score + 1))
 
     return score_composite
 

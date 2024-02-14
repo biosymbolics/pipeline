@@ -4,6 +4,7 @@ from pydantic import Field, computed_field
 from pydash import compact, count_by, flatten, group_by
 from prisma.enums import TrialPhase, TrialStatus
 import logging
+from constants.documents import MAX_DATA_YEAR
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
 from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
@@ -15,7 +16,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 OWNERS_LIMIT = 10
-MAX_DATA_YEAR = 2022
 
 
 @dataclass(frozen=True)
