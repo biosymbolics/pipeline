@@ -5,7 +5,7 @@ import pytest
 from clients.umls.types import EdgeRecord, NodeRecord
 from data.etl.entity.biomedical_entity.umls import AncestorUmlsGraph
 from data.etl.entity.biomedical_entity.umls.utils import (
-    choose_best_available_ancestor_type,
+    choose_best_ancestor_type,
 )
 from typings import DocType
 from utils.classes import overrides
@@ -221,7 +221,7 @@ async def test_ancestor_counts():
 
 
 @pytest.mark.asyncio
-async def test_choose_best_available_ancestor_type():
+async def test_choose_best_ancestor_type():
     tc = unittest.TestCase()
 
     simple_test_cases = [
@@ -319,7 +319,5 @@ async def test_choose_best_available_ancestor_type():
     for test in test_cases:
         expected_output = test["expected"]
 
-        result = choose_best_available_ancestor_type(
-            test["child_types"], test["ancestor_types"]
-        )
+        result = choose_best_ancestor_type(test["child_types"], test["ancestor_types"])
         tc.assertEqual(result, expected_output)

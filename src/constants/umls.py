@@ -499,28 +499,28 @@ CANDIDATE_TYPE_WEIGHT_MAP = {
 PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
     **{
         k: {
-            **{dt: 4 for dt in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
-            **{dt: 3 for dt in list(UMLS_PATHOGEN_TYPES.keys())},
-            **{dt: 2 for dt in list(UMLS_NON_PATHOGEN_DISEASE_TYPES.keys())},
-            **{dt: 1 for dt in list(UMLS_CORE_DISEASE_TYPES.keys())},
+            **{dt: 1 for dt in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
+            **{dt: 2 for dt in list(UMLS_PATHOGEN_TYPES.keys())},
+            **{dt: 3 for dt in list(UMLS_NON_PATHOGEN_DISEASE_TYPES.keys())},
+            **{dt: 4 for dt in list(UMLS_CORE_DISEASE_TYPES.keys())},
         }
         for k in UMLS_EXTENDED_DISEASE_TYPES.keys()
     },
     **{
         k: {
-            **{dt: 8 for dt in list(UMLS_PATHOGEN_TYPES.keys())},  # probiotics, etc
+            **{dt: 1 for dt in list(UMLS_PATHOGEN_TYPES.keys())},  # probiotics, etc
             **{
-                dt: 7
+                dt: 2
                 for dt in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
             },
             **{
-                dt: 6 for dt in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
+                dt: 3 for dt in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())
             },
-            **{dt: 5 for dt in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
-            **{dt: 4 for dt in list(UMLS_COMPOUND_TYPES.keys())},
-            **{dt: 3 for dt in list(UMLS_BIOLOGIC_TYPES.keys())},
-            **{dt: 2 for dt in list(UMLS_MECHANISM_TYPES.keys())},
-            **{dt: 1 for dt in list(UMLS_TARGET_TYPES.keys())},
+            **{dt: 4 for dt in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+            **{dt: 5 for dt in list(UMLS_COMPOUND_TYPES.keys())},
+            **{dt: 6 for dt in list(UMLS_BIOLOGIC_TYPES.keys())},
+            **{dt: 7 for dt in list(UMLS_MECHANISM_TYPES.keys())},
+            **{dt: 8 for dt in list(UMLS_TARGET_TYPES.keys())},
         }
         for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
