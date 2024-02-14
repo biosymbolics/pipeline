@@ -5,8 +5,8 @@ Patent client
 import logging
 import time
 
-from prisma import Prisma
 
+from clients.low_level.prisma import prisma_context
 
 from .types import AutocompleteResult
 
@@ -25,23 +25,24 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     """
     start = time.monotonic()
 
-    results = await Prisma().query_raw(
-        f"""
-        SELECT name, count from (
-            SELECT name, count
-            FROM biomedical_entity
-            WHERE search @@ plainto_tsquery('english', $1)
+    async with prisma_context(300) as db:
+        results = await db.query_raw(
+            f"""
+            SELECT name, count from (
+                SELECT name, count
+                FROM biomedical_entity
+                WHERE search @@ plainto_tsquery('english', $1)
 
-            UNION
+                UNION
 
-            SELECT name, count
-            FROM owner
-            WHERE search @@ plainto_tsquery('english', $1)
-        ) s ORDER BY count DESC
-        LIMIT {limit}
-        """,
-        string,
-    )
+                SELECT name, count
+                FROM owner
+                WHERE search @@ plainto_tsquery('english', $1)
+            ) s ORDER BY count DESC
+            LIMIT {limit}
+            """,
+            string,
+        )
 
     logger.info(
         "Autocomplete for string %s took %s seconds (%s)",
