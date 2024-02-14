@@ -59,7 +59,10 @@ class TestUmlsUtils(unittest.TestCase):
 
         for test in test_cases:
             result = is_umls_suppressed(
-                test["cui"], test["canonical_name"], test["matching_aliases"]
+                test["cui"],
+                test["canonical_name"],
+                test["matching_aliases"],
+                is_composite=False,
             )
             self.assertEqual(result, test["expected"])
 
