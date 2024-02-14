@@ -243,7 +243,7 @@ class AncestorUmlsGraph(UmlsGraph):
         return edges
 
     @staticmethod
-    def set_counts(G: DiGraph) -> DiGraph:
+    def _set_counts(G: DiGraph) -> DiGraph:
         """
         Sets counts recursively up the tree
             - assumes leafs have counts
@@ -303,7 +303,7 @@ class AncestorUmlsGraph(UmlsGraph):
 
         return G
 
-    def get_level(
+    def _get_level(
         self,
         current_node: NodeRecord,
         prev_count: int,
@@ -351,7 +351,7 @@ class AncestorUmlsGraph(UmlsGraph):
 
         return OntologyLevel.NA
 
-    def set_level(
+    def _set_level(
         self,
         G: DiGraph,
         node: NodeRecord,
@@ -381,7 +381,7 @@ class AncestorUmlsGraph(UmlsGraph):
             else None
         )
 
-        level = self.get_level(node, prev_count or 0, last_level, max_parent_count)
+        level = self._get_level(node, prev_count or 0, last_level, max_parent_count)
 
         # level may have already been set via a different path
         existing_level = G.nodes[node.id].get("level") or OntologyLevel.UNKNOWN
@@ -408,7 +408,7 @@ class AncestorUmlsGraph(UmlsGraph):
         if depth < MAX_DEPTH_NETWORK:
             for parent_id in parent_ids:
                 parent = NodeRecord(**G.nodes[parent_id])
-                self.set_level(
+                self._set_level(
                     G,
                     parent,
                     NodeRecord(**G.nodes[node.id]),
@@ -424,13 +424,13 @@ class AncestorUmlsGraph(UmlsGraph):
         """
 
         # set counts on all nodes
-        new_g = AncestorUmlsGraph.set_counts(G.copy().to_directed())
+        new_g = AncestorUmlsGraph._set_counts(G.copy().to_directed())
 
         logger.info("Propagating levels up the tree")
         # take all nodes with no *outgoing* edges, i.e. leaf nodes
         for node_id in [n for n, d in new_g.out_degree() if d == 0]:
             node = NodeRecord(**new_g.nodes[node_id])
-            self.set_level(new_g, node)
+            self._set_level(new_g, node)
 
         return new_g
 

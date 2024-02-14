@@ -4,15 +4,12 @@ Patent client
 
 from datetime import datetime
 import logging
-from typing import Sequence
-from prisma.client import Prisma
 from prisma.types import (
     PatentWhereInput,
     PatentWhereInputRecursive1,
 )
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_context
 from typings.documents.patents import ScoredPatent
 from typings.client import (
     DocumentSearchCriteria,
