@@ -1,9 +1,38 @@
 import unittest
 
-from core.ner.linker.utils import score_candidate
+from core.ner.linker.utils import apply_match_retry_rewrites, score_candidate
 
 
 class TestLinkerUtils(unittest.TestCase):
+    def test_apply_match_retry_rewrites(self):
+        test_conditions = [
+            {
+                "description": "synonym test",
+                "text": "Type I interferon Receptor Antagonist",
+                "expected_output": "Type I interferon Receptor inhibitor",
+            },
+            {
+                "description": "hyphenated test (short next)",
+                "text": "tnf-a modulator",
+                "expected_output": "tnfa modulator",
+            },
+            {
+                "description": "hyphenated test (long next)",
+                "text": "tnf-alpha modulator",
+                "expected_output": "tnf alpha modulator",
+            },
+            {
+                "description": "no rewrite",
+                "text": "nothing to rewrite",
+                "expected_output": None,
+            },
+        ]
+
+        for test in test_conditions:
+            result = apply_match_retry_rewrites(test["text"])
+            print("Actual", result, "expected", test["expected_output"])
+            self.assertEqual(result, test["expected_output"])
+
     def test_score_candidate(self):
         test_conditions = [
             {
@@ -20,6 +49,7 @@ class TestLinkerUtils(unittest.TestCase):
                     ],
                     "matching_aliases": ["melanoma"],
                     "syntactic_similarity": 1.0,
+                    "is_composite": False,
                 },
                 "expected_output": 1.1,
             },
@@ -54,6 +84,7 @@ class TestLinkerUtils(unittest.TestCase):
                     ],
                     "matching_aliases": ["paclitaxel 6 mg/ml injectable solution"],
                     "syntactic_similarity": 1.0,
+                    "is_composite": False,
                 },
                 "expected_output": 0.77,
             },
@@ -70,6 +101,7 @@ class TestLinkerUtils(unittest.TestCase):
                     ],
                     "matching_aliases": [],
                     "syntactic_similarity": 1.0,
+                    "is_composite": False,
                 },
                 "expected_output": 0.0,
             },
@@ -86,8 +118,41 @@ class TestLinkerUtils(unittest.TestCase):
                     ],
                     "matching_aliases": [],
                     "syntactic_similarity": 1.0,
+                    "is_composite": False,
                 },
                 "expected_output": 0.0,
+            },
+            {
+                "description": "non-composite/inhibitor (conditionally suppressed cui)",
+                "input": {
+                    "id": "C1999216",
+                    "canonical_name": "inhibitors",
+                    "type_ids": ["T123"],
+                    "aliases": [
+                        "Inhibitors",
+                        "inhibitor",
+                    ],
+                    "matching_aliases": ["inhibitor"],
+                    "syntactic_similarity": 0.8,
+                    "is_composite": False,
+                },
+                "expected_output": 0.0,
+            },
+            {
+                "description": "composite/inhibitor (conditionally suppressed cui)",
+                "input": {
+                    "id": "C1999216",
+                    "canonical_name": "inhibitors",
+                    "type_ids": ["T123"],
+                    "aliases": [
+                        "Inhibitors",
+                        "inhibitor",
+                    ],
+                    "matching_aliases": ["inhibitor"],
+                    "syntactic_similarity": 0.8,
+                    "is_composite": True,
+                },
+                "expected_output": 0.88,
             },
         ]
 

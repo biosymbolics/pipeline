@@ -9,7 +9,12 @@ from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 
 from .types import AbstractCandidateSelector, EntityWithScore
-from .utils import candidate_to_canonical, apply_umls_word_overrides, score_candidate
+from .utils import (
+    apply_match_retry_rewrites,
+    candidate_to_canonical,
+    apply_umls_word_overrides,
+    score_candidate,
+)
 
 MIN_SIMILARITY = 0.85
 UMLS_KB = None
@@ -52,6 +57,7 @@ class CandidateSelector(AbstractCandidateSelector):
         concept_id: str,
         matching_aliases: Sequence[str],
         similarity: float,
+        is_composite: bool,
     ) -> float:
         return score_candidate(
             concept_id,
@@ -60,9 +66,12 @@ class CandidateSelector(AbstractCandidateSelector):
             self.kb.cui_to_entity[concept_id].aliases,
             matching_aliases=matching_aliases,
             syntactic_similarity=similarity,
+            is_composite=is_composite,
         )
 
-    def _get_best_candidate(self, text: str) -> tuple[MentionCandidate, float] | None:
+    def _get_best_candidate(
+        self, text: str, is_composite: bool
+    ) -> tuple[MentionCandidate, float] | None:
         """
         Select the best candidate for a mention
         """
@@ -86,14 +95,10 @@ class CandidateSelector(AbstractCandidateSelector):
             logger.debug(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
-            # tfidf vectorizer and/or the UMLS data have inconsistent handling of hyphens
-            if "-" in text:
-                # try replacing - with empty string
-                res = self._get_best_candidate(text.replace("-", ""))
-                if res is None:
-                    # try replacing - with space (which will result in confusion if it separates out single chars)
-                    return self._get_best_candidate(text.replace("-", " "))
-                return res
+            # apply rewrites and look for another match
+            rewritten_text = apply_match_retry_rewrites(text)
+            if rewritten_text is not None:
+                return self._get_best_candidate(rewritten_text, is_composite)
             return None
 
         # score candidates
@@ -104,6 +109,7 @@ class CandidateSelector(AbstractCandidateSelector):
                     candidate.concept_id,
                     candidate.aliases,
                     candidate.similarities[0],
+                    is_composite=is_composite,
                 ),
             )
             for candidate in sufficiently_similiar_candidates
@@ -115,11 +121,13 @@ class CandidateSelector(AbstractCandidateSelector):
         return sorted_candidates[0]
 
     @overrides(AbstractCandidateSelector)
-    def select_candidate(self, text: str) -> EntityWithScore | None:
+    def select_candidate(
+        self, text: str, is_composite: bool = False
+    ) -> EntityWithScore | None:
         """
         Select the best candidate for a mention
         """
-        res = self._get_best_candidate(text)
+        res = self._get_best_candidate(text, is_composite)
 
         if res is None:
             return None
@@ -129,8 +137,10 @@ class CandidateSelector(AbstractCandidateSelector):
         return top_canonical, score
 
     @overrides(AbstractCandidateSelector)
-    def select_candidate_from_entity(self, entity: DocEntity) -> EntityWithScore | None:
-        return self.select_candidate(entity.term)
+    def select_candidate_from_entity(
+        self, entity: DocEntity, is_composite: bool = False
+    ) -> EntityWithScore | None:
+        return self.select_candidate(entity.term, is_composite)
 
     @overrides(AbstractCandidateSelector)
     def __call__(self, entity: DocEntity) -> CanonicalEntity | None:

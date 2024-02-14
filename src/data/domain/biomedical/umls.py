@@ -8,6 +8,7 @@ from constants.umls import (
     UMLS_GENE_PROTEIN_TYPES,
     UMLS_NAME_OVERRIDES,
     UMLS_NAME_SUPPRESSIONS,
+    UMLS_NON_COMPOSITE_SUPPRESSION,
     UMLS_TO_ENTITY_TYPE,
 )
 from utils.list import has_intersection
@@ -93,7 +94,7 @@ def clean_umls_name(
 
 
 def is_umls_suppressed(
-    id: str, canonical_name: str, matching_aliases: Sequence[str]
+    id: str, canonical_name: str, matching_aliases: Sequence[str], is_composite: bool
 ) -> bool:
     """
     Whether a UMLS concept should be suppressed from candidate linking / ancestors /etc
@@ -115,6 +116,9 @@ def is_umls_suppressed(
         and id in UMLS_CUI_ALIAS_SUPPRESSIONS
         and has_intersection(matching_aliases, UMLS_CUI_ALIAS_SUPPRESSIONS[id])
     ):
+        return True
+
+    if not is_composite and id in UMLS_NON_COMPOSITE_SUPPRESSION:
         return True
 
     return False

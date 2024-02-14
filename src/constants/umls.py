@@ -46,6 +46,8 @@ UMLS_WORD_OVERRIDES = {
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "transporter": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "transporters": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
+    "ch24h": "C0769789",  # cholesterol 24-hydroxylase
+    # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
@@ -79,11 +81,36 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1422833": ["suppressin"],  # DEAF1
     "C1414085": ["dm"],  # DMPK gene
     "C1413365": ["cf"],  # CFTR gene
-    "C1421546": ["x3"],
+    "C1421546": ["x3", "x receptor"],  # XPR1 gene
     "C0015230": ["spots"],
+    "C1420009": ["type", "a4"],  # SGCG gene
+    "C0040517": ["ts", "gts"],  # Tourette's syndrome
+    "C0004943": ["bd"],  # Behcet Syndrome
+    "C0022336": ["cjd"],  # Creutzfeldt-Jakob Syndrome
+    "C0175739": ["receptacle", "receptacles"],  # Electrical outlet"
+    "C0040188": ["tic", "tics"],  # Tic disorder
+    "C0017921": ["amd", "glycogenosis 2"],  # Glycogen storage disease type II
+    "C1826790": ["retinal degeneration 3"],  # RD3 gene
+    "C0347129": ["ain"],  # anal dysplasia
+    "C1422072": ["ct10"],  # MAGEC2 gene
+    "C0144227": ["switch 3"],  # SWI3 protein, S cerevisiae
+    "C0085113": ["gene, nf 1", "nf 1 gene"],  # NF1 gene
+    "C1420817": ["light"],  # TNFSF14 gene
+    "C1419349": ["activator 1", "a1"],
+    "C1843354": ["base"],  # bpifa4p
+    "C0149911": ["hmm", "mahc"],
+    "C5575229": ["bind"],
+}
+
+UMLS_NON_COMPOSITE_SUPPRESSION = {
+    "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
 }
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0003944": "as if personality",  # matches "as if" too much
+    "C0017259": "gene conversion",
+    "C1298197": "no tumor invasion",
+    "C1550600": "ingredient",  # matches too much
     "C1704222": "genome encoded entity",
     "C0243083": "associated disease",
     "C3263722": "Traumatic AND/OR non-traumatic injury",
