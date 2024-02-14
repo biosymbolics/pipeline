@@ -215,15 +215,21 @@ UMLS_MAYBE_COMPOUND_TYPES = {
     **UMLS_FORMULATION_TYPES,
 }
 
-
-UMLS_GENE_PROTEIN_TYPES = {
-    "T028": "Gene or Genome",
+# separate preferred and not preferred to avoid sometimes choosing protein or gene for the same gene symbol.
+# important for this to be consistent.
+UMLS_PREFERRED_TARGET_TYPES = {
     "T116": "Amino Acid, Peptide, or Protein",
 }
 
+UMLS_LESS_PREFERRED_TARGET_TYPES = {
+    "T028": "Gene or Genome",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",  # 14666 of 14889 are NOT also in UMLS_PREFERRED_TARGET_TYPES
+}
+
+
 UMLS_TARGET_TYPES = {
-    **UMLS_GENE_PROTEIN_TYPES,
-    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",  # 14666 of 14889 are NOT also in UMLS_GENE_PROTEIN_TYPES
+    **UMLS_PREFERRED_TARGET_TYPES,
+    **UMLS_LESS_PREFERRED_TARGET_TYPES,
 }
 
 UMLS_BIOLOGIC_TYPES = {
@@ -238,9 +244,9 @@ UMLS_BIOLOGIC_TYPES = {
     "T088": "Carbohydrate",  #  "Carbohydrate Sequence",
     "T129": "Immunologic Factor",  # proteins, isoforms, enzymes (usually duplicated elsewhere, e.g. "amino acid, peptide, protein")
     # the following could be target types, but avoiding overlap
-    "T125": "Hormone",  # 2039 of 3348 are NOT also in UMLS_GENE_PROTEIN_TYPES
-    "T126": "Enzyme",  # only 28 or 30924 are NOT also in UMLS_GENE_PROTEIN_TYPES
-    "T192": "Receptor",  # only 198 of 5655 are NOT also in UMLS_GENE_PROTEIN_TYPES
+    "T125": "Hormone",  # 2039 of 3348 are NOT also in UMLS_PREFERRED_TARGET_TYPES
+    "T126": "Enzyme",  # only 28 or 30924 are NOT also in UMLS_PREFERRED_TARGET_TYPES
+    "T192": "Receptor",  # only 198 of 5655 are NOT also in UMLS_PREFERRED_TARGET_TYPES
 }
 
 UMLS_MAYBE_BIOLOGIC_TYPES = {
@@ -490,7 +496,8 @@ CANDIDATE_TYPE_WEIGHT_MAP = {
     **{t: 1.1 for t in list(UMLS_COMPOUND_TYPES.keys())},
     **{t: 1.1 for t in list(UMLS_BIOLOGIC_TYPES.keys())},
     **{t: 1.1 for t in list(UMLS_MECHANISM_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_TARGET_TYPES.keys())},
+    **{t: 1.1 for t in list(UMLS_LESS_PREFERRED_TARGET_TYPES.keys())},
+    **{t: 1.2 for t in list(UMLS_PREFERRED_TARGET_TYPES.keys())},
     **{t: 1.1 for t in list(UMLS_CORE_DISEASE_TYPES.keys())},
     "T200": 0.7,  # Clinical Drug - too specific. avoid matching.
 }
@@ -520,7 +527,8 @@ PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
             **{dt: 5 for dt in list(UMLS_COMPOUND_TYPES.keys())},
             **{dt: 6 for dt in list(UMLS_BIOLOGIC_TYPES.keys())},
             **{dt: 7 for dt in list(UMLS_MECHANISM_TYPES.keys())},
-            **{dt: 8 for dt in list(UMLS_TARGET_TYPES.keys())},
+            **{dt: 8 for dt in list(UMLS_LESS_PREFERRED_TARGET_TYPES.keys())},
+            **{dt: 9 for dt in list(UMLS_PREFERRED_TARGET_TYPES.keys())},
         }
         for k in UMLS_EXTENDED_PHARMACOLOGIC_INTERVENTION_TYPES.keys()
     },
