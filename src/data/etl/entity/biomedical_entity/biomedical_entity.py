@@ -27,7 +27,7 @@ from typings.documents.common import ENTITY_MAP_TABLES
 from utils.file import save_as_pickle
 from utils.list import merge_nested
 
-from .umls.umls_load import UmlsLoader
+from .umls.load_umls import UmlsLoader
 from ..base_entity_etl import BaseEntityEtl
 
 DEFAULT_TYPE_FIELD = "default_type"
