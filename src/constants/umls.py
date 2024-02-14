@@ -226,6 +226,11 @@ UMLS_LESS_PREFERRED_TARGET_TYPES = {
     "T114": "Nucleic Acid, Nucleoside, or Nucleotide",  # 14666 of 14889 are NOT also in UMLS_PREFERRED_TARGET_TYPES
 }
 
+# used for one-off purpose
+UMLS_GENE_PROTEIN_TYPES = {
+    "T116": "Amino Acid, Peptide, or Protein",
+    "T028": "Gene or Genome",
+}
 
 UMLS_TARGET_TYPES = {
     **UMLS_PREFERRED_TARGET_TYPES,
