@@ -76,6 +76,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1422833": ["suppressin"],  # DEAF1
     "C1414085": ["dm"],  # DMPK gene
     "C1413365": ["cf"],  # CFTR gene
+    "C1421546": ["x3"],
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -146,6 +147,11 @@ UMLS_CUI_SUPPRESSIONS = {
     "C2699893": "Molecular Targeted Therapy",  # ??
     "C0004793": "base sequence",  # ??
     "C0728990": "clinical use template",  # template
+    "C0085155": "generic drugs",
+    "C0336535": "Environmental agent",
+    "C0013230": "Investigational new drugs",
+    "C0013232": "Drugs, orphan",
+    "C0013231": "Drugs, non-prescription",
 }
 
 UMLS_WITH_NO_ANCESTORS = {
