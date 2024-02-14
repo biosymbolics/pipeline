@@ -1,10 +1,12 @@
 from functools import reduce
+import math
 from typing import Callable, Mapping, Sequence
 from pydash import compact, flatten, uniq
 from prisma.enums import OntologyLevel
 import logging
 
 from constants.umls import PREFERRED_ANCESTOR_TYPE_MAP
+from data.etl.entity.biomedical_entity.umls.constants import ONTOLOGY_LEVEL_MAP
 
 from .types import UmlsInfo
 
@@ -22,15 +24,71 @@ def choose_best_ancestor(
         child_types (list[str]): list of child types
         ancestors (list[str]): list of ancestors
     """
-    score_ancestor_by_type = get_ancestor_type_scorer(child.type_ids)
+    score_composite = get_composite_ancestor_scorer(child)
 
     best_ancestors = sorted(
-        [a for a in ancestors if score_ancestor_by_type(a.type_ids) != -1],
-        key=lambda a: score_ancestor_by_type(a.type_ids),
+        [a for a in ancestors if score_composite(a) > 0],
+        key=lambda a: score_composite(a),
         reverse=True,
     )
 
+    if len(best_ancestors) == 0:
+        return None
+
     return best_ancestors[0]
+
+
+def get_composite_ancestor_scorer(child: UmlsInfo) -> Callable[[UmlsInfo], int]:
+    """
+    Returns a composite ancestor scorer function
+    (higher is better; -1 means disqualified)
+
+    Args:
+        child (UmlsInfo): child
+
+    Returns (Callable[[UmlsInfo], int]): a function that scores an ancestor by type and level
+    """
+    score_ancestor_by_type = get_ancestor_type_scorer(child.type_ids)
+    score_ancestor_by_level = get_ancestor_level_scorer(child.level)
+
+    def score_composite(a: UmlsInfo) -> int:
+        type_score = score_ancestor_by_type(a.type_ids)
+        level_score = score_ancestor_by_level(a.level)
+
+        if type_score < 0 or level_score < 0:
+            return -1
+
+        # higher is better (but not that much better, thus log)
+        return round(math.log(type_score) + math.log(level_score))
+
+    return score_composite
+
+
+def get_ancestor_level_scorer(
+    child_level: OntologyLevel,
+) -> Callable[[OntologyLevel], int]:
+    """
+    Returns an ancestor level scorer function
+
+    Args:
+        child_level (OntologyLevel): child level
+
+    Returns (Callable[[OntologyLevel], int]): a function that scores an ancestor by level
+        higher is better; -1 means disqualified
+    """
+    MAX_ONTOLOGY_SCORE = max(ONTOLOGY_LEVEL_MAP.values())
+
+    def score_ancestor_by_level(ancestor_level: OntologyLevel) -> int:
+        diff = ONTOLOGY_LEVEL_MAP[ancestor_level] - ONTOLOGY_LEVEL_MAP[child_level]
+
+        # if the ancestor is less specific than the child, disqualify it
+        if diff < 0:
+            return -1
+
+        # smaller diffs are better
+        return (MAX_ONTOLOGY_SCORE - diff) + 1
+
+    return score_ancestor_by_level
 
 
 def get_ancestor_type_scorer(
@@ -62,31 +120,6 @@ def get_ancestor_type_scorer(
         return max(scores)
 
     return score_ancestor_by_type
-
-
-def choose_best_ancestor_type(
-    child_types: Sequence[str], ancestor_types: Sequence[str]
-) -> str | None:
-    """
-    Choose the best available ancestor type for a child from a list of possible ancestor types
-
-    Args:
-        child_types (list[str]): list of child types
-        ancestor_types (list[str]): list of possible ancestor types
-
-    Returns (str): best ancestor type (a tui)
-    """
-    score_ancestor_by_type = get_ancestor_type_scorer(child_types)
-    types_by_preference = flatten(
-        sorted(
-            [[at] for at in ancestor_types], key=score_ancestor_by_type, reverse=True
-        )
-    )
-
-    if len(types_by_preference) == 0:
-        return None
-
-    return types_by_preference[0]  # type: ignore
 
 
 def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
