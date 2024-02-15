@@ -9,7 +9,7 @@ class TestLinkerUtils(unittest.TestCase):
             {
                 "description": "synonym test",
                 "text": "Type I interferon Receptor Antagonist",
-                "expected_output": "Type I interferon Receptor inhibitor",
+                "expected_output": "Type I interferon inhibitor",
             },
             {
                 "description": "hyphenated test (short next)",
@@ -25,6 +25,16 @@ class TestLinkerUtils(unittest.TestCase):
                 "description": "no rewrite",
                 "text": "nothing to rewrite",
                 "expected_output": None,
+            },
+            {
+                "description": "hyphenated test (multiple)",
+                "text": "glp-1 receptor-active glucagon-based peptides",
+                "expected_output": "glp1 active glucagon based peptides",
+            },
+            {
+                "description": "one word",
+                "text": "glp1-agonists",
+                "expected_output": "glp1 agonists",
             },
         ]
 

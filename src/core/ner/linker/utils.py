@@ -242,7 +242,7 @@ def score_semantic_candidate(
     canonical_name: str,
     type_ids: list[str],
     aliases: list[str],
-    matching_aliases: list[str],
+    matching_aliases: Sequence[str],
     original_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,
@@ -375,14 +375,23 @@ def apply_umls_word_overrides(
 
 
 MATCH_RETRY_REWRITES = {
-    "inhibitor": "antagonist",
-    "antagonist": "inhibitor",
     # Rewrite a dash to:
     # 1) empty string if the next word is less than 3 character, e.g. tnf-a -> tnfa
     # 2) space if the next word is >= 3 characters, e.g. tnf-alpha -> tnf alpha
     # Reason: tfidf vectorizer and/or the UMLS data have inconsistent handling of hyphens
-    r"(\w+)-(\w{1,3})": r"\1\2",
+    r"(\w{2,})-(\w{1,3})": r"\1\2",
+    r"(\w)-(\w{1,3})": r"\1 \2",
     r"(\w+)-(\w{4,})": r"\1 \2",
+    "inhibitor": "antagonist",
+    "antagonist": "inhibitor",
+    "agent": "",
+    "drug": "",
+    "receptor": "",
+    "anti": "",
+    "antibod(?:y|ie)": "",
+    "ligand": "",
+    "targeting": "",
+    r"\s{2,}": " ",
 }
 
 MATCH_RETRY_RE = get_or_re(

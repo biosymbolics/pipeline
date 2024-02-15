@@ -28,7 +28,7 @@ class CompositeSemanticCandidateSelector(
     """
 
     def __init__(
-        self, *args, min_composite_similarity: float = 1.0, ngrams_n: int = 1, **kwargs
+        self, *args, min_composite_similarity: float = 1.2, ngrams_n: int = 2, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.min_composite_similarity = min_composite_similarity
@@ -137,7 +137,7 @@ class CompositeSemanticCandidateSelector(
         tokens, vectors = get_tokens_and_vectors(entity)
 
         ngram_entity_map = {
-            t.text: self.select_candidate(t.text, vector)
+            t.text: self.select_candidate(t.text, vector, is_composite=True)
             for t, vector in zip(tokens, vectors)
             if len(t) > 1  # avoid weird matches for single characters/nums
         }
@@ -157,7 +157,9 @@ class CompositeSemanticCandidateSelector(
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
         # get initial non-composite match
-        match, match_score, _ = super().select_candidate_from_entity(entity) or EMPTY
+        match, match_score, _ = (
+            super().select_candidate_from_entity(entity, is_composite=False) or EMPTY
+        )
 
         # if high enough score, or not a composite candidate, return
         if match_score >= self.min_similarity or not is_composite_eligible(entity):
@@ -165,6 +167,10 @@ class CompositeSemanticCandidateSelector(
 
         # else, generate a composite candidate
         comp_match, comp_score, _ = self.generate_candidate(entity) or EMPTY
+
+        # if composite and direct matches bad, no match.
+        if comp_score < self.min_similarity and match_score < self.min_similarity:
+            return None
 
         if comp_score > match_score:
             logger.debug(

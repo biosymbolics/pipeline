@@ -345,7 +345,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         TODO: counts from UMLS
         """
         logger.info("Adding biomedical counts")
-        client = await prisma_client(6)
+        client = await prisma_client(600)
         # add counts to biomedical_entity & owner
         for table in ENTITY_MAP_TABLES:
             await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")

@@ -19,7 +19,7 @@ from .utils import (
 )
 
 DEFAULT_K = 20
-MIN_SIMILARITY = 1.1
+MIN_SIMILARITY = 1.2
 UMLS_KB = None
 WORD_EMBEDDING_LENGTH = 768
 
@@ -60,9 +60,11 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         """
         docs = list(self.nlp.pipe(texts))
         bert_vecs = [
-            l1_regularize(torch.tensor(doc.vector))
-            if len(doc.vector) > 0
-            else torch.zeros(self.vector_length)
+            (
+                l1_regularize(torch.tensor(doc.vector))
+                if len(doc.vector) > 0
+                else torch.zeros(self.vector_length)
+            )
             for doc in docs
         ]
         return bert_vecs
@@ -112,24 +114,31 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
     def _score_candidate(
         self,
         concept_id: str,
+        matching_aliases: Sequence[str],
         mention_vector: torch.Tensor,
         candidate_vector: torch.Tensor,
         syntactic_similarity: float,
         semantic_distance: float,
+        is_composite: bool,
     ) -> float:
         return score_semantic_candidate(
             concept_id,
             self.kb.cui_to_entity[concept_id].canonical_name,
             self.kb.cui_to_entity[concept_id].types,
             self.kb.cui_to_entity[concept_id].aliases,
-            mention_vector,
+            matching_aliases=matching_aliases,
+            original_vector=mention_vector,
             candidate_vector=candidate_vector,
             syntactic_similarity=syntactic_similarity,
             semantic_distance=semantic_distance,
+            is_composite=is_composite,
         )
 
     def _get_best_canonical(
-        self, mention_vector: torch.Tensor, candidates: Sequence[MentionCandidate]
+        self,
+        mention_vector: torch.Tensor,
+        candidates: Sequence[MentionCandidate],
+        is_composite: bool,
     ) -> EntityWithScoreVector | None:
         """
         Get best candidate by semantic similarity
@@ -163,10 +172,12 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
                     candidates[id],
                     self._score_candidate(
                         candidates[id].concept_id,
+                        candidates[id].aliases,
                         norm_vector,
                         candidate_vector=torch.tensor(umls_ann.get_item_vector(id)),
                         syntactic_similarity=candidates[id].similarities[0],
                         semantic_distance=distances[i],
+                        is_composite=is_composite,
                     ),
                     umls_ann.get_item_vector(id),
                 )
@@ -175,6 +186,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             key=lambda x: x[1],
             reverse=True,
         )
+        logger.info("Sorted candidates: %s", [sc[0] for sc in scored_candidates])
         top_candidate = scored_candidates[0][0]
         top_score = scored_candidates[0][1]
         top_vector = scored_candidates[0][2]
@@ -192,16 +204,19 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         self,
         term: str,
         mention_vector: torch.Tensor,
+        is_composite: bool,
     ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
         """
         candidates = self._get_candidates(term)
-        return self._get_best_canonical(mention_vector, candidates)
+        return self._get_best_canonical(
+            mention_vector, candidates, is_composite=is_composite
+        )
 
     @overrides(AbstractCandidateSelector)
     def select_candidate_from_entity(
-        self, entity: DocEntity
+        self, entity: DocEntity, is_composite: bool
     ) -> EntityWithScoreVector | None:
         """
         Generate & select candidates for a list of mention texts
@@ -213,14 +228,18 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             raise ValueError("Vector required")
 
         return self.select_candidate(
-            entity.normalized_term, torch.tensor(entity.vector)
+            entity.normalized_term,
+            torch.tensor(entity.vector),
+            is_composite=is_composite,
         )
 
-    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    def __call__(
+        self, entity: DocEntity, is_composite: bool = False
+    ) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        res = self.select_candidate_from_entity(entity)
+        res = self.select_candidate_from_entity(entity, is_composite)
 
         if res is None:
             return None

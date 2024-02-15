@@ -42,6 +42,10 @@ SUBSTITUTIONS = {
     r"[.,:;'\"]+$": "",  # trailing punct
     r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
+    "compounds?": "",
+    "substituted": "",
+    "candidates?": "",
+    "receptors?": "",
 }
 
 
@@ -117,14 +121,14 @@ class EntityCleaner:
         """
 
         def make_substitutions(_terms: Sequence[str]) -> Iterable[str]:
-            def __substitute_strings(term):
+            def _substitute_strings(term):
                 for pattern, replacement in self.substitutions.items():
                     term = re.sub(pattern, replacement, term, flags=RE_FLAGS)
 
                 return term
 
             for term in _terms:
-                yield __substitute_strings(term)
+                yield _substitute_strings(term)
 
         def decode_html(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
