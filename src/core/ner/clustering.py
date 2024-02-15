@@ -206,7 +206,7 @@ def cluster_terms(
     # if true, go through another pass on the remaining terms
     if recluster_remaining:
         logger.info("Reclustering remaining terms (%s)", sum([len(o) for o in others]))
-        # TODO: use HDSCAN if cluster is sufficiently small (~40k expanded)
+        # TODO: use HDBSCAN if cluster is sufficiently small (~40k expanded)
         remaining_cluster_map: dict[str, str] = reduce(
             lambda x, other: {
                 **x,

@@ -31,12 +31,16 @@ UMLS_NAME_OVERRIDES = {
     "C0030281": "Beta Cell",  # Structure of beta Cell of islet
     "C4521924": "CFTR potentiator",  # https://uts.nlm.nih.gov/uts/umls/concept/C4521924
     "C4722064": "Transporter",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
+    "C1420809": "BCMA",  # TNFRSF17
 }
 
 # sets canonical based on (single!) word
 UMLS_WORD_OVERRIDES = {
     "modulator": "C0005525",  # "Biological Response Modifiers"
     "modulators": "C0005525",
+    "modulation": "C0005525",
+    "modulated": "C0005525",
+    "modulating": "C0005525",
     "binder": "C1145667",  # binding action
     "binders": "C1145667",  # binding action
     "binding": "C1145667",  # binding action
@@ -44,9 +48,12 @@ UMLS_WORD_OVERRIDES = {
     "inhibitors": "C1999216",  # https://uts.nlm.nih.gov/uts/umls/concept/C1999216
     "antagonist": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "antagonists": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "antagonizing": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
+    "antagonism": "C4721408",  # https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "transporter": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "transporters": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "ch24h": "C0769789",  # cholesterol 24-hydroxylase
+    "agonism": "C2987634",  # agonist
     # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
@@ -100,10 +107,28 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1843354": ["base"],  # bpifa4p
     "C0149911": ["hmm", "mahc"],
     "C5575229": ["bind"],
+    "C1293131": ["fusion", "fusions"],
+    "C0268275": ["ab variant"],
+    "C1415363": ["star"],
+    "C1451001": ["star"],
+    "C1448834": ["f5", "ptc"],
+    "C0162326": ["sequences", "sequence"],
 }
 
 UMLS_NON_COMPOSITE_SUPPRESSION = {
     "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
+    "C0003241": "antibodies",
+    "C0030956": "peptides",
+    "C0005525": "modulators",  # Biological Response Modifiers
+    "C0243192": "agonists",
+    "C4721408": "antagonists",
+    "C1305923": "polypeptides",
+    "C0017362": "genes regulatory",
+    "C0017366": "structural genes",
+    "C0023688": "ligands",
+    "C1363844": "mediator",
+    "C0597357": "receptor",
+    "C0003320": "Antigens",
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -184,8 +209,20 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0013232": "Drugs, orphan",
     "C0013231": "Drugs, non-prescription",
     "C1517495": "Gene Feature",
+    "C0206446": "tin compounds",
+    "C0127400": "Mediator brand of benfluorex hydrochloride",  # "mediator" sigh
+    "C0439662": "immune",
+    "C1514562": "protein domain",
+    "C1510464": "protein structure",
+    "C0599894": "cell targeting",
+    "C0148445": "enhancin",
+    "C0037420": "social interaction",
+    "C1301751": "no effect",
 }
 
+# glucagon peptides glp 1
+# glucagon-like peptide-1 glp-1-receptor modulators
+# glp 1 constitutively -
 UMLS_WITH_NO_ANCESTORS = {
     "C0041242": "Trypsin Inhibitors",  # should be C0033607/Protease Inhibitors
     "C4319541": "Apolipoprotein L1",  # should be C4319541/Apolipoproteins L
