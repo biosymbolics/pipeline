@@ -118,7 +118,7 @@ class CandidateSelector(AbstractCandidateSelector):
         sorted_candidates = sorted(
             scored_candidates, key=lambda sc: sc[1], reverse=True
         )
-        print(sorted_candidates)
+        logger.debug("Sorted candidates: %s", sorted_candidates)
         return sorted_candidates[0]
 
     @overrides(AbstractCandidateSelector)

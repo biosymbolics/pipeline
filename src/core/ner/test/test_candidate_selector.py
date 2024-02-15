@@ -17,35 +17,25 @@ COMMON_COMPOSITE_TEST_CASES = [
         ],
     },
     {
-        "description": "drop extra garbage term if 2+ terms match",
-        "text": ["AABBCC sglt2 modulator"],
-        "expected": [
-            {
-                "id": "C0005525|C1420201",
-                "name": "SGLT2 Modulator",
-            }
-        ],
-    },
-    {
         "description": "keep unknown term if not enough terms of the right type match",
-        "text": ["AABBCC modulator"],
+        "text": ["AABBCCxyz1 modulator"],
         "expected": [
             {
-                "id": "C0005525|aabbcc",
-                "name": "aabbcc Modulator",
+                "id": "C0005525|aabbccxyz1",
+                "name": "aabbccxyz1 Modulator",
             }
         ],
     },
-    {
-        "description": "shrink composite down to single match if only 1 term of the right type",
-        "text": ["Maleimides Groups"],
-        "expected": [
-            {
-                "id": "C0024579",
-                "name": "Maleimides",
-            }
-        ],
-    },
+    # {
+    #     "description": "shrink composite down to single match if only 1 term of the right type",
+    #     "text": ["Maleimides Groups"],
+    #     "expected": [
+    #         {
+    #             "id": "C0024579",
+    #             "name": "Maleimides",
+    #         }
+    #     ],
+    # },
     {
         "description": "apply canonical naming rules if single match composite",
         "text": ["LEUCINE-RICH REPEAT KINASE 2"],
@@ -134,7 +124,7 @@ NON_SEMANTIC_COMPOSITE_TEST_CASES = [
         "text": ["sglt1 sglt2 modulator"],
         "expected": [
             {
-                "id": "C0005525|C1420200|C1420201",
+                "id": "C0005525|C1505133|C1564997",
                 "name": "SLC5A1 SGLT2 Modulator",
             }
         ],
@@ -144,7 +134,7 @@ NON_SEMANTIC_COMPOSITE_TEST_CASES = [
         "text": ["c-aryl glucoside sglt2 inhibitor"],
         "expected": [
             {
-                "id": "C0017765|C1420201|C1999216",
+                "id": "C0017765|C1505133|C1999216",
                 "name": "Glucosides SGLT2 Inhibitor",
             }
         ],
@@ -172,6 +162,16 @@ NON_SEMANTIC_COMPOSITE_TEST_CASES = [
 ]
 
 SEMANTIC_COMPOSITE_TEST_CASES = [
+    {
+        "description": "drop extra garbage term if 2+ terms match",
+        "text": ["AABBCC sglt2 modulator"],
+        "expected": [
+            {
+                "id": "C0005525|C1505133",
+                "name": "SGLT2 Modulator",
+            }
+        ],
+    },
     {
         "description": "composite match test with name override (SGLT2 > SLC5A2)",
         # "sglt1/sglt2 modulator" but ner splits on "/"

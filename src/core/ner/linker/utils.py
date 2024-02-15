@@ -16,7 +16,7 @@ from constants.umls import (
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
-from utils.re import get_or_re, sub_extra_spaces
+from utils.re import get_or_re
 
 
 logger = logging.getLogger(__name__)
@@ -242,7 +242,7 @@ def score_semantic_candidate(
     canonical_name: str,
     type_ids: list[str],
     aliases: list[str],
-    matching_aliases: list[str],
+    matching_aliases: Sequence[str],
     original_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,

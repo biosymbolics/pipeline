@@ -35,7 +35,7 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         self,
         *args,
         min_similarity: float = 0.85,
-        min_composite_similarity: float = 0.7,
+        min_composite_similarity: float = 0.8,
         min_word_length: int = 3,  # higher for non-semantic composite
         **kwargs
     ):
@@ -90,17 +90,14 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         """
 
         def get_composite_candidate(token: str) -> EntityWithScore:
-            """
-            Recursive function to see if the first ngram has a match, then the first n-1, etc.
-            """
             if token in token_entity_map:
                 return token_entity_map[token]
 
-            # otherwise, no match. create a fake CanonicalEntity.
+            # create a fake CanonicalEntity.
             return (
-                # concept_id is the word itself, so composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
+                # concept_id is the word itself
+                # so composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
                 CanonicalEntity(id=token.lower(), name=token.lower()),
-                # TODO: should be the mean of all candidates, or something?
                 self.min_composite_similarity - 0.1,
             )
 
@@ -189,8 +186,8 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         res = self.generate_candidate(entity)
         comp_match, comp_score = res or (None, 0.0)
 
-        # if composite and direct matches are 0, no match.
-        if comp_score == 0.0 and match_score == 0.0:
+        # if composite and direct matches are bad, no match.
+        if comp_score < self.min_similarity and match_score < self.min_similarity:
             return None
 
         if comp_score > match_score:

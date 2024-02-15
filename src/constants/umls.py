@@ -22,6 +22,7 @@ UMLS_NAME_OVERRIDES = {
     "C0005525": "Modulator",  # Biological Response Modifiers https://uts.nlm.nih.gov/uts/umls/concept/C0005525
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
     "C1420201": "SGLT2",  # otherwise SLC5A2
+    "C1505133": "SGLT2",  # otherwise SLC5A2
     # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
@@ -32,6 +33,7 @@ UMLS_NAME_OVERRIDES = {
     "C4521924": "CFTR potentiator",  # https://uts.nlm.nih.gov/uts/umls/concept/C4521924
     "C4722064": "Transporter",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "C1420809": "BCMA",  # TNFRSF17
+    "C3203086": "PD-L1 Protein",
 }
 
 # sets canonical based on (single!) word
@@ -132,7 +134,10 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
     "C0019932": "hormones",
 }
 
+
 UMLS_CUI_SUPPRESSIONS = {
+    "C4277514": "Tripartite Motif Proteins",
+    "C3539969": "Specific immunoglobulin combinations",
     "C0003944": "as if personality",  # matches "as if" too much
     "C0017259": "gene conversion",
     "C1298197": "no tumor invasion",
@@ -222,9 +227,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C1301751": "no effect",
 }
 
-# glucagon peptides glp 1
-# glucagon-like peptide-1 glp-1-receptor modulators
-# glp 1 constitutively -
+
 UMLS_WITH_NO_ANCESTORS = {
     "C0041242": "Trypsin Inhibitors",  # should be C0033607/Protease Inhibitors
     "C4319541": "Apolipoprotein L1",  # should be C4319541/Apolipoproteins L
