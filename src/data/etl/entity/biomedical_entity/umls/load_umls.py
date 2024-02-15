@@ -187,21 +187,19 @@ class UmlsLoader:
         """
         await client.execute_raw(create_fun_query)
         query = """
-            update umls_graph ug set relationship='isa'
+            UPDATE umls_graph set relationship='isa'
             FROM umls head_umls
-            LEFT JOIN umls_graph ug2 ON ug2.tail_id=head_umls.id and ug2.relationship='isa'
-            where ug.head_id=head_umls.id
-            and ARRAY['T116', 'T028', 'T121'] && head_umls.type_ids
-            and ug.relationship=''
+            where head_id=head_umls.id
+            and relationship=''
             and (
-                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 1)) && head_umls.synonyms
+                (select array_agg(word_ngrams) from word_ngrams(tail_name, 1)) && head_umls.synonyms
                 OR
-                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 2)) && head_umls.synonyms
+                (select array_agg(word_ngrams) from word_ngrams(tail_name, 2)) && head_umls.synonyms
                 OR
-                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 3)) && head_umls.synonyms
+                (select array_agg(word_ngrams) from word_ngrams(tail_name, 3)) && head_umls.synonyms
             )
-            and ug.head_id<>ug.tail_id
-            AND ug2.head_id is null
+            and head_id<>tail_id
+            AND NOT EXISTS (select 1 from umls_graph where umls_graph.relationship='isa' and umls_graph.tail_id=tail_id limit 1)
         """
         await client.execute_raw(query)
 
