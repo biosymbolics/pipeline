@@ -204,6 +204,24 @@ class UmlsLoader:
         await client.execute_raw(query)
 
     @staticmethod
+    async def remove_duplicates():
+        query = """
+            UPDATE umls SET level='NA'
+            WHERE id IN (
+                SELECT id FROM umls, unnest(synonyms) synonym
+                WHERE NOT 'T116'=ANY(type_ids)
+                AND synonym IN (
+                    SELECT synonym
+                    FROM umls, unnest(synonyms) synonym
+                    WHERE 'T116'=ANY(type_ids)
+                    GROUP BY synonym having count(*) > 1
+                )
+            );
+        """
+        client = await prisma_client(600)
+        await client.execute_raw(query)
+
+    @staticmethod
     async def copy_all():
         """
         Copy all UMLS data
@@ -235,6 +253,7 @@ class UmlsLoader:
         (since it depends upon those being present)
         """
         await UmlsLoader.set_ontology_levels()
+        await UmlsLoader.remove_duplicates()
         await UmlsLoader.post_doc_finalize_checksum()
 
 
