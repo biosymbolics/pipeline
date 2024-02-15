@@ -154,9 +154,9 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     include: Annotated[dict, Field()] = {}
 
 
-class BuyerFinderParams(BaseModel):
+class CompanyFinderParams(BaseModel):
     """
-    Parameters for finding potential buyers
+    Parameters for finding companies
     """
 
     description: Annotated[str, Field(validate_default=True)]

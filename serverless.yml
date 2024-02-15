@@ -226,13 +226,13 @@ functions:
     handler: src.handlers.chat.chat
     layers:
       - Ref: PythonRequirementsLambdaLayer
-  find-buyers:
+  find-companies:
     events:
       - http:
-          path: patents/buyers
+          path: patents/companies
           method: get
           cors: true
-    handler: src.handlers.patents.find_buyers
+    handler: src.handlers.patents.find_companies
     layers:
       - Ref: PythonRequirementsLambdaLayer
 plugins:

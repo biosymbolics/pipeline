@@ -125,7 +125,7 @@ class GptApiClient:
     async def generate_ip_description(self, short_description: str) -> str:
         """
         Generate a description of IP based on a short sentence
-        (for testing with buyer_finder)
+        (for testing with company_finder)
         """
         query = (
             "Please expand the following into a 2-3 paragraph technical description of a biomedical invention:\n"

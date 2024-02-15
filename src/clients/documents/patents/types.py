@@ -15,7 +15,7 @@ class RelevanceByYear(ResultBase):
     relevance: float
 
 
-class BuyerRecord(ResultBase):
+class CompanyRecord(ResultBase):
     id: int
     name: str
     ids: list[str]
@@ -32,6 +32,6 @@ class BuyerRecord(ResultBase):
     score: float
 
 
-class FindBuyerResult(ResultBase):
-    buyers: list[BuyerRecord]
+class FindCompanyResult(ResultBase):
+    companies: list[CompanyRecord]
     description: str  # included since it could be a result of expansion

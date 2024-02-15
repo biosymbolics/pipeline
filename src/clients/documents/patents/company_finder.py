@@ -1,5 +1,5 @@
 """
-Buyer finder client
+Company client
 """
 
 from datetime import date
@@ -14,8 +14,8 @@ from constants.documents import MAX_DATA_YEAR
 from constants.patents import DEFAULT_PATENT_K
 from core.ner.spacy import get_transformer_nlp
 from .types import (
-    BuyerRecord,
-    FindBuyerResult,
+    CompanyRecord,
+    FindCompanyResult,
     RelevanceByYear,
 )
 
@@ -26,11 +26,11 @@ SIMILARITY_EXAGGERATION_FACTOR = 50
 MIN_YEAR = 2000
 
 
-async def fetch_buyer_reports(
+async def fetch_company_reports(
     patent_ids: Sequence[str], owner_ids: Sequence[str], min_year: int = MIN_YEAR
 ) -> dict[str, list[RelevanceByYear]]:
     """
-    Fetches buyer reports for a set of patent and owner ids
+    Fetches company reports for a set of patent and owner ids
     """
     report_query = f"""
         SELECT
@@ -61,11 +61,11 @@ async def fetch_buyer_reports(
     }
 
 
-async def find_buyers(
+async def find_companies(
     description: str, knn: int = DEFAULT_PATENT_K, use_gpt_expansion: bool = False
-) -> FindBuyerResult:
+) -> FindCompanyResult:
     """
-    A specific method to find potential buyers for IP
+    A specific method to find potential buyers for IP / companies
 
     Does a cosine similarity search on the description and returns the top k
         with scoring based on recency and relevance
@@ -131,11 +131,11 @@ async def find_buyers(
 
     owner_ids = tuple([record["id"] for record in records])
     patent_ids = tuple(flatten([record["ids"] for record in records]))
-    report_map = await fetch_buyer_reports(patent_ids, owner_ids)
+    report_map = await fetch_company_reports(patent_ids, owner_ids)
 
-    potential_buyers = sorted(
+    companies = sorted(
         [
-            BuyerRecord(
+            CompanyRecord(
                 **record,
                 activity=[v.relevance for v in report_map[record["id"]]],
                 relevance_by_year=report_map[record["id"]],
@@ -149,7 +149,7 @@ async def find_buyers(
     logger.info(
         "Find took %s seconds (%s)",
         round(time.monotonic() - start, 2),
-        len(potential_buyers),
+        len(companies),
     )
 
-    return FindBuyerResult(buyers=potential_buyers, description=description)
+    return FindCompanyResult(companies=companies, description=description)
