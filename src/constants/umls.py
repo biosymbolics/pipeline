@@ -109,8 +109,8 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C5575229": ["bind"],
     "C1293131": ["fusion", "fusions"],
     "C0268275": ["ab variant"],
-    "C1415363": ["star"],
-    "C1451001": ["star"],
+    "C1415363": ["star", "sta receptor"],
+    "C1451001": ["star", "sta receptor"],
     "C1448834": ["f5", "ptc"],
     "C0162326": ["sequences", "sequence"],
 }
@@ -129,6 +129,7 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
     "C1363844": "mediator",
     "C0597357": "receptor",
     "C0003320": "Antigens",
+    "C0019932": "hormones",
 }
 
 UMLS_CUI_SUPPRESSIONS = {
@@ -155,6 +156,7 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0009429": "combination",
     "C0963641": "cat combination",
     "C0596316": "chemical group",
+    "C5399721": "Receptor Antagonist [APC]",  # prefer C4721408
     "C1173729": "SPES herbal extract",
     "C0233656": "mental condensation",  # matches condensation
     "C0012634": "disease",  # useless

@@ -1,6 +1,7 @@
 """
 Linking/cleaning of terms
 """
+
 from typing import Sequence
 import logging
 

@@ -1,6 +1,7 @@
 """
 Term Normalizer
 """
+
 import logging
 import time
 from typing import Sequence
@@ -33,7 +34,7 @@ class TermLinker:
 
     def __init__(
         self,
-        candidate_selector_class: CandidateSelectorType = "SemanticCandidateSelector",
+        candidate_selector: CandidateSelectorType = "SemanticCandidateSelector",
         *args,
         **kwargs,
     ):
@@ -41,12 +42,10 @@ class TermLinker:
         Initialize term normalizer using existing model
         """
         # lazy (UMLS is large)
-        logger.info("Loading %s (might be slow...)", candidate_selector_class)
-        modules = __import__(
-            CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_class]
-        )
+        logger.info("Loading %s (might be slow...)", candidate_selector)
+        modules = __import__(CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector])
         self.candidate_selector: AbstractCandidateSelector = getattr(
-            modules, candidate_selector_class
+            modules, candidate_selector
         )(*args, **kwargs)
 
     def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:

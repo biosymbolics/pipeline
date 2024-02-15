@@ -160,12 +160,12 @@ NON_SEMANTIC_COMPOSITE_TEST_CASES = [
         ],  # avoid C1539188 / DNAAF6 ("TWISTER")
     },
     {
-        "description": "should not match htr7",
+        "description": "should match htr7",
         "text": ["5-ht7 receptor antagonists"],
         "expected": [
             {
-                "id": "C0533325",  # TODO?
-                "name": "TWIST1",  # "Musculoskeletal torsion River driver",  # TODO
+                "id": "C1415816|C4721408",
+                "name": "HTR7 Antagonist",
             }
         ],
     },
@@ -237,7 +237,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
             else:
                 for field in fields_to_test:
                     self.assertEqual(
-                        result.canonical_entity._asdict()[field],
+                        result.canonical_entity.__dict__[field],
                         test["expected"][0][field],
                     )
 
@@ -274,7 +274,7 @@ class TestCompositeSemanticCandidateSelector(unittest.TestCase):
             else:
                 for field in fields_to_test:
                     self.assertEqual(
-                        result.canonical_entity._asdict()[field],
+                        result.canonical_entity.__dict__[field],
                         test["expected"][0][field],
                     )
 
