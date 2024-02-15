@@ -133,7 +133,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         Specs for creating associated biomedical entities (executed by BiomedicalEntityEtl)
         """
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="drugcentral",
             get_source_map=get_indication_source_map,
             non_canonical_source=Source.FDA,
@@ -145,7 +145,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         )
 
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="drugcentral",
             get_source_map=get_intervention_source_map,
             relation_id_field_map=RelationIdFieldMap(

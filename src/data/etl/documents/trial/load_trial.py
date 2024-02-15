@@ -222,7 +222,7 @@ class TrialLoader(BaseDocumentEtl):
             """
 
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database=f"{ETL_BASE_DATABASE_URL}/aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
@@ -240,7 +240,7 @@ class TrialLoader(BaseDocumentEtl):
                 # remove dosage uoms
                 lambda terms: [re.sub(DOSAGE_UOM_RE, "", t).strip() for t in terms],
             ],
-            candidate_selector="CandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database=f"{ETL_BASE_DATABASE_URL}/aact",
             get_source_map=lambda recs: {
                 rec["name"]: {
