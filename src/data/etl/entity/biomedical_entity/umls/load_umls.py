@@ -164,12 +164,55 @@ class UmlsLoader:
         )
 
     @staticmethod
+    async def add_missing_relationships():
+        """
+        Add missing UMLS relationships
+        """
+        client = await prisma_client(600)
+        # if no 'isa' relationship exists for the tail
+        # AND the tail name is a subset of the head synonyms (e.g. XYZ inhibitor -> XYZ)
+        # then mark the relationship as 'isa'
+        create_fun_query = """
+            create or replace function word_ngrams(str text, n int)
+            returns setof text language plpgsql as $$
+            declare
+                i int;
+                arr text[];
+            begin
+                arr := regexp_split_to_array(str, '[^[:alnum:]]+');
+                for i in 1 .. cardinality(arr)- n+ 1 loop
+                    return next array_to_string(arr[i : i+n-1], ' ');
+                end loop;
+            end $$;
+        """
+        await client.execute_raw(create_fun_query)
+        query = """
+            update umls_graph ug set relationship='isa'
+            FROM umls head_umls
+            LEFT JOIN umls_graph ug2 ON ug2.tail_id=head_umls.id and ug2.relationship='isa'
+            where ug.head_id=head_umls.id
+            and ARRAY['T116', 'T028', 'T121'] && head_umls.type_ids
+            and ug.relationship=''
+            and (
+                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 1)) && head_umls.synonyms
+                OR
+                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 2)) && head_umls.synonyms
+                OR
+                (select array_agg(word_ngrams) from word_ngrams(ug.tail_name, 3)) && head_umls.synonyms
+            )
+            and ug.head_id<>ug.tail_id
+            AND ug2.head_id is null
+        """
+        await client.execute_raw(query)
+
+    @staticmethod
     async def copy_all():
         """
         Copy all UMLS data
         """
         await UmlsLoader.create_umls_lookup()
         await UmlsLoader.copy_relationships()
+        await UmlsLoader.add_missing_relationships()
 
     @staticmethod
     async def post_doc_finalize_checksum():
