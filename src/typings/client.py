@@ -106,13 +106,13 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
 
 class DocumentSearchParams(DocumentSearchCriteria):
+    description: Annotated[str | None, Field(validate_default=True)] = None
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
     skip_cache: Annotated[bool, Field(validate_default=True)] = True
 
 
 class PatentSearchParams(DocumentSearchParams):
-    description: Annotated[str | None, Field(validate_default=True)] = None
-    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     include: Annotated[PatentInclude | None, Field(validate_default=True)] = (
         DEFAULT_PATENT_INCLUDE
     )
@@ -130,7 +130,7 @@ class TrialSearchParams(DocumentSearchParams):
     )
 
 
-class AssetSearchParams(DocumentSearchParams):
+class AssetSearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
     entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
         EntityMapType.intervention

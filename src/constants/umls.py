@@ -34,6 +34,7 @@ UMLS_NAME_OVERRIDES = {
     "C4722064": "Transporter",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "C1420809": "BCMA",  # TNFRSF17
     "C3203086": "PD-L1 Protein",
+    "C0171406": "NADH Dehydrogenase",
 }
 
 # sets canonical based on (single!) word
@@ -106,7 +107,6 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0085113": ["gene, nf 1", "nf 1 gene"],  # NF1 gene
     "C1420817": ["light"],  # TNFSF14 gene
     "C1419349": ["activator 1", "a1"],
-    "C1843354": ["base"],  # bpifa4p
     "C0149911": ["hmm", "mahc"],
     "C5575229": ["bind"],
     "C1293131": ["fusion", "fusions"],
@@ -115,6 +115,8 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1451001": ["star", "sta receptor"],
     "C1448834": ["f5", "ptc"],
     "C0162326": ["sequences", "sequence"],
+    "C0171406": ["complex i"],  # NADH Dehydrogenase
+    "C0687133": ["interactions"],
 }
 
 UMLS_NON_COMPOSITE_SUPPRESSION = {

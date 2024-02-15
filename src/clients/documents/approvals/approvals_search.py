@@ -72,6 +72,11 @@ async def search(
     """
     p = RegulatoryApprovalSearchParams.parse(params)
     search_criteria = DocumentSearchCriteria.parse(p)
+
+    if len(p.terms) < 1:
+        logger.error("Terms required for trials search: %s", p.terms)
+        return []
+
     key = get_id(
         {
             **search_criteria.__dict__,
