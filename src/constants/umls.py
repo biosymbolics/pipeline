@@ -117,6 +117,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0162326": ["sequences", "sequence"],
     "C0171406": ["complex i"],  # NADH Dehydrogenase
     "C0687133": ["interactions"],
+    "C2231143": ["multiple uri"],
 }
 
 UMLS_NON_COMPOSITE_SUPPRESSION = {
