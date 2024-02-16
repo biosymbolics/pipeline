@@ -26,7 +26,7 @@ class CompanyRecord(ResultBase):
     min_age: int
     avg_age: float
     activity: list[float]
-    avg_relevance_score: float
+    relevance_score: float
     wheelhouse_score: float
     count_by_year: list[CountByYear]
     score: float

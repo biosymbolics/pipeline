@@ -100,6 +100,52 @@ async def get_vector(description: str | None, companies: Sequence[str]) -> list[
     return combined_vector
 
 
+def get_fields(
+    companies: Sequence[str], description: str | None, vector: Sequence[float]
+) -> list[str]:
+    """
+    Get fields for the query that differ based on the presence of companies and description
+    """
+    current_year = date.today().year
+
+    common_fields = [
+        "owner.id as id",
+        "owner.name as name",
+        "COALESCE(financials.symbol, '') as symbol",
+        "ARRAY_AGG(patent.id) AS ids",
+        "COUNT(title) AS count",
+        "ARRAY_AGG(title) AS titles",
+        f"MIN({current_year}-date_part('year', priority_date))::int AS min_age",
+        f"ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age",
+        f"ROUND(POW((1 - (AVG(patent.vector) <=> owner.vector)), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS wheelhouse_score",
+    ]
+    company_fields = [
+        f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS relevance_score",
+        f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS score",
+    ]
+
+    description_fields = [
+        f"ROUND(POW((1 - (AVG(patent.vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS relevance_score",
+        f"""
+            ROUND(
+                SUM(
+                    POW((1 - (patent.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
+                    * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
+                )::numeric, 2
+            ) AS score
+        """,
+    ]
+
+    if description:
+        # wins over companies
+        return common_fields + description_fields
+
+    if companies:
+        return common_fields + company_fields
+
+    raise ValueError("No companies or description")
+
+
 async def find_companies(p: CompanyFinderParams) -> FindCompanyResult:
     """
     A specific method to find potential buyers for IP / companies
@@ -123,27 +169,10 @@ async def find_companies(p: CompanyFinderParams) -> FindCompanyResult:
         description = p.description
 
     vector = await get_vector(description, p.companies)
-
-    current_year = date.today().year
+    fields = get_fields(p.companies, description, vector)
 
     query = rf"""
-        select
-            owner.id as id,
-            owner.name as name,
-            COALESCE(financials.symbol, '') as symbol,
-            ARRAY_AGG(patent.id) AS ids,
-            COUNT(title) AS count,
-            ARRAY_AGG(title) AS titles,
-            MIN({current_year}-date_part('year', priority_date))::int AS min_age,
-            ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age,
-            ROUND(POW((1 - (AVG(patent.vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS avg_relevance_score,
-            ROUND(
-                SUM(
-                    POW((1 - (patent.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
-                    * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
-                )::numeric, 2
-            ) AS score,
-            ROUND(POW((1 - (AVG(patent.vector) <=> owner.vector)), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS wheelhouse_score
+        select {', '.join(fields)}
         FROM ownable, patent, owner
         LEFT JOIN financials ON financials.owner_id=owner.id
         WHERE ownable.patent_id=patent.id
