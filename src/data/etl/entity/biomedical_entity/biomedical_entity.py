@@ -17,6 +17,7 @@ from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 
 from clients.low_level.prisma import batch_update, prisma_client
+from constants.umls import UMLS_COMMON_BASES
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -408,10 +409,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     SET
                         instance_rollup=lower(instance_rollup.parent_name),
                         category_rollup=lower(category_rollup.parent_name)
-                    FROM biomedical_entity as entity
-                    JOIN _rollups as instance_rollup ON instance_rollup.child_id=entity.id
-                    LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
+                    FROM biomedical_entity AS entity
+                    JOIN _rollups AS instance_rollup ON instance_rollup.child_id=entity.id
+                    LEFT JOIN _rollups AS category_rollup ON category_rollup.child_id=instance_rollup.parent_id
                     WHERE {table}.entity_id=entity.id
+                    AND entity.canonical_id NOT IN {tuple(UMLS_COMMON_BASES.keys())}
                 """,
                 # ensure all records have rollups
                 f"""
@@ -529,8 +531,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
         """
         logger.info("Finalizing biomedical entity etl")
-        await BiomedicalEntityEtl.link_to_documents()
-        await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
+        # await BiomedicalEntityEtl.link_to_documents()
+        # await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
