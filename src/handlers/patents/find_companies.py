@@ -27,17 +27,13 @@ async def _find_companies(raw_event: dict, context):
 
     p = CompanyFinderParams(**raw_event["queryStringParameters"])
 
-    if p.description is None:
-        raise ValueError("Description is required")
+    if p.description is None and len(p.companies) == 0:
+        raise ValueError("Description and/or companies are required")
 
     logger.info("Fetching companies for parameters: %s", p)
 
     try:
-        results = await find_patent_companies(
-            description=p.description,
-            knn=p.k,
-            use_gpt_expansion=p.use_gpt_expansion,
-        )
+        results = await find_patent_companies(p)
     except Exception as e:
         message = f"Error finding companies: {e}"
         logger.error(message)

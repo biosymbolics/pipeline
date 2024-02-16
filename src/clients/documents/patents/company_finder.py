@@ -3,16 +3,18 @@ Company client
 """
 
 from datetime import date
+import json
 import logging
 import time
 from typing import Sequence
 from pydash import flatten, group_by
+import torch
 
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from constants.documents import MAX_DATA_YEAR
-from constants.patents import DEFAULT_PATENT_K
 from core.ner.spacy import get_transformer_nlp
+from typings.client import CompanyFinderParams
 from .types import (
     CompanyRecord,
     FindCompanyResult,
@@ -61,9 +63,44 @@ async def fetch_company_reports(
     }
 
 
-async def find_companies(
-    description: str, knn: int = DEFAULT_PATENT_K, use_gpt_expansion: bool = False
-) -> FindCompanyResult:
+async def get_companies_vector(companies: Sequence[str]) -> list[float]:
+    """
+    Get the avg vector for a list of companies
+    """
+    query = f"""
+        SELECT AVG(vector)::text vector FROM owner
+        WHERE name=ANY($1)
+    """
+    async with prisma_context(300) as db:
+        result = await db.query_raw(query, companies)
+
+    return json.loads(result[0]["vector"])
+
+
+async def get_vector(description: str | None, companies: Sequence[str]) -> list[float]:
+    """
+    Get the vector for a description & list of companies
+    """
+    nlp = get_transformer_nlp()
+
+    vectors: list[list[float]] = []
+
+    if description is not None:
+        description_doc = nlp(description)
+        vectors.append(description_doc.vector.tolist())
+
+    if len(companies) > 0:
+        company_vector = await get_companies_vector(companies)
+        vectors.append(company_vector)
+
+    combined_vector: list[float] = (
+        torch.stack([torch.tensor(v) for v in vectors]).mean(dim=0).tolist()
+    )
+
+    return combined_vector
+
+
+async def find_companies(p: CompanyFinderParams) -> FindCompanyResult:
     """
     A specific method to find potential buyers for IP / companies
 
@@ -72,19 +109,20 @@ async def find_companies(
 
     Args:
         description: description of the IP
+        companies: list of companies to search
         k: number of nearest neighbors to consider
         use_gpt_expansion: whether to use GPT to expand the description (mostly for testing)
     """
     start = time.monotonic()
-    nlp = get_transformer_nlp()
 
-    if use_gpt_expansion:
+    if p.use_gpt_expansion and p.description is not None:
         logger.info("Using GPT to expand description")
         gpt_client = GptApiClient()
-        description = await gpt_client.generate_ip_description(description)
+        description = await gpt_client.generate_ip_description(p.description)
+    else:
+        description = p.description
 
-    description_doc = nlp(description)
-    vector = description_doc.vector.tolist()
+    vector = await get_vector(description, p.companies)
 
     current_year = date.today().year
 
@@ -119,7 +157,7 @@ async def find_companies(
                     SELECT id, title
                     FROM patent
                     ORDER BY (1 - (vector <=> '{vector}')) DESC
-                    LIMIT {knn}
+                    LIMIT {p.k}
             ) embed
             GROUP BY embed.title
         )
@@ -152,4 +190,4 @@ async def find_companies(
         len(companies),
     )
 
-    return FindCompanyResult(companies=companies, description=description)
+    return FindCompanyResult(companies=companies, description=description or "")

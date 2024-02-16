@@ -159,9 +159,17 @@ class CompanyFinderParams(BaseModel):
     Parameters for finding companies
     """
 
-    description: Annotated[str, Field(validate_default=True)]
+    description: Annotated[str | None, Field(validate_default=True)] = None
+    companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
+
+    @field_validator("companies", mode="before")
+    def companies_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        companies = [t.strip() for t in (v.split(";") if v else [])]
+        return companies
 
 
 AutocompleteType = Literal["entity", "owner"]
