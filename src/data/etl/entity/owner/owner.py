@@ -261,6 +261,7 @@ class OwnerEtl(BaseEntityEtl):
         ivfflat "lists"  = rows / 1000 = 24183 / 1000 = 24
         """
         queries = [
+            "DROP INDEX if exists owner_vector",
             """
             UPDATE owner
             SET vector = agg.vector
@@ -272,7 +273,7 @@ class OwnerEtl(BaseEntityEtl):
             ) agg
             WHERE agg.owner_id=owner.id
             """,
-            "CREATE INDEX ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24)",
+            "CREATE INDEX owner_vector ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24)",
         ]
         client = await prisma_client(600)
 

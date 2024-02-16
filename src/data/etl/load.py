@@ -46,12 +46,12 @@ def get_entity_map_matview_query() -> list[str]:
                 FROM ownable e, owner where owner.id=e.owner_id AND owner_type<>'OTHER'
             )
         """,
-        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_search ON {SEARCH_TABLE} USING GIN(search)",
+        f"CREATE INDEX {SEARCH_TABLE}_search ON {SEARCH_TABLE} USING GIN(search)",
         *[
-            f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
+            f"CREATE INDEX {SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
             for doc_type in DocType
         ],
-        f"CREATE INDEX IF NOT EXISTS idx_{SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
+        f"CREATE INDEX {SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
     ]
 
 
