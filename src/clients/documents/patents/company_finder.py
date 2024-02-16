@@ -16,7 +16,7 @@ from core.ner.spacy import get_transformer_nlp
 from .types import (
     CompanyRecord,
     FindCompanyResult,
-    RelevanceByYear,
+    CountByYear,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ MIN_YEAR = 2000
 
 async def fetch_company_reports(
     patent_ids: Sequence[str], owner_ids: Sequence[str], min_year: int = MIN_YEAR
-) -> dict[str, list[RelevanceByYear]]:
+) -> dict[str, list[CountByYear]]:
     """
     Fetches company reports for a set of patent and owner ids
     """
@@ -36,7 +36,7 @@ async def fetch_company_reports(
         SELECT
             owner_id as id,
             date_part('year', priority_date) as year,
-            count(*) as relevance
+            count(*) as count
         FROM patent, ownable
         WHERE patent.id in {patent_ids}
         AND ownable.owner_id in {owner_ids}
@@ -49,12 +49,12 @@ async def fetch_company_reports(
         report = await db.query_raw(report_query)
 
     result_map = {
-        k: {v["year"]: RelevanceByYear(**v) for v in vals}
+        k: {v["year"]: CountByYear(**v) for v in vals}
         for k, vals in group_by(report, "id").items()
     }
     return {
         k: [
-            vals.get(y) or RelevanceByYear(year=y, relevance=0.0)
+            vals.get(y) or CountByYear(year=y, count=0)
             for y in range(min_year, MAX_DATA_YEAR)
         ]
         for k, vals in result_map.items()
@@ -98,14 +98,14 @@ async def find_companies(
             ARRAY_AGG(title) AS titles,
             MIN({current_year}-date_part('year', priority_date))::int AS min_age,
             ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age,
-            ROUND(POW(MAX(1 - (vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 3) AS max_relevance_score,
-            ROUND(POW((1 - (AVG(vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 3) AS avg_relevance_score,
+            ROUND(POW((1 - (AVG(patent.vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS avg_relevance_score,
             ROUND(
                 SUM(
-                    POW((1 - (vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
+                    POW((1 - (patent.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
                     * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
                 )::numeric, 2
-            ) AS score
+            ) AS score,
+            ROUND(POW((1 - (AVG(patent.vector) <=> owner.vector)), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS wheelhouse_score
         FROM ownable, patent, owner
         LEFT JOIN financials ON financials.owner_id=owner.id
         WHERE ownable.patent_id=patent.id
@@ -137,8 +137,8 @@ async def find_companies(
         [
             CompanyRecord(
                 **record,
-                activity=[v.relevance for v in report_map[record["id"]]],
-                relevance_by_year=report_map[record["id"]],
+                activity=[v.count for v in report_map[record["id"]]],
+                count_by_year=report_map[record["id"]],
             )
             for record in records
         ],
