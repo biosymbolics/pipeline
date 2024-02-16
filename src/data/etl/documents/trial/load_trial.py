@@ -73,6 +73,7 @@ def get_source_fields() -> list[str]:
         "studies.source": "sponsor",  # lead sponsor
         "studies.start_date::TIMESTAMP": "start_date",
         "studies.why_stopped": "termination_description",
+        "brief_summaries.description": "abstract",
         "designs.allocation": "randomization",  # Randomized, Non-Randomized, n/a
         "designs.intervention_model": "design",  # Single Group Assignment, Crossover Assignment, etc.
         "designs.primary_purpose": "purpose",  # Treatment, Prevention, Diagnostic, Supportive Care, Screening, Health Services Research, Basic Science, Device Feasibility
@@ -196,6 +197,7 @@ class TrialLoader(BaseDocumentEtl):
                 FROM outcome_analyses
                 GROUP BY nct_id
             ) outcome_analyses on outcome_analyses.nct_id = studies.nct_id
+            LEFT JOIN brief_summaries on brief_summaries.nct_id = studies.nct_id
             WHERE study_type = 'Interventional'
             AND designs.nct_id = studies.nct_id
         """

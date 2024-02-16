@@ -294,6 +294,8 @@ prisma db push
 
 #### Random
 ```
+alter database aact set search_path = ctgov, public;
+
 from core.ner.spacy import Spacy
 nlp = Spacy.get_instance(
             model="en_core_web_trf",

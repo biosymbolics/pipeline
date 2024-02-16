@@ -1,10 +1,9 @@
 import asyncio
 import logging
 import sys
-from typing import Optional, TypedDict
+from typing import Optional
+
 from constants.core import APPLICATIONS_TABLE, PATENT_VECTOR_TABLE
-
-
 from data.etl.documents.common.vectorizer import DocumentVectorizer
 from system import initialize
 
@@ -15,8 +14,6 @@ logger.setLevel(logging.INFO)
 MAX_TEXT_LENGTH = 2000
 VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_patents.txt"
 
-
-VectorizedDoc = TypedDict("VectorizedDoc", {"id": str, "vector": list[float]})
 
 initialize()
 
