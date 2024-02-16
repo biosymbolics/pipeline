@@ -50,7 +50,7 @@ PATENT_SOURCE_FIELDS = [
     "attributes",
     "claims",
     "country",
-    "embeddings",
+    "family_id",
     "ipc_codes",
     "inventors",
     "priority_date::TIMESTAMP as priority_date",
@@ -262,6 +262,7 @@ class PatentLoader(BaseDocumentEtl):
                             # assignees (relation)
                             "claims": p["claims"],
                             "country_code": p["country"],
+                            "family_id": p["family_id"],
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
                             # interventions (relation)

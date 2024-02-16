@@ -83,6 +83,7 @@ model Patent {
     attributes         String[]
     claims             String?
     country_code       String
+    family_id          String?
     interventions      Intervenable[]
     indications        Indicatable[]
     inventors          Ownable[]                   @relation("inventor_to_patent")
