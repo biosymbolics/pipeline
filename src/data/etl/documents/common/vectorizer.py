@@ -174,7 +174,7 @@ class DocumentVectorizer:
 
             # clear vocab to reduce memory utilization & force gc
             if (i % 10) == 0:
-                logger.info("Clearing vocab (%s)", len(self.nlp.vocab))
+                logger.info("Clearing vocab (%s)", len(self.nlp.vocab()))
                 self.nlp.reset()
 
             i += 1

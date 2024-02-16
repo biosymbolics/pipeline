@@ -496,7 +496,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
     @staticmethod
     async def post_finalize():
-        """
+        r"""
         Run after:
             1) UMLS is loaded
             2) all biomedical entities are loaded
