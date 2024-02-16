@@ -228,7 +228,7 @@ class OwnerEtl(BaseEntityEtl):
             """
         )
         await client.execute_raw(
-            "CREATE INDEX owner_search_idx ON biomedical_entity USING GIN(search)"
+            "CREATE INDEX owner_search_idx ON owner USING GIN(search)"
         )
 
     @staticmethod
