@@ -205,6 +205,12 @@ class UmlsLoader:
 
     @staticmethod
     async def remove_duplicates():
+        """
+        Remove duplicate UMLS records (based on synonyms)
+
+        TODO
+        - cytokine receptor gene -> cytokine
+        """
         query = """
             UPDATE umls SET level='NA'
             WHERE id IN (

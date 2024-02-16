@@ -228,7 +228,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         update search index
         """
-        client = await prisma_client(300)
+        logger.info("Updating biomedical_entity search index")
+        client = await prisma_client(600)
         await client.execute_raw("DROP INDEX IF EXISTS biomedical_entity_search_idx")
         await client.execute_raw(
             f"""
@@ -531,8 +532,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
         """
         logger.info("Finalizing biomedical entity etl")
-        # await BiomedicalEntityEtl.link_to_documents()
-        # await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
+        await BiomedicalEntityEtl.link_to_documents()
+        await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
