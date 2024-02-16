@@ -204,6 +204,7 @@ class AncestorUmlsGraph(UmlsGraph):
                     FROM indicatable
                 ) docs ON docs.entity_id=etu."A"
                 WHERE umls.id=etu."B"
+                AND utu."B" not in {cui_suppressions} -- TODO: shouldn't be necessary
 
                 UNION
 
@@ -232,8 +233,6 @@ class AncestorUmlsGraph(UmlsGraph):
             SELECT DISTINCT head, tail
             FROM working_terms
             """
-
-        print(query)
 
         client = await prisma_client(300)
         results = await client.query_raw(query, self.considered_tuis)
