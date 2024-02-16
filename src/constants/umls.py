@@ -120,7 +120,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C2231143": ["multiple uri"],
 }
 
-UMLS_NON_COMPOSITE_SUPPRESSION = {
+UMLS_COMMON_BASES = {
     "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
     "C0003241": "antibodies",
     "C0030956": "peptides",
@@ -128,17 +128,41 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
     "C0243192": "agonists",
     "C4721408": "antagonists",
     "C1305923": "polypeptides",
-    "C0017362": "genes regulatory",
-    "C0017366": "structural genes",
     "C0023688": "ligands",
     "C1363844": "mediator",
     "C0597357": "receptor",
-    "C0003320": "Antigens",
+    "C0003320": "antigens",
     "C0019932": "hormones",
+    "C0596973": "monomer",
+    "C0014442": "enzymes",
+    "C0033684": "proteins",
+    "C0017337": "genes",
+    "C0007634": "cells",
+    "C0001128": "acids",
+    "C0002520": "amino acids",
+    "C0034788": "receptor, antigen",
+    "C0003320": "antigens",
+    "C0035668": "rna",
+    "C0012854": "dna",
+    "C0005515": "biological factors",
+    "C0450442": "agent",
+}
+
+UMLS_NON_COMPOSITE_SUPPRESSION = {
+    **UMLS_COMMON_BASES,
+    "C0017362": "genes regulatory",
+    "C0017366": "structural genes",
 }
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C1521826": "protocol agent",
+    "C0376315": "manufactured form",
+    "C4703569": "urine xenobiotic",  # WTF
+    "C1335532": "protein family",
+    "C1457887": "symptom",  # matches too much
+    "C1511130": "biochemical process",
+    "C1510464": "protein structure",
     "C4277514": "Tripartite Motif Proteins",
     "C3539969": "Specific immunoglobulin combinations",
     "C0003944": "as if personality",  # matches "as if" too much
@@ -228,6 +252,8 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0148445": "enhancin",
     "C0037420": "social interaction",
     "C1301751": "no effect",
+    "C0221138": "blood group antibody i",
+    "C1517495": "gene feature",
 }
 
 
@@ -266,6 +292,12 @@ UMLS_NAME_SUPPRESSIONS = [
     "drugs",  # e.g. CARDIOVASCULAR SYSTEM DRUGS
     "various",  #  VARIOUS DRUG CLASSES IN ATC
     "unspecified",  # e.g. Nitrogen Compounds, Unspecified
+    "physiology",
+    "phenomena",  # e.g. Physiological Phenomena
+    "processes",  # e.g. Physiological Processes
+    "pathways",
+    "form",
+    "wt",  # wt allele
 ]
 
 
