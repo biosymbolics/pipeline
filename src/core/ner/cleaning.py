@@ -48,6 +48,7 @@ SUBSTITUTIONS = {
     "receptors?": "",
     "forms?": "",
     "formulations?": "",
+    "products?": "",
 }
 
 
