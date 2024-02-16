@@ -106,13 +106,13 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
 
 class DocumentSearchParams(DocumentSearchCriteria):
+    description: Annotated[str | None, Field(validate_default=True)] = None
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
     skip_cache: Annotated[bool, Field(validate_default=True)] = True
 
 
 class PatentSearchParams(DocumentSearchParams):
-    description: Annotated[str | None, Field(validate_default=True)] = None
-    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     include: Annotated[PatentInclude | None, Field(validate_default=True)] = (
         DEFAULT_PATENT_INCLUDE
     )
@@ -130,7 +130,7 @@ class TrialSearchParams(DocumentSearchParams):
     )
 
 
-class AssetSearchParams(DocumentSearchParams):
+class AssetSearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
     entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
         EntityMapType.intervention
@@ -154,11 +154,38 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     include: Annotated[dict, Field()] = {}
 
 
-class BuyerFinderParams(BaseModel):
+class CompanyFinderParams(BaseModel):
     """
-    Parameters for finding potential buyers
+    Parameters for finding companies
     """
 
-    description: Annotated[str, Field(validate_default=True)]
+    description: Annotated[str | None, Field(validate_default=True)] = None
+    companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
+
+    @field_validator("companies", mode="before")
+    def companies_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        companies = [t.strip() for t in (v.split(";") if v else [])]
+        return companies
+
+
+AutocompleteType = Literal["entity", "owner"]
+
+
+class AutocompleteParams(BaseModel):
+    string: str
+    limit: int = 25
+    types: Annotated[list[AutocompleteType], Field(validate_default=True)] = [
+        "entity",
+        "owner",
+    ]
+
+    @field_validator("types", mode="before")
+    def types_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        types = [t.strip() for t in (v.split(";") if v else [])]
+        return types

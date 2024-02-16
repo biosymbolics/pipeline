@@ -15,7 +15,6 @@ from clients.low_level.prisma import prisma_client
 from constants.core import (
     ETL_BASE_DATABASE_URL,
     GPR_ANNOTATIONS_TABLE,
-    PATENT_VECTOR_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
@@ -50,7 +49,7 @@ PATENT_SOURCE_FIELDS = [
     "attributes",
     "claims",
     "country",
-    "embeddings",
+    "family_id",
     "ipc_codes",
     "inventors",
     "priority_date::TIMESTAMP as priority_date",
@@ -218,11 +217,13 @@ class PatentLoader(BaseDocumentEtl):
         Copy vectors to patent table
 
         @see vectorize_patents.py
+
+        ivfflat "lists"  = rows / 1000 = 1287
         """
         client = await prisma_client(1200)
         queries = [
             "CREATE EXTENSION IF NOT EXISTS dblink",
-            "DROP INDEX IF EXISTS idx_patent_vector",
+            "DROP INDEX IF EXISTS patent_vector",
             f"""
                 UPDATE patent set vector = v.vector
                 FROM dblink(
@@ -234,7 +235,7 @@ class PatentLoader(BaseDocumentEtl):
             # TODO: switch to hnsw maybe
             # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",
             # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
-            "CREATE INDEX ON patent USING ivfflat (vector vector_cosine_ops) WITH (lists = 1287)",
+            "CREATE INDEX patent_vector ON patent USING ivfflat (vector vector_cosine_ops) WITH (lists = 1287)",
         ]
         for query in queries:
             await client.execute_raw(query)
@@ -260,6 +261,7 @@ class PatentLoader(BaseDocumentEtl):
                             # assignees (relation)
                             "claims": p["claims"],
                             "country_code": p["country"],
+                            "family_id": p["family_id"],
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
                             # interventions (relation)

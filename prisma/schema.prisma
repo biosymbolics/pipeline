@@ -48,16 +48,17 @@ model EntitySynonym {
 }
 
 model Owner {
-    id                 Int                      @id @default(autoincrement())
-    children           Owner[]                  @relation("owner_to_parent")
-    count              Int                      @default(0)
+    id                 Int                         @id @default(autoincrement())
+    children           Owner[]                     @relation("owner_to_parent")
+    count              Int                         @default(0)
     financial_snapshot FinancialSnapshot?
     ownables           Ownable[] // backref
     owner_type         OwnerType
-    parents            Owner[]                  @relation("owner_to_parent")
-    name               String                   @unique
+    parents            Owner[]                     @relation("owner_to_parent")
+    name               String                      @unique
     search             Unsupported("tsvector")?
     synonyms           OwnerSynonym[]
+    vector             Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
 
     @@index([owner_type], name: "owner_owner_type")
     @@map("owner")
@@ -82,6 +83,7 @@ model Patent {
     attributes         String[]
     claims             String?
     country_code       String
+    family_id          String?
     interventions      Intervenable[]
     indications        Indicatable[]
     inventors          Ownable[]                   @relation("inventor_to_patent")
@@ -341,6 +343,7 @@ enum OwnerType {
     HEALTH_SYSTEM
     FOUNDATION
     OTHER_ORGANIZATION
+    NON_PROFIT
     INDIVIDUAL
     OTHER
 }

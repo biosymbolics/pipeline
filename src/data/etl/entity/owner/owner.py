@@ -228,7 +228,7 @@ class OwnerEtl(BaseEntityEtl):
             """
         )
         await client.execute_raw(
-            "CREATE INDEX owner_search_idx ON biomedical_entity USING GIN(search)"
+            "CREATE INDEX owner_search_idx ON owner USING GIN(search)"
         )
 
     @staticmethod
@@ -251,6 +251,34 @@ class OwnerEtl(BaseEntityEtl):
         for key, result in zip(checksums.keys(), results):
             logger.warning(f"Load checksum {key}: {result}")
         return
+
+    @staticmethod
+    async def add_vectors():
+        """
+        Create company-level vectors that are the average of all patents
+        (and other documents in the future)
+
+        ivfflat "lists"  = rows / 1000 = 24183 / 1000 = 24
+        """
+        queries = [
+            "DROP INDEX if exists owner_vector",
+            """
+            UPDATE owner
+            SET vector = agg.vector
+            FROM (
+                SELECT AVG(vector) as vector, ownable.owner_id as owner_id
+                FROM patent, ownable
+                WHERE patent.id=ownable.patent_id
+                GROUP BY ownable.owner_id
+            ) agg
+            WHERE agg.owner_id=owner.id
+            """,
+            "CREATE INDEX owner_vector ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24)",
+        ]
+        client = await prisma_client(600)
+
+        for query in queries:
+            await client.execute_raw(query)
 
     @overrides(BaseEntityEtl)
     @staticmethod

@@ -29,7 +29,9 @@ async def _search(raw_event: dict, context):
         **(raw_event.get("queryStringParameters") or {}),
     )
 
-    if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+    if (
+        len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms])
+    ) and p.description is None:
         logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 

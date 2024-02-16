@@ -43,6 +43,7 @@ DEFAULT_UMLS_TO_UMLS_RELATIONSHIPS = (
     "has_target",  # head/target->tail/drug
     "has_active_ingredient",  # DROXIDOPA -> DROXIDOPA 100 mg ORAL CAPSULE (important for clinical drugs)
     "tradename_of",  # Amoxycillin -> Amoxil; gatifloxacin 5 MG/ML Ophthalmic Solution -> gatifloxacin 5 MG/ML Ophthalmic Solution [Zymaxid]
+    "has_structural_class",  # e.g. corticotropins -> Adrenocorticotropic Hormone [EPC]; Monoclonal Antibody -> Interleukin-6-directed Antibody
     ### DISEASE ###
     "has_phenotype",  # head/disease->tail/phenotype, e.g. Mantle-Cell Lymphoma -> (specific MCL phenotype)
     ### INTERESTING BUT NOT FOR NOW ###
@@ -203,6 +204,7 @@ class AncestorUmlsGraph(UmlsGraph):
                     FROM indicatable
                 ) docs ON docs.entity_id=etu."A"
                 WHERE umls.id=etu."B"
+                AND etu."B" NOT IN {cui_suppressions} -- TODO: shouldn't be necessary
 
                 UNION
 
@@ -231,8 +233,6 @@ class AncestorUmlsGraph(UmlsGraph):
             SELECT DISTINCT head, tail
             FROM working_terms
             """
-
-        print(query)
 
         client = await prisma_client(300)
         results = await client.query_raw(query, self.considered_tuis)

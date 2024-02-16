@@ -44,6 +44,7 @@ RELATIONSHIPS_OF_INTEREST_MAP = {
     "MECHANISM": [
         "has_physiologic_effect",  # head/effect -> tail/drug, e.g. Increased Glycolysis [PE]  -> PIOGLITAZONE
         "has_mechanism_of_action",  # head/MoA->tail/drug
+        "has_structural_class",
         "has_therapeutic_class",  # e.g. Antihelmintics -> ALBENDAZOLE
         "negatively_regulates",  # neurotransmitter uptake -> negative regulation of neurotransmitter uptake
         "positively_regulates",  # neurotransmitter uptake -> positive regulation of neurotransmitter uptake

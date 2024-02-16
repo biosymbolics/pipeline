@@ -3,7 +3,7 @@ import logging
 import time
 from typing import Optional, Sequence, TypedDict
 import polars as pl
-from pydash import uniq
+from pydash import compact, uniq
 import hashlib
 
 
@@ -38,6 +38,7 @@ class DocumentVectorizer:
         """
         Initialize the vectorizer
         """
+        logger.info("Initializing DocumentVectorizer with db %s", database)
         self.db = PsqlDatabaseClient(database)
         self.processed_docs_file = processed_docs_file
         self.batch_size = batch_size
@@ -79,7 +80,8 @@ class DocumentVectorizer:
         Format documents for vectorization
         Concatenates fields and trucates to MAX_TEXT_LENGTH
         """
-        texts = [doc_df[field].to_list() for field in self.text_fields]
+        print(doc_df)
+        texts = compact([doc_df[field].to_list() for field in self.text_fields])
         return [("\n".join(text))[0:MAX_TEXT_LENGTH] for text in zip(*texts)]
 
     def _vectorize(self, documents: list[str]) -> list[list[float]]:
@@ -164,6 +166,9 @@ class DocumentVectorizer:
         """
         Vectorize & persist documents
         """
+
+        t = await self.db.select("select * from studies limit 1")
+        print(t)
         batch = await self._fetch_batch(last_id=starting_id)
         i = 0
 
@@ -174,7 +179,7 @@ class DocumentVectorizer:
 
             # clear vocab to reduce memory utilization & force gc
             if (i % 10) == 0:
-                logger.info("Clearing vocab (%s)", len(self.nlp.vocab))
+                logger.info("Clearing vocab (%s)", len(self.nlp.vocab()))
                 self.nlp.reset()
 
             i += 1

@@ -17,6 +17,7 @@ from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 
 from clients.low_level.prisma import batch_update, prisma_client
+from constants.umls import UMLS_COMMON_BASES
 from core.ner.cleaning import CleanFunction
 from core.ner.linker.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -227,7 +228,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         update search index
         """
-        client = await prisma_client(300)
+        logger.info("Updating biomedical_entity search index")
+        client = await prisma_client(600)
         await client.execute_raw("DROP INDEX IF EXISTS biomedical_entity_search_idx")
         await client.execute_raw(
             f"""
@@ -408,10 +410,11 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     SET
                         instance_rollup=lower(instance_rollup.parent_name),
                         category_rollup=lower(category_rollup.parent_name)
-                    FROM biomedical_entity as entity
-                    JOIN _rollups as instance_rollup ON instance_rollup.child_id=entity.id
-                    LEFT JOIN _rollups as category_rollup ON category_rollup.child_id=instance_rollup.parent_id
+                    FROM biomedical_entity AS entity
+                    JOIN _rollups AS instance_rollup ON instance_rollup.child_id=entity.id
+                    LEFT JOIN _rollups AS category_rollup ON category_rollup.child_id=instance_rollup.parent_id
                     WHERE {table}.entity_id=entity.id
+                    AND entity.canonical_id NOT IN {tuple(UMLS_COMMON_BASES.keys())}
                 """,
                 # ensure all records have rollups
                 f"""
@@ -493,7 +496,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
     @staticmethod
     async def post_finalize():
-        """
+        r"""
         Run after:
             1) UMLS is loaded
             2) all biomedical entities are loaded

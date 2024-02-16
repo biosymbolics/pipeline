@@ -10,12 +10,12 @@ from typings.core import ResultBase
 RelevancyThreshold = Literal["very low", "low", "medium", "high", "very high"]
 
 
-class RelevanceByYear(ResultBase):
+class CountByYear(ResultBase):
     year: int
-    relevance: float
+    count: int
 
 
-class BuyerRecord(ResultBase):
+class CompanyRecord(ResultBase):
     id: int
     name: str
     ids: list[str]
@@ -26,12 +26,12 @@ class BuyerRecord(ResultBase):
     min_age: int
     avg_age: float
     activity: list[float]
-    max_relevance_score: float
-    avg_relevance_score: float
-    relevance_by_year: list[RelevanceByYear]
+    relevance_score: float
+    wheelhouse_score: float
+    count_by_year: list[CountByYear]
     score: float
 
 
-class FindBuyerResult(ResultBase):
-    buyers: list[BuyerRecord]
+class FindCompanyResult(ResultBase):
+    companies: list[CompanyRecord]
     description: str  # included since it could be a result of expansion

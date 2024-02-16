@@ -391,6 +391,7 @@ MATCH_RETRY_REWRITES = {
     "antibod(?:y|ie)": "",
     "ligand": "",
     "targeting": "",
+    "penetration": "",
     r"\s{2,}": " ",
 }
 

@@ -5,13 +5,18 @@ Functions to initialize the patents database
 import asyncio
 import logging
 import sys
+from data.etl.documents.trial.vectorize_trials import TrialVectorizer
 
 from system import initialize
 
 initialize()
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from constants.core import PATENT_VECTOR_TABLE
+from constants.core import (
+    PATENT_VECTOR_TABLE,
+    REGULATORY_APPROVAL_VECTOR_TABLE,
+    TRIAL_VECTOR_TABLE,
+)
 from data.etl.documents.patent.vectorize_patents import PatentVectorizer
 
 from .prep_bq_patents import copy_patent_tables
@@ -42,17 +47,22 @@ async def create_funcs():
     return
 
 
-async def vectorize_patents():
+async def vectorize_documents():
     """
     Vectorize patents and store in postgres
     """
-    await PsqlDatabaseClient().create_table(
-        PATENT_VECTOR_TABLE, {"id": "text", "vector": "vector(768)"}, exists_ok=True
-    )
+    for db, table in [
+        ("patents", PATENT_VECTOR_TABLE),
+        ("drugcentral", REGULATORY_APPROVAL_VECTOR_TABLE),
+        ("aact", TRIAL_VECTOR_TABLE),
+    ]:
+        await PsqlDatabaseClient(db).create_table(
+            table, {"id": "text", "vector": "vector(768)"}, exists_ok=True
+        )
 
     # create vectors for patents. this will take 4+ hours (depends upon GPU & memory)
-    vectorizer = PatentVectorizer()
-    await vectorizer()
+    await PatentVectorizer()()
+    await TrialVectorizer()()
 
 
 async def main():
@@ -63,6 +73,7 @@ async def main():
     await create_funcs()
     await copy_patent_tables()
     await copy_bq_to_psql()
+    await vectorize_documents()
 
 
 if __name__ == "__main__":

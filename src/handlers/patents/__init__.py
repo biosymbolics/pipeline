@@ -1,4 +1,4 @@
-from .find_buyers import find_buyers
+from .find_companies import find_companies
 from .search import search
 
-__all__ = ["find_buyers", "search"]
+__all__ = ["find_companies", "search"]
