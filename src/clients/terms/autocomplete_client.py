@@ -4,9 +4,11 @@ Patent client
 
 import logging
 import time
+from typing import Sequence
 
 
 from clients.low_level.prisma import prisma_context
+from typings.client import AutocompleteParams
 
 from .types import AutocompleteResult
 
@@ -14,8 +16,10 @@ from .types import AutocompleteResult
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+TYPE_TABLE_MAP = {"entity": "biomedical_entity", "owner": "owner"}
 
-async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]:
+
+async def autocomplete(p: AutocompleteParams) -> list[AutocompleteResult]:
     """
     Generates an autocomplete list for a given string and query
 
@@ -25,28 +29,28 @@ async def autocomplete(string: str, limit: int = 25) -> list[AutocompleteResult]
     """
     start = time.monotonic()
 
+    queries = [
+        f"""
+        SELECT name, count
+        FROM {TYPE_TABLE_MAP[type]}
+        WHERE search @@ plainto_tsquery('english', $1)
+        """
+        for type in p.types
+    ]
+    query = " UNION ".join(queries)
+
     async with prisma_context(300) as db:
         results = await db.query_raw(
             f"""
-            SELECT name, count from (
-                SELECT name, count
-                FROM biomedical_entity
-                WHERE search @@ plainto_tsquery('english', $1)
-
-                UNION
-
-                SELECT name, count
-                FROM owner
-                WHERE search @@ plainto_tsquery('english', $1)
-            ) s ORDER BY count DESC
-            LIMIT {limit}
+            SELECT name, count FROM ({query}) s
+            ORDER BY count DESC LIMIT {p.limit}
             """,
-            string,
+            p.string,
         )
 
     logger.info(
         "Autocomplete for string %s took %s seconds (%s)",
-        string,
+        p.string,
         round(time.monotonic() - start, 2),
         len(results),
     )

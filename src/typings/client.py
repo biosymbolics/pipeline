@@ -162,3 +162,22 @@ class CompanyFinderParams(BaseModel):
     description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
+
+
+AutocompleteType = Literal["entity", "owner"]
+
+
+class AutocompleteParams(BaseModel):
+    string: str
+    limit: int = 25
+    types: Annotated[list[AutocompleteType], Field(validate_default=True)] = [
+        "entity",
+        "owner",
+    ]
+
+    @field_validator("types", mode="before")
+    def types_from_string(cls, v):
+        if isinstance(v, list):
+            return v
+        types = [t.strip() for t in (v.split(";") if v else [])]
+        return types

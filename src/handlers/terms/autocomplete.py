@@ -8,14 +8,10 @@ from pydantic import BaseModel
 
 from clients import terms as terms_client
 from handlers.utils import handle_async
+from typings.client import AutocompleteParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class AutocompleteParams(BaseModel):
-    string: str
-    limit: int = 25
 
 
 class AutocompleteEvent(BaseModel):
@@ -65,7 +61,7 @@ async def _autocomplete(raw_event: dict, context):
         logger.info("Term too short, skipping autocomplete")
         return {"statusCode": 200, "body": json.dumps([])}
 
-    terms = await terms_client.autocomplete(p.string, p.limit)
+    terms = await terms_client.autocomplete(p)
 
     return {"statusCode": 200, "body": json.dumps(terms)}
 
