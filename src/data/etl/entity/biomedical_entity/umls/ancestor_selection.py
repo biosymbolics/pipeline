@@ -204,7 +204,7 @@ class AncestorUmlsGraph(UmlsGraph):
                     FROM indicatable
                 ) docs ON docs.entity_id=etu."A"
                 WHERE umls.id=etu."B"
-                AND utu."B" not in {cui_suppressions} -- TODO: shouldn't be necessary
+                AND etu."B" NOT IN {cui_suppressions} -- TODO: shouldn't be necessary
 
                 UNION
 

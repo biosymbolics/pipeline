@@ -218,6 +218,8 @@ class PatentLoader(BaseDocumentEtl):
         Copy vectors to patent table
 
         @see vectorize_patents.py
+
+        ivfflat "lists"  = rows / 1000 = 1287
         """
         client = await prisma_client(1200)
         queries = [
