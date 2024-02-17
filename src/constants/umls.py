@@ -122,6 +122,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
 }
 
 UMLS_COMMON_BASES = {
+    "C1704241": "complex",
     "C2324496": "biogenic peptide",
     "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
     "C0003241": "antibodies",
@@ -300,9 +301,11 @@ UMLS_NAME_SUPPRESSIONS = [
     "physiology",
     "phenomena",  # e.g. Physiological Phenomena
     "processes",  # e.g. Physiological Processes
+    "process",  # too extreme? C2263112
     "pathways",
     "form",
     "wt",  # wt allele
+    "consent",
 ]
 
 
