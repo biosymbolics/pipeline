@@ -61,6 +61,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1448132": ["ir"],
     "C1843354": ["base"],  # "bpifa4p",  # matches base
     "C1427122": ["tube"],  # "tube1",  # matches tube
     "C1823381": ["hole"],  # TMEM121 - hole

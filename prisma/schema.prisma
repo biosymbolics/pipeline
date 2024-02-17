@@ -314,6 +314,23 @@ model UmlsGraph {
     @@map("umls_graph")
 }
 
+model MockChat {
+    id              Int          @id @default(autoincrement())
+    conversation_id String
+    message_id      String
+    content         String
+    type            MockChatType @default(STANDARD)
+
+    @@unique([conversation_id, message_id])
+    @@map("mock_chat")
+}
+
+enum MockChatType {
+    HEATMAP
+    TIMELINE
+    STANDARD
+}
+
 enum ComparisonType {
     ACTIVE
     PLACEBO
