@@ -432,4 +432,6 @@ if __name__ == "__main__":
 
     is_update = "--update" in sys.argv
 
-    asyncio.run(TrialLoader(document_type="trial").copy_all(is_update))
+    asyncio.run(
+        TrialLoader(document_type="trial", source_db="aact").copy_all(is_update)
+    )
