@@ -8,11 +8,11 @@ class MockChatClient:
     Mock chat client for demo purposes
     """
 
-    def __init__(self, conversation_key: str, delay: int = 0):
-        self.conversation_key = conversation_key
+    def __init__(self, conversation_id: str, delay: int = 0):
+        self.conversation_id = conversation_id
         self.delay = delay
 
-    async def query(self, message_key: str) -> MockChat | None:
+    async def query(self, message_id: int) -> MockChat | None:
         """
         Get a message by its key
         """
@@ -20,8 +20,8 @@ class MockChatClient:
             message = await MockChat.prisma(db).find_unique(
                 where={
                     "conversation_id_message_id": {
-                        "conversation_id": self.conversation_key,
-                        "message_id": message_key,
+                        "conversation_id": self.conversation_id,
+                        "message_id": message_id,
                     }
                 },
             )

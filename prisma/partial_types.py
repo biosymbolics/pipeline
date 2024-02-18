@@ -7,6 +7,7 @@ To apply changes: `prisma generate`
 from prisma.models import (
     Indicatable,
     Intervenable,
+    MockChat,
     Patent,
     Ownable,
     RegulatoryApproval,
@@ -100,4 +101,10 @@ Trial.create_partial(
         "interventions": "IntervenableDto",
         "indications": "IndicatableDto",
     },
+)
+
+
+MockChat.create_partial(
+    "Chat",
+    exclude={"id"},
 )
