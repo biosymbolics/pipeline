@@ -6,13 +6,13 @@ from abc import abstractmethod
 import asyncio
 import logging
 from typing import Literal
-from clients.low_level.prisma import prisma_client
 
+
+from clients.low_level.prisma import prisma_client
+from data.etl.types import BiomedicalEntityLoadSpec
 from system import initialize
 
 initialize()
-
-from data.etl.types import BiomedicalEntityLoadSpec
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,9 @@ DocumentType = Literal["patent", "regulatory_approval", "trial"]
 
 
 class BaseDocumentEtl:
-    def __init__(self, document_type: DocumentType):
+    def __init__(self, document_type: DocumentType, source_db: str):
         self.document_type = document_type
+        self.source_db = source_db
 
     @abstractmethod
     def entity_specs(self) -> list[BiomedicalEntityLoadSpec]:
@@ -46,7 +47,39 @@ class BaseDocumentEtl:
             await self.delete_documents()
         logger.info("Coping documents...")
         await self.copy_documents()
+        await self.copy_vectors()
         await self.checksum()
+
+    async def copy_vectors(self):
+        """
+        Copy vectors to document tables
+        """
+        client = await prisma_client(1200)
+        row_count = await client.query_raw(
+            f"SELECT COUNT(*) as count FROM {self.document_type}"
+        )
+        list_count = int(row_count[0]["count"] / 1000)
+        queries = [
+            "CREATE EXTENSION IF NOT EXISTS dblink",
+            f"DROP INDEX IF EXISTS {self.document_type}_vector",
+            f"""
+                UPDATE {self.document_type} set vector = v.vector
+                FROM dblink(
+                    'dbname={self.source_db}',
+                    'SELECT id, vector FROM {self.document_type}_vectors'
+                ) AS v(id TEXT, vector vector(768))
+                WHERE {self.document_type}.id=v.id
+            """,
+            # TODO: switch to hnsw maybe
+            # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",
+            # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
+            f"""
+                CREATE INDEX {self.document_type}_vector ON {self.document_type}
+                USING ivfflat (vector vector_cosine_ops) WITH (lists = {list_count})
+            """,
+        ]
+        for query in queries:
+            await client.execute_raw(query)
 
     async def checksum(self):
         """

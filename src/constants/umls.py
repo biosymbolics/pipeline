@@ -61,6 +61,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1448132": ["ir"],
     "C1843354": ["base"],  # "bpifa4p",  # matches base
     "C1427122": ["tube"],  # "tube1",  # matches tube
     "C1823381": ["hole"],  # TMEM121 - hole
@@ -121,6 +122,8 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
 }
 
 UMLS_COMMON_BASES = {
+    "C1704241": "complex",
+    "C2324496": "biogenic peptide",
     "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
     "C0003241": "antibodies",
     "C0030956": "peptides",
@@ -146,6 +149,7 @@ UMLS_COMMON_BASES = {
     "C0012854": "dna",
     "C0005515": "biological factors",
     "C0450442": "agent",
+    "C5235658": "targeted therapy agent",
 }
 
 UMLS_NON_COMPOSITE_SUPPRESSION = {
@@ -156,6 +160,8 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0178499": "base",
+    "C0013216": "pharmacotherapy",
     "C1521826": "protocol agent",
     "C0376315": "manufactured form",
     "C4703569": "urine xenobiotic",  # WTF
@@ -295,9 +301,11 @@ UMLS_NAME_SUPPRESSIONS = [
     "physiology",
     "phenomena",  # e.g. Physiological Phenomena
     "processes",  # e.g. Physiological Processes
+    "process",  # too extreme? C2263112
     "pathways",
     "form",
     "wt",  # wt allele
+    "consent",
 ]
 
 

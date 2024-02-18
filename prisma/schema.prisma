@@ -126,14 +126,14 @@ model TrialDropoutReason {
 }
 
 model Trial {
-    id                      String               @id @unique
+    id                      String                      @id @unique
     abstract                String?
     acronym                 String?
-    arm_count               Int?                 @default(-1)
+    arm_count               Int?                        @default(-1)
     arm_types               String[]
     comparison_type         ComparisonType
     design                  TrialDesign
-    dropout_count           Int?                 @default(-1)
+    dropout_count           Int?                        @default(-1)
     dropout_reasons         TrialDropoutReason[]
     duration                Int?
     end_date                DateTime?
@@ -149,7 +149,7 @@ model Trial {
     phase                   TrialPhase
     purpose                 String
     randomization           TrialRandomization
-    sponsor_id              Int?                 @unique
+    sponsor_id              Int?                        @unique
     sponsor                 Ownable?
     start_date              DateTime?
     status                  TrialStatus
@@ -157,6 +157,7 @@ model Trial {
     termination_reason      TerminationReason
     title                   String
     url                     String
+    vector                  Unsupported("vector(768)")?
 
     @@index([start_date], name: "trial_start_date")
     @@map("trial")
@@ -312,6 +313,23 @@ model UmlsGraph {
 
     @@unique([head_id, tail_id, relationship])
     @@map("umls_graph")
+}
+
+model MockChat {
+    id              Int           @id @default(autoincrement())
+    conversation_id String
+    message_id      Int
+    content         String
+    type            MockChatType? @default(STANDARD)
+
+    @@unique([conversation_id, message_id])
+    @@map("mock_chat")
+}
+
+enum MockChatType {
+    HEATMAP
+    TIMELINE
+    STANDARD
 }
 
 enum ComparisonType {

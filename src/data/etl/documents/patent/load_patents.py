@@ -212,34 +212,6 @@ class PatentLoader(BaseDocumentEtl):
         )
         await Patent.prisma(client).delete_many()
 
-    async def copy_vectors(self):
-        """
-        Copy vectors to patent table
-
-        @see vectorize_patents.py
-
-        ivfflat "lists"  = rows / 1000 = 1287
-        """
-        client = await prisma_client(1200)
-        queries = [
-            "CREATE EXTENSION IF NOT EXISTS dblink",
-            "DROP INDEX IF EXISTS patent_vector",
-            f"""
-                UPDATE patent set vector = v.vector
-                FROM dblink(
-                    'dbname=patents',
-                    'SELECT id, vector FROM patent_vectors'
-                ) AS v(id TEXT, vector vector(768))
-                WHERE patent.id=v.id
-            """,
-            # TODO: switch to hnsw maybe
-            # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",
-            # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
-            "CREATE INDEX patent_vector ON patent USING ivfflat (vector vector_cosine_ops) WITH (lists = 1287)",
-        ]
-        for query in queries:
-            await client.execute_raw(query)
-
     @overrides(BaseDocumentEtl)
     async def copy_documents(self):
         """
@@ -373,4 +345,6 @@ if __name__ == "__main__":
 
     is_update = "--update" in sys.argv
 
-    asyncio.run(PatentLoader(document_type="patent").copy_all(is_update))
+    asyncio.run(
+        PatentLoader(document_type="patent", source_db="patents").copy_all(is_update)
+    )

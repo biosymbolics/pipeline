@@ -294,7 +294,7 @@ if __name__ == "__main__":
     is_update = "--update" in sys.argv
 
     asyncio.run(
-        RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
-            is_update
-        )
+        RegulatoryApprovalLoader(
+            document_type="regulatory_approval", source_db="drugcentral"
+        ).copy_all(is_update)
     )

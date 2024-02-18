@@ -73,7 +73,7 @@ class GptApiClient:
 
         return answer
 
-    def query(self, query: str, is_array: bool = False) -> Any:
+    async def query(self, query: str, is_array: bool = False) -> Any:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
@@ -110,9 +110,9 @@ class GptApiClient:
             in markdown:
             {", ".join(terms)}
         """
-        return self.query(query)
+        return await self.query(query)
 
-    def describe_topic(self, topic_features: list[str]) -> str:
+    async def describe_topic(self, topic_features: list[str]) -> str:
         """
         Simple query to describe a topic
         """
@@ -120,7 +120,7 @@ class GptApiClient:
             "Return a good, succinct name for the topic described by the following words:\n"
             + "\n".join(topic_features)
         )
-        return self.query(query)
+        return await self.query(query)
 
     async def generate_ip_description(self, short_description: str) -> str:
         """
@@ -131,10 +131,10 @@ class GptApiClient:
             "Please expand the following into a 2-3 paragraph technical description of a biomedical invention:\n"
             + short_description
         )
-        return self.query(query)
+        return await self.query(query)
 
     @staticmethod
-    def clindev_timelines(indication: str) -> list[dict]:
+    async def clindev_timelines(indication: str) -> list[dict]:
         """
         Query GPT about clindev timelines
 
@@ -166,5 +166,5 @@ class GptApiClient:
 
         # gpt-4 too slow
         gpt_client = GptApiClient(schemas=response_schemas, model="gpt-3.5-turbo")
-        answer_as_array: list[dict] = gpt_client.query(prompt, is_array=True)
+        answer_as_array: list[dict] = await gpt_client.query(prompt, is_array=True)
         return answer_as_array

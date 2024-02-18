@@ -33,9 +33,6 @@ async def _search(raw_event: dict, context):
 
     p = PatentSearchParams(**raw_event["queryStringParameters"])
 
-    if p.include is None:
-        raise ValueError("Include is required")
-
     if (
         len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms])
     ) and p.description is None:
