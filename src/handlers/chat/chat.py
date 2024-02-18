@@ -4,6 +4,7 @@ from typing import TypedDict
 import logging
 import uuid
 from pydantic import BaseModel
+from prisma.enums import MockChatType
 from prisma.models import MockChat
 from prisma.partials import Chat
 
@@ -54,12 +55,12 @@ async def _chat(raw_event: dict, context):
     logger.info("Asking llm: %s", p)
 
     if p.conversation_id is not None and p.message_id is not None:
-        time.sleep(5)
         resp = await MockChatClient(conversation_id=p.conversation_id).query(
             p.message_id + 1
         )
         logger.info("Got response from mock chat: %s", resp)
         if resp is not None:
+            time.sleep(5)
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -83,6 +84,7 @@ async def _chat(raw_event: dict, context):
                 message_id=0,
                 conversation_id=p.conversation_id or str(uuid.uuid4()),
                 content=answer,
+                type=MockChatType.STANDARD,
             ),
             cls=DataclassJSONEncoder,
         ),
