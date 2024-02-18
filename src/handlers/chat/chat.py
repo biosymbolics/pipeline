@@ -1,4 +1,5 @@
 import json
+import time
 from typing import TypedDict
 import logging
 import uuid
@@ -53,6 +54,7 @@ async def _chat(raw_event: dict, context):
     logger.info("Asking llm: %s", p)
 
     if p.conversation_id is not None and p.message_id is not None:
+        time.sleep(5)
         resp = await MockChatClient(conversation_id=p.conversation_id).query(
             p.message_id + 1
         )
