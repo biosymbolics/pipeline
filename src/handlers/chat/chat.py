@@ -58,7 +58,6 @@ async def _chat(raw_event: dict, context):
         resp = await MockChatClient(conversation_id=p.conversation_id).query(
             p.message_id + 1
         )
-        logger.info("Got response from mock chat: %s", resp)
         if resp is not None:
             time.sleep(5)
             return {
@@ -70,7 +69,7 @@ async def _chat(raw_event: dict, context):
             }
 
     if p.skip_cache:
-        answer = gpt_client.query(p.content)
+        answer = await gpt_client.query(p.content)
     else:
         key = f"gpt-chat-{p.content}"
         answer = await retrieve_with_cache_check(
