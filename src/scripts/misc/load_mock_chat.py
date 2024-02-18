@@ -15,15 +15,16 @@ async def load_mock_chat():
     conversations = [
         {
             "conversation_id": key,
-            "message_id": message["id"],
+            "message_id": int(message["id"]),
             "content": message["content"],
+            "description": message.get("description"),
             "type": message.get("type") or MockChatType.STANDARD,
         }
         for key, conversation in data.items()
         for message in conversation["messages"]
-        if isinstance(conversation["sender"], dict)
     ]
     client = await prisma_client(600)
+    await MockChat.prisma(client).delete_many()
     await MockChat.prisma(client).create_many(conversations)  # type: ignore
 
 

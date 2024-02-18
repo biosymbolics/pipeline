@@ -320,6 +320,7 @@ model MockChat {
     conversation_id String
     message_id      Int
     content         String
+    description     String?
     type            MockChatType? @default(STANDARD)
 
     @@unique([conversation_id, message_id])
