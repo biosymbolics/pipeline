@@ -61,14 +61,14 @@ class BaseDocumentEtl:
         list_count = int(row_count[0]["count"] / 1000)
         queries = [
             "CREATE EXTENSION IF NOT EXISTS dblink",
-            f"DROP INDEX IF EXISTS {self.document_type}_vector",
+            f"DROP INDEX IF EXISTS {self.document_type}_vector;",
             f"""
                 UPDATE {self.document_type} set vector = v.vector
                 FROM dblink(
                     'dbname={self.source_db}',
                     'SELECT id, vector FROM {self.document_type}_vectors'
                 ) AS v(id TEXT, vector vector(768))
-                WHERE {self.document_type}.id=v.id
+                WHERE {self.document_type}.id=v.id;
             """,
             # TODO: switch to hnsw maybe
             # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",

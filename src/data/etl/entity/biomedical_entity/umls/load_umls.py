@@ -167,6 +167,9 @@ class UmlsLoader:
     async def add_missing_relationships():
         """
         Add missing UMLS relationships
+
+        TODO:
+        - handle similar synonyms, e.g. normalize for plurals and dashes (ex C3864925 vs C3864917)
         """
         client = await prisma_client(600)
         # if no 'isa' relationship exists for the tail
@@ -210,12 +213,13 @@ class UmlsLoader:
 
         TODO
         - cytokine receptor gene -> cytokine
+        - add more types!!
         """
         query = """
             UPDATE umls SET level='NA'
             WHERE id IN (
                 SELECT id FROM umls, unnest(synonyms) synonym
-                WHERE NOT 'T116'=ANY(type_ids)
+                WHERE NOT 'T116'=ANY(type_ids) -- Amino Acid, Peptide, or Protein
                 AND synonym IN (
                     SELECT synonym
                     FROM umls, unnest(synonyms) synonym
