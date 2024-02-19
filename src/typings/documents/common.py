@@ -15,12 +15,12 @@ class TermField(Enum):
 
 
 # TODO: arcane name
-class EntityMapType(Enum):
+class EntityCategory(Enum):
     intervention = "intervenable"
     indication = "indicatable"
 
 
-ENTITY_MAP_TABLES = [t.value for t in EntityMapType]
+ENTITY_MAP_TABLES = [t.value for t in EntityCategory]
 
 
 ENTITY_TYPE_MAP = BiomedicalEntityType.__members__

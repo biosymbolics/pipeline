@@ -18,7 +18,7 @@ from typings.client import (
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
-from typings.documents.common import EntityMapType, TermField
+from typings.documents.common import EntityCategory, TermField
 from typings.entities import Entity
 from utils.string import get_id
 
@@ -37,7 +37,7 @@ async def get_docs_by_entity_id(
     doc_id_map: Mapping[str, list[str]],
     rollup_field: TermField,
     child_field: TermField | None,
-    entity_map_type: EntityMapType,
+    entity_category: EntityCategory,
 ) -> list[EntWithDocResult]:
     """
     Gets entities for a set of doc ids
@@ -49,7 +49,7 @@ async def get_docs_by_entity_id(
             array_remove(array_agg(patent_id), NULL) as patents,
             array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
             array_remove(array_agg(trial_id), NULL) as trials
-        FROM {entity_map_type.value} -- intervenable or indicatable
+        FROM {entity_category.value} -- intervenable or indicatable
         WHERE (
             patent_id = ANY($1)
             OR regulatory_approval_id = ANY($2)
@@ -114,14 +114,14 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     )
 
 
-async def _search(p: DocumentSearchParams) -> list[Entity]:
+async def _search(p: EntitySearchParams) -> list[Entity]:
     """
     Internal search for documents grouped by entity
     """
     start = time.monotonic()
 
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
-    docs_by_type = await get_matching_docs(p)
+    docs_by_type = await get_matching_docs(DocumentSearchParams.parse(p))
 
     doc_id_map = {k: list(v.keys()) for k, v in docs_by_type.items()}
 
@@ -130,7 +130,7 @@ async def _search(p: DocumentSearchParams) -> list[Entity]:
         doc_id_map,
         TermField.category_rollup,
         TermField.instance_rollup,
-        EntityMapType.intervention,
+        p.entity_category,
     )
 
     grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
@@ -204,7 +204,7 @@ async def search(p: EntitySearchParams) -> list[Entity]:
     """
     Search for documents, grouped by entity
     """
-    search_criteria = DocumentSearchParams.parse(p)
+    search_criteria = EntitySearchParams.parse(p)
     key = get_id(
         {
             **search_criteria.__dict__,

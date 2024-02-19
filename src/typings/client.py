@@ -6,7 +6,7 @@ from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 from constants.patents import DEFAULT_PATENT_K
 from typings.documents.common import DocType
 
-from .documents.common import EntityMapType, TermField
+from .documents.common import EntityCategory, TermField
 
 
 QueryType = Literal["AND", "OR"]
@@ -132,16 +132,16 @@ class TrialSearchParams(DocumentSearchParams):
 
 class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
-        EntityMapType.intervention
+    entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
+        EntityCategory.intervention
     )
-    include: Annotated[None, Field()] = None
+    include: Annotated[None | dict, Field()] = None
 
-    @field_validator("entity_map_type", mode="before")
-    def entity_map_type_from_string(cls, v):
-        if isinstance(v, EntityMapType):
+    @field_validator("entity_category", mode="before")
+    def entity_category_from_string(cls, v):
+        if isinstance(v, EntityCategory):
             return v
-        return EntityMapType(v)
+        return EntityCategory[v]
 
 
 class DocumentCharacteristicParams(DocumentSearchParams):
