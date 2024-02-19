@@ -4,7 +4,7 @@ from .constants import DOC_CLIENT_LOOKUP
 from .patents import (
     patents_client as patent_client,
     search as patent_search,
-    find_companies,
+    find_companies_semantically,
 )
 from .trials import search as trial_search
 
@@ -12,7 +12,7 @@ __all__ = [
     "DOC_CLIENT_LOOKUP",
     "approval_search",
     "entity_search",
-    "find_companies",
+    "find_companies_semantically",
     "patent_client",
     "patent_search",
     "trial_search",
