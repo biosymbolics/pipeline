@@ -49,6 +49,11 @@ SUBSTITUTIONS = {
     "forms?": "",
     "formulations?": "",
     "products?": "",
+    "refactory": "",  # e.g. refractory sarcoidosis
+    "recurrent": "",
+    "severe": "",
+    "mild": "",
+    "progressive": "",
 }
 
 

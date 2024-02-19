@@ -146,7 +146,7 @@ def get_fields(
     raise ValueError("No companies or description")
 
 
-async def find_companies(p: CompanyFinderParams) -> FindCompanyResult:
+async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResult:
     """
     A specific method to find potential buyers for IP / companies
 
@@ -168,8 +168,8 @@ async def find_companies(p: CompanyFinderParams) -> FindCompanyResult:
     else:
         description = p.description
 
-    vector = await get_vector(description, p.companies)
-    fields = get_fields(p.companies, description, vector)
+    vector = await get_vector(description, p.similar_companies)
+    fields = get_fields(p.similar_companies, description, vector)
 
     query = rf"""
         select {', '.join(fields)}

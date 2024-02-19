@@ -6,7 +6,7 @@ from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 from constants.patents import DEFAULT_PATENT_K
 from typings.documents.common import DocType
 
-from .documents.common import EntityMapType, TermField
+from .documents.common import EntityCategory, TermField
 
 
 QueryType = Literal["AND", "OR"]
@@ -130,18 +130,18 @@ class TrialSearchParams(DocumentSearchParams):
     )
 
 
-class AssetSearchParams(PatentSearchParams):
+class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
-        EntityMapType.intervention
+    entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
+        EntityCategory.intervention
     )
-    include: Annotated[None, Field()] = None
+    include: Annotated[None | dict, Field()] = None
 
-    @field_validator("entity_map_type", mode="before")
-    def entity_map_type_from_string(cls, v):
-        if isinstance(v, EntityMapType):
+    @field_validator("entity_category", mode="before")
+    def entity_category_from_string(cls, v):
+        if isinstance(v, EntityCategory):
             return v
-        return EntityMapType(v)
+        return EntityCategory[v]
 
 
 class DocumentCharacteristicParams(DocumentSearchParams):
@@ -160,16 +160,16 @@ class CompanyFinderParams(BaseModel):
     """
 
     description: Annotated[str | None, Field(validate_default=True)] = None
-    companies: Annotated[list[str], Field(validate_default=True)] = []
+    similar_companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
 
-    @field_validator("companies", mode="before")
-    def companies_from_string(cls, v):
+    @field_validator("similar_companies", mode="before")
+    def similar_companies_from_string(cls, v):
         if isinstance(v, list):
             return v
-        companies = [t.strip() for t in (v.split(";") if v else [])]
-        return companies
+        similar_companies = [t.strip() for t in (v.split(";") if v else [])]
+        return similar_companies
 
 
 AutocompleteType = Literal["entity", "owner"]

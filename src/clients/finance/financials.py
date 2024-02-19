@@ -18,8 +18,8 @@ STD = "ShortLongTermDebt"
 LTD = "LongTermDebt"
 ND = "NetDebt"
 TD = "TotalDebt"
-CA = "CurrentAssets"
-TA = "TotalAssets"
+CA = "CurrentEntitys"
+TA = "TotalEntitys"
 TSE = "StockholdersEquity"
 CL = "CurrentLiabilities"
 TL = "TotalLiabilities"
@@ -102,16 +102,16 @@ class CompanyFinancialExtractor(StockPerformance):
     @property
     def shareholders_equity(self) -> float | None:
         """
-        Shareholders equity  = total assets - total liabilities
+        Shareholders equity  = total entities - total liabilities
         """
         se = self.get_value("balance_sheet", TSE)
         calc_se = None
 
-        total_assets = self.get_value("balance_sheet", TA)
+        total_entities = self.get_value("balance_sheet", TA)
         total_liabilities = self.get_value("balance_sheet", TL)
 
-        if total_assets is not None and total_liabilities is not None:
-            calc_se = total_assets - total_liabilities
+        if total_entities is not None and total_liabilities is not None:
+            calc_se = total_entities - total_liabilities
             if se is not None and se != calc_se:
                 logger.warning(
                     "Shareholders equity mismatch for %s: se %s != calc_se %s",
@@ -279,19 +279,19 @@ class CompanyFinancialExtractor(StockPerformance):
     @property
     def current_ratio(self) -> float | None:
         """
-        CR = current_assets / current_liabilities
+        CR = current_entities / current_liabilities
         """
-        current_assets = self.get_value("balance_sheet", CA)
+        current_entities = self.get_value("balance_sheet", CA)
         current_liabilities = self.get_value("balance_sheet", CL)
 
         if (
-            current_assets is None
+            current_entities is None
             or current_liabilities is None
             or current_liabilities == 0
         ):
             return None
 
-        return round(current_assets / current_liabilities, SIG_DIGITS)
+        return round(current_entities / current_liabilities, SIG_DIGITS)
 
     @property
     def debt_equity_ratio(self) -> float | None:

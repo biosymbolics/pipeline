@@ -1,5 +1,5 @@
 """
-Asset client
+Entity client
 """
 
 from dataclasses import dataclass

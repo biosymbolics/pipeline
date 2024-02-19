@@ -14,13 +14,13 @@ class TermField(Enum):
     category_rollup = "category_rollup"
 
 
-# TODO: arcane name
-class EntityMapType(Enum):
+class EntityCategory(Enum):
     intervention = "intervenable"
     indication = "indicatable"
+    owner = "ownable"
 
 
-ENTITY_MAP_TABLES = [t.value for t in EntityMapType]
+ENTITY_MAP_TABLES = [t.value for t in EntityCategory]
 
 
 ENTITY_TYPE_MAP = BiomedicalEntityType.__members__

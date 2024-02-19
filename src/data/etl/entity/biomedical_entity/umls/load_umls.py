@@ -183,33 +183,40 @@ class UmlsLoader:
                 arr text[];
             begin
                 arr := regexp_split_to_array(str, '[^[:alnum:]]+');
-                for i in 1 .. cardinality(arr)- n+ 1 loop
+                for i in 1 .. cardinality(arr)-n+1 loop
                     return next array_to_string(arr[i : i+n-1], ' ');
                 end loop;
             end $$;
         """
+        # TODO: remove s, dash, and presense of non-distinguishing words like "receptor", "gene" and "antibody"
         await client.execute_raw(create_fun_query)
         query = """
-            UPDATE umls_graph set relationship='isa'
+            UPDATE umls_graph SET relationship='isa'
             FROM umls head_umls
-            where head_id=head_umls.id
-            and relationship=''
-            and (
-                (select array_agg(word_ngrams) from word_ngrams(tail_name, 1)) && head_umls.synonyms
+            WHERE head_id=head_umls.id
+            AND relationship=''
+            AND (
+                (SELECT array_agg(word_ngrams) FROM word_ngrams(tail_name, 1)) && head_umls.synonyms
                 OR
-                (select array_agg(word_ngrams) from word_ngrams(tail_name, 2)) && head_umls.synonyms
+                (SELECT array_agg(word_ngrams) FROM word_ngrams(tail_name, 2)) && head_umls.synonyms
                 OR
-                (select array_agg(word_ngrams) from word_ngrams(tail_name, 3)) && head_umls.synonyms
+                (SELECT array_agg(word_ngrams) FROM word_ngrams(tail_name, 3)) && head_umls.synonyms
             )
             and head_id<>tail_id
-            AND NOT EXISTS (select 1 from umls_graph where umls_graph.relationship='isa' and umls_graph.tail_id=tail_id limit 1)
+            AND NOT EXISTS (
+                SELECT 1 FROM umls_graph
+                WHERE umls_graph.relationship='isa'
+                AND umls_graph.tail_id=tail_id
+                LIMIT 1
+            )
         """
         await client.execute_raw(query)
 
     @staticmethod
     async def remove_duplicates():
         """
-        Remove duplicate UMLS records (based on synonyms)
+        Make certain duplicate UMLS records unavailable for rollup
+        (based on synonyms)
 
         TODO
         - cytokine receptor gene -> cytokine
@@ -226,7 +233,7 @@ class UmlsLoader:
                     WHERE 'T116'=ANY(type_ids)
                     GROUP BY synonym having count(*) > 1
                 )
-            );
+            )
         """
         client = await prisma_client(600)
         await client.execute_raw(query)

@@ -57,11 +57,22 @@ UMLS_WORD_OVERRIDES = {
     "transporters": "C4722064",  # https://uts.nlm.nih.gov/uts/umls/concept/C4722064
     "ch24h": "C0769789",  # cholesterol 24-hydroxylase
     "agonism": "C2987634",  # agonist
+    "sleep initiation and maintenance disorders": "C0851578",
+    "hiv/aids": "C0001175",
     # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1420817": ["light"],
+    "C0011209": ["delivery"],
+    "C1416525": ["alagille syndrome"],
+    "C5433528": ["n protein", "protein n"],
+    "C1421478": ["wiskott-aldrich syndrome"],
+    "C3469826": ["post"],
+    "C3812627": ["spasm"],
+    "C1419736": ["scar"],
     "C1448132": ["ir"],
+    "C1367460": ["warts"],
     "C1843354": ["base"],  # "bpifa4p",  # matches base
     "C1427122": ["tube"],  # "tube1",  # matches tube
     "C1823381": ["hole"],  # TMEM121 - hole
@@ -119,6 +130,15 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C0171406": ["complex i"],  # NADH Dehydrogenase
     "C0687133": ["interactions"],
     "C2231143": ["multiple uri"],
+    "C0031237": ["pertussis"],
+    "C1334103": ["allergic rhinitis"],
+    "C0085113": [
+        "neurofibromatosis",
+        "watson disease",
+        "on recklinghausen disease",
+    ],
+    "C1417326": ["b1"],
+    "C5779639": ["s. aureus protein a"],
 }
 
 UMLS_COMMON_BASES = {
@@ -140,10 +160,12 @@ UMLS_COMMON_BASES = {
     "C0014442": "enzymes",
     "C0033684": "proteins",
     "C0017337": "genes",
+    "C1517486": "gene expression process",
     "C0007634": "cells",
     "C0001128": "acids",
     "C0002520": "amino acids",
     "C0034788": "receptor, antigen",
+    "C1148575": "antigen binding",
     "C0003320": "antigens",
     "C0035668": "rna",
     "C0012854": "dna",
@@ -160,6 +182,11 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0456981": "specific antigen",
+    "C5238790": "medication for kawasaki disease",
+    "C0810005": "Congestive heart failure; nonhypertensive",
+    "C2697310": "SARCOIDOSIS, SUSCEPTIBILITY TO, 1",
+    "C0039082": "syndrome",
     "C0009812": "constitutional symptom",
     "C0678661": "biological control",
     "C0178499": "base",
@@ -285,7 +312,7 @@ UMLS_NAME_SUPPRESSIONS = [
     "category",  # https://uts.nlm.nih.gov/uts/umls/concept/C1709248
     "preparations",  # https://uts.nlm.nih.gov/uts/umls/concept/C2267085
     "other",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C3540010
-    "and",
+    "and",  # bad for https://uts.nlm.nih.gov/uts/umls/concept/C0021603
     "or",
     "by",  # https://uts.nlm.nih.gov/uts/umls/concept/C0682899
     "and/or",  # e.g. https://uts.nlm.nih.gov/uts/umls/concept/C1276307
@@ -308,6 +335,9 @@ UMLS_NAME_SUPPRESSIONS = [
     "form",
     "wt",  # wt allele
     "consent",
+    "reason",  # https://uts.nlm.nih.gov/uts/umls/concept/C0940957
+    "unusual",  # C5139132
+    "non-neoplastic",  # e.g. non-neoplastic retinal disorder
 ]
 
 

@@ -19,7 +19,7 @@ OWNERS_LIMIT = 10
 
 
 @dataclass(frozen=True)
-class AssetActivity(Dataclass):
+class EntityActivity(Dataclass):
     # id lists are too big
     patents: int
     regulatory_approvals: int
@@ -27,13 +27,13 @@ class AssetActivity(Dataclass):
     year: int
 
 
-class Asset(ResultBase):
+class Entity(ResultBase):
     activity: list[int]
-    detailed_activity: list[AssetActivity]
+    detailed_activity: list[EntityActivity]
     average_trial_dropout: float
     average_trial_duration: int
     average_trial_enrollment: int
-    children: list["Asset"]
+    children: list["Entity"]
     id: str
     maybe_available_count: int
     maybe_available_ids: list[str]
@@ -57,37 +57,37 @@ class Asset(ResultBase):
         most_recent_trial: dict | None,
         children: list[dict],
         **kwargs: Any
-    ) -> "Asset":
+    ) -> "Entity":
         """
         Load from storage
         """
-        asset = Asset(
+        entity = Entity(
             most_recent_patent=(
                 ScoredPatent(**most_recent_patent) if most_recent_patent else None
             ),
             most_recent_trial=(
                 ScoredTrial(**most_recent_trial) if most_recent_trial else None
             ),
-            children=[Asset.load(**c) for c in children],
+            children=[Entity.load(**c) for c in children],
             **kwargs
         )
-        return asset
+        return entity
 
     @classmethod
     def create(
         cls,
         id: str,
         name: str,
-        children: list["Asset"],
+        children: list["Entity"],
         end_year: int,
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         start_year: int,
         trials: list[ScoredTrial],
         is_child: bool = False,
-    ) -> "Asset":
+    ) -> "Entity":
         maybe_available_ids = cls.get_maybe_available_ids(patents)
-        return Asset(
+        return Entity(
             id=id,
             name=name,
             activity=(
@@ -231,7 +231,7 @@ class Asset(ResultBase):
         patents: list[ScoredPatent],
         regulatory_approvals: list[ScoredRegulatoryApproval],
         trials: list[ScoredTrial],
-    ) -> list[AssetActivity]:
+    ) -> list[EntityActivity]:
         """
         Detailed activity over time
 
@@ -255,7 +255,7 @@ class Asset(ResultBase):
         )
 
         return [
-            AssetActivity(
+            EntityActivity(
                 year=y,
                 patents=len([p.id for p in patent_map.get(y, [])]),
                 regulatory_approvals=len(
