@@ -1,26 +1,25 @@
 """
-Asset client
+Entity client
 """
 
 import asyncio
 from functools import partial
 import time
 from typing import Mapping
-from prisma import Prisma
 from pydash import compact, flatten, group_by
 import logging
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from typings.client import (
-    AssetSearchParams,
+    EntitySearchParams,
     DocumentSearchParams,
     PatentSearchParams as PatentParams,
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
 from typings.documents.common import EntityMapType, TermField
-from typings.assets import Asset
+from typings.entities import Entity
 from utils.string import get_id
 
 from .. import approvals as regulatory_approval_client
@@ -77,7 +76,7 @@ async def get_docs_by_entity_id(
     return ents_with_docs
 
 
-ASSET_DOC_LIMIT = 20000
+ENTITY_DOC_LIMIT = 20000
 
 
 async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
@@ -86,7 +85,7 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     """
 
     common_params = {
-        "limit": ASSET_DOC_LIMIT,
+        "limit": ENTITY_DOC_LIMIT,
         "skip_cache": True,
     }
 
@@ -115,7 +114,7 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     )
 
 
-async def _search(p: DocumentSearchParams) -> list[Asset]:
+async def _search(p: DocumentSearchParams) -> list[Entity]:
     """
     Internal search for documents grouped by entity
     """
@@ -137,12 +136,12 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
     grouped_ents = group_by(ent_with_docs, lambda ewd: ewd.name)
 
     documents_by_entity = [
-        Asset.create(
+        Entity.create(
             id=rollup,
             name=ewds[0].name,
             children=sorted(
                 [
-                    Asset.create(
+                    Entity.create(
                         id=rollup + ewd.child,
                         name=ewd.child,
                         children=[],
@@ -192,16 +191,16 @@ async def _search(p: DocumentSearchParams) -> list[Asset]:
         for rollup, ewds in grouped_ents.items()
     ]
 
-    assets = sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)[
+    entities = sorted(documents_by_entity, key=lambda e: e.record_count, reverse=True)[
         0 : p.limit
     ]
 
     # half the time is in fetching all docs, the other half in transmitting.
-    logger.info("Asset search took %s seconds", round(time.monotonic() - start))
-    return assets
+    logger.info("Entity search took %s seconds", round(time.monotonic() - start))
+    return entities
 
 
-async def search(p: AssetSearchParams) -> list[Asset]:
+async def search(p: EntitySearchParams) -> list[Entity]:
     """
     Search for documents, grouped by entity
     """
@@ -209,18 +208,18 @@ async def search(p: AssetSearchParams) -> list[Asset]:
     key = get_id(
         {
             **search_criteria.__dict__,
-            "api": "assets",
+            "api": "entities",
         }
     )
     search_partial = partial(_search, search_criteria)
 
     # not caching for now; persist to s3 takes too long and it isn't worth.
     if True or p.skip_cache == True:
-        assets = await search_partial()
-        return assets
+        entities = await search_partial()
+        return entities
 
     return await retrieve_with_cache_check(
         search_partial,
         key=key,
-        decode=lambda str_data: [Asset.load(**p) for p in storage_decoder(str_data)],
+        decode=lambda str_data: [Entity.load(**p) for p in storage_decoder(str_data)],
     )

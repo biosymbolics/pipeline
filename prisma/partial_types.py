@@ -59,7 +59,7 @@ Ownable.create_partial(
     "OwnableDto",
     exclude={
         "id",
-        # "canonical_name", # used in assets
+        # "canonical_name", # used in entities
         "instance_rollup",
         "category_rollup",
         "is_primary",

@@ -130,7 +130,7 @@ class TrialSearchParams(DocumentSearchParams):
     )
 
 
-class AssetSearchParams(PatentSearchParams):
+class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
     entity_map_type: Annotated[EntityMapType, Field(validate_default=True)] = (
         EntityMapType.intervention

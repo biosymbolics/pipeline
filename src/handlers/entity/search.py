@@ -6,9 +6,9 @@ import json
 import logging
 import traceback
 
-from clients.documents import asset_search
+from clients.documents import entity_search
 from handlers.utils import handle_async
-from typings.client import AssetSearchParams
+from typings.client import EntitySearchParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 
@@ -18,14 +18,14 @@ logger.setLevel(logging.INFO)
 
 async def _search(raw_event: dict, context):
     """
-    Search assets by terms
+    Search entities by terms
 
     Invocation:
-    - Local: `serverless invoke local --function search-assets --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "query_type": "OR", "limit": 50 }}'`
-    - Remote: `serverless invoke --function search-assets --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "limit": 50 }}'`
-    - API: `curl https://api.biosymbolics.ai/assets/search?terms=asthma`
+    - Local: `serverless invoke local --function search-entities --param='ENV=local' --data='{"queryStringParameters": { "terms":"asthma;melanoma", "query_type": "OR", "limit": 50 }}'`
+    - Remote: `serverless invoke --function search-entities --data='{"queryStringParameters": { "terms":"pulmonary arterial hypertension", "limit": 50 }}'`
+    - API: `curl https://api.biosymbolics.ai/entities/search?terms=asthma`
     """
-    p = AssetSearchParams(
+    p = EntitySearchParams(
         **(raw_event.get("queryStringParameters") or {}),
     )
 
@@ -35,10 +35,10 @@ async def _search(raw_event: dict, context):
         logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching assets for params: %s", p)
+    logger.info("Fetching entities for params: %s", p)
 
     try:
-        assets = await asset_search(p)
+        entities = await entity_search(p)
     except Exception as e:
         message = f"Error searching entities: {e}"
         logger.error(message)
@@ -48,7 +48,7 @@ async def _search(raw_event: dict, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps(assets, cls=DataclassJSONEncoder),
+        "body": json.dumps(entities, cls=DataclassJSONEncoder),
     }
 
 
