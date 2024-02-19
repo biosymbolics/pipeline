@@ -160,6 +160,7 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0009812": "constitutional symptom",
     "C0678661": "biological control",
     "C0178499": "base",
     "C0013216": "pharmacotherapy",
