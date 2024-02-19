@@ -74,15 +74,17 @@ async def load_all(force_update: bool = False):
     await OwnerLoader().copy_all(force_update)
 
     # copy patent data
-    await PatentLoader(document_type="patent").copy_all(force_update)
-
-    # copy data about approvals
-    await RegulatoryApprovalLoader(document_type="regulatory_approval").copy_all(
+    await PatentLoader(document_type="patent", source_db="patents").copy_all(
         force_update
     )
 
+    # copy data about approvals
+    await RegulatoryApprovalLoader(
+        document_type="regulatory_approval", source_db="drugcentral"
+    ).copy_all(force_update)
+
     # copy trial data
-    await TrialLoader(document_type="trial").copy_all(force_update)
+    await TrialLoader(document_type="trial", source_db="aact").copy_all(force_update)
 
     # do final biomedical entity stuff that requires everything else be in place
     await BiomedicalEntityLoader().post_finalize()

@@ -392,6 +392,7 @@ MATCH_RETRY_REWRITES = {
     "ligand": "",
     "targeting": "",
     "penetration": "",
+    "expression": "",
     r"\s{2,}": " ",
 }
 

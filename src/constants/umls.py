@@ -63,7 +63,9 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
-    "C1416525": ["Alagille syndrome"],
+    "C1420817": ["light"],
+    "C0011209": ["delivery"],
+    "C1416525": ["alagille syndrome"],
     "C5433528": ["n protein", "protein n"],
     "C1421478": ["wiskott-aldrich syndrome"],
     "C3469826": ["post"],
@@ -130,11 +132,13 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C2231143": ["multiple uri"],
     "C0031237": ["pertussis"],
     "C1334103": ["allergic rhinitis"],
-    "": [
+    "C0085113": [
         "neurofibromatosis",
         "watson disease",
         "on recklinghausen disease",
-    ],  # nf1 gene
+    ],
+    "C1417326": ["b1"],
+    "C5779639": ["s. aureus protein a"],
 }
 
 UMLS_COMMON_BASES = {
@@ -156,10 +160,12 @@ UMLS_COMMON_BASES = {
     "C0014442": "enzymes",
     "C0033684": "proteins",
     "C0017337": "genes",
+    "C1517486": "gene expression process",
     "C0007634": "cells",
     "C0001128": "acids",
     "C0002520": "amino acids",
     "C0034788": "receptor, antigen",
+    "C1148575": "antigen binding",
     "C0003320": "antigens",
     "C0035668": "rna",
     "C0012854": "dna",
@@ -176,6 +182,7 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0456981": "specific antigen",
     "C5238790": "medication for kawasaki disease",
     "C0810005": "Congestive heart failure; nonhypertensive",
     "C2697310": "SARCOIDOSIS, SUSCEPTIBILITY TO, 1",

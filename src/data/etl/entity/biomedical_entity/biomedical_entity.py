@@ -414,7 +414,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     JOIN _rollups AS instance_rollup ON instance_rollup.child_id=entity.id
                     LEFT JOIN _rollups AS category_rollup ON category_rollup.child_id=instance_rollup.parent_id
                     WHERE {table}.entity_id=entity.id
-                    AND entity.canonical_id NOT IN {tuple(UMLS_COMMON_BASES.keys())}
                 """,
                 # ensure all records have rollups
                 f"""
@@ -426,14 +425,16 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # much faster with temp tables
         initialize_queries = [
             "drop table if exists _rollups",
-            """
+            f"""
+            -- temp table with chosen rollup parent
             CREATE TABLE _rollups AS
                 SELECT
                     etp."B" as child_id,
                     max(id order by is_priority desc) as parent_id,
                     max(name order by is_priority desc) as parent_name
                 FROM _entity_to_parent etp
-                JOIN biomedical_entity ON id=etp."A" -- "A" is parent
+                JOIN biomedical_entity parent_entity ON id=etp."A" -- "A" is parent
+                AND parent_entity.canonical_id NOT IN {tuple(UMLS_COMMON_BASES.keys())}
                 GROUP BY etp."B" -- "B" is child
             """,
             "CREATE INDEX _rollups_child_id on _rollups(child_id)",

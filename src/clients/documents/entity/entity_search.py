@@ -49,13 +49,13 @@ async def get_docs_by_entity_id(
             array_remove(array_agg(patent_id), NULL) as patents,
             array_remove(array_agg(regulatory_approval_id), NULL) as regulatory_approvals,
             array_remove(array_agg(trial_id), NULL) as trials
-        FROM {entity_category.value} -- intervenable or indicatable
+        FROM {entity_category.value} -- intervenable, indicatable or ownable
         WHERE (
             patent_id = ANY($1)
             OR regulatory_approval_id = ANY($2)
             OR trial_id = ANY($3)
         )
-        AND entity_id is not NULL
+        AND {"owner_id IS NOT NULL" if entity_category == EntityCategory.owner else "entity_id IS NOT NULL"}
         AND {rollup_field.name} is not NULL
         AND instance_rollup<>'' -- TODO?
         GROUP BY
