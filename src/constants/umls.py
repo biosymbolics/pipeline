@@ -70,10 +70,13 @@ UMLS_WORD_OVERRIDES = {
     "moiety": "C3641152",
     "moieties": "C3641152",
     "tfrl": "C0108801",
+    "conjugate": "C4704928",
+    "conjugates": "C4704928",
     # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C1412362": ["flap"],
     "C0029896": ["ent diseases", "disease, ent"],
     "C3540026": ["combinations"],
     "C1420817": ["light"],
@@ -158,6 +161,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
 }
 
 UMLS_COMMON_BASES = {
+    "C4704928": "ADC",
     "C2985546": "humanized mab",
     "C0003250": "mab",
     "C0028630": "nucliotide",
