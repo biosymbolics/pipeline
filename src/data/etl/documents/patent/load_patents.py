@@ -291,9 +291,6 @@ class PatentLoader(BaseDocumentEtl):
             handle_result_batch=handle_batch,  # type: ignore
         )
 
-        # copy vectors to patent table
-        await self.copy_vectors()
-
         # create "indicatable" records, those that map approval to a canonical indication
         indicatable_records = await PsqlDatabaseClient(SOURCE_DB).select(
             query=get_mapping_entities_sql(["diseases"])

@@ -100,15 +100,16 @@ model Patent {
 }
 
 model RegulatoryApproval {
-    id               String         @id @unique
+    id               String                      @id @unique
     agency           String
-    applicant_id     Int?           @unique
+    applicant_id     Int?                        @unique
     applicant        Ownable?
     application_type String
     approval_date    DateTime
     indications      Indicatable[]
     interventions    Intervenable[]
     url              String
+    vector           Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
 
     @@index([approval_date], name: "approval_date")
     @@map("regulatory_approval")

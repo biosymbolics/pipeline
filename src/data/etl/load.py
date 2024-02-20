@@ -63,7 +63,7 @@ async def load_all(force_update: bool = False):
         force_update (bool, optional): Whether to update or merely create.
             If update, documents and their relations are first deleted.
     """
-    # # copy umls data
+    # copy umls data
     await UmlsLoader().copy_all()
 
     # copy all biomedical entities (from all doc types)

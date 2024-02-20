@@ -4,7 +4,6 @@ Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 
 from typing import Literal, Sequence
 from prisma.enums import BiomedicalEntityType
-from pydash import group_by
 
 from typings.client import EntityField
 
@@ -26,7 +25,6 @@ UMLS_NAME_OVERRIDES = {
     "C1145667": "Binder",  # https://uts.nlm.nih.gov/uts/umls/concept/C1145667
     "C1420201": "SGLT2",  # otherwise SLC5A2
     "C1505133": "SGLT2",  # otherwise SLC5A2
-    # "C1706082": "Compound",
     "C1550602": "Additive",  # otherwise "Additive (substance)"
     "C1292856": "Stimulator",  # https://uts.nlm.nih.gov/uts/umls/concept/C1292856 Stimulation procedure
     "C0025080": "Device",  # vs "Medical Device"
@@ -38,6 +36,12 @@ UMLS_NAME_OVERRIDES = {
     "C1420809": "BCMA",  # TNFRSF17
     "C3203086": "PD-L1 Protein",
     "C0171406": "NADH Dehydrogenase",
+    "C0596316": "group",
+    "C1254351": "substance",
+    "C0013227": "preparation",
+    "C0599894": "targeting",
+    "C0108801": "tfr1",
+    "C0017262": "expression",
 }
 
 # sets canonical based on (single!) word
@@ -109,7 +113,7 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
     "C1414085": ["dm"],  # DMPK gene
     "C1413365": ["cf"],  # CFTR gene
     "C1421546": ["x3", "x receptor"],  # XPR1 gene
-    "C0015230": ["spots"],
+    "C0015230": ["spots", "rash"],
     "C1420009": ["type", "a4"],  # SGCG gene
     "C0040517": ["ts", "gts"],  # Tourette's syndrome
     "C0004943": ["bd"],  # Behcet Syndrome
@@ -143,10 +147,14 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
         "on recklinghausen disease",
     ],
     "C1417326": ["b1"],
-    "C5779639": ["s. aureus protein a"],
+    "C5779639": ["s. aureus protein a", "staph. protein a"],
+    "C0038164": ["protein a", "a protein"],
 }
 
 UMLS_COMMON_BASES = {
+    "C0017262": "expression",
+    "C1335532": "protein family",
+    "C1547776": "substance",
     "C1704241": "complex",
     "C2324496": "biogenic peptide",
     "C1999216": "inhibitor",  # matches too much! crowds out useful matches, like targets.
@@ -177,6 +185,21 @@ UMLS_COMMON_BASES = {
     "C0005515": "biological factors",
     "C0450442": "agent",
     "C5235658": "targeted therapy agent",
+    "C0009429": "combo",
+    "C1706082": "Compound",
+    "C1550600": "ingredient",  # matches too much
+    "C0596316": "chemical group",
+    "C1963578": "procedure",
+    "C0039082": "syndrome",
+    "C0012634": "disease",  # useless
+    "C1951340": "process",
+    "C1254351": "pharmacological Substance",
+    "C1550602": "additive",
+    "C0013227": "Pharmaceutical Preparations",
+    "C0243072": "derivative",  # useless
+    "C1167622": "binding",
+    "C0008109": "chimera",
+    "C0599894": "cell targeting",
 }
 
 UMLS_NON_COMPOSITE_SUPPRESSION = {
@@ -188,21 +211,19 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 UMLS_CUI_SUPPRESSIONS = {
     "C0280950": "cancer related symptom",
+    "C0009812": "constitutional symptom",
+    "C1457887": "symptom",  # matches too much
     "C0025362": "Mental retardation",
     "C0456981": "specific antigen",
     "C5238790": "medication for kawasaki disease",
     "C0810005": "Congestive heart failure; nonhypertensive",
     "C2697310": "SARCOIDOSIS, SUSCEPTIBILITY TO, 1",
-    "C0039082": "syndrome",
-    "C0009812": "constitutional symptom",
     "C0678661": "biological control",
     "C0178499": "base",
     "C0013216": "pharmacotherapy",
     "C1521826": "protocol agent",
     "C0376315": "manufactured form",
     "C4703569": "urine xenobiotic",  # WTF
-    "C1335532": "protein family",
-    "C1457887": "symptom",  # matches too much
     "C1511130": "biochemical process",
     "C1510464": "protein structure",
     "C4277514": "Tripartite Motif Proteins",
@@ -210,30 +231,18 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0003944": "as if personality",  # matches "as if" too much
     "C0017259": "gene conversion",
     "C1298197": "no tumor invasion",
-    "C1550600": "ingredient",  # matches too much
     "C1704222": "genome encoded entity",
     "C0243083": "associated disease",
     "C3263722": "Traumatic AND/OR non-traumatic injury",
-    "C1706082": "Compound",
-    "C0009429": "combo",
-    "C0596316": "chemical group",
-    "C1547776": "substance",
     "C0991538": "orderable drug form",
     "C1517360": "gem 220",
     "C0007992": "pharmacological phenomenon",
     "C1698899": "solid drug form",
     "C0525067": "laboratory chemicals",
-    "C1550602": "additive",
-    "C1951340": "process",
-    "C0013227": "Pharmaceutical Preparations",
-    "C1963578": "procedure",
-    "C0009429": "combination",
     "C0963641": "cat combination",
-    "C0596316": "chemical group",
     "C5399721": "Receptor Antagonist [APC]",  # prefer C4721408
     "C1173729": "SPES herbal extract",
     "C0233656": "mental condensation",  # matches condensation
-    "C0012634": "disease",  # useless
     "C0012359": "Pathological Dilatation",
     "C0234985": "Mental deterioration",
     "C0000925": "Incised wound",
@@ -246,33 +255,24 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0599156": "Transition Mutation",
     "C1136365": "gene component",  # matches too much stuff
     "C1704681": "gene probe",  # matches 'probe'
-    "C0597357": "receptor",  # TODO: we don't want to suppress this so much as make it unimportant
     "C0243076": "antagonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C4721408
     "C0243192": "agonists",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C2987634
     "C0243077": "inhibitors",  # prefer https://uts.nlm.nih.gov/uts/umls/concept/C1999216
-    "C0243072": "derivative",  # useless
     "C1413336": "cel gene",  # matches cell
     "C0815040": "acidic amino acid",  # matches amino acid
-    "C0008109": "chimera",
     "C0043335": "xenobiotic",
     "C1257890": "population group",  # matches group
     "C0443933": "Sjogren's syndrome B antibody",  # matches monoclonal antibody (not necessary if semantic matching)
-    "C1254351": "pharmacological Substance",
     "C0544791": "Inflammatory fistula",
     "C4085054": "particl",  # matches particle
     "C0596611": "Gene Mutation",
     "C0543419": "Sequela of disorder",
-    "C0033684": "proteins",  # fix ancestory, get rid of this.
-    "C1335532": "protein family",
     "C1148560": "molecular_function",
-    "C0012854": "DNA",  # fix ancestory, get rid of this.
-    "C0450442": "Agent",
     # "C5235658": "Targeted therapy agent",  # maybe re-enable; it has some utility.
     "C0079429": "gene a",
     "C1260969": "ring device",
     "C0282636": "cell respiration",  # matches respiration
     "C0456386": "Medicament",
-    "C1167622": "binding",
     "C0019047": "abnormal hemoglobin",
     "C1516451": "chemical modifier",
     # "C1709058": "modified release dosage form",
@@ -290,7 +290,6 @@ UMLS_CUI_SUPPRESSIONS = {
     "C0439662": "immune",
     "C1514562": "protein domain",
     "C1510464": "protein structure",
-    "C0599894": "cell targeting",
     "C0148445": "enhancin",
     "C0037420": "social interaction",
     "C1301751": "no effect",

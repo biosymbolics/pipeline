@@ -41,7 +41,7 @@ class BaseTrial(Dataclass):
     """
 
     id: str
-    # abstract: str | None
+    abstract: str | None
     acronym: str | None
     arm_count: int
     arm_types: list[str]
