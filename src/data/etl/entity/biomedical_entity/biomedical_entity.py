@@ -351,18 +351,25 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         logger.info("Adding biomedical counts")
         client = await prisma_client(600)
         # add counts to biomedical_entity & owner
-        for table in ENTITY_MAP_TABLES:
-            if table == "ownable":
-                return
 
-            await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
-            await client.execute_raw(
-                f"INSERT INTO temp_count (id, count) SELECT entity_id as id, count(*) FROM {table} GROUP BY entity_id"
-            )
-            await client.execute_raw(
-                "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
-            )
-            await client.execute_raw("DROP TABLE IF EXISTS temp_count;")
+        await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
+        await client.execute_raw(
+            f"""
+                INSERT INTO temp_count (id, count)
+                SELECT s.entity_id as id, count(*) as count
+                FROM (
+                    SELECT entity_id FROM intervenable
+
+                    UNION ALL
+
+                    SELECT entity_id FROM indicatable
+                ) s  GROUP BY s.entity_id
+            """
+        )
+        await client.execute_raw(
+            "UPDATE biomedical_entity ct SET count=temp_count.count FROM temp_count WHERE temp_count.id=ct.id"
+        )
+        await client.execute_raw("DROP TABLE IF EXISTS temp_count;")
 
     @staticmethod
     async def link_to_documents():
