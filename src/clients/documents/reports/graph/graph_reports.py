@@ -26,7 +26,7 @@ logger.setLevel(logging.INFO)
 
 MAX_NODES = 100
 MIN_NODE_DEGREE = 2
-MAX_TAILS = 20
+MAX_TAILS = 50
 MAX_HEADS = 20
 
 
@@ -86,7 +86,6 @@ DOCUMENT_GROUP = "patent"
 
 
 def _apply_limit(df: pl.DataFrame) -> list[AggregateDocumentRelationship]:
-    # get top tail (i.e. UMLS terms represented across as many of the head dimension as possible)
     top_tails = (
         df.group_by("tail")
         .agg(pl.count("head").alias("head_count"))
@@ -203,7 +202,7 @@ async def _aggregate_document_entity_relationships(
         AND head.{p.doc_type.name}_id = tail.{p.doc_type.name}_id
         AND head.type = ANY($2::"BiomedicalEntityType"[])
         AND tail.type = ANY($3::"BiomedicalEntityType"[])
-        GROUP BY head.{p.doc_type.name}_id, head.category_rollup, tail.category_rollup
+        GROUP BY head.category_rollup, tail.category_rollup
         ORDER BY count(*) DESC
     """
     start = time.monotonic()
