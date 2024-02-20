@@ -26,8 +26,8 @@ logger.setLevel(logging.INFO)
 
 MAX_NODES = 100
 MIN_NODE_DEGREE = 2
-MAX_TAILS = 50
-MAX_HEADS = 20
+MAX_TAILS = 30
+MAX_HEADS = 15
 
 
 # IMPORTANT: these only make sense if "head" is a *parent* and not a child of the document.
@@ -191,7 +191,7 @@ async def _aggregate_document_entity_relationships(
         SELECT
             head.category_rollup head,
             tail.category_rollup tail,
-            count(*) AS count,
+            count(distinct head.{p.doc_type.name}_id) AS count,
             array_agg(distinct head.{p.doc_type.name}_id) AS documents
         FROM
             {SEARCH_TABLE} search_table,

@@ -76,6 +76,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C0027627": ["secondary"],
     "C1412362": ["flap"],
     "C0029896": ["ent diseases", "disease, ent"],
     "C3540026": ["combinations"],
