@@ -66,6 +66,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C0029896": ["ent diseases", "disease, ent"],
     "C3540026": ["combinations"],
     "C1420817": ["light"],
     "C0011209": ["delivery"],

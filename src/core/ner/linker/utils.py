@@ -393,6 +393,7 @@ MATCH_RETRY_REWRITES = {
     "targeting": "",
     "penetration": "",
     "expression": "",
+    "diseases?": "disorder",
     r"\s{2,}": " ",
 }
 
