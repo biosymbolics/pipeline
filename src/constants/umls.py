@@ -2,9 +2,11 @@
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
 
-from typing import Literal
+from typing import Literal, Sequence
 from prisma.enums import BiomedicalEntityType
 from pydash import group_by
+
+from typings.client import EntityField
 
 LegacyDomainType = Literal[
     "compounds",
@@ -64,6 +66,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C3540026": ["combinations"],
     "C1420817": ["light"],
     "C0011209": ["delivery"],
     "C1416525": ["alagille syndrome"],
@@ -183,6 +186,8 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0280950": "cancer related symptom",
+    "C0025362": "Mental retardation",
     "C0456981": "specific antigen",
     "C5238790": "medication for kawasaki disease",
     "C0810005": "Congestive heart failure; nonhypertensive",
@@ -682,8 +687,8 @@ PERMITTED_ANCESTOR_TYPES = list(
 )
 
 
-CATEGORY_TO_ENTITY_TYPES = {
-    "intervention": [
+CATEGORY_TO_ENTITY_TYPES: dict[EntityField, Sequence[BiomedicalEntityType]] = {
+    "interventions": [
         BiomedicalEntityType.BIOLOGIC,
         BiomedicalEntityType.COMPOUND,
         BiomedicalEntityType.DEVICE,
@@ -691,12 +696,10 @@ CATEGORY_TO_ENTITY_TYPES = {
         BiomedicalEntityType.MECHANISM,
         BiomedicalEntityType.PROCEDURE,
     ],
-    "disease": [BiomedicalEntityType.DISEASE],
-    "diagnostic": [BiomedicalEntityType.DIAGNOSTIC],
-    "research": [BiomedicalEntityType.RESEARCH],
+    "indications": [BiomedicalEntityType.DISEASE],
 }
 
-ENTITY_TYPE_TO_CATEGORY = {
+ENTITY_TYPE_TO_CATEGORY: dict[BiomedicalEntityType, EntityField] = {
     k: v for v, ks in CATEGORY_TO_ENTITY_TYPES.items() for k in ks
 }
 

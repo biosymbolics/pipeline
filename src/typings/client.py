@@ -144,7 +144,7 @@ class EntitySearchParams(PatentSearchParams):
         return EntityCategory[v]
 
 
-HeadField = Literal["interventions", "indications", "owner"]
+EntityField = Literal["interventions", "indications", "owner"]
 
 
 class DocumentCharacteristicParams(DocumentSearchParams):
@@ -153,7 +153,8 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     """
 
     doc_type: DocType = DocType.patent
-    head_field: HeadField
+    head_field: EntityField
+    tail_field: EntityField
     include: Annotated[dict, Field()] = {}
 
 

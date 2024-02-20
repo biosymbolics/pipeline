@@ -5,11 +5,9 @@ Patent graph reports
 import time
 from typing import Sequence
 import logging
-from prisma import Prisma
 import polars as pl
 from prisma.enums import BiomedicalEntityType
 
-from clients.documents.constants import DOC_CLIENT_LOOKUP
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from constants.core import SEARCH_TABLE
@@ -28,7 +26,7 @@ logger.setLevel(logging.INFO)
 
 MAX_NODES = 100
 MIN_NODE_DEGREE = 2
-MAX_TAILS = 50
+MAX_TAILS = 20
 MAX_HEADS = 20
 
 
@@ -85,6 +83,29 @@ RELATIONSHIPS_OF_INTEREST = [
 
 ENTITY_GROUP = "entity"
 DOCUMENT_GROUP = "patent"
+
+
+def _apply_limit(df: pl.DataFrame) -> list[AggregateDocumentRelationship]:
+    # get top tail (i.e. UMLS terms represented across as many of the head dimension as possible)
+    top_tails = (
+        df.group_by("tail")
+        .agg(pl.count("head").alias("head_count"))
+        .sort(pl.col("head_count"), descending=True)
+        .limit(MAX_TAILS)
+    )
+    top_heads = (
+        df.group_by("head")
+        .agg(pl.count("tail").alias("tail_count"))
+        .sort(pl.col("tail_count"), descending=True)
+        .limit(MAX_HEADS)
+    )
+    top_records = (
+        df.join(top_tails, on="tail", how="inner")
+        .join(top_heads, on="head", how="inner")
+        .drop(["head_count", "tail_count"])
+        .to_dicts()
+    )
+    return [AggregateDocumentRelationship(**tr) for tr in top_records]
 
 
 async def _aggregate_document_umls_relationships(
@@ -149,27 +170,8 @@ async def _aggregate_document_umls_relationships(
     async with prisma_context(300) as db:
         results = await db.query_raw(sql)
 
-    df = pl.DataFrame(results)
-
     # get top tail (i.e. UMLS terms represented across as many of the head dimension as possible)
-    top_tails = (
-        df.group_by("tail")
-        .agg(pl.count("head").alias("head_count"))
-        .sort(pl.col("head_count"), descending=True)
-        .limit(MAX_TAILS)
-    )
-    top_heads = (
-        df.group_by("head")
-        .agg(pl.count("tail").alias("tail_count"))
-        .sort(pl.col("tail_count"), descending=True)
-        .limit(MAX_HEADS)
-    )
-    top_records = (
-        df.join(top_tails, on="tail", how="inner")
-        .join(top_heads, on="head", how="inner")
-        .drop(["head_count", "tail_count"])
-        .to_dicts()
-    )
+    top_records = _apply_limit(pl.DataFrame(results))
 
     logger.info(
         "Generated characteristics report (%s records) in %s seconds",
@@ -177,11 +179,10 @@ async def _aggregate_document_umls_relationships(
         round(time.monotonic() - start),
     )
 
-    return [AggregateDocumentRelationship(**tr) for tr in top_records]
+    return top_records
 
 
 async def _aggregate_document_entity_relationships(
-    ids: Sequence[str],
     p: DocumentCharacteristicParams,
 ) -> list[AggregateDocumentRelationship]:
     """
@@ -192,26 +193,41 @@ async def _aggregate_document_entity_relationships(
             head.category_rollup head,
             tail.category_rollup tail,
             count(*) AS count,
-            array_agg(distinct head.{p.doc_type}_id) AS documents
-        FROM {SEARCH_TABLE} head, {SEARCH_TABLE} tail
-        WHERE head.{p.doc_type}_id = ANY(ARRAY{ids})
-        AND head.{p.doc_type}_id = tail.{p.doc_type}_id
-        AND head.type in {tuple(CATEGORY_TO_ENTITY_TYPES[p.head_field])}
-        AND tail.type in {tuple(CATEGORY_TO_ENTITY_TYPES[p.tail_field])}
-        GROUP BY head.{p.doc_type}_id, head.category_rollup, tail.category_rollup
+            array_agg(distinct head.{p.doc_type.name}_id) AS documents
+        FROM
+            {SEARCH_TABLE} search_table,
+            {SEARCH_TABLE} head,
+            {SEARCH_TABLE} tail
+        WHERE search_table.search @@ plainto_tsquery('english', $1)
+        AND search_table.{p.doc_type.name}_id=head.{p.doc_type.name}_id
+        AND head.{p.doc_type.name}_id = tail.{p.doc_type.name}_id
+        AND head.type = ANY($2::"BiomedicalEntityType"[])
+        AND tail.type = ANY($3::"BiomedicalEntityType"[])
+        GROUP BY head.{p.doc_type.name}_id, head.category_rollup, tail.category_rollup
         ORDER BY count(*) DESC
     """
     start = time.monotonic()
+
+    # TODO - AND/OR; description
+    term_query = " ".join(p.terms)
+
     async with prisma_context(300) as db:
-        results = await db.query_raw(sql)
+        results = await db.query_raw(
+            sql,
+            term_query,
+            CATEGORY_TO_ENTITY_TYPES[p.head_field],
+            CATEGORY_TO_ENTITY_TYPES[p.tail_field],
+        )
+
+    top_records = _apply_limit(pl.DataFrame(results))
 
     logger.info(
         "Generated entity relationships report (%s records) in %s seconds",
-        len(results),
+        len(top_records),
         round(time.monotonic() - start),
     )
 
-    return [AggregateDocumentRelationship(**r) for r in results]
+    return top_records
 
 
 async def aggregate_document_relationships(
@@ -222,24 +238,13 @@ async def aggregate_document_relationships(
     """
 
     async def _run_report() -> list[AggregateDocumentRelationship]:
-        # get the documents
-        documents = await DOC_CLIENT_LOOKUP[p.doc_type].search(p)
-
-        if len(documents) == 0:
-            logging.info("No documents found for terms: %s", p.terms)
-            return []
-
-        # do the report aggregation
-        # TODO: switch to direct search
-        return await _aggregate_document_entity_relationships(
-            ids=[d.id for d in documents], p=p
-        )
+        return await _aggregate_document_entity_relationships(p=p)
 
     if p.skip_cache == True:
         patents = await _run_report()
         return patents
 
-    key = get_id({**p.__dict__, "api": "document_relationships"})
+    key = get_id({**p.model_dump(), "api": "document_relationships"})
 
     return await retrieve_with_cache_check(
         _run_report,
