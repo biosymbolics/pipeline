@@ -223,6 +223,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             batch_size=1000,
         )
 
+        await BiomedicalEntityEtl.pre_finalize()
+
     @staticmethod
     async def _update_search_index():
         """

@@ -4,6 +4,7 @@ Handler for patent graph reports
 
 import json
 import logging
+import traceback
 
 from clients.documents.reports.graph import aggregate_document_relationships
 from handlers.utils import handle_async
@@ -42,6 +43,7 @@ async def _document_characteristics(raw_event: dict, context):
     except Exception as e:
         message = f"Error generating patent reports: {e}"
         logger.error(message)
+        traceback.print_exc()
         return {"statusCode": 500, "body": message}
 
     return {

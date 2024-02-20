@@ -292,4 +292,5 @@ class OwnerEtl(BaseEntityEtl):
         await OwnerEtl.link_to_documents()
         await OwnerEtl.add_counts()
         await OwnerEtl._update_search_index()
+        await OwnerEtl.add_vectors()
         await OwnerEtl.checksum()

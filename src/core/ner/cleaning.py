@@ -54,6 +54,10 @@ SUBSTITUTIONS = {
     "severe": "",
     "mild": "",
     "progressive": "",
+    "capable": "",
+    "cycling": "",
+    "binding": "",
+    "selective": "",
 }
 
 

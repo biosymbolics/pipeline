@@ -144,7 +144,7 @@ class EntitySearchParams(PatentSearchParams):
         return EntityCategory[v]
 
 
-EntityField = Literal["interventions", "indications", "owner"]
+EntityField = Literal["interventions", "indications", "owners"]
 
 
 class DocumentCharacteristicParams(DocumentSearchParams):

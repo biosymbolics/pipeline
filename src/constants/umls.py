@@ -42,6 +42,7 @@ UMLS_NAME_OVERRIDES = {
     "C0599894": "targeting",
     "C0108801": "tfr1",
     "C0017262": "expression",
+    "C3641152": "moiety",
 }
 
 # sets canonical based on (single!) word
@@ -66,6 +67,9 @@ UMLS_WORD_OVERRIDES = {
     "agonism": "C2987634",  # agonist
     "sleep initiation and maintenance disorders": "C0851578",
     "hiv/aids": "C0001175",
+    "moiety": "C3641152",
+    "moieties": "C3641152",
+    "tfrl": "C0108801",
     # "immunoproteasome inhibitor": "C1443643", # Proteasome inhibitor
 }
 
@@ -97,12 +101,14 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
         "cells le",
         "cell le",
     ],
+    "C0432616": ["anti a"],
     "C0242781": ["transmission"],  # "disease transmission"
     "C0010124": ["compound b", "b compounds"],  # "corticosterone"
     "C1421222": ["connectin"],  # TTN gene
     "C1418824": ["inhibitor 1", "i1"],  # PPP1R1A
     "C0019167": ["e antigens", "e antigen", "antigen e"],  # "Hepatitis B e Antigens
     "C1448132": ["ir"],
+    "C0524983": ["g cell"],
     "C0666364": ["odf"],  # TRANCE protein
     "C0022709": ["ace"],  # Peptidyl-Dipeptidase A
     "C5441529": ["er"],  # Estrogen Receptor Family, human
@@ -152,6 +158,12 @@ UMLS_CUI_ALIAS_SUPPRESSIONS = {
 }
 
 UMLS_COMMON_BASES = {
+    "C2985546": "humanized mab",
+    "C0003250": "mab",
+    "C0028630": "nucliotide",
+    "C0032550": "polynucleotide",
+    "C0599013": "Aptamer",
+    "C3641152": "moiety",
     "C0017262": "expression",
     "C1335532": "protein family",
     "C1547776": "substance",
@@ -697,6 +709,7 @@ CATEGORY_TO_ENTITY_TYPES: dict[EntityField, Sequence[BiomedicalEntityType]] = {
         BiomedicalEntityType.PROCEDURE,
     ],
     "indications": [BiomedicalEntityType.DISEASE],
+    "owners": [BiomedicalEntityType.OWNER],
 }
 
 ENTITY_TYPE_TO_CATEGORY: dict[BiomedicalEntityType, EntityField] = {
