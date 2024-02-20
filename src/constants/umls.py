@@ -4,6 +4,7 @@ Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 
 from typing import Literal
 from prisma.enums import BiomedicalEntityType
+from pydash import group_by
 
 LegacyDomainType = Literal[
     "compounds",
@@ -615,6 +616,7 @@ ENTITY_TO_UMLS_TYPE = {
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
 
+
 # not used yet
 NAME_TO_UMLS_TYPE = {
     "dosage form": BiomedicalEntityType.DOSAGE_FORM,
@@ -625,18 +627,6 @@ NAME_TO_UMLS_TYPE = {
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
-
-
-NER_ENTITY_TYPES = frozenset(
-    [
-        "biologics",
-        "compounds",
-        "devices",
-        "diseases",
-        "mechanisms",
-        "procedures",
-    ]
-)
 
 
 CANDIDATE_TYPE_WEIGHT_MAP = {
@@ -689,4 +679,35 @@ PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
 
 PERMITTED_ANCESTOR_TYPES = list(
     set([k for v in PREFERRED_ANCESTOR_TYPE_MAP.values() for k in v.keys()])
+)
+
+
+CATEGORY_TO_ENTITY_TYPES = {
+    "intervention": [
+        BiomedicalEntityType.BIOLOGIC,
+        BiomedicalEntityType.COMPOUND,
+        BiomedicalEntityType.DEVICE,
+        BiomedicalEntityType.DOSAGE_FORM,
+        BiomedicalEntityType.MECHANISM,
+        BiomedicalEntityType.PROCEDURE,
+    ],
+    "disease": [BiomedicalEntityType.DISEASE],
+    "diagnostic": [BiomedicalEntityType.DIAGNOSTIC],
+    "research": [BiomedicalEntityType.RESEARCH],
+}
+
+ENTITY_TYPE_TO_CATEGORY = {
+    k: v for v, ks in CATEGORY_TO_ENTITY_TYPES.items() for k in ks
+}
+
+
+NER_ENTITY_TYPES = frozenset(
+    [
+        "biologics",
+        "compounds",
+        "devices",
+        "diseases",
+        "mechanisms",
+        "procedures",
+    ]
 )

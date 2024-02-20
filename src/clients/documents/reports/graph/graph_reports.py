@@ -13,6 +13,7 @@ from clients.documents.constants import DOC_CLIENT_LOOKUP
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from constants.core import SEARCH_TABLE
+from constants.umls import CATEGORY_TO_ENTITY_TYPES
 from typings import DocType
 from typings.client import DocumentCharacteristicParams
 from utils.string import get_id
@@ -86,7 +87,7 @@ ENTITY_GROUP = "entity"
 DOCUMENT_GROUP = "patent"
 
 
-async def _aggregate_document_relationships(
+async def _aggregate_document_umls_relationships(
     ids: Sequence[str],
     head_field: str,
     entity_types: Sequence[BiomedicalEntityType] | None,
@@ -115,7 +116,7 @@ async def _aggregate_document_relationships(
         -- document to entity relationships
         SELECT
             {head_sql} as head,
-            umls.name as concept,
+            umls.name as tail,
             count(*) as count,
             array_agg(distinct {doc_type.name}.id) as documents
         FROM {doc_type.name}
@@ -124,14 +125,14 @@ async def _aggregate_document_relationships(
             JOIN _entity_to_umls as etu ON etu."A"={SEARCH_TABLE}.entity_id
             JOIN umls ON umls.id = etu."B"
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
-        GROUP BY {head_sql}, concept
+        GROUP BY {head_sql}, tail
 
         UNION ALL
 
         -- entity to entity relationships
         SELECT
             {head_sql} as head,
-            tail_name as concept,
+            tail_name as tail,
             count(*) as count,
             array_agg(distinct {doc_type.name}.id) as documents
         FROM {doc_type.name}
@@ -142,7 +143,7 @@ async def _aggregate_document_relationships(
         WHERE {doc_type.name}.id = ANY(ARRAY{ids})
         AND head_id<>tail_id
         AND umls_graph.relationship in {tuple(relationships)}
-        GROUP BY {head_sql}, concept
+        GROUP BY {head_sql}, tail
     """
 
     async with prisma_context(300) as db:
@@ -150,23 +151,23 @@ async def _aggregate_document_relationships(
 
     df = pl.DataFrame(results)
 
-    # get top concepts (i.e. UMLS terms represented across as many of the head dimension as possible)
-    top_concepts = (
-        df.group_by("concept")
+    # get top tail (i.e. UMLS terms represented across as many of the head dimension as possible)
+    top_tails = (
+        df.group_by("tail")
         .agg(pl.count("head").alias("head_count"))
         .sort(pl.col("head_count"), descending=True)
         .limit(MAX_TAILS)
     )
     top_heads = (
         df.group_by("head")
-        .agg(pl.count("concept").alias("concept_count"))
-        .sort(pl.col("concept_count"), descending=True)
+        .agg(pl.count("tail").alias("tail_count"))
+        .sort(pl.col("tail_count"), descending=True)
         .limit(MAX_HEADS)
     )
     top_records = (
-        df.join(top_concepts, on="concept", how="inner")
+        df.join(top_tails, on="tail", how="inner")
         .join(top_heads, on="head", how="inner")
-        .drop(["head_count", "concept_count"])
+        .drop(["head_count", "tail_count"])
         .to_dicts()
     )
 
@@ -177,6 +178,40 @@ async def _aggregate_document_relationships(
     )
 
     return [AggregateDocumentRelationship(**tr) for tr in top_records]
+
+
+async def _aggregate_document_entity_relationships(
+    ids: Sequence[str],
+    p: DocumentCharacteristicParams,
+) -> list[AggregateDocumentRelationship]:
+    """
+    Aggregated intervention x indication report for a set of documents
+    """
+    sql = f"""
+        SELECT
+            head.category_rollup head,
+            tail.category_rollup tail,
+            count(*) AS count,
+            array_agg(distinct head.{p.doc_type}_id) AS documents
+        FROM {SEARCH_TABLE} head, {SEARCH_TABLE} tail
+        WHERE head.{p.doc_type}_id = ANY(ARRAY{ids})
+        AND head.{p.doc_type}_id = tail.{p.doc_type}_id
+        AND head.type in {tuple(CATEGORY_TO_ENTITY_TYPES[p.head_field])}
+        AND tail.type in {tuple(CATEGORY_TO_ENTITY_TYPES[p.tail_field])}
+        GROUP BY head.{p.doc_type}_id, head.category_rollup, tail.category_rollup
+        ORDER BY count(*) DESC
+    """
+    start = time.monotonic()
+    async with prisma_context(300) as db:
+        results = await db.query_raw(sql)
+
+    logger.info(
+        "Generated entity relationships report (%s records) in %s seconds",
+        len(results),
+        round(time.monotonic() - start),
+    )
+
+    return [AggregateDocumentRelationship(**r) for r in results]
 
 
 async def aggregate_document_relationships(
@@ -195,12 +230,9 @@ async def aggregate_document_relationships(
             return []
 
         # do the report aggregation
-        return await _aggregate_document_relationships(
-            ids=[d.id for d in documents],  # TODO: switch to direct search
-            head_field=p.head_field,
-            entity_types=None,
-            relationships=RELATIONSHIPS_OF_INTEREST,
-            doc_type=p.doc_type,
+        # TODO: switch to direct search
+        return await _aggregate_document_entity_relationships(
+            ids=[d.id for d in documents], p=p
         )
 
     if p.skip_cache == True:

@@ -33,6 +33,6 @@ class SerializableGraph:
 @dataclass(frozen=True)
 class AggregateDocumentRelationship(Dataclass):
     head: str
-    concept: str
+    tail: str
     count: int
     documents: list[str]
