@@ -101,7 +101,7 @@ class XYReport:
             raise ValueError(f"Invalid y dimension: {y_dimension}")
 
         # TODO - AND/OR
-        term_query = " ".join([t.lower() for t in search_params.terms])
+        term_query = " ".join(search_params.terms)
 
         query = XYReport._form_query(
             x_dimension,

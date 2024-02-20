@@ -144,13 +144,17 @@ class EntitySearchParams(PatentSearchParams):
         return EntityCategory[v]
 
 
+EntityField = Literal["interventions", "indications", "owner"]
+
+
 class DocumentCharacteristicParams(DocumentSearchParams):
     """
     Parameters for document characteristics
     """
 
     doc_type: DocType = DocType.patent
-    head_field: str = "priority_date"
+    head_field: EntityField
+    tail_field: EntityField
     include: Annotated[dict, Field()] = {}
 
 

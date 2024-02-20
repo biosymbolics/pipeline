@@ -27,8 +27,8 @@ async def _document_characteristics(raw_event: dict, context):
     """
     p = DocumentCharacteristicParams(
         **{
-            **raw_event["queryStringParameters"],
             **DEFAULT_REPORT_PARAMS,
+            **raw_event["queryStringParameters"],
         }
     )
     if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):

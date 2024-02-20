@@ -2,8 +2,11 @@
 Constants related to UMLS (https://uts.nlm.nih.gov/uts/umls/home)
 """
 
-from typing import Literal
+from typing import Literal, Sequence
 from prisma.enums import BiomedicalEntityType
+from pydash import group_by
+
+from typings.client import EntityField
 
 LegacyDomainType = Literal[
     "compounds",
@@ -63,6 +66,8 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C0029896": ["ent diseases", "disease, ent"],
+    "C3540026": ["combinations"],
     "C1420817": ["light"],
     "C0011209": ["delivery"],
     "C1416525": ["alagille syndrome"],
@@ -182,6 +187,8 @@ UMLS_NON_COMPOSITE_SUPPRESSION = {
 
 
 UMLS_CUI_SUPPRESSIONS = {
+    "C0280950": "cancer related symptom",
+    "C0025362": "Mental retardation",
     "C0456981": "specific antigen",
     "C5238790": "medication for kawasaki disease",
     "C0810005": "Congestive heart failure; nonhypertensive",
@@ -615,6 +622,7 @@ ENTITY_TO_UMLS_TYPE = {
     BiomedicalEntityType.RESEARCH: UMLS_RESEARCH_TYPES,
 }
 
+
 # not used yet
 NAME_TO_UMLS_TYPE = {
     "dosage form": BiomedicalEntityType.DOSAGE_FORM,
@@ -625,18 +633,6 @@ NAME_TO_UMLS_TYPE = {
 }
 
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
-
-
-NER_ENTITY_TYPES = frozenset(
-    [
-        "biologics",
-        "compounds",
-        "devices",
-        "diseases",
-        "mechanisms",
-        "procedures",
-    ]
-)
 
 
 CANDIDATE_TYPE_WEIGHT_MAP = {
@@ -689,4 +685,33 @@ PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {
 
 PERMITTED_ANCESTOR_TYPES = list(
     set([k for v in PREFERRED_ANCESTOR_TYPE_MAP.values() for k in v.keys()])
+)
+
+
+CATEGORY_TO_ENTITY_TYPES: dict[EntityField, Sequence[BiomedicalEntityType]] = {
+    "interventions": [
+        BiomedicalEntityType.BIOLOGIC,
+        BiomedicalEntityType.COMPOUND,
+        BiomedicalEntityType.DEVICE,
+        BiomedicalEntityType.DOSAGE_FORM,
+        BiomedicalEntityType.MECHANISM,
+        BiomedicalEntityType.PROCEDURE,
+    ],
+    "indications": [BiomedicalEntityType.DISEASE],
+}
+
+ENTITY_TYPE_TO_CATEGORY: dict[BiomedicalEntityType, EntityField] = {
+    k: v for v, ks in CATEGORY_TO_ENTITY_TYPES.items() for k in ks
+}
+
+
+NER_ENTITY_TYPES = frozenset(
+    [
+        "biologics",
+        "compounds",
+        "devices",
+        "diseases",
+        "mechanisms",
+        "procedures",
+    ]
 )
