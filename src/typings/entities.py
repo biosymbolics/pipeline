@@ -136,6 +136,12 @@ class Entity(ResultBase):
             return "high"
         if self.total_trial_enrollment > 500:
             return "medium"
+
+        if self.patent_count > 100:
+            return "high"
+        if self.patent_count > 50:
+            return "medium"
+
         return "low"
 
     @computed_field  # type: ignore
