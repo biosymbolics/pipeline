@@ -213,10 +213,21 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
         reverse=True,
     )
 
+    total = sum([c.score for c in companies])
+    exit_score = sum([c.score for c in companies if len(c.symbol or "") > 0]) / total
+    competition_score = (
+        sum([c.score for c in companies if len(c.symbol or "") == 0]) / total
+    )
+
     logger.info(
         "Find took %s seconds (%s)",
         round(time.monotonic() - start, 2),
         len(companies),
     )
 
-    return FindCompanyResult(companies=companies, description=description or "")
+    return FindCompanyResult(
+        companies=companies,
+        description=description or "",
+        exit_score=exit_score,
+        competition_score=competition_score,
+    )

@@ -35,3 +35,5 @@ class CompanyRecord(ResultBase):
 class FindCompanyResult(ResultBase):
     companies: list[CompanyRecord]
     description: str  # included since it could be a result of expansion
+    exit_score: float
+    competition_score: float
