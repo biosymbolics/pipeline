@@ -9,6 +9,7 @@ from typing import Sequence
 from prisma.enums import BiomedicalEntityType
 from prisma.models import Indicatable, Intervenable, Ownable, Patent
 from prisma.types import PatentCreateInput
+from pydash import uniq
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
@@ -261,7 +262,7 @@ class PatentLoader(BaseDocumentEtl):
                         "patent_id": p["id"],
                     }
                     for p in batch
-                    for a in p["assignees"]
+                    for a in uniq(p["assignees"])
                 ],
                 skip_duplicates=True,
             )
@@ -278,7 +279,7 @@ class PatentLoader(BaseDocumentEtl):
                         "inventor_patent_id": p["id"],
                     }
                     for p in batch
-                    for i in p["inventors"]
+                    for i in uniq(p["inventors"])
                 ],
                 skip_duplicates=True,
             )

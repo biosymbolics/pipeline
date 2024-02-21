@@ -69,9 +69,8 @@ class SecClient:
 
         if not filings:
             logging.error("Response is missing 'filings': %s", response)
-            raise KeyError("Response is missing 'filings'")
 
-        return filings
+        return filings or []
 
     async def fetch_mergers_and_acquisitions(
         self, names: Sequence[str]
