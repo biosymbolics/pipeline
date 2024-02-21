@@ -158,6 +158,10 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     include: Annotated[dict, Field()] = {}
 
 
+SIMILARITY_EXAGGERATION_FACTOR = 50
+MIN_RELEVANCE_SCORE = 0.5
+
+
 class CompanyFinderParams(BaseModel):
     """
     Parameters for finding companies
@@ -167,6 +171,12 @@ class CompanyFinderParams(BaseModel):
     similar_companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
+    min_relevance_score: Annotated[float, Field(validate_default=True)] = (
+        MIN_RELEVANCE_SCORE
+    )
+    exag_factor: Annotated[int, Field(validate_default=True)] = (
+        SIMILARITY_EXAGGERATION_FACTOR
+    )
 
     @field_validator("similar_companies", mode="before")
     def similar_companies_from_string(cls, v):

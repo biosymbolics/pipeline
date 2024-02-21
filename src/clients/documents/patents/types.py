@@ -19,6 +19,7 @@ class CompanyRecord(ResultBase):
     id: int
     name: str
     ids: list[str]
+    is_acquirer: bool
     count: int
     symbol: str | None
     titles: list[str]
