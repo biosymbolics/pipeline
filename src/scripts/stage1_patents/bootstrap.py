@@ -80,7 +80,7 @@ if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-                Usage: python3 -m scripts.patents.bootstrap
+                Usage: python3 -m scripts.stage1_patents.bootstrap
                 Creates initial patent data, which is later ETL'd into biosym
                 Run rarely. Will take a long time (esp patent vectorization)
             """

@@ -10,7 +10,7 @@ from .constants import GPR_PUBLICATIONS_TABLE
 
 async def _copy_publications():
     """
-    Copy publications from patents-public-data to a local table
+    Copy publications from `patents-public-data` to a BigQuery table in our workspace
     """
     table_id = "publications"
     client = BQDatabaseClient()
@@ -41,6 +41,8 @@ async def _copy_gpr_annotations():
     """
     Copy annotations from GPR to a local table
     (ONLY diseases, and only the first instance of the term for a given publication_number)
+
+    **Requires BigQuery publications table in our workspace**
     """
     client = BQDatabaseClient()
     await client.delete_table(GPR_ANNOTATIONS_TABLE)
@@ -53,7 +55,6 @@ async def _copy_gpr_annotations():
         max(ocid) as ocid,
         'diseases' as domain,
         (array_agg(a.source order by a.character_offset_start asc))[0] as source,
-        array_agg(distinct a.source) as sources,
         (array_agg(a.confidence order by a.character_offset_start asc))[0] as confidence,
         min(a.character_offset_start) as character_offset_start,
         min(a.character_offset_end) as character_offset_end,
@@ -72,7 +73,9 @@ async def _copy_gpr_annotations():
 
 async def _copy_gpr_publications():
     """
-    Copy publications from GPR to a local table
+    Copy publications from GPR to a BigQuery table in our workspace
+
+    **Requires BigQuery publications table in our workspace**
     """
     client = BQDatabaseClient()
     await client.delete_table(GPR_PUBLICATIONS_TABLE)
@@ -92,9 +95,10 @@ async def copy_patent_tables():
 
     Idempotent (as in, tables are deleted and recreated) but not atomic, and also expensive (from a BigQuery standpoint)
     """
-    # copy gpr_annotations table
-    await _copy_gpr_annotations()
 
     # copy publications and gpr publications table (order matters)
     await _copy_publications()
+
+    # depend upon publications
     await _copy_gpr_publications()
+    await _copy_gpr_annotations()

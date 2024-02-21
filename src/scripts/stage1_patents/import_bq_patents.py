@@ -217,7 +217,7 @@ async def copy_bq_to_psql():
     await export_bq_tables()
     await import_into_psql(today)
 
-    await PsqlDatabaseClient().create_indices(
+    await PsqlDatabaseClient("patents").create_indices(
         [
             {
                 "table": APPLICATIONS_TABLE,
@@ -226,7 +226,7 @@ async def copy_bq_to_psql():
             },
             {
                 "table": GPR_ANNOTATIONS_TABLE,
-                "column": "preferred_term",
+                "column": "preferred_name",
                 "is_lower": True,
             },
             {

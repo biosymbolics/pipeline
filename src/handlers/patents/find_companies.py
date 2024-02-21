@@ -25,7 +25,6 @@ async def _find_companies(raw_event: dict, context):
     - Local: `curl http://localhost:3001/dev/patents/companies?description=a%20lipid-based%20drug%20delivery%20platform`
     - Local: curl 'http://localhost:3001/dev/patents/companies?description=a%20lipid-based%20drug%20delivery%20platform&use_gpt_expansion=true'
     """
-
     p = CompanyFinderParams(**raw_event["queryStringParameters"])
 
     if p.description is None and len(p.similar_companies) == 0:
