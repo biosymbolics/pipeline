@@ -208,7 +208,7 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
             GROUP BY embed.family_id
         ) top_patents
         JOIN ownable on ownable.patent_id=top_patents.id
-        JOIN owner on owner.id=ownable.owner_id -- AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')
+        JOIN owner on owner.id=ownable.owner_id
         LEFT JOIN financials ON financials.owner_id=owner.id
         GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
     """
@@ -225,7 +225,11 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
                 **omit(record, "score"),
                 activity=[v.count for v in report_map[record["id"]]],
                 count_by_year=report_map[record["id"]],
-                score=record["score"] or record["relevance_score"],
+                score=(
+                    record["score"]
+                    if record["score"] is not None
+                    else record["relevance_score"]
+                ),
             )
             for record in records
         ],
