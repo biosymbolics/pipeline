@@ -49,6 +49,7 @@ model EntitySynonym {
 
 model Owner {
     id                 Int                         @id @default(autoincrement())
+    acquisition_count  Int                         @default(0)
     children           Owner[]                     @relation("owner_to_parent")
     count              Int                         @default(0)
     financial_snapshot FinancialSnapshot?

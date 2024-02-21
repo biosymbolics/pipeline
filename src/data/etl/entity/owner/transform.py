@@ -51,6 +51,8 @@ def generate_clean_owner_map(
     - normalizes terms (e.g. "lab" -> "laboratory", "univ" -> "university")
     - applies overrides (e.g. "biogen ma" -> "biogen")
     - then does clustering
+
+    Returns a mapping between original name (key) and cleaned name (value)
     """
 
     def sub_suppressions(terms: list[str]) -> Iterable[str]:

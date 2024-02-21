@@ -114,8 +114,8 @@ def get_fields(
     common_fields = [
         "owner.id as id",
         "owner.name as name",
-        "(financials.symbol is not null OR owner.owner_type='INDUSTRY_LARGE') AS is_acquirer",
-        "(financials.symbol is null AND owner.owner_type='INDUSTRY') AS is_competition",
+        "(owner.acquisition_count > 0) AS is_acquirer",
+        "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
         "financials.symbol as symbol",
         "ARRAY_AGG(top_patents.id) AS ids",
         "COUNT(title) AS count",

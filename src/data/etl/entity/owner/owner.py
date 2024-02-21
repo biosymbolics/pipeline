@@ -10,6 +10,7 @@ from prisma.models import FinancialSnapshot, Ownable, Owner, OwnerSynonym
 from prisma.types import OwnerUpdateInput
 
 from clients.low_level.prisma import batch_update, prisma_client
+from clients.sec.sec_client import SecClient
 from core.ner.cleaning import CleanFunction
 from core.ner.normalizer import TermNormalizer
 from data.etl.entity.base_entity_etl import BaseEntityEtl
@@ -47,17 +48,24 @@ class OwnerEtl(BaseEntityEtl):
     def _generate_insert_records(
         self,
         names: Sequence[str],
-        lookup_map: dict[str, str],
+        canonical_lookup_map: dict[str, str],
+        ma_lookup_map: dict[str, int],
     ) -> list[OwnerCreateWithSynonymsInput]:
         """
         Create record dicts for entity insert
+
+        Args:
+        - names: list of names to insert
+        - canonical_lookup_map: mapping of name to canonical name
+        - ma_lookup_map: mapping of name to number of M&A filings
         """
 
         # merge records with same name
         flat_recs = [
             OwnerCreateWithSynonymsInput(
-                name=(lookup_map.get(name) or name),
+                name=(canonical_lookup_map.get(name) or name),
                 owner_type=OwnerTypeParser().find(name),
+                acquisition_count=ma_lookup_map.get(name) or 0,
                 synonyms=[name],
             )
             for name in names
@@ -87,8 +95,13 @@ class OwnerEtl(BaseEntityEtl):
             names: list of names to insert
         """
         client = await prisma_client(600)
-        lookup_map = generate_clean_owner_map(names, counts)
-        insert_recs = self._generate_insert_records(names, lookup_map)
+        canonical_lookup_map = generate_clean_owner_map(names, counts)
+        ma_lookup_map = await self.generate_acquisition_map(
+            list(canonical_lookup_map.values())
+        )
+        insert_recs = self._generate_insert_records(
+            names, canonical_lookup_map, ma_lookup_map
+        )
 
         # create flat records
         await Owner.prisma(client).create_many(
@@ -136,6 +149,20 @@ class OwnerEtl(BaseEntityEtl):
             data=transform_financials(public_companies, owner_map),
             skip_duplicates=True,
         )
+
+    async def generate_acquisition_map(
+        self, canonical_names: Sequence[str]
+    ) -> dict[str, int]:
+        """
+        Load a simple map of company to number of M&A filings
+        """
+        sec_client = SecClient()
+        filings = await sec_client.fetch_mergers_and_acquisitions(canonical_names)
+
+        has_filings_map = {
+            company: len(filings[company]) for company in canonical_names
+        }
+        return has_filings_map
 
     async def delete_owners(self):
         """
