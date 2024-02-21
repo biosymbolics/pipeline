@@ -115,6 +115,7 @@ def get_fields(
         "owner.id as id",
         "owner.name as name",
         "(financials.symbol is not null OR owner.owner_type='INDUSTRY_LARGE') AS is_acquirer",
+        "(financials.symbol is null AND owner.owner_type='INDUSTRY') AS is_competition",
         "financials.symbol as symbol",
         "ARRAY_AGG(top_patents.id) AS ids",
         "COUNT(title) AS count",
@@ -133,7 +134,10 @@ def get_fields(
             ROUND(
                 SUM(
                     relevance_score
-                    * POW(((date_part('year', priority_date) - 2000) / 24), {recency_decay_factor}) -- recency
+                    * POW(
+                        GREATEST(0.0, ((date_part('year', priority_date) - 2000) / 24)),
+                        {recency_decay_factor}
+                    )
                 )::numeric, 2
             ) AS score
         """,
@@ -204,7 +208,7 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
             GROUP BY embed.family_id
         ) top_patents
         JOIN ownable on ownable.patent_id=top_patents.id
-        JOIN owner on owner.id=ownable.owner_id AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')
+        JOIN owner on owner.id=ownable.owner_id -- AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')
         LEFT JOIN financials ON financials.owner_id=owner.id
         GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
     """
@@ -234,7 +238,7 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
         (sum([c.score for c in companies if c.is_acquirer]) / total) if total > 0 else 0
     )
     competition_score = (
-        (sum([c.score for c in companies if not c.is_acquirer]) / total)
+        (sum([c.score for c in companies if c.is_competition]) / total)
         if total > 0
         else 0
     )

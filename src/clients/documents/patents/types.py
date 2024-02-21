@@ -20,6 +20,7 @@ class CompanyRecord(ResultBase):
     name: str
     ids: list[str]
     is_acquirer: bool
+    is_competition: bool
     count: int
     symbol: str | None
     titles: list[str]
