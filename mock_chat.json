@@ -81,13 +81,13 @@
         "id": "1",
         "messages": [
             {
-                "content": "What are characteristics of drugs that would have greater efficacy if they could cross the blood brain barrier?",
+                "content": "What are the primary ways in which to enhance the ability for a drug to pass the blood brrain barrier?",
                 "id": "1",
                 "sender": "You",
                 "timestamp": "Wednesday 9:20am"
             },
             {
-                "content": "Here are some key characteristics that would make a drug more likely to have improved efficacy if its ability to cross the blood-brain barrier (BBB) was enhanced:\n* Targets the central nervous system - The drug's intended mechanism of action or therapeutic target is located in the brain or spinal cord. For example, drugs treating Alzheimer's, Parkinson's, psychiatric disorders, chronic pain, etc.\n* Hydrophilic - Highly lipophilic (fat-soluble) small molecules can sometimes passively diffuse across the BBB. Hydrophilic compounds have a harder time crossing. Making hydrophilic drugs more hydrophobic can improve permeation.\n* Large molecular weight - Small molecules under 500 Da can more easily cross the BBB compared to larger compounds like peptides or antibodies. Strategies like nanoparticle encapsulation can help transport large molecules.\n* Substrate for efflux pumps - Transporters like p-glycoprotein at the BBB actively pump many drugs back into the bloodstream. Inhibiting these pumps could give more brain exposure.\n* Positive charge - The BBB favors passive diffusion of neutral or negatively charged molecules. Adding negative charge via salts or esters can sometimes improve penetration.\n* Brain-specific delivery - Having a targeting mechanism for enhanced brain vs peripheral uptake helps minimize side effects and maximize CNS action.\n\nThe ideal candidate is a hydrophilic, high molecular weight CNS-active compound that is subject to extensive efflux. Overcoming these barriers to improve brain penetration would significantly enhance its efficacy.\n ",
+                "content": "Here are some of the main strategies being researched to enhance drug delivery across the blood-brain barrier (BBB):\n\n* Increasing lipophilicity - Making a drug more lipid-soluble to pass through lipid membranes more easily. Examples include prodrugs and lipid conjugation.\n\n* Efflux transporter inhibition - Using inhibitors to block drug efflux transporters like P-gp on the BBB that pump drugs out. Examples include verapamil and cyclosporine.\n\n* Nanocarrier systems - Encapsulating drugs in nanoparticles or liposomes that can cross the BBB through endocytosis. Examples include solid lipid nanoparticles and polymeric nanoparticles.\n\n* Receptor/transporter mediated transcytosis - Linking drugs to nutrients like glucose, insulin or transferrin to utilize receptor-mediated transport into the brain.\n\n* Ultrasound-mediated BBB disruption - Using focused ultrasound to temporarily open tight junctions of the BBB in a localized region.\n\n* Intranasal delivery - Administering drugs intranasally so they can travel along olfactory nerve pathways directly into the CNS.\n\n* Cell-penetrating peptides - Using peptides like TAT to carry drugs across cell membranes and the BBB.\n\n* Chimeric peptide technology - Re-engineering drugs into peptide mimetics that can utilize transporters.\n\n* [Chimeric peptides](http://localhost:3000/core/find-companies?description=Chimeric+peptide+technology+-+Re-engineering+drugs+into+peptide+mimetics+that+can+utilize+transporters.&useGptExpansion=true&k=1000&similarCompanies=)\n\nThe optimal strategy depends on the drug's characteristics and desired clinical effect. A combination approach is often most effective at enhancing BBB penetration.",
                 "id": "2",
                 "sender": {
                     "name": "Biosym Bot",
@@ -96,43 +96,19 @@
                 "timestamp": "Wednesday 9:21am"
             },
             {
-                "content": "What are compounds that failed clinical trials for indications in CNS, with off-target effects in the periphery?",
+                "content": "Please show me companies developing such technologies, broken out by strategy.",
                 "id": "3",
                 "sender": "You",
                 "timestamp": "Wednesday 9:22am"
             },
             {
-                "content": "<<< answer >>>",
+                "content": "Sure, the following reports show companies developing technologies to enhance drug delivery across the BBB, broken out by strategy:\n\n* [Increasing lipophilicity](http://localhost:3000/core/find-companies?description=Increasing%20lipophilicity%20-%20Making%20a%20drug%20more%20lipid-soluble%20to%20pass%20through%20lipid%20membranes%20more%20easily.%20Examples%20include%20prodrugs%20and%20lipid%20conjugation)\n\n* [Nanocarrier systems](http://localhost:3000/core/find-companies?description=Nanocarrier%20systems%20-%20Encapsulating%20drugs%20in%20nanoparticles%20or%20liposomes%20that%20can%20cross%20the%20BBB%20through%20endocytosis.%20Examples%20include%20solid%20lipid%20nanoparticles%20and%20polymeric%20nanoparticles) \n\n* [Receptor/transporter mediated transcytosis](http://localhost:3000/core/find-companies?description=Receptor/transporter%20mediated%20transcytosis%20-%20Linking%20drugs%20to%20nutrients%20like%20glucose,%20insulin%20or%20transferrin%20to%20utilize%20receptor-mediated%20transport%20into%20the%20brain)\n\n* [Ultrasound-mediated BBB disruption](http://localhost:3000/core/find-companies?description=Ultrasound-mediated%20BBB%20disruption%20-%20Using%20focused%20ultrasound%20to%20temporarily%20open%20tight%20junctions%20of%20the%20BBB%20in%20a%20localized%20region)\n\n* [Cell-penetrating peptides](http://localhost:3000/core/find-companies?description=Cell-penetrating%20peptides%20-%20Using%20peptides%20like%20TAT%20to%20carry%20drugs%20across%20cell%20membranes%20and%20the%20BBB)\n\n* [Intranasal delivery](http://localhost:3000/core/find-companies?description=Intranasal+delivery+-+Administering+drugs+intranasally+so+they+can+travel+along+olfactory+nerve+pathways+directly+into+the+CNS.&useGptExpansion=true&k=1000)",
                 "id": "4",
                 "sender": {
                     "name": "Biosym Bot",
                     "username": "@biosymbolics"
                 },
                 "timestamp": "Wednesday 9:23am"
-            }
-        ],
-        "sender": {
-            "name": "Biosym Bot",
-            "username": "@biosymbolics"
-        }
-    },
-    "findExceptionalCompanies": {
-        "id": "1",
-        "messages": [
-            {
-                "content": "What are promising seed-stage biotechs, innovating in drug delivery systems?",
-                "id": "1",
-                "sender": "You",
-                "timestamp": "Wednesday 9:00am"
-            },
-            {
-                "content": "...",
-                "id": "2",
-                "sender": {
-                    "name": "Biosym Bot",
-                    "username": "@biosymbolics"
-                },
-                "timestamp": "Wednesday 11:30am"
             }
         ],
         "sender": {
