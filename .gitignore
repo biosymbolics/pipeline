@@ -27,3 +27,4 @@ yfinance.cache
 umls_ancestors.json
 biosym-etl-cache/**
 src/biosym-etl-cache/**
+biosym-patents-dev/**
