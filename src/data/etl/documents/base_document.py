@@ -74,7 +74,7 @@ class BaseDocumentEtl:
                 WHERE {self.document_type}.id=v.id;
             """,
             # TODO: switch to hnsw maybe
-            # "CREATE INDEX ON patent USING hnsw (vector vector_cosine_ops) WITH (m = 16, ef_construction = 64)",
+            # "CREATE INDEX ON patent_vector_hnsw USING hnsw (vector vector_cosine_ops)",
             # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
             f"""
                 CREATE INDEX {self.document_type}_vector ON {self.document_type}
