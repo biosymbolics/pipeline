@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import polars as pl
-from pydash import flatten, uniq
+from pydash import flatten
 from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient
@@ -19,7 +19,7 @@ ASSIGNEE_PATENT_THRESHOLD = 50
 
 class OwnerLoader:
     @staticmethod
-    async def get_owners() -> tuple[list[str], list[int]]:
+    async def _get_owner_names() -> tuple[list[str], list[int]]:
         """
         Generates owner terms (assignee/inventor) from:
         - patent applications table
@@ -118,7 +118,7 @@ class OwnerLoader:
         ]
 
     async def copy_all(self, is_force_update: bool = False):
-        names, counts = await self.get_owners()
+        names, counts = await self._get_owner_names()
         public_companies = self.load_public_companies()
         await OwnerEtl().copy_all(names, counts, public_companies, is_force_update)
 

@@ -167,8 +167,6 @@ class DocumentVectorizer:
         Vectorize & persist documents
         """
 
-        t = await self.db.select("select * from studies limit 1")
-        print(t)
         batch = await self._fetch_batch(last_id=starting_id)
         i = 0
 

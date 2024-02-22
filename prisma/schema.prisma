@@ -49,6 +49,7 @@ model EntitySynonym {
 
 model Owner {
     id                 Int                         @id @default(autoincrement())
+    acquisition_count  Int                         @default(0)
     children           Owner[]                     @relation("owner_to_parent")
     count              Int                         @default(0)
     financial_snapshot FinancialSnapshot?
@@ -219,13 +220,12 @@ model Ownable {
     @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
-    // @@index([instance_rollup], name: "ownable_instance_rollup")
-    // @@index([category_rollup], name: "ownable_category_rollup")
+    @@index([instance_rollup], name: "ownable_instance_rollup")
+    @@index([category_rollup], name: "ownable_category_rollup")
     @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
     @@index([owner_id], name: "ownable_owner_id")
     @@index([patent_id], name: "ownable_patent_id")
     @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
-    // @@index([trial_id], name: "ownable_trial_id") // already a uniq index (since 1<>1)
     @@map("ownable")
 }
 

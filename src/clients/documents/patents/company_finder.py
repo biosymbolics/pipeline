@@ -7,7 +7,7 @@ import json
 import logging
 import time
 from typing import Sequence
-from pydash import flatten, group_by
+from pydash import flatten, group_by, omit
 import torch
 
 from clients.low_level.prisma import prisma_context
@@ -24,8 +24,8 @@ from .types import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SIMILARITY_EXAGGERATION_FACTOR = 50
 MIN_YEAR = 2000
+RECENCY_DECAY_FACTOR = 2
 
 
 async def fetch_company_reports(
@@ -40,15 +40,14 @@ async def fetch_company_reports(
             date_part('year', priority_date) as year,
             count(*) as count
         FROM patent, ownable
-        WHERE patent.id in {patent_ids}
-        AND ownable.owner_id in {owner_ids}
+        WHERE patent.id = ANY($1)
+        AND ownable.owner_id = ANY($2)
         AND ownable.patent_id=patent.id
         AND date_part('year', priority_date) >= {min_year}
         GROUP BY owner_id, date_part('year', priority_date)
     """
-
     async with prisma_context(300) as db:
-        report = await db.query_raw(report_query)
+        report = await db.query_raw(report_query, patent_ids, owner_ids)
 
     result_map = {
         k: {v["year"]: CountByYear(**v) for v in vals}
@@ -101,7 +100,11 @@ async def get_vector(description: str | None, companies: Sequence[str]) -> list[
 
 
 def get_fields(
-    companies: Sequence[str], description: str | None, vector: Sequence[float]
+    companies: Sequence[str],
+    description: str | None,
+    vector: Sequence[float],
+    exag_factor: int,
+    recency_decay_factor: int = RECENCY_DECAY_FACTOR,
 ) -> list[str]:
     """
     Get fields for the query that differ based on the presence of companies and description
@@ -111,26 +114,30 @@ def get_fields(
     common_fields = [
         "owner.id as id",
         "owner.name as name",
-        "COALESCE(financials.symbol, '') as symbol",
-        "ARRAY_AGG(patent.id) AS ids",
+        "(owner.acquisition_count > 0) AS is_acquirer",
+        "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
+        "financials.symbol as symbol",
+        "ARRAY_AGG(top_patents.id) AS ids",
         "COUNT(title) AS count",
         "ARRAY_AGG(title) AS titles",
         f"MIN({current_year}-date_part('year', priority_date))::int AS min_age",
         f"ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age",
-        f"ROUND(POW((1 - (AVG(patent.vector) <=> owner.vector)), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS wheelhouse_score",
+        f"ROUND(POW((1 - (AVG(top_patents.vector) <=> owner.vector)), {exag_factor})::numeric, 2) AS wheelhouse_score",
     ]
     company_fields = [
-        f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS relevance_score",
-        f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS score",
+        f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {exag_factor})::numeric, 2) AS relevance_score",
     ]
 
     description_fields = [
-        f"ROUND(POW((1 - (AVG(patent.vector) <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR})::numeric, 2) AS relevance_score",
+        f"ROUND(AVG(relevance_score), 2) AS relevance_score",
         f"""
             ROUND(
                 SUM(
-                    POW((1 - (patent.vector <=> '{vector}')), {SIMILARITY_EXAGGERATION_FACTOR}) -- cosine similarity
-                    * POW(((date_part('year', priority_date) - 2000) / 24), 2) -- recency
+                    relevance_score
+                    * POW(
+                        GREATEST(0.0, ((date_part('year', priority_date) - 2000) / 24)),
+                        {recency_decay_factor}
+                    )
                 )::numeric, 2
             ) AS score
         """,
@@ -154,10 +161,12 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
         with scoring based on recency and relevance
 
     Args:
-        description: description of the IP
-        companies: list of companies to search
-        k: number of nearest neighbors to consider
-        use_gpt_expansion: whether to use GPT to expand the description (mostly for testing)
+        p.description: description of the IP
+        p.companies: list of companies to search
+        p.k: number of nearest neighbors to consider
+        p.use_gpt_expansion: whether to use GPT to expand the description (mostly for testing)
+        p.min_relevance_score: minimum relevance score to consider
+        p.exag_factor: factor to exaggerate cosine similarity
     """
     start = time.monotonic()
 
@@ -169,30 +178,40 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
         description = p.description
 
     vector = await get_vector(description, p.similar_companies)
-    fields = get_fields(p.similar_companies, description, vector)
+    fields = get_fields(p.similar_companies, description, vector, p.exag_factor)
 
     query = rf"""
         select {', '.join(fields)}
-        FROM ownable, patent, owner
-        LEFT JOIN financials ON financials.owner_id=owner.id
-        WHERE ownable.patent_id=patent.id
-        AND owner.id=ownable.owner_id
-        AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')
-        AND patent.id IN (
+        FROM (
             -- this is probably sub-optimal
             -- groups by title to avoid dups (also hack-y)
-            SELECT MAX(id)
+            SELECT
+                MAX(id) as id,
+                ARRAY_AGG(id) as ids,
+                AVG(relevance_score) as relevance_score,
+                AVG(vector) as vector,
+                MIN(priority_date) as priority_date,
+                MAX(title) as title
             FROM (
-                    SELECT id, title
+                    SELECT
+                        id,
+                        family_id,
+                        title,
+                        POW((1 - (vector <=> '{vector}')), {p.exag_factor})::numeric as relevance_score,
+                        vector,
+                        priority_date
                     FROM patent
                     ORDER BY (1 - (vector <=> '{vector}')) DESC
                     LIMIT {p.k}
             ) embed
-            GROUP BY embed.title
-        )
-        GROUP BY owner.name, owner.id, financials.symbol
+            WHERE relevance_score >= {p.min_relevance_score}
+            GROUP BY embed.family_id
+        ) top_patents
+        JOIN ownable on ownable.patent_id=top_patents.id
+        JOIN owner on owner.id=ownable.owner_id
+        LEFT JOIN financials ON financials.owner_id=owner.id
+        GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
     """
-
     async with prisma_context(300) as db:
         records = await db.query_raw(query)
 
@@ -203,9 +222,14 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
     companies = sorted(
         [
             CompanyRecord(
-                **record,
+                **omit(record, "score"),
                 activity=[v.count for v in report_map[record["id"]]],
                 count_by_year=report_map[record["id"]],
+                score=(
+                    record["score"]
+                    if record["score"] is not None
+                    else record["relevance_score"]
+                ),
             )
             for record in records
         ],
@@ -214,9 +238,13 @@ async def find_companies_semantically(p: CompanyFinderParams) -> FindCompanyResu
     )
 
     total = sum([c.score for c in companies])
-    exit_score = sum([c.score for c in companies if len(c.symbol or "") > 0]) / total
+    exit_score = (
+        (sum([c.score for c in companies if c.is_acquirer]) / total) if total > 0 else 0
+    )
     competition_score = (
-        sum([c.score for c in companies if len(c.symbol or "") == 0]) / total
+        (sum([c.score for c in companies if c.is_competition]) / total)
+        if total > 0
+        else 0
     )
 
     logger.info(
