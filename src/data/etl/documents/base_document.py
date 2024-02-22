@@ -63,8 +63,8 @@ class BaseDocumentEtl:
         )
         list_count = int(row_count[0]["count"] / 1000)
         queries = [
-            "CREATE EXTENSION IF NOT EXISTS dblink",
-            f"DROP INDEX IF EXISTS {self.document_type}_vector;",
+            # "CREATE EXTENSION IF NOT EXISTS dblink",
+            f"DROP INDEX IF EXISTS {self.document_type}_vector",
             f"""
                 UPDATE {self.document_type} set vector = v.vector
                 FROM dblink(
@@ -74,7 +74,7 @@ class BaseDocumentEtl:
                 WHERE {self.document_type}.id=v.id;
             """,
             # TODO: switch to hnsw maybe
-            # "CREATE INDEX ON patent_vector_hnsw USING hnsw (vector vector_cosine_ops)",
+            # "CREATE INDEX patent_vector_hnsw ON patent USING hnsw (vector vector_cosine_ops)",
             # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
             f"""
                 CREATE INDEX {self.document_type}_vector ON {self.document_type}

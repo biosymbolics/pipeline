@@ -232,7 +232,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         logger.info("Updating biomedical_entity search index")
         client = await prisma_client(600)
-        await client.execute_raw("DROP INDEX IF EXISTS biomedical_entity_search_idx;")
+        await client.execute_raw("DROP INDEX IF EXISTS biomedical_entity_search")
         await client.execute_raw(
             f"""
             WITH synonym as (
@@ -245,7 +245,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             """
         )
         await client.execute_raw(
-            "CREATE INDEX biomedical_entity_search_idx ON biomedical_entity USING GIN(search);"
+            "CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search)"
         )
 
     @staticmethod

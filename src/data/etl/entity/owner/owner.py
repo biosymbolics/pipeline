@@ -244,7 +244,7 @@ class OwnerEtl(BaseEntityEtl):
         update search index
         """
         client = await prisma_client(300)
-        await client.execute_raw("DROP INDEX IF EXISTS owner_search_idx;")
+        await client.execute_raw("DROP INDEX IF EXISTS owner_search")
         await client.execute_raw(
             f"""
             WITH synonym as (
@@ -258,9 +258,7 @@ class OwnerEtl(BaseEntityEtl):
                 AND array_length(synonym.terms, 1) < 100000; -- dumb categorization error check
             """
         )
-        await client.execute_raw(
-            "CREATE INDEX owner_search_idx ON owner USING GIN(search);"
-        )
+        await client.execute_raw("CREATE INDEX owner_search ON owner USING GIN(search)")
 
     @staticmethod
     async def checksum():
@@ -292,7 +290,7 @@ class OwnerEtl(BaseEntityEtl):
         ivfflat "lists"  = rows / 1000 = 24183 / 1000 = 24
         """
         queries = [
-            "DROP INDEX if exists owner_vector;",
+            "DROP INDEX if exists owner_vector",
             """
             UPDATE owner
             SET vector = agg.vector
@@ -302,9 +300,9 @@ class OwnerEtl(BaseEntityEtl):
                 WHERE patent.id=ownable.patent_id
                 GROUP BY ownable.owner_id
             ) agg
-            WHERE agg.owner_id=owner.id;
+            WHERE agg.owner_id=owner.id
             """,
-            "CREATE INDEX owner_vector ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24);",
+            "CREATE INDEX owner_vector ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24)",
         ]
         client = await prisma_client(600)
 
