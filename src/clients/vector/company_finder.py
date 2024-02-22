@@ -9,12 +9,14 @@ import time
 from typing import Sequence
 from pydash import flatten, group_by, omit
 import torch
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from constants.documents import MAX_DATA_YEAR
 from core.ner.spacy import get_transformer_nlp
 from typings.client import CompanyFinderParams
+from utils.string import get_id
 from .types import (
     CompanyRecord,
     FindCompanyResult,
@@ -74,6 +76,39 @@ class SemanticCompanyFinder:
         return combined_vector
 
     @staticmethod
+    async def _get_knn_ids(vector: list[float], k: int) -> list[str]:
+        """
+        Get the ids of the k nearest neighbors to a vector
+        Cached.
+
+        Args:
+            vector (list[float]): vector to search
+            k (int): number of nearest neighbors to return
+        """
+
+        async def fetch():
+            query = f"""
+                SELECT id
+                FROM patent
+                ORDER BY (1 - (vector <=> '{vector}')) DESC
+                LIMIT {k}
+            """
+            async with prisma_context(300) as db:
+                records = await db.query_raw(query)
+
+            return [record["id"] for record in records]
+
+        cache_key = get_id([vector, k])
+        response = await retrieve_with_cache_check(
+            fetch,
+            key=cache_key,
+            decode=lambda str_data: storage_decoder(str_data),
+            use_filesystem=True,
+        )
+
+        return response
+
+    @staticmethod
     def _get_fields(
         companies: Sequence[str],
         description: str | None,
@@ -128,64 +163,6 @@ class SemanticCompanyFinder:
         raise ValueError("No companies or description")
 
     @staticmethod
-    def _form_query(
-        p: CompanyFinderParams,
-        description: str | None,
-        vector: list[float],
-    ) -> str:
-        fields = SemanticCompanyFinder._get_fields(
-            p.similar_companies, description, vector, p.exag_factor
-        )
-        query = rf"""
-            select {', '.join(fields)}
-            FROM (
-                -- this is probably sub-optimal
-                -- groups by title to avoid dups (also hack-y)
-                SELECT
-                    MAX(id) as id,
-                    ARRAY_AGG(id) as ids,
-                    AVG(relevance_score) as relevance_score,
-                    AVG(vector) as vector,
-                    MIN(priority_date) as priority_date,
-                    MAX(title) as title
-                FROM (
-                        SELECT
-                            id,
-                            family_id,
-                            title,
-                            POW((1 - (vector <=> '{vector}')), {p.exag_factor})::numeric as relevance_score,
-                            vector,
-                            priority_date
-                        FROM patent
-                        ORDER BY (1 - (vector <=> '{vector}')) DESC
-                        LIMIT {p.k}
-                ) embed
-                WHERE relevance_score >= {p.min_relevance_score}
-                GROUP BY embed.family_id
-            ) top_patents
-            JOIN ownable on ownable.patent_id=top_patents.id
-            JOIN owner on owner.id=ownable.owner_id
-            LEFT JOIN financials ON financials.owner_id=owner.id
-            GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
-        """
-        return query
-
-    @staticmethod
-    def _compute_scores(companies: Sequence[CompanyRecord]) -> tuple[float, float]:
-        total = sum([c.score for c in companies])
-        exit_score = (
-            (sum([c.score for c in companies if c.is_acquirer]) / total)
-            if total > 0
-            else 0
-        )
-        competition_score = (
-            (sum([c.score for c in companies if c.is_competition]) / total)
-            if total > 0
-            else 0
-        )
-        return exit_score, competition_score
-
-    @staticmethod
     async def _fetch_company_reports(
         patent_ids: Sequence[str], owner_ids: Sequence[str], min_year: int = MIN_YEAR
     ) -> dict[str, list[CountByYear]]:
@@ -219,6 +196,90 @@ class SemanticCompanyFinder:
             for k, vals in result_map.items()
         }
 
+    @staticmethod
+    async def _fetch_companies(
+        p: CompanyFinderParams,
+        description: str | None,
+        vector: list[float],
+    ) -> list[CompanyRecord]:
+        ids = await SemanticCompanyFinder._get_knn_ids(vector, p.k)
+        fields = SemanticCompanyFinder._get_fields(
+            p.similar_companies, description, vector, p.exag_factor
+        )
+        query = rf"""
+            select {', '.join(fields)}
+            FROM (
+                SELECT
+                    MAX(id) as id,
+                    ARRAY_AGG(id) as ids,
+                    AVG(relevance_score) as relevance_score,
+                    AVG(vector) as vector,
+                    MIN(priority_date) as priority_date,
+                    MAX(title) as title
+                FROM (
+                        SELECT
+                            id,
+                            family_id,
+                            title,
+                            POW((1 - (vector <=> '{vector}')), {p.exag_factor})::numeric as relevance_score,
+                            vector,
+                            priority_date
+                        FROM patent
+                        WHERE id = ANY($1)
+                ) embed
+                WHERE relevance_score >= {p.min_relevance_score}
+                GROUP BY embed.family_id
+            ) top_patents
+            JOIN ownable on ownable.patent_id=top_patents.id
+            JOIN owner on owner.id=ownable.owner_id
+            LEFT JOIN financials ON financials.owner_id=owner.id
+            GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
+        """
+        async with prisma_context(300) as db:
+            logger.info("Fetching companies with ids %s", ids)
+            records = await db.query_raw(query, ids)
+
+        owner_ids = tuple([record["id"] for record in records])
+        patent_ids = tuple(flatten([record["ids"] for record in records]))
+        report_map = await SemanticCompanyFinder._fetch_company_reports(
+            patent_ids, owner_ids
+        )
+
+        companies = sorted(
+            [
+                CompanyRecord(
+                    **omit(record, "score"),
+                    activity=[v.count for v in report_map[record["id"]]],
+                    count_by_year=report_map[record["id"]],
+                    score=(
+                        record["score"]
+                        if record["score"] is not None
+                        else record["relevance_score"]
+                    ),
+                )
+                for record in records
+            ],
+            key=lambda x: x.score,
+            reverse=True,
+        )
+
+        return companies
+
+    @staticmethod
+    def _compute_scores(companies: Sequence[CompanyRecord]) -> tuple[float, float]:
+        total = sum([c.score for c in companies])
+        exit_score = (
+            (sum([c.score for c in companies if c.is_acquirer]) / total)
+            if total > 0
+            else 0
+        )
+        competition_score = (
+            (sum([c.score for c in companies if c.is_competition]) / total)
+            if total > 0
+            else 0
+        )
+        return exit_score, competition_score
+
     async def __call__(self, p: CompanyFinderParams) -> FindCompanyResult:
         """
         A specific method to find potential buyers for IP / companies
@@ -243,33 +304,7 @@ class SemanticCompanyFinder:
             description = p.description
 
         vector = await self._form_vector(description, p.similar_companies)
-        query = self._form_query(p, description, vector)
-
-        async with prisma_context(300) as db:
-            records = await db.query_raw(query)
-
-        owner_ids = tuple([record["id"] for record in records])
-        patent_ids = tuple(flatten([record["ids"] for record in records]))
-        report_map = await self._fetch_company_reports(patent_ids, owner_ids)
-
-        companies = sorted(
-            [
-                CompanyRecord(
-                    **omit(record, "score"),
-                    activity=[v.count for v in report_map[record["id"]]],
-                    count_by_year=report_map[record["id"]],
-                    score=(
-                        record["score"]
-                        if record["score"] is not None
-                        else record["relevance_score"]
-                    ),
-                )
-                for record in records
-            ],
-            key=lambda x: x.score,
-            reverse=True,
-        )
-
+        companies = await self._fetch_companies(p, description, vector)
         exit_score, competition_score = self._compute_scores(companies)
 
         logger.info(

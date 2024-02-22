@@ -69,13 +69,13 @@ class ConceptDecomposer:
     async def fetch_subconcept_details(self, sub_concepts: Sequence[SubConcept]):
         """
         Fetches details for sub-concepts
+
+        Will be slow.
         """
 
-        async def fetch_detail(description: str):
-            results = await self.semantic_client(
-                CompanyFinderParams(description=description)
-            )
-
         details = await asyncio.gather(
-            *[fetch_detail(sc.description) for sc in sub_concepts]
+            *[
+                self.semantic_client(CompanyFinderParams(description=sc.description))
+                for sc in sub_concepts
+            ]
         )
