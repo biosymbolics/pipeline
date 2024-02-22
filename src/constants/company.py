@@ -250,7 +250,7 @@ MA_MAPPINGS = {
     "bioverativ": "sanofi",
     "onyx": "amgen",
     "allergan": "abbvie",
-    "catalent": "novo nordisk",
+    # "catalent": "novo nordisk",
     "wyeth": "pfizer",
     "genentech": "roche",
 }

@@ -17,6 +17,7 @@ from data.etl.entity.base_entity_etl import BaseEntityEtl
 from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
+from utils.list import batch
 
 from .constants import OwnerTypePriorityMap
 from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
@@ -97,7 +98,7 @@ class OwnerEtl(BaseEntityEtl):
         client = await prisma_client(600)
         canonical_lookup_map = generate_clean_owner_map(names, counts)
         ma_lookup_map = await self.generate_acquisition_map(
-            list(canonical_lookup_map.values())
+            uniq(canonical_lookup_map.values())
         )
         insert_recs = self._generate_insert_records(
             names, canonical_lookup_map, ma_lookup_map
@@ -157,12 +158,15 @@ class OwnerEtl(BaseEntityEtl):
         Load a simple map of company to number of M&A filings
         """
         sec_client = SecClient()
-        filings = await sec_client.fetch_mergers_and_acquisitions(canonical_names)
 
-        has_filings_map = {
-            company: len(filings[company]) for company in canonical_names
-        }
-        return has_filings_map
+        batches = batch(canonical_names, 2000)
+
+        async def handle_batch(b):
+            filings = await sec_client.fetch_mergers_and_acquisitions(b)
+            return {company: len(filings[company]) for company in b}
+
+        batch_results = await asyncio.gather(*[handle_batch(b) for b in batches])
+        return {k: v for d in batch_results for k, v in d.items()}
 
     async def delete_owners(self):
         """

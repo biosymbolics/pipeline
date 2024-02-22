@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import polars as pl
-from pydash import flatten, uniq
+from pydash import flatten
 from prisma.models import FinancialSnapshot
 
 from clients.low_level.postgres.postgres import PsqlDatabaseClient

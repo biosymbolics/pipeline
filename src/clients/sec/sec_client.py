@@ -41,14 +41,16 @@ class SecClient:
         }
         return query
 
-    async def fetch_docs(self, criteria: list[str]) -> list[SecFiling]:
+    async def fetch_docs(
+        self, criteria: list[str], take: int = 100, skip: int = 0
+    ) -> list[SecFiling]:
         """
         Fetch SEC docs based on specified criteria
         e.g. ["ticker:PFE", "filedAt:{2020-01-01 TO 2020-12-31}", "formType:10-K"] -> docs
 
         Uses s3 cache.
         """
-        query = self._get_query(criteria)
+        query = self._get_query(criteria, take, skip)
         logging.info("Getting SEC docs with query %s", query)
 
         async def fetch():
@@ -60,6 +62,7 @@ class SecClient:
             key=key,
             decode=lambda str_data: storage_decoder(str_data),
             cache_name="biosym-etl-cache",
+            use_filesystem=True,
         )
 
         if not response:
@@ -85,7 +88,8 @@ class SecClient:
                     f"companyName:{name}",
                     'formType:"S-4"',
                     'NOT formType:("4/A" OR "S-4 POS")',
-                ]
+                ],
+                take=5,
             )
 
         return {name: await fetch(name) for name in names}
