@@ -54,9 +54,9 @@ def include_discriminator(v: Any) -> str:
 class TermSearchCriteria(BaseModel):
     query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
     terms: Annotated[list[str], Field(validate_default=True)] = []
-    term_fields: Annotated[list[TermField], Field(validate_default=True)] = (
-        DEFAULT_TERM_FIELDS
-    )
+    term_fields: Annotated[
+        list[TermField], Field(validate_default=True)
+    ] = DEFAULT_TERM_FIELDS
 
     @field_validator("term_fields", mode="before")
     def term_fields_from_string(cls, v):
@@ -113,9 +113,9 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 
 class PatentSearchParams(DocumentSearchParams):
-    include: Annotated[PatentInclude | None, Field(validate_default=True)] = (
-        DEFAULT_PATENT_INCLUDE
-    )
+    include: Annotated[
+        PatentInclude | None, Field(validate_default=True)
+    ] = DEFAULT_PATENT_INCLUDE
 
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
@@ -125,16 +125,16 @@ class RegulatoryApprovalSearchParams(DocumentSearchParams):
 
 
 class TrialSearchParams(DocumentSearchParams):
-    include: Annotated[Union[TrialInclude, None], Field(validate_default=True)] = (
-        DEFAULT_TRIAL_INCLUDE
-    )
+    include: Annotated[
+        Union[TrialInclude, None], Field(validate_default=True)
+    ] = DEFAULT_TRIAL_INCLUDE
 
 
 class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
-        EntityCategory.intervention
-    )
+    entity_category: Annotated[
+        EntityCategory, Field(validate_default=True)
+    ] = EntityCategory.intervention
     include: Annotated[None | dict, Field()] = None
 
     @field_validator("entity_category", mode="before")
@@ -158,10 +158,6 @@ class DocumentCharacteristicParams(DocumentSearchParams):
     include: Annotated[dict, Field()] = {}
 
 
-SIMILARITY_EXAGGERATION_FACTOR = 50
-MIN_RELEVANCE_SCORE = 0.5
-
-
 class CompanyFinderParams(BaseModel):
     """
     Parameters for finding companies
@@ -171,12 +167,6 @@ class CompanyFinderParams(BaseModel):
     similar_companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
-    min_relevance_score: Annotated[float, Field(validate_default=True)] = (
-        MIN_RELEVANCE_SCORE
-    )
-    exag_factor: Annotated[int, Field(validate_default=True)] = (
-        SIMILARITY_EXAGGERATION_FACTOR
-    )
 
     @field_validator("similar_companies", mode="before")
     def similar_companies_from_string(cls, v):
