@@ -176,6 +176,15 @@ class CompanyFinderParams(BaseModel):
         return similar_companies
 
 
+class ConceptDecomposeParams(BaseModel):
+    """
+    Parameters for concept decomposition handler
+    """
+
+    description: Annotated[str, Field(validate_default=True)]
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
+
+
 AutocompleteType = Literal["entity", "owner"]
 
 

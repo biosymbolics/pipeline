@@ -125,8 +125,6 @@ class VectorReportClient:
         """
         query = get_query(inner_query) if get_query else inner_query
 
-        logger.info("Getting top docs with query %s", query)
-
         async with prisma_context(300) as db:
             records: list[dict] = await db.query_raw(query, ids)
 

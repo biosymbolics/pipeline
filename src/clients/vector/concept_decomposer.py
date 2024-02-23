@@ -9,7 +9,7 @@ from langchain.output_parsers import ResponseSchema
 from clients.openai.gpt_client import GptApiClient
 from core.ner.spacy import get_transformer_nlp
 
-from .semantic_finder import VectorReportClient
+from .vector_report_client import VectorReportClient
 from .types import SubConcept, TopDocsByYear
 
 

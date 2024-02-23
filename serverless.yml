@@ -235,6 +235,15 @@ functions:
     handler: src.handlers.patents.find_companies
     layers:
       - Ref: PythonRequirementsLambdaLayer
+  decompose-concept:
+    events:
+      - http:
+          path: concept/decompose
+          method: get
+          cors: true
+    handler: src.handlers.reports.decompose_concepts
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
 plugins:
   - serverless-python-requirements
   - serverless-offline
