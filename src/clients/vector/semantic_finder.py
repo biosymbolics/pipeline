@@ -6,10 +6,11 @@ import json
 import logging
 from typing import Sequence
 import torch
-from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 
+from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
+from clients.vector.types import TopDocRecord, TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
 from utils.string import get_id
 
@@ -39,7 +40,7 @@ class SemanticFinder:
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
         """
-        Get the avg vector for a list of companies
+        From the avg vector for a list of companies
         """
         query = f"""
             SELECT AVG(vector)::text vector FROM owner
@@ -55,7 +56,7 @@ class SemanticFinder:
         description: str | None, companies: Sequence[str]
     ) -> list[float]:
         """
-        Get the vector for a description & list of companies
+        Form query vector for a description & list of companies
         """
         nlp = get_transformer_nlp()
 
@@ -82,19 +83,18 @@ class SemanticFinder:
         query = f"""
             SELECT
                 MAX(id) as id,
-                ARRAY_AGG(id) as ids,
                 AVG(relevance_score) as relevance_score,
+                MAX(title) as title,
                 AVG(vector) as vector,
-                MIN(priority_date) as priority_date,
-                MAX(title) as title
+                MIN(year) as year
             FROM (
                 SELECT
                     id,
                     family_id,
-                    title,
                     POW((1 - (vector <=> '{vector}')), {self.exaggeration_factor})::numeric as relevance_score,
+                    title,
                     vector,
-                    priority_date
+                    date_part('year', priority_date) as year
                 FROM patent
                 WHERE id = ANY($1)
             ) s
@@ -133,3 +133,60 @@ class SemanticFinder:
         )
 
         return response
+
+    async def get_top_docs(
+        self, description: str, similar_companies: Sequence[str] = []
+    ) -> list[TopDocRecord]:
+        """
+        Get the top documents for a description and (optionally) similar companies
+        (unaggregated)
+
+        Args:
+            description (str): description of the concept
+            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+        """
+        vector = await self._form_vector(description, similar_companies)
+        async with prisma_context(300) as db:
+            top_docs = await db.query_raw(self.get_top_docs_query(vector))
+
+        return [TopDocRecord(**record) for record in top_docs]
+
+    async def get_top_docs_by_year(
+        self, description: str, similar_companies: Sequence[str] = []
+    ) -> list[TopDocsByYear]:
+        """
+        Get the top documents for a description and (optionally) similar companies,
+        aggregated by year
+
+        Args:
+            description (str): description of the concept
+            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+        """
+        vector = await self._form_vector(description, similar_companies)
+        doc_query = self.get_top_docs_query(vector)
+        query = f"""
+            SELECT
+                ARRAY_AGG(id) as ids,
+                AVG(relevance_score) as avg_score,
+                ARRAY_AGG(relevance_score) as scores,
+                ARRAY_AGG(title) as titles,
+                year
+            FROM ({doc_query}) top_docs
+            GROUP BY year
+        """
+        async with prisma_context(300) as db:
+            top_docs = await db.query_raw(query)
+
+        return [TopDocsByYear(**record) for record in top_docs]
+
+    async def __call__(
+        self, description: str, similar_companies: Sequence[str] = []
+    ) -> list[TopDocsByYear]:
+        """
+        Get the top documents for a description and (optionally) similar companies, by year
+
+        Args:
+            description (str): description of the concept
+            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+        """
+        return await self.get_top_docs_by_year(description, similar_companies)

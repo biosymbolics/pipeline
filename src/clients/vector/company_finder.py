@@ -76,8 +76,8 @@ class SemanticCompanyFinder(SemanticFinder):
             "ARRAY_AGG(top_docs.id) AS ids",
             "COUNT(title) AS count",
             "ARRAY_AGG(title) AS titles",
-            f"MIN({current_year}-date_part('year', priority_date))::int AS min_age",
-            f"ROUND(AVG({current_year}-date_part('year', priority_date))) AS avg_age",
+            f"MIN({current_year}-year)::int AS min_age",
+            f"ROUND(AVG({current_year}-year)) AS avg_age",
             f"ROUND(POW((1 - (AVG(top_docs.vector) <=> owner.vector)), {self.exaggeration_factor})::numeric, 2) AS wheelhouse_score",
         ]
         company_fields = [
@@ -91,7 +91,7 @@ class SemanticCompanyFinder(SemanticFinder):
                 SUM(
                     relevance_score
                     * POW(
-                        GREATEST(0.0, ((date_part('year', priority_date) - {self.min_year}) / 24)),
+                        GREATEST(0.0, ((year - {self.min_year}) / 24)),
                         {self.recency_decay_factor}
                     )
                 )::numeric, 2

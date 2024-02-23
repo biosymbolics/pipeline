@@ -5,6 +5,22 @@ Vector client types
 from typings.core import ResultBase
 
 
+class TopDocRecord(ResultBase):
+    id: str
+    relevance_score: float
+    title: str
+    vector: list[float]
+    year: int
+
+
+class TopDocsByYear(ResultBase):
+    ids: list[str]
+    avg_score: float
+    scores: list[float]
+    titles: list[str]
+    year: int
+
+
 class CountByYear(ResultBase):
     year: int
     count: int

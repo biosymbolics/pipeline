@@ -8,9 +8,9 @@ from langchain.output_parsers import ResponseSchema
 from pydantic import BaseModel
 
 from clients.openai.gpt_client import GptApiClient
-from clients.vector.company_finder import SemanticCompanyFinder
+from clients.vector import SemanticFinder
+from clients.vector.types import TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
-from typings.client import CompanyFinderParams
 
 
 class SubConcept(BaseModel):
@@ -42,7 +42,7 @@ class ConceptDecomposer:
 
         self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
         self.nlp = get_transformer_nlp()
-        self.semantic_client = SemanticCompanyFinder()
+        self.semantic_client = SemanticFinder()
 
     async def decompose_concept(self, concept_description: str) -> list[SubConcept]:
         """
@@ -66,16 +66,23 @@ class ConceptDecomposer:
 
         return sub_concepts
 
-    async def fetch_subconcept_details(self, sub_concepts: Sequence[SubConcept]):
+    async def fetch_subconcept_details(
+        self, sub_concepts: Sequence[SubConcept]
+    ) -> dict[str, list[TopDocsByYear]]:
         """
-        Fetches details for sub-concepts
+        Fetches reports for each sub-concept
 
-        Will be slow.
+        Returns a dictionary with sub-concept names as keys and lists of TopDocsByYear as values
+        Example:
+        {
+            "efflux pump inhibitors": [{ year: 2011, avg_score: 0.43, ... }, ...],
+            "receptor-mediated transport": [{ year: 2011, avg_score: 0.31, ... }, ...],
+            "intranasal delivery": [{ year: 2011, avg_score: 0.57, ... }, ...],
+        }
         """
-
-        details = await asyncio.gather(
-            *[
-                self.semantic_client(CompanyFinderParams(description=sc.description))
-                for sc in sub_concepts
-            ]
+        sub_concept_names = [sc.name for sc in sub_concepts]
+        concept_docs_by_year = await asyncio.gather(
+            *[self.semantic_client(sc.description) for sc in sub_concepts]
         )
+
+        return dict(zip(sub_concept_names, concept_docs_by_year))
