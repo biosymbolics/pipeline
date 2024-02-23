@@ -38,10 +38,10 @@ class CompanyRecord(ResultBase):
     # terms: list[str]
     min_age: int
     avg_age: float
-    activity: list[float]
+    activity: list[float] = []
     relevance_score: float
     wheelhouse_score: float
-    count_by_year: list[CountByYear]
+    count_by_year: list[CountByYear] = []
     score: float
 
 
@@ -50,3 +50,8 @@ class FindCompanyResult(ResultBase):
     description: str  # included since it could be a result of expansion
     exit_score: float
     competition_score: float
+
+
+class SubConcept(ResultBase):
+    name: str
+    description: str

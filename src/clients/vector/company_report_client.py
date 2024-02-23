@@ -9,7 +9,7 @@ from typing import Sequence
 from pydash import flatten, group_by, omit
 
 from clients.low_level.prisma import prisma_context
-from clients.vector.semantic_finder import SemanticFinder
+from clients.vector.vector_report_client import VectorReportClient
 from constants.documents import MAX_DATA_YEAR
 from typings.client import CompanyFinderParams
 from .types import (
@@ -22,12 +22,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class SemanticCompanyFinder(SemanticFinder):
+class CompanyReportClient(VectorReportClient):
     async def _fetch_company_reports(
-        self, document_ids: Sequence[str], owner_ids: Sequence[str]
-    ) -> dict[str, list[CountByYear]]:
+        self, document_ids: Sequence[str], owner_ids: Sequence[int]
+    ) -> dict[int, list[CountByYear]]:
         """
         Fetches company reports for a set of patent and owner ids
+
+        Returns map between owner_id and list of corresponding list[CountByYear]
         """
         report_query = f"""
             SELECT
@@ -82,6 +84,7 @@ class SemanticCompanyFinder(SemanticFinder):
         ]
         company_fields = [
             f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS relevance_score",
+            f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS score",
         ]
 
         description_fields = [
@@ -114,39 +117,36 @@ class SemanticCompanyFinder(SemanticFinder):
         description: str | None,
         vector: list[float],
     ) -> list[CompanyRecord]:
-        # get knn ids
-        ids = await SemanticCompanyFinder._get_knn_ids(vector, p.k)
+        def by_company_query(inner_query: str) -> str:
+            fields = self._get_fields(p.similar_companies, description, vector)
+            return f"""
+                SELECT {', '.join(fields)}
+                FROM ({inner_query}) top_docs
+                JOIN ownable ON ownable.patent_id=top_docs.id
+                JOIN owner ON owner.id=ownable.owner_id
+                LEFT JOIN financials ON financials.owner_id=owner.id
+                GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
+            """
 
-        fields = self._get_fields(p.similar_companies, description, vector)
-        query = f"""
-            SELECT {', '.join(fields)}
-            FROM ({self.get_top_docs_query(vector)}) top_docs
-            JOIN ownable ON ownable.patent_id=top_docs.id
-            JOIN owner ON owner.id=ownable.owner_id
-            LEFT JOIN financials ON financials.owner_id=owner.id
-            GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
-        """
-        async with prisma_context(300) as db:
-            print(query)
-            logger.info("Fetching companies from %s ids", len(ids))
-            records = await db.query_raw(query, ids)
+        companies = await self.get_top_docs(
+            description,
+            p.similar_companies,
+            p.k,
+            get_query=by_company_query,
+            Schema=CompanyRecord,
+        )
 
-        owner_ids = tuple([record["id"] for record in records])
-        patent_ids = tuple(flatten([record["ids"] for record in records]))
+        owner_ids = tuple([c.id for c in companies])
+        patent_ids = tuple(flatten([c.ids for c in companies]))
         report_map = await self._fetch_company_reports(patent_ids, owner_ids)
 
         companies = [
             CompanyRecord(
-                **omit(record, "score"),
-                activity=[v.count for v in report_map[record["id"]]],
-                count_by_year=report_map[record["id"]],
-                score=(
-                    record["score"]
-                    if record["score"] is not None
-                    else record["relevance_score"]
-                ),
+                **omit(c.model_dump(), "activity", "count_by_year"),
+                activity=[v.count for v in report_map[c.id]],
+                count_by_year=report_map[c.id],
             )
-            for record in records
+            for c in companies
         ]
 
         return sorted(companies, key=lambda x: x.score, reverse=True)

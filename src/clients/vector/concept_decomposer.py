@@ -5,17 +5,12 @@ Concept decomposition client
 import asyncio
 from typing import Sequence
 from langchain.output_parsers import ResponseSchema
-from pydantic import BaseModel
 
 from clients.openai.gpt_client import GptApiClient
-from clients.vector import SemanticFinder
-from clients.vector.types import TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
 
-
-class SubConcept(BaseModel):
-    name: str
-    description: str
+from .semantic_finder import VectorReportClient
+from .types import SubConcept, TopDocsByYear
 
 
 class ConceptDecomposer:
@@ -42,7 +37,7 @@ class ConceptDecomposer:
 
         self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
         self.nlp = get_transformer_nlp()
-        self.semantic_client = SemanticFinder()
+        self.vector_report_client = VectorReportClient()
 
     async def decompose_concept(self, concept_description: str) -> list[SubConcept]:
         """
@@ -66,7 +61,7 @@ class ConceptDecomposer:
 
         return sub_concepts
 
-    async def fetch_subconcept_details(
+    async def _generate_subconcept_reports(
         self, sub_concepts: Sequence[SubConcept]
     ) -> dict[str, list[TopDocsByYear]]:
         """
@@ -82,7 +77,16 @@ class ConceptDecomposer:
         """
         sub_concept_names = [sc.name for sc in sub_concepts]
         concept_docs_by_year = await asyncio.gather(
-            *[self.semantic_client(sc.description) for sc in sub_concepts]
+            *[self.vector_report_client(sc.description) for sc in sub_concepts]
         )
 
         return dict(zip(sub_concept_names, concept_docs_by_year))
+
+    async def decompose_concept_with_reports(
+        self, concept_description: str
+    ) -> dict[str, list[TopDocsByYear]]:
+        """
+        Decompose a concept into sub-concepts and fetch reports for each sub-concept
+        """
+        sub_concepts = await self.decompose_concept(concept_description)
+        return await self._generate_subconcept_reports(sub_concepts)

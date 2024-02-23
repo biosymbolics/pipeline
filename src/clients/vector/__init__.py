@@ -1,8 +1,8 @@
-from .company_finder import SemanticCompanyFinder
-from .semantic_finder import SemanticFinder
+from .company_report_client import CompanyReportClient
+from .vector_report_client import VectorReportClient
 
 
 __all__ = [
-    "SemanticFinder",
-    "SemanticCompanyFinder",
+    "VectorReportClient",
+    "CompanyReportClient",
 ]

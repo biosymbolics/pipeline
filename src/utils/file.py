@@ -29,8 +29,6 @@ def save_as_file(content: Union[str, bytes], filename: str, path: str = "") -> s
 
     file_path = os.path.join(path, filename)
 
-    print("FILE PATH", file_path)
-
     mode = "wb" if isinstance(content, bytes) else "w"
     with open(file_path, mode) as file:
         file.write(content)

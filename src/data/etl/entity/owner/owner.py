@@ -66,7 +66,10 @@ class OwnerEtl(BaseEntityEtl):
             OwnerCreateWithSynonymsInput(
                 name=(canonical_lookup_map.get(name) or name),
                 owner_type=OwnerTypeParser().find(name),
-                acquisition_count=ma_lookup_map.get(name) or 0,
+                acquisition_count=ma_lookup_map.get(
+                    canonical_lookup_map.get(name) or name  # lookup by canonical name
+                )
+                or 0,
                 synonyms=[name],
             )
             for name in names

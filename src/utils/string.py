@@ -53,7 +53,9 @@ def get_id(value: Idable) -> str:
             ]
         )
 
-    if isinstance(value, list) or isinstance(value, Sequence):
+    if isinstance(value, list) or (
+        isinstance(value, Sequence) and not isinstance(value, str)
+    ):
         value = "_".join([str(v) for v in value])
         if len(value) > MAX_ID_CHARS:
             # create a hash key if otherwise too long
