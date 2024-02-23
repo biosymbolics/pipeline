@@ -91,6 +91,13 @@ class VectorReportClient:
     ) -> list[ResultSchema]:
         """
         Get the query to get the top documents for a vector
+
+        Args:
+            description (str, optional): description of the concept. Defaults to None.
+            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+            k (int, optional): number of top documents to return. Defaults to DEFAULT_K.
+            get_query (Callable[[str], str], optional): function yielding the overall desired query.
+            Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
         vector = await self._form_vector(description, similar_companies)
         ids = await self._get_knn_ids(vector, k)
