@@ -332,6 +332,7 @@ enum MockChatType {
     HEATMAP
     TIMELINE
     STANDARD
+    CONCEPT_DECOMPOSITION
 }
 
 enum ComparisonType {
