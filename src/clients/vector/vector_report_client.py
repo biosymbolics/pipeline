@@ -177,9 +177,11 @@ class VectorReportClient:
             return f"""
                 SELECT
                     ARRAY_AGG(id) as ids,
+                    COUNT(*) as count,
                     AVG(relevance_score) as avg_score,
                     ARRAY_AGG(relevance_score) as scores,
                     ARRAY_AGG(title) as titles,
+                    SUM(relevance_score) as total_score,
                     year
                 FROM ({doc_query}) top_docs
                 GROUP BY year

@@ -15,9 +15,11 @@ class TopDocRecord(ResultBase):
 
 class TopDocsByYear(ResultBase):
     ids: list[str]
+    count: int
     avg_score: float
     scores: list[float]
     titles: list[str]
+    total_score: float
     year: int
 
 
@@ -55,3 +57,4 @@ class FindCompanyResult(ResultBase):
 class SubConcept(ResultBase):
     name: str
     description: str
+    report: list[TopDocsByYear] = []

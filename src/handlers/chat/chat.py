@@ -11,6 +11,7 @@ from prisma.partials import Chat
 from clients.biosym_chat.mock_chat import MockChatClient
 from clients.low_level.boto3 import retrieve_with_cache_check
 from clients.openai.gpt_client import GptApiClient
+from clients.vector import ConceptDecomposer
 from handlers.utils import handle_async
 from typings.core import ResultBase
 from utils.encoding.json_encoder import DataclassJSONEncoder
@@ -53,6 +54,22 @@ async def _chat(raw_event: dict, context):
     p = ChatParams(**(raw_event["queryStringParameters"] or {}))
 
     logger.info("Asking llm: %s", p)
+
+    if p.conversation_id == "conceptDecomposition":
+        resp = await ConceptDecomposer().decompose_concept_with_reports(p.content)
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                MockChatResponse(
+                    id=123,
+                    conversation_id="conceptDecomposition",
+                    message_id=100,
+                    content=json.dumps(resp, cls=DataclassJSONEncoder),
+                    type=MockChatType.CONCEPT_DECOMPOSITION,
+                ),
+                cls=DataclassJSONEncoder,
+            ),
+        }
 
     if p.conversation_id is not None and p.message_id is not None:
         resp = await MockChatClient(conversation_id=p.conversation_id).query(

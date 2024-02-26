@@ -5,12 +5,13 @@ Concept decomposition client
 import asyncio
 from typing import Sequence
 from langchain.output_parsers import ResponseSchema
+from pydash import omit
 
 from clients.openai.gpt_client import GptApiClient
 from core.ner.spacy import get_transformer_nlp
 
 from .vector_report_client import VectorReportClient
-from .types import SubConcept, TopDocsByYear
+from .types import SubConcept
 
 
 class ConceptDecomposer:
@@ -35,7 +36,9 @@ class ConceptDecomposer:
             ),
         ]
 
-        self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
+        self.llm = GptApiClient(
+            schemas=response_schemas, model="gpt-4", skip_cache=False
+        )
         self.nlp = get_transformer_nlp()
         self.vector_report_client = VectorReportClient()
 
@@ -44,8 +47,7 @@ class ConceptDecomposer:
         Decompose a concept into sub-concepts
         """
         prompt = f"""
-            What follows is a description of a biomedical research concept:
-            {concept_description}
+            What follows is a description of a biomedical research concept.
 
             Please decompose this concept into sub-concepts, which may come in the form of:
             - specific phenotypes of a given disease
@@ -54,6 +56,9 @@ class ConceptDecomposer:
 
             Return the answer as an array of json objects with the following fields: name, description.
             The description should be technical and detailed, non-self-referential, and 2-4 paragraphs in length.
+
+            Here is the concept:
+            "{concept_description}"
         """
 
         response = await self.llm.query(prompt, is_array=True)
@@ -63,7 +68,7 @@ class ConceptDecomposer:
 
     async def _generate_subconcept_reports(
         self, sub_concepts: Sequence[SubConcept]
-    ) -> dict[str, list[TopDocsByYear]]:
+    ) -> list[SubConcept]:
         """
         Fetches reports for each sub-concept
 
@@ -75,16 +80,18 @@ class ConceptDecomposer:
             "intranasal delivery": [{ year: 2011, avg_score: 0.57, ... }, ...],
         }
         """
-        sub_concept_names = [sc.name for sc in sub_concepts]
         concept_docs_by_year = await asyncio.gather(
             *[self.vector_report_client(sc.description) for sc in sub_concepts]
         )
 
-        return dict(zip(sub_concept_names, concept_docs_by_year))
+        return [
+            SubConcept(**omit(sc.model_dump(), "report"), report=report)
+            for sc, report in zip(sub_concepts, concept_docs_by_year)
+        ]
 
     async def decompose_concept_with_reports(
         self, concept_description: str
-    ) -> dict[str, list[TopDocsByYear]]:
+    ) -> list[SubConcept]:
         """
         Decompose a concept into sub-concepts and fetch reports for each sub-concept
         """
