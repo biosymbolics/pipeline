@@ -55,6 +55,27 @@ def get_entity_map_matview_query() -> list[str]:
     ]
 
 
+# these get wiped for every prisma db push. Will figure out a better way to handle this.
+# https://github.com/prisma/prisma/issues/12751
+MANUAL_INDICES = [
+    """
+    CREATE INDEX IF NOT EXISTS patent_vector ON patent
+        USING ivfflat (vector vector_cosine_ops) WITH (lists = 1250);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS trial_vector ON trial
+        USING ivfflat (vector vector_cosine_ops) WITH (lists = 400);
+    """,
+    """
+    CREATE INDEX owner_vector ON owner
+        USING ivfflat (vector vector_cosine_ops) WITH (lists = 24);
+    """,
+    """
+    CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);
+    """,
+]
+
+
 async def load_all(force_update: bool = False):
     """
     Central script for stage 2 of ETL (local dbs -> biosym)
