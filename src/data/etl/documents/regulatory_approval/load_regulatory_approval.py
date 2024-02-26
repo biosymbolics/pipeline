@@ -24,6 +24,7 @@ from data.etl.types import (
     RelationConnectInfo,
     RelationIdFieldMap,
 )
+from typings import DocType
 from utils.classes import overrides
 
 from .types import InterventionIntermediate, PharmaClass
@@ -295,6 +296,6 @@ if __name__ == "__main__":
 
     asyncio.run(
         RegulatoryApprovalLoader(
-            document_type="regulatory_approval", source_db="drugcentral"
+            document_type=DocType.regulatory_approval, source_db="drugcentral"
         ).copy_all(is_update)
     )

@@ -29,6 +29,7 @@ from data.domain.biomedical import (
 )
 from data.etl.types import BiomedicalEntityLoadSpec
 from data.domain.trials import extract_max_timeframe
+from typings import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
@@ -433,5 +434,5 @@ if __name__ == "__main__":
     is_update = "--update" in sys.argv
 
     asyncio.run(
-        TrialLoader(document_type="trial", source_db="aact").copy_all(is_update)
+        TrialLoader(document_type=DocType.trial, source_db="aact").copy_all(is_update)
     )
