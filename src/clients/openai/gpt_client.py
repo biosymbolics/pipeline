@@ -8,9 +8,11 @@ from langchain_openai import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Literal, Optional, cast
 import logging
+from clients.low_level.boto3 import retrieve_with_cache_check
 
 from typings.gpt import OutputParser
 from utils.parse import parse_answer
+from utils.string import get_id
 
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
@@ -31,13 +33,14 @@ class GptApiClient:
         self,
         schemas: Optional[list[ResponseSchema]] = None,
         model: GptModel = DEFAULT_GPT_MODEL,
+        skip_cache: bool = False,
     ):
         self.client = None
         self.model = model
-
         prompt_template, output_parser = self._get_prompt_and_parser(schemas)
         self.output_parser: Optional[StructuredOutputParser] = output_parser
         self.prompt_template: PromptTemplate = prompt_template
+        self.skip_cache = skip_cache
 
     def _get_prompt_and_parser(
         self, schemas: list[ResponseSchema] | None
@@ -73,7 +76,7 @@ class GptApiClient:
 
         return answer
 
-    async def query(self, query: str, is_array: bool = False) -> Any:
+    async def _query(self, query: str, is_array: bool = False) -> Any:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
@@ -90,8 +93,24 @@ class GptApiClient:
             logger.warning("Error formatting answer: %s", e)
             return output
 
+    async def query(self, query: str, is_array: bool = False) -> Any:
+        """
+        Query GPT with a cache check
+        """
+        if self.skip_cache:
+            result = self._query(query, is_array)
+        else:
+            key = f"gpt-query-{get_id([query])}"
+            result = await retrieve_with_cache_check(
+                lambda: self._query(query, is_array), key=key
+            )
+
+        return result
+
     async def describe_terms(
-        self, terms: list[str], context_terms: Optional[list[str]] = None
+        self,
+        terms: list[str],
+        context_terms: Optional[list[str]] = None,
     ) -> str:
         """
         Simple query to describe terms
