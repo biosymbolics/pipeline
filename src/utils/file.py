@@ -11,7 +11,7 @@ from typing import Any, Union
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-BASE_PATH = "../data"
+BASE_PATH = "./data"  # TODO: make absolute?
 
 
 def get_full_path(path: str) -> str:
