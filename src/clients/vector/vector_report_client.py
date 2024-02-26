@@ -121,7 +121,7 @@ class VectorReportClient:
                 SELECT
                     id,
                     1 - (vector <=> '{vector}') as similarity
-                FROM patent
+                FROM {self.document_type.name}
                 ORDER BY (1 - (vector <=> '{vector}')) DESC
                 LIMIT {k}
             """
@@ -195,7 +195,7 @@ class VectorReportClient:
                     title,
                     vector,
                     date_part('year', priority_date) as year
-                FROM patent
+                FROM {self.document_type.name}
                 WHERE id = ANY($1)
             ) s
             GROUP BY s.family_id
