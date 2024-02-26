@@ -55,7 +55,8 @@ class ConceptDecomposer:
             - different ways of achieving a given therapeutic effect
 
             Return the answer as an array of json objects with the following fields: name, description.
-            The description should be technical and detailed, non-self-referential, and 2-4 paragraphs in length.
+            The description should be technical, detailed, standalone and 2-4 paragraphs in length.
+            Each description should be of similar specificity and relatedness to the original concept.
 
             Here is the concept:
             "{concept_description}"
