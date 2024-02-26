@@ -47,15 +47,15 @@ class ConceptDecomposer:
         Decompose a concept into sub-concepts
         """
         prompt = f"""
-            What follows is a description of a biomedical research concept.
+            What follows is a description of a biomedical R&D concept.
 
             Please decompose this concept into sub-concepts, which may come in the form of:
             - specific phenotypes of a given disease
             - diseases within a therapeutic area
-            - different ways of achieving a given therapeutic effect
+            - different technologies and/or strategies to achieve given therapeutic effect
 
             Return the answer as an array of json objects with the following fields: name, description.
-            The description should be technical, detailed, standalone and 2-4 paragraphs in length.
+            The description should be technically detailed, standalone, 3-4 paragraphs in length and include examples.
             Each description should be of similar specificity and relatedness to the original concept.
 
             Here is the concept:

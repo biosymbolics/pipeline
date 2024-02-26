@@ -72,7 +72,7 @@ class CompanyReportClient(VectorReportClient):
         common_fields = [
             "owner.id AS id",
             "owner.name AS name",
-            "(owner.acquisition_count > 0) AS is_acquirer",
+            "(owner.acquisition_count > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
             "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",

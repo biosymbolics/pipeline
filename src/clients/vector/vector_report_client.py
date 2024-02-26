@@ -4,9 +4,8 @@ Base semantic finder
 
 import json
 import logging
-from typing import Callable, Generic, Sequence, Type, TypeVar
+from typing import Callable, Sequence, Type, TypeVar
 from pydantic import BaseModel
-from pydantic.type_adapter import TypeAdapter
 import torch
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
@@ -14,6 +13,7 @@ from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from clients.vector.types import TopDocRecord, TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
+from typings.documents.common import DocType
 from utils.string import get_id
 
 logger = logging.getLogger(__name__)
@@ -21,9 +21,8 @@ logger.setLevel(logging.INFO)
 
 MIN_YEAR = 2000
 RECENCY_DECAY_FACTOR = 2
-SIMILARITY_EXAGGERATION_FACTOR = 50
-MIN_RELEVANCE_SCORE = 0.3  # 0.5
 DEFAULT_K = 1000
+SIMILARITY_EXAGGERATION_FACTOR = 50  # adjust with MIN_RELEVANCE_SCORE
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
@@ -34,13 +33,13 @@ class VectorReportClient:
         min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
         exaggeration_factor: int = SIMILARITY_EXAGGERATION_FACTOR,
-        min_relevance_score: float = MIN_RELEVANCE_SCORE,
+        document_type: DocType = DocType.patent,
     ):
         self.gpt_client = GptApiClient()
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
         self.exaggeration_factor = exaggeration_factor
-        self.min_relevance_score = min_relevance_score
+        self.document_type = document_type
 
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
@@ -81,6 +80,85 @@ class VectorReportClient:
 
         return combined_vector
 
+    def _calc_min_similarity(
+        self, similarity_scores: Sequence[float], alpha: float = 0.75
+    ) -> float:
+        """
+        Get the default min similarity score
+        min=avg(sim)+α*σ(sim)
+
+        Args:
+            similarity_scores (Sequence[float]): similarity scores
+            alpha (float, optional): alpha. Defaults to 0.75.
+
+        Returns:
+            min similarity score (float)
+
+        Taken from https://www.researchgate.net/post/Determination-of-threshold-for-cosine-similarity-score
+        """
+        mean = sum(similarity_scores) / len(similarity_scores)
+        stddev = (
+            sum((x - mean) ** 2 for x in similarity_scores) / len(similarity_scores)
+        ) ** 0.5
+        return mean + alpha * stddev
+
+    async def _get_top_ids(
+        self, vector: list[float], k: int, alpha: float = 0.75
+    ) -> list[str]:
+        """
+        Get the ids of the k nearest neighbors to a vector
+        Returns ids only above a certain threshold, determined dynamically.
+        Cached.
+
+        Args:
+            vector (list[float]): vector to search
+            k (int): number of nearest neighbors to return
+            alpha (float, optional): alpha for min sim score calc. Defaults to 0.75.
+        """
+
+        async def fetch():
+            query = f"""
+                SELECT
+                    id,
+                    1 - (vector <=> '{vector}') as similarity
+                FROM patent
+                ORDER BY (1 - (vector <=> '{vector}')) DESC
+                LIMIT {k}
+            """
+            async with prisma_context(300) as db:
+                records = await db.query_raw(query)
+
+            scores = [
+                record["similarity"]
+                for record in records
+                if record["similarity"] is not None  # not sure why it returns null
+            ]
+            min_similiarity = self._calc_min_similarity(scores, alpha)
+
+            above_threshold_ids = [
+                record["id"]
+                for record in records
+                if (record["similarity"] or 0) >= min_similiarity
+            ]
+
+            logger.info(
+                "Returning %s ids above similarity threshold %s",
+                len(above_threshold_ids),
+                min_similiarity,
+            )
+
+            return above_threshold_ids
+
+        cache_key = get_id([vector, k])
+        response = await retrieve_with_cache_check(
+            fetch,
+            key=cache_key,
+            decode=lambda str_data: storage_decoder(str_data),
+            use_filesystem=True,
+        )
+
+        return response
+
     async def get_top_docs(
         self,
         description: str | None = None,
@@ -100,7 +178,7 @@ class VectorReportClient:
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
         vector = await self._form_vector(description, similar_companies)
-        ids = await self._get_knn_ids(vector, k)
+        ids = await self._get_top_ids(vector, k)
 
         inner_query = f"""
             SELECT
@@ -120,7 +198,6 @@ class VectorReportClient:
                 FROM patent
                 WHERE id = ANY($1)
             ) s
-            WHERE relevance_score >= {self.min_relevance_score}
             GROUP BY s.family_id
         """
         query = get_query(inner_query) if get_query else inner_query
@@ -129,37 +206,6 @@ class VectorReportClient:
             records: list[dict] = await db.query_raw(query, ids)
 
         return [Schema(**record) for record in records]
-
-    @staticmethod
-    async def _get_knn_ids(vector: list[float], k: int) -> list[str]:
-        """
-        Get the ids of the k nearest neighbors to a vector
-        Cached.
-
-        Args:
-            vector (list[float]): vector to search
-            k (int): number of nearest neighbors to return
-        """
-
-        async def fetch():
-            query = f"""
-                SELECT id FROM patent
-                ORDER BY (1 - (vector <=> '{vector}')) DESC LIMIT {k}
-            """
-            async with prisma_context(300) as db:
-                records = await db.query_raw(query)
-
-            return [record["id"] for record in records]
-
-        cache_key = get_id([vector, k])
-        response = await retrieve_with_cache_check(
-            fetch,
-            key=cache_key,
-            decode=lambda str_data: storage_decoder(str_data),
-            use_filesystem=True,
-        )
-
-        return response
 
     async def get_top_docs_by_year(
         self, description: str, similar_companies: Sequence[str] = []
