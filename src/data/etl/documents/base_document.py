@@ -11,6 +11,7 @@ from typing import Literal
 from clients.low_level.prisma import prisma_client
 from data.etl.types import BiomedicalEntityLoadSpec
 from system import initialize
+from typings.documents.common import DocType
 
 initialize()
 
@@ -18,11 +19,9 @@ initialize()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-DocumentType = Literal["patent", "regulatory_approval", "trial"]
-
 
 class BaseDocumentEtl:
-    def __init__(self, document_type: DocumentType, source_db: str):
+    def __init__(self, document_type: DocType, source_db: str):
         self.document_type = document_type
         self.source_db = source_db
 
@@ -48,7 +47,7 @@ class BaseDocumentEtl:
         logger.info("Coping documents...")
         await self.copy_documents()
 
-        if self.document_type != "regulatory_approval":
+        if self.document_type != DocType.regulatory_approval:
             await self.copy_vectors()
 
         await self.checksum()
@@ -59,25 +58,25 @@ class BaseDocumentEtl:
         """
         client = await prisma_client(1200)
         row_count = await client.query_raw(
-            f"SELECT COUNT(*) as count FROM {self.document_type}"
+            f"SELECT COUNT(*) as count FROM {self.document_type.name}"
         )
         list_count = int(row_count[0]["count"] / 1000)
         queries = [
             # "CREATE EXTENSION IF NOT EXISTS dblink",
             f"DROP INDEX IF EXISTS {self.document_type}_vector",
             f"""
-                UPDATE {self.document_type} set vector = v.vector
+                UPDATE {self.document_type.name} set vector = v.vector
                 FROM dblink(
                     'dbname={self.source_db}',
-                    'SELECT id, vector FROM {self.document_type}_vectors'
+                    'SELECT id, vector FROM {self.document_type.name}_vectors'
                 ) AS v(id TEXT, vector vector(768))
-                WHERE {self.document_type}.id=v.id;
+                WHERE {self.document_type.name}.id=v.id;
             """,
             # TODO: switch to hnsw maybe
             # "CREATE INDEX patent_vector_hnsw ON patent USING hnsw (vector vector_cosine_ops)",
             # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
             f"""
-                CREATE INDEX {self.document_type}_vector ON {self.document_type}
+                CREATE INDEX {self.document_type.name}_vector ON {self.document_type.name}
                 USING ivfflat (vector vector_cosine_ops) WITH (lists = {list_count})
             """,
         ]
@@ -91,22 +90,24 @@ class BaseDocumentEtl:
         """
         client = await prisma_client(300)
         checksums = {
-            self.document_type: f"SELECT COUNT(*) FROM {self.document_type}",
+            self.document_type.name: f"SELECT COUNT(*) FROM {self.document_type.name}",
             "owners": f"""
                 SELECT COUNT(*) as count, COUNT(distinct owner_id) as distinct_count
-                FROM ownable WHERE {self.document_type}_id IS NOT NULL
+                FROM ownable WHERE {self.document_type.name}_id IS NOT NULL
             """,
             "indications": f"""
                 SELECT COUNT(*) as count, COUNT(distinct entity_id) as distinct_count
-                FROM indicatable WHERE {self.document_type}_id IS NOT NULL
+                FROM indicatable WHERE {self.document_type.name}_id IS NOT NULL
             """,
             "interventions": f"""
                 SELECT COUNT(*) as count, COUNT(distinct entity_id) as distinct_count
-                FROM intervenable WHERE {self.document_type}_id IS NOT NULL
+                FROM intervenable WHERE {self.document_type.name}_id IS NOT NULL
             """,
         }
         results = await asyncio.gather(
             *[client.query_raw(query) for query in checksums.values()]
         )
         for key, result in zip(checksums.keys(), results):
-            logger.warning(f"{self.document_type} load checksum {key}: {result[0]}")
+            logger.warning(
+                f"{self.document_type.name} load checksum {key}: {result[0]}"
+            )
