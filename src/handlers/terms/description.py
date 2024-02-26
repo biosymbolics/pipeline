@@ -50,7 +50,7 @@ async def _describe(event: DescribeEvent, context):
         terms_list,
     )
 
-    description = gpt_client.describe_terms(terms_list)
+    description = await gpt_client.describe_terms(terms_list)
 
     return {"statusCode": 200, "body": description}
 

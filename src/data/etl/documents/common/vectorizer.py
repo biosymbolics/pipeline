@@ -80,7 +80,6 @@ class DocumentVectorizer:
         Format documents for vectorization
         Concatenates fields and trucates to MAX_TEXT_LENGTH
         """
-        print(doc_df)
         texts = compact([doc_df[field].to_list() for field in self.text_fields])
         return [("\n".join(text))[0:MAX_TEXT_LENGTH] for text in zip(*texts)]
 

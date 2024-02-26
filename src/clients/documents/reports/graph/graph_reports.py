@@ -86,6 +86,10 @@ DOCUMENT_GROUP = "patent"
 
 
 def _apply_limit(df: pl.DataFrame) -> list[AggregateDocumentRelationship]:
+
+    if len(df) == 0:
+        return []
+
     top_tails = (
         df.group_by("tail")
         .agg(pl.count("head").alias("head_count"))

@@ -47,7 +47,7 @@ class ConceptDecomposer:
         Decompose a concept into sub-concepts
         """
         prompt = f"""
-            What follows is a description of a biomedical R&D concept.
+            What follows is a description of a biomedical concept.
 
             Please decompose it into 5-10 sub-concepts, which may come in the form of:
             - specific phenotypes of a given disease
@@ -56,8 +56,16 @@ class ConceptDecomposer:
             - and so on.
 
             Return the answer as an array of json objects with the following fields: name, description.
-            The description should be technically detailed, standalone, 3-4 paragraphs in length and include examples.
-            Each description should be of similar specificity and relatedness to the original concept.
+            The description should be written as if a patent: technical, detailed, precise and making appropriate use of jargon.
+            Each description should be 3-4 paragraphs, standalone and avoid any reference to the other descriptions.
+            They should be, in a sense, homogeneous: having similar specificity, scope and scale relative to the original concept.
+
+            Here is an example:
+            name: Galectin-1 antibodies
+            description: "Monovalent antibodies such as nanobodies that are specific for galectin-1 are described.
+            These monovalent antibodies are able to interfere with the activity of galectin-1,
+            and thus may be used for the treatment of diseases associated with dysregulated galectin-1 expression
+            and/or activity, such as certain types of cancers, as well as conditions associated with pathological angiogenesis or fibrosis."
 
             Here is the concept:
             "{concept_description}"

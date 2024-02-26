@@ -43,6 +43,7 @@ UMLS_NAME_OVERRIDES = {
     "C0108801": "tfr1",
     "C0017262": "expression",
     "C3641152": "moiety",
+    "C1424685": "nk1",
 }
 
 # sets canonical based on (single!) word
@@ -76,6 +77,7 @@ UMLS_WORD_OVERRIDES = {
 }
 
 UMLS_CUI_ALIAS_SUPPRESSIONS = {
+    "C3470073": ["post"],
     "C0027627": ["secondary"],
     "C1412362": ["flap"],
     "C0029896": ["ent diseases", "disease, ent"],

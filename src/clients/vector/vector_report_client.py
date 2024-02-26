@@ -81,29 +81,29 @@ class VectorReportClient:
         return combined_vector
 
     def _calc_min_similarity(
-        self, similarity_scores: Sequence[float], alpha: float = 0.75
+        self, similarities: Sequence[float], alpha: float
     ) -> float:
         """
         Get the default min similarity score
         min=avg(sim)+α*σ(sim)
 
         Args:
-            similarity_scores (Sequence[float]): similarity scores
-            alpha (float, optional): alpha. Defaults to 0.75.
+            similarities (Sequence[float]): similarity scores
+            alpha (float): alpha for the calculation
 
         Returns:
             min similarity score (float)
 
         Taken from https://www.researchgate.net/post/Determination-of-threshold-for-cosine-similarity-score
         """
-        mean = sum(similarity_scores) / len(similarity_scores)
+        mean = sum(similarities) / len(similarities)
         stddev = (
-            sum((x - mean) ** 2 for x in similarity_scores) / len(similarity_scores)
+            sum((score - mean) ** 2 for score in similarities) / len(similarities)
         ) ** 0.5
         return mean + alpha * stddev
 
     async def _get_top_ids(
-        self, vector: list[float], k: int, alpha: float = 0.75
+        self, vector: list[float], k: int, alpha: float = 0.85
     ) -> list[str]:
         """
         Get the ids of the k nearest neighbors to a vector
@@ -122,7 +122,7 @@ class VectorReportClient:
                     id,
                     1 - (vector <=> '{vector}') as similarity
                 FROM {self.document_type.name}
-                ORDER BY (1 - (vector <=> '{vector}')) DESC
+                ORDER BY vector <-> '{vector}' ASC
                 LIMIT {k}
             """
             async with prisma_context(300) as db:
@@ -251,7 +251,7 @@ class VectorReportClient:
             similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
         """
         logger.info(
-            "Getting top docs by year for description: %s and similar companies: %s",
+            "Getting top docs by year for description: '%s' and similar companies: %s",
             description,
             similar_companies,
         )

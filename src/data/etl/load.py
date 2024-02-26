@@ -59,16 +59,13 @@ def get_entity_map_matview_query() -> list[str]:
 # https://github.com/prisma/prisma/issues/12751
 MANUAL_INDICES = [
     """
-    CREATE INDEX IF NOT EXISTS patent_vector ON patent
-        USING ivfflat (vector vector_cosine_ops) WITH (lists = 1250);
+    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
     """,
     """
-    CREATE INDEX IF NOT EXISTS trial_vector ON trial
-        USING ivfflat (vector vector_cosine_ops) WITH (lists = 400);
+    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
     """,
     """
-    CREATE INDEX owner_vector ON owner
-        USING ivfflat (vector vector_cosine_ops) WITH (lists = 24);
+    CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
     """,
     """
     CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);

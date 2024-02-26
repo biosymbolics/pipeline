@@ -54,9 +54,9 @@ def include_discriminator(v: Any) -> str:
 class TermSearchCriteria(BaseModel):
     query_type: Annotated[QueryType, Field(validate_default=True)] = DEFAULT_QUERY_TYPE
     terms: Annotated[list[str], Field(validate_default=True)] = []
-    term_fields: Annotated[
-        list[TermField], Field(validate_default=True)
-    ] = DEFAULT_TERM_FIELDS
+    term_fields: Annotated[list[TermField], Field(validate_default=True)] = (
+        DEFAULT_TERM_FIELDS
+    )
 
     @field_validator("term_fields", mode="before")
     def term_fields_from_string(cls, v):
@@ -113,9 +113,9 @@ class DocumentSearchParams(DocumentSearchCriteria):
 
 
 class PatentSearchParams(DocumentSearchParams):
-    include: Annotated[
-        PatentInclude | None, Field(validate_default=True)
-    ] = DEFAULT_PATENT_INCLUDE
+    include: Annotated[PatentInclude | None, Field(validate_default=True)] = (
+        DEFAULT_PATENT_INCLUDE
+    )
 
 
 class RegulatoryApprovalSearchParams(DocumentSearchParams):
@@ -125,16 +125,16 @@ class RegulatoryApprovalSearchParams(DocumentSearchParams):
 
 
 class TrialSearchParams(DocumentSearchParams):
-    include: Annotated[
-        Union[TrialInclude, None], Field(validate_default=True)
-    ] = DEFAULT_TRIAL_INCLUDE
+    include: Annotated[Union[TrialInclude, None], Field(validate_default=True)] = (
+        DEFAULT_TRIAL_INCLUDE
+    )
 
 
 class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
-    entity_category: Annotated[
-        EntityCategory, Field(validate_default=True)
-    ] = EntityCategory.intervention
+    entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
+        EntityCategory.intervention
+    )
     include: Annotated[None | dict, Field()] = None
 
     @field_validator("entity_category", mode="before")
