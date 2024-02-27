@@ -89,11 +89,11 @@ class CompanyReportClient(VectorReportClient):
             "ARRAY_AGG(title) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
-            f"ROUND(POW((1 - (AVG(top_docs.vector) <=> owner.vector)), {self.exaggeration_factor})::numeric, 2) AS wheelhouse_score",
+            f"ROUND((AVG(top_docs.vector) <-> owner.vector)::numeric * 10, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS relevance_score",
-            f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * 10, 2) AS relevance_score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * 10, 2) AS score",
         ]
 
         description_fields = [

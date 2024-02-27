@@ -22,7 +22,6 @@ logger.setLevel(logging.INFO)
 MIN_YEAR = 2000
 RECENCY_DECAY_FACTOR = 2
 DEFAULT_K = 1000
-SIMILARITY_EXAGGERATION_FACTOR = 50  # adjust with MIN_RELEVANCE_SCORE
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
@@ -32,13 +31,11 @@ class VectorReportClient:
         self,
         min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
-        exaggeration_factor: int = SIMILARITY_EXAGGERATION_FACTOR,
         document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
     ):
         self.gpt_client = GptApiClient()
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
-        self.exaggeration_factor = exaggeration_factor
         self.document_types = document_types
 
     @staticmethod
@@ -200,7 +197,7 @@ class VectorReportClient:
                     SELECT
                         id,
                         {dedup_id_field} as dedup_id,
-                        POW((1 - (vector <=> '{vector}')), {self.exaggeration_factor})::numeric as relevance_score,
+                        ((1 / exp(vector <-> '{vector}')) * 10)::numeric as relevance_score,
                         title,
                         vector,
                         date_part('year', {date_field})::int as year
