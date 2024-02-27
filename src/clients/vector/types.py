@@ -28,6 +28,11 @@ class CountByYear(ResultBase):
     count: int
 
 
+class UrlDef(ResultBase):
+    title: str
+    url: str
+
+
 class CompanyRecord(ResultBase):
     id: int
     name: str
@@ -37,6 +42,7 @@ class CompanyRecord(ResultBase):
     count: int
     symbol: str | None
     titles: list[str]
+    urls: list[UrlDef]
     # terms: list[str]
     min_age: int
     avg_age: float

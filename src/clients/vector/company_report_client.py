@@ -85,15 +85,24 @@ class CompanyReportClient(VectorReportClient):
             "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",
+            f"""
+            ARRAY_AGG(
+                JSON_BUILD_OBJECT(
+                    'url', url,
+                    'title', title
+                )
+            ) AS urls
+            """,
+            "ARRAY_AGG(top_docs.year) AS years",
             "COUNT(title) AS count",
             "ARRAY_AGG(title) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
-            f"ROUND((AVG(top_docs.vector) <-> owner.vector)::numeric * 10, 2) AS wheelhouse_score",
+            f"ROUND((1 / exp(AVG(top_docs.vector) <-> owner.vector))::numeric * {self.relevance_scale_power}, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * 10, 2) AS relevance_score",
-            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * 10, 2) AS score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
         ]
 
         description_fields = [
