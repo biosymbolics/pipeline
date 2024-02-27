@@ -289,8 +289,6 @@ class OwnerEtl(BaseEntityEtl):
         """
         Create company-level vectors that are the average of all patents
         (and other documents in the future)
-
-        ivfflat "lists"  = rows / 1000 = 24183 / 1000 = 24
         """
         queries = [
             "DROP INDEX if exists owner_vector",
@@ -298,14 +296,29 @@ class OwnerEtl(BaseEntityEtl):
             UPDATE owner
             SET vector = agg.vector
             FROM (
-                SELECT AVG(vector) as vector, ownable.owner_id as owner_id
-                FROM patent, ownable
-                WHERE patent.id=ownable.patent_id
-                GROUP BY ownable.owner_id
+                SELECT AVG(vector) vector, owner_id
+                FROM (
+                    SELECT AVG(vector) vector, ownable.owner_id as owner_id
+                    FROM ownable, trial
+                    WHERE ownable.trial_id=trial.id
+                    AND vector IS NOT null
+                    AND owner_id IS NOT null
+                    GROUP BY ownable.owner_id
+
+                    UNION ALL
+
+                    SELECT AVG(vector) vector, ownable.owner_id as owner_id
+                    FROM ownable, patent
+                    WHERE ownable.patent_id=patent.id
+                    AND vector IS NOT null
+                    AND owner_id IS NOT null
+                    GROUP BY ownable.owner_id
+                ) s
+                GROUP BY owner_id
             ) agg
             WHERE agg.owner_id=owner.id
             """,
-            "CREATE INDEX owner_vector ON owner USING ivfflat (vector vector_cosine_ops) WITH (lists = 24)",
+            "CREATE INDEX owner_vector ON owner USING hnsw (vector vector_l2_ops)",
         ]
         client = await prisma_client(600)
 

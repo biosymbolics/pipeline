@@ -28,6 +28,11 @@ class CountByYear(ResultBase):
     count: int
 
 
+class UrlDef(ResultBase):
+    title: str
+    url: str
+
+
 class CompanyRecord(ResultBase):
     id: int
     name: str
@@ -37,12 +42,13 @@ class CompanyRecord(ResultBase):
     count: int
     symbol: str | None
     titles: list[str]
+    urls: list[UrlDef]
     # terms: list[str]
     min_age: int
     avg_age: float
     activity: list[float] = []
     relevance_score: float
-    wheelhouse_score: float
+    wheelhouse_score: float = 0.0
     count_by_year: list[CountByYear] = []
     score: float
 

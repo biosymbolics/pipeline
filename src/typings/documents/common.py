@@ -8,6 +8,19 @@ class DocType(Enum):
     trial = "trial"
 
 
+DOC_TYPE_DATE_MAP: dict[DocType, str] = {
+    DocType.patent: "priority_date",
+    DocType.regulatory_approval: "approval_date",
+    DocType.trial: "start_date",
+}
+
+DOC_TYPE_DEDUP_ID_MAP: dict[DocType, str] = {
+    DocType.patent: "family_id",
+    DocType.regulatory_approval: "id",
+    DocType.trial: "id",
+}
+
+
 class TermField(Enum):
     canonical_name = "canonical_name"
     instance_rollup = "instance_rollup"

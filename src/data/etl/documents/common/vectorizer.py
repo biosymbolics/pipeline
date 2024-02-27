@@ -66,7 +66,7 @@ class DocumentVectorizer:
             f.write("\n" + "\n".join(ids))
 
     @abstractmethod
-    async def _fetch_batch(self, last_id: Optional[str] = None) -> list[dict]:
+    async def _fetch_batch(self, last_id: Optional[str] = None, **kwargs) -> list[dict]:
         """
         Fetch a batch of documents to vectorize
 
@@ -161,12 +161,14 @@ class DocumentVectorizer:
             round(time.monotonic() - start),
         )
 
-    async def __call__(self, starting_id: Optional[str] = None) -> None:
+    async def __call__(
+        self, starting_id: Optional[str] = None, **fetch_batch_args
+    ) -> None:
         """
         Vectorize & persist documents
         """
 
-        batch = await self._fetch_batch(last_id=starting_id)
+        batch = await self._fetch_batch(last_id=starting_id, **fetch_batch_args)
         i = 0
 
         while batch:

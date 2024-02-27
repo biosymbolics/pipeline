@@ -11,7 +11,9 @@ from pydash import flatten, group_by, omit
 from clients.low_level.prisma import prisma_context
 from clients.vector.vector_report_client import VectorReportClient
 from constants.documents import MAX_DATA_YEAR
+from typings import DocType
 from typings.client import CompanyFinderParams
+from typings.documents.common import DOC_TYPE_DATE_MAP
 from .types import (
     CompanyRecord,
     FindCompanyResult,
@@ -27,22 +29,29 @@ class CompanyReportClient(VectorReportClient):
         self, document_ids: Sequence[str], owner_ids: Sequence[int]
     ) -> dict[int, list[CountByYear]]:
         """
-        Fetches company reports for a set of patent and owner ids
+        Fetches company reports for a set of document and owner ids
 
         Returns map between owner_id and list of corresponding list[CountByYear]
         """
-        report_query = f"""
-            SELECT
-                owner_id as id,
-                date_part('year', priority_date) as year,
-                count(*) as count
-            FROM patent, ownable
-            WHERE patent.id = ANY($1)
-            AND ownable.owner_id = ANY($2)
-            AND ownable.patent_id=patent.id
-            AND date_part('year', priority_date) >= {self.min_year}
-            GROUP BY owner_id, date_part('year', priority_date)
-        """
+
+        def get_report_query(doc_type: DocType):
+            date_field = DOC_TYPE_DATE_MAP[doc_type]
+            return f"""
+                SELECT
+                    owner_id as id,
+                    date_part('year', {date_field}) as year,
+                    count(*) as count
+                FROM {doc_type.name}, ownable
+                WHERE {doc_type.name}.id = ANY($1)
+                AND ownable.owner_id = ANY($2)
+                AND ownable.{doc_type.name}_id={doc_type.name}.id
+                AND date_part('year', {date_field}) >= {self.min_year}
+                GROUP BY owner_id, date_part('year', {date_field})
+            """
+
+        report_query = " UNION ALL ".join(
+            [get_report_query(doc_type) for doc_type in self.document_types]
+        )
         async with prisma_context(300) as db:
             report = await db.query_raw(report_query, document_ids, owner_ids)
 
@@ -76,15 +85,24 @@ class CompanyReportClient(VectorReportClient):
             "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",
+            f"""
+            ARRAY_AGG(
+                JSON_BUILD_OBJECT(
+                    'url', url,
+                    'title', title
+                )
+            ) AS urls
+            """,
+            "ARRAY_AGG(top_docs.year) AS years",
             "COUNT(title) AS count",
             "ARRAY_AGG(title) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
-            f"ROUND(POW((1 - (AVG(top_docs.vector) <=> owner.vector)), {self.exaggeration_factor})::numeric, 2) AS wheelhouse_score",
+            f"ROUND((1 / exp(AVG(top_docs.vector) <-> owner.vector))::numeric * {self.relevance_scale_power}, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS relevance_score",
-            f"ROUND(POW((1 - (owner.vector <=> '{vector}')), {self.exaggeration_factor})::numeric, 2) AS score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
+            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
         ]
 
         description_fields = [
@@ -119,12 +137,20 @@ class CompanyReportClient(VectorReportClient):
     ) -> list[CompanyRecord]:
         def by_company_query(inner_query: str) -> str:
             fields = self._get_fields(p.similar_companies, description, vector)
+
+            ownable_join = " OR ".join(
+                [
+                    f"ownable.{doc_type.name}_id=top_docs.id"
+                    for doc_type in self.document_types
+                ]
+            )
             return f"""
                 SELECT {', '.join(fields)}
                 FROM ({inner_query}) top_docs
-                JOIN ownable ON ownable.patent_id=top_docs.id
+                JOIN ownable ON {ownable_join}
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
+                WHERE owner.vector is not null
                 GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
             """
 
@@ -137,8 +163,8 @@ class CompanyReportClient(VectorReportClient):
         )
 
         owner_ids = tuple([c.id for c in companies])
-        patent_ids = tuple(flatten([c.ids for c in companies]))
-        report_map = await self._fetch_company_reports(patent_ids, owner_ids)
+        document_ids = tuple(flatten([c.ids for c in companies]))
+        report_map = await self._fetch_company_reports(document_ids, owner_ids)
 
         companies = [
             CompanyRecord(
