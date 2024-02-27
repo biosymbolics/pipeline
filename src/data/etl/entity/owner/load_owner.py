@@ -105,8 +105,8 @@ class OwnerLoader:
         """
         nasdaq = pl.read_csv("data/NASDAQ.csv")
         nyse = pl.read_csv("data/NYSE.csv")
-        nyse = pl.read_csv("data/OTC.csv")
-        all = nasdaq.vstack(nyse)
+        otc = pl.read_csv("data/OTC.csv")
+        all = nasdaq.vstack(nyse).vstack(otc)
         pharmas = (
             all.filter(pl.col("Sector").str.to_lowercase() == "health care")
             .rename({"Symbol": "symbol", "Name": "name"})
