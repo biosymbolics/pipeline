@@ -99,7 +99,9 @@ class OwnerLoader:
         """
         Load public companies
 
-        @source https://www.nasdaq.com/market-activity/stocks/screener
+        Sources:
+        https://www.nasdaq.com/market-activity/stocks/screener (NASDAQ, NYSE, AMEX)
+        https://www.otcmarkets.com/research/stock-screener (PINK, OTCQB, OTCQX)
         """
         nasdaq = pl.read_csv("data/NASDAQ.csv")
         nyse = pl.read_csv("data/NYSE.csv")
