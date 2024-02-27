@@ -55,6 +55,24 @@ def get_entity_map_matview_query() -> list[str]:
     ]
 
 
+# these get wiped for every prisma db push. Will figure out a better way to handle this.
+# https://github.com/prisma/prisma/issues/12751
+MANUAL_INDICES = [
+    """
+    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
+    """,
+    """
+    CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
+    """,
+    """
+    CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);
+    """,
+]
+
+
 async def load_all(force_update: bool = False):
     """
     Central script for stage 2 of ETL (local dbs -> biosym)
@@ -74,17 +92,19 @@ async def load_all(force_update: bool = False):
     await OwnerLoader().copy_all(force_update)
 
     # copy patent data
-    await PatentLoader(document_type="patent", source_db="patents").copy_all(
+    await PatentLoader(document_type=DocType.patent, source_db="patents").copy_all(
         force_update
     )
 
     # copy data about approvals
     await RegulatoryApprovalLoader(
-        document_type="regulatory_approval", source_db="drugcentral"
+        document_type=DocType.regulatory_approval, source_db="drugcentral"
     ).copy_all(force_update)
 
     # copy trial data
-    await TrialLoader(document_type="trial", source_db="aact").copy_all(force_update)
+    await TrialLoader(document_type=DocType.trial, source_db="aact").copy_all(
+        force_update
+    )
 
     # do final biomedical entity stuff that requires everything else be in place
     await BiomedicalEntityLoader().post_finalize()

@@ -25,5 +25,3 @@ mps/**
 umls_betweenness.json
 yfinance.cache
 umls_ancestors.json
-biosym-etl-cache/**
-src/biosym-etl-cache/**

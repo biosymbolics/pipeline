@@ -101,7 +101,6 @@ async def _retrieve_with_filesystem_cache_check(
     """
     cache_key = get_cache_key(key, include_dir=False)
 
-    print("cache_key", cache_key, directory)
     if is_file_exists(cache_key, directory):
         logger.info("Cache hit (filesystem) for key `%s`", key)
         return decode(load_file(cache_key, directory))

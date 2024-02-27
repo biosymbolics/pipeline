@@ -69,6 +69,17 @@ async def main():
     """
     Copy tables from patents-public-data to a local dataset.
     Order matters.
+
+    Future:
+    SELECT * FROM `patents-public-data.uspto_oce_pair.transactions` where event_code='CTFR' (rejected)
+        IFEE = issue fee paid
+        EXPRO = expired provisional
+        other codes: https://www.uspto.gov/sites/default/files/documents/Appendix%20B.pdf
+        (but only updated until 2017)
+
+    patents-public-data.patentsview.claim (but only updated until 2019)
+    patents-public-data.patentsview.claims_2021
+    patents-public-data.patentsview.claim_201908
     """
     await create_funcs()
     await copy_patent_tables()

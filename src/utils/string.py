@@ -2,17 +2,17 @@
 String utilities
 """
 
-
 from datetime import date
 from enum import Enum
 import json
 import regex as re
-from typing import Mapping, TypeGuard, Union
+from typing import Mapping, Sequence, TypeGuard, Union
 from hashlib import sha1
 
 
-_Idable = str | list[str] | int | date
-Idable = _Idable | Mapping[str, _Idable]
+_IdablePrimitives = str | int | date | float | list[str] | None
+_Idable = _IdablePrimitives | Sequence[_IdablePrimitives]
+Idable = _Idable | Mapping[str, _Idable] | Sequence[_Idable]
 
 
 MAX_ID_CHARS = 200
@@ -42,6 +42,9 @@ def get_id(value: Idable) -> str:
     Args:
         string (str or list[str]): string to get id of
     """
+    if value is None:
+        return ""
+
     if isinstance(value, Mapping):
         value = "_".join(
             [
@@ -50,7 +53,9 @@ def get_id(value: Idable) -> str:
             ]
         )
 
-    if isinstance(value, list):
+    if isinstance(value, list) or (
+        isinstance(value, Sequence) and not isinstance(value, str)
+    ):
         value = "_".join([str(v) for v in value])
         if len(value) > MAX_ID_CHARS:
             # create a hash key if otherwise too long
@@ -63,7 +68,7 @@ def get_id(value: Idable) -> str:
     if isinstance(value, date):
         value = value.isoformat()
 
-    if isinstance(value, int):
+    if isinstance(value, int) or isinstance(value, float):
         value = str(value)
 
     if isinstance(value, Enum):

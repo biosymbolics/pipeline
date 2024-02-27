@@ -11,12 +11,31 @@ from typing import Any, Union
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+BASE_PATH = "./data"  # TODO: make absolute?
+
+
+def get_full_path(path: str) -> str:
+    """
+    Returns the full path
+    """
+    full_path = os.path.join(BASE_PATH, path)
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+    return full_path
+
+
+def get_file_path(filename: str, path: str = "") -> str:
+    """
+    Returns the full file path
+    """
+    return os.path.join(get_full_path(path), filename)
+
 
 def is_file_exists(filename: str, path: str = "") -> bool:
     """
     Checks if file exists
     """
-    file_path = os.path.join(path, filename)
+    file_path = get_file_path(filename, path)
     return os.path.exists(file_path)
 
 
@@ -24,12 +43,7 @@ def save_as_file(content: Union[str, bytes], filename: str, path: str = "") -> s
     """
     Simple file writer function
     """
-    if path and not os.path.exists(path):
-        os.makedirs(path)
-
-    file_path = os.path.join(path, filename)
-
-    print("FILE PATH", file_path)
+    file_path = get_file_path(filename, path)
 
     mode = "wb" if isinstance(content, bytes) else "w"
     with open(file_path, mode) as file:
@@ -45,7 +59,7 @@ def load_file(filename: str, path: str = "") -> Any:
     Args:
         filename (str): filename to read
     """
-    file_path = os.path.join(path, filename)
+    file_path = get_file_path(filename, path)
 
     if not is_file_exists(filename, path):
         raise FileNotFoundError(f"File not found: {file_path}")
@@ -58,10 +72,7 @@ def save_as_pickle(obj: Any, filename: str, path: str = "") -> str:
     """
     Saves obj as pickle
     """
-    if path and not os.path.exists(path):
-        os.makedirs(path)
-
-    file_path = os.path.join(path, filename)
+    file_path = get_file_path(filename, path)
 
     with open(file_path, "wb") as file:
         pickle.dump(obj, file)
@@ -84,7 +95,7 @@ def load_pickle(filename: str, path: str = "") -> Any:
     """
     Loads pickle from file
     """
-    file_path = os.path.join(path, filename)
+    file_path = get_file_path(filename, path)
 
     if not is_file_exists(filename, path):
         raise FileNotFoundError(f"File not found: {file_path}")

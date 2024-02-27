@@ -6,7 +6,7 @@ import json
 import logging
 import traceback
 
-from clients.documents import find_companies_semantically
+from clients.vector import CompanyReportClient
 from handlers.utils import handle_async
 from typings.client import CompanyFinderParams
 from utils.encoding.json_encoder import DataclassJSONEncoder
@@ -33,7 +33,7 @@ async def _find_companies(raw_event: dict, context):
     logger.info("Fetching companies for parameters: %s", p)
 
     try:
-        results = await find_companies_semantically(p)
+        results = await CompanyReportClient()(p)
     except Exception as e:
         message = f"Error finding companies: {e}"
         logger.error(message)

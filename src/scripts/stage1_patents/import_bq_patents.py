@@ -52,7 +52,7 @@ PATENT_APPLICATION_FIELDS = [
     "url",
     # **FROM PUBLICATIONS **
     "ARRAY(SELECT assignee.name FROM UNNEST(assignee_harmonized) as assignee) as assignees",  # TODO: non-harmoized assignees??
-    "claims_localized as claims",
+    "ARRAY(SELECT distinct claim.text FROM UNNEST(claim_texts) as claim) as claims",
     "family_id",
     "ARRAY(SELECT inventor.name FROM UNNEST(inventor_harmonized) as inventor) as inventors",
     "ARRAY(SELECT ipc.code FROM UNNEST(ipc) as ipc) as ipc_codes",

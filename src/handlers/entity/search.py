@@ -43,7 +43,6 @@ async def _search(raw_event: dict, context):
         message = f"Error searching entities: {e}"
         logger.error(message)
         traceback.print_exc()
-
         return {"statusCode": 500, "body": message}
 
     return {

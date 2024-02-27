@@ -21,6 +21,7 @@ from constants.core import (
 )
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
+from typings import DocType
 from utils.classes import overrides
 
 from ..base_document import BaseDocumentEtl
@@ -344,5 +345,7 @@ if __name__ == "__main__":
     is_update = "--update" in sys.argv
 
     asyncio.run(
-        PatentLoader(document_type="patent", source_db="patents").copy_all(is_update)
+        PatentLoader(document_type=DocType.patent, source_db="patents").copy_all(
+            is_update
+        )
     )
