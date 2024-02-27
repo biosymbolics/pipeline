@@ -68,7 +68,7 @@ class SecClient:
         if not response:
             raise Exception("No response from SEC API")
 
-        filings = response.get("filings")
+        filings = [SecFiling(**f) for f in response.get("filings")]
 
         if not filings:
             logging.error("Response is missing 'filings': %s", response)

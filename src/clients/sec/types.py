@@ -27,13 +27,12 @@ class SecFiling(BaseModel):
     formType: str
     description: str
     filedAt: str  # iso date
-    linkToText: str  # url
+    linkToTxt: str  # url
     linkToHtml: str  # url
     linkToXbrl: str  # url
     linkToFilingDetails: str  # url
     documentFormatFiles: list[SecFilingSection]
     dataFiles: list[SecFilingSection]
-    periodOfReport: str  # of date
 
 
 SecProductQueryStrategy = Literal["TABLE", "SEARCH"]

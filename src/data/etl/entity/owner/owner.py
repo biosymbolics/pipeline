@@ -158,7 +158,7 @@ class OwnerEtl(BaseEntityEtl):
                     owner_id=symbol_map[symbol],
                     accession_number=filing.accessionNo,
                     filing_date=datetime.fromisoformat(filing.filedAt),
-                    url=filing.linkToText,
+                    url=filing.linkToTxt,
                 )
                 for symbol, filings in filing_map.items()
                 for filing in filings
