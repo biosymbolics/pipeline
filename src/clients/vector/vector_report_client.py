@@ -13,7 +13,7 @@ from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from clients.vector.types import TopDocRecord, TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
-from typings.documents.common import DOC_TYPE_DATE_MAP, DocType
+from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
 logger = logging.getLogger(__name__)
@@ -33,14 +33,13 @@ class VectorReportClient:
         min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
         exaggeration_factor: int = SIMILARITY_EXAGGERATION_FACTOR,
-        document_type: DocType = DocType.patent,
+        document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
     ):
         self.gpt_client = GptApiClient()
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
         self.exaggeration_factor = exaggeration_factor
-        self.document_type = document_type
-        self.date_field = DOC_TYPE_DATE_MAP[document_type]
+        self.document_types = document_types
 
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
@@ -118,14 +117,20 @@ class VectorReportClient:
         """
 
         async def fetch():
+            def get_doc_query(doc_type: DocType):
+                return f"SELECT id, vector FROM {doc_type.name}"
+
+            doc_queries = " UNION ALL ".join(
+                [get_doc_query(doc_type) for doc_type in self.document_types]
+            )
+
             query = f"""
-                SELECT
-                    id,
-                    (1 / exp(vector <-> '{vector}')) * 10 as similarity
-                FROM {self.document_type.name}
-                ORDER BY vector <-> '{vector}' ASC
-                LIMIT {k}
+                SELECT id, (1 / exp(vector <-> '{vector}')) * 10 AS similarity
+                FROM ({doc_queries}) docs
+                ORDER BY vector <-> '{vector}'
+                ASC LIMIT {k}
             """
+            print("QUERY12", query)
             async with prisma_context(300) as db:
                 records = await db.query_raw(query)
 
@@ -181,26 +186,34 @@ class VectorReportClient:
         vector = await self._form_vector(description, similar_companies)
         ids = await self._get_top_ids(vector, k)
 
-        inner_query = f"""
-            SELECT
-                MAX(id) as id,
-                AVG(relevance_score) as relevance_score,
-                MAX(title) as title,
-                AVG(vector) as vector,
-                MIN(year) as year
-            FROM (
+        def get_inner_query(doc_type: DocType):
+            date_field = DOC_TYPE_DATE_MAP[doc_type]
+            dedup_id_field = DOC_TYPE_DEDUP_ID_MAP[doc_type]
+            return f"""
                 SELECT
-                    id,
-                    family_id,
-                    POW((1 - (vector <=> '{vector}')), {self.exaggeration_factor})::numeric as relevance_score,
-                    title,
-                    vector,
-                    date_part('year', {self.date_field}) as year
-                FROM {self.document_type.name}
-                WHERE id = ANY($1)
-            ) s
-            GROUP BY s.family_id
-        """
+                    MAX(id) as id,
+                    AVG(relevance_score) as relevance_score,
+                    MAX(title) as title,
+                    AVG(vector) as vector,
+                    MIN(year) as year
+                FROM (
+                    SELECT
+                        id,
+                        {dedup_id_field} as dedup_id,
+                        POW((1 - (vector <=> '{vector}')), {self.exaggeration_factor})::numeric as relevance_score,
+                        title,
+                        vector,
+                        date_part('year', {date_field})::int as year
+                    FROM {doc_type.name}
+                    WHERE id = ANY($1)
+                    AND {date_field} is not null
+                ) s
+                GROUP BY s.dedup_id
+            """
+
+        inner_query = " UNION ALL ".join(
+            [get_inner_query(doc_type) for doc_type in self.document_types]
+        )
         query = get_query(inner_query) if get_query else inner_query
 
         async with prisma_context(300) as db:

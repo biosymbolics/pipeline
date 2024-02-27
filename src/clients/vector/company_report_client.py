@@ -11,7 +11,9 @@ from pydash import flatten, group_by, omit
 from clients.low_level.prisma import prisma_context
 from clients.vector.vector_report_client import VectorReportClient
 from constants.documents import MAX_DATA_YEAR
+from typings import DocType
 from typings.client import CompanyFinderParams
+from typings.documents.common import DOC_TYPE_DATE_MAP
 from .types import (
     CompanyRecord,
     FindCompanyResult,
@@ -31,18 +33,25 @@ class CompanyReportClient(VectorReportClient):
 
         Returns map between owner_id and list of corresponding list[CountByYear]
         """
-        report_query = f"""
-            SELECT
-                owner_id as id,
-                date_part('year', {self.date_field}) as year,
-                count(*) as count
-            FROM {self.document_type.name}, ownable
-            WHERE {self.document_type.name}.id = ANY($1)
-            AND ownable.owner_id = ANY($2)
-            AND ownable.{self.document_type.name}_id={self.document_type.name}.id
-            AND date_part('year', {self.date_field}) >= {self.min_year}
-            GROUP BY owner_id, date_part('year', {self.date_field})
-        """
+
+        def get_report_query(doc_type: DocType):
+            date_field = DOC_TYPE_DATE_MAP[doc_type]
+            return f"""
+                SELECT
+                    owner_id as id,
+                    date_part('year', {date_field}) as year,
+                    count(*) as count
+                FROM {doc_type.name}, ownable
+                WHERE {doc_type.name}.id = ANY($1)
+                AND ownable.owner_id = ANY($2)
+                AND ownable.{doc_type.name}_id={doc_type.name}.id
+                AND date_part('year', {date_field}) >= {self.min_year}
+                GROUP BY owner_id, date_part('year', {date_field})
+            """
+
+        report_query = " UNION ALL ".join(
+            [get_report_query(doc_type) for doc_type in self.document_types]
+        )
         async with prisma_context(300) as db:
             report = await db.query_raw(report_query, document_ids, owner_ids)
 
@@ -119,12 +128,20 @@ class CompanyReportClient(VectorReportClient):
     ) -> list[CompanyRecord]:
         def by_company_query(inner_query: str) -> str:
             fields = self._get_fields(p.similar_companies, description, vector)
+
+            ownable_join = " OR ".join(
+                [
+                    f"ownable.{doc_type.name}_id=top_docs.id"
+                    for doc_type in self.document_types
+                ]
+            )
             return f"""
                 SELECT {', '.join(fields)}
                 FROM ({inner_query}) top_docs
-                JOIN ownable ON ownable.{self.document_type.name}_id=top_docs.id
+                JOIN ownable ON {ownable_join}
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
+                WHERE owner.vector is not null
                 GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
             """
 

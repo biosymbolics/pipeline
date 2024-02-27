@@ -42,7 +42,7 @@ class CompanyRecord(ResultBase):
     avg_age: float
     activity: list[float] = []
     relevance_score: float
-    wheelhouse_score: float
+    wheelhouse_score: float = 0.0
     count_by_year: list[CountByYear] = []
     score: float
 
