@@ -13,7 +13,7 @@ from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from clients.vector.types import TopDocRecord, TopDocsByYear
 from core.ner.spacy import get_transformer_nlp
-from typings.documents.common import DocType
+from typings.documents.common import DOC_TYPE_DATE_MAP, DocType
 from utils.string import get_id
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ class VectorReportClient:
         self.recency_decay_factor = recency_decay_factor
         self.exaggeration_factor = exaggeration_factor
         self.document_type = document_type
+        self.date_field = DOC_TYPE_DATE_MAP[document_type]
 
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
@@ -194,7 +195,7 @@ class VectorReportClient:
                     POW((1 - (vector <=> '{vector}')), {self.exaggeration_factor})::numeric as relevance_score,
                     title,
                     vector,
-                    date_part('year', priority_date) as year
+                    date_part('year', {self.date_field}) as year
                 FROM {self.document_type.name}
                 WHERE id = ANY($1)
             ) s

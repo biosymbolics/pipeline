@@ -27,21 +27,21 @@ class CompanyReportClient(VectorReportClient):
         self, document_ids: Sequence[str], owner_ids: Sequence[int]
     ) -> dict[int, list[CountByYear]]:
         """
-        Fetches company reports for a set of patent and owner ids
+        Fetches company reports for a set of document and owner ids
 
         Returns map between owner_id and list of corresponding list[CountByYear]
         """
         report_query = f"""
             SELECT
                 owner_id as id,
-                date_part('year', priority_date) as year,
+                date_part('year', {self.date_field}) as year,
                 count(*) as count
-            FROM patent, ownable
-            WHERE patent.id = ANY($1)
+            FROM {self.document_type.name}, ownable
+            WHERE {self.document_type.name}.id = ANY($1)
             AND ownable.owner_id = ANY($2)
-            AND ownable.patent_id=patent.id
-            AND date_part('year', priority_date) >= {self.min_year}
-            GROUP BY owner_id, date_part('year', priority_date)
+            AND ownable.{self.document_type.name}_id={self.document_type.name}.id
+            AND date_part('year', {self.date_field}) >= {self.min_year}
+            GROUP BY owner_id, date_part('year', {self.date_field})
         """
         async with prisma_context(300) as db:
             report = await db.query_raw(report_query, document_ids, owner_ids)
@@ -122,7 +122,7 @@ class CompanyReportClient(VectorReportClient):
             return f"""
                 SELECT {', '.join(fields)}
                 FROM ({inner_query}) top_docs
-                JOIN ownable ON ownable.patent_id=top_docs.id
+                JOIN ownable ON ownable.{self.document_type.name}_id=top_docs.id
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
                 GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
@@ -137,8 +137,8 @@ class CompanyReportClient(VectorReportClient):
         )
 
         owner_ids = tuple([c.id for c in companies])
-        patent_ids = tuple(flatten([c.ids for c in companies]))
-        report_map = await self._fetch_company_reports(patent_ids, owner_ids)
+        document_ids = tuple(flatten([c.ids for c in companies]))
+        report_map = await self._fetch_company_reports(document_ids, owner_ids)
 
         companies = [
             CompanyRecord(
