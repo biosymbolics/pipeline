@@ -125,7 +125,9 @@ class VectorReportClient:
             )
 
             query = f"""
-                SELECT id, (1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power} AS similarity
+                SELECT
+                    id,
+                    (1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power} AS similarity
                 FROM ({doc_queries}) docs
                 ORDER BY vector <-> '{vector}'
                 ASC LIMIT {k}
@@ -195,7 +197,7 @@ class VectorReportClient:
                     MAX(title) as title,
                     MAX(url) as url,
                     AVG(vector) as vector,
-                    MIN(year) as year
+                    MAX(year) as year
                 FROM (
                     SELECT
                         id,

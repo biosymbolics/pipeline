@@ -101,8 +101,8 @@ class CompanyReportClient(VectorReportClient):
             f"ROUND((1 / exp(AVG(top_docs.vector) <-> owner.vector))::numeric * {self.relevance_scale_power}, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
-            f"ROUND((1 / exp(vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
+            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
+            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
         ]
 
         description_fields = [
@@ -112,7 +112,7 @@ class CompanyReportClient(VectorReportClient):
                 SUM(
                     relevance_score
                     * POW(
-                        GREATEST(0.0, ((year - {self.min_year}) / 24)),
+                        GREATEST(0.0, ((year - {self.min_year}) / 24.0)),
                         {self.recency_decay_factor}
                     )
                 )::numeric, 2
