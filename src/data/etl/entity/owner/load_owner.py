@@ -103,9 +103,10 @@ class OwnerLoader:
         https://www.nasdaq.com/market-activity/stocks/screener (NASDAQ, NYSE, AMEX)
         https://www.otcmarkets.com/research/stock-screener (PINK, OTCQB, OTCQX)
         """
-        nasdaq = pl.read_csv("data/NASDAQ.csv")
-        nyse = pl.read_csv("data/NYSE.csv")
-        otc = pl.read_csv("data/OTC.csv")
+        csv_columns = ["Symbol", "Name", "Sector"]
+        nasdaq = pl.read_csv("data/NASDAQ.csv", columns=csv_columns)
+        nyse = pl.read_csv("data/NYSE.csv", columns=csv_columns)
+        otc = pl.read_csv("data/OTC.csv", columns=csv_columns)
         all = nasdaq.vstack(nyse).vstack(otc)
         pharmas = (
             all.filter(pl.col("Sector").str.to_lowercase() == "health care")
