@@ -105,6 +105,7 @@ class OwnerLoader:
         """
         nasdaq = pl.read_csv("data/NASDAQ.csv")
         nyse = pl.read_csv("data/NYSE.csv")
+        nyse = pl.read_csv("data/OTC.csv")
         all = nasdaq.vstack(nyse)
         pharmas = (
             all.filter(pl.col("Sector").str.to_lowercase() == "health care")

@@ -3,11 +3,15 @@ Class for biomedical entity etl
 """
 
 import asyncio
+from datetime import datetime
 from typing import Sequence
 from pydash import flatten, group_by, omit, uniq
 import logging
-from prisma.models import FinancialSnapshot, Ownable, Owner, OwnerSynonym
-from prisma.types import OwnerUpdateInput
+from prisma.models import Acquisition, FinancialSnapshot, Ownable, Owner, OwnerSynonym
+from prisma.types import (
+    AcquisitionCreateWithoutRelationsInput as AcquisitionCreateInput,
+    OwnerUpdateInput,
+)
 
 from clients.low_level.prisma import batch_update, prisma_client
 from clients.sec.sec_client import SecClient
@@ -50,7 +54,6 @@ class OwnerEtl(BaseEntityEtl):
         self,
         names: Sequence[str],
         canonical_lookup_map: dict[str, str],
-        ma_lookup_map: dict[str, int],
     ) -> list[OwnerCreateWithSynonymsInput]:
         """
         Create record dicts for entity insert
@@ -66,10 +69,6 @@ class OwnerEtl(BaseEntityEtl):
             OwnerCreateWithSynonymsInput(
                 name=(canonical_lookup_map.get(name) or name),
                 owner_type=OwnerTypeParser().find(name),
-                acquisition_count=ma_lookup_map.get(
-                    canonical_lookup_map.get(name) or name  # lookup by canonical name
-                )
-                or 0,
                 synonyms=[name],
             )
             for name in names
@@ -100,12 +99,7 @@ class OwnerEtl(BaseEntityEtl):
         """
         client = await prisma_client(600)
         canonical_lookup_map = generate_clean_owner_map(names, counts)
-        ma_lookup_map = await self.generate_acquisition_map(
-            uniq(canonical_lookup_map.values())
-        )
-        insert_recs = self._generate_insert_records(
-            names, canonical_lookup_map, ma_lookup_map
-        )
+        insert_recs = self._generate_insert_records(names, canonical_lookup_map)
 
         # create flat records
         await Owner.prisma(client).create_many(
@@ -130,8 +124,7 @@ class OwnerEtl(BaseEntityEtl):
 
         logger.info("Updated owners")
 
-    @staticmethod
-    async def load_financials(public_companies: Sequence[CompanyInfo]):
+    async def load_financials(self, public_companies: Sequence[CompanyInfo]):
         """
         Data from https://www.nasdaq.com/market-activity/stocks/screener?exchange=NYSE
         """
@@ -154,22 +147,24 @@ class OwnerEtl(BaseEntityEtl):
             skip_duplicates=True,
         )
 
-    async def generate_acquisition_map(
-        self, canonical_names: Sequence[str]
-    ) -> dict[str, int]:
-        """
-        Load a simple map of company to number of M&A filings
-        """
         sec_client = SecClient()
-
-        batches = batch(canonical_names, 2000)
-
-        async def handle_batch(b):
-            filings = await sec_client.fetch_mergers_and_acquisitions(b)
-            return {company: len(filings[company]) for company in b}
-
-        batch_results = await asyncio.gather(*[handle_batch(b) for b in batches])
-        return {k: v for d in batch_results for k, v in d.items()}
+        symbol_map = {co["symbol"]: owner_map[co["name"]] for co in public_companies}
+        filing_map = await sec_client.fetch_mergers_and_acquisitions(
+            list(symbol_map.keys())
+        )
+        await Acquisition.prisma().create_many(
+            data=[
+                AcquisitionCreateInput(
+                    owner_id=symbol_map[symbol],
+                    accession_number=filing.accessionNo,
+                    filing_date=datetime.fromisoformat(filing.filedAt),
+                    url=filing.linkToText,
+                )
+                for symbol, filings in filing_map.items()
+                for filing in filings
+            ],
+            skip_duplicates=True,
+        )
 
     async def delete_owners(self):
         """

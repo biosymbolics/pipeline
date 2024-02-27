@@ -1,7 +1,8 @@
-from typing import Literal, TypedDict
+from typing import Literal
+from pydantic import BaseModel
 
 
-class SecFilingSection(TypedDict):
+class SecFilingSection(BaseModel):
     """
     SEC filing section
     """
@@ -13,13 +14,14 @@ class SecFilingSection(TypedDict):
     size: int
 
 
-class SecFiling(TypedDict):
+class SecFiling(BaseModel):
     """
     SEC filing
     """
 
     id: str
     ticker: str
+    accessionNo: str
     companyName: str
     companyNameLong: str
     formType: str

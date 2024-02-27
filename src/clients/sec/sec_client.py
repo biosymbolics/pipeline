@@ -76,20 +76,20 @@ class SecClient:
         return filings or []
 
     async def fetch_mergers_and_acquisitions(
-        self, names: Sequence[str]
+        self, symbols: Sequence[str]
     ) -> dict[str, list[SecFiling]]:
         """
-        Fetch SEC docs for mergers and acquisitions based on company name
+        Fetch SEC docs for mergers and acquisitions based on ticker symbol
         """
 
-        async def fetch(name: str):
+        async def fetch(symbol: str):
             return await self.fetch_docs(
                 [
-                    f"companyName:{name}",
+                    f"ticker:{symbol}",
                     'formType:"S-4"',
                     'NOT formType:("4/A" OR "S-4 POS")',
                 ],
-                take=5,
+                take=100,
             )
 
-        return {name: await fetch(name) for name in names}
+        return {symbol: await fetch(symbol) for symbol in symbols}

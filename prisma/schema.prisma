@@ -12,6 +12,20 @@ generator client {
     previewFeatures      = ["fullTextSearch", "postgresqlExtensions"]
 }
 
+model Acquisition {
+    id               Int      @id @default(autoincrement())
+    accession_number String
+    owner_id         Int
+    owner            Owner    @relation("acquired", fields: [owner_id], references: [id])
+    acquired_id      Int?
+    acquired         Owner?   @relation("acquired_by", fields: [acquired_id], references: [id])
+    filing_date      DateTime
+    url              String
+
+    @@index([owner_id], name: "owner_id")
+    @@map("acquisition")
+}
+
 model BiomedicalEntity {
     id            Int                      @id @default(autoincrement())
     canonical_id  String                   @unique
@@ -47,9 +61,134 @@ model EntitySynonym {
     @@map("entity_synonym")
 }
 
+model FinancialSnapshot {
+    id                         Int      @id @default(autoincrement())
+    owner_id                   Int      @unique
+    owner                      Owner    @relation(fields: [owner_id], references: [id])
+    current_ratio              Float?
+    debt_equity_ratio          Float?
+    ebitda                     Float?
+    gross_profit               Float?
+    market_cap                 Float?
+    net_debt                   Float?
+    return_on_equity           Float?
+    return_on_research_capital Float?
+    snapshot_date              DateTime
+    symbol                     String   @unique
+    total_debt                 Float?
+
+    @@index([owner_id], name: "financial_snapshot_owner_id")
+    @@map("financials")
+}
+
+model Intervenable {
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    context_of_use         ContextOfUse          @default(NA)
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+    trial_id               String?
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
+
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "intervenable_name")
+    @@index([canonical_name], name: "intervenable_canonical_name")
+    @@index([instance_rollup], name: "intervenable_instance_rollup")
+    @@index([category_rollup], name: "intervenable_category_rollup")
+    @@index([entity_id], name: "intervenable_entity_id")
+    @@index([patent_id], name: "intervenable_patent_id")
+    @@index([regulatory_approval_id], name: "intervenable_regulatory_approval_id")
+    @@index([trial_id], name: "intervenable_trial_id")
+    @@map("intervenable")
+}
+
+model Indicatable {
+    id                     Int                   @id @default(autoincrement())
+    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
+    entity_id              Int?
+    is_primary             Boolean               @default(false)
+    mention_index          Int                   @default(-1)
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    canonical_type         BiomedicalEntityType?
+    instance_rollup        String?               @default("") // denormalized from biomedical entity
+    category_rollup        String?               @default("") // denormalized from biomedical entity
+    trial_id               String?
+    trial                  Trial?                @relation(fields: [trial_id], references: [id])
+    patent                 Patent?               @relation(fields: [patent_id], references: [id])
+    patent_id              String?
+    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?
+
+    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "indicatable_name")
+    @@index([canonical_name], name: "indicatable_canonical_name")
+    @@index([instance_rollup], name: "indicatable_instance_rollup")
+    @@index([category_rollup], name: "indicatable_category_rollup")
+    @@index([entity_id], name: "indicatable_entity_id")
+    @@index([patent_id], name: "indicatable_patent_id")
+    @@index([regulatory_approval_id], name: "indicatable_regulatory_approval_id")
+    @@index([trial_id], name: "indicatable_trial_id")
+    @@map("indicatable")
+}
+
+model MockChat {
+    id              Int           @id @default(autoincrement())
+    conversation_id String
+    message_id      Int
+    content         String
+    description     String?
+    type            MockChatType? @default(STANDARD)
+
+    @@unique([conversation_id, message_id])
+    @@map("mock_chat")
+}
+
+model Ownable {
+    id                     Int                 @id @default(autoincrement())
+    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [patent_id], references: [id])
+    patent_id              String?
+    inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
+    inventor_patent_id     String?
+    is_primary             Boolean?            @default(false)
+    owner                  Owner?              @relation(fields: [owner_id], references: [id])
+    owner_id               Int?
+    name                   String
+    canonical_name         String // denormalized from biomedical entity
+    instance_rollup        String?             @default("") // denormalized from biomedical entity
+    category_rollup        String?             @default("") // denormalized from biomedical entity
+    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
+    regulatory_approval_id String?             @unique
+    trial                  Trial?              @relation(fields: [trial_id], references: [id])
+    trial_id               String?             @unique
+
+    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
+    @@index([name], name: "ownable_name")
+    @@index([canonical_name], name: "ownable_canonical_name")
+    @@index([instance_rollup], name: "ownable_instance_rollup")
+    @@index([category_rollup], name: "ownable_category_rollup")
+    @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
+    @@index([owner_id], name: "ownable_owner_id")
+    @@index([patent_id], name: "ownable_patent_id")
+    @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
+    @@map("ownable")
+}
+
 model Owner {
     id                 Int                         @id @default(autoincrement())
-    acquisition_count  Int                         @default(0)
+    acquisitions       Acquisition[]               @relation("acquired")
+    acquired_by        Acquisition[]               @relation("acquired_by")
     children           Owner[]                     @relation("owner_to_parent")
     count              Int                         @default(0)
     financial_snapshot FinancialSnapshot?
@@ -116,17 +255,6 @@ model RegulatoryApproval {
     @@map("regulatory_approval")
 }
 
-model TrialDropoutReason {
-    id       Int           @id @default(autoincrement())
-    count    Int
-    reason   DropoutReason
-    trial_id String
-    trial    Trial         @relation(fields: [trial_id], references: [id])
-
-    @@index([trial_id], name: "trial_dropout_reason_trial_id")
-    @@map("trial_dropout_reason")
-}
-
 model Trial {
     id                      String                      @id @unique
     abstract                String?
@@ -165,6 +293,17 @@ model Trial {
     @@map("trial")
 }
 
+model TrialDropoutReason {
+    id       Int           @id @default(autoincrement())
+    count    Int
+    reason   DropoutReason
+    trial_id String
+    trial    Trial         @relation(fields: [trial_id], references: [id])
+
+    @@index([trial_id], name: "trial_dropout_reason_trial_id")
+    @@map("trial_dropout_reason")
+}
+
 model TrialOutcome {
     id              Int             @id @default(autoincrement())
     description     String?
@@ -176,118 +315,6 @@ model TrialOutcome {
 
     @@index([trial_id], name: "trial_outcome_trial_id")
     @@map("trial_outcome")
-}
-
-model FinancialSnapshot {
-    id                         Int      @id @default(autoincrement())
-    owner_id                   Int      @unique
-    owner                      Owner    @relation(fields: [owner_id], references: [id])
-    current_ratio              Float?
-    debt_equity_ratio          Float?
-    ebitda                     Float?
-    gross_profit               Float?
-    market_cap                 Float?
-    net_debt                   Float?
-    return_on_equity           Float?
-    return_on_research_capital Float?
-    snapshot_date              DateTime
-    symbol                     String   @unique
-    total_debt                 Float?
-
-    @@index([owner_id], name: "financial_snapshot_owner_id")
-    @@map("financials")
-}
-
-model Ownable {
-    id                     Int                 @id @default(autoincrement())
-    assignee_patent        Patent?             @relation("assignee_to_patent", fields: [patent_id], references: [id])
-    patent_id              String?
-    inventor_patent        Patent?             @relation("inventor_to_patent", fields: [inventor_patent_id], references: [id])
-    inventor_patent_id     String?
-    is_primary             Boolean?            @default(false)
-    owner                  Owner?              @relation(fields: [owner_id], references: [id])
-    owner_id               Int?
-    name                   String
-    canonical_name         String // denormalized from biomedical entity
-    instance_rollup        String?             @default("") // denormalized from biomedical entity
-    category_rollup        String?             @default("") // denormalized from biomedical entity
-    regulatory_approval    RegulatoryApproval? @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?             @unique
-    trial                  Trial?              @relation(fields: [trial_id], references: [id])
-    trial_id               String?             @unique
-
-    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
-    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
-    @@index([name], name: "ownable_name")
-    @@index([canonical_name], name: "ownable_canonical_name")
-    @@index([instance_rollup], name: "ownable_instance_rollup")
-    @@index([category_rollup], name: "ownable_category_rollup")
-    @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
-    @@index([owner_id], name: "ownable_owner_id")
-    @@index([patent_id], name: "ownable_patent_id")
-    @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
-    @@map("ownable")
-}
-
-model Intervenable {
-    id                     Int                   @id @default(autoincrement())
-    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
-    entity_id              Int?
-    context_of_use         ContextOfUse          @default(NA)
-    is_primary             Boolean               @default(false)
-    mention_index          Int                   @default(-1)
-    patent                 Patent?               @relation(fields: [patent_id], references: [id])
-    patent_id              String?
-    name                   String
-    canonical_name         String // denormalized from biomedical entity
-    canonical_type         BiomedicalEntityType?
-    instance_rollup        String?               @default("") // denormalized from biomedical entity
-    category_rollup        String?               @default("") // denormalized from biomedical entity
-    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?
-    trial_id               String?
-    trial                  Trial?                @relation(fields: [trial_id], references: [id])
-
-    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
-    @@index([name], name: "intervenable_name")
-    @@index([canonical_name], name: "intervenable_canonical_name")
-    @@index([instance_rollup], name: "intervenable_instance_rollup")
-    @@index([category_rollup], name: "intervenable_category_rollup")
-    @@index([entity_id], name: "intervenable_entity_id")
-    @@index([patent_id], name: "intervenable_patent_id")
-    @@index([regulatory_approval_id], name: "intervenable_regulatory_approval_id")
-    @@index([trial_id], name: "intervenable_trial_id")
-    @@map("intervenable")
-}
-
-model Indicatable {
-    id                     Int                   @id @default(autoincrement())
-    entity                 BiomedicalEntity?     @relation(fields: [entity_id], references: [id])
-    entity_id              Int?
-    is_primary             Boolean               @default(false)
-    mention_index          Int                   @default(-1)
-    name                   String
-    canonical_name         String // denormalized from biomedical entity
-    canonical_type         BiomedicalEntityType?
-    instance_rollup        String?               @default("") // denormalized from biomedical entity
-    category_rollup        String?               @default("") // denormalized from biomedical entity
-    trial_id               String?
-    trial                  Trial?                @relation(fields: [trial_id], references: [id])
-    patent                 Patent?               @relation(fields: [patent_id], references: [id])
-    patent_id              String?
-    regulatory_approval    RegulatoryApproval?   @relation(fields: [regulatory_approval_id], references: [id])
-    regulatory_approval_id String?
-
-    @@unique([name, entity_id, patent_id, regulatory_approval_id, trial_id])
-    @@index([name], name: "indicatable_name")
-    @@index([canonical_name], name: "indicatable_canonical_name")
-    @@index([instance_rollup], name: "indicatable_instance_rollup")
-    @@index([category_rollup], name: "indicatable_category_rollup")
-    @@index([entity_id], name: "indicatable_entity_id")
-    @@index([patent_id], name: "indicatable_patent_id")
-    @@index([regulatory_approval_id], name: "indicatable_regulatory_approval_id")
-    @@index([trial_id], name: "indicatable_trial_id")
-    @@map("indicatable")
 }
 
 model Umls {
@@ -314,18 +341,6 @@ model UmlsGraph {
 
     @@unique([head_id, tail_id, relationship])
     @@map("umls_graph")
-}
-
-model MockChat {
-    id              Int           @id @default(autoincrement())
-    conversation_id String
-    message_id      Int
-    content         String
-    description     String?
-    type            MockChatType? @default(STANDARD)
-
-    @@unique([conversation_id, message_id])
-    @@map("mock_chat")
 }
 
 enum MockChatType {
