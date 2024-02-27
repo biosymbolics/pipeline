@@ -31,14 +31,12 @@ class ConceptDecomposer:
             ),
             ResponseSchema(
                 name="description",
-                description="2-4 paragraph description of the sub-concept",
+                description="2-4 paragraph technical description of the sub-concept",
                 type="string",
             ),
         ]
 
-        self.llm = GptApiClient(
-            schemas=response_schemas, model="gpt-4", skip_cache=False
-        )
+        self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
         self.nlp = get_transformer_nlp()
         self.vector_report_client = VectorReportClient()
 

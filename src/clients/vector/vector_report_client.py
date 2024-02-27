@@ -120,7 +120,7 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    1 - (vector <=> '{vector}') as similarity
+                    (1 / exp(vector <-> '{vector}')) * 10 as similarity
                 FROM {self.document_type.name}
                 ORDER BY vector <-> '{vector}' ASC
                 LIMIT {k}
