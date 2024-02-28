@@ -68,6 +68,8 @@ class BaseDocumentEtl:
                 ) AS v(id TEXT, vector vector(768))
                 WHERE {self.document_type.name}.id=v.id;
             """,
+            # https://github.com/pgvector/pgvector?tab=readme-ov-file#index-build-time
+            "SET maintenance_work_mem = '5GB'",
             f"""
                 CREATE INDEX {self.document_type.name}_vector ON {self.document_type.name}
                 USING hnsw (vector vector_l2_ops)
