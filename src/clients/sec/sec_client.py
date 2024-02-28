@@ -13,7 +13,7 @@ from utils.string import create_hash_key, get_id
 from .types import SecFiling
 
 
-API_KEY = os.environ["SEC_API_KEY"]
+API_KEY = os.environ.get("SEC_API_KEY") or ""
 
 
 class SecClient:
