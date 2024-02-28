@@ -57,12 +57,8 @@ class BaseDocumentEtl:
         Copy vectors to document tables
         """
         client = await prisma_client(1200)
-        row_count = await client.query_raw(
-            f"SELECT COUNT(*) as count FROM {self.document_type.name}"
-        )
-        list_count = int(row_count[0]["count"] / 1000)
         queries = [
-            # "CREATE EXTENSION IF NOT EXISTS dblink",
+            "CREATE EXTENSION IF NOT EXISTS dblink",
             f"DROP INDEX IF EXISTS {self.document_type}_vector",
             f"""
                 UPDATE {self.document_type.name} set vector = v.vector
@@ -72,12 +68,9 @@ class BaseDocumentEtl:
                 ) AS v(id TEXT, vector vector(768))
                 WHERE {self.document_type.name}.id=v.id;
             """,
-            # TODO: switch to hnsw maybe
-            # "CREATE INDEX patent_vector_hnsw ON patent USING hnsw (vector vector_l2_ops)",
-            # sizing: https://github.com/pgvector/pgvector#ivfflat (rows / 1000)
             f"""
                 CREATE INDEX {self.document_type.name}_vector ON {self.document_type.name}
-                USING ivfflat (vector vector_l2_ops) WITH (lists = {list_count})
+                USING hnsw (vector vector_l2_ops)
             """,
         ]
         for query in queries:
