@@ -156,7 +156,7 @@ class OwnerEtl(BaseEntityEtl):
             data=[
                 AcquisitionCreateInput(
                     owner_id=symbol_map[symbol],
-                    accession_number=filing.accessionNo,
+                    accession_number=filing.accessionNo or "",
                     filing_date=datetime.fromisoformat(filing.filedAt),
                     url=filing.linkToTxt,
                 )
