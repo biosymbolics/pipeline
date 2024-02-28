@@ -23,6 +23,7 @@ regex
 requests
 scispacy
 scikit-learn
+sec-api
 spacy
 spacy-lookups-data
 --find-links https://download.pytorch.org/whl/torch_stable.html

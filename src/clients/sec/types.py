@@ -1,37 +1,38 @@
-from typing import Literal, TypedDict
+from typing import Literal
+from pydantic import BaseModel
 
 
-class SecFilingSection(TypedDict):
+class SecFilingSection(BaseModel):
     """
     SEC filing section
     """
 
-    sequence: str  # number
-    description: str  # e.g. EX-31.2
-    documentUrl: str
-    type: str  # e.g. EX-32
-    size: int
+    sequence: str | None = None  # number
+    description: str | None = None  # e.g. EX-31.2
+    documentUrl: str | None = None
+    type: str | None = None  # e.g. EX-32
+    size: int | None = None
 
 
-class SecFiling(TypedDict):
+class SecFiling(BaseModel):
     """
     SEC filing
     """
 
     id: str
     ticker: str
+    accessionNo: str | None = None
     companyName: str
-    companyNameLong: str
-    formType: str
-    description: str
+    companyNameLong: str | None = None
+    formType: str | None = None
+    description: str | None = None
     filedAt: str  # iso date
-    linkToText: str  # url
-    linkToHtml: str  # url
-    linkToXbrl: str  # url
-    linkToFilingDetails: str  # url
+    linkToTxt: str  # url
+    linkToHtml: str | None = None
+    linkToXbrl: str | None = None
+    linkToFilingDetails: str | None = None
     documentFormatFiles: list[SecFilingSection]
     dataFiles: list[SecFilingSection]
-    periodOfReport: str  # of date
 
 
 SecProductQueryStrategy = Literal["TABLE", "SEARCH"]

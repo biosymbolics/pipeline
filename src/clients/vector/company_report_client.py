@@ -81,8 +81,8 @@ class CompanyReportClient(VectorReportClient):
         common_fields = [
             "owner.id AS id",
             "owner.name AS name",
-            "(owner.acquisition_count > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
-            "(owner.acquisition_count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
+            "(acquisition.count > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
+            "(acquisition.count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",
             f"""
@@ -150,6 +150,11 @@ class CompanyReportClient(VectorReportClient):
                 JOIN ownable ON {ownable_join}
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
+                LEFT JOIN (
+                    SELECT owner_id, count(*) as count
+                    FROM acquisition
+                    GROUP BY owner_id
+                ) acquisition ON acquisition.owner_id=owner.id
                 WHERE owner.vector is not null
                 GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
             """

@@ -13,7 +13,7 @@ from utils.string import create_hash_key, get_id
 from .types import SecFiling
 
 
-API_KEY = os.environ["SEC_API_KEY"]
+API_KEY = os.environ.get("SEC_API_KEY") or ""
 
 
 class SecClient:
@@ -68,7 +68,7 @@ class SecClient:
         if not response:
             raise Exception("No response from SEC API")
 
-        filings = response.get("filings")
+        filings = [SecFiling(**f) for f in response.get("filings")]
 
         if not filings:
             logging.error("Response is missing 'filings': %s", response)
@@ -76,20 +76,20 @@ class SecClient:
         return filings or []
 
     async def fetch_mergers_and_acquisitions(
-        self, names: Sequence[str]
+        self, symbols: Sequence[str]
     ) -> dict[str, list[SecFiling]]:
         """
-        Fetch SEC docs for mergers and acquisitions based on company name
+        Fetch SEC docs for mergers and acquisitions based on ticker symbol
         """
 
-        async def fetch(name: str):
+        async def fetch(symbol: str):
             return await self.fetch_docs(
                 [
-                    f"companyName:{name}",
+                    f"ticker:{symbol}",
                     'formType:"S-4"',
                     'NOT formType:("4/A" OR "S-4 POS")',
                 ],
-                take=5,
+                take=100,
             )
 
-        return {name: await fetch(name) for name in names}
+        return {symbol: await fetch(symbol) for symbol in symbols}
