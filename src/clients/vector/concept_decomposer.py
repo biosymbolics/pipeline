@@ -31,7 +31,7 @@ class ConceptDecomposer:
             ),
             ResponseSchema(
                 name="description",
-                description="2-4 paragraph technical description of the sub-concept",
+                description="3-4 paragraphs of technical description of the sub-concept",
                 type="string",
             ),
         ]
@@ -55,7 +55,7 @@ class ConceptDecomposer:
 
             Return the answer as an array of json objects with the following fields: name, description.
             The description should be written as if a patent: technical, detailed, precise and making appropriate use of jargon.
-            Each description should be 3-4 paragraphs, standalone and avoid any reference to the other descriptions.
+            Each description should be three to four paragraphs, standalone and avoid any reference to the other descriptions.
             They should be, in a sense, homogeneous: having similar specificity, scope and scale relative to the original concept.
 
             Here is an example:

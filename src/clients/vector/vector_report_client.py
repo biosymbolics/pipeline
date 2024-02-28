@@ -12,7 +12,7 @@ from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from clients.vector.types import TopDocRecord, TopDocsByYear
-from core.ner.spacy import get_transformer_nlp
+from core.vector import Vectorizer
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
@@ -40,6 +40,7 @@ class VectorReportClient:
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
         self.relevance_scale_power = relevance_scale_power
+        self.vectorizer = Vectorizer()
 
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
@@ -55,20 +56,17 @@ class VectorReportClient:
 
         return json.loads(result[0]["vector"])
 
-    @staticmethod
     async def _form_vector(
-        description: str | None, companies: Sequence[str]
+        self, description: str | None, companies: Sequence[str]
     ) -> list[float]:
         """
         Form query vector for a description & list of companies
         """
-        nlp = get_transformer_nlp()
-
         vectors: list[list[float]] = []
 
         if description is not None:
-            description_doc = nlp(description)
-            vectors.append(description_doc.vector.tolist())
+            desc_vector = self.vectorizer(description).tolist()
+            vectors.append(desc_vector)
 
         if len(companies) > 0:
             company_vector = await VectorReportClient._get_companies_vector(companies)
@@ -103,7 +101,7 @@ class VectorReportClient:
         return mean + alpha * stddev
 
     async def _get_top_ids(
-        self, vector: list[float], k: int, alpha: float = 0.85
+        self, vector: list[float], k: int, alpha: float = 0.70
     ) -> list[str]:
         """
         Get the ids of the k nearest neighbors to a vector

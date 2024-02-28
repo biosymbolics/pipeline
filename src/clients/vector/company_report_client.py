@@ -81,8 +81,8 @@ class CompanyReportClient(VectorReportClient):
         common_fields = [
             "owner.id AS id",
             "owner.name AS name",
-            "(acquisition.count > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
-            "(acquisition.count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
+            "(COALESCE(acquisition.count, 0) > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
+            "(COALESCE(acquisition.count, 0) = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",
             f"""
@@ -156,7 +156,7 @@ class CompanyReportClient(VectorReportClient):
                     GROUP BY owner_id
                 ) acquisition ON acquisition.owner_id=owner.id
                 WHERE owner.vector is not null
-                GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
+                GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol, acquisition.count
             """
 
         companies = await self.get_top_docs(

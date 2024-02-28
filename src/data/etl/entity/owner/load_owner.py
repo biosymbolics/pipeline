@@ -125,6 +125,7 @@ class OwnerLoader:
         names, counts = await self._get_owner_names()
         public_companies = self.load_public_companies()
         await OwnerEtl().copy_all(names, counts, public_companies, is_force_update)
+        return
 
     @staticmethod
     async def post_finalize():
