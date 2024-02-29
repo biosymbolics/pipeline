@@ -113,7 +113,12 @@ class VectorReportClient:
 
         async def fetch():
             def get_doc_query(doc_type: DocType):
-                return f"SELECT id, vector FROM {doc_type.name}"
+                date_field = DOC_TYPE_DATE_MAP[doc_type]
+                return f"""
+                    SELECT id, vector
+                    FROM {doc_type.name}
+                    WHERE date_part('year', {date_field}) >= {self.min_year}
+                """
 
             doc_queries = " UNION ALL ".join(
                 [get_doc_query(doc_type) for doc_type in self.document_types]
@@ -124,13 +129,11 @@ class VectorReportClient:
                     id,
                     1 - (vector <=> '{vector}') as similarity
                 FROM ({doc_queries}) docs
-                WHERE vector <=> '{vector}' is not null
                 ORDER BY 1 - (vector <=> '{vector}') DESC
                 LIMIT {k}
             """
             async with prisma_context(300) as db:
                 records = await db.query_raw(query)
-                print(records[0:10])
 
             scores = [
                 record["similarity"]

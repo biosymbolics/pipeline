@@ -45,7 +45,6 @@ class CompanyReportClient(VectorReportClient):
                 WHERE {doc_type.name}.id = ANY($1)
                 AND ownable.owner_id = ANY($2)
                 AND ownable.{doc_type.name}_id={doc_type.name}.id
-                AND date_part('year', {date_field}) >= {self.min_year}
                 GROUP BY owner_id, date_part('year', {date_field})
             """
 
@@ -98,11 +97,11 @@ class CompanyReportClient(VectorReportClient):
             "ARRAY_AGG(title) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
-            f"ROUND((1 / exp(AVG(top_docs.vector) <-> owner.vector))::numeric * {self.relevance_scale_power}, 2) AS wheelhouse_score",
+            f"ROUND((1 - (AVG(top_docs.vector) <=> owner.vector))::numeric, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
-            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
+            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS relevance_score",
+            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS score",
         ]
 
         description_fields = [
