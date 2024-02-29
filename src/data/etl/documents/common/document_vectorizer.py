@@ -169,8 +169,15 @@ class DocumentVectorizer:
         """
 
         batch = await self._fetch_batch(last_id=starting_id, **fetch_batch_args)
+        i = 0
 
         while batch:
             await self.handle_batch(batch)
             last_id = batch[-1][self.id_field]
             batch = await self._fetch_batch(last_id=str(last_id))
+
+            if i % 10 == 0:
+                logger.info("Processed %s batches; emptying cache", i)
+                self.vectorizer.empty_cache()
+
+            i += 1
