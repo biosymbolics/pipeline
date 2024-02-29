@@ -38,9 +38,9 @@ class CompanyReportClient(VectorReportClient):
             date_field = DOC_TYPE_DATE_MAP[doc_type]
             return f"""
                 SELECT
-                    owner_id as id,
-                    date_part('year', {date_field}) as year,
-                    count(*) as count
+                    owner_id AS id,
+                    date_part('year', {date_field}) AS year,
+                    count(*) AS count
                 FROM {doc_type.name}, ownable
                 WHERE {doc_type.name}.id = ANY($1)
                 AND ownable.owner_id = ANY($2)

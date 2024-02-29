@@ -129,7 +129,7 @@ class VectorReportClient:
                     id,
                     1 - (vector <=> '{vector}') as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY 1 - (vector <=> '{vector}') DESC
+                ORDER BY (vector <=> '{vector}') ASC
                 LIMIT {k}
             """
             async with prisma_context(300) as db:

@@ -313,7 +313,7 @@ class OwnerEtl(BaseEntityEtl):
             ) agg
             WHERE agg.owner_id=owner.id
             """,
-            "CREATE INDEX owner_vector ON owner USING hnsw (vector vector_l2_ops)",
+            "CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops)",
         ]
         client = await prisma_client(600)
 
