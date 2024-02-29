@@ -24,6 +24,7 @@ requests
 scispacy
 scikit-learn
 sec-api
+sentence-transformers
 spacy
 spacy-lookups-data
 --find-links https://download.pytorch.org/whl/torch_stable.html
