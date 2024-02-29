@@ -1,6 +1,7 @@
 """
 Binder NER model
 """
+
 from typing import Iterable, Sequence
 from pydash import compact
 import torch
@@ -48,7 +49,7 @@ class BinderNlp:
         self._tokenizer = AutoTokenizer.from_pretrained(
             base_model, use_fast=True, device_map="auto"
         )
-        self.nlp = get_transformer_nlp()
+        self.nlp = get_transformer_nlp()  # TODO: use DEFAULT_VECTORIZATION_MODEL?
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)

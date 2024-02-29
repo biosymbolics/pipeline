@@ -8,7 +8,6 @@ from langchain.output_parsers import ResponseSchema
 from pydash import omit
 
 from clients.openai.gpt_client import GptApiClient
-from core.ner.spacy import get_transformer_nlp
 
 from .vector_report_client import VectorReportClient
 from .types import SubConcept
@@ -37,7 +36,6 @@ class ConceptDecomposer:
         ]
 
         self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
-        self.nlp = get_transformer_nlp()
         self.vector_report_client = VectorReportClient()
 
     async def decompose_concept(self, concept_description: str) -> list[SubConcept]:
