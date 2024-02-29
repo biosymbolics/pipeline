@@ -17,22 +17,13 @@ from constants.umls import (
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from utils.re import get_or_re
+from utils.tensor import similarity_with_residual_penalty, tensor_mean
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SYNTACTIC_SIMILARITY_WEIGHT = 0.3
-
-
-def vector_mean(vectors: Sequence[torch.Tensor]) -> torch.Tensor:
-    """
-    Takes a list of Nx0 vectors and returns the mean vector (Nx0)
-    """
-    return torch.concat(
-        [v.unsqueeze(dim=1) for v in vectors],
-        dim=1,
-    ).mean(dim=1)
 
 
 def generate_ngrams(
@@ -58,7 +49,7 @@ def generate_ngrams(
     )
     ngrams = [tuple(tokens[i].text for i in iset) for iset in index_sets]
     vectors = [
-        vector_mean([torch.tensor(t.vector) for t in tokens[min(iset) : max(iset)]])
+        tensor_mean([torch.tensor(t.vector) for t in tokens[min(iset) : max(iset)]])
         for iset in index_sets
     ]
     return list(zip(ngrams, vectors))
@@ -78,93 +69,6 @@ def generate_ngram_phrases(
         list[tuple[str, list[float]]]: list of n-grams and their vectors
     """
     return [(" ".join(ng[0]), ng[1]) for ng in generate_ngrams(tokens, n)]
-
-
-def l1_regularize(vector: torch.Tensor) -> torch.Tensor:
-    # sparsify
-    vector[vector.abs() < 0.3] = 0  # sparsify
-
-    # l1 normalize
-    return F.normalize(vector, p=1, dim=0)
-
-
-def combine_vectors(
-    a: torch.Tensor, b: torch.Tensor, a_weight: float = 0.8
-) -> torch.Tensor:
-    """
-    Weighted combination of two vectors, regularized
-    """
-    b_weight = 1 - a_weight
-    vector = (1 - a_weight) * a + b_weight * b
-    norm_vector = l1_regularize(vector)
-    return norm_vector
-
-
-def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
-    """
-    Torch implementation of TruncatedSVD
-    (from Anthropic)
-    """
-    # Reshape x if it's a 1D vector
-    if vector.ndim == 1:
-        vector = vector.unsqueeze(1)
-
-    # l1 reg
-    v_sparse = l1_regularize(vector)
-
-    # SVD
-    U, S, _ = torch.linalg.svd(v_sparse)
-
-    # Sorted eigenvalues
-    E = torch.sort(S**2 / torch.sum(S**2), descending=True)
-
-    # Cumulative energy
-    cum_energy = torch.cumsum(E[0], dim=0)
-
-    mask = cum_energy > variance_threshold
-    k = torch.sum(mask).int() + 1
-
-    # Compute reduced components
-    U_reduced = U[:, :k]
-
-    return cast(torch.Tensor, U_reduced)
-
-
-def similarity_with_residual_penalty(
-    mention_vector: torch.Tensor,
-    candidate_vector: torch.Tensor,
-    distance: float | None = None,  # cosine/"angular" distance
-    alpha: float = 0.5,
-) -> float:
-    """
-    Compute a weighted similarity score that penalizes a large residual.
-
-    Args:
-        mention_vector (torch.Tensor): mention vector
-        candidate_vector (torch.Tensor): candidate vector
-        distance (float, optional): cosine/"angular" distance. Defaults to None, in which case it is computed.
-        alpha (float, optional): weight of the residual penalty. Defaults to 0.3.
-    """
-    if distance is None:
-        _distance = F.cosine_similarity(mention_vector, candidate_vector, dim=0)
-    else:
-        _distance = torch.tensor(distance)
-
-    similarity = 2 - _distance
-
-    # Compute residual
-    residual = torch.subtract(mention_vector, candidate_vector)
-
-    # Frobenius norm
-    residual_norm = torch.norm(residual, p="fro")
-
-    # Scale residual norm to [0,1] range
-    scaled_residual_norm = torch.divide(residual_norm, torch.norm(mention_vector))
-
-    # Weighted score
-    score = alpha * similarity + (1 - alpha) * (1 - scaled_residual_norm)
-
-    return score.item()
 
 
 MIN_ORTHO_DISTANCE = 0.2

@@ -6,9 +6,10 @@ import torch
 
 from core.ner.linker.semantic_candidate_selector import SemanticCandidateSelector
 from core.ner.linker.types import EntityWithScoreVector
-from core.ner.linker.utils import combine_vectors, join_punctuated_tokens
+from core.ner.linker.utils import join_punctuated_tokens
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
+from utils.tensor import combine_tensors
 
 from .types import AbstractCompositeCandidateSelector
 from .utils import form_composite_entity, is_composite_eligible
@@ -124,7 +125,7 @@ class CompositeSemanticCandidateSelector(
             # to add context for semantic similarity comparison
             if entity.vector is not None:
                 vectors = [
-                    combine_vectors(
+                    combine_tensors(
                         torch.tensor(t.vector), torch.tensor(entity.vector), 0.9
                     )
                     for t in tokens

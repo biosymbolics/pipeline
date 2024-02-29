@@ -9,12 +9,12 @@ from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity, DocEntity
 from constants.umls import PREFERRED_UMLS_TYPES
 from utils.classes import overrides
+from utils.tensor import l1_regularize
 
 from .types import AbstractCandidateSelector, EntityWithScoreVector
 from .utils import (
     apply_umls_word_overrides,
     candidate_to_canonical,
-    l1_regularize,
     score_semantic_candidate,
 )
 

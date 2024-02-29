@@ -98,7 +98,11 @@ class VectorReportClient:
         return mean + alpha * stddev
 
     async def _get_top_ids(
-        self, vector: list[float], k: int, alpha: float = 0.70
+        self,
+        vector: list[float],
+        k: int,
+        skip_ids: Sequence[str] = [],
+        alpha: float = 0.70,
     ) -> list[str]:
         """
         Get the ids of the k nearest neighbors to a vector
@@ -118,6 +122,7 @@ class VectorReportClient:
                     SELECT id, vector
                     FROM {doc_type.name}
                     WHERE date_part('year', {date_field}) >= {self.min_year}
+                    AND NOT id = ANY($1)
                 """
 
             doc_queries = " UNION ALL ".join(
@@ -133,7 +138,7 @@ class VectorReportClient:
                 LIMIT {k}
             """
             async with prisma_context(300) as db:
-                records = await db.query_raw(query)
+                records = await db.query_raw(query, skip_ids)
 
             scores = [
                 record["similarity"]
@@ -166,26 +171,24 @@ class VectorReportClient:
 
         return response
 
-    async def get_top_docs(
+    async def get_top_docs_by_vector(
         self,
-        description: str | None = None,
-        similar_companies: Sequence[str] = [],
+        vector: list[float],
         k: int = DEFAULT_K,
         get_query: Callable[[str], str] | None = None,
         Schema: Type[ResultSchema] = TopDocRecord,
-    ) -> list[ResultSchema]:
+        skip_ids: Sequence[str] = [],
+    ):
         """
-        Get the query to get the top documents for a vector
+        Get the top documents for a vector
 
         Args:
-            description (str, optional): description of the concept. Defaults to None.
-            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+            vector (list[float]): vector to search
+            skip_ids (Sequence[str], optional): ids to skip. Defaults to [].
             k (int, optional): number of top documents to return. Defaults to DEFAULT_K.
             get_query (Callable[[str], str], optional): function yielding the overall desired query.
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
-        vector = await self._form_vector(description, similar_companies)
-        ids = await self._get_top_ids(vector, k)
 
         def get_inner_query(doc_type: DocType):
             date_field = DOC_TYPE_DATE_MAP[doc_type]
@@ -219,14 +222,37 @@ class VectorReportClient:
             [get_inner_query(doc_type) for doc_type in self.document_types]
         )
         query = get_query(inner_query) if get_query else inner_query
+        ids = await self._get_top_ids(vector, k, skip_ids)
 
         async with prisma_context(300) as db:
             records: list[dict] = await db.query_raw(query, ids)
 
         return [Schema(**record) for record in records]
 
-    async def get_top_docs_by_year(
-        self, description: str, similar_companies: Sequence[str] = []
+    async def get_top_docs(
+        self,
+        description: str | None = None,
+        similar_companies: Sequence[str] = [],
+        k: int = DEFAULT_K,
+        get_query: Callable[[str], str] | None = None,
+        Schema: Type[ResultSchema] = TopDocRecord,
+    ) -> list[ResultSchema]:
+        """
+        Get the query to get the top documents for a vector
+
+        Args:
+            description (str, optional): description of the concept. Defaults to None.
+            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
+            k (int, optional): number of top documents to return. Defaults to DEFAULT_K.
+            get_query (Callable[[str], str], optional): function yielding the overall desired query.
+            Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
+        """
+        vector = await self._form_vector(description, similar_companies)
+        top_docs = await self.get_top_docs_by_vector(vector, k, get_query, Schema)
+        return top_docs
+
+    async def get_top_docs_by_year_and_vector(
+        self, vector: list[float], skip_ids: Sequence[str] = []
     ) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies,
@@ -251,11 +277,30 @@ class VectorReportClient:
                 GROUP BY year
             """
 
-        return await self.get_top_docs(
-            description,
-            similar_companies,
+        return await self.get_top_docs_by_vector(
+            vector,
             get_query=by_year_query,
             Schema=TopDocsByYear,
+            skip_ids=skip_ids,
+        )
+
+    async def get_top_residual_docs_by_year(
+        self,
+        description: str,
+        known_doc_ids: Sequence[str],
+    ) -> list[TopDocsByYear]:
+        concept_vector = self.vectorizer(description)
+        docs = await self.get_top_docs_by_year_and_vector(
+            concept_vector.tolist(), skip_ids=known_doc_ids
+        )
+
+        return docs
+
+    async def get_top_docs_by_year(
+        self, description: str, similar_companies: Sequence[str] = []
+    ) -> list[TopDocsByYear]:
+        return await self.get_top_docs_by_year_and_vector(
+            await self._form_vector(description, similar_companies)
         )
 
     async def __call__(
