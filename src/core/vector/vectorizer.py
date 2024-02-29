@@ -22,6 +22,9 @@ class Vectorizer:
         return self.vectorize([text])[0]
 
     def vectorize(self, texts: list[str]) -> list[torch.Tensor]:
+        if self.embedding_model is None:
+            raise ValueError("Embedding model is not initialized")
+
         with torch.no_grad():
             tensors = self.embedding_model.encode(texts)
 

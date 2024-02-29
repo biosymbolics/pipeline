@@ -72,7 +72,7 @@ class BaseDocumentEtl:
             "SET maintenance_work_mem = '5GB'",
             f"""
                 CREATE INDEX {self.document_type.name}_vector ON {self.document_type.name}
-                USING hnsw (vector vector_l2_ops)
+                USING hnsw (vector vector_cosine_ops)
             """,
         ]
         for query in queries:

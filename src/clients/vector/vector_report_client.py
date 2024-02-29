@@ -22,7 +22,6 @@ logger.setLevel(logging.INFO)
 MIN_YEAR = 2000
 RECENCY_DECAY_FACTOR = 2
 DEFAULT_K = 1000
-RELEVANCE_SCALE_FACTOR = 100
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
@@ -32,14 +31,12 @@ class VectorReportClient:
         self,
         min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
-        relevance_scale_power: int = RELEVANCE_SCALE_FACTOR,
         document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
     ):
         self.document_types = document_types
         self.gpt_client = GptApiClient()
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
-        self.relevance_scale_power = relevance_scale_power
         self.vectorizer = Vectorizer()
 
     @staticmethod
@@ -125,13 +122,15 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    (1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power} AS similarity
+                    1 - (vector <=> '{vector}') as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY vector <-> '{vector}'
-                ASC LIMIT {k}
+                WHERE vector <=> '{vector}' is not null
+                ORDER BY 1 - (vector <=> '{vector}') DESC
+                LIMIT {k}
             """
             async with prisma_context(300) as db:
                 records = await db.query_raw(query)
+                print(records[0:10])
 
             scores = [
                 record["similarity"]
@@ -200,7 +199,7 @@ class VectorReportClient:
                     SELECT
                         id,
                         {dedup_id_field} as dedup_id,
-                        ((1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power})::numeric as relevance_score,
+                        (1 - (vector <=> '{vector}'))::numeric as relevance_score,
                         title,
                         url,
                         vector,
