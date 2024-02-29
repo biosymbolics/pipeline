@@ -284,18 +284,6 @@ class VectorReportClient:
             skip_ids=skip_ids,
         )
 
-    async def get_top_residual_docs_by_year(
-        self,
-        description: str,
-        known_doc_ids: Sequence[str],
-    ) -> list[TopDocsByYear]:
-        concept_vector = self.vectorizer(description)
-        docs = await self.get_top_docs_by_year_and_vector(
-            concept_vector.tolist(), skip_ids=known_doc_ids
-        )
-
-        return docs
-
     async def get_top_docs_by_year(
         self, description: str, similar_companies: Sequence[str] = []
     ) -> list[TopDocsByYear]:

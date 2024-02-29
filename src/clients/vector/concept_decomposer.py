@@ -104,9 +104,10 @@ class ConceptDecomposer:
         if len(known_ids) == 0:
             raise ValueError("No known ids for residual report")
 
-        residual_report = await self.vector_report_client.get_top_residual_docs_by_year(
+        residual_report = await self.vector_report_client.get_top_docs_by_year(
             description, known_ids
         )
+
         residual_text = "\n\n".join(flatten([d.titles for d in residual_report]))
         sub_description_list = "\n".join(sub_descriptions)
 
