@@ -6,6 +6,7 @@ class DocType(Enum):
     patent = "patent"
     regulatory_approval = "regulatory_approval"
     trial = "trial"
+    all = "all"
 
 
 DOC_TYPE_DATE_MAP: dict[DocType, str] = {

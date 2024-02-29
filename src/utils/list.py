@@ -2,7 +2,6 @@
 Utils for lists/arrays
 """
 
-
 from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar, cast
 import numpy as np
 from pydash import compact, merge_with, uniq
@@ -127,7 +126,7 @@ MT = TypeVar("MT")
 def merge_nested(a: MT, *sources: MT) -> MT:
     """
     Merge two nested structures (dicts, lists, etc.)
-    Lists are concatenated, dicts are merged
+    Lists are concatenated, dicts are merged. For everything else, a is returned.
     """
 
     def handle_merge(a: MT, b: MT):

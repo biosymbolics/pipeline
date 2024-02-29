@@ -26,6 +26,7 @@ class TopDocsByYear(ResultBase):
 class CountByYear(ResultBase):
     year: int
     count: int
+    type: str
 
 
 class UrlDef(ResultBase):
@@ -49,7 +50,7 @@ class CompanyRecord(ResultBase):
     activity: list[float] = []
     relevance_score: float
     wheelhouse_score: float = 0.0
-    count_by_year: list[CountByYear] = []
+    count_by_year: dict[str, list[CountByYear]] = {}
     score: float
 
 

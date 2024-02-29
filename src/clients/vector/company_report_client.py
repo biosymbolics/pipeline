@@ -6,7 +6,7 @@ from datetime import date
 import logging
 import time
 from typing import Sequence
-from pydash import flatten, group_by, omit
+from pydash import flatten, group_by, merge_with, omit
 
 from clients.low_level.prisma import prisma_context
 from clients.vector.vector_report_client import VectorReportClient
@@ -27,7 +27,7 @@ logger.setLevel(logging.INFO)
 class CompanyReportClient(VectorReportClient):
     async def _fetch_company_reports(
         self, document_ids: Sequence[str], owner_ids: Sequence[int]
-    ) -> dict[int, list[CountByYear]]:
+    ) -> dict[str, dict[int, list[CountByYear]]]:
         """
         Fetches company reports for a set of document and owner ids
 
@@ -40,6 +40,7 @@ class CompanyReportClient(VectorReportClient):
                 SELECT
                     owner_id AS id,
                     date_part('year', {date_field}) AS year,
+                    '{doc_type.name}' AS type,
                     count(*) AS count
                 FROM {doc_type.name}, ownable
                 WHERE {doc_type.name}.id = ANY($1)
@@ -55,15 +56,25 @@ class CompanyReportClient(VectorReportClient):
             report = await db.query_raw(report_query, document_ids, owner_ids)
 
         result_map = {
-            k: {v["year"]: CountByYear(**v) for v in vals}
-            for k, vals in group_by(report, "id").items()
+            type: {
+                k: {
+                    v["year"]: CountByYear(**v)
+                    for v in vals
+                    if type == type.all or v["type"] == type.name
+                }
+                for k, vals in group_by(report, "id").items()
+            }
+            for type in [DocType.all, *self.document_types]
         }
         return {
-            k: [
-                vals.get(y) or CountByYear(year=y, count=0)
-                for y in range(self.min_year, MAX_DATA_YEAR)
-            ]
-            for k, vals in result_map.items()
+            type.name: {
+                k: [
+                    vals.get(y) or CountByYear(year=y, count=0, type=type.name)
+                    for y in range(self.min_year, MAX_DATA_YEAR)
+                ]
+                for k, vals in map.items()
+            }
+            for type, map in result_map.items()
         }
 
     def _get_fields(
@@ -150,11 +161,11 @@ class CompanyReportClient(VectorReportClient):
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
                 LEFT JOIN (
-                    SELECT owner_id, count(*) as count
+                    SELECT owner_id, count(*) AS count
                     FROM acquisition
                     GROUP BY owner_id
                 ) acquisition ON acquisition.owner_id=owner.id
-                WHERE owner.vector is not null
+                WHERE owner.vector IS NOT null
                 GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol, acquisition.count
             """
 
@@ -173,8 +184,10 @@ class CompanyReportClient(VectorReportClient):
         companies = [
             CompanyRecord(
                 **omit(c.model_dump(), "activity", "count_by_year"),
-                activity=[v.count for v in report_map[c.id]],
-                count_by_year=report_map[c.id],
+                activity=[v.count for v in report_map["all"][c.id]],
+                count_by_year={
+                    t.name: report_map[t.name][c.id] for t in self.document_types
+                },
             )
             for c in companies
         ]

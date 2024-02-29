@@ -197,7 +197,8 @@ class VectorReportClient:
                     MAX(title) as title,
                     MAX(url) as url,
                     AVG(vector) as vector,
-                    MAX(year) as year
+                    MAX(year) as year,
+                    '{doc_type.name}' as type
                 FROM (
                     SELECT
                         id,

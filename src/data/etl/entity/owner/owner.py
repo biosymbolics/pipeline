@@ -236,6 +236,20 @@ class OwnerEtl(BaseEntityEtl):
             """
         )
 
+        # hack!! avoid updating/inserting dups to being with
+        # (though this will be ugly unless we map ownables -> owners prior to insert)
+        await client.execute_raw(
+            """
+            DELETE FROM ownable o1
+            USING ownable o2
+            WHERE o1.owner_id=o2.owner_id
+            AND o1.patent_id=o2.patent_id
+            AND o1.patent_id IS NOT null
+            AND o2.patent_id IS NOT null
+            AND o1.id > o2.id;
+            """
+        )
+
     @staticmethod
     async def _update_search_index():
         """
