@@ -292,9 +292,17 @@ alter role biosym with superuser;
 prisma db push
 ```
 
+##### Ctgov
+```
+createdb aact
+pg_restore -e -v -O -x -d aact --no-owner ~/Downloads/postgres_data.dmp
+alter database aact set search_path = ctgov, public;
+create extension vector;
+create table trial_vectors(id text, vector vector(768));
+```
+
 #### Random
 ```
-alter database aact set search_path = ctgov, public;
 
 from core.ner.spacy import Spacy
 nlp = Spacy.get_instance(
