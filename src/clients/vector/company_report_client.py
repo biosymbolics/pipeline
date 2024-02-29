@@ -6,7 +6,7 @@ from datetime import date
 import logging
 import time
 from typing import Sequence
-from pydash import flatten, group_by, merge_with, omit
+from pydash import flatten, group_by, omit
 
 from clients.low_level.prisma import prisma_context
 from clients.vector.vector_report_client import VectorReportClient
