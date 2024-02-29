@@ -169,7 +169,7 @@ class DocumentVectorizer:
         """
 
         if starting_id is None and len(self._get_processed_docs()) == 0:
-            logger.info(
+            logger.warning(
                 "No starting_id and no processed docs; clearing vector table if exists"
             )
             await self.db.execute_query(f"TRUNCATE {self.dest_table}")
