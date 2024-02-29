@@ -168,6 +168,12 @@ class DocumentVectorizer:
         Vectorize & persist documents
         """
 
+        if starting_id is None and len(self._get_processed_docs()) == 0:
+            logger.info(
+                "No starting_id and no processed docs; clearing vector table if exists"
+            )
+            await self.db.execute_query(f"TRUNCATE {self.dest_table}")
+
         batch = await self._fetch_batch(last_id=starting_id, **fetch_batch_args)
         i = 0
 
