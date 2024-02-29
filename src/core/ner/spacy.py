@@ -120,7 +120,7 @@ class Spacy:
         return cls._instances[args_hash]
 
 
-def get_transformer_nlp() -> Spacy:
+def get_transformer_nlp(model: str = DEFAULT_BASE_TRANSFORMER_MODEL) -> Spacy:
     """
     Get a Spacy NLP model that uses a transformer
     """
@@ -135,7 +135,7 @@ def get_transformer_nlp() -> Spacy:
                 "config": {
                     "model": {
                         "@architectures": "spacy-transformers.TransformerModel.v3",
-                        "name": DEFAULT_BASE_TRANSFORMER_MODEL,
+                        "name": model,
                         "get_spans": {
                             "@span_getters": "spacy-transformers.strided_spans.v1",
                             "window": 128,

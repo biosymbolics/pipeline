@@ -8,7 +8,7 @@ import hashlib
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from core.ner.spacy import get_transformer_nlp
+from core.vector import Vectorizer
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class DocumentVectorizer:
         self.text_fields = text_fields
         self.dest_table = dest_table
         self.id_field = id_field
-        self.nlp = get_transformer_nlp()
+        self.vectorizer = Vectorizer()
 
     def _get_processed_docs(self) -> list[str]:
         """
@@ -101,7 +101,7 @@ class DocumentVectorizer:
             )
 
         # vectorize
-        vectors = [doc.vector.tolist() for doc in self.nlp.pipe(uniq_documents)]
+        vectors = [v.tolist() for v in self.vectorizer.vectorize(uniq_documents)]
 
         # map of content hash to vector
         vectors_map = {
@@ -168,6 +168,12 @@ class DocumentVectorizer:
         Vectorize & persist documents
         """
 
+        if starting_id is None and len(self._get_processed_docs()) == 0:
+            logger.warning(
+                "No starting_id and no processed docs; clearing vector table if exists"
+            )
+            await self.db.execute_query(f"TRUNCATE {self.dest_table}")
+
         batch = await self._fetch_batch(last_id=starting_id, **fetch_batch_args)
         i = 0
 
@@ -176,9 +182,8 @@ class DocumentVectorizer:
             last_id = batch[-1][self.id_field]
             batch = await self._fetch_batch(last_id=str(last_id))
 
-            # clear vocab to reduce memory utilization & force gc
-            if (i % 10) == 0:
-                logger.info("Clearing vocab (%s)", len(self.nlp.vocab()))
-                self.nlp.reset()
+            if i % 10 == 0:
+                logger.info("Processed %s batches; emptying cache", i)
+                self.vectorizer.empty_cache()
 
             i += 1

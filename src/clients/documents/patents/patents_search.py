@@ -12,6 +12,7 @@ from prisma.types import (
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
+from constants.core import DEFAULT_VECTORIZATION_MODEL
 from typings.documents.patents import ScoredPatent
 from typings.client import (
     DocumentSearchCriteria,
@@ -74,7 +75,7 @@ async def get_description_ids(description: str, k: int) -> list[str]:
     from core.ner.spacy import get_transformer_nlp
 
     logger.info("Searching patents by description (slow-ish)")
-    nlp = get_transformer_nlp()
+    nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
     vector = nlp(description).vector.tolist()
 
     query = f"""

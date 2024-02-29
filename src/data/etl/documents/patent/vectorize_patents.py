@@ -4,7 +4,7 @@ import sys
 from typing import Optional
 
 from constants.core import APPLICATIONS_TABLE, PATENT_VECTOR_TABLE
-from data.etl.documents.common.vectorizer import DocumentVectorizer
+from data.etl.documents import DocumentVectorizer
 from system import initialize
 
 

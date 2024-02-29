@@ -27,7 +27,7 @@ logger.setLevel(logging.INFO)
 class CompanyReportClient(VectorReportClient):
     async def _fetch_company_reports(
         self, document_ids: Sequence[str], owner_ids: Sequence[int]
-    ) -> dict[int, list[CountByYear]]:
+    ) -> dict[str, dict[int, list[CountByYear]]]:
         """
         Fetches company reports for a set of document and owner ids
 
@@ -38,14 +38,14 @@ class CompanyReportClient(VectorReportClient):
             date_field = DOC_TYPE_DATE_MAP[doc_type]
             return f"""
                 SELECT
-                    owner_id as id,
-                    date_part('year', {date_field}) as year,
-                    count(*) as count
+                    owner_id AS id,
+                    date_part('year', {date_field}) AS year,
+                    '{doc_type.name}' AS type,
+                    count(*) AS count
                 FROM {doc_type.name}, ownable
                 WHERE {doc_type.name}.id = ANY($1)
                 AND ownable.owner_id = ANY($2)
                 AND ownable.{doc_type.name}_id={doc_type.name}.id
-                AND date_part('year', {date_field}) >= {self.min_year}
                 GROUP BY owner_id, date_part('year', {date_field})
             """
 
@@ -56,15 +56,25 @@ class CompanyReportClient(VectorReportClient):
             report = await db.query_raw(report_query, document_ids, owner_ids)
 
         result_map = {
-            k: {v["year"]: CountByYear(**v) for v in vals}
-            for k, vals in group_by(report, "id").items()
+            type: {
+                k: {
+                    v["year"]: CountByYear(**v)
+                    for v in vals
+                    if type == type.all or v["type"] == type.name
+                }
+                for k, vals in group_by(report, "id").items()
+            }
+            for type in [DocType.all, *self.document_types]
         }
         return {
-            k: [
-                vals.get(y) or CountByYear(year=y, count=0)
-                for y in range(self.min_year, MAX_DATA_YEAR)
-            ]
-            for k, vals in result_map.items()
+            type.name: {
+                k: [
+                    vals.get(y) or CountByYear(year=y, count=0, type=type.name)
+                    for y in range(self.min_year, MAX_DATA_YEAR)
+                ]
+                for k, vals in map.items()
+            }
+            for type, map in result_map.items()
         }
 
     def _get_fields(
@@ -81,8 +91,8 @@ class CompanyReportClient(VectorReportClient):
         common_fields = [
             "owner.id AS id",
             "owner.name AS name",
-            "(acquisition.count > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
-            "(acquisition.count = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
+            "(COALESCE(acquisition.count, 0) > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
+            "(COALESCE(acquisition.count, 0) = 0 AND owner.owner_type='INDUSTRY') AS is_competition",
             "financials.symbol AS symbol",
             "ARRAY_AGG(top_docs.id) AS ids",
             f"""
@@ -98,11 +108,11 @@ class CompanyReportClient(VectorReportClient):
             "ARRAY_AGG(title) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
-            f"ROUND((1 / exp(AVG(top_docs.vector) <-> owner.vector))::numeric * {self.relevance_scale_power}, 2) AS wheelhouse_score",
+            f"ROUND((1 - (AVG(top_docs.vector) <=> owner.vector))::numeric, 2) AS wheelhouse_score",
         ]
         company_fields = [
-            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS relevance_score",
-            f"ROUND((1 / exp(owner.vector <-> '{vector}'))::numeric * {self.relevance_scale_power}, 2) AS score",
+            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS relevance_score",
+            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS score",
         ]
 
         description_fields = [
@@ -151,12 +161,12 @@ class CompanyReportClient(VectorReportClient):
                 JOIN owner ON owner.id=ownable.owner_id
                 LEFT JOIN financials ON financials.owner_id=owner.id
                 LEFT JOIN (
-                    SELECT owner_id, count(*) as count
+                    SELECT owner_id, count(*) AS count
                     FROM acquisition
                     GROUP BY owner_id
                 ) acquisition ON acquisition.owner_id=owner.id
-                WHERE owner.vector is not null
-                GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol
+                WHERE owner.vector IS NOT null
+                GROUP BY owner.name, owner.id, owner.owner_type, financials.symbol, acquisition.count
             """
 
         companies = await self.get_top_docs(
@@ -174,8 +184,10 @@ class CompanyReportClient(VectorReportClient):
         companies = [
             CompanyRecord(
                 **omit(c.model_dump(), "activity", "count_by_year"),
-                activity=[v.count for v in report_map[c.id]],
-                count_by_year=report_map[c.id],
+                activity=[v.count for v in report_map["all"][c.id]],
+                count_by_year={
+                    t.name: report_map[t.name][c.id] for t in self.document_types
+                },
             )
             for c in companies
         ]

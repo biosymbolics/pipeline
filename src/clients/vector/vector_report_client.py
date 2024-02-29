@@ -12,7 +12,7 @@ from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from clients.vector.types import TopDocRecord, TopDocsByYear
-from core.ner.spacy import get_transformer_nlp
+from core.vector import Vectorizer
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
@@ -22,7 +22,6 @@ logger.setLevel(logging.INFO)
 MIN_YEAR = 2000
 RECENCY_DECAY_FACTOR = 2
 DEFAULT_K = 1000
-RELEVANCE_SCALE_FACTOR = 100
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
@@ -32,14 +31,13 @@ class VectorReportClient:
         self,
         min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
-        relevance_scale_power: int = RELEVANCE_SCALE_FACTOR,
         document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
     ):
         self.document_types = document_types
         self.gpt_client = GptApiClient()
         self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
-        self.relevance_scale_power = relevance_scale_power
+        self.vectorizer = Vectorizer()
 
     @staticmethod
     async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
@@ -55,20 +53,17 @@ class VectorReportClient:
 
         return json.loads(result[0]["vector"])
 
-    @staticmethod
     async def _form_vector(
-        description: str | None, companies: Sequence[str]
+        self, description: str | None, companies: Sequence[str]
     ) -> list[float]:
         """
         Form query vector for a description & list of companies
         """
-        nlp = get_transformer_nlp()
-
         vectors: list[list[float]] = []
 
         if description is not None:
-            description_doc = nlp(description)
-            vectors.append(description_doc.vector.tolist())
+            desc_vector = self.vectorizer(description).tolist()
+            vectors.append(desc_vector)
 
         if len(companies) > 0:
             company_vector = await VectorReportClient._get_companies_vector(companies)
@@ -103,7 +98,7 @@ class VectorReportClient:
         return mean + alpha * stddev
 
     async def _get_top_ids(
-        self, vector: list[float], k: int, alpha: float = 0.85
+        self, vector: list[float], k: int, alpha: float = 0.70
     ) -> list[str]:
         """
         Get the ids of the k nearest neighbors to a vector
@@ -118,7 +113,12 @@ class VectorReportClient:
 
         async def fetch():
             def get_doc_query(doc_type: DocType):
-                return f"SELECT id, vector FROM {doc_type.name}"
+                date_field = DOC_TYPE_DATE_MAP[doc_type]
+                return f"""
+                    SELECT id, vector
+                    FROM {doc_type.name}
+                    WHERE date_part('year', {date_field}) >= {self.min_year}
+                """
 
             doc_queries = " UNION ALL ".join(
                 [get_doc_query(doc_type) for doc_type in self.document_types]
@@ -127,10 +127,10 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    (1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power} AS similarity
+                    1 - (vector <=> '{vector}') as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY vector <-> '{vector}'
-                ASC LIMIT {k}
+                ORDER BY (vector <=> '{vector}') ASC
+                LIMIT {k}
             """
             async with prisma_context(300) as db:
                 records = await db.query_raw(query)
@@ -197,12 +197,13 @@ class VectorReportClient:
                     MAX(title) as title,
                     MAX(url) as url,
                     AVG(vector) as vector,
-                    MAX(year) as year
+                    MAX(year) as year,
+                    '{doc_type.name}' as type
                 FROM (
                     SELECT
                         id,
                         {dedup_id_field} as dedup_id,
-                        ((1 / exp(vector <-> '{vector}')) * {self.relevance_scale_power})::numeric as relevance_score,
+                        (1 - (vector <=> '{vector}'))::numeric as relevance_score,
                         title,
                         url,
                         vector,
