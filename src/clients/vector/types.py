@@ -2,6 +2,9 @@
 Vector client types
 """
 
+from typing import Sequence
+
+from pydantic import BaseModel
 from typings.core import ResultBase
 
 
@@ -65,3 +68,23 @@ class SubConcept(ResultBase):
     name: str
     description: str
     report: list[TopDocsByYear] = []
+
+
+MIN_YEAR = 2000
+DEFAULT_K = 1000
+
+
+class VectorSearchParams(BaseModel):
+    min_year: int = MIN_YEAR
+    skip_ids: Sequence[str] = []
+    k: int = DEFAULT_K
+    vector: list[float] = []
+
+    def merge(self, new_params: dict) -> "VectorSearchParams":
+        self_keep = {
+            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
+        }
+        return VectorSearchParams(
+            **self_keep,
+            **new_params,
+        )

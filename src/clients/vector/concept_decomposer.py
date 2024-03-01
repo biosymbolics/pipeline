@@ -12,6 +12,8 @@ from clients.openai.gpt_client import GptApiClient
 from .vector_report_client import VectorReportClient
 from .types import SubConcept
 
+RESIDUAL_START_YEAR = 2021
+
 
 class ConceptDecomposer:
     """
@@ -73,7 +75,7 @@ class ConceptDecomposer:
         return sub_concepts
 
     async def _generate_subconcept_reports(
-        self, sub_concepts: Sequence[SubConcept]
+        self, sub_concepts: Sequence[SubConcept], min_year: int = 2000
     ) -> list[SubConcept]:
         """
         Fetches reports for each sub-concept
@@ -87,7 +89,10 @@ class ConceptDecomposer:
         }
         """
         concept_docs_by_year = await asyncio.gather(
-            *[self.vector_report_client(sc.description) for sc in sub_concepts]
+            *[
+                self.vector_report_client(sc.description, min_year=min_year)
+                for sc in sub_concepts
+            ]
         )
 
         return [
@@ -131,7 +136,9 @@ class ConceptDecomposer:
         """
         response = await self.llm.query(prompt, is_array=True)
         new_sub_concepts = [SubConcept(**r) for r in response]
-        new_reports = await self._generate_subconcept_reports(new_sub_concepts)
+        new_reports = await self._generate_subconcept_reports(
+            new_sub_concepts, min_year=RESIDUAL_START_YEAR
+        )
         return new_reports
 
     async def decompose_concept_with_reports(

@@ -11,35 +11,18 @@ import torch
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
-from clients.vector.types import TopDocRecord, TopDocsByYear
 from core.vector import Vectorizer
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
+from .types import TopDocRecord, TopDocsByYear, VectorSearchParams
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MIN_YEAR = 2000
 RECENCY_DECAY_FACTOR = 2
-DEFAULT_K = 1000
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
-
-
-class VectorSearchParams(BaseModel):
-    min_year: int = MIN_YEAR
-    skip_ids: Sequence[str] = []
-    k: int = DEFAULT_K
-    vector: list[float] = []
-
-    def merge(self, new_params: dict) -> "VectorSearchParams":
-        self_keep = {
-            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
-        }
-        return VectorSearchParams(
-            **self_keep,
-            **new_params,
-        )
 
 
 class VectorReportClient:
@@ -122,8 +105,7 @@ class VectorReportClient:
         Cached.
 
         Args:
-            vector (list[float]): vector to search
-            k (int): number of nearest neighbors to return
+            search_params (VectorSearchParams): search parameters
             alpha (float, optional): alpha for min sim score calc. Defaults to 0.75.
         """
 
@@ -193,9 +175,7 @@ class VectorReportClient:
         Get the top documents for a vector
 
         Args:
-            vector (list[float]): vector to search
-            skip_ids (Sequence[str], optional): ids to skip. Defaults to [].
-            k (int, optional): number of top documents to return. Defaults to DEFAULT_K.
+            search_params (VectorSearchParams): search parameters
             get_query (Callable[[str], str], optional): function yielding the overall desired query.
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
@@ -253,7 +233,7 @@ class VectorReportClient:
         Args:
             description (str, optional): description of the concept. Defaults to None.
             similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
-            k (int, optional): number of top documents to return. Defaults to DEFAULT_K.
+            search_params (VectorSearchParams, optional): search parameters.
             get_query (Callable[[str], str], optional): function yielding the overall desired query.
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
@@ -270,7 +250,7 @@ class VectorReportClient:
     ) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies,
-        aggregated by year
+        aggregated by year.
 
         Args:
             description (str): description of the concept
@@ -298,15 +278,21 @@ class VectorReportClient:
         )
 
     async def get_top_docs_by_year(
-        self, description: str, similar_companies: Sequence[str] = []
+        self,
+        description: str,
+        similar_companies: Sequence[str] = [],
+        search_params: VectorSearchParams = VectorSearchParams(),
     ) -> list[TopDocsByYear]:
+        """
+        Get the top documents for a description and (optionally) similar companies, aggregated by year
+        """
         vector = await self._form_vector(description, similar_companies)
         return await self.get_top_docs_by_year_and_vector(
-            VectorSearchParams(vector=vector)
+            search_params.merge({"vector": vector})
         )
 
     async def __call__(
-        self, description: str, similar_companies: Sequence[str] = []
+        self, description: str, similar_companies: Sequence[str] = [], **kwargs
     ) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies, by year
@@ -315,9 +301,13 @@ class VectorReportClient:
             description (str): description of the concept
             similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
         """
+        search_params = VectorSearchParams(**kwargs)
         logger.info(
             "Getting top docs by year for description: '%s' and similar companies: %s",
             description,
             similar_companies,
+            search_params,
         )
-        return await self.get_top_docs_by_year(description, similar_companies)
+        return await self.get_top_docs_by_year(
+            description, similar_companies, search_params
+        )
