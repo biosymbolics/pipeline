@@ -311,6 +311,7 @@ class TrialLoader(BaseDocumentEtl):
         """
         client = await prisma_client(600)
         await TrialOutcome.prisma(client).delete_many()
+        await TrialDropoutReason.prisma(client).delete_many()
         await Ownable.prisma(client).query_raw(
             "DELETE FROM ownable WHERE trial_id IS NOT NULL"
         )
