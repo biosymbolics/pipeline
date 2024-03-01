@@ -93,7 +93,6 @@ class Topics:
         client = GptApiClient(response_schemas)
         query = _get_topic_prompt()
         results = await client.query(query, is_array=True)
-        print(results)
 
         topic_name_map: dict[int, str] = dict(
             [(result["cluster_id"], result["name"]) for result in results]
