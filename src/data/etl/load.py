@@ -23,7 +23,7 @@ def get_entity_map_matview_query() -> list[str]:
     search_or = "|| ' ' || ".join(name_fields)
     search = f"to_tsvector('english', {search_or} )"
     fields = [
-        *[f"{doc_type.name}_id" for doc_type in DocType],
+        *[f"{doc_type.name}_id" for doc_type in DocType if doc_type != DocType.all],
         f"{search} as search",
         *name_fields,
     ]
@@ -50,6 +50,7 @@ def get_entity_map_matview_query() -> list[str]:
         *[
             f"CREATE INDEX {SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
             for doc_type in DocType
+            if doc_type != DocType.all
         ],
         f"CREATE INDEX {SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
     ]
