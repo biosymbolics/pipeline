@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
+from clients.vector.types import VectorSearchParams
 
 from constants.patents import DEFAULT_PATENT_K
 from typings.documents.common import DocType
@@ -84,6 +85,7 @@ class DocumentSearchCriteria(TermSearchCriteria):
         Discriminator(include_discriminator),
     ]
     start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
+    vector_search_params: VectorSearchParams = VectorSearchParams()
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
@@ -107,7 +109,6 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
 class DocumentSearchParams(DocumentSearchCriteria):
     description: Annotated[str | None, Field(validate_default=True)] = None
-    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
     skip_cache: Annotated[bool, Field(validate_default=True)] = True
 
@@ -163,11 +164,9 @@ class CompanyFinderParams(BaseModel):
     Parameters for finding companies
     """
 
-    description: Annotated[str | None, Field(validate_default=True)] = None
-    similar_companies: Annotated[list[str], Field(validate_default=True)] = []
+    description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     min_year: Annotated[int, Field(validate_default=True)] = 2000
-    use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
 
     @field_validator("similar_companies", mode="before")
     def similar_companies_from_string(cls, v):

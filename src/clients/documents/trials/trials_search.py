@@ -8,7 +8,7 @@ from typing import Sequence
 from prisma.types import TrialWhereInput, TrialWhereInputRecursive1
 
 from clients.documents.utils import (
-    get_description_ids,
+    get_doc_ids_for_description,
     get_search_clause,
     get_term_clause,
 )
@@ -45,19 +45,9 @@ def get_where_clause(
     )
 
 
-async def search(params: DocumentSearchParams | TrialSearchParams) -> list[ScoredTrial]:
+async def search(params: TrialSearchParams) -> list[ScoredTrial]:
     """
     Search trials by terms
-
-    Args:
-        p.terms (Sequence[str]): list of terms to search for
-        p.include (TrialInclude, optional): whether to include assignees, inventors, interventions, indications. Defaults to DEFAULT_PATENT_INCLUDE.
-        p.start_year (int, optional): minimum priority date year. Defaults to DEFAULT_START_YEAR.
-        p.end_year (int, optional): maximum priority date year. Defaults to DEFAULT_END_YEAR.
-        p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        p.term_fields (Sequence[TermField], optional): which fields to search for terms in. Defaults to DEFAULT_TERM_FIELDS.
-        p.limit (int, optional): max results to return.
-        p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
     """
     p = TrialSearchParams.parse(params)
     search_criteria = DocumentSearchCriteria.parse(p)
@@ -76,13 +66,13 @@ async def search(params: DocumentSearchParams | TrialSearchParams) -> list[Score
     async def _search(limit: int):
         # if a description is provided, get the ids of the nearest neighbors
         if p.description:
-            description_ids = await get_description_ids(
-                p.description, k=p.k, doc_type=DocType.trial
+            vector_matching_ids = await get_doc_ids_for_description(
+                p.description, DocType.trial, p.vector_search_params
             )
         else:
-            description_ids = None
+            vector_matching_ids = None
 
-        where = get_where_clause(search_criteria, description_ids)
+        where = get_where_clause(search_criteria, vector_matching_ids)
         return await find_many(where=where, include=p.include, take=limit)
 
     if p.skip_cache == True:

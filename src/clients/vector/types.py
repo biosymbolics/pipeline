@@ -84,17 +84,17 @@ DEFAULT_K = 1000
 
 
 class VectorSearchParams(BaseModel):
-    min_year: int = MIN_YEAR
-    skip_ids: Sequence[str] = []
     alpha: float = 0.7
     k: int = DEFAULT_K
     vector: list[float] = []
+    min_year: int = MIN_YEAR
+    skip_ids: Sequence[str] = []
 
-    def merge(self, new_params: dict) -> "VectorSearchParams":
+    def merge(self, new_params: dict):
         self_keep = {
             k: v for k, v in self.model_dump().items() if k not in new_params.keys()
         }
-        return VectorSearchParams(
+        return self.__class__(
             **self_keep,
             **new_params,
         )

@@ -16,9 +16,9 @@ from typings.client import CompanyFinderParams
 from typings.documents.common import DOC_TYPE_DATE_MAP
 from .types import (
     CompanyRecord,
+    VectorSearchParams,
     FindCompanyResult,
     CountByYear,
-    VectorSearchParams,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,17 +80,14 @@ class CompanyReportClient(VectorReportClient):
 
     def _get_fields(
         self,
-        companies: Sequence[str],
-        description: str | None,
-        vector: Sequence[float],
         min_year: int,
     ) -> list[str]:
         """
-        Get fields for the query that differ based on the presence of companies and description
+        Get fields for the company report query
         """
         current_year = date.today().year
 
-        common_fields = [
+        return [
             "owner.id AS id",
             "owner.name AS name",
             "(COALESCE(acquisition.count, 0) > 0 AND owner.owner_type in ('INDUSTRY', 'INDUSTRY_LARGE')) AS is_acquirer",
@@ -111,13 +108,6 @@ class CompanyReportClient(VectorReportClient):
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
             f"ROUND((1 - (AVG(top_docs.vector) <=> owner.vector))::numeric, 2) AS wheelhouse_score",
-        ]
-        company_fields = [
-            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS relevance_score",
-            f"ROUND((1 - (owner.vector <=> '{vector}'))::numeric, 2) AS score",
-        ]
-
-        description_fields = [
             f"ROUND(AVG(relevance_score), 2) AS relevance_score",
             f"""
             ROUND(
@@ -132,25 +122,13 @@ class CompanyReportClient(VectorReportClient):
             """,
         ]
 
-        if description:
-            # wins over companies
-            return common_fields + description_fields
-
-        if companies:
-            return common_fields + company_fields
-
-        raise ValueError("No companies or description")
-
     async def _fetch_companies(
         self,
         p: CompanyFinderParams,
-        description: str | None,
-        vector: list[float],
+        description: str,
     ) -> list[CompanyRecord]:
         def by_company_query(inner_query: str) -> str:
-            fields = self._get_fields(
-                p.similar_companies, description, vector, p.min_year
-            )
+            fields = self._get_fields(p.min_year)
 
             ownable_join = " OR ".join(
                 [
@@ -175,7 +153,6 @@ class CompanyReportClient(VectorReportClient):
 
         companies = await self.get_top_docs(
             description,
-            p.similar_companies,
             VectorSearchParams(k=p.k, min_year=p.min_year),
             get_query=by_company_query,
             Schema=CompanyRecord,
@@ -221,23 +198,10 @@ class CompanyReportClient(VectorReportClient):
 
         Does a cosine similarity search on the description and returns the top k
             with scoring based on recency and relevance
-
-        Args:
-            p.description: description of the IP
-            p.companies: list of companies to search
-            p.k: number of nearest neighbors to consider
-            p.use_gpt_expansion: whether to use GPT to expand the description (mostly for testing)
         """
         start = time.monotonic()
 
-        if p.use_gpt_expansion and p.description is not None:
-            logger.info("Using GPT to expand description")
-            description = await self.gpt_client.generate_ip_description(p.description)
-        else:
-            description = p.description
-
-        vector = await self._form_vector(description, p.similar_companies)
-        companies = await self._fetch_companies(p, description, vector)
+        companies = await self._fetch_companies(p, p.description)
         exit_score, competition_score = self._compute_scores(companies)
 
         logger.info(
@@ -248,7 +212,7 @@ class CompanyReportClient(VectorReportClient):
 
         return FindCompanyResult(
             companies=companies,
-            description=description or "",
+            description=p.description,
             exit_score=exit_score,
             competition_score=competition_score,
         )

@@ -15,7 +15,7 @@ from core.vector import Vectorizer
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
-from .types import TopDocRecord, TopDocsByYear, VectorSearchParams
+from .types import TopDocRecord, TopDocsByYear, VectorSearchParams, VectorSearchParams
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,42 +35,6 @@ class VectorReportClient:
         self.gpt_client = GptApiClient()
         self.recency_decay_factor = recency_decay_factor
         self.vectorizer = Vectorizer()
-
-    @staticmethod
-    async def _get_companies_vector(companies: Sequence[str]) -> list[float]:
-        """
-        From the avg vector for a list of companies
-        """
-        query = f"""
-            SELECT AVG(vector)::text vector FROM owner
-            WHERE name=ANY($1)
-        """
-        async with prisma_context(300) as db:
-            result = await db.query_raw(query, companies)
-
-        return json.loads(result[0]["vector"])
-
-    async def _form_vector(
-        self, description: str | None, companies: Sequence[str]
-    ) -> list[float]:
-        """
-        Form query vector for a description & list of companies
-        """
-        vectors: list[list[float]] = []
-
-        if description is not None:
-            desc_vector = self.vectorizer(description).tolist()
-            vectors.append(desc_vector)
-
-        if len(companies) > 0:
-            company_vector = await VectorReportClient._get_companies_vector(companies)
-            vectors.append(company_vector)
-
-        combined_vector: list[float] = (
-            torch.stack([torch.tensor(v) for v in vectors]).mean(dim=0).tolist()
-        )
-
-        return combined_vector
 
     def _calc_min_similarity(
         self, similarities: Sequence[float], alpha: float
@@ -94,7 +58,7 @@ class VectorReportClient:
         ) ** 0.5
         return mean + alpha * stddev
 
-    async def _get_top_ids(
+    async def get_top_doc_ids(
         self,
         search_params: VectorSearchParams,
     ) -> list[str]:
@@ -214,7 +178,7 @@ class VectorReportClient:
             [get_inner_query(doc_type) for doc_type in self.document_types]
         )
         query = get_query(inner_query) if get_query else inner_query
-        ids = await self._get_top_ids(search_params)
+        ids = await self.get_top_doc_ids(search_params)
 
         async with prisma_context(300) as db:
             records: list[dict] = await db.query_raw(query, ids)
@@ -223,8 +187,7 @@ class VectorReportClient:
 
     async def get_top_docs(
         self,
-        description: str | None = None,
-        similar_companies: Sequence[str] = [],
+        description: str,
         search_params: VectorSearchParams = VectorSearchParams(),
         get_query: Callable[[str], str] | None = None,
         Schema: Type[ResultSchema] = TopDocRecord,
@@ -234,12 +197,11 @@ class VectorReportClient:
 
         Args:
             description (str, optional): description of the concept. Defaults to None.
-            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
             search_params (VectorSearchParams, optional): search parameters.
             get_query (Callable[[str], str], optional): function yielding the overall desired query.
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
-        vector = await self._form_vector(description, similar_companies)
+        vector = self.vectorizer(description).tolist()
         top_docs = await self.get_top_docs_by_vector(
             search_params.merge({"vector": vector}),
             get_query=get_query,
@@ -256,7 +218,6 @@ class VectorReportClient:
 
         Args:
             description (str): description of the concept
-            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
         """
 
         def by_year_query(doc_query: str) -> str:
@@ -283,34 +244,27 @@ class VectorReportClient:
     async def get_top_docs_by_year(
         self,
         description: str,
-        similar_companies: Sequence[str] = [],
         search_params: VectorSearchParams = VectorSearchParams(),
     ) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies, aggregated by year
         """
-        vector = await self._form_vector(description, similar_companies)
+        vector = self.vectorizer(description).tolist()
         return await self.get_top_docs_by_year_and_vector(
             search_params.merge({"vector": vector})
         )
 
-    async def __call__(
-        self, description: str, similar_companies: Sequence[str] = [], **kwargs
-    ) -> list[TopDocsByYear]:
+    async def __call__(self, description: str, **kwargs) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies, by year
 
         Args:
             description (str): description of the concept
-            similar_companies (Sequence[str], optional): list of similar companies. Defaults to [].
         """
         search_params = VectorSearchParams(**kwargs)
         logger.info(
-            "Getting top docs by year for description: '%s', similar companies: %s, params: %s",
+            "Getting top docs by year for description: '%s', params: %s",
             description,
-            similar_companies,
             search_params,
         )
-        return await self.get_top_docs_by_year(
-            description, similar_companies, search_params
-        )
+        return await self.get_top_docs_by_year(description, search_params)

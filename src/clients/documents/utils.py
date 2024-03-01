@@ -8,7 +8,8 @@ from prisma.types import (
     TrialWhereInput,
     TrialWhereInputRecursive1,
 )
-from clients.low_level.prisma import prisma_context
+from clients.vector.types import VectorSearchParams
+from clients.vector.vector_report_client import VectorReportClient
 from constants.core import DEFAULT_VECTORIZATION_MODEL
 import logging
 
@@ -86,30 +87,25 @@ def get_term_clause(
     return cast(T, {"OR": term_clause})
 
 
-async def get_description_ids(description: str, k: int, doc_type: DocType) -> list[str]:
+async def get_doc_ids_for_description(
+    description: str, doc_type: DocType, search_params: VectorSearchParams
+) -> list[str]:
     """
     Get patent ids within K nearest neighbors of a vectorized description
 
     Args:
         description (str): a description of the desired patents
-        k (int): k nearest neighbors
+        doc_type (DocType): the type of document to search
+        search_params (VectorSearchParams): search parameters
     """
     # lazy import
     from core.ner.spacy import get_transformer_nlp
 
-    logger.info("Searching documents by description (slow-ish)")
     nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
     vector = nlp(description).vector.tolist()
+    params = search_params.merge({"vector": vector})
 
-    query = f"""
-        SELECT id FROM {doc_type.name}
-        ORDER BY (1 - (vector <=> '{vector}')) DESC
-        LIMIT {k}
-    """
-
-    async with prisma_context(300) as db:
-        results = await db.query_raw(query)
-    return [r["id"] for r in results]
+    return await VectorReportClient(document_types=[doc_type]).get_top_doc_ids(params)
 
 
 def get_search_clause(

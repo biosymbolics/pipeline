@@ -24,7 +24,7 @@ from utils.string import get_id
 
 from .patents_client import find_many
 
-from ..utils import get_description_ids, get_search_clause, get_term_clause
+from ..utils import get_doc_ids_for_description, get_search_clause, get_term_clause
 
 
 logger = logging.getLogger(__name__)
@@ -52,28 +52,10 @@ def get_where_clause(
 
 
 async def search(
-    params: DocumentSearchParams | PatentSearchParams,
+    params: PatentSearchParams,
 ) -> list[ScoredPatent]:
     """
     Search patents by terms
-    Filters on
-    - lower'd terms
-    - priority date
-    - at least one composition of matter IPC code
-
-    Args:
-        p.terms (Sequence[str]): list of terms to search for
-        p.description (Sequence[str], optional): a description of the desired patents. Defaults to None.
-        p.k (int, optional): k nearest neighbors. used only with `description`. Defaults to DEFAULT_K.
-        p.include (PatentInclude, optional): whether to include assignees, inventors, interventions, indications. Defaults to DEFAULT_PATENT_INCLUDE.
-        p.start_year (int, optional): minimum priority date year. Defaults to DEFAULT_START_YEAR.
-        p.end_year (int, optional): maximum priority date year. Defaults to DEFAULT_END_YEAR.
-        p.query_type (QueryType, optional): whether to search for patents with all terms (AND) or any term (OR). Defaults to "AND".
-        p.term_fields (Sequence[TermField], optional): which fields to search for terms in. Defaults to DEFAULT_TERM_FIELDS.
-        p.limit (int, optional): max results to return.
-        p.skip_cache (bool, optional): whether to skip cache. Defaults to False.
-
-    Returns: a list of matching patent applications
     """
     p = PatentSearchParams.parse(params)
 
@@ -87,13 +69,13 @@ async def search(
 
     # if a description is provided, get the ids of the nearest neighbors
     if p.description:
-        description_ids = await get_description_ids(
-            p.description, k=p.k, doc_type=DocType.patent
+        vector_matching_ids = await get_doc_ids_for_description(
+            p.description, DocType.patent, p.vector_search_params
         )
     else:
-        description_ids = None
+        vector_matching_ids = None
 
-    where = get_where_clause(search_criteria, description_ids)
+    where = get_where_clause(search_criteria, vector_matching_ids)
 
     async def _search(limit: int):
         return await find_many(
