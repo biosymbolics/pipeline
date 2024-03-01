@@ -166,6 +166,7 @@ class CompanyFinderParams(BaseModel):
     description: Annotated[str | None, Field(validate_default=True)] = None
     similar_companies: Annotated[list[str], Field(validate_default=True)] = []
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
+    min_year: Annotated[int, Field(validate_default=True)] = 2000
     use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
 
     @field_validator("similar_companies", mode="before")

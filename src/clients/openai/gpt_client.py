@@ -4,6 +4,7 @@ Client stub for GPT
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Literal, Optional, cast
@@ -17,8 +18,8 @@ from utils.string import get_id
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
 
-GptModel = Literal["gpt-3.5-turbo", "gpt-4"]
-DEFAULT_GPT_MODEL: GptModel = "gpt-3.5-turbo"
+GptModel = Literal["gpt-3.5-turbo", "gpt-4", "mixtral-8x7b-32768"]
+DEFAULT_GPT_MODEL: GptModel = "mixtral-8x7b-32768"  # Groq! cheap & fast!
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,7 +36,6 @@ class GptApiClient:
         model: GptModel = DEFAULT_GPT_MODEL,
         skip_cache: bool = False,
     ):
-        self.client = None
         self.model = model
         prompt_template, output_parser = self._get_prompt_and_parser(schemas)
         self.output_parser: Optional[StructuredOutputParser] = output_parser
@@ -80,11 +80,16 @@ class GptApiClient:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
-        llm = ChatOpenAI(
-            temperature=DEFAULT_TEMPERATURE,
-            model=self.model,
-            client=self.client,
-        )
+        if self.model != "mixtral-8x7b-32768":
+            llm = ChatOpenAI(
+                temperature=DEFAULT_TEMPERATURE,
+                model=self.model,
+            )
+        else:
+            llm = ChatGroq(
+                temperature=DEFAULT_TEMPERATURE, name=self.model, max_tokens=20000
+            )
+
         llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
         output = llm_chain.invoke(input={"query": query})
         try:
@@ -100,7 +105,7 @@ class GptApiClient:
         if self.skip_cache:
             result = self._query(query, is_array)
         else:
-            key = f"gpt-query-{get_id([query])}"
+            key = f"llm-query-{get_id([query])}"
             result = await retrieve_with_cache_check(
                 lambda: self._query(query, is_array), key=key
             )
@@ -183,7 +188,6 @@ class GptApiClient:
             ),
         ]
 
-        # gpt-4 too slow
-        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-3.5-turbo")
+        gpt_client = GptApiClient(schemas=response_schemas)
         answer_as_array: list[dict] = await gpt_client.query(prompt, is_array=True)
         return answer_as_array

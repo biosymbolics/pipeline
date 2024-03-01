@@ -49,7 +49,7 @@ async def _chat(raw_event: dict, context):
     - Remote: `serverless invoke --function chat --data='{"queryStringParameters": { "content":"tell me about gpr84", "skip_cache": true }}'`
     - API: `curl https://api.biosymbolics.ai/chat?content=tell me about gpr84`
     """
-    gpt_client = GptApiClient(model="gpt-4")  # gpt-3.5-turbo
+    gpt_client = GptApiClient()
 
     p = ChatParams(**(raw_event["queryStringParameters"] or {}))
 

@@ -46,10 +46,10 @@ def prisma_context(timeout: int | None) -> Prisma:
 
     if not client.is_registered():
         try:
-            logger.info("Registering prisma client (%s)", client.is_registered())
+            logger.debug("Registering prisma client (%s)", client.is_registered())
             register(client)
         except Exception as e:
-            logger.info("Error registering prisma client: %s", e)
+            logger.debug("Error registering prisma client: %s", e)
     else:
         logger.info("Prisma client already registered")
 

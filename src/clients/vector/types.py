@@ -22,6 +22,7 @@ class TopDocsByYear(ResultBase):
     avg_score: float
     scores: list[float]
     titles: list[str]
+    descriptions: list[str] = []
     total_score: float
     year: int
 

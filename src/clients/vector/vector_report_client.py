@@ -185,22 +185,24 @@ class VectorReportClient:
             dedup_id_field = DOC_TYPE_DEDUP_ID_MAP[doc_type]
             return f"""
                 SELECT
-                    MAX(id) as id,
-                    AVG(relevance_score) as relevance_score,
-                    MAX(title) as title,
-                    MAX(url) as url,
-                    AVG(vector) as vector,
-                    MAX(year) as year,
-                    '{doc_type.name}' as type
+                    MAX(id) AS id,
+                    AVG(relevance_score) AS relevance_score,
+                    MAX(title) AS title,
+                    CONCAT(MAX(title), '\n', MAX(LEFT(abstract, 250))) AS description,
+                    MAX(url) AS url,
+                    AVG(vector) AS vector,
+                    MAX(year) AS year,
+                    '{doc_type.name}' AS type
                 FROM (
                     SELECT
                         id,
-                        {dedup_id_field} as dedup_id,
-                        (1 - (vector <=> '{search_params.vector}'))::numeric as relevance_score,
+                        {dedup_id_field} AS dedup_id,
+                        (1 - (vector <=> '{search_params.vector}'))::numeric AS relevance_score,
+                        abstract,
                         title,
                         url,
                         vector,
-                        date_part('year', {date_field})::int as year
+                        date_part('year', {date_field})::int AS year
                     FROM {doc_type.name}
                     WHERE id = ANY($1)
                     AND {date_field} is not null
@@ -265,6 +267,7 @@ class VectorReportClient:
                     AVG(relevance_score) as avg_score,
                     ARRAY_AGG(relevance_score) as scores,
                     ARRAY_AGG(title) as titles,
+                    ARRAY_AGG(distinct description) as descriptions,
                     SUM(relevance_score) as total_score,
                     year
                 FROM ({doc_query}) top_docs
@@ -303,7 +306,7 @@ class VectorReportClient:
         """
         search_params = VectorSearchParams(**kwargs)
         logger.info(
-            "Getting top docs by year for description: '%s' and similar companies: %s",
+            "Getting top docs by year for description: '%s', similar companies: %s, params: %s",
             description,
             similar_companies,
             search_params,
