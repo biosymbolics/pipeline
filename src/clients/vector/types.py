@@ -4,16 +4,24 @@ Vector client types
 
 from typing import Sequence
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typings.core import ResultBase
 
 
 class TopDocRecord(ResultBase):
+    description: str
     id: str
     relevance_score: float
     title: str
     vector: list[float]
     year: int
+
+    @field_validator("vector", mode="before")
+    def vector_from_string(cls, vec):
+        # vec may be a string due to prisma limitations
+        if isinstance(vec, str):
+            return [float(v) for v in vec.strip("[]").split(",")]
+        return vec
 
 
 class TopDocsByYear(ResultBase):
@@ -78,6 +86,7 @@ DEFAULT_K = 1000
 class VectorSearchParams(BaseModel):
     min_year: int = MIN_YEAR
     skip_ids: Sequence[str] = []
+    alpha: float = 0.7
     k: int = DEFAULT_K
     vector: list[float] = []
 

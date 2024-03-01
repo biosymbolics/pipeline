@@ -97,7 +97,6 @@ class VectorReportClient:
     async def _get_top_ids(
         self,
         search_params: VectorSearchParams,
-        alpha: float = 0.70,
     ) -> list[str]:
         """
         Get the ids of the k nearest neighbors to a vector
@@ -139,7 +138,7 @@ class VectorReportClient:
                 for record in records
                 if record["similarity"] is not None  # not sure why it returns null
             ]
-            min_similiarity = self._calc_min_similarity(scores, alpha)
+            min_similiarity = self._calc_min_similarity(scores, search_params.alpha)
 
             above_threshold_ids = [
                 record["id"]
@@ -188,9 +187,10 @@ class VectorReportClient:
                     MAX(id) AS id,
                     AVG(relevance_score) AS relevance_score,
                     MAX(title) AS title,
-                    CONCAT(MAX(title), '\n', MAX(LEFT(abstract, 250))) AS description,
+                    CONCAT(MAX(title), ': ', MAX(LEFT(abstract, 150)), '...') AS description,
                     MAX(url) AS url,
-                    AVG(vector) AS vector,
+                    -- if no get_query, we cast vector to string (because prisma can't deserialize vectors)
+                    AVG(vector){'::text' if get_query is None else ''} AS vector,
                     MAX(year) AS year,
                     '{doc_type.name}' AS type
                 FROM (
