@@ -152,10 +152,9 @@ class ConceptDecomposer:
         sub_concepts = await self.decompose_concept(concept_description)
         sc_reports = await self._generate_subconcept_reports(sub_concepts)
 
-        # makes up silly junk
-        # TODO: try LDA or PCA on remaining vectors, using LLM to generate descriptions
-        residual_sc_reports = await self._generate_residuals(
-            concept_description, sc_reports
-        )
+        # WIP and slow
+        # residual_sc_reports = await self._generate_residuals(
+        #     concept_description, sc_reports
+        # )
 
-        return sc_reports + residual_sc_reports
+        return sc_reports  # + residual_sc_reports
