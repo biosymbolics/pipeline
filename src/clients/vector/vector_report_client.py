@@ -26,16 +26,30 @@ DEFAULT_K = 1000
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
 
+class VectorSearchParams(BaseModel):
+    min_year: int = MIN_YEAR
+    skip_ids: Sequence[str] = []
+    k: int = DEFAULT_K
+    vector: list[float] = []
+
+    def merge(self, new_params: dict) -> "VectorSearchParams":
+        self_keep = {
+            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
+        }
+        return VectorSearchParams(
+            **self_keep,
+            **new_params,
+        )
+
+
 class VectorReportClient:
     def __init__(
         self,
-        min_year: int = MIN_YEAR,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
         document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
     ):
         self.document_types = document_types
         self.gpt_client = GptApiClient()
-        self.min_year = min_year
         self.recency_decay_factor = recency_decay_factor
         self.vectorizer = Vectorizer()
 
@@ -99,9 +113,7 @@ class VectorReportClient:
 
     async def _get_top_ids(
         self,
-        vector: list[float],
-        k: int,
-        skip_ids: Sequence[str] = [],
+        search_params: VectorSearchParams,
         alpha: float = 0.70,
     ) -> list[str]:
         """
@@ -121,7 +133,7 @@ class VectorReportClient:
                 return f"""
                     SELECT id, vector
                     FROM {doc_type.name}
-                    WHERE date_part('year', {date_field}) >= {self.min_year}
+                    WHERE date_part('year', {date_field}) >= {search_params.min_year}
                     AND NOT id = ANY($1)
                 """
 
@@ -132,13 +144,13 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    1 - (vector <=> '{vector}') as similarity
+                    1 - (vector <=> '{search_params.vector}') as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY (vector <=> '{vector}') ASC
-                LIMIT {k}
+                ORDER BY (vector <=> '{search_params.vector}') ASC
+                LIMIT {search_params.k}
             """
             async with prisma_context(300) as db:
-                records = await db.query_raw(query, skip_ids)
+                records = await db.query_raw(query, search_params.skip_ids)
 
             scores = [
                 record["similarity"]
@@ -161,7 +173,7 @@ class VectorReportClient:
 
             return above_threshold_ids
 
-        cache_key = get_id([vector, k])
+        cache_key = get_id([search_params.vector, search_params.k])
         response = await retrieve_with_cache_check(
             fetch,
             key=cache_key,
@@ -173,11 +185,9 @@ class VectorReportClient:
 
     async def get_top_docs_by_vector(
         self,
-        vector: list[float],
-        k: int = DEFAULT_K,
+        search_params: VectorSearchParams,
         get_query: Callable[[str], str] | None = None,
         Schema: Type[ResultSchema] = TopDocRecord,
-        skip_ids: Sequence[str] = [],
     ):
         """
         Get the top documents for a vector
@@ -206,7 +216,7 @@ class VectorReportClient:
                     SELECT
                         id,
                         {dedup_id_field} as dedup_id,
-                        (1 - (vector <=> '{vector}'))::numeric as relevance_score,
+                        (1 - (vector <=> '{search_params.vector}'))::numeric as relevance_score,
                         title,
                         url,
                         vector,
@@ -222,7 +232,7 @@ class VectorReportClient:
             [get_inner_query(doc_type) for doc_type in self.document_types]
         )
         query = get_query(inner_query) if get_query else inner_query
-        ids = await self._get_top_ids(vector, k, skip_ids)
+        ids = await self._get_top_ids(search_params)
 
         async with prisma_context(300) as db:
             records: list[dict] = await db.query_raw(query, ids)
@@ -233,7 +243,7 @@ class VectorReportClient:
         self,
         description: str | None = None,
         similar_companies: Sequence[str] = [],
-        k: int = DEFAULT_K,
+        search_params: VectorSearchParams = VectorSearchParams(),
         get_query: Callable[[str], str] | None = None,
         Schema: Type[ResultSchema] = TopDocRecord,
     ) -> list[ResultSchema]:
@@ -248,11 +258,15 @@ class VectorReportClient:
             Schema (Type[ResultSchema], optional): schema to use for the result. Defaults to TopDocRecord.
         """
         vector = await self._form_vector(description, similar_companies)
-        top_docs = await self.get_top_docs_by_vector(vector, k, get_query, Schema)
+        top_docs = await self.get_top_docs_by_vector(
+            search_params.merge({"vector": vector}),
+            get_query=get_query,
+            Schema=Schema,
+        )
         return top_docs
 
     async def get_top_docs_by_year_and_vector(
-        self, vector: list[float], skip_ids: Sequence[str] = []
+        self, search_params: VectorSearchParams
     ) -> list[TopDocsByYear]:
         """
         Get the top documents for a description and (optionally) similar companies,
@@ -278,17 +292,17 @@ class VectorReportClient:
             """
 
         return await self.get_top_docs_by_vector(
-            vector,
+            search_params,
             get_query=by_year_query,
             Schema=TopDocsByYear,
-            skip_ids=skip_ids,
         )
 
     async def get_top_docs_by_year(
         self, description: str, similar_companies: Sequence[str] = []
     ) -> list[TopDocsByYear]:
+        vector = await self._form_vector(description, similar_companies)
         return await self.get_top_docs_by_year_and_vector(
-            await self._form_vector(description, similar_companies)
+            VectorSearchParams(vector=vector)
         )
 
     async def __call__(

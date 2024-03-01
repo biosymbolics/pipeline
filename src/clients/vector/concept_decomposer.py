@@ -108,6 +108,7 @@ class ConceptDecomposer:
             description, known_ids
         )
 
+        # TODO: include abstracts
         residual_text = "\n\n".join(flatten([d.titles for d in residual_report]))
         sub_description_list = "\n".join(sub_descriptions)
 
