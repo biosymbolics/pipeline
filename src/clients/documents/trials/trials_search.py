@@ -4,15 +4,21 @@ Trials client
 
 from datetime import datetime
 import logging
+from typing import Sequence
 from prisma.types import TrialWhereInput, TrialWhereInputRecursive1
 
-from clients.documents.utils import get_term_clause
+from clients.documents.utils import (
+    get_description_ids,
+    get_search_clause,
+    get_term_clause,
+)
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import TrialSearchParams
 from typings.client import (
     DocumentSearchCriteria,
     DocumentSearchParams,
 )
+from typings.documents.common import DocType
 from typings.documents.trials import ScoredTrial
 from utils.string import get_id
 
@@ -22,7 +28,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_where_clause(p: DocumentSearchCriteria) -> TrialWhereInput:
+def get_where_clause(
+    p: DocumentSearchCriteria, description_ids: Sequence[str] | None = None
+) -> TrialWhereInput:
     is_id_search = any([t.startswith("NCT") for t in p.terms])
 
     # require homogeneous search
@@ -32,21 +40,9 @@ def get_where_clause(p: DocumentSearchCriteria) -> TrialWhereInput:
     if is_id_search:
         return {"id": {"in": list(p.terms)}}
 
-    term_clause = get_term_clause(p, TrialWhereInputRecursive1)
-
-    where: TrialWhereInput = {
-        "AND": [
-            term_clause,
-            {
-                "start_date": {
-                    "gte": datetime(p.start_year, 1, 1),
-                    "lte": datetime(p.end_year, 1, 1),
-                }
-            },
-        ],
-    }
-
-    return where
+    return get_search_clause(
+        DocType.trial, p, description_ids, return_type=TrialWhereInput
+    )
 
 
 async def search(params: DocumentSearchParams | TrialSearchParams) -> list[ScoredTrial]:
@@ -78,7 +74,15 @@ async def search(params: DocumentSearchParams | TrialSearchParams) -> list[Score
     )
 
     async def _search(limit: int):
-        where = get_where_clause(search_criteria)
+        # if a description is provided, get the ids of the nearest neighbors
+        if p.description:
+            description_ids = await get_description_ids(
+                p.description, k=p.k, doc_type=DocType.trial
+            )
+        else:
+            description_ids = None
+
+        where = get_where_clause(search_criteria, description_ids)
         return await find_many(where=where, include=p.include, take=limit)
 
     if p.skip_cache == True:

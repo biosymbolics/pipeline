@@ -2,12 +2,12 @@
 Regulatory approvals client
 """
 
-from datetime import datetime
 import logging
 import re
+from typing import Sequence
 from prisma.types import RegulatoryApprovalWhereInput
 
-from clients.documents.utils import get_term_clause
+from clients.documents.utils import get_description_ids, get_search_clause
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from typings import (
     RegulatoryApprovalSearchParams,
@@ -17,6 +17,7 @@ from typings.client import (
     DocumentSearchCriteria,
     DocumentSearchParams,
 )
+from typings.documents.common import DocType
 from utils.string import get_id
 
 from .approvals_client import find_many
@@ -28,7 +29,9 @@ logger.setLevel(logging.INFO)
 APPROVAL_ID_RE = re.compile("^[0-9]{4,5}-[0-9]{3,4}$")
 
 
-def get_where_clause(p: DocumentSearchCriteria) -> RegulatoryApprovalWhereInput:
+def get_where_clause(
+    p: DocumentSearchCriteria, description_ids: Sequence[str] | None = None
+) -> RegulatoryApprovalWhereInput:
     """
     Get where clause for regulatory approvals
     """
@@ -41,17 +44,12 @@ def get_where_clause(p: DocumentSearchCriteria) -> RegulatoryApprovalWhereInput:
     if is_id_search:
         return {"id": {"in": list(p.terms)}}
 
-    term_clause = get_term_clause(p, RegulatoryApprovalWhereInput)
-
-    where: RegulatoryApprovalWhereInput = {
-        **term_clause,
-        "approval_date": {
-            "gte": datetime(p.start_year, 1, 1),
-            "lte": datetime(p.end_year, 1, 1),
-        },
-    }
-
-    return where
+    return get_search_clause(
+        DocType.regulatory_approval,
+        p,
+        description_ids,
+        return_type=RegulatoryApprovalWhereInput,
+    )
 
 
 async def search(
@@ -85,6 +83,13 @@ async def search(
     )
 
     async def _search(limit: int):
+        # if a description is provided, get the ids of the nearest neighbors
+        if p.description:
+            description_ids = await get_description_ids(
+                p.description, k=p.k, doc_type=DocType.regulatory_approval
+            )
+        else:
+            description_ids = None
         where = get_where_clause(search_criteria)
         return await find_many(where=where, include=p.include, take=limit)
 

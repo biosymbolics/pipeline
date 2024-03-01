@@ -13,6 +13,7 @@ from prisma.types import (
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from constants.core import DEFAULT_VECTORIZATION_MODEL
+from typings.documents.common import DocType
 from typings.documents.patents import ScoredPatent
 from typings.client import (
     DocumentSearchCriteria,
@@ -23,7 +24,7 @@ from utils.string import get_id
 
 from .patents_client import find_many
 
-from ..utils import get_term_clause
+from ..utils import get_description_ids, get_search_clause, get_term_clause
 
 
 logger = logging.getLogger(__name__)
@@ -45,48 +46,9 @@ def get_where_clause(
     if is_id_search:
         return {"id": {"in": list(p.terms)}}
 
-    term_clause = get_term_clause(p, PatentWhereInputRecursive1)
-
-    where: PatentWhereInput = {
-        "AND": [
-            term_clause,
-            {
-                "priority_date": {
-                    "gte": datetime(p.start_year, 1, 1),
-                    "lte": datetime(p.end_year, 1, 1),
-                }
-            },
-            {"id": {"in": list(description_ids)}} if description_ids else {},
-        ],
-    }
-
-    return where
-
-
-async def get_description_ids(description: str, k: int) -> list[str]:
-    """
-    Get patent ids within K nearest neighbors of a vectorized description
-
-    Args:
-        description (str): a description of the desired patents
-        k (int): k nearest neighbors
-    """
-    # lazy import
-    from core.ner.spacy import get_transformer_nlp
-
-    logger.info("Searching patents by description (slow-ish)")
-    nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
-    vector = nlp(description).vector.tolist()
-
-    query = f"""
-        SELECT id FROM patent
-        ORDER BY (1 - (vector <=> '{vector}')) DESC
-        LIMIT {k}
-    """
-
-    async with prisma_context(300) as db:
-        results = await db.query_raw(query)
-    return [r["id"] for r in results]
+    return get_search_clause(
+        DocType.patent, p, description_ids, return_type=PatentWhereInput
+    )
 
 
 async def search(
@@ -125,7 +87,9 @@ async def search(
 
     # if a description is provided, get the ids of the nearest neighbors
     if p.description:
-        description_ids = await get_description_ids(p.description, k=p.k)
+        description_ids = await get_description_ids(
+            p.description, k=p.k, doc_type=DocType.patent
+        )
     else:
         description_ids = None
 

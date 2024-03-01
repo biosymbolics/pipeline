@@ -41,6 +41,7 @@ async def get_docs_by_entity_id(
 ) -> list[EntWithDocResult]:
     """
     Gets entities for a set of doc ids
+    Returns entity info with list of the various document ids (patent/regulatory_approval/trial)
     """
     query = f"""
         SELECT
