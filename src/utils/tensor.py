@@ -1,8 +1,9 @@
 """
 Tensor utilities
 """
+
 import logging
-from typing import Sequence
+from typing import Sequence, cast
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -178,3 +179,100 @@ def is_scalar(d):
     is_tensor = isinstance(d, torch.Tensor) and (len(d.shape) == 0 or d.shape[0] == 0)
     is_numpy_scalar = isinstance(d, np.number)
     return is_tensor or is_numpy_scalar or isinstance(d, (int, float))
+
+
+def l1_regularize(vector: torch.Tensor) -> torch.Tensor:
+    # sparsify
+    vector[vector.abs() < 0.3] = 0  # sparsify
+
+    # l1 normalize
+    return F.normalize(vector, p=1, dim=0)
+
+
+def combine_tensors(
+    a: torch.Tensor, b: torch.Tensor, a_weight: float = 0.8
+) -> torch.Tensor:
+    """
+    Weighted combination of two vectors, regularized
+    """
+    b_weight = 1 - a_weight
+    vector = (1 - a_weight) * a + b_weight * b
+    norm_vector = l1_regularize(vector)
+    return norm_vector
+
+
+def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
+    """
+    Torch implementation of TruncatedSVD
+    (from Anthropic)
+    """
+    # Reshape x if it's a 1D vector
+    if vector.ndim == 1:
+        vector = vector.unsqueeze(1)
+
+    # l1 reg
+    v_sparse = l1_regularize(vector)
+
+    # SVD
+    U, S, _ = torch.linalg.svd(v_sparse)
+
+    # Sorted eigenvalues
+    E = torch.sort(S**2 / torch.sum(S**2), descending=True)
+
+    # Cumulative energy
+    cum_energy = torch.cumsum(E[0], dim=0)
+
+    mask = cum_energy > variance_threshold
+    k = torch.sum(mask).int() + 1
+
+    # Compute reduced components
+    U_reduced = U[:, :k]
+
+    return cast(torch.Tensor, U_reduced)
+
+
+def similarity_with_residual_penalty(
+    a: torch.Tensor,
+    b: torch.Tensor,
+    distance: float | None = None,  # cosine/"angular" distance
+    alpha: float = 0.5,
+) -> float:
+    """
+    Compute a weighted similarity score that penalizes a large residual.
+
+    Args:
+        a (torch.Tensor): tensor a
+        b (torch.Tensor): tensor b
+        distance (float, optional): cosine/"angular" distance. Defaults to None, in which case it is computed.
+        alpha (float, optional): weight of the residual penalty. Defaults to 0.3.
+    """
+    if distance is None:
+        _distance = F.cosine_similarity(a, b, dim=0)
+    else:
+        _distance = torch.tensor(distance)
+
+    similarity = 2 - _distance
+
+    # Compute residual
+    residual = torch.subtract(a, b)
+
+    # Frobenius norm
+    residual_norm = torch.norm(residual, p="fro")
+
+    # Scale residual norm to [0,1] range
+    scaled_residual_norm = torch.divide(residual_norm, torch.norm(a))
+
+    # Weighted score
+    score = alpha * similarity + (1 - alpha) * (1 - scaled_residual_norm)
+
+    return score.item()
+
+
+def tensor_mean(vectors: Sequence[torch.Tensor]) -> torch.Tensor:
+    """
+    Takes a list of Nx0 vectors and returns the mean vector (Nx0)
+    """
+    return torch.concat(
+        [v.unsqueeze(dim=1) for v in vectors],
+        dim=1,
+    ).mean(dim=1)

@@ -2,15 +2,26 @@
 Vector client types
 """
 
+from typing import Sequence
+
+from pydantic import BaseModel, field_validator
 from typings.core import ResultBase
 
 
 class TopDocRecord(ResultBase):
+    description: str
     id: str
     relevance_score: float
     title: str
     vector: list[float]
     year: int
+
+    @field_validator("vector", mode="before")
+    def vector_from_string(cls, vec):
+        # vec may be a string due to prisma limitations
+        if isinstance(vec, str):
+            return [float(v) for v in vec.strip("[]").split(",")]
+        return vec
 
 
 class TopDocsByYear(ResultBase):
@@ -19,6 +30,7 @@ class TopDocsByYear(ResultBase):
     avg_score: float
     scores: list[float]
     titles: list[str]
+    descriptions: list[str] = []
     total_score: float
     year: int
 
@@ -65,3 +77,24 @@ class SubConcept(ResultBase):
     name: str
     description: str
     report: list[TopDocsByYear] = []
+
+
+MIN_YEAR = 2000
+DEFAULT_K = 1000
+
+
+class VectorSearchParams(BaseModel):
+    min_year: int = MIN_YEAR
+    skip_ids: Sequence[str] = []
+    alpha: float = 0.7
+    k: int = DEFAULT_K
+    vector: list[float] = []
+
+    def merge(self, new_params: dict) -> "VectorSearchParams":
+        self_keep = {
+            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
+        }
+        return VectorSearchParams(
+            **self_keep,
+            **new_params,
+        )

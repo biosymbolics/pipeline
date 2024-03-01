@@ -5,12 +5,19 @@ Concept decomposition client
 import asyncio
 from typing import Sequence
 from langchain.output_parsers import ResponseSchema
-from pydash import omit
+from pydash import flatten, omit
+import logging
 
 from clients.openai.gpt_client import GptApiClient
+from core.topic import Topics
 
 from .vector_report_client import VectorReportClient
-from .types import SubConcept
+from .types import SubConcept, VectorSearchParams
+
+RESIDUAL_START_YEAR = 2021
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class ConceptDecomposer:
@@ -35,7 +42,7 @@ class ConceptDecomposer:
             ),
         ]
 
-        self.llm = GptApiClient(schemas=response_schemas, model="gpt-4")
+        self.llm = GptApiClient(schemas=response_schemas)
         self.vector_report_client = VectorReportClient()
 
     async def decompose_concept(self, concept_description: str) -> list[SubConcept]:
@@ -52,9 +59,10 @@ class ConceptDecomposer:
             - and so on.
 
             Return the answer as an array of json objects with the following fields: name, description.
+
             The description should be written as if a patent: technical, detailed, precise and making appropriate use of jargon.
             Each description should be three to four paragraphs, standalone and avoid any reference to the other descriptions.
-            They should be, in a sense, homogeneous: having similar specificity, scope and scale relative to the original concept.
+            They should be homogeneous, which is to say having similar specificity, scope and scale relative to the original concept.
 
             Here is an example:
             name: Galectin-1 antibodies
@@ -73,7 +81,7 @@ class ConceptDecomposer:
         return sub_concepts
 
     async def _generate_subconcept_reports(
-        self, sub_concepts: Sequence[SubConcept]
+        self, sub_concepts: Sequence[SubConcept], skip_ids: list[str] = []
     ) -> list[SubConcept]:
         """
         Fetches reports for each sub-concept
@@ -87,13 +95,53 @@ class ConceptDecomposer:
         }
         """
         concept_docs_by_year = await asyncio.gather(
-            *[self.vector_report_client(sc.description) for sc in sub_concepts]
+            *[
+                self.vector_report_client(sc.description, skip_ids=skip_ids)
+                for sc in sub_concepts
+            ]
         )
 
         return [
             SubConcept(**omit(sc.model_dump(), "report"), report=report)
             for sc, report in zip(sub_concepts, concept_docs_by_year)
         ]
+
+    async def _generate_residuals(
+        self, description: str, sub_concepts: Sequence[SubConcept]
+    ) -> list[SubConcept]:
+        """
+        Generate residual sub-concepts from the original concept
+        """
+
+        # get known document ids
+        known_ids = flatten([r.ids for sc in sub_concepts for r in sc.report])
+
+        if len(known_ids) == 0:
+            raise ValueError("No known ids for residual report")
+
+        residual_docs = await self.vector_report_client.get_top_docs(
+            description,
+            search_params=VectorSearchParams(
+                min_year=RESIDUAL_START_YEAR,
+                skip_ids=known_ids,
+                # higher threshold for similarity for residuals
+                # to avoid just getting what was deemed irrelevant in the original search
+                alpha=0.99,
+            ),
+        )
+
+        topic_map = await Topics.model_topics(
+            [d.vector for d in residual_docs],
+            [d.description for d in residual_docs],
+            existing_labels=[d.name for d in sub_concepts],
+            context_strings=[description],
+        )
+
+        new_sub_concepts = [SubConcept(**r) for r in topic_map]
+        new_reports = await self._generate_subconcept_reports(
+            new_sub_concepts, skip_ids=known_ids
+        )
+        return new_reports
 
     async def decompose_concept_with_reports(
         self, concept_description: str
@@ -102,4 +150,11 @@ class ConceptDecomposer:
         Decompose a concept into sub-concepts and fetch reports for each sub-concept
         """
         sub_concepts = await self.decompose_concept(concept_description)
-        return await self._generate_subconcept_reports(sub_concepts)
+        sc_reports = await self._generate_subconcept_reports(sub_concepts)
+
+        # WIP and slow
+        # residual_sc_reports = await self._generate_residuals(
+        #     concept_description, sc_reports
+        # )
+
+        return sc_reports  # + residual_sc_reports

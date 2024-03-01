@@ -56,7 +56,7 @@ class BaseDocumentEtl:
         """
         Copy vectors to document tables
         """
-        client = await prisma_client(1200)
+        client = await prisma_client(2400)
         queries = [
             "CREATE EXTENSION IF NOT EXISTS dblink",
             f"DROP INDEX IF EXISTS {self.document_type}_vector",

@@ -4,17 +4,18 @@ from annoy import AnnoyIndex
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 import torch
 import logging
+from constants.core import DEFAULT_VECTORIZATION_MODEL
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity, DocEntity
 from constants.umls import PREFERRED_UMLS_TYPES
 from utils.classes import overrides
+from utils.tensor import l1_regularize
 
 from .types import AbstractCandidateSelector, EntityWithScoreVector
 from .utils import (
     apply_umls_word_overrides,
     candidate_to_canonical,
-    l1_regularize,
     score_semantic_candidate,
 )
 
@@ -52,7 +53,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         self.candidate_generator = CandidateGenerator(*args, kb=UMLS_KB, **kwargs)
         self.min_similarity = min_similarity
         self.vector_length = vector_length
-        self.nlp = get_transformer_nlp()
+        self.nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
 
     def _batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
         """

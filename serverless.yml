@@ -80,6 +80,7 @@ provider:
     ENV: ${param:ENV, 'dev'}
     MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
+    GROQ_API_KEY: ${ssm:/biosymbolics/pipeline/groq/api_key}
     PINECONE_API_KEY: ${ssm:/biosymbolics/pipeline/pinecone/api_key}
     PINECONE_ENVIRONMENT: ${ssm:/biosymbolics/pipeline/pinecone/environment}
     PYTHONPATH: ./src:./binder:./:/opt/python:/opt/python/lib/python3.11/site-packages:/var/lang/lib/python3.11/site-packages/

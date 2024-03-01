@@ -4,7 +4,9 @@ Client stub for GPT
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
+from langchain_community.llms import HuggingFaceEndpoint
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from typing import Any, Literal, Optional, cast
 import logging
@@ -17,8 +19,16 @@ from utils.string import get_id
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
 
-GptModel = Literal["gpt-3.5-turbo", "gpt-4"]
-DEFAULT_GPT_MODEL: GptModel = "gpt-3.5-turbo"
+# mixtral via Groq... cheap & fast.
+# Mistral 8x7B is MoE
+GptModel = Literal[
+    "gpt-3.5-turbo",
+    "gpt-4",
+    "mixtral-8x7b-32768",
+    "mistralai/Mistral-7B-Instruct-v0.1",
+    "biomistral-7b-dare-mps",
+]
+DEFAULT_GPT_MODEL: GptModel = "mixtral-8x7b-32768"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,7 +45,6 @@ class GptApiClient:
         model: GptModel = DEFAULT_GPT_MODEL,
         skip_cache: bool = False,
     ):
-        self.client = None
         self.model = model
         prompt_template, output_parser = self._get_prompt_and_parser(schemas)
         self.output_parser: Optional[StructuredOutputParser] = output_parser
@@ -52,7 +61,7 @@ class GptApiClient:
         """
         if not schemas:
             prompt_template = PromptTemplate(
-                template="Answer this query as best as possible.\n{query}",
+                template="Answer this query to the best of your expert ability.\n{query}",
                 input_variables=["query"],
             )
             return (prompt_template, None)
@@ -61,7 +70,7 @@ class GptApiClient:
         format_intructions = output_parser.get_format_instructions()
 
         prompt_template = PromptTemplate(
-            template="Answer this query as best as possible.\n{format_instructions}\n{query}",
+            template="Answer this query to the best of your expert ability.\n{format_instructions}\n{query}",
             input_variables=["query"],
             partial_variables={"format_instructions": format_intructions},
         )
@@ -80,11 +89,31 @@ class GptApiClient:
         """
         Query GPT, applying the prompt template and output parser if response schemas were provided
         """
-        llm = ChatOpenAI(
-            temperature=DEFAULT_TEMPERATURE,
-            model=self.model,
-            client=self.client,
-        )
+        if self.model == "mixtral-8x7b-32768":
+            llm = ChatGroq(
+                temperature=DEFAULT_TEMPERATURE, name=self.model, max_tokens=20000
+            )
+        elif self.model == "mistralai/Mistral-7B-Instruct-v0.1":
+            llm = HuggingFaceEndpoint(
+                repo_id=self.model,
+                temperature=DEFAULT_TEMPERATURE,
+                max_new_tokens=8000,
+                model_kwargs={"max_tokens": 20000},
+            )
+        elif self.model == "biomistral-7b-dare-mps":
+            llm = HuggingFaceEndpoint(
+                endpoint_url="https://v0sk5eajj1ohvc6z.us-east-1.aws.endpoints.huggingface.cloud",
+                temperature=DEFAULT_TEMPERATURE,
+                max_new_tokens=8000,
+                max_tokens=20000,
+            )
+        else:
+            llm = ChatOpenAI(
+                temperature=DEFAULT_TEMPERATURE,
+                model=self.model,
+                max_tokens=DEFAULT_MAX_TOKENS,
+            )
+
         llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
         output = llm_chain.invoke(input={"query": query})
         try:
@@ -100,7 +129,7 @@ class GptApiClient:
         if self.skip_cache:
             result = self._query(query, is_array)
         else:
-            key = f"gpt-query-{get_id([query])}"
+            key = f"llm-query-{get_id([query])}"
             result = await retrieve_with_cache_check(
                 lambda: self._query(query, is_array), key=key
             )
@@ -183,7 +212,6 @@ class GptApiClient:
             ),
         ]
 
-        # gpt-4 too slow
-        gpt_client = GptApiClient(schemas=response_schemas, model="gpt-3.5-turbo")
+        gpt_client = GptApiClient(schemas=response_schemas)
         answer_as_array: list[dict] = await gpt_client.query(prompt, is_array=True)
         return answer_as_array
