@@ -2,20 +2,19 @@
 Base semantic finder
 """
 
-import json
 import logging
 from typing import Callable, Sequence, Type, TypeVar
 from pydantic import BaseModel
-import torch
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.openai.gpt_client import GptApiClient
 from core.vector import Vectorizer
+from typings.client import VectorSearchParams
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
 
-from .types import TopDocRecord, TopDocsByYear, VectorSearchParams, VectorSearchParams
+from .types import TopDocRecord, TopDocsByYear
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,6 +51,8 @@ class VectorReportClient:
 
         Taken from https://www.researchgate.net/post/Determination-of-threshold-for-cosine-similarity-score
         """
+        if len(similarities) == 0:
+            return 0
         mean = sum(similarities) / len(similarities)
         stddev = (
             sum((score - mean) ** 2 for score in similarities) / len(similarities)

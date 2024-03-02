@@ -8,13 +8,16 @@ from prisma.types import (
     TrialWhereInput,
     TrialWhereInputRecursive1,
 )
-from clients.vector.types import VectorSearchParams
 from clients.vector.vector_report_client import VectorReportClient
 from constants.core import DEFAULT_VECTORIZATION_MODEL
 import logging
 
 from typings import TermField
-from typings.client import DocumentSearchCriteria, TermSearchCriteria
+from typings.client import (
+    DocumentSearchCriteria,
+    TermSearchCriteria,
+    VectorSearchParams,
+)
 from typings.documents.common import DOC_TYPE_DATE_MAP, DocType
 
 logger = logging.getLogger(__name__)
@@ -88,7 +91,7 @@ def get_term_clause(
 
 
 async def get_doc_ids_for_description(
-    description: str, doc_type: DocType, search_params: VectorSearchParams
+    description: str, doc_types: Sequence[DocType], search_params: VectorSearchParams
 ) -> list[str]:
     """
     Get patent ids within K nearest neighbors of a vectorized description
@@ -105,7 +108,7 @@ async def get_doc_ids_for_description(
     vector = nlp(description).vector.tolist()
     params = search_params.merge({"vector": vector})
 
-    return await VectorReportClient(document_types=[doc_type]).get_top_doc_ids(params)
+    return await VectorReportClient(document_types=doc_types).get_top_doc_ids(params)
 
 
 def get_search_clause(

@@ -43,6 +43,7 @@ async def get_docs_by_entity_id(
     Gets entities for a set of doc ids
     Returns entity info with list of the various document ids (patent/regulatory_approval/trial)
     """
+
     query = f"""
         SELECT
             {rollup_field.name} as name,
@@ -163,7 +164,7 @@ async def _search(p: EntitySearchParams) -> list[Entity]:
                         is_child=True,
                     )
                     for ewd in ewds
-                    if ewd.child
+                    if ewd.child and ewd.child != ewd.name
                 ],
                 key=lambda e: e.record_count,
                 reverse=True,
