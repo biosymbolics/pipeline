@@ -22,10 +22,20 @@ def get_entity_map_matview_query() -> list[str]:
     ]
     search_or = "|| ' ' || ".join(name_fields)
     search = f"to_tsvector('english', {search_or} )"
+
+    doc_type_switch = " ".join(
+        [
+            f"WHEN {doc_type.name}_id IS NOT NULL THEN '{doc_type.name}'"
+            for doc_type in DocType
+            if doc_type != DocType.all
+        ]
+    )
+
     fields = [
         *[f"{doc_type.name}_id" for doc_type in DocType if doc_type != DocType.all],
         f"{search} as search",
         *name_fields,
+        f"CASE {doc_type_switch} END as doc_type",
     ]
     return [
         f"DROP MATERIALIZED VIEW IF EXISTS {SEARCH_TABLE}",
@@ -53,6 +63,7 @@ def get_entity_map_matview_query() -> list[str]:
             if doc_type != DocType.all
         ],
         f"CREATE INDEX {SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
+        f"CREATE INDEX {SEARCH_TABLE}_doc_type ON {SEARCH_TABLE} (doc_type)",
     ]
 
 

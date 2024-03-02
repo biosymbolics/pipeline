@@ -72,7 +72,7 @@ async def search(
         # if a description is provided, get the ids of the nearest neighbors
         if p.description:
             vector_matching_ids = await get_doc_ids_for_description(
-                p.description, DocType.regulatory_approval, p.vector_search_params
+                p.description, [DocType.regulatory_approval], p.vector_search_params
             )
         else:
             vector_matching_ids = None

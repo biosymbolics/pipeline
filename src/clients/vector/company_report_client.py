@@ -12,11 +12,10 @@ from clients.low_level.prisma import prisma_context
 from clients.vector.vector_report_client import VectorReportClient
 from constants.documents import MAX_DATA_YEAR
 from typings import DocType
-from typings.client import CompanyFinderParams
+from typings.client import CompanyFinderParams, VectorSearchParams
 from typings.documents.common import DOC_TYPE_DATE_MAP
 from .types import (
     CompanyRecord,
-    VectorSearchParams,
     FindCompanyResult,
     CountByYear,
 )

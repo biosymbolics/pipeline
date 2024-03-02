@@ -10,9 +10,10 @@ import logging
 
 from clients.openai.gpt_client import GptApiClient
 from core.topic import Topics
+from typings.client import VectorSearchParams
 
 from .vector_report_client import VectorReportClient
-from .types import SubConcept, VectorSearchParams
+from .types import SubConcept
 
 RESIDUAL_START_YEAR = 2021
 
