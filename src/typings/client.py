@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Sequence, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
-from clients.vector.types import VectorSearchParams
 
 from constants.patents import DEFAULT_PATENT_K
 from typings.documents.common import DocType
@@ -65,6 +64,27 @@ class TermSearchCriteria(BaseModel):
             return v
         term_fields = [t.strip() for t in (v.split(";") if v else [])]
         return term_fields
+
+
+MIN_YEAR = 2000
+DEFAULT_K = 1000
+
+
+class VectorSearchParams(BaseModel):
+    alpha: float = 0.7
+    k: int = DEFAULT_K
+    vector: list[float] = []
+    min_year: int = MIN_YEAR
+    skip_ids: Sequence[str] = []
+
+    def merge(self, new_params: dict):
+        self_keep = {
+            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
+        }
+        return self.__class__(
+            **self_keep,
+            **new_params,
+        )
 
 
 class DocumentSearchCriteria(TermSearchCriteria):
@@ -167,13 +187,6 @@ class CompanyFinderParams(BaseModel):
     description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     min_year: Annotated[int, Field(validate_default=True)] = 2000
-
-    @field_validator("similar_companies", mode="before")
-    def similar_companies_from_string(cls, v):
-        if isinstance(v, list):
-            return v
-        similar_companies = [t.strip() for t in (v.split(";") if v else [])]
-        return similar_companies
 
 
 class ConceptDecomposeParams(BaseModel):
