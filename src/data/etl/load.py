@@ -70,6 +70,7 @@ def get_entity_map_matview_query() -> list[str]:
 # these get wiped for every prisma db push. Will figure out a better way to handle this.
 # https://github.com/prisma/prisma/issues/12751
 MANUAL_INDICES = [
+    "SET maintenance_work_mem = '5GB'",
     """
     CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
     """,
@@ -77,6 +78,9 @@ MANUAL_INDICES = [
     CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
     """,
     """
+    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
+    """
+    """,
     CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
     """,
     """
