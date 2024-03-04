@@ -32,7 +32,7 @@ class ApprovalVectorizer(DocumentVectorizer):
             ],
             id_field="id",
             processed_docs_file=VECTORIZED_PROCESSED_DOCS_FILE,
-            batch_size=1000,
+            batch_size=3000,
         )
 
     async def _fetch_batch(self, last_id: Optional[str] = None) -> list[dict]:

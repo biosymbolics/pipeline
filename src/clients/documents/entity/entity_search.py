@@ -18,7 +18,7 @@ from typings.client import (
     RegulatoryApprovalSearchParams as ApprovalParams,
     TrialSearchParams as TrialParams,
 )
-from typings.documents.common import EntityCategory, TermField
+from typings.documents.common import DocType, EntityCategory, TermField
 from typings.entities import Entity
 from utils.string import get_id
 
