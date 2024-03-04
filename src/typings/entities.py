@@ -30,9 +30,9 @@ class EntityActivity(Dataclass):
 class Entity(ResultBase):
     activity: list[int]
     detailed_activity: list[EntityActivity]
-    average_trial_dropout: float
-    average_trial_duration: int
-    average_trial_enrollment: int
+    average_trial_dropout: float | None
+    average_trial_duration: int | None
+    average_trial_enrollment: int | None
     children: list["Entity"]
     id: str
     maybe_available_count: int
@@ -41,14 +41,14 @@ class Entity(ResultBase):
     owners: list[str]
     patent_count: int
     patent_ids: list[str]
-    percent_trials_stopped: float
+    percent_trials_stopped: float | None
     most_recent_patent: ScoredPatent | None = Field(exclude=True)
     most_recent_trial: ScoredTrial | None = Field(exclude=True)
     regulatory_approval_count: int
     regulatory_approval_ids: list[str]
     trial_count: int
     trial_ids: list[str]
-    total_trial_enrollment: int
+    total_trial_enrollment: int | None
 
     @classmethod
     def load(
@@ -130,11 +130,13 @@ class Entity(ResultBase):
     @computed_field  # type: ignore
     @property
     def investment_level(self) -> str:
-        if self.total_trial_enrollment > 5000:
+        total_enrollment = self.total_trial_enrollment or 0
+
+        if total_enrollment > 5000:
             return "very high"
-        if self.total_trial_enrollment > 1000:
+        if total_enrollment > 1000:
             return "high"
-        if self.total_trial_enrollment > 500:
+        if total_enrollment > 500:
             return "medium"
 
         if self.patent_count > 100:
@@ -273,7 +275,10 @@ class Entity(ResultBase):
         ]
 
     @classmethod
-    def get_average_trial_enrollment(cls, trials) -> int:
+    def get_average_trial_enrollment(cls, trials) -> int | None:
+        if len(trials) == 0:
+            return None
+
         enrollments = [t.enrollment for t in trials if t.enrollment is not None]
 
         if len(enrollments) == 0:
@@ -281,10 +286,13 @@ class Entity(ResultBase):
         return round(sum(enrollments) / len(enrollments))
 
     @classmethod
-    def get_total_trial_enrollment(cls, trials) -> int:
+    def get_total_trial_enrollment(cls, trials) -> int | None:
         """
         Used as proxy for level of investment
         """
+        if len(trials) == 0:
+            return None
+
         enrollments = [t.enrollment for t in trials if t.enrollment is not None]
 
         if len(enrollments) == 0:
@@ -308,7 +316,7 @@ class Entity(ResultBase):
         return trials[-1]
 
     @classmethod
-    def get_average_trial_dropout(cls, trials: list[ScoredTrial]) -> float:
+    def get_average_trial_dropout(cls, trials: list[ScoredTrial]) -> float | None:
         enroll_drop = [
             (t.enrollment, t.dropout_count)
             for t in trials
@@ -318,13 +326,19 @@ class Entity(ResultBase):
             and t.dropout_count < (t.enrollment or 0)
         ]
 
+        if len(trials) == 0:
+            return None
+
         if len(enroll_drop) == 0:
             return 0.0
 
         return sum([d[1] for d in enroll_drop]) / sum([d[0] for d in enroll_drop])
 
     @classmethod
-    def get_average_trial_duration(cls, trials: list[ScoredTrial]) -> int:
+    def get_average_trial_duration(cls, trials: list[ScoredTrial]) -> int | None:
+        if len(trials) == 0:
+            return None
+
         durations = [trial.duration for trial in trials if trial.duration is not None]
 
         if len(durations) == 0:
@@ -380,9 +394,9 @@ class Entity(ResultBase):
         return [o[0] for o in sorted_owners[0:OWNERS_LIMIT]]
 
     @classmethod
-    def get_percent_trials_stopped(cls, trials: list[ScoredTrial]) -> float:
+    def get_percent_trials_stopped(cls, trials: list[ScoredTrial]) -> float | None:
         if len(trials) == 0:
-            return 0.0
+            return None
         trial_statuses = [get_trial_status_parent(t.status) for t in trials]
         return trial_statuses.count(TrialStatusGroup.STOPPED) / len(trial_statuses)
 

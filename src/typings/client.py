@@ -67,11 +67,11 @@ class TermSearchCriteria(BaseModel):
 
 
 class VectorSearchParams(BaseModel):
-    alpha: float = 0.7
+    alpha: Annotated[float, Field(validate_default=True)] = 0.7
     end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
-    k: int = DEFAULT_K
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_K
     skip_ids: Sequence[str] = []
-    start_year: int = DEFAULT_START_YEAR
+    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
     vector: list[float] = []
 
     def merge(self, new_params: dict):
@@ -158,6 +158,7 @@ class TrialSearchParams(DocumentSearchParams):
 
 class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
+    # TODO: does this do anything??
     entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
         EntityCategory.intervention
     )
