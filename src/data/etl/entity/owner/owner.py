@@ -204,6 +204,7 @@ class OwnerEtl(BaseEntityEtl):
         """
         add counts to owner table (used for autocomplete ordering)
         """
+        logger.info("Adding owner counts")
         client = await prisma_client(600)
         await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
         await client.execute_raw(
@@ -221,6 +222,7 @@ class OwnerEtl(BaseEntityEtl):
         - Link "ownable" to canonical entities
         - add instance_rollup and category_rollups
         """
+        logger.info("Linking owners")
         client = await prisma_client(600)
         await client.execute_raw(
             f"""
@@ -255,6 +257,7 @@ class OwnerEtl(BaseEntityEtl):
         """
         update search index
         """
+        logger.info("Owner search index")
         client = await prisma_client(300)
         await client.execute_raw("DROP INDEX IF EXISTS owner_search")
         await client.execute_raw(
@@ -299,6 +302,7 @@ class OwnerEtl(BaseEntityEtl):
         Create company-level vectors that are the average of all patents
         (and other documents in the future)
         """
+        logger.info("Owner vector and vector index")
         queries = [
             "DROP INDEX if exists owner_vector",
             """
@@ -329,7 +333,7 @@ class OwnerEtl(BaseEntityEtl):
             """,
             "CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops)",
         ]
-        client = await prisma_client(600)
+        client = await prisma_client(2400)
 
         for query in queries:
             await client.execute_raw(query)

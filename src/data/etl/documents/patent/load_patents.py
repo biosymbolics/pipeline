@@ -49,7 +49,7 @@ PATENT_SOURCE_FIELDS = [
     "application_number",
     "assignees",
     "attributes",
-    "claims",
+    "ARRAY_TO_STRING(COALESCE(claims, ARRAY[]::text[]), '\n') as claims",
     "country",
     "family_id",
     "ipc_codes",
@@ -86,6 +86,8 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
                     min(character_offset_start) as mention_index
                 FROM {GPR_ANNOTATIONS_TABLE}
                 WHERE domain='diseases'
+                AND publication_number in
+                    (select publication_number from applications where publication_number={GPR_ANNOTATIONS_TABLE}.publication_number)
                 GROUP BY publication_number, lower(preferred_name)
 
                 UNION ALL
