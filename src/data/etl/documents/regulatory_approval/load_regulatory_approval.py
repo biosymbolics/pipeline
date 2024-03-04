@@ -27,6 +27,7 @@ from data.etl.types import (
 from typings import DocType
 from utils.classes import overrides
 
+from .constants import DESIRABLE_LABEL_SECTIONS
 from .types import InterventionIntermediate, PharmaClass
 
 from ..base_document import BaseDocumentEtl
@@ -107,24 +108,31 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
     def get_source_sql(fields: list[str]):
         return f"""
         SELECT {", ".join(fields)}
-        FROM
-            approval,
-            active_ingredient,
-            product prod,
-            prd2label p2l,
-            label,
-            structures struct
+        FROM approval, structures struct
+        JOIN active_ingredient ON active_ingredient.struct_id = struct.id
+        JOIN product prod ON active_ingredient.ndc_product_code = prod.ndc_product_code
         LEFT JOIN pharma_class ON pharma_class.struct_id = struct.id
         LEFT JOIN omop_relationship metadata ON metadata.struct_id = struct.id AND metadata.relationship_name = 'indication'
+        LEFT JOIN prd2label p2l ON p2l.ndc_product_code = prod.ndc_product_code
+        LEFT JOIN label ON label.id = p2l.label_id
+        LEFT JOIN (
+            SELECT
+                ARRAY_TO_STRING(ARRAY_AGG(distinct CONCAT(title, '\n', text)), '\n\n') AS label_text,
+                label_id
+            FROM section
+            WHERE code IN {tuple(DESIRABLE_LABEL_SECTIONS.keys())}
+            GROUP BY label_id
+        ) AS label_section ON label_section.label_id = label.id
         WHERE approval.struct_id = struct.id
         AND active_ingredient.struct_id = struct.id
         AND active_ingredient.ndc_product_code = prod.ndc_product_code
         AND p2l.ndc_product_code = prod.ndc_product_code
         AND p2l.label_id = label.id
+        AND label_section.label_id = label.id
         AND lower(prod.marketing_status) NOT IN {SUPPRESSION_APPROVAL_TYPES}
         AND approval.approval IS NOT NULL
         AND prod.product_name IS NOT NULL
-        GROUP BY prod.product_name
+        GROUP BY prod.product_name, prod.ndc_product_code
     """
 
     @overrides(BaseDocumentEtl)
@@ -217,6 +225,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "MAX(approval.approval)::TIMESTAMP AS approval_date",
             "MAX(approval.type) AS agency",
             "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) AS indications",
+            "MAX(label_text) as label_text",
             "MAX(label.pdf_url) AS url",
         ]
         approvals = await PsqlDatabaseClient(SOURCE_DB).select(

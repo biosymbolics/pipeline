@@ -47,9 +47,7 @@ class BaseDocumentEtl:
         logger.info("Coping documents...")
         await self.copy_documents()
 
-        if self.document_type != DocType.regulatory_approval:
-            await self.copy_vectors()
-
+        await self.copy_vectors()
         await self.checksum()
 
     async def copy_vectors(self):

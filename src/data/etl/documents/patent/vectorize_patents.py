@@ -11,7 +11,6 @@ from system import initialize
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_TEXT_LENGTH = 2000
 VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_patents.txt"
 
 
@@ -66,7 +65,6 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m data.etl.documents.patent.vectorize_patents [starting_id] [--only_with_claims]
-            Loads NER data for patents
             """
         )
         sys.exit()
