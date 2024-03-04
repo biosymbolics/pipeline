@@ -36,7 +36,7 @@ class TrialVectorizer(DocumentVectorizer):
                 # "baseline_population",
                 "intervention_text",
                 "condition_text",
-                "inclusion_criteria",
+                # "inclusion_criteria",
             ],
             id_field="nct_id",
             processed_docs_file=VECTORIZED_PROCESSED_DOCS_FILE,
