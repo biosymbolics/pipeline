@@ -234,7 +234,7 @@ class OwnerEtl(BaseEntityEtl):
                 category_rollup=owner.name
             FROM owner_synonym, owner
             WHERE ownable.name=owner_synonym.term
-            AND owner_synonym.owner_id=owner.id;
+            AND owner_synonym.owner_id=owner.id
             """
         )
 

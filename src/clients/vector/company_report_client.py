@@ -103,15 +103,15 @@ class CompanyReportClient(VectorReportClient):
             """,
             "ARRAY_AGG(top_docs.year) AS years",
             "COUNT(title) AS count",
-            "ARRAY_AGG(title) AS titles",
+            "ARRAY_REMOVE(ARRAY_AGG(title), NULL) AS titles",
             f"MIN({current_year}-year)::int AS min_age",
             f"ROUND(AVG({current_year}-year)) AS avg_age",
             f"ROUND((1 - (AVG(top_docs.vector) <=> owner.vector))::numeric, 2) AS wheelhouse_score",
-            f"ROUND(AVG(relevance_score), 2) AS relevance_score",
+            f"ROUND(AVG(relevance), 2) AS relevance",
             f"""
             ROUND(
                 SUM(
-                    relevance_score
+                    relevance
                     * POW(
                         GREATEST(0.0, ((year - {start_year}) / 24.0)),
                         {self.recency_decay_factor}

@@ -19,6 +19,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from constants.documents import PATENT_WEIGHT_MULTIPLIER
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
 from typings import DocType
@@ -238,6 +239,8 @@ class PatentLoader(BaseDocumentEtl):
                             "claims": p["claims"],
                             "country_code": p["country"],
                             "family_id": p["family_id"],
+                            "investment": len(p["other_ids"])
+                            * PATENT_WEIGHT_MULTIPLIER,
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
                             # interventions (relation)
@@ -246,6 +249,7 @@ class PatentLoader(BaseDocumentEtl):
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
                             "title": p["title"],
+                            "traction": len(p["other_ids"]) * PATENT_WEIGHT_MULTIPLIER,
                             "url": p["url"],
                         }
                     )

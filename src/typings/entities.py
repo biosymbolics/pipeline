@@ -35,17 +35,21 @@ class Entity(ResultBase):
     average_trial_enrollment: int | None
     children: list["Entity"]
     id: str
+    investment: int
     maybe_available_count: int
     maybe_available_ids: list[str]
     name: str
     owners: list[str]
     patent_count: int
     patent_ids: list[str]
+    patent_weight: int
     percent_trials_stopped: float | None
     most_recent_patent: ScoredPatent | None = Field(exclude=True)
     most_recent_trial: ScoredTrial | None = Field(exclude=True)
     regulatory_approval_count: int
     regulatory_approval_ids: list[str]
+    total_completed_trial_enrollment: int | None
+    traction: int
     trial_count: int
     trial_ids: list[str]
     total_trial_enrollment: int | None
@@ -107,6 +111,11 @@ class Entity(ResultBase):
                 if not is_child
                 else []
             ),
+            investment=sum(
+                [p.investment for p in patents]
+                + [a.investment for a in regulatory_approvals]
+                + [t.investment for t in trials]
+            ),
             maybe_available_count=len(maybe_available_ids),
             maybe_available_ids=maybe_available_ids,
             most_recent_patent=cls.get_most_recent_patent(patents),
@@ -114,10 +123,19 @@ class Entity(ResultBase):
             owners=cls.get_owners(patents, regulatory_approvals, trials),
             patent_count=len(patents),
             patent_ids=[p.id for p in patents],
+            patent_weight=cls.get_patent_weight(patents),
             percent_trials_stopped=cls.get_percent_trials_stopped(trials),
             regulatory_approval_count=len(regulatory_approvals),
             regulatory_approval_ids=[a.id for a in regulatory_approvals],
+            total_completed_trial_enrollment=cls.get_total_trial_enrollment(
+                trials, [TrialStatus.COMPLETED]
+            ),
             total_trial_enrollment=cls.get_total_trial_enrollment(trials),
+            traction=sum(
+                [p.traction for p in patents]
+                + [a.traction for a in regulatory_approvals]
+                + [t.traction for t in trials]
+            ),
             trial_count=len(trials),
             trial_ids=[t.id for t in trials],
         )
@@ -127,21 +145,34 @@ class Entity(ResultBase):
     def child_count(self) -> int:
         return len(self.children)
 
+    @classmethod
+    def get_patent_weight(cls, patents: Sequence[ScoredPatent]) -> int:
+        """
+        Count all patents - not just the WO, but the country-specific and other variants
+        (proxy for LOI in each patent)
+        """
+        return sum([len(p.other_ids) for p in patents])
+
     @computed_field  # type: ignore
     @property
     def investment_level(self) -> str:
-        total_enrollment = self.total_trial_enrollment or 0
-
-        if total_enrollment > 5000:
+        if self.investment > 5000:
             return "very high"
-        if total_enrollment > 1000:
+        if self.investment > 1000:
             return "high"
-        if total_enrollment > 500:
+        if self.investment > 500:
             return "medium"
 
-        if self.patent_count > 100:
+        return "low"
+
+    @computed_field  # type: ignore
+    @property
+    def traction_level(self) -> str:
+        if self.traction > 1000:
+            return "very high"
+        if self.traction > 500:
             return "high"
-        if self.patent_count > 50:
+        if self.traction > 100:
             return "medium"
 
         return "low"
@@ -286,17 +317,30 @@ class Entity(ResultBase):
         return round(sum(enrollments) / len(enrollments))
 
     @classmethod
-    def get_total_trial_enrollment(cls, trials) -> int | None:
+    def get_total_trial_enrollment(
+        cls,
+        trials: Sequence[ScoredTrial],
+        statuses: Sequence[TrialStatus] | None = None,
+    ) -> int | None:
         """
-        Used as proxy for level of investment
+        Get total enrollment for trials.
+
+        Args:
+            trials (list[ScoredTrial]): list of trials
+            statuses (list[TrialStatus], optional): filter by status. Defaults to None (all statuses)
         """
         if len(trials) == 0:
             return None
 
-        enrollments = [t.enrollment for t in trials if t.enrollment is not None]
+        enrollments = [
+            t.enrollment
+            for t in trials
+            if t.enrollment is not None and (statuses is None or t.status in statuses)
+        ]
 
         if len(enrollments) == 0:
             return 0
+
         return sum(enrollments)
 
     @classmethod

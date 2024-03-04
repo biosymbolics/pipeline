@@ -29,7 +29,11 @@ class VectorReportClient:
     def __init__(
         self,
         recency_decay_factor: int = RECENCY_DECAY_FACTOR,
-        document_types: Sequence[DocType] = [DocType.patent, DocType.trial],
+        document_types: Sequence[DocType] = [
+            DocType.patent,
+            DocType.regulatory_approval,
+            DocType.trial,
+        ],
     ):
         self.document_types = document_types
         self.gpt_client = GptApiClient()
@@ -70,7 +74,7 @@ class VectorReportClient:
         #     similarities,
         # )
 
-        return 0.5
+        return 0.6
 
     async def get_top_doc_ids(
         self,
@@ -169,9 +173,11 @@ class VectorReportClient:
             return f"""
                 SELECT
                     MAX(id) AS id,
-                    AVG(relevance_score) AS relevance_score,
+                    AVG(relevance) AS relevance,
+                    SUM(investment) AS investment,
                     MAX(title) AS title,
                     CONCAT(MAX(title), ': ', MAX(LEFT(abstract, 150)), '...') AS description,
+                    SUM(traction) AS traction,
                     MAX(url) AS url,
                     -- if no get_query, we cast vector to string (because prisma can't deserialize vectors)
                     AVG(vector){'::text' if get_query is None else ''} AS vector,
@@ -181,9 +187,11 @@ class VectorReportClient:
                     SELECT
                         id,
                         {dedup_id_field} AS dedup_id,
-                        (1 - (vector <=> '{search_params.vector}'))::numeric AS relevance_score,
+                        (1 - (vector <=> '{search_params.vector}'))::numeric AS relevance,
                         abstract,
+                        investment,
                         title,
+                        traction,
                         url,
                         vector,
                         date_part('year', {date_field})::int AS year
@@ -245,11 +253,12 @@ class VectorReportClient:
                 SELECT
                     ARRAY_AGG(id) as ids,
                     COUNT(*) as count,
-                    AVG(relevance_score) as avg_score,
-                    ARRAY_AGG(relevance_score) as scores,
-                    ARRAY_AGG(title) as titles,
-                    ARRAY_AGG(distinct description) as descriptions,
-                    SUM(relevance_score) as total_score,
+                    ARRAY_REMOVE(ARRAY_AGG(title), NULL) as titles,
+                    -- ARRAY_AGG(distinct description) as descriptions,
+                    AVG(relevance) as avg_relevance,
+                    SUM(investment) as total_investment,
+                    SUM(relevance) as total_relevance,
+                    SUM(traction) as total_traction,
                     year
                 FROM ({doc_query}) top_docs
                 GROUP BY year

@@ -9,7 +9,7 @@ from typings.core import ResultBase
 class TopDocRecord(ResultBase):
     description: str
     id: str
-    relevance_score: float
+    relevance: float
     title: str
     vector: list[float]
     year: int
@@ -25,12 +25,14 @@ class TopDocRecord(ResultBase):
 class TopDocsByYear(ResultBase):
     ids: list[str]
     count: int
-    avg_score: float
-    scores: list[float]
-    titles: list[str]
     descriptions: list[str] = []
-    total_score: float
+    titles: list[str]
     year: int
+
+    avg_relevance: float
+    total_investment: float
+    total_relevance: float
+    total_traction: float
 
 
 class CountByYear(ResultBase):
@@ -58,7 +60,7 @@ class CompanyRecord(ResultBase):
     min_age: int
     avg_age: float
     activity: list[float] = []
-    relevance_score: float
+    relevance: float
     wheelhouse_score: float = 0.0
     count_by_year: dict[str, list[CountByYear]] = {}
     score: float

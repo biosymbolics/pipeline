@@ -24,7 +24,7 @@ from utils.string import get_id
 
 from .patents_client import find_many
 
-from ..utils import get_doc_ids_for_description, get_search_clause, get_term_clause
+from ..utils import get_doc_ids_for_description, get_search_clause
 
 
 logger = logging.getLogger(__name__)

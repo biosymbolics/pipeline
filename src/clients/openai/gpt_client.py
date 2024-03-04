@@ -28,7 +28,7 @@ GptModel = Literal[
     "mistralai/Mistral-7B-Instruct-v0.1",
     "biomistral-7b-dare-mps",
 ]
-DEFAULT_GPT_MODEL: GptModel = "mixtral-8x7b-32768"
+DEFAULT_GPT_MODEL: GptModel = "gpt-4"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
