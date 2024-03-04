@@ -125,14 +125,22 @@ def get_search_clause(
 
     where = {
         "AND": [
-            term_clause,
+            {
+                p.query_type: [
+                    term_clause,
+                    (
+                        {"id": {"in": list(description_ids)}}
+                        if description_ids is not None
+                        else {}
+                    ),
+                ]
+            },
             {
                 date_field: {
                     "gte": datetime(p.start_year, 1, 1),
                     "lte": datetime(p.end_year, 1, 1),
                 }
             },
-            {"id": {"in": list(description_ids)}} if description_ids else {},
         ],
     }
 
