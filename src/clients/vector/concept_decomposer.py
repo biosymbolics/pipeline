@@ -123,7 +123,7 @@ class ConceptDecomposer:
         residual_docs = await self.vector_report_client.get_top_docs(
             description,
             search_params=VectorSearchParams(
-                min_year=RESIDUAL_START_YEAR,
+                start_year=RESIDUAL_START_YEAR,
                 skip_ids=known_ids,
                 # higher threshold for similarity for residuals
                 # to avoid just getting what was deemed irrelevant in the original search

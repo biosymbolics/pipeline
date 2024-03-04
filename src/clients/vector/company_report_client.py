@@ -26,7 +26,7 @@ logger.setLevel(logging.INFO)
 
 class CompanyReportClient(VectorReportClient):
     async def _fetch_company_reports(
-        self, document_ids: Sequence[str], owner_ids: Sequence[int], min_year: int
+        self, document_ids: Sequence[str], owner_ids: Sequence[int], start_year: int
     ) -> dict[str, dict[int, list[CountByYear]]]:
         """
         Fetches company reports for a set of document and owner ids
@@ -70,7 +70,7 @@ class CompanyReportClient(VectorReportClient):
             type.name: {
                 k: [
                     vals.get(y) or CountByYear(year=y, count=0, type=type.name)
-                    for y in range(min_year, MAX_DATA_YEAR)
+                    for y in range(start_year, MAX_DATA_YEAR)
                 ]
                 for k, vals in map.items()
             }
@@ -79,7 +79,7 @@ class CompanyReportClient(VectorReportClient):
 
     def _get_fields(
         self,
-        min_year: int,
+        start_year: int,
     ) -> list[str]:
         """
         Get fields for the company report query
@@ -113,7 +113,7 @@ class CompanyReportClient(VectorReportClient):
                 SUM(
                     relevance_score
                     * POW(
-                        GREATEST(0.0, ((year - {min_year}) / 24.0)),
+                        GREATEST(0.0, ((year - {start_year}) / 24.0)),
                         {self.recency_decay_factor}
                     )
                 )::numeric, 2
@@ -127,7 +127,7 @@ class CompanyReportClient(VectorReportClient):
         description: str,
     ) -> list[CompanyRecord]:
         def by_company_query(inner_query: str) -> str:
-            fields = self._get_fields(p.min_year)
+            fields = self._get_fields(p.start_year)
 
             ownable_join = " OR ".join(
                 [
@@ -152,7 +152,7 @@ class CompanyReportClient(VectorReportClient):
 
         companies = await self.get_top_docs(
             description,
-            VectorSearchParams(k=p.k, min_year=p.min_year),
+            VectorSearchParams(k=p.k, start_year=p.start_year),
             get_query=by_company_query,
             Schema=CompanyRecord,
         )
@@ -160,7 +160,7 @@ class CompanyReportClient(VectorReportClient):
         owner_ids = tuple([c.id for c in companies])
         document_ids = tuple(flatten([c.ids for c in companies]))
         report_map = await self._fetch_company_reports(
-            document_ids, owner_ids, p.min_year
+            document_ids, owner_ids, p.start_year
         )
 
         companies = [

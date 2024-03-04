@@ -79,7 +79,7 @@ class VectorReportClient:
                 return f"""
                     SELECT id, vector
                     FROM {doc_type.name}
-                    WHERE date_part('year', {date_field}) >= {search_params.min_year}
+                    WHERE date_part('year', {date_field}) >= {search_params.start_year}
                     AND NOT id = ANY($1)
                 """
 

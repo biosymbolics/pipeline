@@ -8,14 +8,14 @@ from typings.documents.common import DocType
 
 from .documents.common import EntityCategory, TermField
 
-
+DEFAULT_K = 1000
 QueryType = Literal["AND", "OR"]
 DEFAULT_QUERY_TYPE: QueryType = "AND"
 DEFAULT_TERM_FIELDS = [
     TermField.canonical_name,
     TermField.instance_rollup,
 ]
-DEFAULT_START_YEAR = datetime.today().year - 10
+DEFAULT_START_YEAR = datetime.today().year - 20
 DEFAULT_END_YEAR = datetime.today().year + 1
 DEFAULT_LIMIT = 2000
 
@@ -66,16 +66,13 @@ class TermSearchCriteria(BaseModel):
         return term_fields
 
 
-MIN_YEAR = 2000
-DEFAULT_K = 1000
-
-
 class VectorSearchParams(BaseModel):
     alpha: float = 0.7
+    end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
     k: int = DEFAULT_K
-    vector: list[float] = []
-    min_year: int = MIN_YEAR
     skip_ids: Sequence[str] = []
+    start_year: int = DEFAULT_START_YEAR
+    vector: list[float] = []
 
     def merge(self, new_params: dict):
         self_keep = {
@@ -87,13 +84,12 @@ class VectorSearchParams(BaseModel):
         )
 
 
-class DocumentSearchCriteria(TermSearchCriteria):
+class DocumentSearchCriteria(TermSearchCriteria, VectorSearchParams):
     """
     Document search criteria
     """
 
-    end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
-    # TODO: HACK!!
+    # TODO: this is hacky
     include: Annotated[
         Union[
             Annotated[PatentInclude, Tag("patent_include")],
@@ -104,8 +100,17 @@ class DocumentSearchCriteria(TermSearchCriteria):
         ],
         Discriminator(include_discriminator),
     ]
-    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
-    vector_search_params: VectorSearchParams = VectorSearchParams()
+
+    @property
+    def vector_search_params(self) -> VectorSearchParams:
+        return VectorSearchParams(
+            alpha=self.alpha,
+            end_year=self.end_year,
+            k=self.k,
+            vector=self.vector,
+            skip_ids=self.skip_ids,
+            start_year=self.start_year,
+        )
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
@@ -186,7 +191,7 @@ class CompanyFinderParams(BaseModel):
 
     description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
-    min_year: Annotated[int, Field(validate_default=True)] = 2000
+    start_year: Annotated[int, Field(validate_default=True)] = 2000
 
 
 class ConceptDecomposeParams(BaseModel):
