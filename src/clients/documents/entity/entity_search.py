@@ -116,6 +116,21 @@ async def get_matching_docs(p: DocumentSearchParams) -> DocsByType:
     )
 
 
+def _get_docs_for_ent(
+    ewds: list[EntWithDocResult], docs_by_type: DocsByType
+) -> dict[str, list]:
+    return {
+        f"{doc_type}s": compact(
+            [
+                getattr(docs_by_type, f"{doc_type}s").get(id)
+                for id in flatten([getattr(ewd, f"{doc_type}s") for ewd in ewds])
+            ]
+        )
+        for doc_type in DocType.__members__
+        if doc_type != DocType.all.name
+    }
+
+
 async def _search(p: EntitySearchParams) -> list[Entity]:
     """
     Internal search for documents grouped by entity
@@ -125,7 +140,7 @@ async def _search(p: EntitySearchParams) -> list[Entity]:
     # full docs (if it were pulled in the prior query, would pull dups; thus like this.)
     docs_by_type = await get_matching_docs(DocumentSearchParams.parse(p))
 
-    doc_id_map = {k: list(v.keys()) for k, v in docs_by_type.items()}
+    doc_id_map = {k: list(v.keys()) for k, v in docs_by_type.model_dump().items()}
 
     # entity/doc matching for ents in first order docs
     ent_with_docs = await get_docs_by_entity_id(
@@ -140,28 +155,18 @@ async def _search(p: EntitySearchParams) -> list[Entity]:
     documents_by_entity = [
         Entity.create(
             id=rollup,
+            **_get_docs_for_ent(ewds, docs_by_type),
             name=ewds[0].name,
             children=sorted(
                 [
                     Entity.create(
                         id=rollup + ewd.child,
-                        name=ewd.child,
+                        **_get_docs_for_ent([ewd], docs_by_type),
                         children=[],
-                        end_year=p.end_year,
-                        patents=compact(
-                            [docs_by_type.patents.get(id) for id in ewd.patents]
-                        ),
-                        regulatory_approvals=compact(
-                            [
-                                docs_by_type.regulatory_approvals.get(id)
-                                for id in ewd.regulatory_approvals
-                            ]
-                        ),
-                        start_year=p.start_year,
-                        trials=compact(
-                            [docs_by_type.trials.get(id) for id in ewd.trials]
-                        ),
                         is_child=True,
+                        name=ewd.child,
+                        end_year=p.end_year,
+                        start_year=p.start_year,
                     )
                     for ewd in ewds
                     if ewd.child and ewd.child != ewd.name
@@ -170,25 +175,8 @@ async def _search(p: EntitySearchParams) -> list[Entity]:
                 reverse=True,
             ),
             end_year=p.end_year,
-            patents=compact(
-                [
-                    docs_by_type.patents.get(id)
-                    for id in flatten([ewd.patents for ewd in ewds])
-                ]
-            ),
-            regulatory_approvals=compact(
-                [
-                    docs_by_type.regulatory_approvals.get(id)
-                    for id in flatten([ewd.regulatory_approvals for ewd in ewds])
-                ]
-            ),
+            is_child=False,
             start_year=p.start_year,
-            trials=compact(
-                [
-                    docs_by_type.trials.get(id)
-                    for id in flatten([ewd.trials for ewd in ewds])
-                ]
-            ),
         )
         for rollup, ewds in grouped_ents.items()
     ]
