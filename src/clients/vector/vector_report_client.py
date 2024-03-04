@@ -3,6 +3,7 @@ Base semantic finder
 """
 
 import logging
+import math
 from typing import Callable, Sequence, Type, TypeVar
 from pydantic import BaseModel
 
@@ -40,7 +41,7 @@ class VectorReportClient:
     ) -> float:
         """
         Get the default min similarity score
-        min=avg(sim)+α*σ(sim)
+        min=avg(sim) * (1 / (1 + exp(-α * (σ(sim) - 1))))
 
         Args:
             similarities (Sequence[float]): similarity scores
@@ -48,16 +49,28 @@ class VectorReportClient:
 
         Returns:
             min similarity score (float)
-
-        Taken from https://www.researchgate.net/post/Determination-of-threshold-for-cosine-similarity-score
         """
-        if len(similarities) == 0:
-            return 0
-        mean = sum(similarities) / len(similarities)
-        stddev = (
-            sum((score - mean) ** 2 for score in similarities) / len(similarities)
-        ) ** 0.5
-        return mean + alpha * stddev
+        # if len(similarities) == 0:
+        #     return 0
+
+        # mean = sum(similarities) / len(similarities)
+        # stddev = (
+        #     sum((score - mean) ** 2 for score in similarities) / len(similarities)
+        # ) ** 0.5
+
+        # # if stddev is small, return everything. if stddev is large, return above the mean
+        # sigmoid = 1 / (1 + math.exp(-alpha * (stddev - 1)))
+        # threshold = mean * sigmoid
+
+        # logger.info(
+        #     "Similarity breakdown: mean=%s, stddev=%s, thres=%s (%s)",
+        #     mean,
+        #     stddev,
+        #     threshold,
+        #     similarities,
+        # )
+
+        return 0.5
 
     async def get_top_doc_ids(
         self,
@@ -112,14 +125,20 @@ class VectorReportClient:
             ]
 
             logger.info(
-                "Returning %s ids above similarity threshold %s",
+                "Returning %s (of %s) ids above similarity threshold %s",
                 len(above_threshold_ids),
+                len(records),
                 min_similiarity,
             )
 
             return above_threshold_ids
 
-        cache_key = get_id([search_params.vector, search_params.k])
+        cache_key = get_id(
+            [
+                *search_params.model_dump().values(),
+                [dt.name for dt in self.document_types],
+            ]
+        )
         response = await retrieve_with_cache_check(
             fetch,
             key=cache_key,
