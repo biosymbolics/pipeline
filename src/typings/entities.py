@@ -7,7 +7,11 @@ import logging
 from constants.documents import MAX_DATA_YEAR
 
 from typings import ScoredRegulatoryApproval, ScoredPatent, ScoredTrial
-from typings.documents.trials import TrialStatusGroup, get_trial_status_parent
+from typings.documents.trials import (
+    TRIAL_PHASE_ORDER,
+    TrialStatusGroup,
+    get_trial_status_parent,
+)
 
 from .core import Dataclass, ResultBase
 from .documents.patents import AvailabilityLikelihood
@@ -38,6 +42,7 @@ class Entity(ResultBase):
     investment: int
     maybe_available_count: int
     maybe_available_ids: list[str]
+    max_phase: TrialPhase
     name: str
     owners: list[str]
     patent_count: int
@@ -118,6 +123,7 @@ class Entity(ResultBase):
             ),
             maybe_available_count=len(maybe_available_ids),
             maybe_available_ids=maybe_available_ids,
+            max_phase=cls.get_max_phase(trials, len(regulatory_approvals)),
             most_recent_patent=cls.get_most_recent_patent(patents),
             most_recent_trial=cls.get_most_recent_trial(trials),
             owners=cls.get_owners(patents, regulatory_approvals, trials),
@@ -214,14 +220,21 @@ class Entity(ResultBase):
 
         return max(compact([p_updated, t_updated]))
 
-    @computed_field  # type: ignore
-    @property
-    def max_phase(self) -> TrialPhase | str:
-        if self.regulatory_approval_count > 0:
+    @classmethod
+    def get_max_phase(
+        cls, trials: Sequence[ScoredTrial], regulatory_approval_count: int
+    ) -> TrialPhase:
+        if regulatory_approval_count > 0:
             return TrialPhase.APPROVED
-        if not self.most_recent_trial:
+        if len(trials) == 0:
             return TrialPhase.PRECLINICAL
-        return TrialPhase(self.most_recent_trial.phase)
+
+        phases = sorted(
+            [TrialPhase(t.phase) for t in trials if t.phase is not None],
+            key=lambda x: TRIAL_PHASE_ORDER[x],
+            reverse=True,
+        )
+        return phases[0]
 
     @computed_field  # type: ignore
     @property

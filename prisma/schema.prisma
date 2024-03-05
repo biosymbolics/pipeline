@@ -172,8 +172,6 @@ model Ownable {
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     trial_id               String?             @unique
 
-    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
-    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
     @@index([instance_rollup], name: "ownable_instance_rollup")
@@ -181,7 +179,6 @@ model Ownable {
     @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
     @@index([owner_id], name: "ownable_owner_id")
     @@index([patent_id], name: "ownable_patent_id")
-    @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
     @@map("ownable")
 }
 

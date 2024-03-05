@@ -24,7 +24,11 @@ from utils.string import get_id
 
 from .patents_client import find_many
 
-from ..utils import get_doc_ids_for_description, get_search_clause
+from ..utils import (
+    get_doc_ids_for_description,
+    get_doc_ids_for_terms,
+    get_search_clause,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +36,9 @@ logger.setLevel(logging.INFO)
 
 
 def get_where_clause(
-    p: DocumentSearchCriteria, description_ids: Sequence[str] | None = None
+    p: DocumentSearchCriteria,
+    term_matching_ids: Sequence[str] | None = None,
+    description_ids: Sequence[str] | None = None,
 ) -> PatentWhereInput:
     is_id_search = any([t.startswith("WO-") for t in p.terms])
 
@@ -47,7 +53,11 @@ def get_where_clause(
         return {"id": {"in": list(p.terms)}}
 
     return get_search_clause(
-        DocType.patent, p, description_ids, return_type=PatentWhereInput
+        DocType.patent,
+        p,
+        term_matching_ids,
+        description_ids,
+        return_type=PatentWhereInput,
     )
 
 
@@ -69,13 +79,20 @@ async def search(
 
     # if a description is provided, get the ids of the nearest neighbors
     if p.description:
-        vector_matching_ids = await get_doc_ids_for_description(
+        vector_match_ids = await get_doc_ids_for_description(
             p.description, [DocType.patent], p.vector_search_params
         )
     else:
-        vector_matching_ids = None
+        vector_match_ids = None
 
-    where = get_where_clause(search_criteria, vector_matching_ids)
+    if len(p.terms) > 0:
+        term_match_ids = await get_doc_ids_for_terms(
+            p.terms, p.query_type, [DocType.patent]
+        )
+    else:
+        term_match_ids = None
+
+    where = get_where_clause(search_criteria, term_match_ids, vector_match_ids)
 
     async def _search(limit: int):
         return await find_many(

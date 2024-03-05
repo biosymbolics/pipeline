@@ -8,6 +8,7 @@ from prisma.types import TrialWhereInput
 
 from clients.documents.utils import (
     get_doc_ids_for_description,
+    get_doc_ids_for_terms,
     get_search_clause,
 )
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
@@ -26,7 +27,9 @@ logger.setLevel(logging.INFO)
 
 
 def get_where_clause(
-    p: DocumentSearchCriteria, description_ids: Sequence[str] | None = None
+    p: DocumentSearchCriteria,
+    term_matching_ids: Sequence[str] | None = None,
+    description_ids: Sequence[str] | None = None,
 ) -> TrialWhereInput:
     is_id_search = any([t.startswith("NCT") for t in p.terms])
 
@@ -38,7 +41,11 @@ def get_where_clause(
         return {"id": {"in": list(p.terms)}}
 
     return get_search_clause(
-        DocType.trial, p, description_ids, return_type=TrialWhereInput
+        DocType.trial,
+        p,
+        term_matching_ids,
+        description_ids,
+        return_type=TrialWhereInput,
     )
 
 
@@ -59,13 +66,20 @@ async def search(params: TrialSearchParams) -> list[ScoredTrial]:
     async def _search(limit: int):
         # if a description is provided, get the ids of the nearest neighbors
         if p.description:
-            vector_matching_ids = await get_doc_ids_for_description(
+            vector_match_ids = await get_doc_ids_for_description(
                 p.description, [DocType.trial], p.vector_search_params
             )
         else:
-            vector_matching_ids = None
+            vector_match_ids = None
 
-        where = get_where_clause(search_criteria, vector_matching_ids)
+        if len(p.terms) > 0:
+            term_match_ids = await get_doc_ids_for_terms(
+                p.terms, p.query_type, [DocType.trial]
+            )
+        else:
+            term_match_ids = None
+
+        where = get_where_clause(search_criteria, term_match_ids, vector_match_ids)
         return await find_many(where=where, include=p.include, take=limit)
 
     if p.skip_cache == True:
