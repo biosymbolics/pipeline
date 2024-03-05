@@ -227,6 +227,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) AS indications",
             "MAX(label_text) as label_text",
             "MAX(label.pdf_url) AS url",
+            "CASE WHEN MAX(prod.marketing_status) in ('NDA', 'BLA') THEN 200 ELSE 30 END AS traction",
         ]
         approvals = await PsqlDatabaseClient(SOURCE_DB).select(
             query=RegulatoryApprovalLoader.get_source_sql(fields)
