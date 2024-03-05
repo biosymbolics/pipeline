@@ -22,10 +22,20 @@ def get_entity_map_matview_query() -> list[str]:
     ]
     search_or = "|| ' ' || ".join(name_fields)
     search = f"to_tsvector('english', {search_or} )"
+
+    doc_type_switch = " ".join(
+        [
+            f"WHEN {doc_type.name}_id IS NOT NULL THEN '{doc_type.name}'"
+            for doc_type in DocType
+            if doc_type != DocType.all
+        ]
+    )
+
     fields = [
-        *[f"{doc_type.name}_id" for doc_type in DocType],
+        *[f"{doc_type.name}_id" for doc_type in DocType if doc_type != DocType.all],
         f"{search} as search",
         *name_fields,
+        f"CASE {doc_type_switch} END as doc_type",
     ]
     return [
         f"DROP MATERIALIZED VIEW IF EXISTS {SEARCH_TABLE}",
@@ -50,14 +60,17 @@ def get_entity_map_matview_query() -> list[str]:
         *[
             f"CREATE INDEX {SEARCH_TABLE}_{doc_type.name}_id ON {SEARCH_TABLE} ({doc_type.name}_id)"
             for doc_type in DocType
+            if doc_type != DocType.all
         ],
         f"CREATE INDEX {SEARCH_TABLE}_type ON {SEARCH_TABLE} (type)",
+        f"CREATE INDEX {SEARCH_TABLE}_doc_type ON {SEARCH_TABLE} (doc_type)",
     ]
 
 
 # these get wiped for every prisma db push. Will figure out a better way to handle this.
 # https://github.com/prisma/prisma/issues/12751
 MANUAL_INDICES = [
+    "SET maintenance_work_mem = '5GB'",
     """
     CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
     """,
@@ -65,6 +78,9 @@ MANUAL_INDICES = [
     CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
     """,
     """
+    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
+    """
+    """,
     CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
     """,
     """

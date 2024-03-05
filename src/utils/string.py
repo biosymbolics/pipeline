@@ -5,6 +5,7 @@ String utilities
 from datetime import date
 from enum import Enum
 import json
+from pydantic import BaseModel
 import regex as re
 from typing import Mapping, Sequence, TypeGuard, Union
 from hashlib import sha1
@@ -44,6 +45,9 @@ def get_id(value: Idable) -> str:
     """
     if value is None:
         return ""
+
+    if isinstance(value, BaseModel):
+        return get_id(value.model_dump())
 
     if isinstance(value, Mapping):
         value = "_".join(

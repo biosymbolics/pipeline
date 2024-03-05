@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable, Sequence, TypeVar, TypedDict
+from typing import Awaitable, Callable, Sequence, TypeVar
 from httpx import Limits
 from prisma.client import Prisma, register
 import logging

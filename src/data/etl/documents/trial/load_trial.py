@@ -8,7 +8,7 @@ import sys
 import logging
 from typing import Sequence
 from pydash import uniq
-from prisma.enums import BiomedicalEntityType, Source
+from prisma.enums import BiomedicalEntityType, Source, TrialStatus
 from prisma.models import (
     Indicatable,
     Intervenable,
@@ -23,6 +23,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.core import ETL_BASE_DATABASE_URL
 from constants.patterns.intervention import DOSAGE_UOM_RE
+from constants.documents import TRIAL_WEIGHT_MULTIPLIER
 from data.domain.biomedical import (
     remove_trailing_leading,
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
@@ -273,6 +274,7 @@ class TrialLoader(BaseDocumentEtl):
         trial = TrialRecord(**record)
         design = TrialDesignParser.find_from_record(trial)
         masking = TrialMaskingParser.find(trial.masking)
+        status = TrialStatusParser.find(trial.status)
 
         return TrialCreateWithoutRelationsInput(
             id=trial.id,
@@ -288,6 +290,7 @@ class TrialLoader(BaseDocumentEtl):
             enrollment=int(trial.enrollment or 0),
             hypothesis_type=HypothesisTypeParser.find(trial.hypothesis_types),
             intervention_type=InterventionTypeParser.find(trial.intervention_types),
+            investment=(trial.enrollment or 0) * TRIAL_WEIGHT_MULTIPLIER,
             last_updated_date=trial.last_updated_date,
             masking=masking,
             max_timeframe=extract_max_timeframe(trial["time_frames"]),
@@ -295,12 +298,14 @@ class TrialLoader(BaseDocumentEtl):
             purpose=TrialPurposeParser.find(trial.purpose).name,
             randomization=TrialRandomizationParser.find(trial.randomization, design),
             start_date=trial.start_date,
-            status=TrialStatusParser.find(trial.status),
+            status=status,
             termination_reason=TerminationReasonParser.find(
                 trial.termination_description
             ),
             termination_description=trial.termination_description,
             title=trial.title,
+            traction=((trial.enrollment or 0) if status == TrialStatus.COMPLETED else 0)
+            * TRIAL_WEIGHT_MULTIPLIER,
             url=f"https://clinicaltrials.gov/study/{trial.id}",
         )
 

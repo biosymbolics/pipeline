@@ -19,6 +19,7 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
 )
+from constants.documents import PATENT_WEIGHT_MULTIPLIER
 from constants.umls import LegacyDomainType
 from data.etl.types import BiomedicalEntityLoadSpec
 from typings import DocType
@@ -49,7 +50,7 @@ PATENT_SOURCE_FIELDS = [
     "application_number",
     "assignees",
     "attributes",
-    "claims",
+    "ARRAY_TO_STRING(COALESCE(claims, ARRAY[]::text[]), '\n') as claims",
     "country",
     "family_id",
     "ipc_codes",
@@ -86,6 +87,8 @@ def get_mapping_entities_sql(domains: Sequence[str]) -> str:
                     min(character_offset_start) as mention_index
                 FROM {GPR_ANNOTATIONS_TABLE}
                 WHERE domain='diseases'
+                AND publication_number in
+                    (select publication_number from applications where publication_number={GPR_ANNOTATIONS_TABLE}.publication_number)
                 GROUP BY publication_number, lower(preferred_name)
 
                 UNION ALL
@@ -236,6 +239,8 @@ class PatentLoader(BaseDocumentEtl):
                             "claims": p["claims"],
                             "country_code": p["country"],
                             "family_id": p["family_id"],
+                            "investment": len(p["other_ids"])
+                            * PATENT_WEIGHT_MULTIPLIER,
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
                             # interventions (relation)
@@ -244,6 +249,7 @@ class PatentLoader(BaseDocumentEtl):
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
                             "title": p["title"],
+                            "traction": len(p["other_ids"]) * PATENT_WEIGHT_MULTIPLIER,
                             "url": p["url"],
                         }
                     )

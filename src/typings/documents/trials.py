@@ -1,6 +1,6 @@
 import random
 from prisma.partials import TrialDto
-from prisma.enums import TerminationReason, TrialStatus
+from prisma.enums import TerminationReason, TrialPhase, TrialStatus
 from pydantic import computed_field
 
 from typings.core import ResultBase
@@ -52,3 +52,18 @@ def get_trial_status_parent(ts: TrialStatus) -> TrialStatusGroup | str:
     if ts == TrialStatus.COMPLETED:
         return TrialStatusGroup.COMPLETED
     return TrialStatusGroup.UNKNOWN
+
+
+TRIAL_PHASE_ORDER: dict[TrialPhase, float] = {
+    TrialPhase.PRECLINICAL: 0,
+    TrialPhase.EARLY_PHASE_1: 0.5,
+    TrialPhase.PHASE_1: 1,
+    TrialPhase.PHASE_1_2: 1.5,
+    TrialPhase.PHASE_2: 2,
+    TrialPhase.PHASE_2_3: 2.5,
+    TrialPhase.PHASE_3: 3,
+    TrialPhase.APPROVED: 4,
+    TrialPhase.PHASE_4: -1,
+    TrialPhase.NA: -1,
+    TrialPhase.UNKNOWN: -1,
+}

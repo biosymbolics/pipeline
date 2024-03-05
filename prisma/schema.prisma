@@ -172,8 +172,6 @@ model Ownable {
     trial                  Trial?              @relation(fields: [trial_id], references: [id])
     trial_id               String?             @unique
 
-    @@unique([owner_id, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
-    @@unique([name, patent_id, inventor_patent_id, regulatory_approval_id, trial_id])
     @@index([name], name: "ownable_name")
     @@index([canonical_name], name: "ownable_canonical_name")
     @@index([instance_rollup], name: "ownable_instance_rollup")
@@ -181,7 +179,6 @@ model Ownable {
     @@index([inventor_patent_id], name: "ownable_inventor_patent_id")
     @@index([owner_id], name: "ownable_owner_id")
     @@index([patent_id], name: "ownable_patent_id")
-    @@index([regulatory_approval_id], name: "ownable_regulatory_approval_id")
     @@map("ownable")
 }
 
@@ -227,11 +224,13 @@ model Patent {
     interventions      Intervenable[]
     indications        Indicatable[]
     inventors          Ownable[]                   @relation("inventor_to_patent")
+    investment         Int                         @default(10)
     ipc_codes          String[]
     other_ids          String[]
     priority_date      DateTime
     similar_patents    String[]
     title              String
+    traction           Int                         @default(10)
     url                String
     vector             Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
 
@@ -241,6 +240,7 @@ model Patent {
 
 model RegulatoryApproval {
     id               String                      @id @unique
+    abstract         String?                     @default("") // just to match other doc types (but could put label?)
     agency           String
     applicant_id     Int?                        @unique
     applicant        Ownable?
@@ -248,6 +248,9 @@ model RegulatoryApproval {
     approval_date    DateTime
     indications      Indicatable[]
     interventions    Intervenable[]
+    investment       Int                         @default(0)
+    title            String?                     @default("") // just to match other doc types (but could put label?)
+    traction         Int                         @default(200)
     url              String
     vector           Unsupported("vector(768)")? // TODO: maybe move this to avoid long table scans
 
@@ -270,6 +273,7 @@ model Trial {
     enrollment              Int?
     hypothesis_type         HypothesisType // calc field??
     indications             Indicatable[]
+    investment              Int                         @default(0)
     interventions           Intervenable[]
     intervention_type       BiomedicalEntityType
     last_updated_date       DateTime
@@ -286,6 +290,7 @@ model Trial {
     termination_description String?
     termination_reason      TerminationReason
     title                   String
+    traction                Int                         @default(0)
     url                     String
     vector                  Unsupported("vector(768)")?
 

@@ -6,12 +6,11 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
 
-from typings.core import Dataclass
 from typings import ScoredPatent, ScoredRegulatoryApproval, ScoredTrial
 
 
 @dataclass(frozen=True)
-class DocsByType(Dataclass):
+class DocsByType(BaseModel):
     patents: dict[str, ScoredPatent]
     regulatory_approvals: dict[str, ScoredRegulatoryApproval]
     trials: dict[str, ScoredTrial]

@@ -12,7 +12,6 @@ from system import initialize
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_TEXT_LENGTH = 2000
 VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_trials.txt"
 
 
@@ -37,7 +36,7 @@ class TrialVectorizer(DocumentVectorizer):
                 # "baseline_population",
                 "intervention_text",
                 "condition_text",
-                "inclusion_criteria",
+                # "inclusion_criteria",
             ],
             id_field="nct_id",
             processed_docs_file=VECTORIZED_PROCESSED_DOCS_FILE,
@@ -83,7 +82,6 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m data.etl.documents.trial.vectorize_trials [starting_id]
-            Loads NER data for trials
             """
         )
         sys.exit()

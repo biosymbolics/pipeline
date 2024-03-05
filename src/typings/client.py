@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Sequence, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, field_validator
 from prisma.types import PatentInclude, RegulatoryApprovalInclude, TrialInclude
 
@@ -8,14 +8,14 @@ from typings.documents.common import DocType
 
 from .documents.common import EntityCategory, TermField
 
-
+DEFAULT_K = 1000
 QueryType = Literal["AND", "OR"]
 DEFAULT_QUERY_TYPE: QueryType = "AND"
 DEFAULT_TERM_FIELDS = [
     TermField.canonical_name,
     TermField.instance_rollup,
 ]
-DEFAULT_START_YEAR = datetime.today().year - 10
+DEFAULT_START_YEAR = datetime.today().year - 20
 DEFAULT_END_YEAR = datetime.today().year + 1
 DEFAULT_LIMIT = 2000
 
@@ -66,13 +66,30 @@ class TermSearchCriteria(BaseModel):
         return term_fields
 
 
-class DocumentSearchCriteria(TermSearchCriteria):
+class VectorSearchParams(BaseModel):
+    alpha: Annotated[float, Field(validate_default=True)] = 0.7
+    end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
+    k: Annotated[int, Field(validate_default=True)] = DEFAULT_K
+    skip_ids: Sequence[str] = []
+    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
+    vector: list[float] = []
+
+    def merge(self, new_params: dict):
+        self_keep = {
+            k: v for k, v in self.model_dump().items() if k not in new_params.keys()
+        }
+        return self.__class__(
+            **self_keep,
+            **new_params,
+        )
+
+
+class DocumentSearchCriteria(TermSearchCriteria, VectorSearchParams):
     """
     Document search criteria
     """
 
-    end_year: Annotated[int, Field(validate_default=True)] = DEFAULT_END_YEAR
-    # TODO: HACK!!
+    # TODO: this is hacky
     include: Annotated[
         Union[
             Annotated[PatentInclude, Tag("patent_include")],
@@ -83,7 +100,17 @@ class DocumentSearchCriteria(TermSearchCriteria):
         ],
         Discriminator(include_discriminator),
     ]
-    start_year: Annotated[int, Field(validate_default=True)] = DEFAULT_START_YEAR
+
+    @property
+    def vector_search_params(self) -> VectorSearchParams:
+        return VectorSearchParams(
+            alpha=self.alpha,
+            end_year=self.end_year,
+            k=self.k,
+            vector=self.vector,
+            skip_ids=self.skip_ids,
+            start_year=self.start_year,
+        )
 
     @field_validator("terms", mode="before")
     def terms_from_string(cls, v):
@@ -107,7 +134,6 @@ class DocumentSearchCriteria(TermSearchCriteria):
 
 class DocumentSearchParams(DocumentSearchCriteria):
     description: Annotated[str | None, Field(validate_default=True)] = None
-    k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
     limit: Annotated[int, Field(validate_default=True)] = DEFAULT_LIMIT
     skip_cache: Annotated[bool, Field(validate_default=True)] = True
 
@@ -132,6 +158,7 @@ class TrialSearchParams(DocumentSearchParams):
 
 class EntitySearchParams(PatentSearchParams):
     # device, diagnostic, etc. not compound because it can be moa
+    # TODO: does this do anything??
     entity_category: Annotated[EntityCategory, Field(validate_default=True)] = (
         EntityCategory.intervention
     )
@@ -163,18 +190,9 @@ class CompanyFinderParams(BaseModel):
     Parameters for finding companies
     """
 
-    description: Annotated[str | None, Field(validate_default=True)] = None
-    similar_companies: Annotated[list[str], Field(validate_default=True)] = []
+    description: Annotated[str, Field(validate_default=True)]
     k: Annotated[int, Field(validate_default=True)] = DEFAULT_PATENT_K
-    min_year: Annotated[int, Field(validate_default=True)] = 2000
-    use_gpt_expansion: Annotated[bool, Field(validate_default=True)] = False
-
-    @field_validator("similar_companies", mode="before")
-    def similar_companies_from_string(cls, v):
-        if isinstance(v, list):
-            return v
-        similar_companies = [t.strip() for t in (v.split(";") if v else [])]
-        return similar_companies
+    start_year: Annotated[int, Field(validate_default=True)] = 2000
 
 
 class ConceptDecomposeParams(BaseModel):

@@ -28,7 +28,10 @@ async def find_many(
     where: Optional[TrialWhereInput] = None,
     cursor: Optional[TrialWhereUniqueInput] = None,
     include: Optional[TrialInclude] = None,
-    order: Optional[TrialOrderByInput | list[TrialOrderByInput]] = None,
+    order: Optional[TrialOrderByInput | list[TrialOrderByInput]] = [
+        {"start_date": "desc"},
+        {"end_date": "desc"},
+    ],
     distinct: Optional[list[TrialScalarFieldKeys]] = None,
 ) -> list[ScoredTrial]:
     """

@@ -21,19 +21,3 @@ class DocClient(Dataclass):
         ],
     ]
     find_many: Callable[[Any], Awaitable]
-
-
-DOC_CLIENT_LOOKUP: dict[DocType, DocClient] = {
-    DocType.patent: DocClient(
-        search=patent_client.search,
-        find_many=patent_client.find_many,
-    ),
-    DocType.regulatory_approval: DocClient(
-        search=regulatory_approval_client.search,
-        find_many=regulatory_approval_client.find_many,
-    ),
-    DocType.trial: DocClient(
-        search=trial_client.search,
-        find_many=trial_client.find_many,
-    ),
-}
