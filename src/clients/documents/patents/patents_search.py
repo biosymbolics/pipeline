@@ -74,8 +74,6 @@ async def search(
         [DocType.patent],
     )
 
-    print("term_match_ids", term_match_ids, "vector_match_ids", vector_match_ids)
-
     where = get_where_clause(search_criteria, term_match_ids, vector_match_ids)
 
     async def _search(limit: int):
