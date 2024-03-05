@@ -11,7 +11,7 @@ from spacy.vocab import Vocab
 from thinc.api import set_gpu_allocator
 import torch
 
-from constants.core import DEFAULT_BASE_TRANSFORMER_MODEL, DEFAULT_TORCH_DEVICE
+from constants.core import DEFAULT_BASE_TOKENIZER_MODEL, DEFAULT_TORCH_DEVICE
 from utils.args import make_hashable
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class Spacy:
         return cls._instances[args_hash]
 
 
-def get_transformer_nlp(model: str = DEFAULT_BASE_TRANSFORMER_MODEL) -> Spacy:
+def get_transformer_nlp(model: str = DEFAULT_BASE_TOKENIZER_MODEL) -> Spacy:
     """
     Get a Spacy NLP model that uses a transformer
     """

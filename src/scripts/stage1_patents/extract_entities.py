@@ -52,7 +52,7 @@ class BaseEnricher:
         """
         Initialize the enricher
         """
-        self.db = PsqlDatabaseClient()
+        self.db = PsqlDatabaseClient("patents")
         self.processed_pubs_file = processed_pubs_file
         self.batch_size = batch_size
 
@@ -151,20 +151,21 @@ class BaseEnricher:
             logger.warning("No entities found")
             return None
 
-        # turn into dicts for polars' sake
-        entity_dicts = [
-            [
-                {
-                    **a.to_flat_dict(),
-                    "publication_number": patent_ids[i],
-                }
-                for a in es
-            ]
-            for i, es in enumerate(entities)
-        ]
-
         entity_df = (
-            pl.DataFrame(flatten(entity_dicts))
+            pl.DataFrame(
+                flatten(
+                    [
+                        [
+                            {
+                                **a.to_flat_dict(),
+                                "publication_number": patent_ids[i],
+                            }
+                            for a in es
+                        ]
+                        for i, es in enumerate(entities)
+                    ]
+                )
+            )
             .rename(
                 {
                     "type": "domain",
@@ -253,13 +254,10 @@ class PatentEnricher(BaseEnricher):
         Initialize the enricher
         """
 
-        batch_size = 1000
+        batch_size = 100
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, batch_size)
         self.tagger = NerTagger.get_instance(
             entity_types=NER_ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
-        )
-        raise Exception(
-            "Switch to postgres before running again, lest we pay $400 again for export"
         )
 
     @overrides(BaseEnricher)

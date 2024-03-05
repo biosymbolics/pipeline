@@ -48,7 +48,7 @@ def extract_prediction(
 
     scores = span_logits[mask].unsqueeze(1)
 
-    # slow part - mask.nonzero() can take 1-2 seconds
+    # slow - mask.nonzero() can take 1-2 seconds
     scores = torch.concat([mask.nonzero(), scores], dim=1)
 
     if scores.size(0) == 0:
@@ -76,17 +76,21 @@ def extract_prediction(
             & (pl.col("end_char") is not None)
         )
         .with_columns(
-            pl.struct(["start_char", "end_char"]).map_elements(lambda r: feature["text"][r["start_char"] : r["end_char"]], return_dtype=pl.Utf8).alias("text"),  # type: ignore
+            pl.struct(["start_char", "end_char"])
+            .map_elements(
+                lambda r: feature["text"][r["start_char"] : r["end_char"]],
+                return_dtype=pl.Utf8,
+            )
+            .alias("text"),  # type: ignore
         )
         .sort(by="score", descending=True)
         .unique(("start", "end"), maintain_order=True)
     )
 
-    annotations = [
+    return [
         Annotation(**r, id=f"{feature['id']}-{i}")
         for i, r in enumerate(df.drop(["type", "start", "end", "score"]).to_dicts())
     ]
-    return annotations
 
 
 def prepare_feature(text: str, index: int, tokenized: BatchEncoding) -> Feature:
