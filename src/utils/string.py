@@ -189,7 +189,7 @@ def generate_ngrams(tokens: tuple[str, ...], n: int) -> list[tuple[str, str]]:
     return list(zip(*[tokens[i:] for i in range(n)]))  # type: ignore
 
 
-def generate_ngram_phrases(tokens: tuple[str, ...], n: int) -> list[str]:
+def generate_ngram_phrases(tokens: tuple[str, ...], max_n: int) -> list[str]:
     """
     Generate n-grams from a list of tokens
 
@@ -199,9 +199,13 @@ def generate_ngram_phrases(tokens: tuple[str, ...], n: int) -> list[str]:
 
     Example:
         >>> generate_ngram_phrases(["a", "b", "c", "d"], 2)
-        ['a b', 'b c', 'c d']
+        ['a b', 'b c', 'c d', 'a', 'b', 'c', 'd']
     """
-    return [" ".join(ng) for ng in generate_ngrams(tokens, n)]
+
+    def generate(n):
+        return [" ".join(ng) for ng in generate_ngrams(tokens, n)]
+
+    return flatten([generate(n) for n in range(1, max_n + 1)])
 
 
 def generate_ngram_phrases_from_doc(doc: Doc, max_n: int) -> list[Span]:
@@ -221,4 +225,4 @@ def tokens_to_string(tokens: Sequence[Span | Token]) -> str:
     Args:
         tokens (Sequence[Span | Token]): list of tokens
     """
-    return "".join([t.text_with_ws for t in tokens])
+    return "".join([t.text_with_ws for t in tokens]).strip()

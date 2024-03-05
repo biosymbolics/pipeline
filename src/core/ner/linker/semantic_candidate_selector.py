@@ -20,7 +20,7 @@ from .utils import (
 )
 
 DEFAULT_K = 20
-MIN_SIMILARITY = 0.85
+MIN_SIMILARITY = 1.1
 UMLS_KB = None
 WORD_EMBEDDING_LENGTH = 768
 
@@ -40,7 +40,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         *args,
         min_similarity: float = MIN_SIMILARITY,
         vector_length: int = WORD_EMBEDDING_LENGTH,
-        **kwargs
+        **kwargs,
     ):
         global UMLS_KB
 
@@ -78,6 +78,27 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         with_overrides = apply_umls_word_overrides(text, candidates)
         return with_overrides
 
+    def _score_candidate(
+        self,
+        concept_id: str,
+        matching_aliases: Sequence[str],
+        mention_vector: torch.Tensor,
+        candidate_vector: torch.Tensor,
+        syntactic_similarity: float,
+        is_composite: bool,
+    ) -> float:
+        return score_semantic_candidate(
+            concept_id,
+            self.kb.cui_to_entity[concept_id].canonical_name,
+            self.kb.cui_to_entity[concept_id].types,
+            self.kb.cui_to_entity[concept_id].aliases,
+            matching_aliases=matching_aliases,
+            original_vector=mention_vector,
+            candidate_vector=candidate_vector,
+            syntactic_similarity=syntactic_similarity,
+            is_composite=is_composite,
+        )
+
     def create_ann_index(
         self,
         candidates: Sequence[MentionCandidate],
@@ -101,7 +122,9 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
         descriptions = [
-            self.kb.cui_to_entity[c.concept_id].definition or "" for c in candidates
+            self.kb.cui_to_entity[c.concept_id].definition
+            or f"{self.kb.cui_to_entity[c.concept_id].canonical_name} is a {t}"
+            for c, t in zip(candidates, types)
         ]
 
         vectors = self._batch_vectorize(canonical_names + types + descriptions)
@@ -120,29 +143,6 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         umls_ann.build(len(candidates))
         logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
         return umls_ann
-
-    def _score_candidate(
-        self,
-        concept_id: str,
-        matching_aliases: Sequence[str],
-        mention_vector: torch.Tensor,
-        candidate_vector: torch.Tensor,
-        syntactic_similarity: float,
-        semantic_distance: float,
-        is_composite: bool,
-    ) -> float:
-        return score_semantic_candidate(
-            concept_id,
-            self.kb.cui_to_entity[concept_id].canonical_name,
-            self.kb.cui_to_entity[concept_id].types,
-            self.kb.cui_to_entity[concept_id].aliases,
-            matching_aliases=matching_aliases,
-            original_vector=mention_vector,
-            candidate_vector=candidate_vector,
-            syntactic_similarity=syntactic_similarity,
-            semantic_distance=semantic_distance,
-            is_composite=is_composite,
-        )
 
     def _get_best_canonical(
         self,
@@ -168,19 +168,11 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         umls_ann = self.create_ann_index(candidates)
 
         norm_vector = l1_regularize(mention_vector)
-        print("NORM VECTOR TO GET FROM ANN", norm_vector.count_nonzero())
-        ids, distances = umls_ann.get_nns_by_vector(
-            norm_vector.tolist(), 10, search_k=-1, include_distances=True
-        )
+        ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), 20, search_k=-1)
 
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
             return None
-
-        print(
-            "ANNs",
-            [torch.tensor(umls_ann.get_item_vector(id)).count_nonzero() for id in ids],
-        )
 
         scored_candidates = sorted(
             [
@@ -192,7 +184,6 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
                         norm_vector,
                         candidate_vector=torch.tensor(umls_ann.get_item_vector(id)),
                         syntactic_similarity=candidates[id].similarities[0],
-                        semantic_distance=distances[i],
                         is_composite=is_composite,
                     ),
                     umls_ann.get_item_vector(id),

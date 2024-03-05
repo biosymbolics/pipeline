@@ -10,7 +10,11 @@ from core.ner.linker.semantic_candidate_selector import SemanticCandidateSelecto
 from core.ner.linker.types import EntityWithScoreVector
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
-from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
+from utils.string import (
+    generate_ngram_phrases,
+    generate_ngram_phrases_from_doc,
+    tokens_to_string,
+)
 from utils.tensor import combine_tensors
 
 from .types import AbstractCompositeCandidateSelector
@@ -31,7 +35,7 @@ class CompositeSemanticCandidateSelector(
     """
 
     def __init__(
-        self, *args, min_composite_similarity: float = 0.7, ngrams_n: int = 3, **kwargs
+        self, *args, min_composite_similarity: float = 0.9, ngrams_n: int = 3, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.min_composite_similarity = min_composite_similarity
@@ -46,10 +50,8 @@ class CompositeSemanticCandidateSelector(
         Generate a composite candidate from tokens & ngram map
 
         Args:
-            mention_text (str): Mention text
+            tokens (Sequence[Token | Span]): tokens to generate composite from
             ngram_entity_map (dict[str, EntityWithScoreVector]): word-to-candidate map
-
-        TODO: remove ngram if ultimately only using N of 1
         """
 
         def get_composite_candidates(
@@ -64,21 +66,17 @@ class CompositeSemanticCandidateSelector(
             effective_ngrams_n = min(self.ngrams_n, len(tokens) - 1)
 
             if effective_ngrams_n > 0:
-                possible_ngrams = [
-                    (
-                        i,
-                        ngram_entity_map.get(tokens_to_string(tokens[0:i])),
-                    )
-                    for i in range(effective_ngrams_n, 1, -1)
-                ]
-                ngram_matches = sorted(
-                    [m for m in possible_ngrams if m[1] is not None],
-                    key=lambda m: (m[1] or {})[1],
+                ngrams = generate_ngram_phrases(
+                    tuple([t.text for t in tokens]), effective_ngrams_n
+                )
+                ngram_matches: list[EntityWithScoreVector] = sorted(
+                    compact([ngram_entity_map.get(ng) for ng in ngrams]),
+                    key=lambda m: len(m[0].name.split(" ")),
                     reverse=True,
                 )
                 if len(ngram_matches) > 0 and ngram_matches[0][1] is not None:
-                    remainder_idx = ngram_matches[0][0] + 1
-                    best_match = ngram_matches[0][1]
+                    best_match = ngram_matches[0]
+                    remainder_idx = len(best_match[0].name.split(" "))
 
                     return [
                         best_match,
@@ -122,30 +120,19 @@ class CompositeSemanticCandidateSelector(
         """
 
         def generate_ngram_spans(
-            entity: DocEntity,
+            doc: Doc, context_vector: torch.Tensor | None
         ) -> tuple[list[Span], list[torch.Tensor]]:
             """
             Get tokens and vectors from a doc entity
-
-            TODO: suppress stop words
             """
-            non_stopwords = " ".join(
-                [
-                    w
-                    for w in entity.normalized_term.split(" ")
-                    if w not in stop_words.STOP_WORDS
-                ]
-            )
-            doc = self.nlp(non_stopwords)
+
             ngram_docs = generate_ngram_phrases_from_doc(doc, self.ngrams_n)
 
             # if the entity has a vector, combine with newly created token vectors
             # to add context for semantic similarity comparison
-            if entity.vector is not None:
+            if context_vector is not None:
                 vectors = [
-                    combine_tensors(
-                        torch.tensor(d.vector), torch.tensor(entity.vector), 0.8
-                    )
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.95)
                     for d in ngram_docs
                 ]
             else:
@@ -153,17 +140,30 @@ class CompositeSemanticCandidateSelector(
 
             return ngram_docs, vectors
 
-        spans, vectors = generate_ngram_spans(entity)
-        print("TOKENS", spans)
+        non_stopwords = " ".join(
+            [
+                w
+                for w in entity.normalized_term.split(" ")
+                if w not in stop_words.STOP_WORDS
+            ]
+        )
+        doc = self.nlp(non_stopwords)
 
+        ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
         ngram_entity_map = {
             t.text: self.select_candidate(t.text, vector, is_composite=True)
-            for t, vector in zip(spans, vectors)
+            for t, vector in zip(ngrams, ngram_vectors)
             if len(t.text) > 1  # avoid weird matches for single characters/nums
         }
-        print({k: v[0].name for k, v in ngram_entity_map.items() if v is not None})
+        print(
+            {
+                k: (v[0].name, v[1])
+                for k, v in ngram_entity_map.items()
+                if v is not None
+            },
+        )
         return self._generate_composite_from_ngrams(
-            spans,
+            list(doc),
             omit_by(
                 ngram_entity_map,
                 lambda v: v is None or v[1] < self.min_composite_similarity,
@@ -193,7 +193,7 @@ class CompositeSemanticCandidateSelector(
         if False and (
             comp_score < self.min_similarity and match_score < self.min_similarity
         ):
-            logger.debug("No match for %s", entity.normalized_term)
+            logger.warning("No match for %s", entity.normalized_term)
             return None
 
         if comp_score > match_score:

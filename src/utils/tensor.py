@@ -187,12 +187,12 @@ def is_scalar(d):
 
 
 def l1_regularize(
-    vector: torch.Tensor, sparsity_threshold: float = 0.3
+    vector: torch.Tensor, sparsity_threshold: float = 0.1
 ) -> torch.Tensor:
     vector[vector.abs() < sparsity_threshold] = 0  # sparsify
 
     # l1 normalize
-    return F.normalize(vector, p=1, dim=0)
+    return F.normalize(vector, p=2, dim=0)
 
 
 def combine_tensors(
@@ -201,9 +201,12 @@ def combine_tensors(
     """
     Weighted combination of two vectors, regularized
     """
+    if a.count_nonzero().item() == 0 or b.count_nonzero().item() == 0:
+        logger.warning("a or b tensor is all zeros")
+        raise ValueError("a or b tensor is all zeros")
+
     b_weight = 1 - a_weight
     vector = (1 - a_weight) * a + b_weight * b
-    # norm_vector = l1_regularize(vector, 0.1)
     return vector
 
 
@@ -241,7 +244,8 @@ def similarity_with_residual_penalty(
     a: torch.Tensor,
     b: torch.Tensor,
     distance: float | None = None,  # cosine/"angular" distance
-    alpha: float = 0.5,
+    alpha: float = 0.3,
+    name: str = "na",
 ) -> float:
     """
     Compute a weighted similarity score that penalizes a large residual.
@@ -273,11 +277,12 @@ def similarity_with_residual_penalty(
     scaled_residual_norm = torch.divide(residual_norm, torch.norm(a))
 
     # Weighted score
-    score = alpha * similarity + (1 - alpha) * (1 - scaled_residual_norm)
+    score = alpha * similarity + (1 - alpha) * (1 - torch.abs(scaled_residual_norm))
     logger.info(
-        "Similarity %s, Residual: %s, Score: %s",
-        (alpha * similarity).item(),
-        ((1 - alpha) * (1 - scaled_residual_norm)).item(),
+        "%s: Similarity %s, Residual: %s, Score: %s",
+        name,
+        similarity.item(),
+        scaled_residual_norm.item(),
         score.item(),
     )
     return score.item()

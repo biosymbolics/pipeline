@@ -146,7 +146,6 @@ def score_semantic_candidate(
     original_vector: torch.Tensor,
     candidate_vector: torch.Tensor,
     syntactic_similarity: float,
-    semantic_distance: float,
     is_composite: bool,
 ) -> float:
     """
@@ -164,7 +163,6 @@ def score_semantic_candidate(
         syntactic_similarity (float): syntactic similarity score
         original_vector (torch.Tensor): original mention vector
         candidate_vector (torch.Tensor): candidate vector
-        semantic_distance (float): semantic distance
     """
     type_score = score_candidate(
         id,
@@ -174,13 +172,12 @@ def score_semantic_candidate(
         matching_aliases=matching_aliases,
         is_composite=is_composite,
     )
-    print("TYPE S", type_score)
 
     if type_score == 0:
         return 0.0
 
     semantic_similarity = similarity_with_residual_penalty(
-        original_vector, candidate_vector, semantic_distance
+        original_vector, candidate_vector, name=canonical_name
     )
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
