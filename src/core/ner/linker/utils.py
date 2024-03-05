@@ -1,10 +1,8 @@
-import math
 import re
-from typing import Sequence, cast
+from typing import Sequence
 from pydash import flatten, uniq
 from spacy.tokens import Doc, Span, Token
 import torch
-from torch.nn import functional as F
 import networkx as nx
 from functools import reduce
 import logging
@@ -24,6 +22,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 SYNTACTIC_SIMILARITY_WEIGHT = 0.3
+MIN_ORTHO_DISTANCE = 0.2
 
 
 def generate_ngrams(
@@ -69,9 +68,6 @@ def generate_ngram_phrases(
         list[tuple[str, list[float]]]: list of n-grams and their vectors
     """
     return [(" ".join(ng[0]), ng[1]) for ng in generate_ngrams(tokens, n)]
-
-
-MIN_ORTHO_DISTANCE = 0.2
 
 
 def get_orthogonal_members(
@@ -178,6 +174,7 @@ def score_semantic_candidate(
         matching_aliases=matching_aliases,
         is_composite=is_composite,
     )
+    print("TYPE S", type_score)
 
     if type_score == 0:
         return 0.0
@@ -189,46 +186,6 @@ def score_semantic_candidate(
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
         + SYNTACTIC_SIMILARITY_WEIGHT * syntactic_similarity
     ) * type_score
-
-
-JOIN_PUNCT = ["-", "/", "'"]
-
-
-def join_punctuated_tokens(doc: Doc) -> list[Token | Span]:
-    """
-    Join tokens that are separated by punctuation, in certain conditions
-    e.g. ['non', '-', 'competitive'] -> "non-competitive"
-
-    Specifically, join tokens separated by punctuation if:
-    - the punctuation is '-', '/' or "'"
-    - the token before OR after is less than 4 characters
-
-    TODO:
-    - this is kinda hacky; we don't robustly know if these things should actually be joined
-    - what about free-floating numbers, e.g. "peptide 1"  or "apoe 4"?
-    """
-    punct_indices = [
-        i
-        for i, t in enumerate(doc)
-        if t.text in JOIN_PUNCT
-        and i > 0
-        and i < len(doc) - 1
-        and (len(doc[i - 1]) < 4 or len(doc[i + 1]) < 4)
-    ]
-    join_tuples = [(pi - 1, pi, pi + 1) for pi in punct_indices]
-    join_indices = flatten(join_tuples)
-    join_starts = [j[0] for j in join_tuples]
-    tokens: list[Token | Span] = []
-    for i in range(len(doc)):
-        if i in join_indices:
-            if i in join_starts:
-                tokens.append(doc[i : i + 3])
-            else:
-                continue
-        else:
-            tokens.append(doc[i])
-
-    return tokens
 
 
 def candidate_to_canonical(

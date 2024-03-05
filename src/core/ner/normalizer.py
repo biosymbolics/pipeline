@@ -125,5 +125,5 @@ class TermNormalizer:
         normalized = self.normalize(doc_ents)
         return normalized
 
-    def __call__(self, *args, **kwargs) -> list[DocEntity]:
-        return self.normalize(*args, **kwargs)
+    def __call__(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
+        return self.normalize(doc_entities)

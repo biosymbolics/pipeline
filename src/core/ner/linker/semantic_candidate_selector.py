@@ -20,7 +20,7 @@ from .utils import (
 )
 
 DEFAULT_K = 20
-MIN_SIMILARITY = 1.2
+MIN_SIMILARITY = 0.85
 UMLS_KB = None
 WORD_EMBEDDING_LENGTH = 768
 
@@ -100,12 +100,21 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         # because otherwise terms are totally without disambiguating context
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        vectors = self._batch_vectorize(canonical_names + types)
+        descriptions = [
+            self.kb.cui_to_entity[c.concept_id].definition or "" for c in candidates
+        ]
+
+        vectors = self._batch_vectorize(canonical_names + types + descriptions)
         cn_vectors = vectors[0 : len(canonical_names)]
-        type_vectors = vectors[len(canonical_names) :]
+        type_vectors = vectors[len(canonical_names) : len(canonical_names) + len(types)]
+        desc_vectors = vectors[len(canonical_names) + len(types) :]
 
         for i in range(len(candidates)):
-            combined_vec = (0.8 * cn_vectors[i]) + (0.2 * type_vectors[i])
+            combined_vec = (
+                (0.8 * cn_vectors[i])
+                + (0.1 * type_vectors[i])
+                + (0.1 * desc_vectors[i])
+            )
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
@@ -145,7 +154,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         Get best candidate by semantic similarity
         """
         if len(candidates) == 0:
-            logger.warning("get_best_canoical called with no candidates")
+            logger.warning("get_best_canonical called with no candidates")
             return None
 
         if len(mention_vector) == 0:
@@ -156,9 +165,10 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             )
             return None
 
-        norm_vector = l1_regularize(mention_vector)
         umls_ann = self.create_ann_index(candidates)
 
+        norm_vector = l1_regularize(mention_vector)
+        print("NORM VECTOR TO GET FROM ANN", norm_vector.count_nonzero())
         ids, distances = umls_ann.get_nns_by_vector(
             norm_vector.tolist(), 10, search_k=-1, include_distances=True
         )
@@ -166,6 +176,11 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
             return None
+
+        print(
+            "ANNs",
+            [torch.tensor(umls_ann.get_item_vector(id)).count_nonzero() for id in ids],
+        )
 
         scored_candidates = sorted(
             [
@@ -187,7 +202,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             key=lambda x: x[1],
             reverse=True,
         )
-        logger.info("Sorted candidates: %s", [sc[0] for sc in scored_candidates])
+        logger.info("Scored candidates: %s", [sc[0] for sc in scored_candidates])
         top_candidate = scored_candidates[0][0]
         top_score = scored_candidates[0][1]
         top_vector = scored_candidates[0][2]
@@ -210,7 +225,11 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         """
         Generate & select candidates for a list of mention texts
         """
+        if mention_vector.count_nonzero().item() == 0:
+            raise ValueError("Vector is zero")
+
         candidates = self._get_candidates(term)
+
         return self._get_best_canonical(
             mention_vector, candidates, is_composite=is_composite
         )

@@ -4,6 +4,7 @@ Utils for the NER pipeline
 
 from functools import partial, reduce
 import logging
+from pydash import flatten
 import regex as re
 from typing import Iterable, Sequence
 from spacy.tokens import Doc, Span, Token
@@ -488,3 +489,33 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
         for span in spans
     ]
     return entity_set
+
+
+def join_punctuated_tokens(text: str) -> str:
+    """
+    Join tokens that are separated by punctuation, in certain conditions
+    e.g. ['non', '-', 'competitive'] -> "noncompetitive"
+
+    Specifically, join tokens separated by punctuation if:
+    - the punctuation is '-', '/' or "'"
+    - the token before OR after is less than 4 characters
+
+    TODO:
+    - this is kinda hacky; we don't robustly know if these things should actually be joined
+    - what about free-floating numbers, e.g. "peptide 1"  or "apoe 4"?
+    """
+    JOIN_PUNCT = ["-", "/", "'"]
+
+    join_punct_re = get_or_re([" ", *JOIN_PUNCT], permit_plural=False)
+
+    pre_post_conditional_re = [
+        rf"(\w{1,3}){join_punct_re}(\w{2,})",
+        rf"(\w{2,}){join_punct_re}(\w{1,3})",
+    ]
+
+    new_text = text
+
+    for text_re in pre_post_conditional_re:
+        new_text = re.sub(text_re, rf"\1\2", new_text)
+
+    return new_text

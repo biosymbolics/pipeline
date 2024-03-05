@@ -20,7 +20,12 @@ from utils.re import get_or_re, sub_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLA
 from typings.core import is_string_list
 
 from .types import DocEntity, is_entity_doc_list
-from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
+from .utils import (
+    depluralize_tails,
+    join_punctuated_tokens,
+    normalize_by_pos,
+    rearrange_terms,
+)
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
@@ -56,7 +61,7 @@ SUBSTITUTIONS = {
     "progressive": "",
     "capable": "",
     "cycling": "",
-    "binding": "",
+    "-?binding": "",
     "selective": "",
 }
 
@@ -165,6 +170,16 @@ class EntityCleaner:
                     continue
                 yield term
 
+        def join_on_punct(_terms: Sequence[str]) -> Iterable[str]:
+            for term in _terms:
+                print(term, join_punctuated_tokens(term))
+                yield join_punctuated_tokens(term)
+
+        def remove_dash(_terms: Sequence[str]) -> Iterable[str]:
+            for term in _terms:
+                print(term, re.sub("-", " ", term, flags=RE_FLAGS))
+                yield re.sub("-", " ", term, flags=RE_FLAGS)
+
         def rewrite_phrases(_terms: Sequence[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
@@ -209,7 +224,9 @@ class EntityCleaner:
             # ),
             # depluralize_tails,
             # normalize_by_pos,  # not important if linking
-            rewrite_phrases,  # order matters (after rearrange)
+            join_on_punct,
+            remove_dash,
+            rewrite_phrases,
             *self.additional_cleaners,
             sub_extra_spaces,
             lower,

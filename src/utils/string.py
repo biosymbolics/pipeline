@@ -5,6 +5,8 @@ String utilities
 from datetime import date
 from enum import Enum
 import json
+from pydash import flatten
+from spacy.tokens import Doc, Span, Token
 from pydantic import BaseModel
 import regex as re
 from typing import Mapping, Sequence, TypeGuard, Union
@@ -200,3 +202,23 @@ def generate_ngram_phrases(tokens: tuple[str, ...], n: int) -> list[str]:
         ['a b', 'b c', 'c d']
     """
     return [" ".join(ng) for ng in generate_ngrams(tokens, n)]
+
+
+def generate_ngram_phrases_from_doc(doc: Doc, max_n: int) -> list[Span]:
+    def generate_ngrams(n: int):
+        return [
+            doc[min([v.i for v in z]) : max([v.i for v in z]) + 1]
+            for z in zip(*[doc[i:] for i in range(n)])
+        ]
+
+    return flatten([generate_ngrams(n) for n in range(1, max_n + 1)])
+
+
+def tokens_to_string(tokens: Sequence[Span | Token]) -> str:
+    """
+    Convert a list of tokens to a string
+
+    Args:
+        tokens (Sequence[Span | Token]): list of tokens
+    """
+    return "".join([t.text_with_ws for t in tokens])

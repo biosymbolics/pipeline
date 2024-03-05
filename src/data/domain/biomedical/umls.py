@@ -102,6 +102,8 @@ def is_umls_suppressed(
     Args:
         id (str): cui
         canonical_name (str): canonical name
+        matching_aliases (list[str]): the aliases that were a syntactic match
+        is_composite (bool): is this a composite candidate selection? slightly different rules apply.
     """
     if id in UMLS_CUI_SUPPRESSIONS:
         return True
