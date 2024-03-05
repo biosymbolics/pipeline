@@ -2,22 +2,15 @@
 Patent client
 """
 
-from datetime import datetime
 import logging
 from typing import Sequence
-from prisma.types import (
-    PatentWhereInput,
-    PatentWhereInputRecursive1,
-)
+from prisma.types import PatentWhereInput
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
-from clients.low_level.prisma import prisma_context
-from constants.core import DEFAULT_VECTORIZATION_MODEL
 from typings.documents.common import DocType
 from typings.documents.patents import ScoredPatent
 from typings.client import (
     DocumentSearchCriteria,
-    DocumentSearchParams,
     PatentSearchParams,
 )
 from utils.string import get_id
@@ -25,8 +18,7 @@ from utils.string import get_id
 from .patents_client import find_many
 
 from ..utils import (
-    get_doc_ids_for_description,
-    get_doc_ids_for_terms,
+    get_matching_doc_ids,
     get_search_clause,
 )
 
@@ -37,8 +29,8 @@ logger.setLevel(logging.INFO)
 
 def get_where_clause(
     p: DocumentSearchCriteria,
-    term_matching_ids: Sequence[str] | None = None,
-    description_ids: Sequence[str] | None = None,
+    term_match_ids: Sequence[str] | None = None,
+    vector_match_ids: Sequence[str] | None = None,
 ) -> PatentWhereInput:
     is_id_search = any([t.startswith("WO-") for t in p.terms])
 
@@ -46,7 +38,7 @@ def get_where_clause(
     if is_id_search and any([not t.startswith("WO-") for t in p.terms]):
         raise ValueError("ID search; all terms must be WO-.*")
 
-    if description_ids is not None and is_id_search:
+    if vector_match_ids is not None and is_id_search:
         raise ValueError("Cannot search by description and id")
 
     if is_id_search:
@@ -55,8 +47,8 @@ def get_where_clause(
     return get_search_clause(
         DocType.patent,
         p,
-        term_matching_ids,
-        description_ids,
+        term_match_ids,
+        vector_match_ids,
         return_type=PatentWhereInput,
     )
 
@@ -77,20 +69,12 @@ async def search(
         }
     )
 
-    # if a description is provided, get the ids of the nearest neighbors
-    if p.description:
-        vector_match_ids = await get_doc_ids_for_description(
-            p.description, [DocType.patent], p.vector_search_params
-        )
-    else:
-        vector_match_ids = None
+    term_match_ids, vector_match_ids = await get_matching_doc_ids(
+        p,
+        [DocType.patent],
+    )
 
-    if len(p.terms) > 0:
-        term_match_ids = await get_doc_ids_for_terms(
-            p.terms, p.query_type, [DocType.patent]
-        )
-    else:
-        term_match_ids = None
+    print("term_match_ids", term_match_ids, "vector_match_ids", vector_match_ids)
 
     where = get_where_clause(search_criteria, term_match_ids, vector_match_ids)
 

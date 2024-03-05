@@ -5,7 +5,6 @@ Document report client
 import asyncio
 import logging
 import polars as pl
-from prisma import Prisma
 
 
 from clients.documents.reports.utils import apply_dimension_limit

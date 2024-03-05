@@ -32,11 +32,14 @@ async def _document_characteristics(raw_event: dict, context):
             **raw_event["queryStringParameters"],
         }
     )
-    if len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms]):
+
+    if (
+        len(p.terms) < 1 or not all([len(t) > 1 for t in p.terms])
+    ) and p.description is None:
         logger.error("Missing or malformed params: %s", p)
         return {"statusCode": 400, "body": "Missing params(s)"}
 
-    logger.info("Fetching reports for params: %s", p)
+    logger.info("Fetching characteristics reports for params: %s", p)
 
     try:
         report = await aggregate_document_relationships(p)

@@ -7,6 +7,7 @@ from typing import Sequence
 import logging
 import polars as pl
 from prisma.enums import BiomedicalEntityType
+from clients.documents.utils import get_doc_ids_for_description, get_matching_doc_ids
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
@@ -201,23 +202,37 @@ async def _aggregate_document_entity_relationships(
             {SEARCH_TABLE} search_table,
             {SEARCH_TABLE} head,
             {SEARCH_TABLE} tail
-        WHERE search_table.search @@ plainto_tsquery('english', $1)
+        WHERE (
+            search_table.search @@ plainto_tsquery('english', $1)
+            OR
+            search_table.{p.doc_type.name}_id = ANY($2::text[])
+        )
         AND search_table.{p.doc_type.name}_id=head.{p.doc_type.name}_id
         AND head.{p.doc_type.name}_id = tail.{p.doc_type.name}_id
-        AND head.type = ANY($2::"BiomedicalEntityType"[])
-        AND tail.type = ANY($3::"BiomedicalEntityType"[])
+        AND head.type = ANY($3::"BiomedicalEntityType"[])
+        AND tail.type = ANY($4::"BiomedicalEntityType"[])
         GROUP BY head.category_rollup, tail.category_rollup
         ORDER BY count(*) DESC
     """
     start = time.monotonic()
 
-    # TODO - AND/OR; description
-    term_query = " ".join(p.terms)
+    query_joiner = " & " if p.query_type == "AND" else " | "
+    term_query = query_joiner.join([" & ".join(t.split(" ")) for t in p.terms])
+
+    if p.description is not None:
+        vector_match_ids = await get_doc_ids_for_description(
+            p.description,
+            [p.doc_type],
+            p.vector_search_params,
+        )
+    else:
+        vector_match_ids = []
 
     async with prisma_context(300) as db:
         results = await db.query_raw(
             sql,
             term_query,
+            vector_match_ids,
             CATEGORY_TO_ENTITY_TYPES[p.head_field],
             CATEGORY_TO_ENTITY_TYPES[p.tail_field],
         )

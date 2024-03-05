@@ -271,7 +271,7 @@ class Entity(ResultBase):
                     if t.end_date is not None and t.start_date is not None
                 ]
             )
-            + [a.approval_date for a in regulatory_approvals]
+            + [a.approval_date.year for a in regulatory_approvals]
         )
         return [dates.count(y) for y in range(start_year, min(MAX_DATA_YEAR, end_year))]
 

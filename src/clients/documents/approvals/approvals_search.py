@@ -8,8 +8,7 @@ from typing import Sequence
 from prisma.types import RegulatoryApprovalWhereInput
 
 from clients.documents.utils import (
-    get_doc_ids_for_description,
-    get_doc_ids_for_terms,
+    get_matching_doc_ids,
     get_search_clause,
 )
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
@@ -72,20 +71,10 @@ async def search(
     )
 
     async def _search(limit: int):
-        # if a description is provided, get the ids of the nearest neighbors
-        if p.description:
-            vector_match_ids = await get_doc_ids_for_description(
-                p.description, [DocType.regulatory_approval], p.vector_search_params
-            )
-        else:
-            vector_match_ids = None
-
-        if len(p.terms) > 0:
-            term_match_ids = await get_doc_ids_for_terms(
-                p.terms, p.query_type, [DocType.regulatory_approval]
-            )
-        else:
-            term_match_ids = None
+        term_match_ids, vector_match_ids = await get_matching_doc_ids(
+            p,
+            [DocType.trial],
+        )
 
         where = get_where_clause(search_criteria, term_match_ids, vector_match_ids)
         return await find_many(where=where, include=p.include, take=limit)
