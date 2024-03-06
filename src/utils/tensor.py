@@ -190,9 +190,7 @@ def l1_regularize(
     vector: torch.Tensor, sparsity_threshold: float = 0.1
 ) -> torch.Tensor:
     vector[vector.abs() < sparsity_threshold] = 0  # sparsify
-
-    # l1 normalize
-    return F.normalize(vector, p=2, dim=0)
+    return F.normalize(vector, p=1, dim=0)  # l1 normalize
 
 
 def combine_tensors(
@@ -201,13 +199,9 @@ def combine_tensors(
     """
     Weighted combination of two vectors, regularized
     """
-    if a.count_nonzero().item() == 0 or b.count_nonzero().item() == 0:
-        logger.warning("a or b tensor is all zeros")
-        raise ValueError("a or b tensor is all zeros")
-
     b_weight = 1 - a_weight
-    vector = (1 - a_weight) * a + b_weight * b
-    return vector
+    vector = a_weight * a + b_weight * b
+    return vector  # l1_regularize(vector, 0)
 
 
 def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
@@ -244,7 +238,7 @@ def similarity_with_residual_penalty(
     a: torch.Tensor,
     b: torch.Tensor,
     distance: float | None = None,  # cosine/"angular" distance
-    alpha: float = 0.3,
+    alpha: float = 0.45,
     name: str = "na",
 ) -> float:
     """
@@ -263,10 +257,6 @@ def similarity_with_residual_penalty(
 
     similarity = 2 - _distance
 
-    if a.count_nonzero().item() == 0 or b.count_nonzero().item() == 0:
-        logger.warning("a or b tensor is all zeros")
-        return similarity.item()
-
     # Compute residual
     residual = torch.subtract(a, b)
 
@@ -278,7 +268,7 @@ def similarity_with_residual_penalty(
 
     # Weighted score
     score = alpha * similarity + (1 - alpha) * (1 - torch.abs(scaled_residual_norm))
-    logger.info(
+    logger.debug(
         "%s: Similarity %s, Residual: %s, Score: %s",
         name,
         similarity.item(),

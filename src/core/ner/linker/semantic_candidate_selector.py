@@ -121,23 +121,14 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         # because otherwise terms are totally without disambiguating context
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        descriptions = [
-            self.kb.cui_to_entity[c.concept_id].definition
-            or f"{self.kb.cui_to_entity[c.concept_id].canonical_name} is a {t}"
-            for c, t in zip(candidates, types)
-        ]
+        type_descs = [f"{c} is of type {t}" for c, t in zip(canonical_names, types)]
 
-        vectors = self._batch_vectorize(canonical_names + types + descriptions)
+        vectors = self._batch_vectorize(canonical_names + type_descs)
         cn_vectors = vectors[0 : len(canonical_names)]
-        type_vectors = vectors[len(canonical_names) : len(canonical_names) + len(types)]
-        desc_vectors = vectors[len(canonical_names) + len(types) :]
+        type_vectors = vectors[len(canonical_names) :]
 
         for i in range(len(candidates)):
-            combined_vec = (
-                (0.8 * cn_vectors[i])
-                + (0.1 * type_vectors[i])
-                + (0.1 * desc_vectors[i])
-            )
+            combined_vec = (0.8 * cn_vectors[i]) + (0.2 * type_vectors[i])
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
@@ -168,7 +159,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         umls_ann = self.create_ann_index(candidates)
 
         norm_vector = l1_regularize(mention_vector)
-        ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), 20, search_k=-1)
+        ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), 10, search_k=-1)
 
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
@@ -188,7 +179,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
                     ),
                     umls_ann.get_item_vector(id),
                 )
-                for i, id in enumerate(ids)
+                for id in ids
             ],
             key=lambda x: x[1],
             reverse=True,
@@ -216,9 +207,6 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         """
         Generate & select candidates for a list of mention texts
         """
-        if mention_vector.count_nonzero().item() == 0:
-            raise ValueError("Vector is zero")
-
         candidates = self._get_candidates(term)
 
         return self._get_best_canonical(

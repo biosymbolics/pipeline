@@ -1,6 +1,5 @@
-import re
 from typing import Mapping, Sequence
-from pydash import compact, omit_by
+from pydash import omit_by
 from spacy.tokens import Doc, Span, Token
 import logging
 import torch
@@ -11,7 +10,6 @@ from core.ner.linker.types import EntityWithScoreVector
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 from utils.string import (
-    generate_ngram_phrases,
     generate_ngram_phrases_from_doc,
     tokens_to_string,
 )
@@ -35,7 +33,7 @@ class CompositeSemanticCandidateSelector(
     """
 
     def __init__(
-        self, *args, min_composite_similarity: float = 0.9, ngrams_n: int = 3, **kwargs
+        self, *args, min_composite_similarity: float = 0.85, ngrams_n: int = 3, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.min_composite_similarity = min_composite_similarity
@@ -63,25 +61,29 @@ class CompositeSemanticCandidateSelector(
             if len(tokens) == 0:
                 return []
 
-            effective_ngrams_n = min(self.ngrams_n, len(tokens) - 1)
+            actual_ngrams_n = min(self.ngrams_n, len(tokens))
 
-            if effective_ngrams_n > 0:
-                ngrams = generate_ngram_phrases(
-                    tuple([t.text for t in tokens]), effective_ngrams_n
-                )
-                ngram_matches: list[EntityWithScoreVector] = sorted(
-                    compact([ngram_entity_map.get(ng) for ng in ngrams]),
-                    key=lambda m: len(m[0].name.split(" ")),
-                    reverse=True,
-                )
-                if len(ngram_matches) > 0 and ngram_matches[0][1] is not None:
-                    best_match = ngram_matches[0]
-                    remainder_idx = len(best_match[0].name.split(" "))
+            possible_ngrams = [
+                (n, tokens_to_string(tokens[0:n]))
+                for n in range(actual_ngrams_n, 0, -1)
+            ]
+            ngram_matches = sorted(
+                [
+                    (n, ngram_entity_map[ng])
+                    for n, ng in possible_ngrams
+                    if ng in ngram_entity_map
+                ],
+                key=lambda m: m[1][1],
+                reverse=True,
+            )
+            if len(ngram_matches) > 0:
+                best_match = ngram_matches[0][1]
+                remainder_idx = ngram_matches[0][0]
 
-                    return [
-                        best_match,
-                        *get_composite_candidates(tokens[remainder_idx:]),
-                    ]
+                return [
+                    best_match,
+                    *get_composite_candidates(tokens[remainder_idx:]),
+                ]
 
             # otherwise, no match. create a fake CanonicalEntity.
             return [
@@ -92,7 +94,7 @@ class CompositeSemanticCandidateSelector(
                         id=tokens[0].text.lower(),
                         name=tokens[0].text.lower(),
                     ),
-                    self.min_composite_similarity,  # TODO: should be the mean of all candidates, or something?
+                    self.min_composite_similarity,  # TODO: should be the mean of all candidates?
                     torch.tensor(tokens[0].vector),
                 ),
                 *get_composite_candidates(tokens[1:]),
@@ -125,14 +127,14 @@ class CompositeSemanticCandidateSelector(
             """
             Get tokens and vectors from a doc entity
             """
-
             ngram_docs = generate_ngram_phrases_from_doc(doc, self.ngrams_n)
 
             # if the entity has a vector, combine with newly created token vectors
             # to add context for semantic similarity comparison
+            # TODO: subtract this before calculating residual?
             if context_vector is not None:
                 vectors = [
-                    combine_tensors(torch.tensor(d.vector), context_vector, 0.95)
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.99)
                     for d in ngram_docs
                 ]
             else:
@@ -155,9 +157,10 @@ class CompositeSemanticCandidateSelector(
             for t, vector in zip(ngrams, ngram_vectors)
             if len(t.text) > 1  # avoid weird matches for single characters/nums
         }
-        print(
+        logger.info(
+            "Ngram entity map: %s",
             {
-                k: (v[0].name, v[1])
+                k: (v[0].name, v[1], v[1] >= self.min_composite_similarity)
                 for k, v in ngram_entity_map.items()
                 if v is not None
             },
@@ -190,8 +193,10 @@ class CompositeSemanticCandidateSelector(
         comp_match, comp_score, _ = self.generate_candidate(entity) or EMPTY
 
         # if composite and direct matches bad, no match.
-        if False and (
-            comp_score < self.min_similarity and match_score < self.min_similarity
+        if (
+            False
+            and comp_score < self.min_similarity
+            and match_score < self.min_similarity
         ):
             logger.warning("No match for %s", entity.normalized_term)
             return None
