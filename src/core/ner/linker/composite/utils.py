@@ -3,8 +3,10 @@ from pydash import flatten
 from spacy.kb import KnowledgeBase
 
 from constants.patterns.iupac import is_iupac
+from constants.umls import MOST_PREFERRED_UMLS_TYPES
 from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import clean_umls_name
+from utils.list import has_intersection
 
 
 MIN_WORD_LENGTH = 1
@@ -51,18 +53,21 @@ def form_composite_entity(
     """
     Form a composite from a list of member entities
     """
+
     # if just a single composite match, treat it like a non-composite match
     if len(members) == 1:
         return members[0]
 
+    selected_members = select_composite_members(members)
+
     # sorted for the sake of consist composite ids
-    ids = sorted([m.id for m in members if m.id is not None])
+    ids = sorted([m.id for m in selected_members if m.id is not None])
 
     # types (CanonicalEntity class will infer single type from UMLS TUIs)
-    types = flatten([m.types for m in members])
+    types = flatten([m.types for m in selected_members])
 
     # form name from comprising candidates
-    name = form_composite_name(members, kb)
+    name = form_composite_name(selected_members, kb)
 
     return CanonicalEntity(
         id="|".join(ids),
@@ -72,3 +77,43 @@ def form_composite_entity(
         # description=..., # TODO: composite description
         # aliases=... # TODO: all permutations
     )
+
+
+def select_composite_members(
+    members: Sequence[CanonicalEntity],
+) -> list[CanonicalEntity]:
+    """
+    Select composite members to return
+    """
+    real_members = [m for m in members if not m.is_fake]
+
+    if len(real_members) == 0:
+        return list(members)
+
+    # Partial match if non-matched words, and only a single candidate (TODO: revisit)
+    is_partial = (
+        # has 1+ fake members (i.e. unmatched)
+        len(real_members) < len(members)
+        # and only one real candidate match
+        and len(real_members) == 1
+    )
+
+    # if partial match, include *all* candidates, which includes the faked ones
+    # "UNMATCHED inhibitor" will have a name and id that reflects the unmatched word
+    if is_partial:
+        return list(members)
+
+    # if we have 1+ preferred candidates, return those
+    # this prevents composites like C0024579|C0441833 ("Maleimides Groups") - wherein "Group" offers little value
+    preferred = [
+        m
+        for m in real_members
+        if has_intersection(m.types, list(MOST_PREFERRED_UMLS_TYPES.keys()))
+    ]
+    if len(preferred) >= 1:
+        return preferred
+
+    # else, we're going to drop unmatched words
+    # e.g. "cpla (2)-selective inhibitor" -> "cpla inhibitor"
+
+    return real_members

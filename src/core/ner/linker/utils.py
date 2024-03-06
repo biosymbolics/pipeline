@@ -114,10 +114,12 @@ def score_candidate(
         2. syntactic similarity (if supplied)
 
     Args:
-        candidate_id (str): candidate ID
-        candidate_canonical_name (str): candidate canonical name
-        candidate_types (list[str]): candidate types
-        candidate_aliases (list[str]): candidate aliases
+        id (str): candidate ID
+        canonical_name (str): candidate canonical name
+        type_ids (list[str]): candidate types
+        aliases (list[str]): candidate aliases
+        matching_aliases (list[str]): aliases that matched the original mention
+        is_composite (bool): whether the candidate is a composite
         syntactic_similarity (float): syntactic similarity score from tfidf vectorizer
             if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
     """

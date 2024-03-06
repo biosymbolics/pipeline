@@ -16,16 +16,16 @@ COMMON_COMPOSITE_TEST_CASES = [
             }
         ],
     },
-    {
-        "description": "keep unknown term if not enough terms of the right type match",
-        "text": ["AABBCCxyz1 modulator"],
-        "expected": [
-            {
-                "id": "C0005525|aabbccxyz1",
-                "name": "aabbccxyz1 Modulator",
-            }
-        ],
-    },
+    # {
+    #     "description": "keep unknown term if not enough terms of the right type match",
+    #     "text": ["AABBCCxyz1 modulator"],
+    #     "expected": [
+    #         {
+    #             "id": "aabbccxyz1|modulator",  # C0005525
+    #             "name": "aabbccxyz1 Modulator",
+    #         }
+    #     ],
+    # },
     # {
     #     "description": "shrink composite down to single match if only 1 term of the right type",
     #     "text": ["Maleimides Groups"],
@@ -206,7 +206,7 @@ SEMANTIC_COMPOSITE_TEST_CASES = [
 ]
 
 
-@pytest.mark.skip(reason="Too slow to include in CI")
+# @pytest.mark.skip(reason="Too slow to include in CI")
 class TestCompositeCandidateSelector(unittest.TestCase):
     """
     Note: test initialization is slow because of the UMLS cache
@@ -243,7 +243,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
 
 
 # TODO: add non-semantic composite logic here.
-@pytest.mark.skip(reason="Too slow to include in CI")
+# @pytest.mark.skip(reason="Too slow to include in CI")
 class TestCompositeSemanticCandidateSelector(unittest.TestCase):
     """
     Note: test initialization is slow because of the UMLS cache

@@ -121,9 +121,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         # because otherwise terms are totally without disambiguating context
         types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
 
-        type_descs = [f"{c} is of type {t}" for c, t in zip(canonical_names, types)]
-
-        vectors = self._batch_vectorize(canonical_names + type_descs)
+        vectors = self._batch_vectorize(canonical_names + types)
         cn_vectors = vectors[0 : len(canonical_names)]
         type_vectors = vectors[len(canonical_names) :]
 
@@ -157,7 +155,6 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             return None
 
         umls_ann = self.create_ann_index(candidates)
-
         norm_vector = l1_regularize(mention_vector)
         ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), 10, search_k=-1)
 
@@ -184,12 +181,10 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
             key=lambda x: x[1],
             reverse=True,
         )
-        logger.info("Scored candidates: %s", [sc[0] for sc in scored_candidates])
+        logger.debug("Scored candidates: %s", [sc[0] for sc in scored_candidates])
         top_candidate = scored_candidates[0][0]
         top_score = scored_candidates[0][1]
         top_vector = scored_candidates[0][2]
-
-        print([(c[0].aliases[0], c[1]) for c in scored_candidates])
 
         return (
             candidate_to_canonical(top_candidate, self.kb),

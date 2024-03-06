@@ -204,7 +204,7 @@ class EntityCleaner:
             if debug:
                 start = time.time()
                 res = list(func(x))
-                logger.info(
+                logger.debug(
                     "Executing function %s took %s", func, round(time.time() - start, 2)
                 )
                 return res

@@ -33,7 +33,7 @@ class CompositeSemanticCandidateSelector(
     """
 
     def __init__(
-        self, *args, min_composite_similarity: float = 0.85, ngrams_n: int = 3, **kwargs
+        self, *args, min_composite_similarity: float = 0.75, ngrams_n: int = 3, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.min_composite_similarity = min_composite_similarity
@@ -134,7 +134,7 @@ class CompositeSemanticCandidateSelector(
             # TODO: subtract this before calculating residual?
             if context_vector is not None:
                 vectors = [
-                    combine_tensors(torch.tensor(d.vector), context_vector, 0.99)
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.8)
                     for d in ngram_docs
                 ]
             else:
@@ -191,15 +191,6 @@ class CompositeSemanticCandidateSelector(
 
         # else, generate a composite candidate
         comp_match, comp_score, _ = self.generate_candidate(entity) or EMPTY
-
-        # if composite and direct matches bad, no match.
-        if (
-            False
-            and comp_score < self.min_similarity
-            and match_score < self.min_similarity
-        ):
-            logger.warning("No match for %s", entity.normalized_term)
-            return None
 
         if comp_score > match_score:
             logger.info(
