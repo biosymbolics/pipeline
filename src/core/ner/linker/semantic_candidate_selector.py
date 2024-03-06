@@ -20,7 +20,7 @@ from .utils import (
 )
 
 DEFAULT_K = 20
-MIN_SIMILARITY = 1.1
+MIN_SIMILARITY = 1.0
 UMLS_KB = None
 WORD_EMBEDDING_LENGTH = 768
 

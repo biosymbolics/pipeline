@@ -172,10 +172,16 @@ class EntityCleaner:
 
         def join_on_punct(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
+                if is_iupac(term):
+                    yield term
+                    continue
                 yield join_punctuated_tokens(term)
 
         def remove_dash(_terms: Sequence[str]) -> Iterable[str]:
             for term in _terms:
+                if is_iupac(term):
+                    yield term
+                    continue
                 yield re.sub("-", " ", term, flags=RE_FLAGS)
 
         def rewrite_phrases(_terms: Sequence[str]) -> Iterable[str]:
