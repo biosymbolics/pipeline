@@ -41,6 +41,7 @@ UMLS_NAME_OVERRIDES = {
     "C0013227": "preparation",
     "C0599894": "targeting",
     "C0108801": "tfr1",
+    "C0762871": "tl1a",
     "C0017262": "expression",
     "C3641152": "moiety",
     "C1424685": "nk1",

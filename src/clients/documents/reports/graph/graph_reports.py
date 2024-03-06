@@ -192,7 +192,9 @@ async def _aggregate_document_entity_relationships(
     """
     Aggregated intervention x indication report for a set of documents
     """
-    term_clause = "search @@ plainto_tsquery('english', $1)" if p.terms else "1 <> 1"
+    term_clause = (
+        "search_table.search @@ plainto_tsquery('english', $1)" if p.terms else "1 <> 1"
+    )
     sql = f"""
         SELECT
             head.category_rollup head,

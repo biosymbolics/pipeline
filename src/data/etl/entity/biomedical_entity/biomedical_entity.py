@@ -3,7 +3,7 @@ Class for biomedical entity etl
 """
 
 import asyncio
-from typing import Sequence
+from typing import Iterable, Sequence
 import uuid
 from prisma.models import BiomedicalEntity
 from prisma.enums import BiomedicalEntityType, Source
@@ -15,6 +15,7 @@ from prisma.types import (
 )
 from pydash import compact, flatten, group_by, is_empty, omit
 import logging
+from spacy.lang.en import stop_words
 
 from clients.low_level.prisma import batch_update, prisma_client
 from constants.umls import UMLS_COMMON_BASES
@@ -24,7 +25,6 @@ from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
-from typings.documents.common import ENTITY_MAP_TABLES
 from utils.file import save_as_pickle
 from utils.list import merge_nested
 
@@ -51,14 +51,21 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         candidate_selector: CandidateSelectorType,
         relation_id_field_map: RelationIdFieldMap,
         non_canonical_source: Source,
-        additional_cleaners: Sequence[CleanFunction] = [],
     ):
         self.normalizer = TermNormalizer(
             candidate_selector=candidate_selector,
-            additional_cleaners=additional_cleaners,
+            additional_cleaners=[BiomedicalEntityEtl.remove_stopwords],
         )
         self.relation_id_field_map = relation_id_field_map
         self.non_canonical_source = non_canonical_source
+
+    @staticmethod
+    def remove_stopwords(terms: Sequence[str]) -> Iterable[str]:
+        """
+        Remove stop word cleaner
+        """
+        for term in terms:
+            yield " ".join([w for w in term.split() if w not in stop_words.STOP_WORDS])
 
     def _generate_lookup_map(
         self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
@@ -102,7 +109,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             """
             source_rec = source_map[orig_name]
             canonical = canonical_map.get(orig_name) or CanonicalEntity(
-                orig_name.lower(), orig_name.lower()
+                id=orig_name.lower(), name=orig_name.lower()
             )
 
             entity_type = (

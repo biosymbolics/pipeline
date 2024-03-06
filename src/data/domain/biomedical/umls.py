@@ -85,7 +85,7 @@ def clean_umls_name(
             + (5 if a.split(" ")[0].lower() != name_words[0].lower() else 0)
             # prefer same first letter
             + (20 if a[0].lower() != canonical_name[0].lower() else 0)
-            # prefer non-comma
+            # prefer without comma + other irritating chars
             + (5 if has_intersection(BAD_NAME_CHARS, list(a)) else 0)
         )
 
@@ -102,6 +102,8 @@ def is_umls_suppressed(
     Args:
         id (str): cui
         canonical_name (str): canonical name
+        matching_aliases (list[str]): the aliases that were a syntactic match
+        is_composite (bool): is this a composite candidate selection? slightly different rules apply.
     """
     if id in UMLS_CUI_SUPPRESSIONS:
         return True

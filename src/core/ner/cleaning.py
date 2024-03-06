@@ -11,16 +11,14 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from constants.patterns.intervention import (
-    PRIMARY_MECHANISM_BASE_TERMS,
-)
+
 from constants.patterns.iupac import is_iupac
 from data.domain.biomedical.constants import PHRASE_REWRITES
 from utils.re import get_or_re, sub_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .types import DocEntity, is_entity_doc_list
-from .utils import depluralize_tails, normalize_by_pos, rearrange_terms
+from .utils import join_punctuated_tokens
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
@@ -32,7 +30,7 @@ logger.setLevel(logging.INFO)
 
 class CleanFunction(Protocol):
     @abstractmethod
-    def __call__(self, terms: Sequence[str]) -> Sequence[str]:
+    def __call__(self, terms: Sequence[str]) -> Iterable[str]:
         pass
 
 
@@ -48,6 +46,7 @@ SUBSTITUTIONS = {
     "receptors?": "",
     "forms?": "",
     "formulations?": "",
+    "formulae?s?": "",
     "products?": "",
     "refactory": "",  # e.g. refractory sarcoidosis
     "recurrent": "",
@@ -56,7 +55,7 @@ SUBSTITUTIONS = {
     "progressive": "",
     "capable": "",
     "cycling": "",
-    "binding": "",
+    "-?binding": "",
     "selective": "",
 }
 
@@ -165,6 +164,20 @@ class EntityCleaner:
                     continue
                 yield term
 
+        def join_on_punct(_terms: Sequence[str]) -> Iterable[str]:
+            for term in _terms:
+                if is_iupac(term):
+                    yield term
+                    continue
+                yield join_punctuated_tokens(term)
+
+        def remove_dash(_terms: Sequence[str]) -> Iterable[str]:
+            for term in _terms:
+                if is_iupac(term):
+                    yield term
+                    continue
+                yield re.sub("-", " ", term, flags=RE_FLAGS)
+
         def rewrite_phrases(_terms: Sequence[str]) -> Iterable[str]:
             def _map(s, syn, canonical):
                 return re.sub(rf"\b{syn}s?\b", canonical, s, flags=RE_FLAGS)
@@ -191,7 +204,7 @@ class EntityCleaner:
             if debug:
                 start = time.time()
                 res = list(func(x))
-                logger.info(
+                logger.debug(
                     "Executing function %s took %s", func, round(time.time() - start, 2)
                 )
                 return res
@@ -209,7 +222,9 @@ class EntityCleaner:
             # ),
             # depluralize_tails,
             # normalize_by_pos,  # not important if linking
-            rewrite_phrases,  # order matters (after rearrange)
+            join_on_punct,
+            remove_dash,
+            rewrite_phrases,
             *self.additional_cleaners,
             sub_extra_spaces,
             lower,
@@ -239,17 +254,10 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity.create(
-                    **{
-                        "term": modified_texts[i],
-                        "start_char": orig_ents[i].start_char,
-                        "end_char": orig_ents[i].end_char,
-                        "normalized_term": modified_texts[i],
-                        "type": orig_ents[i].type,
-                        "canonical_entity": orig_ents[i].canonical_entity,
-                        "vector": orig_ents[i].vector,
-                        "spacy_doc": orig_ents[i].spacy_doc,
-                    }
+                DocEntity.merge(
+                    orig_ents[i],
+                    term=modified_texts[i],
+                    normalized_term=modified_texts[i],
                 )
                 for i in range(len(orig_ents))
             ]

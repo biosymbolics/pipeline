@@ -1,6 +1,7 @@
 """
 Low-level Postgres client
 """
+
 import time
 from typing import Any, Awaitable, Callable, Sequence, cast
 import logging
@@ -106,9 +107,8 @@ class PsqlDatabaseClient(DatabaseClient):
         """
         query = f"""
             SELECT EXISTS (
-                SELECT FROM
-                    information_schema.tables
-                WHERE  table_name = '{table_name}'
+                SELECT FROM information_schema.tables
+                WHERE  able_name = '{table_name}'
             );
         """
         try:
@@ -208,10 +208,16 @@ class PsqlDatabaseClient(DatabaseClient):
                 return self.handle_error(conn, e, ignore_error=ignore_error)
 
     @overrides(DatabaseClient)
-    async def _insert(self, table_name: str, records: list[M]) -> ExecuteResult:
+    async def _insert(
+        self, table_name: str, records: list[M], on_conflict: str | None = None
+    ) -> ExecuteResult:
         columns = [c for c in list(records[0].keys())]
         insert_cols = ", ".join([f'"{c}"' for c in columns])
-        query = f"INSERT INTO {table_name} ({insert_cols}) VALUES ({(', ').join(['%s' for _ in range(len(columns)) ])})"
+        query = f"""
+            INSERT INTO {table_name} ({insert_cols})
+            VALUES ({(', ').join(['%s' for _ in range(len(columns)) ])})
+            {on_conflict or ""}
+        """
         values = [[item[col] for col in columns] for item in records]
 
         conn = self.client.get_conn()

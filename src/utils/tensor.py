@@ -8,9 +8,14 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import torch
+import logging
 
 from typings.core import Primitive
 from utils.list import BATCH_SIZE, batch, is_sequence
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def pad_or_truncate_to_size(
@@ -181,12 +186,11 @@ def is_scalar(d):
     return is_tensor or is_numpy_scalar or isinstance(d, (int, float))
 
 
-def l1_regularize(vector: torch.Tensor) -> torch.Tensor:
-    # sparsify
-    vector[vector.abs() < 0.3] = 0  # sparsify
-
-    # l1 normalize
-    return F.normalize(vector, p=1, dim=0)
+def l1_regularize(
+    vector: torch.Tensor, sparsity_threshold: float = 0.1
+) -> torch.Tensor:
+    vector[vector.abs() < sparsity_threshold] = 0  # sparsify
+    return F.normalize(vector, p=1, dim=0)  # l1 normalize
 
 
 def combine_tensors(
@@ -196,9 +200,8 @@ def combine_tensors(
     Weighted combination of two vectors, regularized
     """
     b_weight = 1 - a_weight
-    vector = (1 - a_weight) * a + b_weight * b
-    norm_vector = l1_regularize(vector)
-    return norm_vector
+    vector = a_weight * a + b_weight * b
+    return vector  # l1_regularize(vector, 0)
 
 
 def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
@@ -235,7 +238,8 @@ def similarity_with_residual_penalty(
     a: torch.Tensor,
     b: torch.Tensor,
     distance: float | None = None,  # cosine/"angular" distance
-    alpha: float = 0.5,
+    alpha: float = 0.45,
+    name: str = "na",
 ) -> float:
     """
     Compute a weighted similarity score that penalizes a large residual.
@@ -244,10 +248,10 @@ def similarity_with_residual_penalty(
         a (torch.Tensor): tensor a
         b (torch.Tensor): tensor b
         distance (float, optional): cosine/"angular" distance. Defaults to None, in which case it is computed.
-        alpha (float, optional): weight of the residual penalty. Defaults to 0.3.
+        alpha (float, optional): 1 - a == weight of the residual penalty. Defaults to 0.5.
     """
     if distance is None:
-        _distance = F.cosine_similarity(a, b, dim=0)
+        _distance = 1 - F.cosine_similarity(a, b, dim=0)
     else:
         _distance = torch.tensor(distance)
 
@@ -263,8 +267,14 @@ def similarity_with_residual_penalty(
     scaled_residual_norm = torch.divide(residual_norm, torch.norm(a))
 
     # Weighted score
-    score = alpha * similarity + (1 - alpha) * (1 - scaled_residual_norm)
-
+    score = alpha * similarity + (1 - alpha) * (1 - torch.abs(scaled_residual_norm))
+    logger.debug(
+        "%s: Similarity %s, Residual: %s, Score: %s",
+        name,
+        similarity.item(),
+        scaled_residual_norm.item(),
+        score.item(),
+    )
     return score.item()
 
 

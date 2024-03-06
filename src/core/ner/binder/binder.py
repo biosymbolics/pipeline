@@ -11,9 +11,10 @@ from spacy.tokens import Doc
 
 from core.ner.spacy import get_transformer_nlp
 from constants.core import (
-    DEFAULT_BASE_TRANSFORMER_MODEL,
+    DEFAULT_BASE_TOKENIZER_MODEL,
     DEFAULT_TORCH_DEVICE,
     DEFAULT_NLP_MODEL_ARGS,
+    DEFAULT_VECTORIZATION_MODEL,
 )
 
 from .constants import NER_TYPES
@@ -35,9 +36,7 @@ class BinderNlp:
     To create the model, clone https://github.com/kristinlindquist/binder and from that directory, run the instructions in the readme.
     """
 
-    def __init__(
-        self, model_file: str, base_model: str = DEFAULT_BASE_TRANSFORMER_MODEL
-    ):
+    def __init__(self, model_file: str, base_model: str = DEFAULT_BASE_TOKENIZER_MODEL):
         device = torch.device(DEFAULT_TORCH_DEVICE)
 
         logger.info(
@@ -49,7 +48,7 @@ class BinderNlp:
         self._tokenizer = AutoTokenizer.from_pretrained(
             base_model, use_fast=True, device_map="auto"
         )
-        self.nlp = get_transformer_nlp()  # TODO: use DEFAULT_VECTORIZATION_MODEL?
+        self.nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
 
     def __call__(self, texts: list[str]):
         return self.pipe(texts)
@@ -158,13 +157,12 @@ class BinderNlp:
         ```
         """
         if isinstance(input, str):
-            doc = self.nlp(input)
+            text = input
         else:
-            doc = input
+            text = input.text
 
-        # TODO: avoid re-tokenizing?
-        tokenized = self.tokenize(doc.text)
-        feature = prepare_feature(doc.text, 0, tokenized)
+        tokenized = self.tokenize(text)
+        feature = prepare_feature(text, 0, tokenized)
 
         tokenized.pop("overflow_to_sample_mapping")
         tokenized.pop("offset_mapping")
@@ -176,6 +174,12 @@ class BinderNlp:
             feature,
             self.type_map,
         )
+
+        if isinstance(input, str):
+            doc = Doc(self.nlp.vocab(), words=tokenized.tokens())
+        else:
+            doc = input
+
         return self.add_entities_to_doc(doc, annotations)
 
     def pipe(

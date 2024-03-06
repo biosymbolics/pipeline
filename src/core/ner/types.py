@@ -2,7 +2,6 @@
 NER types
 """
 
-from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
@@ -13,27 +12,27 @@ from typing import (
     TypedDict,
     Union,
 )
+from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 from pydash import compact
 from spacy.language import Language
 from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
+import torch
 
 from data.domain.biomedical.umls import tuis_to_entity_type
-from typings.core import Dataclass
 
 
 NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
 
-@dataclass(frozen=True)
-class CanonicalEntity:
+class CanonicalEntity(BaseModel):
     id: str | None
     name: str
     ids: Optional[list[str]] = None
     description: Optional[str] = None
-    aliases: list[str] = field(default_factory=list)
-    types: list[str] = field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)
+    types: list[str] = Field(default_factory=list)
 
     @property
     def is_fake(self):
@@ -53,37 +52,53 @@ class CanonicalEntity:
         return tuis_to_entity_type(self.types)
 
 
-@dataclass(frozen=True)
-class DocEntity(Dataclass):
+class DocEntity(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     term: str
     start_char: int
     end_char: int
     normalized_term: str
     type: str | None = None
-    vector: Optional[list[float]] = None
-    spacy_doc: Optional[Doc] = None
-    canonical_entity: Optional[CanonicalEntity] = None
+    vector: Optional[torch.Tensor] = None
+    spacy_doc: SkipValidation[Optional[Doc]] = None
+    canonical_entity: SkipValidation[Optional[CanonicalEntity]] = None
 
     @staticmethod
     def create(
-        term,
-        start_char,
-        end_char,
-        normalized_term,
+        term: str,
+        normalized_term=None,
+        start_char=0,
+        end_char=0,
         type=None,
-        vector=None,
+        vector: list[float] | torch.Tensor | None = None,
         spacy_doc=None,
         canonical_entity=None,
     ):
+        _vector = (
+            vector if vector is not None else (spacy_doc.vector if spacy_doc else None)
+        )
+        if not isinstance(_vector, torch.Tensor):
+            _vector = torch.tensor(_vector)
+
         return DocEntity(
             term=term,
             start_char=start_char,
             end_char=end_char,
-            normalized_term=normalized_term,
-            type=type or (spacy_doc.label_ if spacy_doc else None),
-            vector=vector or (spacy_doc.vector.tolist() if spacy_doc else None),
+            normalized_term=normalized_term or term,
+            type=type or (getattr(spacy_doc, "label_", None) if spacy_doc else None),
+            vector=_vector,
             spacy_doc=spacy_doc,
             canonical_entity=canonical_entity,
+        )
+
+    @staticmethod
+    def merge(
+        e: "DocEntity",
+        **kwargs,
+    ):
+        return DocEntity(
+            **{k: v for k, v in e.model_dump().items() if k not in kwargs},
+            **kwargs,
         )
 
     def copy(

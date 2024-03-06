@@ -14,14 +14,12 @@ from prisma.types import (
 )
 from pydash import compact
 
-from system import initialize
-
-initialize()
 
 from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 from data.domain.biomedical.umls import clean_umls_name
+from system import initialize
 
 from .umls_transform import UmlsAncestorTransformer
 
@@ -30,6 +28,8 @@ logger.setLevel(logging.INFO)
 
 SOURCE_DB = "umls"
 BATCH_SIZE = 10000
+
+initialize()
 
 
 class UmlsLoader:

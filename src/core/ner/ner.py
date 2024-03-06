@@ -1,6 +1,7 @@
 """
 Named-entity recognition using spacy
 """
+
 from functools import reduce
 from itertools import groupby
 import time
@@ -214,7 +215,7 @@ class NerTagger:
             return
 
         for es in entity_sets:
-            yield self.normalizer.normalize(es)
+            yield self.normalizer.link(es)
 
     def extract(
         self,

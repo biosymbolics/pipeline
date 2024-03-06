@@ -10,7 +10,11 @@ from utils.classes import overrides
 from utils.list import has_intersection
 
 from .types import AbstractCompositeCandidateSelector
-from .utils import form_composite_entity, is_composite_eligible
+from .utils import (
+    form_composite_entity,
+    is_composite_eligible,
+    select_composite_members,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -43,49 +47,16 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
         self.min_composite_similarity = min_composite_similarity
         self.min_word_length = min_word_length
 
-    def _select_composite_members(
-        self, members: Sequence[EntityWithScore]
-    ) -> list[EntityWithScore]:
-        real_members = [m for m in members if not m[0].is_fake]
-
-        # Partial match if non-matched words, and only a single candidate (TODO: revisit)
-        is_partial = (
-            # has 1+ fake members (i.e. unmatched)
-            len(real_members) < len(members)
-            # and only one real candidate match
-            and len(real_members) == 1
-        )
-
-        # if partial match, include *all* candidates, which includes the faked ones
-        # "UNMATCHED inhibitor" will have a name and id that reflects the unmatched word
-        if is_partial:
-            return list(members)
-
-        # if we have 1+ preferred candidates, return those
-        # this prevents composites like C0024579|C0441833 ("Maleimides Groups") - wherein "Group" offers little value
-        preferred = [
-            m
-            for m in real_members
-            if has_intersection(m[0].types, list(MOST_PREFERRED_UMLS_TYPES.keys()))
-        ]
-        if len(preferred) >= 1:
-            return preferred
-
-        # else, we're going to drop unmatched words
-        # e.g. "cpla (2)-selective inhibitor" -> "cpla inhibitor"
-
-        return real_members
-
     def _generate_composite(
         self,
-        tokens: Sequence[str],
+        words: Sequence[str],
         token_entity_map: Mapping[str, EntityWithScore],
     ) -> EntityWithScore | None:
         """
         Generate a composite candidate from a mention text
 
         Args:
-            mention_text (str): Mention text
+            words (str): Mention words
             token_entity_map (dict[str, CanonicalEntity]): word-to-entity map
         """
 
@@ -101,18 +72,22 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
                 self.min_composite_similarity - 0.1,
             )
 
-        if len(tokens) == 0:
+        if len(words) == 0:
             return None
 
-        member_scores = [get_composite_candidate(t) for t in tokens]
-        selected = self._select_composite_members(member_scores)
+        members_with_scores = [get_composite_candidate(w) for w in words]
+        score_map = {m[0].name: m[1] for m in members_with_scores}
+        composite_members = select_composite_members(
+            [m[0] for m in members_with_scores]
+        )
 
-        if len(selected) == 0:
+        if len(composite_members) == 0:
             return None
 
-        composite_members = [m[0] for m in selected]
         composite_canonical = form_composite_entity(composite_members, self.kb)
-        composite_score = sum([m[1] for m in selected]) / len(selected)
+        composite_score = sum([score_map[m.name] for m in composite_members]) / len(
+            composite_members
+        )
 
         return (composite_canonical, composite_score)
 

@@ -61,19 +61,23 @@ class TermLinker:
 
         start = time.monotonic()
 
-        # generate the candidates (somewhat time consuming)
+        # generate the candidates (kinda slow)
         canonical_entities = [self.candidate_selector(e) for e in entities]
 
-        def get_canonical(ce: CanonicalEntity | None, de: DocEntity) -> CanonicalEntity:
-            # create a pseudo-canonical entity if no canonical entity found
-            if ce is None:
-                return CanonicalEntity(
-                    id="", name=de.normalized_term or de.term, aliases=[de.term]
-                )
-            return ce
+        logging.info(
+            "Completed candidate generation, took %ss (%s)",
+            round(time.monotonic() - start),
+            [e.term for e in entities],
+        )
 
         linked_doc_ents = [
-            DocEntity.create(**{**e, "canonical_entity": get_canonical(ce, e)})
+            DocEntity.merge(
+                e,
+                canonical_entity=ce
+                or CanonicalEntity(
+                    id="", name=e.normalized_term or e.term, aliases=[e.term]
+                ),
+            )
             for e, ce in zip(entities, canonical_entities)
         ]
 

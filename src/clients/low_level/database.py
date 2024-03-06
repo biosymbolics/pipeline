@@ -37,7 +37,9 @@ class DatabaseClient:
         raise NotImplementedError
 
     @abstractmethod
-    async def _insert(self, table_name: str, records: Sequence[M]):
+    async def _insert(
+        self, table_name: str, records: Sequence[M], on_conflict: str | None = None
+    ):
         raise NotImplementedError
 
     @abstractmethod
@@ -119,6 +121,7 @@ class DatabaseClient:
         table_name: str,
         transform: TransformFunction | None = None,
         batch_size: int = 1000,
+        on_conflict: str | None = None,
     ):
         """
         Insert rows into a table from a list of records
@@ -134,7 +137,7 @@ class DatabaseClient:
         for i, b in enumerate(batched):
             logging.info("Inserting batch %s into table %s", i, table_name)
             transformed = transform(b, records) if transform is not None else b
-            await self._insert(table_name, transformed)
+            await self._insert(table_name, transformed, on_conflict)
 
             logging.info("Successfully inserted %s rows", len(b))
 
