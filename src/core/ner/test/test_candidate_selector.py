@@ -66,16 +66,16 @@ COMMON_COMPOSITE_TEST_CASES = [
             }
         ],
     },
-    # {
-    #     "description": "no composite match for IUPAC name",
-    #     "text": ["-((6-vvvzzzoxo-1,6-dihydropyridazin-4-yl)methyl)piperazine"],
-    #     "expected": [
-    #         {
-    #             "id": "",
-    #             "name": "-((6-oxo-1,6-dihydropyridazin-4-yl)methyl)piperazine",
-    #         }
-    #     ],
-    # },
+    {
+        "description": "no composite match for IUPAC name",
+        "text": ["-((6-oxo-1,6-dihydropyridazin-4-yl)methyl)piperazine"],
+        "expected": [
+            {
+                "id": "",
+                "name": "-((6-oxo-1,6-dihydropyridazin-4-yl)methyl)piperazine",
+            }
+        ],
+    },
     {
         "description": "no match for short partial terms",
         "text": ["1,55"],
