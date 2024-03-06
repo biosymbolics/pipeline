@@ -38,7 +38,7 @@ initialize()
 def extract_attributes(patent_docs: list[str]) -> list[DocEntities]:
     attr_map = get_patent_attribute_map()
     return [
-        [DocEntity.create(term, 0, 0, term, ATTRIBUTE_FIELD) for term in attribute_set]
+        [DocEntity.create(term, type=ATTRIBUTE_FIELD) for term in attribute_set]
         for attribute_set in classify_by_keywords(patent_docs, attr_map)
     ]
 

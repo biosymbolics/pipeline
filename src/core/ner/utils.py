@@ -119,8 +119,10 @@ def lemmatize_tail(
     if isinstance(term, str):
         nlp = Spacy.get_instance(disable=["ner"])
         doc = nlp(term)  # turn into spacy doc (has lemma info)
-    elif isinstance(term, Doc) or isinstance(term, Span):
+    elif isinstance(term, Doc):
         doc = term
+    elif isinstance(term, Span):
+        doc = term.as_doc()
     else:
         raise ValueError("term must be a str or spacy Doc, but is %s", type(term))
 
@@ -481,7 +483,6 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
             span.text,
             span.start_char,
             span.end_char,
-            normalized_term=span.text,  # just to init
             type=span.label_,
             vector=span.vector.tolist(),
             spacy_doc=span.as_doc(),

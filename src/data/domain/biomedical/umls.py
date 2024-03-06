@@ -85,7 +85,7 @@ def clean_umls_name(
             + (5 if a.split(" ")[0].lower() != name_words[0].lower() else 0)
             # prefer same first letter
             + (20 if a[0].lower() != canonical_name[0].lower() else 0)
-            # prefer non-comma
+            # prefer without comma + other irritating chars
             + (5 if has_intersection(BAD_NAME_CHARS, list(a)) else 0)
         )
 

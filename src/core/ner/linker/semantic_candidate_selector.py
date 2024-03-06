@@ -4,11 +4,10 @@ from annoy import AnnoyIndex
 from scispacy.candidate_generation import CandidateGenerator, MentionCandidate
 import torch
 import logging
-from constants.core import DEFAULT_VECTORIZATION_MODEL
 
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import CanonicalEntity, DocEntity
-from constants.umls import PREFERRED_UMLS_TYPES
+from core.vector.vectorizer import Vectorizer
 from utils.classes import overrides
 from utils.tensor import l1_regularize
 
@@ -53,22 +52,26 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         self.candidate_generator = CandidateGenerator(*args, kb=UMLS_KB, **kwargs)
         self.min_similarity = min_similarity
         self.vector_length = vector_length
-        self.nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
+
+        # must use the same model!
+        self.vectorizer = Vectorizer()
+        self.nlp = get_transformer_nlp()
+
+        self.vector_cache: dict[str, torch.Tensor] = {}
 
     def _batch_vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
         """
         Vectorize texts
         """
-        docs = list(self.nlp.pipe(texts))
-        bert_vecs = [
-            (
-                l1_regularize(torch.tensor(doc.vector))
-                if len(doc.vector) > 0
-                else torch.zeros(self.vector_length)
-            )
-            for doc in docs
+        new_vecs = self.vectorizer.vectorize(
+            [t for t in texts if t not in self.vector_cache.keys()]
+        )
+        cached_vecs = [
+            self.vector_cache[t] for t in texts if t in self.vector_cache.keys()
         ]
-        return bert_vecs
+        reg_new_vecs = [l1_regularize(vec) for vec in new_vecs]
+        self.vector_cache.update({text: vec for text, vec in zip(texts, reg_new_vecs)})
+        return reg_new_vecs + cached_vecs
 
     def _get_candidates(self, text: str) -> list[MentionCandidate]:
         """
@@ -105,32 +108,29 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
     ) -> AnnoyIndex:
         """
         Create an Annoy index for a list of candidates
+
+        Metrics other than 'angular' work horribly
         """
         start = time.monotonic()
-        # metrics other than 'angular' work horribly
         umls_ann = AnnoyIndex(self.vector_length, metric="angular")
 
         canonical_names = [
             self.kb.cui_to_entity[c.concept_id].canonical_name.lower()
             for c in candidates
         ]
-        # only use the first alias, since that's the most syntactically similar to the mention
-        tuis = [self.kb.cui_to_entity[c.concept_id].types[0] for c in candidates]
 
-        # get (preferred) UMLS types these to use in semantic similarity determination
-        # because otherwise terms are totally without disambiguating context
-        types = [PREFERRED_UMLS_TYPES.get(tui) or tui for tui in tuis]
-
-        vectors = self._batch_vectorize(canonical_names + types)
-        cn_vectors = vectors[0 : len(canonical_names)]
-        type_vectors = vectors[len(canonical_names) :]
+        vectors = self._batch_vectorize(canonical_names)
 
         for i in range(len(candidates)):
-            combined_vec = (0.8 * cn_vectors[i]) + (0.2 * type_vectors[i])
+            combined_vec = vectors[i]
             umls_ann.add_item(i, combined_vec.detach().cpu().numpy())
 
         umls_ann.build(len(candidates))
-        logger.debug("Took %s seconds to build Annoy index", time.monotonic() - start)
+        logger.debug(
+            "Took %ss to vectorize & build Annoy index (%s)",
+            time.monotonic() - start,
+            len(candidates),
+        )
         return umls_ann
 
     def _get_best_canonical(
@@ -138,6 +138,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         mention_vector: torch.Tensor,
         candidates: Sequence[MentionCandidate],
         is_composite: bool,
+        n: int = round(DEFAULT_K / 2),
     ) -> EntityWithScoreVector | None:
         """
         Get best candidate by semantic similarity
@@ -156,7 +157,7 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
 
         umls_ann = self.create_ann_index(candidates)
         norm_vector = l1_regularize(mention_vector)
-        ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), 10, search_k=-1)
+        ids = umls_ann.get_nns_by_vector(norm_vector.tolist(), n, search_k=-1)
 
         if len(ids) == 0:
             logger.warning("No candidates for %s", candidates[0].aliases[0])
@@ -218,12 +219,12 @@ class SemanticCandidateSelector(AbstractCandidateSelector):
         Args:
             entity (DocEntity): entity to link
         """
-        if not entity.vector:
+        if entity.vector is None:
             raise ValueError("Vector required")
 
         return self.select_candidate(
             entity.normalized_term,
-            torch.tensor(entity.vector),
+            entity.vector,
             is_composite=is_composite,
         )
 

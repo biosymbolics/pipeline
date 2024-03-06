@@ -173,7 +173,6 @@ def byte_dict_to_string_dict(
     )
 
 
-# TODO: get rid of these, or combine with linker variants
 def generate_ngrams(tokens: tuple[str, ...], n: int) -> list[tuple[str, str]]:
     """
     Generate n-grams from a list of tokens
@@ -191,11 +190,11 @@ def generate_ngrams(tokens: tuple[str, ...], n: int) -> list[tuple[str, str]]:
 
 def generate_ngram_phrases(tokens: tuple[str, ...], max_n: int) -> list[str]:
     """
-    Generate n-grams from a list of tokens
+    Generate n-grams from a list of tokens, between max-n and 1
 
     Args:
         tokens (tuple[str]): list of tokens
-        n (int): n-gram size
+        max_n (int): max n-gram size
 
     Example:
         >>> generate_ngram_phrases(["a", "b", "c", "d"], 2)
@@ -209,6 +208,17 @@ def generate_ngram_phrases(tokens: tuple[str, ...], max_n: int) -> list[str]:
 
 
 def generate_ngram_phrases_from_doc(doc: Doc, max_n: int) -> list[Span]:
+    """
+    Generate n-grams from a Spacy doc, between max-n and 1
+
+    Args:
+        doc (Doc): spacy doc
+        max_n (int): max n-gram size
+
+    Returns:
+        list[Span]: list of n-grams
+    """
+
     def generate_ngrams(n: int):
         return [
             doc[min([v.i for v in z]) : max([v.i for v in z]) + 1]

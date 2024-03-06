@@ -142,14 +142,10 @@ class CompositeSemanticCandidateSelector(
 
             return ngram_docs, vectors
 
-        non_stopwords = " ".join(
-            [
-                w
-                for w in entity.normalized_term.split(" ")
-                if w not in stop_words.STOP_WORDS
-            ]
-        )
-        doc = self.nlp(non_stopwords)
+        if entity.spacy_doc is None:
+            doc = self.nlp(entity.normalized_term)
+        else:
+            doc = entity.spacy_doc
 
         ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
         ngram_entity_map = {

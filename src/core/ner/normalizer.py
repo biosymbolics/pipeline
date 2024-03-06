@@ -2,8 +2,13 @@
 Linking/cleaning of terms
 """
 
+import time
 from typing import Sequence
 import logging
+from spacy.tokens import Doc
+
+import torch
+
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
@@ -53,11 +58,13 @@ class TermNormalizer:
         )
         self.candidate_selector = candidate_selector
 
-        if self.candidate_selector == "CandidateSelector":
-            self.nlp = None
-        else:
-            # used for vectorization if direct entity linking
+        if self.candidate_selector in [
+            "SemanticCandidateSelector",
+            "CompositeSemanticCandidateSelector",
+        ]:
             self.nlp = get_transformer_nlp()
+        else:
+            self.nlp = None
 
     def normalize(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
         """
@@ -91,39 +98,54 @@ class TermNormalizer:
         TODO: uniqify terms, when possible?
         """
 
+        logger.info("Normalizing %s terms", len(terms))
+
         if vectors is not None and len(terms) != len(vectors):
             raise ValueError("terms and vectors must be the same length")
 
-        # if no vectors AND candidate selectors are semantic, generate docs / vectors
-        if not vectors and self.candidate_selector not in [
-            "CandidateSelector",
-            "CompositeCandidateSelector",
-        ]:
-            if self.nlp is None:
-                raise ValueError(
-                    "nlp model required for vectorization-based candidate selection"
+        def get_vecs(
+            vectors,
+        ) -> tuple[list[Doc] | list[None], list[torch.Tensor] | list[None]]:
+            is_selector_semantic = self.candidate_selector in [
+                "SemanticCandidateSelector",
+                "CompositeSemanticCandidateSelector",
+            ]
+
+            # if no vectors AND candidate selectors are semantic, generate docs / vectors
+            if not vectors and is_selector_semantic:
+                if self.nlp is None:
+                    raise ValueError(
+                        "Vectorizer required for semantic candidate selector"
+                    )
+
+                start = time.monotonic()
+                docs = list(self.nlp.pipe(clean_terms))
+                logger.info(
+                    "Took %ss to docify %s terms",
+                    round(time.monotonic() - start),
+                    len(clean_terms),
                 )
-            docs = self.nlp.pipe(terms)
-        else:
-            logger.info("No nlp model required for CandidateSelector")
-            docs = [None for _ in terms]
+                return docs, vectors or [torch.tensor(doc.vector) for doc in docs]
+
+            return [None for _ in terms], vectors or [None for _ in terms]
+
+        clean_terms = self.cleaner.clean(terms, remove_suppressed=False)
+        docs, _vectors = get_vecs(vectors)
 
         doc_ents = [
             DocEntity.create(
                 term=term,
-                type="unknown",
-                start_char=0,
-                end_char=0,
-                normalized_term=term,
-                vector=vector,  # required for comparing semantic similarity of potential matches
-                spacy_doc=doc,  # required for comparing semantic similarity of potential matches
+                # required for comparing semantic similarity of potential matches
+                vector=torch.tensor(vector),
+                spacy_doc=doc,  # doc for term, NOT the source doc (confusing!!)
             )
-            for term, vector, doc in zip(terms, vectors or [None for _ in terms], docs)
+            for term, vector, doc in zip(clean_terms, _vectors, docs)
         ]
 
-        logger.info("Normalizing %s terms (%s non-unique)", len(doc_ents), len(terms))
-        normalized = self.normalize(doc_ents)
-        return normalized
+        if self.term_linker is not None:
+            return self.term_linker.link(doc_ents)
+
+        return doc_ents
 
     def __call__(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
         return self.normalize(doc_entities)

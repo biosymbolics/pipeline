@@ -11,21 +11,14 @@ import logging
 import html
 from typing_extensions import Protocol
 
-from constants.patterns.intervention import (
-    PRIMARY_MECHANISM_BASE_TERMS,
-)
+
 from constants.patterns.iupac import is_iupac
 from data.domain.biomedical.constants import PHRASE_REWRITES
 from utils.re import get_or_re, sub_extra_spaces, LEGAL_SYMBOLS, RE_STANDARD_FLAGS
 from typings.core import is_string_list
 
 from .types import DocEntity, is_entity_doc_list
-from .utils import (
-    depluralize_tails,
-    join_punctuated_tokens,
-    normalize_by_pos,
-    rearrange_terms,
-)
+from .utils import join_punctuated_tokens
 
 T = TypeVar("T", bound=Union[DocEntity, str])
 
@@ -37,7 +30,7 @@ logger.setLevel(logging.INFO)
 
 class CleanFunction(Protocol):
     @abstractmethod
-    def __call__(self, terms: Sequence[str]) -> Sequence[str]:
+    def __call__(self, terms: Sequence[str]) -> Iterable[str]:
         pass
 
 
@@ -53,6 +46,7 @@ SUBSTITUTIONS = {
     "receptors?": "",
     "forms?": "",
     "formulations?": "",
+    "formulae?s?": "",
     "products?": "",
     "refactory": "",  # e.g. refractory sarcoidosis
     "recurrent": "",
@@ -260,17 +254,10 @@ class EntityCleaner:
 
         if is_entity_doc_list(orig_ents):
             doc_ents = [
-                DocEntity.create(
-                    **{
-                        "term": modified_texts[i],
-                        "start_char": orig_ents[i].start_char,
-                        "end_char": orig_ents[i].end_char,
-                        "normalized_term": modified_texts[i],
-                        "type": orig_ents[i].type,
-                        "canonical_entity": orig_ents[i].canonical_entity,
-                        "vector": orig_ents[i].vector,
-                        "spacy_doc": orig_ents[i].spacy_doc,
-                    }
+                DocEntity.merge(
+                    orig_ents[i],
+                    term=modified_texts[i],
+                    normalized_term=modified_texts[i],
                 )
                 for i in range(len(orig_ents))
             ]
