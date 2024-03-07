@@ -74,11 +74,13 @@ class DocEntity(BaseModel):
         spacy_doc=None,
         canonical_entity=None,
     ):
-        _vector = (
-            vector if vector is not None else (spacy_doc.vector if spacy_doc else None)
-        )
-        if not isinstance(_vector, torch.Tensor):
-            _vector = torch.tensor(_vector)
+        def _vector() -> Optional[torch.Tensor]:
+            if vector is not None:
+                if isinstance(vector, list):
+                    return torch.tensor(vector)
+            elif spacy_doc is not None:
+                return torch.tensor(spacy_doc.vector)
+            return None
 
         return DocEntity(
             term=term,
@@ -86,7 +88,7 @@ class DocEntity(BaseModel):
             end_char=end_char,
             normalized_term=normalized_term or term,
             type=type or (getattr(spacy_doc, "label_", None) if spacy_doc else None),
-            vector=_vector,
+            vector=_vector(),
             spacy_doc=spacy_doc,
             canonical_entity=canonical_entity,
         )

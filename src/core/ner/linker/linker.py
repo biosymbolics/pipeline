@@ -6,7 +6,7 @@ import logging
 import time
 from typing import Sequence
 
-from .types import AbstractCandidateSelector, CandidateSelectorType
+from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
 from ..types import CanonicalEntity, DocEntity
 
@@ -34,7 +34,7 @@ class TermLinker:
 
     def __init__(
         self,
-        candidate_selector: CandidateSelectorType = "SemanticCandidateSelector",
+        candidate_selector: CandidateSelectorType = "CandidateSelector",
         *args,
         **kwargs,
     ):

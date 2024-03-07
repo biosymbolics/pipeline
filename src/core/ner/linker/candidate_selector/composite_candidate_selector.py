@@ -5,7 +5,6 @@ from spacy.tokens import Doc, Span, Token
 
 import torch
 
-from core.ner.linker.types import EntityWithScore, EntityWithScoreVector
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
@@ -17,7 +16,11 @@ from .composite_utils import (
     is_composite_eligible,
     select_composite_members,
 )
-from .types import AbstractCompositeCandidateSelector
+from .types import (
+    AbstractCompositeCandidateSelector,
+    EntityWithScore,
+    EntityWithScoreVector,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -163,7 +166,7 @@ class CompositeCandidateSelector(CandidateSelector, AbstractCompositeCandidateSe
     @overrides(AbstractCompositeCandidateSelector)
     async def generate_candidate(self, entity: DocEntity) -> EntityWithScore | None:
         """
-        Select compsosite candidate for a mention text (i.e. analog to select_candidate_from_entity)
+        Select composite candidate for a mention text (i.e. analog to select_candidate_from_entity)
         """
         # len check - avoid weird matches for single characters/nums & words like "of"
         tokens = [

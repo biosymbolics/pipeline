@@ -30,7 +30,7 @@ class CandidateSelector(AbstractCandidateSelector):
     """
 
     @overrides(AbstractCandidateSelector)
-    def __init__(self, *args, min_similarity: float = MIN_SIMILARITY, **kwargs):
+    def __init__(self, min_similarity: float = MIN_SIMILARITY):
         self.candidate_generator = CandidateGenerator()
 
         if min_similarity > 1:
@@ -48,23 +48,12 @@ class CandidateSelector(AbstractCandidateSelector):
         """
         Select the best candidate for a mention
         """
-        _candidates = (await self.candidate_generator([text], k=K))[0]
-        if len(_candidates) == 0:
+        vanilla_candidates = (await self.candidate_generator([text], k=K))[0]
+        if len(vanilla_candidates) == 0:
             logger.warning(f"No candidates found for {text}")
             return None
 
-        # apply word overrides (e.g. if term is "modulator", give explicit UMLS match)
-        # (because the best-fit UMLS term is "Biological Response Modifiers", which is low syntactic similarity)
-        candidates = apply_umls_word_overrides(text, _candidates)
-
-        # filter out candidates with low similarity
-        sufficiently_similiar_candidates = [
-            candidate
-            for candidate in candidates
-            if candidate.similarity >= self.min_similarity
-        ]
-
-        if len(sufficiently_similiar_candidates) == 0:
+        if len(vanilla_candidates) == 0:
             logger.debug(
                 f"No candidates found for {text} with similarity >= {self.min_similarity}"
             )
@@ -74,16 +63,13 @@ class CandidateSelector(AbstractCandidateSelector):
                 return await self._get_best_candidate(rewritten_text, is_composite)
             return None
 
-        # score candidates
+        # apply word overrides (e.g. if term is "modulator", give explicit UMLS match)
+        # doing now since it can affect scoring
+        candidates = apply_umls_word_overrides(text, vanilla_candidates)
+
         scored_candidates = [
-            (
-                candidate,
-                score_candidate(
-                    candidate,
-                    is_composite=is_composite,
-                ),
-            )
-            for candidate in sufficiently_similiar_candidates
+            (candidate, score_candidate(candidate, is_composite))
+            for candidate in candidates
         ]
         # sort by score
         sorted_candidates = sorted(

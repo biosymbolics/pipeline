@@ -14,8 +14,6 @@ from core.ner.types import CanonicalEntity, DocEntity
 CandidateSelectorType = Literal[
     "CandidateSelector",
     "CompositeCandidateSelector",
-    "SemanticCandidateSelector",
-    "CompositeSemanticCandidateSelector",
 ]
 
 EntityWithScore = tuple[CanonicalEntity, float]
@@ -56,8 +54,6 @@ class AbstractCandidateSelector(object):
         """
         raise NotImplementedError
 
-
-from ..types import EntityWithScore
 
 ES = TypeVar("ES", bound=EntityWithScore)
 

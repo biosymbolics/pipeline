@@ -6,15 +6,15 @@ import time
 from typing import Sequence
 import logging
 from spacy.tokens import Doc
-
 import torch
 
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
-from core.ner.linker.types import CandidateSelectorType
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import DocEntity
+
+from .linker.candidate_selector import CandidateSelectorType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
