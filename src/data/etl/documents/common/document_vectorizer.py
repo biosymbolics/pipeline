@@ -9,6 +9,7 @@ import hashlib
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.vector import Vectorizer
+from data.etl.base_etl import BaseEtl
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_pubs.txt"
 VectorizedDoc = TypedDict("VectorizedDoc", {"id": str, "vector": list[float]})
 
 
-class DocumentVectorizer:
+class DocumentVectorizer(BaseEtl):
     """
     Base class for document vectorization
     """

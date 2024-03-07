@@ -230,8 +230,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             batch_size=1000,
         )
 
-        await BiomedicalEntityEtl.pre_finalize()
-
     @staticmethod
     async def _update_search_index():
         """
@@ -501,21 +499,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         return
 
     @staticmethod
-    async def pre_finalize():
-        """
-        Finalize etl
-        """
-        # map umls to entities
-        await BiomedicalEntityEtl._map_umls()
-
-        # populate search index with name & syns
-        await BiomedicalEntityEtl._update_search_index()
-
-        # checksum
-        await BiomedicalEntityEtl.checksum()
-
-    @staticmethod
-    async def post_finalize():
+    async def finalize():
         r"""
         Run after:
             1) UMLS is loaded
@@ -552,12 +536,19 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             delete from intervenable i using biomedical_entity be, umls  where i.entity_id=be.id and be.entity_type='DISEASE' and umls.id=be.canonical_id and not umls.type_ids && ARRAY['T001', 'T004', 'T005', 'T007', 'T204'];
         """
         logger.info("Finalizing biomedical entity etl")
+
+        # map umls to entities
+        await BiomedicalEntityEtl._map_umls()
+
+        # populate search index with name & syns
+        await BiomedicalEntityEtl._update_search_index()
+
         await BiomedicalEntityEtl.link_to_documents()
         await BiomedicalEntityEtl.add_counts()  # TODO: counts from UMLS
 
         # perform final UMLS updates, which depends upon Biomedical Entities being in place.
         # NOTE: will use data/umls_ancestors.json if available, which could be stale.
-        await UmlsLoader.post_doc_finalize()
+        await UmlsLoader.finalize()
 
         # recursively add biomedical entity parents (from UMLS)
         await BiomedicalEntityEtl._create_biomedical_entity_ancestors()
@@ -565,5 +556,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # set instance & category rollups
         await BiomedicalEntityEtl.set_rollups()
 
-        logger.info("Biomedical entity post_doc_finalize complete")
+        # checksum
+        await BiomedicalEntityEtl.checksum()
+
+        logger.info("Biomedical entity finalization complete")
         return

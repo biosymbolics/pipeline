@@ -21,7 +21,6 @@ from data.etl.entity.base_entity_etl import BaseEntityEtl
 from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
-from utils.list import batch
 
 from .constants import OwnerTypePriorityMap
 from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
@@ -123,6 +122,7 @@ class OwnerEtl(BaseEntityEtl):
         )
 
         logger.info("Updated owners")
+        return
 
     async def load_financials(self, public_companies: Sequence[CompanyInfo]):
         """
@@ -192,11 +192,7 @@ class OwnerEtl(BaseEntityEtl):
 
         await self.create_records(names, counts)
         await self.load_financials(public_companies)
-
-    @overrides(BaseEntityEtl)
-    @staticmethod
-    async def pre_finalize():
-        pass
+        return
 
     @overrides(BaseEntityEtl)
     @staticmethod
@@ -340,7 +336,7 @@ class OwnerEtl(BaseEntityEtl):
 
     @overrides(BaseEntityEtl)
     @staticmethod
-    async def post_finalize():
+    async def finalize():
         """
         Run after:
             1) all biomedical entities are loaded

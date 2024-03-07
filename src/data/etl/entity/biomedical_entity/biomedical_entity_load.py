@@ -40,24 +40,24 @@ class BiomedicalEntityLoader:
                 non_canonical_source=spec.non_canonical_source,
             ).copy_all(terms, *to_canonicalize, source_map)
 
-        await BiomedicalEntityEtl.pre_finalize()
         logger.info("Biomedical entity load complete")
 
     @staticmethod
-    async def post_finalize():
-        await BiomedicalEntityEtl.post_finalize()
+    async def finalize():
+        await BiomedicalEntityEtl.finalize()
+        return
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.biomedical_entity.biomedical_entity_load [--post-finalize]
+            Usage: python3 -m data.etl.entity.biomedical_entity.biomedical_entity_load [--finalize]
             """
         )
         sys.exit()
 
-    if "--post-finalize" in sys.argv:
-        asyncio.run(BiomedicalEntityLoader().post_finalize())
+    if "--finalize" in sys.argv:
+        asyncio.run(BiomedicalEntityLoader().finalize())
     else:
         asyncio.run(BiomedicalEntityLoader().copy_all())

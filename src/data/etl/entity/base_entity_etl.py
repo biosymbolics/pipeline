@@ -22,10 +22,6 @@ class BaseEntityEtl:
         raise NotImplementedError
 
     @staticmethod
-    async def pre_finalize():
-        pass
-
-    @staticmethod
     async def add_counts():
         raise NotImplementedError
 
@@ -35,5 +31,5 @@ class BaseEntityEtl:
         raise NotImplementedError
 
     @classmethod
-    async def post_finalize(cls):
+    async def finalize(cls):
         raise NotImplementedError

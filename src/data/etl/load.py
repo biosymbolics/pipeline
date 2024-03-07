@@ -3,7 +3,7 @@ import sys
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SEARCH_TABLE
-from typings.documents.common import DocType
+from typings.documents.common import DocType, VectorizableRecordType
 from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
@@ -69,22 +69,16 @@ def get_entity_map_matview_query() -> list[str]:
 
 # these get wiped for every prisma db push. Will figure out a better way to handle this.
 # https://github.com/prisma/prisma/issues/12751
+# check progress: SELECT phase, round(100.0 * blocks_done / nullif(blocks_total, 0), 1) AS "%" FROM pg_stat_progress_create_index
 MANUAL_INDICES = [
     "SET maintenance_work_mem = '5GB'",
     """
-    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
-    """,
-    """
-    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
-    """,
-    """
-    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
-    """
-    """,
     CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
-    """,
-    """
     CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);
+    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS umls_vector ON umls USING hnsw (vector vector_cosine_ops);
     """,
 ]
 
@@ -98,7 +92,9 @@ async def load_all(force_update: bool = False):
             If update, documents and their relations are first deleted.
     """
     # copy umls data
-    await UmlsLoader().copy_all()
+    await UmlsLoader(
+        record_type=VectorizableRecordType.umls, source_db="umls"
+    ).copy_all()
 
     # copy all biomedical entities (from all doc types)
     # Takes 3+ hours!!
@@ -123,10 +119,10 @@ async def load_all(force_update: bool = False):
     )
 
     # do final biomedical entity stuff that requires everything else be in place
-    await BiomedicalEntityLoader().post_finalize()
+    await BiomedicalEntityLoader().finalize()
 
     # finally, link owners
-    await OwnerLoader().post_finalize()
+    await OwnerLoader().finalize()
 
     # create some materialized views for reporting
     for query in get_entity_map_matview_query():

@@ -19,49 +19,58 @@ from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 from data.domain.biomedical.umls import clean_umls_name
+from data.etl.base_etl import BaseEtl
 from system import initialize
+from typings.documents.common import VectorizableRecordType
+from utils.classes import overrides
 
+from .vectorize_umls import UmlsVectorizer
 from .umls_transform import UmlsAncestorTransformer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SOURCE_DB = "umls"
 BATCH_SIZE = 10000
 
 initialize()
 
 
-class UmlsLoader:
+class UmlsLoader(BaseEtl):
     @staticmethod
-    async def create_umls_lookup():
+    def get_source_sql(filters: list[str] | None = None, limit: int | None = None):
+        return f"""
+            SELECT
+                TRIM(entities.cui) AS id,
+                TRIM(max(entities.str)) AS name,
+                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) AS type_ids,
+                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) AS type_names,
+                COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
+            FROM mrconso AS entities
+            LEFT JOIN mrsty AS semantic_types ON semantic_types.cui = entities.cui
+            LEFT JOIN (
+                SELECT ARRAY_AGG(DISTINCT(LOWER(str))) AS terms, cui AS id
+                FROM mrconso
+                GROUP BY cui
+            ) AS synonyms ON synonyms.id = entities.cui
+            WHERE entities.lat='ENG' -- english
+            AND entities.ts='P' -- preferred terms (according to UMLS)
+            AND entities.ispref='Y' -- preferred term (according to UMLS)
+            AND entities.stt='PF' -- preferred term (according to UMLS)
+            {('AND ' + ' AND '.join(filters)) if filters else ''}
+            GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
+            ORDER BY entities.cui ASC
+            {'LIMIT ' + str(limit) if limit else ''}
+        """
+
+    async def create_umls_lookup(self):
         """
         Create UMLS lookup table
 
         Creates a table of UMLS entities: id, name, ancestor ids
         """
 
-        source_sql = f"""
-            SELECT
-                TRIM(entities.cui) as id,
-                TRIM(max(entities.str)) as name,
-                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
-                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
-                COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
-            FROM mrconso as entities
-            LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
-            LEFT JOIN (
-                select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
-                group by cui
-            ) as synonyms on synonyms.id = entities.cui
-            WHERE entities.lat='ENG' -- english
-            AND entities.ts='P' -- preferred terms (according to UMLS)
-            AND entities.ispref='Y' -- preferred term (according to UMLS)
-            AND entities.stt='PF' -- preferred term (according to UMLS)
-            GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
-        """
-
         client = await prisma_client(600)
+        source_sql = UmlsLoader.get_source_sql()
 
         async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
@@ -85,7 +94,7 @@ class UmlsLoader:
                 skip_duplicates=True,
             )
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
 
@@ -123,8 +132,7 @@ class UmlsLoader:
             round(time.monotonic() - start),
         )
 
-    @staticmethod
-    async def copy_relationships():
+    async def copy_relationships(self):
         """
         Copy relationships from umls to patents
 
@@ -133,22 +141,22 @@ class UmlsLoader:
         """
         source_sql = f"""
             SELECT
-                cui1 as head_id, max(head.str) as head_name,
-                cui2 as tail_id, max(tail.str) as tail_name,
-                COALESCE(rela, '') as relationship
+                cui1 AS head_id, MAX(head.str) AS head_name,
+                cui2 AS tail_id, MAX(tail.str) AS tail_name,
+                COALESCE(rela, '') AS relationship
             FROM mrrel
-            JOIN mrconso as head on head.cui = cui1
-            JOIN mrconso as tail on tail.cui = cui2
-            JOIN mrsty as head_semantic_type on head_semantic_type.cui = cui1
-            JOIN mrsty as tail_semantic_type on tail_semantic_type.cui = cui2
+            JOIN mrconso AS head on head.cui = cui1
+            JOIN mrconso AS tail on tail.cui = cui2
+            JOIN mrsty AS head_semantic_type ON head_semantic_type.cui = cui1
+            JOIN mrsty AS tail_semantic_type ON tail_semantic_type.cui = cui2
             WHERE head.lat='ENG'
             AND head.ts='P'
             AND head.ispref='Y'
             AND tail.lat='ENG'
             AND tail.ts='P'
             AND tail.ispref='Y'
-            AND head_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
-            AND tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+            AND head_semantic_type.tui IN {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+            AND tail_semantic_type.tui IN {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
             GROUP BY head_id, tail_id, relationship
         """
 
@@ -159,7 +167,7 @@ class UmlsLoader:
                 skip_duplicates=True,
             )
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
 
@@ -176,17 +184,17 @@ class UmlsLoader:
         # AND the tail name is a subset of the head synonyms (e.g. XYZ inhibitor -> XYZ)
         # then mark the relationship as 'isa'
         create_fun_query = """
-            create or replace function word_ngrams(str text, n int)
-            returns setof text language plpgsql as $$
-            declare
+            CREATE or REPLACE FUNCTION word_ngrams(str text, n int)
+            RETURNS setof text language plpgsql as $$
+            DECLARE
                 i int;
                 arr text[];
-            begin
+            BEGIN
                 arr := regexp_split_to_array(str, '[^[:alnum:]]+');
                 for i in 1 .. cardinality(arr)-n+1 loop
                     return next array_to_string(arr[i : i+n-1], ' ');
                 end loop;
-            end $$;
+            END $$;
         """
         # TODO: remove s, dash, and presense of non-distinguishing words like "receptor", "gene" and "antibody"
         await client.execute_raw(create_fun_query)
@@ -202,7 +210,7 @@ class UmlsLoader:
                 OR
                 (SELECT array_agg(word_ngrams) FROM word_ngrams(tail_name, 3)) && head_umls.synonyms
             )
-            and head_id<>tail_id
+            AND head_id<>tail_id
             AND NOT EXISTS (
                 SELECT 1 FROM umls_graph
                 WHERE umls_graph.relationship='isa'
@@ -229,9 +237,9 @@ class UmlsLoader:
                 WHERE NOT 'T116'=ANY(type_ids) -- Amino Acid, Peptide, or Protein
                 AND synonym IN (
                     SELECT synonym
-                    FROM umls, unnest(synonyms) synonym
+                    FROM umls, UNNEST(synonyms) synonym
                     WHERE 'T116'=ANY(type_ids)
-                    GROUP BY synonym having count(*) > 1
+                    GROUP BY synonym HAVING count(*) > 1
                 )
             )
         """
@@ -239,22 +247,14 @@ class UmlsLoader:
         await client.execute_raw(query)
 
     @staticmethod
-    async def copy_all():
-        """
-        Copy all UMLS data
-        """
-        await UmlsLoader.create_umls_lookup()
-        await UmlsLoader.copy_relationships()
-        await UmlsLoader.add_missing_relationships()
-
-    @staticmethod
-    async def post_doc_finalize_checksum():
+    @overrides(BaseEtl)
+    async def checksum():
         """
         Quick UMLS checksum
         """
         client = await prisma_client(300)
         checksums = {
-            "levels": f"SELECT level, COUNT(*) FROM umls group by level",
+            "levels": f"SELECT level, COUNT(*) FROM umls GROUP BY level",
         }
         results = await asyncio.gather(
             *[client.query_raw(query) for query in checksums.values()]
@@ -263,15 +263,27 @@ class UmlsLoader:
             logger.warning(f"UMLS Load checksum {key}: {result}")
         return
 
-    @staticmethod
-    async def post_doc_finalize():
+    @overrides(BaseEtl)
+    async def copy_all(self):
         """
-        To be run after initial UMLS, biomedical entity, and doc loads
+        Copy all UMLS data
+        """
+        await UmlsVectorizer()()
+
+        await self.create_umls_lookup()
+        await self.copy_vectors()
+        await self.copy_relationships()
+        await self.add_missing_relationships()
+
+    @staticmethod
+    async def finalize():
+        """
+        MUST BE RUN after initial UMLS, biomedical entity, and doc loads
         (since it depends upon those being present)
         """
         await UmlsLoader.set_ontology_levels()
         await UmlsLoader.remove_duplicates()
-        await UmlsLoader.post_doc_finalize_checksum()
+        await UmlsLoader.checksum()
 
 
 if __name__ == "__main__":
@@ -279,12 +291,17 @@ if __name__ == "__main__":
         print(
             """
             UMLS ETL
-            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load_umls [--post-doc-finalize]
+            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load_umls [--finalize]
             """
         )
         sys.exit()
 
-    if "--post-doc-finalize" in sys.argv:
-        asyncio.run(UmlsLoader().post_doc_finalize())
+    if "--finalize" in sys.argv:
+        asyncio.run(UmlsLoader.finalize())
     else:
-        asyncio.run(UmlsLoader.copy_all())
+        asyncio.run(
+            UmlsLoader(
+                record_type=VectorizableRecordType.umls,
+                source_db="umls",
+            ).copy_all()
+        )

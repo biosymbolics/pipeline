@@ -9,6 +9,13 @@ class DocType(Enum):
     all = "all"
 
 
+class VectorizableRecordType(Enum):
+    patent = "patent"
+    regulatory_approval = "regulatory_approval"
+    trial = "trial"
+    umls = "umls"
+
+
 DOC_TYPE_DATE_MAP: dict[DocType, str] = {
     DocType.patent: "priority_date",
     DocType.regulatory_approval: "approval_date",

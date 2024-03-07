@@ -3,8 +3,7 @@ from typing import Sequence
 from sentence_transformers import SentenceTransformer
 import torch
 
-from constants.core import DEFAULT_VECTORIZATION_MODEL
-from data.prediction.constants import DEFAULT_DEVICE
+from constants.core import DEFAULT_DEVICE, DEFAULT_VECTORIZATION_MODEL
 
 
 class Vectorizer:

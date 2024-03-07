@@ -11,6 +11,7 @@ SOURCE_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations_source"
 WORKING_BIOSYM_ANNOTATIONS_TABLE = "biosym_annotations"
 PATENT_VECTOR_TABLE = "patent_vectors"
 REGULATORY_APPROVAL_VECTOR_TABLE = "regulatory_approval_vectors"
+UMLS_VECTOR_TABLE = "umls_vectors"
 TRIAL_VECTOR_TABLE = "trial_vectors"
 REGULATORY_APPROVAL_TABLE = "regulatory_approval"
 SEARCH_TABLE = "doc_entity_search"
@@ -42,3 +43,5 @@ DEFAULT_NLP_MODEL_ARGS = {
     "padding": "max_length",
     "truncation": True,
 }
+
+DEFAULT_DEVICE = "mps"

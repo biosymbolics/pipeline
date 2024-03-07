@@ -1,13 +1,16 @@
 """
 General saveable torch model
 """
+
 import os
 from typing import Type, TypeVar, cast
 import torch
 import torch.nn as nn
 import logging
 
-from .constants import DEFAULT_CHECKPOINT_PATH, DEFAULT_DEVICE
+from constants.core import DEFAULT_DEVICE
+
+from .constants import DEFAULT_CHECKPOINT_PATH
 
 
 logger = logging.getLogger(__name__)
