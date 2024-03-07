@@ -1,13 +1,11 @@
 from typing import Sequence
-from scispacy.candidate_generation import (
-    CandidateGenerator,
-    MentionCandidate,
-)
 import logging
 
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
+from typings.documents.common import MentionCandidate
 
+from .candidate_generator import CandidateGenerator
 from .types import AbstractCandidateSelector, EntityWithScore
 from .utils import (
     apply_match_retry_rewrites,
@@ -33,15 +31,7 @@ class CandidateSelector(AbstractCandidateSelector):
 
     @overrides(AbstractCandidateSelector)
     def __init__(self, *args, min_similarity: float = MIN_SIMILARITY, **kwargs):
-        global UMLS_KB
-
-        if UMLS_KB is None:
-            from scispacy.linking_utils import UmlsKnowledgeBase
-
-            UMLS_KB = UmlsKnowledgeBase()
-
-        self.kb = UMLS_KB
-        self.candidate_generator = CandidateGenerator(*args, kb=UMLS_KB, **kwargs)
+        self.candidate_generator = CandidateGenerator()
 
         if min_similarity > 1:
             raise ValueError("min_similarity must be <= 1")
@@ -52,30 +42,13 @@ class CandidateSelector(AbstractCandidateSelector):
 
         self.min_similarity = min_similarity
 
-    def _score_candidate(
-        self,
-        concept_id: str,
-        matching_aliases: Sequence[str],
-        similarity: float,
-        is_composite: bool,
-    ) -> float:
-        return score_candidate(
-            concept_id,
-            self.kb.cui_to_entity[concept_id].canonical_name,
-            self.kb.cui_to_entity[concept_id].types,
-            self.kb.cui_to_entity[concept_id].aliases,
-            matching_aliases=matching_aliases,
-            syntactic_similarity=similarity,
-            is_composite=is_composite,
-        )
-
-    def _get_best_candidate(
+    async def _get_best_candidate(
         self, text: str, is_composite: bool
     ) -> tuple[MentionCandidate, float] | None:
         """
         Select the best candidate for a mention
         """
-        _candidates = self.candidate_generator([text], k=K)[0]
+        _candidates = (await self.candidate_generator([text], k=K))[0]
         if len(_candidates) == 0:
             logger.warning(f"No candidates found for {text}")
             return None
@@ -88,7 +61,7 @@ class CandidateSelector(AbstractCandidateSelector):
         sufficiently_similiar_candidates = [
             candidate
             for candidate in candidates
-            if candidate.similarities[0] >= self.min_similarity
+            if candidate.similarity >= self.min_similarity
         ]
 
         if len(sufficiently_similiar_candidates) == 0:
@@ -98,17 +71,15 @@ class CandidateSelector(AbstractCandidateSelector):
             # apply rewrites and look for another match
             rewritten_text = apply_match_retry_rewrites(text)
             if rewritten_text is not None:
-                return self._get_best_candidate(rewritten_text, is_composite)
+                return await self._get_best_candidate(rewritten_text, is_composite)
             return None
 
         # score candidates
         scored_candidates = [
             (
                 candidate,
-                self._score_candidate(
-                    candidate.concept_id,
-                    candidate.aliases,
-                    candidate.similarities[0],
+                score_candidate(
+                    candidate,
                     is_composite=is_composite,
                 ),
             )
@@ -122,33 +93,33 @@ class CandidateSelector(AbstractCandidateSelector):
         return sorted_candidates[0]
 
     @overrides(AbstractCandidateSelector)
-    def select_candidate(
+    async def select_candidate(
         self, text: str, is_composite: bool = False
     ) -> EntityWithScore | None:
         """
         Select the best candidate for a mention
         """
-        res = self._get_best_candidate(text, is_composite)
+        res = await self._get_best_candidate(text, is_composite)
 
         if res is None:
             return None
 
         candidate, score = res
-        top_canonical = candidate_to_canonical(candidate, self.kb)
+        top_canonical = candidate_to_canonical(candidate)
         return top_canonical, score
 
     @overrides(AbstractCandidateSelector)
-    def select_candidate_from_entity(
+    async def select_candidate_from_entity(
         self, entity: DocEntity, is_composite: bool = False
     ) -> EntityWithScore | None:
-        return self.select_candidate(entity.term, is_composite)
+        return await self.select_candidate(entity.term, is_composite)
 
     @overrides(AbstractCandidateSelector)
-    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        candidate = self.select_candidate(entity.term)
+        candidate = await self.select_candidate(entity.term)
 
         if candidate is None:
             return None

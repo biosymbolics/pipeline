@@ -1,5 +1,6 @@
 from enum import Enum
 from prisma.enums import BiomedicalEntityType
+from pydantic import BaseModel
 
 
 class DocType(Enum):
@@ -58,3 +59,12 @@ DOMAINS_OF_INTEREST = [
     # "inventors",
     # ATTRIBUTE_FIELD,
 ]
+
+
+class MentionCandidate(BaseModel):
+    id: str
+    # definition: str
+    name: str
+    similarity: float
+    synonyms: list[str]
+    types: list[str]

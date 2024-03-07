@@ -30,26 +30,19 @@ def is_composite_eligible(
     return True
 
 
-def form_composite_name(members: Sequence[CanonicalEntity], kb: KnowledgeBase) -> str:
+def form_composite_name(members: Sequence[CanonicalEntity]) -> str:
     """
     Form a composite name from the entities from which it is comprised
     """
 
-    def get_name_part(c: CanonicalEntity):
-        if c.id in kb.cui_to_entity:
-            ce = kb.cui_to_entity[c.id]
-            return clean_umls_name(
-                ce.concept_id, ce.canonical_name, ce.aliases, ce.types, True
-            )
-        return c.name
+    def get_name_part(ce: CanonicalEntity):
+        return clean_umls_name(ce.id or ce.name, ce.name, ce.aliases, ce.types, True)
 
     name = " ".join([get_name_part(c) for c in members])
     return name
 
 
-def form_composite_entity(
-    members: Sequence[CanonicalEntity], kb: KnowledgeBase
-) -> CanonicalEntity:
+def form_composite_entity(members: Sequence[CanonicalEntity]) -> CanonicalEntity:
     """
     Form a composite from a list of member entities
     """
@@ -67,7 +60,7 @@ def form_composite_entity(
     types = flatten([m.types for m in selected_members])
 
     # form name from comprising candidates
-    name = form_composite_name(selected_members, kb)
+    name = form_composite_name(selected_members)
 
     return CanonicalEntity(
         id="|".join(ids),
