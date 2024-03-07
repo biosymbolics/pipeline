@@ -125,10 +125,10 @@ async def load_all(force_update: bool = False):
     )
 
     # do final biomedical entity stuff that requires everything else be in place
-    await BiomedicalEntityLoader().post_finalize()
+    await BiomedicalEntityLoader().finalize()
 
     # finally, link owners
-    await OwnerLoader().post_finalize()
+    await OwnerLoader().finalize()
 
     # create some materialized views for reporting
     for query in get_entity_map_matview_query():

@@ -21,7 +21,6 @@ from data.etl.entity.base_entity_etl import BaseEntityEtl
 from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
-from utils.list import batch
 
 from .constants import OwnerTypePriorityMap
 from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
@@ -197,11 +196,6 @@ class OwnerEtl(BaseEntityEtl):
 
     @overrides(BaseEntityEtl)
     @staticmethod
-    async def pre_finalize():
-        pass
-
-    @overrides(BaseEntityEtl)
-    @staticmethod
     async def add_counts():
         """
         add counts to owner table (used for autocomplete ordering)
@@ -342,7 +336,7 @@ class OwnerEtl(BaseEntityEtl):
 
     @overrides(BaseEntityEtl)
     @staticmethod
-    async def post_finalize():
+    async def finalize():
         """
         Run after:
             1) all biomedical entities are loaded

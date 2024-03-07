@@ -128,21 +128,21 @@ class OwnerLoader:
         return
 
     @staticmethod
-    async def post_finalize():
-        await OwnerEtl.post_finalize()
+    async def finalize():
+        await OwnerEtl.finalize()
 
 
 if __name__ == "__main__":
     if "-h" in sys.argv:
         print(
             """
-            Usage: python3 -m data.etl.entity.owner.load_owner [--post-finalize] [--force_update]
+            Usage: python3 -m data.etl.entity.owner.load_owner [--finalize] [--force_update]
             """
         )
         sys.exit()
 
-    if "--post-finalize" in sys.argv:
-        asyncio.run(OwnerLoader().post_finalize())
+    if "--finalize" in sys.argv:
+        asyncio.run(OwnerLoader().finalize())
     else:
         is_force_update = "--force_update" in sys.argv
         asyncio.run(OwnerLoader().copy_all(is_force_update))

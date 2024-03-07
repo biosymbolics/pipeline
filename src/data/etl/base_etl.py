@@ -54,5 +54,9 @@ class BaseEtl:
             await client.execute_raw(query)
 
     @staticmethod
+    async def finalize():
+        raise NotImplementedError
+
+    @staticmethod
     async def checksum():
         raise NotImplementedError

@@ -276,9 +276,9 @@ class UmlsLoader(BaseEtl):
         await self.add_missing_relationships()
 
     @staticmethod
-    async def post_doc_finalize():
+    async def finalize():
         """
-        To be run after initial UMLS, biomedical entity, and doc loads
+        MUST BE RUN after initial UMLS, biomedical entity, and doc loads
         (since it depends upon those being present)
         """
         await UmlsLoader.set_ontology_levels()
@@ -291,13 +291,13 @@ if __name__ == "__main__":
         print(
             """
             UMLS ETL
-            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load_umls [--post-doc-finalize]
+            Usage: python3 -m data.etl.entity.biomedical_entity.umls.load_umls [--finalize]
             """
         )
         sys.exit()
 
-    if "--post-doc-finalize" in sys.argv:
-        asyncio.run(UmlsLoader.post_doc_finalize())
+    if "--finalize" in sys.argv:
+        asyncio.run(UmlsLoader.finalize())
     else:
         asyncio.run(
             UmlsLoader(
