@@ -51,7 +51,7 @@ from .enums import (
     calc_duration,
 )
 
-from ..base_document import BaseDocumentEtl
+from ..base_document_etl import BaseDocumentEtl
 
 
 logger = logging.getLogger(__name__)
@@ -420,7 +420,7 @@ class TrialLoader(BaseDocumentEtl):
 
             return True
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=self.get_source_sql(),
             batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore

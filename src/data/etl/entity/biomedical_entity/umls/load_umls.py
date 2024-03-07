@@ -6,7 +6,6 @@ import asyncio
 import sys
 import logging
 import time
-from typing import Sequence
 from prisma.enums import OntologyLevel
 from prisma.models import UmlsGraph, Umls
 from prisma.types import (
@@ -20,8 +19,12 @@ from clients.low_level.prisma import batch_update, prisma_client
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.umls import BIOMEDICAL_GRAPH_UMLS_TYPES
 from data.domain.biomedical.umls import clean_umls_name
+from data.etl.base_etl import BaseEtl
 from system import initialize
+from typings.documents.common import VectorizableRecordType
+from utils.classes import overrides
 
+from .vectorize_umls import UmlsVectorizer
 from .umls_transform import UmlsAncestorTransformer
 
 logger = logging.getLogger(__name__)
@@ -33,7 +36,7 @@ BATCH_SIZE = 10000
 initialize()
 
 
-class UmlsLoader:
+class UmlsLoader(BaseEtl):
     @staticmethod
     def get_source_sql(filters: list[str] | None = None, limit: int | None = None):
         return f"""
@@ -59,8 +62,7 @@ class UmlsLoader:
             {'LIMIT ' + str(limit) if limit else ''}
         """
 
-    @staticmethod
-    async def create_umls_lookup():
+    async def create_umls_lookup(self):
         """
         Create UMLS lookup table
 
@@ -92,7 +94,7 @@ class UmlsLoader:
                 skip_duplicates=True,
             )
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
 
@@ -246,16 +248,8 @@ class UmlsLoader:
         await client.execute_raw(query)
 
     @staticmethod
-    async def copy_all():
-        """
-        Copy all UMLS data
-        """
-        await UmlsLoader.create_umls_lookup()
-        await UmlsLoader.copy_relationships()
-        await UmlsLoader.add_missing_relationships()
-
-    @staticmethod
-    async def post_doc_finalize_checksum():
+    @overrides(BaseEtl)
+    async def checksum():
         """
         Quick UMLS checksum
         """
@@ -270,6 +264,18 @@ class UmlsLoader:
             logger.warning(f"UMLS Load checksum {key}: {result}")
         return
 
+    @overrides(BaseEtl)
+    async def copy_all(self):
+        """
+        Copy all UMLS data
+        """
+        await UmlsVectorizer()()
+
+        await self.create_umls_lookup()
+        await self.copy_vectors()
+        await self.copy_relationships()
+        await self.add_missing_relationships()
+
     @staticmethod
     async def post_doc_finalize():
         """
@@ -278,7 +284,7 @@ class UmlsLoader:
         """
         await UmlsLoader.set_ontology_levels()
         await UmlsLoader.remove_duplicates()
-        await UmlsLoader.post_doc_finalize_checksum()
+        await UmlsLoader.checksum()
 
 
 if __name__ == "__main__":
@@ -292,6 +298,11 @@ if __name__ == "__main__":
         sys.exit()
 
     if "--post-doc-finalize" in sys.argv:
-        asyncio.run(UmlsLoader().post_doc_finalize())
+        asyncio.run(UmlsLoader.post_doc_finalize())
     else:
-        asyncio.run(UmlsLoader.copy_all())
+        asyncio.run(
+            UmlsLoader(
+                record_type=VectorizableRecordType.umls,
+                source_db=SOURCE_DB,
+            ).copy_all()
+        )

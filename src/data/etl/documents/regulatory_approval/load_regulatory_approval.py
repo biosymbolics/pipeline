@@ -30,7 +30,7 @@ from utils.classes import overrides
 from .constants import DESIRABLE_LABEL_SECTIONS
 from .types import InterventionIntermediate, PharmaClass
 
-from ..base_document import BaseDocumentEtl
+from ..base_document_etl import BaseDocumentEtl
 
 
 logger = logging.getLogger(__name__)
@@ -229,7 +229,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "MAX(label.pdf_url) AS url",
             "CASE WHEN MAX(prod.marketing_status) in ('NDA', 'BLA') THEN 200 ELSE 30 END AS traction",
         ]
-        approvals = await PsqlDatabaseClient(SOURCE_DB).select(
+        approvals = await PsqlDatabaseClient(self.source_db).select(
             query=RegulatoryApprovalLoader.get_source_sql(fields)
         )
 
@@ -306,6 +306,6 @@ if __name__ == "__main__":
 
     asyncio.run(
         RegulatoryApprovalLoader(
-            document_type=DocType.regulatory_approval, source_db="drugcentral"
+            document_type=DocType.regulatory_approval, source_db=SOURCE_DB
         ).copy_all(is_update)
     )

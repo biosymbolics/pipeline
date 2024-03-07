@@ -3,7 +3,7 @@ import sys
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SEARCH_TABLE
-from typings.documents.common import DocType
+from typings.documents.common import DocType, VectorizableRecordType
 from .entity import BiomedicalEntityLoader, OwnerLoader, UmlsLoader
 from .documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader
 
@@ -98,7 +98,9 @@ async def load_all(force_update: bool = False):
             If update, documents and their relations are first deleted.
     """
     # copy umls data
-    await UmlsLoader().copy_all()
+    await UmlsLoader(
+        record_type=VectorizableRecordType.umls, source_db="umls"
+    ).copy_all()
 
     # copy all biomedical entities (from all doc types)
     # Takes 3+ hours!!

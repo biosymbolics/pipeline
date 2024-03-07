@@ -25,14 +25,13 @@ from data.etl.types import BiomedicalEntityLoadSpec
 from typings import DocType
 from utils.classes import overrides
 
-from ..base_document import BaseDocumentEtl
+from ..base_document_etl import BaseDocumentEtl
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/patents"
 INTERVENTION_DOMAINS: list[LegacyDomainType] = [
     "biologics",
     "compounds",
@@ -293,14 +292,14 @@ class PatentLoader(BaseDocumentEtl):
 
             return True
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=self.get_source_sql(PATENT_SOURCE_FIELDS),
             batch_size=10000,
             handle_result_batch=handle_batch,  # type: ignore
         )
 
         # create "indicatable" records, those that map approval to a canonical indication
-        indicatable_records = await PsqlDatabaseClient(SOURCE_DB).select(
+        indicatable_records = await PsqlDatabaseClient(self.source_db).select(
             query=get_mapping_entities_sql(["diseases"])
         )
         await Indicatable.prisma().create_many(
@@ -318,7 +317,7 @@ class PatentLoader(BaseDocumentEtl):
         )
 
         # create "intervenable" records, those that map approval to a canonical intervention
-        intervenable_records = await PsqlDatabaseClient(SOURCE_DB).select(
+        intervenable_records = await PsqlDatabaseClient(self.source_db).select(
             query=get_mapping_entities_sql(INTERVENTION_DOMAINS)
         )
         await Intervenable.prisma().create_many(
