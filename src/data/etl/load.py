@@ -78,6 +78,9 @@ MANUAL_INDICES = [
     CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
     """,
     """
+    CREATE INDEX IF NOT EXISTS umls_vector ON umls USING hnsw (vector vector_cosine_ops);
+    """,
+    """
     CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
     """
     """,
