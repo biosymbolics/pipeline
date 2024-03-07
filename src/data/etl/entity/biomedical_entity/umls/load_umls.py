@@ -6,6 +6,7 @@ import asyncio
 import sys
 import logging
 import time
+from typing import Sequence
 from prisma.enums import OntologyLevel
 from prisma.models import UmlsGraph, Umls
 from prisma.types import (
@@ -34,14 +35,8 @@ initialize()
 
 class UmlsLoader:
     @staticmethod
-    async def create_umls_lookup():
-        """
-        Create UMLS lookup table
-
-        Creates a table of UMLS entities: id, name, ancestor ids
-        """
-
-        source_sql = f"""
+    def get_source_sql(filters: list[str] | None = None, limit: int | None = None):
+        return f"""
             SELECT
                 TRIM(entities.cui) as id,
                 TRIM(max(entities.str)) as name,
@@ -58,10 +53,22 @@ class UmlsLoader:
             AND entities.ts='P' -- preferred terms (according to UMLS)
             AND entities.ispref='Y' -- preferred term (according to UMLS)
             AND entities.stt='PF' -- preferred term (according to UMLS)
+            {('AND ' + ' AND '.join(filters)) if filters else ''}
             GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
+            ORDER BY entities.cui asc
+            {'LIMIT ' + str(limit) if limit else ''}
+        """
+
+    @staticmethod
+    async def create_umls_lookup():
+        """
+        Create UMLS lookup table
+
+        Creates a table of UMLS entities: id, name, ancestor ids
         """
 
         client = await prisma_client(600)
+        source_sql = UmlsLoader.get_source_sql()
 
         async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
