@@ -323,9 +323,9 @@ model TrialOutcome {
 }
 
 model Umls {
-    id                  String             @id @unique
-    biomedical_entities BiomedicalEntity[] @relation("entity_to_umls") // backref
-    count               Int                @default(0)
+    id                  String                      @id @unique
+    biomedical_entities BiomedicalEntity[]          @relation("entity_to_umls") // backref
+    count               Int                         @default(0)
     level               OntologyLevel
     name                String
     preferred_name      String
@@ -333,6 +333,7 @@ model Umls {
     synonyms            String[]
     type_ids            String[]
     type_names          String[]
+    vector              Unsupported("vector(768)")?
 
     @@map("umls")
 }
