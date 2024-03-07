@@ -123,6 +123,7 @@ class OwnerEtl(BaseEntityEtl):
         )
 
         logger.info("Updated owners")
+        return
 
     async def load_financials(self, public_companies: Sequence[CompanyInfo]):
         """
@@ -192,6 +193,7 @@ class OwnerEtl(BaseEntityEtl):
 
         await self.create_records(names, counts)
         await self.load_financials(public_companies)
+        return
 
     @overrides(BaseEntityEtl)
     @staticmethod

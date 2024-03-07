@@ -30,7 +30,6 @@ from .umls_transform import UmlsAncestorTransformer
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SOURCE_DB = "umls"
 BATCH_SIZE = 10000
 
 initialize()
@@ -41,24 +40,25 @@ class UmlsLoader(BaseEtl):
     def get_source_sql(filters: list[str] | None = None, limit: int | None = None):
         return f"""
             SELECT
-                TRIM(entities.cui) as id,
-                TRIM(max(entities.str)) as name,
-                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) as type_ids,
-                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) as type_names,
+                TRIM(entities.cui) AS id,
+                TRIM(max(entities.str)) AS name,
+                COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) AS type_ids,
+                COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) AS type_names,
                 COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
-            FROM mrconso as entities
-            LEFT JOIN mrsty as semantic_types on semantic_types.cui = entities.cui
+            FROM mrconso AS entities
+            LEFT JOIN mrsty AS semantic_types ON semantic_types.cui = entities.cui
             LEFT JOIN (
-                select array_agg(distinct(lower(str))) as terms, cui as id from mrconso
-                group by cui
-            ) as synonyms on synonyms.id = entities.cui
+                SELECT ARRAY_AGG(DISTINCT(LOWER(str))) AS terms, cui AS id
+                FROM mrconso
+                GROUP BY cui
+            ) AS synonyms ON synonyms.id = entities.cui
             WHERE entities.lat='ENG' -- english
             AND entities.ts='P' -- preferred terms (according to UMLS)
             AND entities.ispref='Y' -- preferred term (according to UMLS)
             AND entities.stt='PF' -- preferred term (according to UMLS)
             {('AND ' + ' AND '.join(filters)) if filters else ''}
             GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
-            ORDER BY entities.cui asc
+            ORDER BY entities.cui ASC
             {'LIMIT ' + str(limit) if limit else ''}
         """
 
@@ -132,8 +132,7 @@ class UmlsLoader(BaseEtl):
             round(time.monotonic() - start),
         )
 
-    @staticmethod
-    async def copy_relationships():
+    async def copy_relationships(self):
         """
         Copy relationships from umls to patents
 
@@ -142,22 +141,22 @@ class UmlsLoader(BaseEtl):
         """
         source_sql = f"""
             SELECT
-                cui1 as head_id, max(head.str) as head_name,
-                cui2 as tail_id, max(tail.str) as tail_name,
-                COALESCE(rela, '') as relationship
+                cui1 AS head_id, MAX(head.str) AS head_name,
+                cui2 AS tail_id, MAX(tail.str) AS tail_name,
+                COALESCE(rela, '') AS relationship
             FROM mrrel
-            JOIN mrconso as head on head.cui = cui1
-            JOIN mrconso as tail on tail.cui = cui2
-            JOIN mrsty as head_semantic_type on head_semantic_type.cui = cui1
-            JOIN mrsty as tail_semantic_type on tail_semantic_type.cui = cui2
+            JOIN mrconso AS head on head.cui = cui1
+            JOIN mrconso AS tail on tail.cui = cui2
+            JOIN mrsty AS head_semantic_type ON head_semantic_type.cui = cui1
+            JOIN mrsty AS tail_semantic_type ON tail_semantic_type.cui = cui2
             WHERE head.lat='ENG'
             AND head.ts='P'
             AND head.ispref='Y'
             AND tail.lat='ENG'
             AND tail.ts='P'
             AND tail.ispref='Y'
-            AND head_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
-            AND tail_semantic_type.tui in {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+            AND head_semantic_type.tui IN {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
+            AND tail_semantic_type.tui IN {tuple(BIOMEDICAL_GRAPH_UMLS_TYPES.keys())}
             GROUP BY head_id, tail_id, relationship
         """
 
@@ -168,7 +167,7 @@ class UmlsLoader(BaseEtl):
                 skip_duplicates=True,
             )
 
-        await PsqlDatabaseClient(SOURCE_DB).execute_query(
+        await PsqlDatabaseClient(self.source_db).execute_query(
             query=source_sql, batch_size=BATCH_SIZE, handle_result_batch=handle_batch
         )
 
@@ -185,17 +184,17 @@ class UmlsLoader(BaseEtl):
         # AND the tail name is a subset of the head synonyms (e.g. XYZ inhibitor -> XYZ)
         # then mark the relationship as 'isa'
         create_fun_query = """
-            create or replace function word_ngrams(str text, n int)
-            returns setof text language plpgsql as $$
-            declare
+            CREATE or REPLACE FUNCTION word_ngrams(str text, n int)
+            RETURNS setof text language plpgsql as $$
+            DECLARE
                 i int;
                 arr text[];
-            begin
+            BEGIN
                 arr := regexp_split_to_array(str, '[^[:alnum:]]+');
                 for i in 1 .. cardinality(arr)-n+1 loop
                     return next array_to_string(arr[i : i+n-1], ' ');
                 end loop;
-            end $$;
+            END $$;
         """
         # TODO: remove s, dash, and presense of non-distinguishing words like "receptor", "gene" and "antibody"
         await client.execute_raw(create_fun_query)
@@ -211,7 +210,7 @@ class UmlsLoader(BaseEtl):
                 OR
                 (SELECT array_agg(word_ngrams) FROM word_ngrams(tail_name, 3)) && head_umls.synonyms
             )
-            and head_id<>tail_id
+            AND head_id<>tail_id
             AND NOT EXISTS (
                 SELECT 1 FROM umls_graph
                 WHERE umls_graph.relationship='isa'
@@ -238,9 +237,9 @@ class UmlsLoader(BaseEtl):
                 WHERE NOT 'T116'=ANY(type_ids) -- Amino Acid, Peptide, or Protein
                 AND synonym IN (
                     SELECT synonym
-                    FROM umls, unnest(synonyms) synonym
+                    FROM umls, UNNEST(synonyms) synonym
                     WHERE 'T116'=ANY(type_ids)
-                    GROUP BY synonym having count(*) > 1
+                    GROUP BY synonym HAVING count(*) > 1
                 )
             )
         """
@@ -255,7 +254,7 @@ class UmlsLoader(BaseEtl):
         """
         client = await prisma_client(300)
         checksums = {
-            "levels": f"SELECT level, COUNT(*) FROM umls group by level",
+            "levels": f"SELECT level, COUNT(*) FROM umls GROUP BY level",
         }
         results = await asyncio.gather(
             *[client.query_raw(query) for query in checksums.values()]
@@ -303,6 +302,6 @@ if __name__ == "__main__":
         asyncio.run(
             UmlsLoader(
                 record_type=VectorizableRecordType.umls,
-                source_db=SOURCE_DB,
+                source_db="umls",
             ).copy_all()
         )
