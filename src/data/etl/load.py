@@ -69,25 +69,16 @@ def get_entity_map_matview_query() -> list[str]:
 
 # these get wiped for every prisma db push. Will figure out a better way to handle this.
 # https://github.com/prisma/prisma/issues/12751
+# check progress: SELECT phase, round(100.0 * blocks_done / nullif(blocks_total, 0), 1) AS "%" FROM pg_stat_progress_create_index
 MANUAL_INDICES = [
     "SET maintenance_work_mem = '5GB'",
     """
-    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
-    """,
-    """
-    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
-    """,
-    """
-    CREATE INDEX IF NOT EXISTS umls_vector ON umls USING hnsw (vector vector_cosine_ops);
-    """,
-    """
-    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
-    """
-    """,
     CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
-    """,
-    """
     CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);
+    CREATE INDEX IF NOT EXISTS regulatory_approval_vector ON regulatory_approval USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS patent_vector ON patent USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS trial_vector ON trial USING hnsw (vector vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS umls_vector ON umls USING hnsw (vector vector_cosine_ops);
     """,
 ]
 

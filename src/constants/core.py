@@ -43,3 +43,5 @@ DEFAULT_NLP_MODEL_ARGS = {
     "padding": "max_length",
     "truncation": True,
 }
+
+DEFAULT_DEVICE = "mps"
