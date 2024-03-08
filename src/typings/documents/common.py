@@ -1,6 +1,7 @@
 from enum import Enum
 from prisma.enums import BiomedicalEntityType
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, SkipValidation, field_validator
+import torch
 
 
 class DocType(Enum):
@@ -62,9 +63,20 @@ DOMAINS_OF_INTEREST = [
 
 
 class MentionCandidate(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: str
     # definition: str
     name: str
-    similarity: float
+    semantic_similarity: float
+    syntactic_similarity: float
     synonyms: list[str]
     types: list[str]
+    vector: torch.Tensor
+
+    @field_validator("vector", mode="before")
+    def vector_from_string(cls, vec):
+        # vec may be a string due to prisma limitations
+        if isinstance(vec, str):
+            return torch.tensor([float(v) for v in vec.strip("[]").split(",")])
+        return vec

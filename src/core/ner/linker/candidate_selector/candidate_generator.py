@@ -1,3 +1,4 @@
+import time
 import torch
 import logging
 
@@ -21,7 +22,7 @@ class CandidateGenerator:
         mention_vec: torch.Tensor,
         k: int,
         min_similarity: float = 0.85,
-    ) -> list[MentionCandidate]:
+    ) -> tuple[list[MentionCandidate], torch.Tensor]:
         """
         Get candidates for a mention
         """
@@ -34,16 +35,17 @@ class CandidateGenerator:
         # ALTER SYSTEM SET pg_trgm.similarity_threshold = 0.9;
         query = f"""
             SELECT
-                umls.id as id,
-                name,
-                ARRAY_AGG(umls_synonym.term) as synonyms,
-                MAX(type_ids) AS types,
-                1 - (AVG(vector) <=> '{float_vec}') as similarity,
-                MAX(similarity('{mention}', term)) as syntactic_similarity
-            FROM umls_synonym, umls
+                umls.id AS id,
+                umls.name as name,
+                synonyms,
+                type_ids AS types,
+                COALESCE(1 - (vector <=> '{float_vec}'), 0.0) AS semantic_similarity,
+                similarity(matches.name, '{mention}') AS syntactic_similarity,
+                vector::text AS vector
+            FROM umls
             JOIN (
-                SELECT * from (
-                    SELECT id
+                SELECT * FROM (
+                    SELECT id, name
                     FROM umls
                     WHERE (vector <=> '{float_vec}') < 1 - {min_similarity}
                     ORDER BY vector <=> '{float_vec}' ASC
@@ -52,19 +54,20 @@ class CandidateGenerator:
 
                 UNION
 
-                select umls_id as id from umls_synonym where '{mention}' % term
+                SELECT umls_id AS id, term AS name
+                FROM umls_synonym
+                WHERE '{mention}' % term
             ) AS matches ON matches.id = umls.id
-            WHERE umls.id = umls_synonym.umls_id
-            GROUP BY umls.id, name
-            ORDER BY vector <=> '{float_vec}' ASC
-            LIMIT {k}
+            WHERE vector is not null
         """
+        start = time.time()
         res = await self.db.query_raw(query)
-        return [MentionCandidate(**r) for r in res]
+        logger.info("Query time: %ss", round(time.time() - start))
+        return [MentionCandidate(**r) for r in res], mention_vec
 
     async def __call__(
-        self, mentions: list[str], k: int = 5, min_similarity: float = 0.85
-    ) -> list[list[MentionCandidate]]:
+        self, mentions: list[str], k: int = 10, min_similarity: float = 0.85
+    ) -> list[tuple[list[MentionCandidate], torch.Tensor]]:
         """
         Generate candidates for a list of mentions
         """

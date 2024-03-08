@@ -327,10 +327,11 @@ model Umls {
     biomedical_entities BiomedicalEntity[]          @relation("entity_to_umls") // backref
     count               Int                         @default(0)
     level               OntologyLevel
+    lookup_synonyms     UmlsSynonym[]
     name                String
     preferred_name      String
     rollup_id           String // TODO: add as biomedical parent
-    synonyms            UmlsSynonym[]
+    synonyms            String[]
     type_ids            String[]
     type_names          String[]
     vector              Unsupported("vector(768)")?

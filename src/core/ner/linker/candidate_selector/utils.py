@@ -97,18 +97,19 @@ def get_orthogonal_members(
 
 def score_candidate(
     candidate: MentionCandidate,
+    mention_vector: torch.Tensor,
     is_composite: bool,
 ) -> float:
     """
-    Generate a score for a candidate (semantic or not)
+    Generate a score for a semantic candidate
 
     - suppresses certain CUIs
     - suppresses certain names
     - scores based on
         1. UMLS type (tui)
-        2. syntactic similarity (if supplied)
+        2. syntactic similarity
+        3. semantic similarity (with residual penalty) similarity
     """
-
     if is_umls_suppressed(candidate.id, candidate.name, [], is_composite):
         return 0.0
 
@@ -118,38 +119,18 @@ def score_candidate(
     # score based on the UMLS type (tui) of the candidate
     type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.7) for ct in candidate.types])
 
-    return round(type_score * alias_score, 3)
+    base_score = round(type_score * alias_score, 3)
 
-
-def score_semantic_candidate(
-    candidate: MentionCandidate,
-    original_vector: torch.Tensor,
-    candidate_vector: torch.Tensor,
-    syntactic_similarity: float,
-    is_composite: bool,
-) -> float:
-    """
-    Generate a score for a semantic candidate
-
-    Score based on
-    - "score_candidate" rules
-    - syntactic similarity
-    """
-    type_score = score_candidate(
-        candidate,
-        is_composite=is_composite,
-    )
-
-    if type_score == 0:
+    if base_score == 0:
         return 0.0
 
     semantic_similarity = similarity_with_residual_penalty(
-        original_vector, candidate_vector, name=candidate.name
+        mention_vector, candidate.vector, name=candidate.name
     )
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
-        + SYNTACTIC_SIMILARITY_WEIGHT * syntactic_similarity
-    ) * type_score
+        + SYNTACTIC_SIMILARITY_WEIGHT * candidate.syntactic_similarity
+    ) * base_score
 
 
 def candidate_to_canonical(candidate: MentionCandidate) -> CanonicalEntity:
@@ -195,7 +176,7 @@ def apply_umls_word_overrides(
                 },
                 id=overrides[text.lower()],
                 synonyms=[text],
-                similarity=1,
+                semantic_similarity=1,
             )
         ]
     return candidates

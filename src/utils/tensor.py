@@ -237,7 +237,6 @@ def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor
 def similarity_with_residual_penalty(
     a: torch.Tensor,
     b: torch.Tensor,
-    distance: float | None = None,  # cosine/"angular" distance
     alpha: float = 0.45,
     name: str = "na",
 ) -> float:
@@ -250,12 +249,7 @@ def similarity_with_residual_penalty(
         distance (float, optional): cosine/"angular" distance. Defaults to None, in which case it is computed.
         alpha (float, optional): 1 - a == weight of the residual penalty. Defaults to 0.5.
     """
-    if distance is None:
-        _distance = 1 - F.cosine_similarity(a, b, dim=0)
-    else:
-        _distance = torch.tensor(distance)
-
-    similarity = 2 - _distance
+    similarity = 2 - F.cosine_similarity(a, b, dim=0)
 
     # Compute residual
     residual = torch.subtract(a, b)

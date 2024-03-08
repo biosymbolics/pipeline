@@ -35,7 +35,7 @@ class CompositeCandidateSelector(CandidateSelector):
         self,
         *args,
         min_similarity: float = 0.85,
-        min_composite_similarity: float = 0.8,
+        min_composite_similarity: float = 0.85,
         min_word_length: int = 2,
         ngrams_n: int = 3,
         **kwargs
@@ -76,10 +76,10 @@ class CompositeCandidateSelector(CandidateSelector):
         else:
             doc = entity.spacy_doc
 
-        ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
+        ngrams, ngram_vectors = generate_ngram_spans(doc, entity.vector)
         ngram_entity_map = {
             ng.text: await self.select_candidate_by_vector(
-                vector, ng.text, self.min_composite_similarity - 0.2
+                vector, ng.text, self.min_composite_similarity, is_composite=True
             )
             for ng, vector in zip(ngrams, ngram_vectors)
             if len(ng.text) > 1  # avoid weird matches for single characters/nums
