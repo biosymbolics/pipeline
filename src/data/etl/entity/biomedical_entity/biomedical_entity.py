@@ -19,8 +19,7 @@ from spacy.lang.en import stop_words
 
 from clients.low_level.prisma import batch_update, prisma_client
 from constants.umls import UMLS_COMMON_BASES
-from core.ner.cleaning import CleanFunction
-from core.ner.linker.types import CandidateSelectorType
+from core.ner.linker.candidate_selector import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
@@ -67,14 +66,14 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         for term in terms:
             yield " ".join([w for w in term.split() if w not in stop_words.STOP_WORDS])
 
-    def _generate_lookup_map(
+    async def _generate_lookup_map(
         self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
     ) -> dict[str, CanonicalEntity]:
         """
         Generate canonical map for source terms
         """
 
-        lookup_docs = self.normalizer.normalize_strings(terms, vectors)
+        lookup_docs = await self.normalizer.normalize_strings(terms, vectors)
 
         # map for quick lookup of canonical entities
         lookup_map = {
@@ -208,7 +207,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             vectors_to_canonicalize (Sequence[Sequence[float]]): vectors to canonicalize, if we have them
             source_map (dict): map of "term" to source record for additional fields, e.g. synonyms, "active_ingredients", etc.
         """
-        canonical_map = self._generate_lookup_map(
+        canonical_map = await self._generate_lookup_map(
             terms_to_canonicalize or terms, vectors_to_canonicalize
         )
         create_data, upsert_data = self._generate_crud(terms, source_map, canonical_map)

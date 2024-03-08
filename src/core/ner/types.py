@@ -78,6 +78,7 @@ class DocEntity(BaseModel):
             if vector is not None:
                 if isinstance(vector, list):
                     return torch.tensor(vector)
+                return vector
             elif spacy_doc is not None:
                 return torch.tensor(spacy_doc.vector)
             return None

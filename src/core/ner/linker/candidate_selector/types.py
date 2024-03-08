@@ -34,21 +34,21 @@ class AbstractCandidateSelector(object):
         pass
 
     @abstractmethod
-    def select_candidate_from_entity(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
+    async def select_candidate_from_entity(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
         """
         Generate & select candidates for a mention text, returning best candidate & score
         """
         raise NotImplementedError
 
     @abstractmethod
-    def select_candidate(self, text: str, vector: torch.Tensor | None = None) -> ST | None:  # type: ignore # TODO
+    async def select_candidate(self, text: str, vector: torch.Tensor | None = None) -> ST | None:  # type: ignore # TODO
         """
         Generate & select candidates for a mention text, returning best candidate & score
         """
         raise NotImplementedError
 
     @abstractmethod
-    def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
@@ -56,16 +56,3 @@ class AbstractCandidateSelector(object):
 
 
 ES = TypeVar("ES", bound=EntityWithScore)
-
-
-class AbstractCompositeCandidateSelector(object):
-    """
-    Base class for composite candidate selectors
-    """
-
-    @abstractmethod
-    def generate_candidate(self, entity: DocEntity) -> ES | None:
-        """
-        Generate a composite candidate for a mention text
-        """
-        raise NotImplementedError

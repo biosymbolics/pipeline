@@ -56,17 +56,10 @@ class TermNormalizer:
         self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
-        self.candidate_selector = candidate_selector
 
-        if self.candidate_selector in [
-            "SemanticCandidateSelector",
-            "CompositeSemanticCandidateSelector",
-        ]:
-            self.nlp = get_transformer_nlp()
-        else:
-            self.nlp = None
+        self.nlp = get_transformer_nlp()
 
-    def normalize(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
+    async def normalize(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
         """
         Normalize and link terms to canonical entities
 
@@ -81,11 +74,11 @@ class TermNormalizer:
         cleaned_entities = self.cleaner.clean(doc_entities, remove_suppressed=False)
 
         if self.term_linker is not None:
-            return self.term_linker.link(cleaned_entities)
+            return await self.term_linker.link(cleaned_entities)
 
         return cleaned_entities
 
-    def normalize_strings(
+    async def normalize_strings(
         self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
     ) -> list[DocEntity]:
         """
@@ -94,8 +87,6 @@ class TermNormalizer:
         Args:
             terms (Sequence[str]): list of terms to normalize
             vectors (Sequence[Sequence[float]]): list of vectors for each term - optional.
-
-        TODO: uniqify terms, when possible?
         """
 
         logger.info("Normalizing %s terms", len(terms))
@@ -106,13 +97,8 @@ class TermNormalizer:
         def get_vecs(
             vectors,
         ) -> tuple[list[Doc] | list[None], list[torch.Tensor] | list[None]]:
-            is_selector_semantic = self.candidate_selector in [
-                "SemanticCandidateSelector",
-                "CompositeSemanticCandidateSelector",
-            ]
-
             # if no vectors AND candidate selectors are semantic, generate docs / vectors
-            if not vectors and is_selector_semantic:
+            if not vectors:
                 if self.nlp is None:
                     raise ValueError(
                         "Vectorizer required for semantic candidate selector"
@@ -135,7 +121,6 @@ class TermNormalizer:
         doc_ents = [
             DocEntity.create(
                 term=term,
-                # required for comparing semantic similarity of potential matches
                 vector=torch.tensor(vector),
                 spacy_doc=doc,  # doc for term, NOT the source doc (confusing!!)
             )
@@ -143,9 +128,9 @@ class TermNormalizer:
         ]
 
         if self.term_linker is not None:
-            return self.term_linker.link(doc_ents)
+            return await self.term_linker.link(doc_ents)
 
         return doc_ents
 
-    def __call__(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
-        return self.normalize(doc_entities)
+    async def __call__(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
+        return await self.normalize(doc_entities)

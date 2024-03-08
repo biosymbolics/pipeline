@@ -44,7 +44,7 @@ class BaseEtl:
                 WHERE {self.record_type.name}.id=v.id;
             """,
             # https://github.com/pgvector/pgvector?tab=readme-ov-file#index-build-time
-            "SET maintenance_work_mem = '5GB'",
+            "SET maintenance_work_mem = '7GB'",
             f"""
                 CREATE INDEX {self.record_type.name}_vector ON {self.record_type.name}
                 USING hnsw (vector vector_cosine_ops)

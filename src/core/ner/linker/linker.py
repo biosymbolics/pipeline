@@ -2,6 +2,7 @@
 Term Normalizer
 """
 
+import asyncio
 import logging
 import time
 from typing import Sequence
@@ -48,7 +49,7 @@ class TermLinker:
             modules, candidate_selector
         )(*args, **kwargs)
 
-    def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
+    async def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
         """
         Link term to canonical entity or synonym
 
@@ -62,7 +63,9 @@ class TermLinker:
         start = time.monotonic()
 
         # generate the candidates (kinda slow)
-        canonical_entities = [self.candidate_selector(e) for e in entities]
+        canonical_entities = await asyncio.gather(
+            *[asyncio.create_task(self.candidate_selector(e)) for e in entities]
+        )
 
         logging.info(
             "Completed candidate generation, took %ss (%s)",
@@ -89,5 +92,5 @@ class TermLinker:
 
         return linked_doc_ents
 
-    def __call__(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-        return self.link(entity_set)
+    async def __call__(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
+        return await self.link(entity_set)

@@ -1,5 +1,6 @@
-from typing import Sequence
 import logging
+
+import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
@@ -16,7 +17,7 @@ from .utils import (
 
 MIN_SIMILARITY = 0.85
 UMLS_KB = None
-K = 10
+K = 5
 
 
 logger = logging.getLogger(__name__)
@@ -31,8 +32,6 @@ class CandidateSelector(AbstractCandidateSelector):
 
     @overrides(AbstractCandidateSelector)
     def __init__(self, min_similarity: float = MIN_SIMILARITY):
-        self.candidate_generator = CandidateGenerator()
-
         if min_similarity > 1:
             raise ValueError("min_similarity must be <= 1")
         elif min_similarity > 0.85:
@@ -41,6 +40,7 @@ class CandidateSelector(AbstractCandidateSelector):
             )
 
         self.min_similarity = min_similarity
+        self.candidate_generator = CandidateGenerator()
 
     async def _get_best_candidate(
         self, text: str, is_composite: bool
@@ -53,15 +53,15 @@ class CandidateSelector(AbstractCandidateSelector):
             logger.warning(f"No candidates found for {text}")
             return None
 
-        if len(vanilla_candidates) == 0:
-            logger.debug(
-                f"No candidates found for {text} with similarity >= {self.min_similarity}"
-            )
-            # apply rewrites and look for another match
-            rewritten_text = apply_match_retry_rewrites(text)
-            if rewritten_text is not None:
-                return await self._get_best_candidate(rewritten_text, is_composite)
-            return None
+        # if len(vanilla_candidates) == 0:
+        #     logger.debug(
+        #         f"No candidates found for {text} with similarity >= {self.min_similarity}"
+        #     )
+        #     # apply rewrites and look for another match
+        #     rewritten_text = apply_match_retry_rewrites(text)
+        #     if rewritten_text is not None:
+        #         return await self._get_best_candidate(rewritten_text, is_composite)
+        #     return None
 
         # apply word overrides (e.g. if term is "modulator", give explicit UMLS match)
         # doing now since it can affect scoring
@@ -93,6 +93,24 @@ class CandidateSelector(AbstractCandidateSelector):
         candidate, score = res
         top_canonical = candidate_to_canonical(candidate)
         return top_canonical, score
+
+    async def select_candidate_by_vector(
+        self, vector: torch.Tensor, min_similarity: float = 0.85
+    ) -> EntityWithScore | None:
+        """
+        Select the best candidate for a mention
+        """
+        candidates = await self.candidate_generator.get_candidates(
+            vector, K, min_similarity
+        )
+
+        if len(candidates) == 0:
+            return None
+
+        candidate = candidates[0]
+
+        top_canonical = candidate_to_canonical(candidate)
+        return top_canonical, candidate.similarity
 
     @overrides(AbstractCandidateSelector)
     async def select_candidate_from_entity(

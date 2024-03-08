@@ -143,3 +143,34 @@ def increment_ontology_level(level: OntologyLevel) -> OntologyLevel:
 
     logger.warning(f"Cannot increment level {level}, returning UNKNOWN")
     return OntologyLevel.UNKNOWN
+
+
+def get_umls_source_sql(
+    filters: list[str] | None = None, limit: int | None = None
+) -> str:
+    """
+    Get the UMLS source SQL
+    """
+    return f"""
+        SELECT
+            TRIM(entities.cui) AS id,
+            TRIM(max(entities.str)) AS name,
+            COALESCE(array_agg(distinct semantic_types.tui::text), ARRAY[]::text[]) AS type_ids,
+            COALESCE(array_agg(distinct semantic_types.sty::text), ARRAY[]::text[]) AS type_names,
+            COALESCE(max(synonyms.terms), ARRAY[]::text[]) as synonyms
+        FROM mrconso AS entities
+        LEFT JOIN mrsty AS semantic_types ON semantic_types.cui = entities.cui
+        LEFT JOIN (
+            SELECT ARRAY_AGG(DISTINCT(LOWER(str))) AS terms, cui AS id
+            FROM mrconso
+            GROUP BY cui
+        ) AS synonyms ON synonyms.id = entities.cui
+        WHERE entities.lat='ENG' -- english
+        AND entities.ts='P' -- preferred terms (according to UMLS)
+        AND entities.ispref='Y' -- preferred term (according to UMLS)
+        AND entities.stt='PF' -- preferred term (according to UMLS)
+        {('AND ' + ' AND '.join(filters)) if filters else ''}
+        GROUP BY entities.cui -- because multiple preferred terms (according to UMLS)
+        ORDER BY entities.cui ASC
+        {'LIMIT ' + str(limit) if limit else ''}
+    """

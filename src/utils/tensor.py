@@ -282,7 +282,4 @@ def tensor_mean(vectors: Sequence[torch.Tensor]) -> torch.Tensor:
     """
     Takes a list of Nx0 vectors and returns the mean vector (Nx0)
     """
-    return torch.concat(
-        [v.unsqueeze(dim=1) for v in vectors],
-        dim=1,
-    ).mean(dim=1)
+    return torch.stack(list(vectors), dim=1).mean(dim=1)

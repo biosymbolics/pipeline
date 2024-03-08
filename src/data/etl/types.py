@@ -4,10 +4,9 @@ from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateManyNestedWithoutRelationsInput as BiomedicalEntityRelationInput,
 )
-from pydash import is_empty
 
 from core.ner.cleaning import CleanFunction
-from core.ner.linker.types import CandidateSelectorType
+from core.ner.linker.candidate_selector import CandidateSelectorType
 from core.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from utils.list import uniq_compact
