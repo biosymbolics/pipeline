@@ -1,5 +1,5 @@
 from typing import Sequence
-from pydash import flatten
+from pydash import flatten, uniq_by
 from spacy.kb import KnowledgeBase
 
 from constants.patterns.iupac import is_iupac
@@ -73,11 +73,12 @@ def form_composite_entity(members: Sequence[CanonicalEntity]) -> CanonicalEntity
 
 
 def select_composite_members(
-    members: Sequence[CanonicalEntity],
+    _members: Sequence[CanonicalEntity],
 ) -> list[CanonicalEntity]:
     """
     Select composite members to return
     """
+    members = uniq_by(_members, lambda m: m.id)
     real_members = [m for m in members if not m.is_fake]
 
     if len(real_members) == 0:
