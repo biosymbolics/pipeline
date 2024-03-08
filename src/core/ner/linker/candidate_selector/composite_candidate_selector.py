@@ -63,7 +63,7 @@ class CompositeCandidateSelector(CandidateSelector):
             # TODO: subtract this before calculating residual?
             if context_vector is not None:
                 vectors = [
-                    combine_tensors(torch.tensor(d.vector), context_vector, 0.9)
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.95)
                     for d in ngram_docs
                 ]
             else:
@@ -192,7 +192,11 @@ class CompositeCandidateSelector(CandidateSelector):
         comp_match, comp_score = res or (None, 0.0)
 
         # if composite and direct matches are bad, no match.
-        if comp_score < self.min_similarity and match_score < self.min_similarity:
+        if (
+            False
+            and comp_score < self.min_similarity
+            and match_score < self.min_similarity
+        ):
             return None
 
         if comp_score > match_score:
