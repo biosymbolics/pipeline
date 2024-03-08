@@ -17,7 +17,7 @@ from .utils import (
 
 MIN_SIMILARITY = 0.85
 UMLS_KB = None
-K = 5
+K = 25
 
 
 logger = logging.getLogger(__name__)
@@ -95,13 +95,13 @@ class CandidateSelector(AbstractCandidateSelector):
         return top_canonical, score
 
     async def select_candidate_by_vector(
-        self, vector: torch.Tensor, min_similarity: float = 0.85
+        self, vector: torch.Tensor, mention: str, min_similarity: float = 0.85
     ) -> EntityWithScore | None:
         """
         Select the best candidate for a mention
         """
         candidates = await self.candidate_generator.get_candidates(
-            vector, K, min_similarity
+            mention, vector, K, min_similarity
         )
 
         if len(candidates) == 0:

@@ -13,10 +13,14 @@ logger.setLevel(logging.INFO)
 class CandidateGenerator:
     def __init__(self):
         self.db = None
-        self.vectorizer = Vectorizer()
+        self.vectorizer = Vectorizer.get_instance()
 
     async def get_candidates(
-        self, mention_vec: torch.Tensor, k: int, min_similarity: float = 0.85
+        self,
+        mention: str,
+        mention_vec: torch.Tensor,
+        k: int,
+        min_similarity: float = 0.85,
     ) -> list[MentionCandidate]:
         """
         Get candidates for a mention
@@ -27,19 +31,33 @@ class CandidateGenerator:
 
         float_vec = mention_vec.tolist()
 
+        # ALTER SYSTEM SET pg_trgm.similarity_threshold = 0.9;
         query = f"""
-            SELECT * FROM (
-                SELECT
-                    id,
-                    name,
-                    synonyms,
-                    type_ids AS types,
-                    1 - (vector <=> '{float_vec}') as similarity
-                FROM umls
-                ORDER BY (vector <=> '{float_vec}') ASC
-                LIMIT {k}
-            ) s
-            WHERE similarity >= {min_similarity}
+            SELECT
+                umls.id as id,
+                name,
+                ARRAY_AGG(umls_synonym.term) as synonyms,
+                MAX(type_ids) AS types,
+                1 - (AVG(vector) <=> '{float_vec}') as similarity,
+                MAX(similarity('{mention}', term)) as syntactic_similarity
+            FROM umls_synonym, umls
+            JOIN (
+                SELECT * from (
+                    SELECT id
+                    FROM umls
+                    WHERE (vector <=> '{float_vec}') < 1 - {min_similarity}
+                    ORDER BY vector <=> '{float_vec}' ASC
+                    LIMIT {k}
+                ) s
+
+                UNION
+
+                select umls_id as id from umls_synonym where '{mention}' % term
+            ) AS matches ON matches.id = umls.id
+            WHERE umls.id = umls_synonym.umls_id
+            GROUP BY umls.id, name
+            ORDER BY vector <=> '{float_vec}' ASC
+            LIMIT {k}
         """
         res = await self.db.query_raw(query)
         return [MentionCandidate(**r) for r in res]
@@ -53,6 +71,7 @@ class CandidateGenerator:
 
         mention_vecs = [l1_regularize(v) for v in self.vectorizer.vectorize(mentions)]
         candidates = [
-            await self.get_candidates(vec, k, min_similarity) for vec in mention_vecs
+            await self.get_candidates(mention, vec, k, min_similarity)
+            for mention, vec in zip(mentions, mention_vecs)
         ]
         return candidates

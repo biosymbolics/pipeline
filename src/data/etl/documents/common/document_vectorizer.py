@@ -55,7 +55,7 @@ class DocumentVectorizer(BaseEtl):
         self.dest_table = dest_table
         self.id_field = id_field
         self.combo_strategy: ComboStrategy = combo_strategy
-        self.vectorizer = Vectorizer()
+        self.vectorizer = Vectorizer.get_instance()
 
     def _get_processed_docs(self) -> list[str]:
         """

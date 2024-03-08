@@ -7,9 +7,10 @@ import sys
 import logging
 import time
 from prisma.enums import OntologyLevel
-from prisma.models import UmlsGraph, Umls
+from prisma.models import UmlsGraph, Umls, UmlsSynonym
 from prisma.types import (
     UmlsCreateWithoutRelationsInput as UmlsCreateInput,
+    UmlsSynonymCreateInput,
     UmlsGraphCreateWithoutRelationsInput as UmlsGraphRecord,
 )
 from pydash import compact
@@ -53,24 +54,30 @@ class UmlsLoader(BaseEtl):
 
         async def handle_batch(batch: list[dict]):
             logger.info("Creating %s UMLS records", len(batch))
-            insert_data = [
-                UmlsCreateInput(
-                    id=r["id"],
-                    name=r["name"],
-                    rollup_id=r["id"],  # start with self as rollup
-                    preferred_name=clean_umls_name(
-                        r["id"], r["name"], r["synonyms"], r["type_ids"], False
-                    ),
-                    synonyms=r["synonyms"],
-                    type_ids=r["type_ids"],
-                    type_names=r["type_names"],
-                    level=OntologyLevel.UNKNOWN,
-                )
-                for r in batch
-            ]
-            await Umls.prisma(client).create_many(
-                data=insert_data,
-                skip_duplicates=True,
+            # insert_data = [
+            #     UmlsCreateInput(
+            #         id=r["id"],
+            #         name=r["name"],
+            #         rollup_id=r["id"],  # start with self as rollup
+            #         preferred_name=clean_umls_name(
+            #             r["id"], r["name"], r["synonyms"], r["type_ids"], False
+            #         ),
+            #         type_ids=r["type_ids"],
+            #         type_names=r["type_names"],
+            #         level=OntologyLevel.UNKNOWN,
+            #     )
+            #     for r in batch
+            # ]
+            # await Umls.prisma(client).create_many(
+            #     data=insert_data,
+            #     skip_duplicates=True,
+            # )
+            await UmlsSynonym.prisma(client).create_many(
+                data=[
+                    UmlsSynonymCreateInput(term=s, umls_id=r["id"])
+                    for r in batch
+                    for s in r["synonyms"]
+                ],
             )
 
         await PsqlDatabaseClient(self.source_db).execute_query(

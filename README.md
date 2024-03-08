@@ -290,6 +290,8 @@ export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
 create role biosym with password 'ok';
 alter role biosym with superuser;
 prisma db push
+
+npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/generated.sql
 ```
 
 ##### Ctgov

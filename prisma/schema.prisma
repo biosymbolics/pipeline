@@ -2,7 +2,7 @@
 datasource db {
     provider   = "postgresql"
     url        = env("DATABASE_URL")
-    extensions = [vector]
+    extensions = [vector, trgm]
 }
 
 // generator
@@ -330,12 +330,24 @@ model Umls {
     name                String
     preferred_name      String
     rollup_id           String // TODO: add as biomedical parent
-    synonyms            String[]
+    synonyms            UmlsSynonym[]
     type_ids            String[]
     type_names          String[]
     vector              Unsupported("vector(768)")?
 
     @@map("umls")
+}
+
+model UmlsSynonym {
+    id      Int    @id @default(autoincrement())
+    umls    Umls   @relation(fields: [umls_id], references: [id])
+    umls_id String
+    term    String
+
+    @@unique([term, umls_id])
+    @@index([term(ops: raw("gin_trgm_ops"))], name: "umls_synonym_term", type: Gin)
+    @@index([umls_id], name: "umls_synonym_umls_id")
+    @@map("umls_synonym")
 }
 
 model UmlsGraph {

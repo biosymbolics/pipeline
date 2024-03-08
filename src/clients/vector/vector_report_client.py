@@ -38,7 +38,7 @@ class VectorReportClient:
         self.document_types = document_types
         self.gpt_client = GptApiClient()
         self.recency_decay_factor = recency_decay_factor
-        self.vectorizer = Vectorizer()
+        self.vectorizer = Vectorizer.get_instance()
 
     def _calc_min_similarity(
         self, similarities: Sequence[float], alpha: float

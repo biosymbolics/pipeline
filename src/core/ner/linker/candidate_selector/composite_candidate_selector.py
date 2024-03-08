@@ -78,11 +78,11 @@ class CompositeCandidateSelector(CandidateSelector):
 
         ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
         ngram_entity_map = {
-            t.text: await self.select_candidate_by_vector(
-                vector, self.min_composite_similarity - 0.2
+            ng.text: await self.select_candidate_by_vector(
+                vector, ng.text, self.min_composite_similarity - 0.2
             )
-            for t, vector in zip(ngrams, ngram_vectors)
-            if len(t.text) > 1  # avoid weird matches for single characters/nums
+            for ng, vector in zip(ngrams, ngram_vectors)
+            if len(ng.text) > 1  # avoid weird matches for single characters/nums
         }
         logger.info(
             "Ngram entity map: %s",
