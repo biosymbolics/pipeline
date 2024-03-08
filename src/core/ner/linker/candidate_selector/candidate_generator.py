@@ -41,7 +41,6 @@ class CandidateGenerator:
             ) s
             WHERE similarity >= {min_similarity}
         """
-        print(query)
         res = await self.db.query_raw(query)
         return [MentionCandidate(**r) for r in res]
 

@@ -45,24 +45,6 @@ class CompositeCandidateSelector(CandidateSelector):
         self.min_word_length = min_word_length
         self.ngrams_n = ngrams_n
 
-    async def _optimize_composite(
-        self, composite: EntityWithScore, original_name: str
-    ) -> EntityWithScore | None:
-        """
-        Taking the new composite names, see if there is now a singular match
-        (e.g. a composite name might be "SGLT2 inhibitor", comprised of two candidates, for which a single match exists)
-        """
-        if composite[0].name.lower() == original_name.lower():
-            # if the name hasn't changed, pointless to attempt re-match
-            return composite
-
-        direct_match = await self.select_candidate(composite[0].name)
-
-        if direct_match is None:
-            return composite
-
-        return direct_match
-
     async def generate_candidate(self, entity: DocEntity) -> EntityWithScore | None:
         """
         Generate a composite candidate from a doc entity
@@ -79,9 +61,9 @@ class CompositeCandidateSelector(CandidateSelector):
             # if the entity has a vector, combine with newly created token vectors
             # to add context for semantic similarity comparison
             # TODO: subtract this before calculating residual?
-            if False and context_vector is not None:
+            if context_vector is not None:
                 vectors = [
-                    combine_tensors(torch.tensor(d.vector), context_vector, 0.99)
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.9)
                     for d in ngram_docs
                 ]
             else:
@@ -110,7 +92,6 @@ class CompositeCandidateSelector(CandidateSelector):
                 if v is not None
             },
         )
-        # return await self._optimize_composite(composite, entity.normalized_term)
         return self._generate_composite_from_ngrams(
             list(doc),
             omit_by(ngram_entity_map, lambda v: v is None),
@@ -183,7 +164,7 @@ class CompositeCandidateSelector(CandidateSelector):
             raise ValueError("No composites found")
 
         avg_score = sum([m[1] for m in composites]) / len(composites)
-        composite_members = [c[0] for c in composites]
+        composite_members = select_composite_members([c[0] for c in composites])
 
         return (
             form_composite_entity(composite_members),

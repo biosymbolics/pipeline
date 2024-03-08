@@ -300,33 +300,3 @@ alter database aact set search_path = ctgov, public;
 create extension vector;
 create table trial_vectors(id text, vector vector(768));
 ```
-
-#### Random
-```
-
-from core.ner.spacy import Spacy
-nlp = Spacy.get_instance(
-            model="en_core_web_trf",
-            disable=["ner", "parser", "tagger"],
-            additional_pipelines={
-                "transformer": {
-                    "config": {
-                        "model": {
-                            "@architectures": "spacy-transformers.TransformerModel.v3",
-                            "name": "bert-base-uncased",
-                            # "tokenizer_config": {"use_fast": True},
-                            # "transformer_config": {},
-                            # "mixed_precision": True,
-                            # "grad_scaler_config": {"init_scale": 32768},
-                            "get_spans": {
-                                "@span_getters": "spacy-transformers.strided_spans.v1",
-                                "window": 128,
-                                "stride": 16,
-                            },
-                        },
-                    },
-                },
-                "tok2vec": {},
-            },
-        )
-```

@@ -2,7 +2,7 @@ import unittest
 
 from prisma.enums import OwnerType
 from pydash import group_by
-from constants.company import COMPANY_MAP, OTHER_OWNER_NAME
+from constants.company import COMPANY_MAP
 
 from data.etl.entity.owner.owner import generate_clean_owner_map, OwnerTypeParser
 
