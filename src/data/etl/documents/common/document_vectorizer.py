@@ -1,10 +1,11 @@
 from abc import abstractmethod
 from enum import Enum
+from functools import reduce
 import logging
 import time
 from typing import Optional, Sequence, TypedDict
 import polars as pl
-from pydash import compact, flatten
+from pydash import compact, flatten, uniq
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 MAX_TEXT_LENGTH = 2000
+MAX_ARRAY_LENGTH = 10
 VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_pubs.txt"
 
 
@@ -91,12 +93,23 @@ class DocumentVectorizer(BaseEtl):
         Concatenates fields and trucates to MAX_TEXT_LENGTH
         """
         texts: list[list[str]] = compact(
-            [flatten(doc_df[field].to_list()) for field in self.text_fields]
+            [doc_df[field].to_list() for field in self.text_fields]
         )
-        if self.combo_strategy == "text_concat":
-            return [("\n".join(text))[0:MAX_TEXT_LENGTH] for text in zip(*texts)]
 
-        return texts
+        def prep_text_set(text_set: tuple[list[str] | str]) -> list[str]:
+            return [
+                ", ".join(uniq(ts)[0:MAX_ARRAY_LENGTH]) if isinstance(ts, list) else ts
+                for ts in text_set
+            ]
+
+        if self.combo_strategy == "text_concat":
+            return [
+                (". ".join(prep_text_set(text_set)))[0:MAX_TEXT_LENGTH]
+                for text_set in zip(*texts)
+            ]
+
+        res = [prep_text_set(text_set) for text_set in zip(*texts)]
+        return res
 
     def _vectorize(self, docs: list[str] | list[list[str]]) -> list[list[float]]:
         """
@@ -109,8 +122,18 @@ class DocumentVectorizer(BaseEtl):
 
         # if the combo strategy is average, vectorize each string and average
         elif self.combo_strategy == ComboStrategy.average and is_list_string_list(docs):
-            vector_sets = [self.vectorizer.vectorize(doc_set) for doc_set in docs]
-            return [l1_regularize(tensor_mean(vs)).tolist() for vs in vector_sets]
+            indices: list[tuple[int, int]] = reduce(
+                lambda acc, d: acc + [(acc[-1][1], acc[-1][1] + len(d) - 1)],
+                docs,
+                [(0, 0)],  # type: ignore
+            )
+            vectors = self.vectorizer.vectorize(flatten(docs))
+            vector_sets = [
+                l1_regularize(tensor_mean(vectors[s:e])).tolist()
+                for s, e in indices[1:]
+            ]
+
+            return vector_sets
 
         raise ValueError("Invalid combination strategy or datatype")
 

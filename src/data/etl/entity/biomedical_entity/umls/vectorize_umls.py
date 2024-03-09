@@ -46,7 +46,6 @@ class UmlsVectorizer(DocumentVectorizer):
         pagination_where = [f"{self.id_field} > '{last_id}'"] if last_id else None
         source_sql = get_umls_source_sql(pagination_where, self.batch_size)
         umls = await self.db.select(source_sql)
-        logger.info("Fetched %s UMLS records", len(umls))
         return umls
 
 
