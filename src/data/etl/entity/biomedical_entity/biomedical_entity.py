@@ -5,7 +5,7 @@ Class for biomedical entity etl
 import asyncio
 from typing import Iterable, Sequence
 import uuid
-from prisma.models import BiomedicalEntity
+from prisma.models import BiomedicalEntity, EntitySynonym
 from prisma.enums import BiomedicalEntityType, Source
 from prisma.types import (
     BiomedicalEntityCreateInput,
@@ -17,7 +17,7 @@ from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 from spacy.lang.en import stop_words
 
-from clients.low_level.prisma import batch_update, prisma_client
+from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
 from core.ner.linker.candidate_selector import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
@@ -47,16 +47,27 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
     def __init__(
         self,
-        candidate_selector: CandidateSelectorType,
+        normalizer: TermNormalizer,
         relation_id_field_map: RelationIdFieldMap,
         non_canonical_source: Source,
     ):
-        self.normalizer = TermNormalizer(
-            candidate_selector=candidate_selector,
-            additional_cleaners=[BiomedicalEntityEtl.remove_stopwords],
-        )
+        self.normalizer = normalizer
         self.relation_id_field_map = relation_id_field_map
         self.non_canonical_source = non_canonical_source
+
+    @classmethod
+    async def create(
+        cls, candidate_selector_type: CandidateSelectorType, *args, **kwargs
+    ):
+        """
+        Create biomedical entity etl
+        """
+        normalizer = await TermNormalizer.create(
+            link=True,
+            candidate_selector_type=candidate_selector_type,
+            additional_cleaners=[BiomedicalEntityEtl.remove_stopwords],
+        )
+        return cls(normalizer, *args, **kwargs)
 
     @staticmethod
     def remove_stopwords(terms: Sequence[str]) -> Iterable[str]:
@@ -212,12 +223,12 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         )
         create_data, upsert_data = self._generate_crud(terms, source_map, canonical_map)
 
-        client = await prisma_client(600)
-        # create first, because updates include linking between biomedical entities
-        await BiomedicalEntity.prisma(client).create_many(
-            data=create_data,
-            skip_duplicates=True,
-        )
+        async with prisma_context(600) as db:
+            # create first, because updates include linking between biomedical entities
+            await BiomedicalEntity.prisma(db).create_many(
+                data=create_data,
+                skip_duplicates=True,
+            )
 
         # then update records with relationships
         await batch_update(
@@ -496,6 +507,16 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         for key, result in zip(checksums.keys(), results):
             logger.warning(f"Load checksum {key}: {result[0]}")
         return
+
+    @staticmethod
+    async def delete_all():
+        logger.info("Deleting all biomedical entities")
+        client = await prisma_client(600)
+        await EntitySynonym.prisma(client).delete_many()
+        await client.execute_raw("TRUNCATE TABLE _entity_to_umls")
+        await client.execute_raw("TRUNCATE TABLE intervenable")
+        await client.execute_raw("TRUNCATE TABLE indicatable")
+        await BiomedicalEntity.prisma(client).delete_many()
 
     @staticmethod
     async def finalize():

@@ -197,7 +197,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         return [intervention_spec, indication_spec]
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         client = await prisma_client(600)
         await Intervenable.prisma(client).query_raw(
             "DELETE FROM intervenable WHERE regulatory_approval_id IS NOT NULL"

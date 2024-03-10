@@ -5,9 +5,11 @@ from spacy.tokens import Doc, Span, Token
 import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
+from utils.classes import overrides
 from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
 from utils.tensor import combine_tensors
 
+from .candidate_generator import CandidateGenerator
 from .candidate_selector import CandidateSelector
 from .composite_utils import (
     form_composite_entity,
@@ -33,6 +35,7 @@ class CompositeCandidateSelector(CandidateSelector):
 
     def __init__(
         self,
+        candidate_generator: CandidateGenerator,
         *args,
         min_similarity: float = 0.85,
         min_composite_similarity: float = 0.85,
@@ -40,10 +43,22 @@ class CompositeCandidateSelector(CandidateSelector):
         ngrams_n: int = 3,
         **kwargs
     ):
-        super().__init__(*args, min_similarity=min_similarity, **kwargs)
+        """
+        Initialize composite candidate selector
+        Use `create` to instantiate with async dependencies
+        """
+        super().__init__(
+            candidate_generator, *args, min_similarity=min_similarity, **kwargs
+        )
         self.min_composite_similarity = min_composite_similarity
         self.min_word_length = min_word_length
         self.ngrams_n = ngrams_n
+
+    @classmethod
+    @overrides(CandidateSelector)
+    async def create(cls, *args, **kwargs):
+        candidate_generator = await CandidateGenerator.create()
+        return cls(candidate_generator=candidate_generator, *args, **kwargs)
 
     async def generate_candidate(self, entity: DocEntity) -> EntityWithScore | None:
         """
@@ -190,14 +205,6 @@ class CompositeCandidateSelector(CandidateSelector):
         # generate composite candidate
         res = await self.generate_candidate(entity)
         comp_match, comp_score = res or (None, 0.0)
-
-        # if composite and direct matches are bad, no match.
-        if (
-            False
-            and comp_score < self.min_similarity
-            and match_score < self.min_similarity
-        ):
-            return None
 
         if comp_score > match_score:
             logger.debug(

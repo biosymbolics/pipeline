@@ -33,21 +33,28 @@ class TermLinker:
         >>> linker(["DNMT1 protein synthase inhibitor"])
     """
 
-    def __init__(
-        self,
-        candidate_selector: CandidateSelectorType = "CandidateSelector",
-        *args,
-        **kwargs,
-    ):
+    def __init__(self, candidate_selector: AbstractCandidateSelector):
         """
         Initialize term normalizer using existing model
+
+        Use `create` to instantiate with async dependencies
         """
-        # lazy (UMLS is large)
-        logger.info("Loading %s (might be slow...)", candidate_selector)
-        modules = __import__(CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector])
-        self.candidate_selector: AbstractCandidateSelector = getattr(
-            modules, candidate_selector
-        )(*args, **kwargs)
+        self.candidate_selector = candidate_selector
+
+    @classmethod
+    async def create(
+        cls,
+        candidate_selector_type: CandidateSelectorType = "CandidateSelector",
+        *args,
+        **kwargs
+    ):
+        modules = __import__(
+            CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_type]
+        )
+        candidate_selector: AbstractCandidateSelector = await getattr(
+            modules, candidate_selector_type
+        ).create(*args, **kwargs)
+        return cls(candidate_selector)
 
     async def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
         """

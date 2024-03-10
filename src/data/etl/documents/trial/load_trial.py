@@ -310,7 +310,7 @@ class TrialLoader(BaseDocumentEtl):
         )
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         """
         Delete all trial records
         """

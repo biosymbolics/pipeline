@@ -1,5 +1,4 @@
 import logging
-
 import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
@@ -31,7 +30,16 @@ class CandidateSelector(AbstractCandidateSelector):
     """
 
     @overrides(AbstractCandidateSelector)
-    def __init__(self, min_similarity: float = MIN_SIMILARITY):
+    def __init__(
+        self,
+        candidate_generator: CandidateGenerator,
+        min_similarity: float = MIN_SIMILARITY,
+    ):
+        """
+        Initialize candidate selector
+
+        Use `create` to instantiate with async dependencies
+        """
         if min_similarity > 1:
             raise ValueError("min_similarity must be <= 1")
         elif min_similarity > 0.85:
@@ -40,7 +48,13 @@ class CandidateSelector(AbstractCandidateSelector):
             )
 
         self.min_similarity = min_similarity
-        self.candidate_generator = CandidateGenerator()
+        self.candidate_generator = candidate_generator
+
+    @classmethod
+    @overrides(AbstractCandidateSelector)
+    async def create(cls, *args, **kwargs):
+        candidate_generator = await CandidateGenerator.create()
+        return cls(candidate_generator=candidate_generator, *args, **kwargs)
 
     def _score_candidates(
         self,
@@ -86,7 +100,9 @@ class CandidateSelector(AbstractCandidateSelector):
             # apply rewrites and look for another match
             rewritten_text = apply_match_retry_rewrites(mention)
             if rewritten_text is not None:
-                return await self.select_candidate(rewritten_text, None, is_composite)
+                return await self.select_candidate(
+                    rewritten_text, None, min_similarity, is_composite
+                )
             return None
 
         candidates = apply_umls_word_overrides(mention, candidates)
@@ -100,9 +116,14 @@ class CandidateSelector(AbstractCandidateSelector):
 
     @overrides(AbstractCandidateSelector)
     async def select_candidate_from_entity(
-        self, entity: DocEntity, is_composite: bool = False
+        self,
+        entity: DocEntity,
+        min_similarity: float = 0.85,
+        is_composite: bool = False,
     ) -> EntityWithScore | None:
-        return await self.select_candidate(entity.term, entity.vector, is_composite)
+        return await self.select_candidate(
+            entity.term, entity.vector, min_similarity, is_composite
+        )
 
     @overrides(AbstractCandidateSelector)
     async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:

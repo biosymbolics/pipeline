@@ -1,4 +1,5 @@
 import time
+from prisma import Prisma
 import torch
 import logging
 
@@ -12,9 +13,19 @@ logger.setLevel(logging.INFO)
 
 
 class CandidateGenerator:
-    def __init__(self):
-        self.db = None
+    def __init__(self, db: Prisma):
+        """
+        Initialize candidate generator
+
+        Use `create` to instantiate with async dependencies
+        """
+        self.db = db
         self.vectorizer = Vectorizer.get_instance()
+
+    @staticmethod
+    async def create() -> "CandidateGenerator":
+        db = await prisma_client(300)
+        return CandidateGenerator(db)
 
     async def get_candidates(
         self,
@@ -29,10 +40,6 @@ class CandidateGenerator:
         if mention_vec is None:
             logger.warning("mention_vec is None, one-off vectorizing mention (slow!)")
             mention_vec = self.vectorizer.vectorize([mention])[0]
-
-        if self.db is None:
-            self.db = await prisma_client(300)
-            assert self.db is not None
 
         float_vec = mention_vec.tolist()
 
@@ -65,7 +72,12 @@ class CandidateGenerator:
             WHERE vector is not null
         """
         start = time.time()
-        res = await self.db.query_raw(query)
+
+        try:
+            res = await self.db.query_raw(query)
+        except Exception as e:
+            logger.error(f"Error querying for {mention}: {e} ({query})")
+            raise e
         logger.info("Query time: %ss", round(time.time() - start))
         return [MentionCandidate(**r) for r in res], mention_vec
 

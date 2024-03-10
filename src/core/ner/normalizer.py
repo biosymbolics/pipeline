@@ -39,25 +39,38 @@ class TermNormalizer:
 
     def __init__(
         self,
-        link: bool = True,
-        candidate_selector: CandidateSelectorType | None = None,
+        term_linker: TermLinker | None = None,
         additional_cleaners: Sequence[CleanFunction] = [],
     ):
         """
         Initialize term normalizer
-        """
-        if link:
-            self.term_linker: TermLinker | None = (
-                TermLinker(candidate_selector) if candidate_selector else TermLinker()
-            )
-        else:
-            self.term_linker = None
 
+        Use `create` to instantiate with async dependencies
+        """
+        self.term_linker = term_linker
         self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
-
         self.nlp = get_transformer_nlp()
+
+    @classmethod
+    async def create(
+        cls,
+        link: bool = True,
+        candidate_selector_type: CandidateSelectorType | None = None,
+        *args,
+        **kwargs
+    ):
+        if link:
+            term_linker: TermLinker | None = await (
+                TermLinker.create(candidate_selector_type)
+                if candidate_selector_type
+                else TermLinker.create()
+            )
+        else:
+            term_linker = None
+
+        return cls(term_linker, *args, **kwargs)
 
     async def normalize(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
         """
@@ -121,7 +134,7 @@ class TermNormalizer:
         doc_ents = [
             DocEntity.create(
                 term=term,
-                vector=torch.tensor(vector),
+                vector=vector,
                 spacy_doc=doc,  # doc for term, NOT the source doc (confusing!!)
             )
             for term, vector, doc in zip(clean_terms, _vectors, docs)

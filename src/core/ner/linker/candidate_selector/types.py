@@ -54,5 +54,10 @@ class AbstractCandidateSelector(object):
         """
         raise NotImplementedError
 
+    @classmethod
+    @abstractmethod
+    async def create(cls, *args, **kwargs):
+        raise NotImplementedError
+
 
 ES = TypeVar("ES", bound=EntityWithScore)

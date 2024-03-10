@@ -163,7 +163,7 @@ class PatentLoader(BaseDocumentEtl):
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
@@ -180,7 +180,7 @@ class PatentLoader(BaseDocumentEtl):
             sql=PatentLoader.get_entity_sql(["diseases"]),
         )
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
@@ -199,7 +199,7 @@ class PatentLoader(BaseDocumentEtl):
         return [indication_spec, intervention_spec]
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         """
         Delete all patent records (which should cascade)
         """
