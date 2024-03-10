@@ -172,7 +172,7 @@ def apply_umls_word_overrides(
                 **{
                     k: v
                     for k, v in candidates[0].model_dump().items()
-                    if k not in ["id", "synonyms", "similarity"]
+                    if k not in ["id", "synonyms", "semantic_similarity"]
                 },
                 id=overrides[text.lower()],
                 synonyms=[text],

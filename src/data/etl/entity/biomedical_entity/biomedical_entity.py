@@ -78,20 +78,21 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             yield " ".join([w for w in term.split() if w not in stop_words.STOP_WORDS])
 
     async def _generate_lookup_map(
-        self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
+        self, terms: Sequence[str], vectors: Sequence[list[float]] | None = None
     ) -> dict[str, CanonicalEntity]:
         """
         Generate canonical map for source terms
         """
-
+        lookup_map = {}
+        i = 0
         lookup_docs = await self.normalizer.normalize_strings(terms, vectors)
 
-        # map for quick lookup of canonical entities
-        lookup_map = {
-            on: de.canonical_entity
-            for on, de in zip(terms, lookup_docs)
-            if de.canonical_entity is not None  # shouldn't happen
-        }
+        async for doc in lookup_docs:
+            lookup_map[doc.term] = doc.canonical_entity
+            i += 1
+            if i % 10000 == 0:
+                logger.info("Normalized %s terms", i)
+
         save_as_pickle(lookup_map, f"canonical_map-{uuid.uuid4()}.pkl")
         return lookup_map
 
@@ -206,7 +207,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         self,
         terms: Sequence[str],
         terms_to_canonicalize: Sequence[str] | None,
-        vectors_to_canonicalize: Sequence[Sequence[float]] | None,
+        vectors_to_canonicalize: Sequence[list[float]] | None,
         source_map: dict[str, dict],
     ):
         """

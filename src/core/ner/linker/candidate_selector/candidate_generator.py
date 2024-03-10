@@ -51,7 +51,7 @@ class CandidateGenerator:
                 synonyms,
                 type_ids AS types,
                 COALESCE(1 - (vector <=> '{float_vec}'), 0.0) AS semantic_similarity,
-                similarity(matches.name, '{mention}') AS syntactic_similarity,
+                similarity(matches.name, $1) AS syntactic_similarity,
                 vector::text AS vector
             FROM umls
             JOIN (
@@ -67,18 +67,19 @@ class CandidateGenerator:
 
                 SELECT umls_id AS id, term AS name
                 FROM umls_synonym
-                WHERE '{mention}' % term
+                WHERE term % $1
             ) AS matches ON matches.id = umls.id
-            WHERE vector is not null
         """
-        start = time.time()
+        if mention_vec is None or len(mention_vec) == 0:
+            return [], mention_vec
 
+        start = time.monotonic()
         try:
-            res = await self.db.query_raw(query)
-        except Exception as e:
-            logger.error(f"Error querying for {mention}: {e} ({query})")
-            raise e
-        logger.info("Query time: %ss", round(time.time() - start))
+            res = await self.db.query_raw(query, mention)
+        except Exception:
+            logger.exception("Failed to query for candidates")
+            return [], mention_vec
+        logger.debug("Query time: %ss", round(time.monotonic() - start))
         return [MentionCandidate(**r) for r in res], mention_vec
 
     async def __call__(

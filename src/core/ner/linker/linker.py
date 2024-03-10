@@ -3,9 +3,13 @@ Term Normalizer
 """
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
-from typing import Sequence
+from typing import AsyncIterable, Iterable, Sequence
+
+from utils.async_utils import gather_with_concurrency_limit
+from utils.list import batch
 
 from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
@@ -56,48 +60,27 @@ class TermLinker:
         ).create(*args, **kwargs)
         return cls(candidate_selector)
 
-    async def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
+    async def link(
+        self, entities: Sequence[DocEntity] | Iterable[DocEntity]
+    ) -> AsyncIterable[DocEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
-            terms (Sequence[str]): list of terms to normalize
+            entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
-        if len(entities) == 0:
-            logging.warning("No entities to link")
-            return []
-
-        start = time.monotonic()
-
         # generate the candidates (kinda slow)
-        canonical_entities = await asyncio.gather(
-            *[asyncio.create_task(self.candidate_selector(e)) for e in entities]
-        )
-
-        logging.info(
-            "Completed candidate generation, took %ss (%s)",
-            round(time.monotonic() - start),
-            [e.term for e in entities],
-        )
-
-        linked_doc_ents = [
-            DocEntity.merge(
+        for e in entities:
+            ce = await self.candidate_selector(e)
+            yield DocEntity.merge(
                 e,
                 canonical_entity=ce
                 or CanonicalEntity(
                     id="", name=e.normalized_term or e.term, aliases=[e.term]
                 ),
             )
-            for e, ce in zip(entities, canonical_entities)
-        ]
 
-        logging.info(
-            "Completed linking batch of %s entities, took %ss",
-            len(entities),
-            round(time.monotonic() - start),
-        )
-
-        return linked_doc_ents
-
-    async def __call__(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-        return await self.link(entity_set)
+    async def __call__(
+        self, entity_set: Sequence[DocEntity] | Iterable[DocEntity]
+    ) -> AsyncIterable[DocEntity]:
+        return self.link(entity_set)

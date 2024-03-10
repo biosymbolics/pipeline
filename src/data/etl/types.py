@@ -112,7 +112,7 @@ class BiomedicalEntityLoadSpec(Dataclass):
     additional_cleaners: Sequence[CleanFunction] = field(default_factory=list)
     get_terms: Callable[[dict], Sequence[str]] = lambda sm: list(sm.keys())
     get_terms_to_canonicalize: Callable[
-        [dict], tuple[Sequence[str], Sequence[Sequence[float]] | None]
+        [dict], tuple[Sequence[str], Sequence[list[float]] | None]
     ] = lambda sm: (list(sm.keys()), None)
     non_canonical_source: Source = Source.BIOSYM
     # operates on source_map
