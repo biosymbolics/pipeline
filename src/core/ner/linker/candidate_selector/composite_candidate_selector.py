@@ -78,8 +78,8 @@ class CompositeCandidateSelector(CandidateSelector):
 
         ngrams, ngram_vectors = generate_ngram_spans(doc, entity.vector)
         ngram_entity_map = {
-            ng.text: await self.select_candidate_by_vector(
-                vector, ng.text, self.min_composite_similarity, is_composite=True
+            ng.text: await self.select_candidate(
+                ng.text, vector, self.min_composite_similarity, is_composite=True
             )
             for ng, vector in zip(ngrams, ngram_vectors)
             if len(ng.text) > 1  # avoid weird matches for single characters/nums

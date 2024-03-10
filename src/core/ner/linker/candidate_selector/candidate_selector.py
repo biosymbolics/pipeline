@@ -42,38 +42,6 @@ class CandidateSelector(AbstractCandidateSelector):
         self.min_similarity = min_similarity
         self.candidate_generator = CandidateGenerator()
 
-    async def _get_best_candidate(
-        self, text: str, is_composite: bool
-    ) -> tuple[MentionCandidate, float] | None:
-        """
-        Select the best candidate for a mention
-        """
-        vanilla_candidates, mention_vec = (await self.candidate_generator([text], k=K))[
-            0
-        ]
-        if len(vanilla_candidates) == 0:
-            logger.warning(f"No candidates found for {text}")
-            return None
-
-        if len(vanilla_candidates) == 0:
-            logger.debug(
-                f"No candidates found for {text} with similarity >= {self.min_similarity}"
-            )
-            # apply rewrites and look for another match
-            rewritten_text = apply_match_retry_rewrites(text)
-            if rewritten_text is not None:
-                return await self._get_best_candidate(rewritten_text, is_composite)
-            return None
-
-        # apply word overrides (e.g. if term is "modulator", give explicit UMLS match)
-        # doing now since it can affect scoring
-        candidates = apply_umls_word_overrides(text, vanilla_candidates)
-
-        scored_candidates = self._score_candidates(
-            candidates, mention_vec, is_composite
-        )
-        return scored_candidates[0]
-
     def _score_candidates(
         self,
         candidates: list[MentionCandidate],
@@ -98,38 +66,34 @@ class CandidateSelector(AbstractCandidateSelector):
 
     @overrides(AbstractCandidateSelector)
     async def select_candidate(
-        self, text: str, is_composite: bool = False
-    ) -> EntityWithScore | None:
-        """
-        Select the best candidate for a mention
-        """
-        res = await self._get_best_candidate(text, is_composite)
-
-        if res is None:
-            return None
-
-        candidate, score = res
-        top_canonical = candidate_to_canonical(candidate)
-        return top_canonical, score
-
-    async def select_candidate_by_vector(
         self,
-        vector: torch.Tensor,
         mention: str,
+        vector: torch.Tensor | None = None,
         min_similarity: float = 0.85,
         is_composite: bool = False,
     ) -> EntityWithScore | None:
         """
         Select the best candidate for a mention
         """
-        candidates, _ = await self.candidate_generator.get_candidates(
+        candidates, mention_vec = await self.candidate_generator.get_candidates(
             mention, vector, K, min_similarity
         )
 
         if len(candidates) == 0:
+            logger.debug(
+                f"No candidates found for {mention} with similarity >= {self.min_similarity}"
+            )
+            # apply rewrites and look for another match
+            rewritten_text = apply_match_retry_rewrites(mention)
+            if rewritten_text is not None:
+                return await self.select_candidate(rewritten_text, None, is_composite)
             return None
 
-        scored_candidates = self._score_candidates(candidates, vector, is_composite)
+        candidates = apply_umls_word_overrides(mention, candidates)
+
+        scored_candidates = self._score_candidates(
+            candidates, mention_vec, is_composite
+        )
         candidate, score = scored_candidates[0]
 
         return candidate_to_canonical(candidate), score
@@ -138,14 +102,14 @@ class CandidateSelector(AbstractCandidateSelector):
     async def select_candidate_from_entity(
         self, entity: DocEntity, is_composite: bool = False
     ) -> EntityWithScore | None:
-        return await self.select_candidate(entity.term, is_composite)
+        return await self.select_candidate(entity.term, entity.vector, is_composite)
 
     @overrides(AbstractCandidateSelector)
     async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
         """
         Generate & select candidates for a list of mention texts
         """
-        candidate = await self.select_candidate(entity.term)
+        candidate = await self.select_candidate(entity.term, entity.vector)
 
         if candidate is None:
             return None

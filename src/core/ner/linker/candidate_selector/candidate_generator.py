@@ -19,13 +19,17 @@ class CandidateGenerator:
     async def get_candidates(
         self,
         mention: str,
-        mention_vec: torch.Tensor,
+        mention_vec: torch.Tensor | None,
         k: int,
         min_similarity: float = 0.85,
     ) -> tuple[list[MentionCandidate], torch.Tensor]:
         """
         Get candidates for a mention
         """
+        if mention_vec is None:
+            logger.warning("mention_vec is None, one-off vectorizing mention (slow!)")
+            mention_vec = self.vectorizer.vectorize([mention])[0]
+
         if self.db is None:
             self.db = await prisma_client(300)
             assert self.db is not None
@@ -66,13 +70,18 @@ class CandidateGenerator:
         return [MentionCandidate(**r) for r in res], mention_vec
 
     async def __call__(
-        self, mentions: list[str], k: int = 10, min_similarity: float = 0.85
+        self,
+        mentions: list[str],
+        vectors: list[torch.Tensor] | None = None,
+        k: int = 10,
+        min_similarity: float = 0.85,
     ) -> list[tuple[list[MentionCandidate], torch.Tensor]]:
         """
         Generate candidates for a list of mentions
         """
+        _vectors = vectors or self.vectorizer.vectorize(mentions)
+        mention_vecs = [l1_regularize(v) for v in _vectors]
 
-        mention_vecs = [l1_regularize(v) for v in self.vectorizer.vectorize(mentions)]
         candidates = [
             await self.get_candidates(mention, vec, k, min_similarity)
             for mention, vec in zip(mentions, mention_vecs)
