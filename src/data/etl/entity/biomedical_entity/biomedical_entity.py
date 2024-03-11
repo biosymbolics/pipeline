@@ -3,7 +3,8 @@ Class for biomedical entity etl
 """
 
 import asyncio
-from typing import Iterable, Sequence
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import AsyncIterable, AsyncIterator, Iterable, Sequence, TypeVar, Iterable
 import uuid
 from prisma.models import BiomedicalEntity, EntitySynonym
 from prisma.enums import BiomedicalEntityType, Source
@@ -16,14 +17,16 @@ from prisma.types import (
 from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 from spacy.lang.en import stop_words
+from aiostream import stream, streamcontext
 
 from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
 from core.ner.linker.candidate_selector import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
-from core.ner.types import CanonicalEntity
+from core.ner.types import CanonicalEntity, DocEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
+from utils.async_utils import ChunkedAsyncIterator
 from utils.file import save_as_pickle
 from utils.list import merge_nested
 
@@ -83,15 +86,15 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         Generate canonical map for source terms
         """
-        lookup_map = {}
-        i = 0
-        lookup_docs = await self.normalizer.normalize_strings(terms, vectors)
 
-        async for doc in lookup_docs:
-            lookup_map[doc.term] = doc.canonical_entity
-            i += 1
-            if i % 10000 == 0:
-                logger.info("Normalized %s terms", i)
+        async def tup(docs, *args):
+            return [(d.term, d.canonical_entity) async for d in docs]
+
+        lookup_docs = self.normalizer.normalize_strings(terms, vectors)
+        lookup_tups = await asyncio.gather(
+            *[tup(c) async for c in ChunkedAsyncIterator(lookup_docs, 10000)]
+        )
+        lookup_map: dict[str, CanonicalEntity] = dict(flatten(lookup_tups))
 
         save_as_pickle(lookup_map, f"canonical_map-{uuid.uuid4()}.pkl")
         return lookup_map
@@ -511,7 +514,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
     @staticmethod
     async def delete_all():
-        logger.info("Deleting all biomedical entities")
+        logger.warn("Deleting all biomedical entities")
         client = await prisma_client(600)
         await EntitySynonym.prisma(client).delete_many()
         await client.execute_raw("TRUNCATE TABLE _entity_to_umls")

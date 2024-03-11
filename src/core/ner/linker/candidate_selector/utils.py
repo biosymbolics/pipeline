@@ -125,7 +125,7 @@ def score_candidate(
         return 0.0
 
     semantic_similarity = similarity_with_residual_penalty(
-        mention_vector, candidate.vector, name=candidate.name
+        mention_vector, torch.tensor(candidate.vector), name=candidate.name
     )
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity

@@ -1,9 +1,8 @@
 import time
-from prisma import Prisma
 import torch
 import logging
 
-from clients.low_level.prisma import prisma_client
+from clients.low_level.prisma import PrismaPool, prisma_client
 from core.vector.vectorizer import Vectorizer
 from typings.documents.common import MentionCandidate
 from utils.tensor import l1_regularize
@@ -13,19 +12,22 @@ logger.setLevel(logging.INFO)
 
 
 class CandidateGenerator:
-    def __init__(self, db: Prisma):
+    def __init__(self, db: Prisma, prisma_pool):
         """
         Initialize candidate generator
 
         Use `create` to instantiate with async dependencies
         """
         self.db = db
+        self.prisma_pool = prisma_pool
         self.vectorizer = Vectorizer.get_instance()
 
     @staticmethod
     async def create() -> "CandidateGenerator":
         db = await prisma_client(300)
-        return CandidateGenerator(db)
+        prisma_pool = PrismaPool(pool_size=10)
+        await prisma_pool.init()
+        return CandidateGenerator(db, prisma_pool)
 
     async def get_candidates(
         self,
@@ -47,10 +49,10 @@ class CandidateGenerator:
         query = f"""
             SELECT
                 umls.id AS id,
-                umls.name as name,
+                umls.name AS name,
                 synonyms,
                 type_ids AS types,
-                COALESCE(1 - (vector <=> '{float_vec}'), 0.0) AS semantic_similarity,
+                COALESCE(1 - (vector <=> $2::vector), 0.0) AS semantic_similarity,
                 similarity(matches.name, $1) AS syntactic_similarity,
                 vector::text AS vector
             FROM umls
@@ -58,8 +60,8 @@ class CandidateGenerator:
                 SELECT * FROM (
                     SELECT id, name
                     FROM umls
-                    WHERE (vector <=> '{float_vec}') < 1 - {min_similarity}
-                    ORDER BY vector <=> '{float_vec}' ASC
+                    WHERE (vector <=> $2::vector) < 1 - {min_similarity}
+                    ORDER BY vector <=> $2::vector ASC
                     LIMIT {k}
                 ) s
 
@@ -68,18 +70,19 @@ class CandidateGenerator:
                 SELECT umls_id AS id, term AS name
                 FROM umls_synonym
                 WHERE term % $1
+
+                LIMIT {k}
             ) AS matches ON matches.id = umls.id
         """
-        if mention_vec is None or len(mention_vec) == 0:
+        if mention_vec is None or len(mention_vec.shape) == 0:
             return [], mention_vec
 
-        start = time.monotonic()
         try:
-            res = await self.db.query_raw(query, mention)
+            client = await self.prisma_pool.get_client()
+            res = await client.query_raw(query, mention, float_vec)
         except Exception:
             logger.exception("Failed to query for candidates")
             return [], mention_vec
-        logger.debug("Query time: %ss", round(time.monotonic() - start))
         return [MentionCandidate(**r) for r in res], mention_vec
 
     async def __call__(

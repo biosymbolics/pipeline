@@ -104,7 +104,7 @@ class EntityCleaner:
     ):
         self.substitutions = substitutions
         self.additional_cleaners = additional_cleaners
-        self.__removal_words: list[str] | None = None
+        self._removal_words: list[str] | None = None
 
     @property
     def removal_words(self) -> list[str]:
@@ -113,7 +113,7 @@ class EntityCleaner:
 
         LEGACY
         """
-        if self.__removal_words is None:
+        if self._removal_words is None:
             with open("10000words.txt", "r") as file:
                 vocab_words = file.read().splitlines()
                 self.__removal_words = vocab_words

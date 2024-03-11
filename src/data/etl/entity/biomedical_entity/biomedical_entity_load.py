@@ -1,7 +1,6 @@
 import asyncio
 import sys
 import logging
-import logging
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from data.etl.documents import PatentLoader, RegulatoryApprovalLoader, TrialLoader

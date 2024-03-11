@@ -167,7 +167,7 @@ class PsqlDatabaseClient(DatabaseClient):
             ignore_error (bool): ignore error if True (default: False)
         """
         start = time.time()
-        logger.info("Starting query: %s", query)
+        logger.debug("Starting query: %s", query)
 
         conn = self.client.get_conn()
         with conn.cursor() as cursor:

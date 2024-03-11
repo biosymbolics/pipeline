@@ -15,7 +15,6 @@ from .utils import (
 )
 
 MIN_SIMILARITY = 0.85
-UMLS_KB = None
 K = 10
 
 
@@ -27,6 +26,8 @@ class CandidateSelector(AbstractCandidateSelector):
     """
     Wraps a CandidateGenerator to select the best candidate for a mention
     Returns the candidate with the highest similarity score
+
+    TODO: multiple locations of min_similarity!
     """
 
     @overrides(AbstractCandidateSelector)
@@ -40,13 +41,6 @@ class CandidateSelector(AbstractCandidateSelector):
 
         Use `create` to instantiate with async dependencies
         """
-        if min_similarity > 1:
-            raise ValueError("min_similarity must be <= 1")
-        elif min_similarity > 0.85:
-            logger.warning(
-                "min_similarity is high, this may result in many missed matches"
-            )
-
         self.min_similarity = min_similarity
         self.candidate_generator = candidate_generator
 
@@ -99,7 +93,7 @@ class CandidateSelector(AbstractCandidateSelector):
             )
             # apply rewrites and look for another match
             rewritten_text = apply_match_retry_rewrites(mention)
-            if rewritten_text is not None:
+            if rewritten_text is not None and rewritten_text != mention:
                 return await self.select_candidate(
                     rewritten_text, None, min_similarity, is_composite
                 )
@@ -122,7 +116,7 @@ class CandidateSelector(AbstractCandidateSelector):
         is_composite: bool = False,
     ) -> EntityWithScore | None:
         return await self.select_candidate(
-            entity.term, entity.vector, min_similarity, is_composite
+            entity.term, torch.tensor(entity.vector), min_similarity, is_composite
         )
 
     @overrides(AbstractCandidateSelector)
@@ -130,7 +124,9 @@ class CandidateSelector(AbstractCandidateSelector):
         """
         Generate & select candidates for a list of mention texts
         """
-        candidate = await self.select_candidate(entity.term, entity.vector)
+        candidate = await self.select_candidate(
+            entity.term, torch.tensor(entity.vector)
+        )
 
         if candidate is None:
             return None

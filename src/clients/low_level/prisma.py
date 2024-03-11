@@ -1,3 +1,4 @@
+import asyncio
 from typing import Awaitable, Callable, Sequence, TypeVar
 from httpx import Limits
 from prisma.client import Prisma, register
@@ -20,6 +21,30 @@ if DATABASE_URL is None:
 os.environ["DATABASE_URL"] = DATABASE_URL
 
 
+class PrismaPool:
+    def __init__(self, pool_size: int = 5, timeout: int | None = 300):
+        self.pool_size = pool_size
+        self.timeout = timeout
+        self.clients: list[Prisma] = []
+        self.lock = asyncio.Lock()
+
+    async def init(self):
+        for _ in range(self.pool_size):
+            client = await prisma_client(self.timeout)
+            self.clients.append(client)
+
+    async def get_client(self):
+        async with self.lock:
+            # Simple round-robin for demonstration purposes
+            client = self.clients.pop(0)
+            self.clients.append(client)
+            return client
+
+    async def disconnect_all(self):
+        for client in self.clients:
+            await client.disconnect()
+
+
 async def prisma_client(timeout: int | None, do_connect: bool = True) -> Prisma:
     """
     Get a Prisma client
@@ -39,9 +64,8 @@ def prisma_context(timeout: int | None) -> Prisma:
     """
     logger.info("Creating Prisma client")
     client = Prisma(
-        # auto_register=True,
         log_queries=False,
-        http={"limits": Limits(max_connections=50), "timeout": timeout},
+        http={"limits": Limits(max_connections=100), "timeout": timeout},
     )
 
     if not client.is_registered():

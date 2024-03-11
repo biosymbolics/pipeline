@@ -2,20 +2,14 @@
 Term Normalizer
 """
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import logging
-import time
 from typing import AsyncIterable, Iterable, Sequence
 
-from utils.async_utils import gather_with_concurrency_limit
-from utils.list import batch
 
 from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
 from ..types import CanonicalEntity, DocEntity
 
-LinkedEntityMap = dict[str, CanonicalEntity]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -69,7 +63,6 @@ class TermLinker:
         Args:
             entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
-        # generate the candidates (kinda slow)
         for e in entities:
             ce = await self.candidate_selector(e)
             yield DocEntity.merge(

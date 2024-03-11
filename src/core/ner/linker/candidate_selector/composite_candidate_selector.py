@@ -97,7 +97,7 @@ class CompositeCandidateSelector(CandidateSelector):
                 ng.text, vector, self.min_composite_similarity, is_composite=True
             )
             for ng, vector in zip(ngrams, ngram_vectors)
-            if len(ng.text) > 1  # avoid weird matches for single characters/nums
+            if len(ng.text) > 2  # short matches tend to be weird
         }
         logger.info(
             "Ngram entity map: %s",

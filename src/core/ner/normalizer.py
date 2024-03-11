@@ -2,6 +2,7 @@
 Linking/cleaning of terms
 """
 
+import asyncio
 from typing import AsyncIterable, Iterable, Sequence
 import logging
 
@@ -45,7 +46,7 @@ class TermNormalizer:
         link: bool = True,
         candidate_selector_type: CandidateSelectorType | None = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if link:
             term_linker: TermLinker | None = await (
@@ -79,7 +80,7 @@ class TermNormalizer:
 
         return cleaned_entities
 
-    async def normalize_strings(
+    def normalize_strings(
         self, terms: Sequence[str], vectors: Sequence[list[float]] | None = None
     ) -> AsyncIterable[DocEntity]:
         """
@@ -95,9 +96,10 @@ class TermNormalizer:
         if vectors is not None and len(terms) != len(vectors):
             raise ValueError("terms and vectors must be the same length")
 
+        clean_terms = self.cleaner.clean(terms, remove_suppressed=False)
+        docs = self.nlp.pipe(clean_terms)
+
         def clean_and_docify() -> Iterable[DocEntity]:
-            clean_terms = self.cleaner.clean(terms, remove_suppressed=False)
-            docs = self.nlp.pipe(clean_terms)
             for term, vector, doc in zip(
                 clean_terms, vectors or [None for _ in terms], docs
             ):
