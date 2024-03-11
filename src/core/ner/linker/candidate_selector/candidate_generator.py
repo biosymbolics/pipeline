@@ -1,4 +1,4 @@
-import time
+from prisma import Prisma
 import torch
 import logging
 
