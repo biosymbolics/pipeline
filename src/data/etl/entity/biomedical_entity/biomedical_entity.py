@@ -3,8 +3,7 @@ Class for biomedical entity etl
 """
 
 import asyncio
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from typing import AsyncIterable, AsyncIterator, Iterable, Sequence, TypeVar, Iterable
+from typing import Iterable, Sequence, Iterable
 import uuid
 from prisma.models import BiomedicalEntity, EntitySynonym
 from prisma.enums import BiomedicalEntityType, Source
@@ -17,16 +16,15 @@ from prisma.types import (
 from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 from spacy.lang.en import stop_words
-from aiostream import stream, streamcontext
 
 from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
 from core.ner.linker.candidate_selector import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
-from core.ner.types import CanonicalEntity, DocEntity
+from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type
 from data.etl.types import RelationIdFieldMap
-from utils.async_utils import ChunkedAsyncIterator
+from utils.classes import overrides
 from utils.file import save_as_pickle
 from utils.list import merge_nested
 
@@ -38,6 +36,14 @@ OVERRIDE_TYPE_FIELD = "type"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def remove_stopwords(terms: Sequence[str]) -> Iterable[str]:
+    """
+    Remove stop word cleaner
+    """
+    for term in terms:
+        yield " ".join([w for w in term.split() if w not in stop_words.STOP_WORDS])
 
 
 class BiomedicalEntityEtl(BaseEntityEtl):
@@ -68,17 +74,9 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         normalizer = await TermNormalizer.create(
             link=True,
             candidate_selector_type=candidate_selector_type,
-            additional_cleaners=[BiomedicalEntityEtl.remove_stopwords],
+            additional_cleaners=[remove_stopwords],
         )
         return cls(normalizer, *args, **kwargs)
-
-    @staticmethod
-    def remove_stopwords(terms: Sequence[str]) -> Iterable[str]:
-        """
-        Remove stop word cleaner
-        """
-        for term in terms:
-            yield " ".join([w for w in term.split() if w not in stop_words.STOP_WORDS])
 
     async def _generate_lookup_map(
         self, terms: Sequence[str], vectors: Sequence[list[float]] | None = None
@@ -86,15 +84,10 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         Generate canonical map for source terms
         """
-
-        async def tup(docs, *args):
-            return [(d.term, d.canonical_entity) async for d in docs]
-
         lookup_docs = self.normalizer.normalize_strings(terms, vectors)
-        lookup_tups = await asyncio.gather(
-            *[tup(c) async for c in ChunkedAsyncIterator(lookup_docs, 10000)]
-        )
-        lookup_map: dict[str, CanonicalEntity] = dict(flatten(lookup_tups))
+        lookup_map = {
+            d.term: d.canonical_entity async for d in lookup_docs if d.canonical_entity
+        }
 
         save_as_pickle(lookup_map, f"canonical_map-{uuid.uuid4()}.pkl")
         return lookup_map
@@ -206,6 +199,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         raise ValueError("Must have canonical_id or name")
 
+    @overrides(BaseEntityEtl)
     async def copy_all(
         self,
         terms: Sequence[str],

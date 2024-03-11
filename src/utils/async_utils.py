@@ -3,7 +3,19 @@ Async utilities
 """
 
 import asyncio
-from typing import AsyncIterable, AsyncIterator, Callable, Coroutine, List, TypeVar
+import builtins
+from contextlib import AsyncExitStack
+from typing import (
+    AsyncIterable,
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Iterable,
+    List,
+    TypeVar,
+)
+
+from aiostream import streamcontext
 
 
 async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
@@ -38,30 +50,7 @@ async def gather_with_concurrency_limit(n: int, *coros):
 T = TypeVar("T")
 
 
-class ChunkedAsyncIterator(AsyncIterator[AsyncIterator[T]]):
-    def __init__(self, source: AsyncIterable[T], chunk_size: int):
-        self.source = source
-        self.chunk_size = chunk_size
-        self.buffer: list[T] = []
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self) -> AsyncIterator[T]:
-        if not self.buffer:  # Fill the buffer if it's empty
-            async for item in self.source:
-                self.buffer.append(item)
-                if len(self.buffer) == self.chunk_size:
-                    break
-            if not self.buffer:  # No more items to read
-                raise StopAsyncIteration
-
-        # Prepare to yield the current chunk
-        chunk, self.buffer = self.buffer, []  # Swap out the buffer
-
-        # Define and return an async generator for the current chunk
-        async def chunk_generator():
-            for item in chunk:
-                yield item
-
-        return chunk_generator()
+async def sync_to_async(iterable: Iterable[T]) -> AsyncIterable[T]:
+    for item in iterable:
+        await asyncio.sleep(0)  # Make it async-friendly
+        yield item

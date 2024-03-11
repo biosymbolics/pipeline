@@ -1,3 +1,4 @@
+from typing import AsyncIterable
 from prisma import Prisma
 import torch
 import logging
@@ -25,7 +26,7 @@ class CandidateGenerator:
     @staticmethod
     async def create() -> "CandidateGenerator":
         db = await prisma_client(300)
-        prisma_pool = PrismaPool(pool_size=10)
+        prisma_pool = PrismaPool(pool_size=5)
         await prisma_pool.init()
         return CandidateGenerator(db, prisma_pool)
 
@@ -91,15 +92,12 @@ class CandidateGenerator:
         vectors: list[torch.Tensor] | None = None,
         k: int = 10,
         min_similarity: float = 0.85,
-    ) -> list[tuple[list[MentionCandidate], torch.Tensor]]:
+    ) -> AsyncIterable[tuple[list[MentionCandidate], torch.Tensor]]:
         """
         Generate candidates for a list of mentions
         """
         _vectors = vectors or self.vectorizer.vectorize(mentions)
         mention_vecs = [l1_regularize(v) for v in _vectors]
 
-        candidates = [
-            await self.get_candidates(mention, vec, k, min_similarity)
-            for mention, vec in zip(mentions, mention_vecs)
-        ]
-        return candidates
+        for mention, vec in zip(mentions, mention_vecs):
+            yield await self.get_candidates(mention, vec, k, min_similarity)

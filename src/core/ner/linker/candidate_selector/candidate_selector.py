@@ -1,4 +1,5 @@
 import logging
+from typing import AsyncIterable, Iterable
 import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
@@ -120,15 +121,16 @@ class CandidateSelector(AbstractCandidateSelector):
         )
 
     @overrides(AbstractCandidateSelector)
-    async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    async def __call__(
+        self, entities: Iterable[DocEntity]
+    ) -> AsyncIterable[CanonicalEntity | None]:
         """
         Generate & select candidates for a list of mention texts
         """
-        candidate = await self.select_candidate(
-            entity.term, torch.tensor(entity.vector)
-        )
 
-        if candidate is None:
-            return None
-
-        return candidate[0]
+        for entity in entities:
+            c = await self.select_candidate_from_entity(entity)
+            if c is not None:
+                yield c[0]
+            else:
+                yield None

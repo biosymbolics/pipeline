@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import TypeVar
+from typing import AsyncIterable, Iterable, Sequence, TypeVar
 
 from core.ner.types import DocEntity
 
@@ -48,7 +48,9 @@ class AbstractCandidateSelector(object):
         raise NotImplementedError
 
     @abstractmethod
-    async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    def __call__(
+        self, entities: Iterable[DocEntity]
+    ) -> AsyncIterable[CanonicalEntity | None]:
         """
         Generate & select candidates for a list of mention texts
         """

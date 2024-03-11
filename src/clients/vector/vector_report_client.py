@@ -97,7 +97,7 @@ class VectorReportClient:
                     SELECT id, vector
                     FROM {doc_type.name}
                     WHERE date_part('year', {date_field}) >= {search_params.start_year}
-                    AND NOT id = ANY($1)
+                    AND NOT id = ANY($2)
                 """
 
             doc_queries = " UNION ALL ".join(
@@ -107,13 +107,15 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    1 - (vector <=> '{search_params.vector}') as similarity
+                    1 - (vector <=> $1::vector) as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY (vector <=> '{search_params.vector}') ASC
+                ORDER BY (vector <=> $1::vector) ASC
                 LIMIT {search_params.k}
             """
             async with prisma_context(300) as db:
-                records = await db.query_raw(query, search_params.skip_ids)
+                records = await db.query_raw(
+                    query, search_params.vector, search_params.skip_ids
+                )
 
             scores = [
                 record["similarity"]

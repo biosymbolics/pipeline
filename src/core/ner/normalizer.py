@@ -5,6 +5,7 @@ Linking/cleaning of terms
 import asyncio
 from typing import AsyncIterable, Iterable, Sequence
 import logging
+from spacy.tokens import Doc
 
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
@@ -64,13 +65,6 @@ class TermNormalizer:
     ) -> AsyncIterable[DocEntity] | list[DocEntity]:
         """
         Normalize and link terms to canonical entities
-
-        Args:
-            terms (Sequence[str]): list of terms to normalize
-
-        Note:
-            - canonical linking is based on normalized term
-            - if no linking is found, then normalized term is as canonical_name, with an empty id
         """
         # removed_suppressed must be false to properly index against original terms
         cleaned_entities = self.cleaner.clean(doc_entities, remove_suppressed=False)
@@ -81,7 +75,9 @@ class TermNormalizer:
         return cleaned_entities
 
     def normalize_strings(
-        self, terms: Sequence[str], vectors: Sequence[list[float]] | None = None
+        self,
+        terms: Sequence[str],
+        vectors: Sequence[list[float]] | None = None,
     ) -> AsyncIterable[DocEntity]:
         """
         Normalize and link terms to canonical entities
@@ -97,9 +93,9 @@ class TermNormalizer:
             raise ValueError("terms and vectors must be the same length")
 
         clean_terms = self.cleaner.clean(terms, remove_suppressed=False)
-        docs = self.nlp.pipe(clean_terms)
+        docs = self.nlp.pipe(clean_terms, n_process=4)
 
-        def clean_and_docify() -> Iterable[DocEntity]:
+        def generator() -> Iterable[DocEntity]:
             for term, vector, doc in zip(
                 clean_terms, vectors or [None for _ in terms], docs
             ):
@@ -110,7 +106,7 @@ class TermNormalizer:
                 )
 
         if self.term_linker is not None:
-            return self.term_linker.link(clean_and_docify())
+            return self.term_linker.link(generator())
 
         raise ValueError("TermLinker is not defined")
 

@@ -2,6 +2,7 @@
 SpaCy client
 """
 
+from collections.abc import Iterable
 import logging
 from typing import Any, Iterator
 import spacy
@@ -74,8 +75,8 @@ class Spacy:
 
         for name, args in additional_pipelines.items():
             self._nlp.add_pipe(name, **args)
-            if name == "tok2vec" or name == "transformer":
-                self._nlp.initialize()
+            if name == "transformer":
+                self._nlp.get_pipe(name).initialize(lambda: iter([]))
 
     def __getattr__(self, name):
         # Delegate attribute access to the underlying Language instance
@@ -128,8 +129,13 @@ def get_transformer_nlp(model: str = DEFAULT_VECTORIZATION_MODEL) -> Spacy:
 
     nlp = Spacy.get_instance(
         model="en_core_web_trf",
-        # parser and tagger don't work with transformer?
-        disable=["ner", "attribute_ruler", "parser", "tagger", "lemmatizer"],
+        exclude=[
+            "ner",
+            "attribute_ruler",
+            "parser",
+            "tagger",
+            "lemmatizer",
+        ],
         additional_pipelines={
             "transformer": {
                 "config": {

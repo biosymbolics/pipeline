@@ -3,8 +3,11 @@ Term Normalizer
 """
 
 import logging
+import time
 from typing import AsyncIterable, Iterable, Sequence
+from aiostream import stream
 
+from utils.async_utils import sync_to_async
 
 from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
@@ -44,7 +47,7 @@ class TermLinker:
         cls,
         candidate_selector_type: CandidateSelectorType = "CandidateSelector",
         *args,
-        **kwargs
+        **kwargs,
     ):
         modules = __import__(
             CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_type]
@@ -54,20 +57,30 @@ class TermLinker:
         ).create(*args, **kwargs)
         return cls(candidate_selector)
 
-    async def link(
-        self, entities: Sequence[DocEntity] | Iterable[DocEntity]
-    ) -> AsyncIterable[DocEntity]:
+    async def link(self, entities: Iterable[DocEntity]) -> AsyncIterable[DocEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
             entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
-        for e in entities:
-            ce = await self.candidate_selector(e)
+        i = 0
+        start = time.monotonic()
+        des = sync_to_async(entities)
+        candidates = self.candidate_selector(entities)
+        async for c, e in stream.zip(candidates, des):
+            if not isinstance(e, DocEntity) or (
+                c is not None and not isinstance(c, CanonicalEntity)
+            ):
+                raise ValueError(f"Expected tuple `DocEntity` and `CanonicalEntity`")
+
+            i += 1
+            if i % 500 == 0:
+                logger.info("Linked %s entities in %ss", i, time.monotonic() - start)
+                start = time.monotonic()
             yield DocEntity.merge(
                 e,
-                canonical_entity=ce
+                canonical_entity=c
                 or CanonicalEntity(
                     id="", name=e.normalized_term or e.term, aliases=[e.term]
                 ),

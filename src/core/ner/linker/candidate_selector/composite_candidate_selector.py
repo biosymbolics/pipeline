@@ -1,4 +1,4 @@
-from typing import Mapping, Sequence
+from typing import AsyncIterable, Iterable, Mapping, Sequence
 from pydash import omit_by
 import logging
 from spacy.tokens import Doc, Span, Token
@@ -88,10 +88,10 @@ class CompositeCandidateSelector(CandidateSelector):
 
         if entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy doc")
-        else:
-            doc = entity.spacy_doc
 
-        ngrams, ngram_vectors = generate_ngram_spans(doc, entity.vector)
+        doc = entity.spacy_doc
+
+        ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
         ngram_entity_map = {
             ng.text: await self.select_candidate(
                 ng.text, vector, self.min_composite_similarity, is_composite=True
@@ -186,20 +186,22 @@ class CompositeCandidateSelector(CandidateSelector):
             avg_score,
         )
 
-    async def __call__(self, entity: DocEntity) -> CanonicalEntity | None:
+    @overrides(CandidateSelector)
+    async def select_candidate_from_entity(
+        self, entity: DocEntity
+    ) -> CanonicalEntity | None:
         """
         Generate candidates for a list of mention texts
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
         # attempt direct/non-composite match
-        res = await self.select_candidate_from_entity(entity, is_composite=False)
+        res = await super().select_candidate_from_entity(entity, is_composite=False)
         match, match_score = res or (None, 0.0)
 
         # if score is sufficient, or if it's not a composite candidate, return
-        if match_score >= (self.min_similarity + 0.05) or not is_composite_eligible(
-            entity
-        ):
+        is_eligibile = is_composite_eligible(entity.normalized_term)
+        if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
             return match
 
         # generate composite candidate
@@ -207,12 +209,23 @@ class CompositeCandidateSelector(CandidateSelector):
         comp_match, comp_score = res or (None, 0.0)
 
         if comp_score > match_score:
-            logger.debug(
-                "Composite has higher score (%s vs %s)", comp_score, match_score
-            )
+            logger.debug("Composite is better (%s vs %s)", comp_score, match_score)
             return comp_match
 
-        logger.debug(
-            "Non-composite has higher score (%s vs %s)", match_score, comp_score
-        )
+        logger.debug("Non-composite is better (%s vs %s)", match_score, comp_score)
         return match
+
+    @overrides(CandidateSelector)
+    async def __call__(
+        self, entities: Iterable[DocEntity]
+    ) -> AsyncIterable[CanonicalEntity | None]:
+        """
+        Generate & select candidates for a list of mention texts
+        """
+
+        for entity in entities:
+            candidate = await self.select_candidate_from_entity(entity)
+            if candidate is None:
+                yield None
+            else:
+                yield candidate
