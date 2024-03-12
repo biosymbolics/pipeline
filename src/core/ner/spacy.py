@@ -2,7 +2,6 @@
 SpaCy client
 """
 
-from collections.abc import Iterable
 import logging
 from typing import Any, Iterator
 import spacy
@@ -41,18 +40,6 @@ class Spacy:
     ):
         """
         Initialize Spacy instance
-
-        Using additions:
-        rule_nlp = Spacy.get_instance(
-            model="en_core_sci_lg",
-            additional_pipelines={
-                "merge_entities": {"after": "ner"},
-                "entity_ruler": {
-                    "config": {"validate": True, "overwrite_ents": True},
-                    "after": "merge_entities",
-                },
-            },
-        )
         """
         # acceleration via https://github.com/explosion/thinc-apple-ops
         # details: https://github.com/explosion/spaCy/discussions/12713
@@ -61,6 +48,7 @@ class Spacy:
         if model.endswith("_trf"):
             logger.warning("Setting GPU allocator to pytorch")
             set_gpu_allocator("pytorch")
+            torch.device(DEFAULT_TORCH_DEVICE)
 
         self.model = model
 
@@ -76,7 +64,7 @@ class Spacy:
         for name, args in additional_pipelines.items():
             self._nlp.add_pipe(name, **args)
             if name == "transformer":
-                self._nlp.get_pipe(name).initialize(lambda: iter([]))
+                self._nlp.get_pipe(name).initialize(lambda: iter([]))  # type: ignore
 
     def __getattr__(self, name):
         # Delegate attribute access to the underlying Language instance
@@ -102,8 +90,10 @@ class Spacy:
     def nlp(cls, text: str) -> Any:
         return cls.get_instance()._nlp(text)
 
-    def pipe(self, *args, **kwargs) -> Iterator[Doc]:
-        return self._nlp.pipe(*args, **kwargs)
+    def pipe(self, *args, n_process=1, **kwargs) -> Iterator[Doc]:
+        if (n_process or 1) > 1:
+            logger.warning("Don't use n_process with GPU.")
+        return self._nlp.pipe(*args, n_process=n_process, **kwargs)
 
     def load(self, *args, **kwargs) -> Any:
         return self.get_instance(*args, **kwargs)

@@ -3,11 +3,8 @@ Term Normalizer
 """
 
 import logging
-import time
-from typing import AsyncIterable, Iterable, Sequence
-from aiostream import stream
+from typing import Iterable, Sequence
 
-from utils.async_utils import sync_to_async
 
 from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
@@ -57,36 +54,24 @@ class TermLinker:
         ).create(*args, **kwargs)
         return cls(candidate_selector)
 
-    async def link(self, entities: Iterable[DocEntity]) -> AsyncIterable[DocEntity]:
+    async def link(self, entities: Iterable[DocEntity]) -> Iterable[DocEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
             entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
-        i = 0
-        start = time.monotonic()
-        des = sync_to_async(entities)
-        candidates = self.candidate_selector(entities)
-        async for c, e in stream.zip(candidates, des):
-            if not isinstance(e, DocEntity) or (
-                c is not None and not isinstance(c, CanonicalEntity)
-            ):
-                raise ValueError(f"Expected tuple `DocEntity` and `CanonicalEntity`")
-
-            i += 1
-            if i % 500 == 0:
-                logger.info("Linked %s entities in %ss", i, time.monotonic() - start)
-                start = time.monotonic()
-            yield DocEntity.merge(
+        candidates = [c async for c in self.candidate_selector(entities)]  # type: ignore
+        return [
+            DocEntity.merge(
                 e,
                 canonical_entity=c
-                or CanonicalEntity(
-                    id="", name=e.normalized_term or e.term, aliases=[e.term]
-                ),
+                or CanonicalEntity.create(e.normalized_term or e.term),
             )
+            for e, c in zip(entities, candidates)
+        ]
 
     async def __call__(
         self, entity_set: Sequence[DocEntity] | Iterable[DocEntity]
-    ) -> AsyncIterable[DocEntity]:
-        return self.link(entity_set)
+    ) -> Iterable[DocEntity]:
+        return await self.link(entity_set)

@@ -326,6 +326,7 @@ model Umls {
     id                  String                      @id @unique
     biomedical_entities BiomedicalEntity[]          @relation("entity_to_umls") // backref
     count               Int                         @default(0)
+    is_eligible         Boolean                     @default(true)
     level               OntologyLevel
     lookup_synonyms     UmlsSynonym[]
     name                String
@@ -337,6 +338,7 @@ model Umls {
     vector              Unsupported("vector(768)")?
 
     @@map("umls")
+    @@index([is_eligible], name: "umls_is_eligible")
 }
 
 model UmlsSynonym {

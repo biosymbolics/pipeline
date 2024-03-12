@@ -1,8 +1,7 @@
 from enum import Enum
 import json
 from prisma.enums import BiomedicalEntityType
-from pydantic import BaseModel, ConfigDict, SkipValidation, field_validator
-import torch
+from pydantic import BaseModel, field_validator
 
 
 class DocType(Enum):

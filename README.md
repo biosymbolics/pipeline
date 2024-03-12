@@ -250,12 +250,14 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 ```
 
-#### Reloading module in REPL
+#### Profiling
 ```
-from system import initialize
-initialize()
-import importlib
-importlib.reload(common.ner.ner)
+python3 -m cProfile -o profile2.out -m data.etl.entity.biomedical_entity.biomedical_entity_load --force_update
+
+import pstats
+p = pstats.Stats('/Users/kristinlindquist/development/pipeline/profile2.out')
+p.sort_stats('time').print_stats(100)
+
 ```
 
 #### Debugging memory leak

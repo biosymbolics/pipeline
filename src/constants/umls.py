@@ -654,7 +654,7 @@ NAME_TO_UMLS_TYPE = {
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
 
 
-CANDIDATE_TYPE_WEIGHT_MAP = {
+CANDIDATE_TYPE_WEIGHT_MAP: dict[str, float] = {
     **{t: 1 for t in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
     **{t: 1 for t in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
     **{t: 1 for t in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
@@ -669,6 +669,8 @@ CANDIDATE_TYPE_WEIGHT_MAP = {
     **{t: 1.1 for t in list(UMLS_PREFERRED_TARGET_TYPES.keys())},
     "T200": 0.7,  # Clinical Drug - too specific. avoid matching.
 }
+
+KNOWN_UMLS_TYPES = list(CANDIDATE_TYPE_WEIGHT_MAP.keys())
 
 
 PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {

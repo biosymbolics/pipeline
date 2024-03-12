@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterable, Iterable
+from typing import AsyncIterable, AsyncIterator, Iterable, Iterator
 import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
@@ -109,28 +109,53 @@ class CandidateSelector(AbstractCandidateSelector):
 
         return candidate_to_canonical(candidate), score
 
-    @overrides(AbstractCandidateSelector)
-    async def select_candidate_from_entity(
+    async def select_candidates(
         self,
-        entity: DocEntity,
+        mentions: list[str],
+        vectors: list[torch.Tensor] | None = None,
         min_similarity: float = 0.85,
         is_composite: bool = False,
-    ) -> EntityWithScore | None:
-        return await self.select_candidate(
-            entity.term, torch.tensor(entity.vector), min_similarity, is_composite
-        )
+    ) -> AsyncIterator[EntityWithScore | None]:
+        """
+        Select the best candidate for a mention
+        """
+        candidate_sets = [
+            ci
+            async for ci in self.candidate_generator(
+                mentions, vectors, K, min_similarity
+            )
+        ]
+        for (candidates, mention_vec), mention in zip(candidate_sets, mentions):
+            if len(candidates) > 0:
+                candidates = apply_umls_word_overrides(mention, candidates)
+                scored_candidates = self._score_candidates(
+                    candidates, mention_vec, is_composite
+                )
+                candidate, score = scored_candidates[0]
+
+                yield candidate_to_canonical(candidate), score
+            else:
+                yield None
+
+    @overrides(AbstractCandidateSelector)
+    def select_candidates_from_entities(
+        self,
+        entities: Iterable[DocEntity],
+        min_similarity: float = 0.85,
+        is_composite: bool = False,
+    ) -> AsyncIterable[EntityWithScore | None]:
+        """
+        Generate & select candidates for a list of mention texts
+        """
+        ents = list(entities)
+        mentions = [ent.normalized_term for ent in ents]
+        vectors = [torch.tensor(ent.vector) for ent in ents]
+
+        return self.select_candidates(mentions, vectors, min_similarity, is_composite)
 
     @overrides(AbstractCandidateSelector)
     async def __call__(
         self, entities: Iterable[DocEntity]
     ) -> AsyncIterable[CanonicalEntity | None]:
-        """
-        Generate & select candidates for a list of mention texts
-        """
-
-        for entity in entities:
-            c = await self.select_candidate_from_entity(entity)
-            if c is not None:
-                yield c[0]
-            else:
-                yield None
+        async for c in self.select_candidates_from_entities(entities):
+            yield c[0] if c else None

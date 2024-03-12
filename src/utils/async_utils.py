@@ -45,12 +45,3 @@ async def gather_with_concurrency_limit(n: int, *coros):
             return await coro
 
     return await asyncio.gather(*(sem_coro(c) for c in coros))
-
-
-T = TypeVar("T")
-
-
-async def sync_to_async(iterable: Iterable[T]) -> AsyncIterable[T]:
-    for item in iterable:
-        await asyncio.sleep(0)  # Make it async-friendly
-        yield item

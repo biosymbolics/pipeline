@@ -44,6 +44,25 @@ class CanonicalEntity(BaseModel):
 
         return tuis_to_entity_type(self.types)
 
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        id: str = "",
+        ids: list[str] | None = None,
+        description: str | None = None,
+        aliases: list[str] | None = None,
+        types: list[str] = [],
+    ):
+        return cls(
+            id=id,
+            name=name,
+            ids=ids,
+            description=description,
+            aliases=aliases or [name],
+            types=types,
+        )
+
 
 class DocEntity(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)

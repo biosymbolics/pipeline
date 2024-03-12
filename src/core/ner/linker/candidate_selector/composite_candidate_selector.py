@@ -17,6 +17,7 @@ from .composite_utils import (
     select_composite_members,
 )
 from .types import (
+    AbstractCandidateSelector,
     EntityWithScore,
     EntityWithScoreVector,
 )
@@ -60,7 +61,7 @@ class CompositeCandidateSelector(CandidateSelector):
         candidate_generator = await CandidateGenerator.create()
         return cls(candidate_generator=candidate_generator, *args, **kwargs)
 
-    async def generate_candidate(self, entity: DocEntity) -> EntityWithScore | None:
+    async def _generate_composite(self, entity: DocEntity) -> EntityWithScore | None:
         """
         Generate a composite candidate from a doc entity
         """
@@ -186,34 +187,38 @@ class CompositeCandidateSelector(CandidateSelector):
             avg_score,
         )
 
-    @overrides(CandidateSelector)
-    async def select_candidate_from_entity(
-        self, entity: DocEntity
-    ) -> CanonicalEntity | None:
+    async def select_candidate_from_entities(
+        self,
+        entities: Iterable[DocEntity],
+    ) -> AsyncIterable[EntityWithScore | None]:
         """
         Generate candidates for a list of mention texts
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
         # attempt direct/non-composite match
-        res = await super().select_candidate_from_entity(entity, is_composite=False)
-        match, match_score = res or (None, 0.0)
+        async for match in super().select_candidates_from_entities(
+            entities, is_composite=True
+        ):
+            entity = next(iter(entities))
+            match_score = match[1] if match is not None else 0
 
-        # if score is sufficient, or if it's not a composite candidate, return
-        is_eligibile = is_composite_eligible(entity.normalized_term)
-        if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
-            return match
+            # if score is sufficient, or if it's not a composite candidate, return
+            is_eligibile = is_composite_eligible(entity.normalized_term)
+            if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
+                yield match
+                return
 
-        # generate composite candidate
-        res = await self.generate_candidate(entity)
-        comp_match, comp_score = res or (None, 0.0)
+            # generate composite candidate
+            composite = await self._generate_composite(entity)
+            composite_score = composite[1] if composite is not None else 0
 
-        if comp_score > match_score:
-            logger.debug("Composite is better (%s vs %s)", comp_score, match_score)
-            return comp_match
+            if composite_score > match_score:
+                logger.debug("Chose composite (%s vs %s)", composite_score, match_score)
+                yield composite
 
-        logger.debug("Non-composite is better (%s vs %s)", match_score, comp_score)
-        return match
+            logger.debug("Chose non-composite (%s vs %s)", match_score, composite_score)
+            yield match
 
     @overrides(CandidateSelector)
     async def __call__(
@@ -222,10 +227,8 @@ class CompositeCandidateSelector(CandidateSelector):
         """
         Generate & select candidates for a list of mention texts
         """
-
-        for entity in entities:
-            candidate = await self.select_candidate_from_entity(entity)
-            if candidate is None:
-                yield None
+        async for e in self.select_candidates_from_entities(entities):
+            if e is not None:
+                yield e[0]
             else:
-                yield candidate
+                yield None

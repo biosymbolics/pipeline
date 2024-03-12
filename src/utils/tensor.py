@@ -190,7 +190,8 @@ def l1_regularize(
     vector: torch.Tensor, sparsity_threshold: float = 0.1
 ) -> torch.Tensor:
     vector[vector.abs() < sparsity_threshold] = 0  # sparsify
-    return F.normalize(vector, p=1, dim=0)  # l1 normalize
+    with torch.no_grad():
+        return F.normalize(vector, p=1, dim=0)  # l1 normalize
 
 
 def combine_tensors(
@@ -201,7 +202,7 @@ def combine_tensors(
     """
     b_weight = 1 - a_weight
     vector = a_weight * a + b_weight * b
-    return vector  # l1_regularize(vector, 0)
+    return vector
 
 
 def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
@@ -249,27 +250,28 @@ def similarity_with_residual_penalty(
         distance (float, optional): cosine/"angular" distance. Defaults to None, in which case it is computed.
         alpha (float, optional): 1 - a == weight of the residual penalty. Defaults to 0.5.
     """
-    similarity = 2 - F.cosine_similarity(a, b, dim=0)
+    with torch.no_grad():
+        similarity = 2 - F.cosine_similarity(a, b, dim=0)
 
-    # Compute residual
-    residual = torch.subtract(a, b)
+        # Compute residual
+        residual = torch.subtract(a, b)
 
-    # Frobenius norm
-    residual_norm = torch.norm(residual, p="fro")
+        # Frobenius norm
+        residual_norm = torch.norm(residual, p="fro")
 
-    # Scale residual norm to [0,1] range
-    scaled_residual_norm = torch.divide(residual_norm, torch.norm(a))
+        # Scale residual norm to [0,1] range
+        scaled_residual_norm = torch.divide(residual_norm, torch.norm(a))
 
-    # Weighted score
-    score = alpha * similarity + (1 - alpha) * (1 - torch.abs(scaled_residual_norm))
-    logger.debug(
-        "%s: Similarity %s, Residual: %s, Score: %s",
-        name,
-        similarity.item(),
-        scaled_residual_norm.item(),
-        score.item(),
-    )
-    return score.item()
+        # Weighted score
+        score = alpha * similarity + (1 - alpha) * (1 - torch.abs(scaled_residual_norm))
+        logger.debug(
+            "%s: Similarity %s, Residual: %s, Score: %s",
+            name,
+            similarity.item(),
+            scaled_residual_norm.item(),
+            score.item(),
+        )
+        return score.item()
 
 
 def tensor_mean(vectors: Sequence[torch.Tensor]) -> torch.Tensor:

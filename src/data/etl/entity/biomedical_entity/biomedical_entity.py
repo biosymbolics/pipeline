@@ -16,6 +16,7 @@ from prisma.types import (
 from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 from spacy.lang.en import stop_words
+import torch
 
 from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
@@ -72,7 +73,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         Create biomedical entity etl
         """
         normalizer = await TermNormalizer.create(
-            link=True,
             candidate_selector_type=candidate_selector_type,
             additional_cleaners=[remove_stopwords],
         )

@@ -1,11 +1,15 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncIterable
 from prisma import Prisma
 import torch
+from asgiref.sync import async_to_sync
 import logging
 
-from clients.low_level.prisma import PrismaPool, prisma_client
+from clients.low_level.prisma import prisma_client
 from core.vector.vectorizer import Vectorizer
 from typings.documents.common import MentionCandidate
+from utils.async_utils import gather_with_concurrency_limit
 from utils.tensor import l1_regularize
 
 logger = logging.getLogger(__name__)
@@ -13,22 +17,19 @@ logger.setLevel(logging.INFO)
 
 
 class CandidateGenerator:
-    def __init__(self, db: Prisma, prisma_pool):
+    def __init__(self, db: Prisma):
         """
         Initialize candidate generator
 
         Use `create` to instantiate with async dependencies
         """
         self.db = db
-        self.prisma_pool = prisma_pool
         self.vectorizer = Vectorizer.get_instance()
 
     @staticmethod
     async def create() -> "CandidateGenerator":
         db = await prisma_client(300)
-        prisma_pool = PrismaPool(pool_size=5)
-        await prisma_pool.init()
-        return CandidateGenerator(db, prisma_pool)
+        return CandidateGenerator(db)
 
     async def get_candidates(
         self,
@@ -44,7 +45,7 @@ class CandidateGenerator:
             logger.warning("mention_vec is None, one-off vectorizing mention (slow!)")
             mention_vec = self.vectorizer.vectorize([mention])[0]
 
-        float_vec = mention_vec.tolist()
+        max_distance = 1 - min_similarity
 
         # ALTER SYSTEM SET pg_trgm.similarity_threshold = 0.9;
         query = f"""
@@ -61,26 +62,24 @@ class CandidateGenerator:
                 SELECT * FROM (
                     SELECT id, name
                     FROM umls
-                    WHERE (vector <=> $2::vector) < 1 - {min_similarity}
+                    WHERE (vector <=> $2::vector) < {max_distance}
+                    -- AND is_eligible=true
                     ORDER BY vector <=> $2::vector ASC
                     LIMIT {k}
                 ) s
 
                 UNION
 
-                SELECT umls_id AS id, term AS name
+                SELECT distinct umls_id AS id, term AS name
                 FROM umls_synonym
                 WHERE term % $1
 
                 LIMIT {k}
             ) AS matches ON matches.id = umls.id
+            -- WHERE is_eligible=true
         """
-        if mention_vec is None or len(mention_vec.shape) == 0:
-            return [], mention_vec
-
         try:
-            client = await self.prisma_pool.get_client()
-            res = await client.query_raw(query, mention, float_vec)
+            res = await self.db.query_raw(query, mention, mention_vec.tolist())
         except Exception:
             logger.exception("Failed to query for candidates")
             return [], mention_vec
@@ -99,5 +98,12 @@ class CandidateGenerator:
         _vectors = vectors or self.vectorizer.vectorize(mentions)
         mention_vecs = [l1_regularize(v) for v in _vectors]
 
-        for mention, vec in zip(mentions, mention_vecs):
-            yield await self.get_candidates(mention, vec, k, min_similarity)
+        candidate_sets = gather_with_concurrency_limit(
+            5,
+            *[
+                self.get_candidates(mention, vec, k, min_similarity)
+                for mention, vec in zip(mentions, mention_vecs)
+            ],
+        )
+        for candidates, vec in await candidate_sets:
+            yield candidates, vec

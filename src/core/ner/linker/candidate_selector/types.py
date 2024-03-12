@@ -34,6 +34,15 @@ class AbstractCandidateSelector(object):
         pass
 
     @abstractmethod
+    def select_candidates_from_entities(
+        self, entities: Iterable[DocEntity]
+    ) -> AsyncIterable[EntityWithScore | None]:
+        """
+        Generate & select candidates for a mention text, returning best candidate & score
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def select_candidate_from_entity(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
         """
         Generate & select candidates for a mention text, returning best candidate & score
@@ -48,7 +57,7 @@ class AbstractCandidateSelector(object):
         raise NotImplementedError
 
     @abstractmethod
-    def __call__(
+    async def __call__(
         self, entities: Iterable[DocEntity]
     ) -> AsyncIterable[CanonicalEntity | None]:
         """
