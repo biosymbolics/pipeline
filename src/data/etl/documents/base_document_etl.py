@@ -24,7 +24,8 @@ logging.basicConfig(level=logging.INFO)
 class BaseDocumentEtl(BaseEtl):
     def __init__(self, document_type: DocType, source_db: str):
         super().__init__(
-            record_type=VectorizableRecordType(document_type), source_db=source_db
+            record_type=VectorizableRecordType.from_doc_type(document_type),
+            source_db=source_db,
         )
 
     @abstractmethod

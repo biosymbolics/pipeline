@@ -42,12 +42,17 @@ class OwnerEtl(BaseEntityEtl):
 
     def __init__(
         self,
-        additional_cleaners: Sequence[CleanFunction] = [],
+        term_normalizer: TermNormalizer,
     ):
-        self.normalizer = TermNormalizer(
+        self.term_normalizer = term_normalizer
+
+    @classmethod
+    async def create(cls, additional_cleaners: Sequence[CleanFunction] = []):
+        normalizer = await TermNormalizer.create(
             link=False,
             additional_cleaners=additional_cleaners,
         )
+        return OwnerEtl(term_normalizer=normalizer)
 
     def _generate_insert_records(
         self,
@@ -175,6 +180,7 @@ class OwnerEtl(BaseEntityEtl):
         await Ownable.prisma(client).query_raw(
             "UPDATE ownable SET owner_id=NULL WHERE owner_id IS NOT NULL"
         )
+        await Acquisition.prisma(client).delete_many()
         await FinancialSnapshot.prisma(client).delete_many()
         await OwnerSynonym.prisma(client).delete_many()
         await Owner.prisma(client).delete_many()

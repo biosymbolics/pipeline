@@ -284,76 +284,68 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         await client.execute_raw(query)
 
     @staticmethod
-    async def _create_biomedical_entity_ancestors(n_depth: int = 2):
+    async def _create_biomedical_entity_ancestors():
         """
         Create ancestor biomedical entities from UMLS
-
-        Args:
-            n_depth (int): numer of iterations / recursion depth
-                e.g. iteration 1, we get parents. iteration 2, we get parents of parents, etc.
-
-        TODO: turn this into an in-memory function and insert only once
         """
 
-        async def execute():
-            query = f"""
+        def get_query(is_recursive_term: bool):
+            return f"""
                 SELECT
                     child_entity.id AS child_id,
                     umls_parent.id AS canonical_id,
                     umls_parent.preferred_name AS name,
-                    umls_parent.type_ids AS type_ids
+                    umls_parent.type_ids AS type_ids,
+                    {'1 AS depth' if not is_recursive_term else 'we.depth + 1 AS depth'}
                 FROM
                     umls,
                     _entity_to_umls etu,
                     umls as umls_parent,
                     biomedical_entity as child_entity
+                {'JOIN working_entities we ON we.child_id=child_entity.id' if is_recursive_term else ''}
                 WHERE
-                    etu."A"=child_entity.id
+                    {'we.depth <= 6' if is_recursive_term else '1 = 1'}
+                    AND etu."A"=child_entity.id
                     AND umls.id=etu."B"
                     AND umls_parent.id=umls.rollup_id
-                    -- only get records for which a parent with this child doesn't yet exist
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM biomedical_entity possible_parent_entity, _entity_to_parent etp
-                        WHERE possible_parent_entity.id=etp."A"
-                        AND child_entity.id=etp."B"
-                        AND canonical_id=umls_parent.id
-                    )
             """
-            client = await prisma_client(300)
-            results = await client.query_raw(query)
-            records = [
-                BiomedicalEntityCreateInput(
-                    canonical_id=r["canonical_id"],
-                    children={"connect": [{"id": r["child_id"]}]},
-                    entity_type=tuis_to_entity_type(r["type_ids"]),
-                    name=r["name"].lower(),
-                    sources=[Source.UMLS],
-                    umls_entities={"connect": [{"id": r["canonical_id"]}]},
-                )
-                for r in results
-            ]
 
-            # TODO: will error on duplicated names, which is exacerbated by the fact that we adjust the default UMLS name
-            # e.g. "icam2", matching https://uts.nlm.nih.gov/uts/umls/concept/C1317964 and https://uts.nlm.nih.gov/uts/umls/concept/C1334075
-            # also pla2g2a, fcgr3b.
-            # maybe we want a 1<>many relationship between biomedical_entity and umls
-            # or in this situation, we could do a WHERE on name if it fails the first time
-            await batch_update(
-                records,
-                update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
-                    data={
-                        "create": r,
-                        "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
-                    },
-                    where=BiomedicalEntityEtl.get_update_where(r),
-                ),
-                batch_size=10000,
+        query = f"""
+            WITH RECURSIVE working_entities AS (
+                {get_query(False)} UNION {get_query(True)}
             )
+            select * from working_entities
+        """
+        client = await prisma_client(300)
+        results = await client.query_raw(query)
+        records = [
+            BiomedicalEntityCreateInput(
+                canonical_id=r["canonical_id"],
+                children={"connect": [{"id": r["child_id"]}]},
+                entity_type=tuis_to_entity_type(r["type_ids"]),
+                name=r["name"].lower(),
+                sources=[Source.UMLS],
+                umls_entities={"connect": [{"id": r["canonical_id"]}]},
+            )
+            for r in results
+        ]
 
-        for n in range(n_depth):
-            logger.info("Adding UMLS as biomedical entity parents, depth %s", n)
-            await execute()
+        # TODO: will error on duplicated names, which is exacerbated by the fact that we adjust the default UMLS name
+        # e.g. "icam2", matching https://uts.nlm.nih.gov/uts/umls/concept/C1317964 and https://uts.nlm.nih.gov/uts/umls/concept/C1334075
+        # also pla2g2a, fcgr3b.
+        # maybe we want a 1<>many relationship between biomedical_entity and umls
+        # or in this situation, we could do a WHERE on name if it fails the first time
+        await batch_update(
+            records,
+            update_func=lambda r, tx: BiomedicalEntity.prisma(tx).upsert(
+                data={
+                    "create": r,
+                    "update": BiomedicalEntityUpdateInput(**r),  # type: ignore
+                },
+                where=BiomedicalEntityEtl.get_update_where(r),
+            ),
+            batch_size=10000,
+        )
 
     @staticmethod
     async def add_counts():
@@ -404,17 +396,17 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                 WHERE {table}.name=entity_synonym.term
                 AND entity_synonym.entity_id=biomedical_entity.id
                 """,
+                f"CREATE INDEX {table}_canonical_name ON {table}(canonical_name)",
+                f"CREATE INDEX {table}_entity_id ON {table}(entity_id)",
             ]
 
         logger.info("Linking mapping tables to canonical entities")
-        client = await prisma_client(600)
+        client = await prisma_client(800)
         for table in ["intervenable", "indicatable"]:
             for query in get_queries(table):
                 await client.execute_raw(query)
 
-        logger.warning(
-            "Completed link_to_documents. ***Be sure to re-apply indices!! (prisma db push)***"
-        )
+        logger.warning("Completed link_to_documents.")
 
     @staticmethod
     async def set_rollups():
@@ -445,6 +437,8 @@ class BiomedicalEntityEtl(BaseEntityEtl):
                     UPDATE {table} SET instance_rollup=canonical_name, category_rollup=canonical_name
                     WHERE instance_rollup=''
                 """,
+                f"CREATE INDEX {table}_instance_rollup ON {table}(instance_rollup)",
+                f"CREATE INDEX {table}_category_rollup ON {table}(instance_rollup)",
             ]
 
         # much faster with temp tables
@@ -469,7 +463,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         logger.info("Setting rollups for mapping tables")
 
-        client = await prisma_client(600)
+        client = await prisma_client(1200)
         for query in initialize_queries:
             await client.execute_raw(query)
 
@@ -482,9 +476,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         for query in cleanup_queries:
             await client.execute_raw(query)
 
-        logger.warning(
-            "Completed set_rollups. ***Be sure to re-apply indices!! (prisma db push)***"
-        )
+        logger.warning("Completed set_rollups.")
 
     @staticmethod
     async def checksum():
@@ -558,7 +550,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         # map umls to entities
         await BiomedicalEntityEtl._map_umls()
 
-        # populate search index with name & syns
+        # # populate search index with name & syns
         await BiomedicalEntityEtl._update_search_index()
 
         await BiomedicalEntityEtl.link_to_documents()

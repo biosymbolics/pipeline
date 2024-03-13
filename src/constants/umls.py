@@ -385,6 +385,7 @@ UMLS_MAYBE_FORMULATION_TYPES: dict[str, str] = {}
 
 UMLS_MAYBE_COMPOUND_TYPES = {
     "T167": "Substance",
+    # "T002": "Plant",
     **UMLS_FORMULATION_TYPES,
 }
 

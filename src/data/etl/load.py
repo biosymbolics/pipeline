@@ -92,9 +92,9 @@ async def load_all(force_update: bool = False):
             If update, documents and their relations are first deleted.
     """
     # copy umls data
-    # await UmlsLoader(
-    #     record_type=VectorizableRecordType.umls, source_db="umls"
-    # ).copy_all()
+    await UmlsLoader(
+        record_type=VectorizableRecordType.umls, source_db="umls"
+    ).copy_all()
 
     # copy all biomedical entities (from all doc types)
     # Takes 3+ hours!!

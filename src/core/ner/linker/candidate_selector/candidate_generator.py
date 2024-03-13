@@ -45,6 +45,10 @@ class CandidateGenerator:
             logger.warning("mention_vec is None, one-off vectorizing mention (slow!)")
             mention_vec = self.vectorizer.vectorize([mention])[0]
 
+        if len(mention_vec.shape) == 0:
+            logger.warning("mention_vec is empty (%s)", mention_vec.shape)
+            return [], mention_vec
+
         max_distance = 1 - min_similarity
 
         # ALTER SYSTEM SET pg_trgm.similarity_threshold = 0.9;
@@ -63,7 +67,7 @@ class CandidateGenerator:
                     SELECT id, name
                     FROM umls
                     WHERE (vector <=> $2::vector) < {max_distance}
-                    -- AND is_eligible=true
+                    AND is_eligible=true
                     ORDER BY vector <=> $2::vector ASC
                     LIMIT {k}
                 ) s
@@ -99,7 +103,7 @@ class CandidateGenerator:
         mention_vecs = [l1_regularize(v) for v in _vectors]
 
         candidate_sets = gather_with_concurrency_limit(
-            5,
+            10,
             *[
                 self.get_candidates(mention, vec, k, min_similarity)
                 for mention, vec in zip(mentions, mention_vecs)

@@ -27,6 +27,7 @@ class TermNormalizer:
 
     def __init__(
         self,
+        link: bool,
         term_linker: TermLinker,
         additional_cleaners: Sequence[CleanFunction] = [],
     ):
@@ -39,11 +40,13 @@ class TermNormalizer:
         self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
+        self.link = link
         self.nlp = get_transformer_nlp()
 
     @classmethod
     async def create(
         cls,
+        link: bool = True,
         candidate_selector_type: CandidateSelectorType | None = None,
         *args,
         **kwargs,
@@ -54,7 +57,7 @@ class TermNormalizer:
             else TermLinker.create()
         )
 
-        return cls(term_linker, *args, **kwargs)
+        return cls(link, term_linker, *args, **kwargs)
 
     async def normalize(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
         """
@@ -63,7 +66,7 @@ class TermNormalizer:
         # removed_suppressed must be false to properly index against original terms
         cleaned_entities = self.cleaner.clean(doc_entities, remove_suppressed=False)
 
-        if self.term_linker is not None:
+        if self.link:
             return await self.term_linker.link(cleaned_entities)
 
         return cleaned_entities
@@ -93,6 +96,7 @@ class TermNormalizer:
 
         for i, b in enumerate(batched_terms):
             logger.info("Batch %s (last took: %ss)", i, round(time.monotonic() - start))
+            start = time.monotonic()
             docs = list(self.nlp.pipe(b))
 
             doc_entities = [
@@ -100,9 +104,14 @@ class TermNormalizer:
                 for term, doc, vector in zip(b, docs, batched_vectors[i])
             ]
 
-            linked = await self.term_linker.link(doc_entities)
-            for link in linked:
-                yield link
+            if self.link:
+                linked = await self.term_linker.link(doc_entities)
+                for link in linked:
+                    yield link
+                return
+
+            for entity in doc_entities:
+                yield entity
 
     async def __call__(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
         return await self.normalize(doc_entities)

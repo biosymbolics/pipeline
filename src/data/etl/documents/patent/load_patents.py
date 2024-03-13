@@ -238,7 +238,7 @@ class PatentLoader(BaseDocumentEtl):
                             "claims": p["claims"],
                             "country_code": p["country"],
                             "family_id": p["family_id"],
-                            "investment": len(p["other_ids"])
+                            "investment": len(p["all_publication_numbers"])
                             * PATENT_WEIGHT_MULTIPLIER,
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
@@ -248,7 +248,8 @@ class PatentLoader(BaseDocumentEtl):
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
                             "title": p["title"],
-                            "traction": len(p["other_ids"]) * PATENT_WEIGHT_MULTIPLIER,
+                            "traction": len(p["all_publication_numbers"])
+                            * PATENT_WEIGHT_MULTIPLIER,
                             "url": p["url"],
                         }
                     )
