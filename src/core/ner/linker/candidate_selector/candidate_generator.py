@@ -1,9 +1,6 @@
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncIterable
 from prisma import Prisma
 import torch
-from asgiref.sync import async_to_sync
 import logging
 
 from clients.low_level.prisma import prisma_client

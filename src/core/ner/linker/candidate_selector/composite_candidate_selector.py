@@ -68,11 +68,12 @@ class CompositeCandidateSelector(CandidateSelector):
 
         def generate_ngram_spans(
             doc: Doc, context_vector: torch.Tensor | None
-        ) -> tuple[list[Span], list[torch.Tensor]]:
+        ) -> tuple[list[str], list[torch.Tensor]]:
             """
             Get tokens and vectors from a doc entity
             """
-            ngram_docs = generate_ngram_phrases_from_doc(doc, self.ngrams_n)
+            ngram_docs = generate_ngram_phrases_from_doc(doc, self.ngrams_n, 2)
+            ngram_strings = [ng.text for ng in ngram_docs]
 
             # if the entity has a vector, combine with newly created token vectors
             # to add context for semantic similarity comparison
@@ -85,7 +86,7 @@ class CompositeCandidateSelector(CandidateSelector):
             else:
                 vectors = [torch.tensor(d.vector) for d in ngram_docs]
 
-            return ngram_docs, vectors
+            return ngram_strings, vectors
 
         if entity.spacy_doc is None:
             raise ValueError("Entity must have a spacy doc")
@@ -93,12 +94,17 @@ class CompositeCandidateSelector(CandidateSelector):
         doc = entity.spacy_doc
 
         ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
-        ngram_entity_map = {
-            ng.text: await self.select_candidate(
-                ng.text, vector, self.min_composite_similarity, is_composite=True
+        ngram_candidates = [
+            c
+            async for c in self.select_candidates(
+                ngrams,
+                ngram_vectors,
+                self.min_composite_similarity,
+                is_composite=True,
             )
-            for ng, vector in zip(ngrams, ngram_vectors)
-            if len(ng.text) > 2  # short matches tend to be weird
+        ]
+        ngram_entity_map = {
+            ng: candidate for ng, candidate in zip(ngrams, ngram_candidates)
         }
         logger.info(
             "Ngram entity map: %s",
