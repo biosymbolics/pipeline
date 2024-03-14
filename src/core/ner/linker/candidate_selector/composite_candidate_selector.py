@@ -187,7 +187,8 @@ class CompositeCandidateSelector(CandidateSelector):
             avg_score,
         )
 
-    async def select_candidate_from_entities(
+    @overrides(CandidateSelector)
+    async def select_candidates_from_entities(
         self,
         entities: Iterable[DocEntity],
     ) -> AsyncIterable[EntityWithScore | None]:
@@ -208,7 +209,6 @@ class CompositeCandidateSelector(CandidateSelector):
             if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
                 yield match
                 return
-
             # generate composite candidate
             composite = await self._generate_composite(entity)
             composite_score = composite[1] if composite is not None else 0
