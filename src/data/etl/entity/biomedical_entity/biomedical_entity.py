@@ -16,7 +16,6 @@ from prisma.types import (
 from pydash import compact, flatten, group_by, is_empty, omit
 import logging
 from spacy.lang.en import stop_words
-import torch
 
 from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
@@ -355,7 +354,6 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         """
         logger.info("Adding biomedical counts")
         client = await prisma_client(600)
-        # add counts to biomedical_entity & owner
 
         await client.execute_raw("CREATE TEMP TABLE temp_count(id int, count int)")
         await client.execute_raw(
@@ -384,7 +382,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
 
         def get_queries(table: str) -> list[str]:
             return [
-                f"DROP INDEX IF EXISTS {table}_canonical_name",  # update perf
+                f"DROP INDEX IF EXISTS {table}_canonical_name",  # for better update perf
                 f"DROP INDEX IF EXISTS {table}_entity_id",  # update perf
                 f"""
                 UPDATE {table}
@@ -418,7 +416,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
         def get_update_queries(table: str) -> list[str]:
             return [
                 # clear existing rollups
-                f"DROP INDEX IF EXISTS {table}_instance_rollup",  # update perf
+                f"DROP INDEX IF EXISTS {table}_instance_rollup",  # for better update perf
                 f"DROP INDEX IF EXISTS {table}_category_rollup",  # update perf
                 f"UPDATE {table} SET instance_rollup='', category_rollup=''",
                 # logic is in how rollup_id is set (umls etl / ancestor_selector)
