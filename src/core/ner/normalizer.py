@@ -108,10 +108,9 @@ class TermNormalizer:
                 linked = await self.term_linker.link(doc_entities)
                 for link in linked:
                     yield link
-                return
-
-            for entity in doc_entities:
-                yield entity
+            else:
+                for entity in doc_entities:
+                    yield entity
 
     async def __call__(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
         return await self.normalize(doc_entities)
