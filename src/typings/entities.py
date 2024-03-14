@@ -47,7 +47,6 @@ class Entity(ResultBase):
     owners: list[str]
     patent_count: int
     patent_ids: list[str]
-    patent_weight: int
     percent_trials_stopped: float | None
     most_recent_patent: ScoredPatent | None = Field(exclude=True)
     most_recent_trial: ScoredTrial | None = Field(exclude=True)
@@ -129,7 +128,6 @@ class Entity(ResultBase):
             owners=cls.get_owners(patents, regulatory_approvals, trials),
             patent_count=len(patents),
             patent_ids=[p.id for p in patents],
-            patent_weight=cls.get_patent_weight(patents),
             percent_trials_stopped=cls.get_percent_trials_stopped(trials),
             regulatory_approval_count=len(regulatory_approvals),
             regulatory_approval_ids=[a.id for a in regulatory_approvals],
@@ -150,14 +148,6 @@ class Entity(ResultBase):
     @property
     def child_count(self) -> int:
         return len(self.children)
-
-    @classmethod
-    def get_patent_weight(cls, patents: Sequence[ScoredPatent]) -> int:
-        """
-        Count all patents - not just the WO, but the country-specific and other variants
-        (proxy for LOI in each patent)
-        """
-        return sum([len(p.other_ids) for p in patents])
 
     @computed_field  # type: ignore
     @property

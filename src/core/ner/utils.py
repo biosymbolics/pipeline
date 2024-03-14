@@ -481,6 +481,7 @@ def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:
     entity_set = [
         DocEntity.create(
             span.text,
+            span.text,
             span.start_char,
             span.end_char,
             type=span.label_,

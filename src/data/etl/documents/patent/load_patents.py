@@ -14,7 +14,6 @@ from pydash import uniq
 from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.core import (
-    ETL_BASE_DATABASE_URL,
     GPR_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
