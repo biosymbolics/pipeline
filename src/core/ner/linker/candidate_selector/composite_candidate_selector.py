@@ -203,11 +203,12 @@ class CompositeCandidateSelector(CandidateSelector):
 
         If the initial top candidate isn't of sufficient similarity, generate a composite candidate.
         """
+        entity_iter = iter(entities)
         # attempt direct/non-composite match
         async for match in super().select_candidates_from_entities(
             entities, is_composite=True
         ):
-            entity = next(iter(entities))
+            entity = next(entity_iter)
             match_score = match[1] if match is not None else 0
 
             # if score is sufficient, or if it's not a composite candidate, return
@@ -215,6 +216,7 @@ class CompositeCandidateSelector(CandidateSelector):
             if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
                 yield match
                 return
+
             # generate composite candidate
             composite = await self._generate_composite(entity)
             composite_score = composite[1] if composite is not None else 0
@@ -222,9 +224,9 @@ class CompositeCandidateSelector(CandidateSelector):
             if composite_score > match_score:
                 logger.debug("Chose composite (%s vs %s)", composite_score, match_score)
                 yield composite
-
-            logger.debug("Chose non-composite (%s vs %s)", match_score, composite_score)
-            yield match
+            else:
+                logger.debug("Chose non-compe (%s vs %s)", match_score, composite_score)
+                yield match
 
     @overrides(CandidateSelector)
     async def __call__(

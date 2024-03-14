@@ -40,23 +40,17 @@ SUBSTITUTIONS = {
     r"[.,:;'\"]+$": "",  # trailing punct
     r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
-    "compounds?": "",
-    "substituted": "",
-    "candidates?": "",
-    "receptors?": "",
-    "forms?": "",
-    "formulations?": "",
-    "formulae?s?": "",
-    "products?": "",
-    "refactory": "",  # e.g. refractory sarcoidosis
-    "recurrent": "",
-    "severe": "",
-    "mild": "",
-    "progressive": "",
-    "capable": "",
-    "cycling": "",
-    "-?binding": "",
-    "selective": "",
+    r"\bcompounds?\b": "",
+    r"\bsubstitutes?d?\b": "",
+    r"\bcandidates?\b": "",
+    r"\breceptors?\b": "",
+    r"\bforms?(?:ulations?)?\b": "",
+    r"\bformulae?s?\b": "",
+    r"\bproducts?\b": "",
+    r"\bcapable\b": "",
+    r"\buseful\b": "",
+    r"\bbinding\b": "",
+    r"\bselective\b": "",
 }
 
 

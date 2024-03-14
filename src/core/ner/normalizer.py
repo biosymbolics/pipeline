@@ -103,7 +103,6 @@ class TermNormalizer:
                 DocEntity.create(term, vector=vector, spacy_doc=doc)
                 for term, doc, vector in zip(b, docs, batched_vectors[i])
             ]
-
             if self.link:
                 linked = await self.term_linker.link(doc_entities)
                 for link in linked:

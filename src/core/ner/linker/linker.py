@@ -61,6 +61,7 @@ class TermLinker:
         Args:
             entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
+
         candidates = [c async for c in self.candidate_selector(entities)]  # type: ignore
         return [
             DocEntity.merge(
@@ -68,7 +69,7 @@ class TermLinker:
                 canonical_entity=c
                 or CanonicalEntity.create(e.normalized_term or e.term),
             )
-            for e, c in zip(entities, candidates)
+            for e, c in zip(iter(entities), candidates)
         ]
 
     async def __call__(
