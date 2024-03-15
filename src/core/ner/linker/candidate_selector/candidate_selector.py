@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterable, AsyncIterator, Iterable, Iterator
+from typing import AsyncIterable, AsyncIterator, Iterable
 import torch
 
 from core.ner.types import CanonicalEntity, DocEntity
@@ -9,13 +9,12 @@ from typings.documents.common import MentionCandidate
 from .candidate_generator import CandidateGenerator
 from .types import AbstractCandidateSelector, EntityWithScore
 from .utils import (
-    apply_match_retry_rewrites,
     candidate_to_canonical,
     apply_umls_word_overrides,
     score_candidate,
 )
 
-MIN_SIMILARITY = 0.85
+MIN_SIMILARITY = 0.8
 K = 10
 
 
@@ -73,47 +72,11 @@ class CandidateSelector(AbstractCandidateSelector):
         )
         return sorted_candidates
 
-    @overrides(AbstractCandidateSelector)
-    async def select_candidate(
-        self,
-        mention: str,
-        vector: torch.Tensor | None = None,
-        min_similarity: float = 0.85,
-        is_composite: bool = False,
-    ) -> EntityWithScore | None:
-        """
-        Select the best candidate for a mention
-        """
-        candidates, mention_vec = await self.candidate_generator.get_candidates(
-            mention, vector, K, min_similarity
-        )
-
-        if len(candidates) == 0:
-            logger.debug(
-                f"No candidates found for {mention} with similarity >= {self.min_similarity}"
-            )
-            # apply rewrites and look for another match
-            rewritten_text = apply_match_retry_rewrites(mention)
-            if rewritten_text is not None and rewritten_text != mention:
-                return await self.select_candidate(
-                    rewritten_text, None, min_similarity, is_composite
-                )
-            return None
-
-        candidates = apply_umls_word_overrides(mention, candidates)
-
-        scored_candidates = self._score_candidates(
-            candidates, mention_vec, is_composite
-        )
-        candidate, score = scored_candidates[0]
-
-        return candidate_to_canonical(candidate), score
-
     async def select_candidates(
         self,
         mentions: list[str],
         vectors: list[torch.Tensor] | None = None,
-        min_similarity: float = 0.85,
+        min_similarity: float = MIN_SIMILARITY,
         is_composite: bool = False,
     ) -> AsyncIterator[EntityWithScore | None]:
         """
@@ -141,7 +104,7 @@ class CandidateSelector(AbstractCandidateSelector):
     def select_candidates_from_entities(
         self,
         entities: Iterable[DocEntity],
-        min_similarity: float = 0.85,
+        min_similarity: float = MIN_SIMILARITY,
         is_composite: bool = False,
     ) -> AsyncIterable[EntityWithScore | None]:
         """

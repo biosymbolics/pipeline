@@ -8,13 +8,13 @@ from typing import (
     Mapping,
     Optional,
     TypeGuard,
-    TypedDict,
     Union,
 )
 from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydash import compact
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
+import numpy.typing as npt
 
 from data.domain.biomedical.umls import tuis_to_entity_type
 
@@ -89,6 +89,8 @@ class DocEntity(BaseModel):
         def _vector() -> list[float] | None:
             if vector is not None and isinstance(vector, list):
                 return vector
+            if vector is not None and hasattr(vector, "tolist"):
+                return vector.tolist()
             elif spacy_doc is not None:
                 return spacy_doc.vector
             return None

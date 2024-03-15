@@ -109,6 +109,9 @@ class DocumentVectorizer(BaseEtl):
             ]
 
         res = [prep_text_set(text_set) for text_set in zip(*texts)]
+
+        if len(doc_df) != len(res):
+            raise ValueError("Mismatched text and document lengths")
         return res
 
     def _vectorize(self, docs: list[str] | list[list[str]]) -> list[list[float]]:
@@ -123,7 +126,7 @@ class DocumentVectorizer(BaseEtl):
         # if the combo strategy is average, vectorize each string and average
         elif self.combo_strategy == ComboStrategy.average and is_list_string_list(docs):
             indices: list[tuple[int, int]] = reduce(
-                lambda acc, d: acc + [(acc[-1][1], acc[-1][1] + len(d) - 1)],
+                lambda acc, d: acc + [(acc[-1][1], acc[-1][1] + len(d))],
                 docs,
                 [(0, 0)],  # type: ignore
             )
@@ -132,6 +135,9 @@ class DocumentVectorizer(BaseEtl):
                 l1_regularize(tensor_mean(vectors[s:e])).tolist()
                 for s, e in indices[1:]
             ]
+
+            if indices[-1][1] != len(flatten(docs)):
+                raise ValueError("Mismatched vector and document lengths")
 
             return vector_sets
 
@@ -152,7 +158,7 @@ class DocumentVectorizer(BaseEtl):
 
         if len(to_process) == 0:
             logger.info("No documents to process")
-            return [], []
+            return [], []  # type: ignore
 
         ids = to_process[self.id_field].to_list()
 

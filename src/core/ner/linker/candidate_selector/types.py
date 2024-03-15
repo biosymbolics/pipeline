@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import AsyncIterable, Iterable, Sequence, TypeVar
+from typing import AsyncIterable, AsyncIterator, Iterable, Sequence, TypeVar
 
 from core.ner.types import DocEntity
 
@@ -15,13 +15,9 @@ CandidateSelectorType = Literal[
     "CandidateSelector",
     "CompositeCandidateSelector",
 ]
-
 EntityWithScore = tuple[CanonicalEntity, float]
 CandidateScore = tuple[MentionCandidate, float]
-
 EntityWithScoreVector = tuple[CanonicalEntity, float, torch.Tensor]
-
-ST = TypeVar("ST", bound=EntityWithScore)
 
 
 class AbstractCandidateSelector(object):
@@ -43,14 +39,13 @@ class AbstractCandidateSelector(object):
         raise NotImplementedError
 
     @abstractmethod
-    async def select_candidate_from_entity(self, entity: DocEntity) -> ST | None:  # type: ignore # TODO
-        """
-        Generate & select candidates for a mention text, returning best candidate & score
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def select_candidate(self, text: str, vector: torch.Tensor | None = None) -> ST | None:  # type: ignore # TODO
+    def select_candidates(
+        self,
+        texts: list[str],
+        vectors: list[torch.Tensor] | None = None,
+        min_similarity: float = 0.85,
+        is_composite: bool = False,
+    ) -> AsyncIterator[EntityWithScore | None]:
         """
         Generate & select candidates for a mention text, returning best candidate & score
         """

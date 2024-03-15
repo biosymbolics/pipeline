@@ -195,7 +195,7 @@ class PatentLoader(BaseDocumentEtl):
             ),
             sql=PatentLoader.get_entity_sql(INTERVENTION_DOMAINS),
         )
-        return [indication_spec, intervention_spec]
+        return [intervention_spec, indication_spec]
 
     @overrides(BaseDocumentEtl)
     async def delete_all(self):

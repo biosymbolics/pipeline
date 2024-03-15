@@ -21,7 +21,7 @@ from utils.tensor import similarity_with_residual_penalty, tensor_mean
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SYNTACTIC_SIMILARITY_WEIGHT = 0.3
+SYNTACTIC_SIMILARITY_WEIGHT = 0.25
 MIN_ORTHO_DISTANCE = 0.2
 
 
@@ -114,15 +114,12 @@ def score_candidate(
         return 0.0
 
     # give candidates with more aliases a higher score, as proxy for num. ontologies in which it is represented.
-    alias_score = 1.1 if len(candidate.synonyms) >= 8 else 1.0
+    alias_score = 1.05 if len(candidate.synonyms) >= 8 else 1.0
 
     # score based on the UMLS type (tui) of the candidate
     type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.7) for ct in candidate.types])
 
     base_score = round(type_score * alias_score, 3)
-
-    if base_score == 0:
-        return 0.0
 
     semantic_similarity = similarity_with_residual_penalty(
         mention_vector, torch.tensor(candidate.vector), name=candidate.name

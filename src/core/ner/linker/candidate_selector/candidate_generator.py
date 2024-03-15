@@ -1,3 +1,4 @@
+import json
 from typing import AsyncIterable
 from prisma import Prisma
 import torch
@@ -31,21 +32,13 @@ class CandidateGenerator:
     async def get_candidates(
         self,
         mention: str,
-        mention_vec: torch.Tensor | None,
+        mention_vec: torch.Tensor,
         k: int,
         min_similarity: float = 0.85,
     ) -> tuple[list[MentionCandidate], torch.Tensor]:
         """
         Get candidates for a mention
         """
-        if mention_vec is None:
-            logger.warning("mention_vec is None, one-off vectorizing mention (slow!)")
-            mention_vec = self.vectorizer.vectorize([mention])[0]
-
-        if len(mention_vec.shape) == 0:
-            logger.warning("mention_vec is empty (%s)", mention_vec.shape)
-            return [], mention_vec
-
         max_distance = 1 - min_similarity
 
         # ALTER SYSTEM SET pg_trgm.similarity_threshold = 0.9;
@@ -56,15 +49,15 @@ class CandidateGenerator:
                 synonyms,
                 type_ids AS types,
                 COALESCE(1 - (vector <=> $2::vector), 0.0) AS semantic_similarity,
-                similarity(matches.name, $1) AS syntactic_similarity,
+                MAX(similarity($1, term)) AS syntactic_similarity,
                 vector::text AS vector
-            FROM umls
+            FROM umls_synonym, umls
             JOIN (
                 SELECT * FROM (
                     SELECT id, name
                     FROM umls
                     WHERE (vector <=> $2::vector) < {max_distance}
-                    AND is_eligible=true
+                    -- AND is_eligible=true
                     ORDER BY vector <=> $2::vector ASC
                     LIMIT {k}
                 ) s
@@ -77,10 +70,14 @@ class CandidateGenerator:
 
                 LIMIT {k}
             ) AS matches ON matches.id = umls.id
-            -- WHERE is_eligible=true
+            WHERE umls.id = umls_synonym.umls_id
+            GROUP BY umls.id, umls.name, synonyms, types, vector
+            -- AND is_eligible=true
         """
         try:
-            res = await self.db.query_raw(query, mention, mention_vec.tolist())
+            res = await self.db.query_raw(
+                query, mention, json.dumps(mention_vec.tolist())
+            )
         except Exception:
             logger.exception("Failed to query for candidates")
             return [], mention_vec
@@ -99,12 +96,12 @@ class CandidateGenerator:
         _vectors = vectors or self.vectorizer.vectorize(mentions)
         mention_vecs = [l1_regularize(v) for v in _vectors]
 
-        candidate_sets = gather_with_concurrency_limit(
+        candidate_sets = await gather_with_concurrency_limit(
             10,
             *[
                 self.get_candidates(mention, vec, k, min_similarity)
                 for mention, vec in zip(mentions, mention_vecs)
             ],
         )
-        for candidates, vec in await candidate_sets:
+        for candidates, vec in candidate_sets:
             yield candidates, vec

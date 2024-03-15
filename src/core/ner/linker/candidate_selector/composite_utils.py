@@ -98,6 +98,7 @@ def select_composite_members(
     preferred = [
         m
         for m in real_members
+        # TODO: this does exclude things like "viral capsid"
         if has_intersection(m.types, list(MOST_PREFERRED_UMLS_TYPES.keys()))
     ]
     if len(preferred) >= 1:

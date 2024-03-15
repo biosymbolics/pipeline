@@ -10,14 +10,13 @@ from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
 from utils.tensor import combine_tensors
 
 from .candidate_generator import CandidateGenerator
-from .candidate_selector import CandidateSelector
+from .candidate_selector import MIN_SIMILARITY, CandidateSelector
 from .composite_utils import (
     form_composite_entity,
     is_composite_eligible,
     select_composite_members,
 )
 from .types import (
-    AbstractCandidateSelector,
     EntityWithScore,
     EntityWithScoreVector,
 )
@@ -38,8 +37,8 @@ class CompositeCandidateSelector(CandidateSelector):
         self,
         candidate_generator: CandidateGenerator,
         *args,
-        min_similarity: float = 0.85,
-        min_composite_similarity: float = 0.85,
+        min_similarity: float = MIN_SIMILARITY,
+        min_composite_similarity: float = 0.7,
         min_word_length: int = 2,
         ngrams_n: int = 3,
         **kwargs
@@ -213,19 +212,24 @@ class CompositeCandidateSelector(CandidateSelector):
 
             # if score is sufficient, or if it's not a composite candidate, return
             is_eligibile = is_composite_eligible(entity.normalized_term)
-            if match_score >= (self.min_similarity + 0.05) or not is_eligibile:
+            if match_score >= self.min_similarity or not is_eligibile:
+                logger.info(
+                    "Choose non-composite without check, %s (%s)",
+                    entity.normalized_term,
+                    match_score,
+                )
                 yield match
-                return
+                continue
 
             # generate composite candidate
             composite = await self._generate_composite(entity)
             composite_score = composite[1] if composite is not None else 0
 
             if composite_score > match_score:
-                logger.debug("Chose composite (%s vs %s)", composite_score, match_score)
+                logger.info("Chose composite (%s vs %s)", composite_score, match_score)
                 yield composite
             else:
-                logger.debug("Chose non-compe (%s vs %s)", match_score, composite_score)
+                logger.info("Chose non-comp (%s vs %s)", match_score, composite_score)
                 yield match
 
     @overrides(CandidateSelector)

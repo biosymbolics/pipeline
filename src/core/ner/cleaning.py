@@ -51,6 +51,16 @@ SUBSTITUTIONS = {
     r"\buseful\b": "",
     r"\bbinding\b": "",
     r"\bselective\b": "",
+    r"\bpresent\b": "",
+    r"\bseparates?d?\b": "",
+    r"\bgroup\b": "",
+    r"\bstabilized\b": "",
+    r"\bchains?\b": "",
+    r"\bsoluble\b": "",
+    r"\bsalt\b": "",
+    r"\bstrands?\b": "",
+    r"\bmatrix?\b": "",
+    r"\btarget(?:ing)?s?\b": "",
 }
 
 
