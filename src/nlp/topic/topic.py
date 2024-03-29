@@ -156,15 +156,12 @@ class Topics:
             context_strings=context_strings,
             existing_labels=existing_labels,
         )
-        print(name_map, description_map)
         df = df.filter(pl.col("cluster_id").is_in(name_map.keys())).with_columns(
             [
                 pl.col("cluster_id").map_dict(name_map).alias("name"),
                 pl.col("cluster_id").map_dict(description_map).alias("description"),
             ]
         )
-
-        print(df)
 
         if len(df) < len(cluster_ids):
             logger.warning(
