@@ -8,7 +8,6 @@ from clients.low_level.prisma import prisma_client
 from core.vector.vectorizer import Vectorizer
 from typings.documents.common import MentionCandidate
 from utils.async_utils import gather_with_concurrency_limit
-from utils.tensor import l1_regularize
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -96,7 +95,7 @@ class CandidateGenerator:
             raise ValueError("Must provide either mentions or vectors")
 
         mention_vecs = vectors or self.vectorizer.vectorize(mentions or [])
-        mention_texts = mentions or [None] * len(mention_vecs)  # l1_regularize?
+        mention_texts = mentions or [None] * len(mention_vecs)
 
         candidate_sets = await gather_with_concurrency_limit(
             10,

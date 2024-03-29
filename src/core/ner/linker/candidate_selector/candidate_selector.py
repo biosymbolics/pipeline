@@ -93,7 +93,8 @@ class CandidateSelector(AbstractCandidateSelector):
 
         for (candidates, mention_vec), mention in zip(candidate_sets, _mention_texts):
             if len(candidates) > 0:
-                # candidates = apply_umls_word_overrides(mention or "", candidates)
+                if mention is not None:
+                    candidates = apply_umls_word_overrides(mention or "", candidates)
                 scored_candidates = self._score_candidates(
                     candidates, mention_vec, is_composite
                 )
