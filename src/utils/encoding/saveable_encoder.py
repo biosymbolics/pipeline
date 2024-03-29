@@ -14,12 +14,10 @@ from utils.list import is_sequence
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# for decoding
 V = TypeVar("V", bound=Sequence | npt.NDArray | int | float)
 
 EncodeableData: TypeAlias = pl.Series | Sequence | npt.NDArray
 EncoderData: TypeAlias = pl.DataFrame | EncodeableData
-
 EncodedData = int | float | list[int | float]
 
 

@@ -16,30 +16,6 @@ from typings.core import Primitive
 from typings.documents.patents import ScoredPatent as PatentApplication
 
 
-# Query for approval data
-# product p, active_ingredient ai, synonyms syns, approval a
-"""
-select
-    p.ndc_product_code as ndc,
-    (array_agg(distinct p.generic_name))[1] as generic_name,
-    (array_agg(distinct p.product_name))[1] as brand_name,
-    (array_agg(distinct p.marketing_status))[1] as status,
-    (array_agg(distinct active_ingredient_count))[1] as active_ingredient_count,
-    (array_agg(distinct route))[1] as route,
-    (array_agg(distinct s.name)) as substance_names,
-    (array_agg(distinct a.type)) as approval_types,
-    (array_agg(distinct a.approval)) as approval_dates,
-    (array_agg(distinct a.applicant)) as applicants
-from structures s
-LEFT JOIN approval a on a.struct_id=s.id
-LEFT JOIN active_ingredient ai on ai.struct_id=s.id
-LEFT JOIN product p on p.ndc_product_code=ai.ndc_product_code
-LEFT JOIN synonyms syns on syns.id=s.id
-where (syns.name ilike '%elexacaftor%' or p.generic_name ilike '%elexacaftor%' or p.product_name ilike '%elexacaftor%')
-group by p.ndc_product_code;
-"""
-
-
 def prepare_inputs(
     patents: Sequence[PatentApplication],
     batch_size: int,
@@ -51,7 +27,7 @@ def prepare_inputs(
     Prepare inputs for model
     """
 
-    def __prepare_dnn_data(
+    def _prepare_dnn_data(
         patents: Sequence[PatentApplication],
         dnn_categorical_fields: list[str],
         dnn_text_fields: list[str],
@@ -79,7 +55,7 @@ def prepare_inputs(
         )
         return {"x1": x1, "y": y}
 
-    def __prepare_gnn_input(
+    def _prepare_gnn_input(
         patents: Sequence[PatentApplication],
         gnn_categorical_fields: list[str],
         batch_size: int,
@@ -99,9 +75,9 @@ def prepare_inputs(
     return cast(
         AllInput,
         {
-            **__prepare_dnn_data(
+            **_prepare_dnn_data(
                 patents, dnn_categorical_fields, dnn_text_fields, batch_size
             ),
-            **__prepare_gnn_input(patents, gnn_categorical_fields, batch_size),
+            **_prepare_gnn_input(patents, gnn_categorical_fields, batch_size),
         },
     )

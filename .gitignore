@@ -9,7 +9,7 @@ data/**
 predictions.json
 patent_model_checkpoints/**
 clindev_model_checkpoints/**
-models/
+models/**
 model*.pt
 node_modules
 .serverless/**
