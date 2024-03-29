@@ -1,5 +1,5 @@
 from typing import Sequence
-from prisma.models import Owner, Ownable
+from prisma.models import Owner
 from prisma.types import OwnableInclude, OwnableWhereInput
 import logging
 from pydash import uniq_by

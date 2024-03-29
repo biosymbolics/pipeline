@@ -23,7 +23,7 @@ EnrichrEntity = TypedDict(
 )
 
 
-def __format_gene_list(genes: Sequence[str]) -> str:
+def _format_gene_list(genes: Sequence[str]) -> str:
     """
     Format genes how Enrichr requires (as a string; one per line)
 
@@ -33,7 +33,7 @@ def __format_gene_list(genes: Sequence[str]) -> str:
     return "\n".join(genes)
 
 
-def __generate_list(genes: Sequence[str]) -> str:
+def _generate_list(genes: Sequence[str]) -> str:
     """
     Generate enrichr list (which is later retrieved)
 
@@ -42,7 +42,7 @@ def __generate_list(genes: Sequence[str]) -> str:
     """
     response: requests.Response = requests.post(
         f"{ENRICHR_URL}/addList",
-        files={"list": (None, __format_gene_list(genes))},
+        files={"list": (None, _format_gene_list(genes))},
     )
 
     if not response.ok:
@@ -53,7 +53,7 @@ def __generate_list(genes: Sequence[str]) -> str:
     return list_id
 
 
-def __retrieve_list(list_id: str, gene_library: str) -> list[EnrichrEntity]:
+def _retrieve_list(list_id: str, gene_library: str) -> list[EnrichrEntity]:
     """
     Retrieve enrichr gene list
 
@@ -100,8 +100,8 @@ def call_enrichr(
         genes (list[str]): list of genes
         gene_library (str): gene library to use; defaults to REACTOME_2022 (https://maayanlab.cloud/Enrichr/#libraries)
     """
-    list_id = __generate_list(genes)
-    entities = __retrieve_list(list_id, gene_library)
+    list_id = _generate_list(genes)
+    entities = _retrieve_list(list_id, gene_library)
     return entities
 
 
