@@ -78,7 +78,6 @@ provider:
     DB_CLUSTER:
       Ref: RdsCluster
     ENV: ${param:ENV, 'dev'}
-    MONGO_URI: mongodb+srv://kristin:LcVacKsgrZ6EQ7N8@biosymbolics.i6psynp.mongodb.net/
     OPENAI_API_KEY: ${ssm:/biosymbolics/pipeline/openai/api_key}
     GROQ_API_KEY: ${ssm:/biosymbolics/pipeline/groq/api_key}
     PINECONE_API_KEY: ${ssm:/biosymbolics/pipeline/pinecone/api_key}
