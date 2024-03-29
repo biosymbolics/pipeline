@@ -1,4 +1,20 @@
-### Setup
+# Biosymbolics Models and APIs
+
+Backend for Biosymbolics - Pattern-based discovery of assets and trends in biopharma.
+
+See also: [Biosymbolics UI](https://github.com/biosymbolics/ui)
+
+
+## The Idea
+
+A platform to support pattern-based discovery of assets across:
+ - therapeutic area, treatment mechanism and modality
+ - basic science, patents, clinical trials, regulatory approvals and market access
+
+and for discovering latent predictors of success (patent signals, company performance, publication trends, mechanistic insights).
+
+![4fb74a16-553d-4224-86a5-396b700e2165_rw_1920](https://github.com/biosymbolics/pipeline/assets/9382486/a0f40593-222f-4db2-b8a7-97d99c26a8a6)
+
 
 ### Running locally
 ```
