@@ -5,7 +5,7 @@ Backend for Biosymbolics - Pattern-based discovery of assets and trends in bioph
 See also: [Biosymbolics UI](https://github.com/biosymbolics/ui)
 
 
-## The Idea
+## The Gist
 
 A platform to support pattern-based discovery of assets across:
  - therapeutic area, treatment mechanism and modality
@@ -14,6 +14,10 @@ A platform to support pattern-based discovery of assets across:
 and for discovering latent predictors of success (patent signals, company performance, publication trends, mechanistic insights).
 
 ![4fb74a16-553d-4224-86a5-396b700e2165_rw_1920](https://github.com/biosymbolics/pipeline/assets/9382486/a0f40593-222f-4db2-b8a7-97d99c26a8a6)
+
+### Data Schema
+(Simplified)
+![Untitled (1)](https://github.com/biosymbolics/pipeline/assets/9382486/e40affba-ed1b-43f4-8afb-563dfa180d04)
 
 
 ### Running locally
