@@ -5,7 +5,7 @@ import torch
 import numpy.typing as npt
 import polars as pl
 
-from core.ner.spacy import Spacy
+from nlp.ner.spacy import Spacy
 from utils.tensor import array_to_tensor
 
 

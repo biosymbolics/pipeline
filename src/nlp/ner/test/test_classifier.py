@@ -1,7 +1,7 @@
 import unittest
 from prisma.enums import TerminationReason
 
-from core.ner.classifier import classify_by_keywords, classify_string
+from nlp.ner.classifier import classify_by_keywords, classify_string
 from constants.patents import get_patent_attribute_map
 from data.domain.biomedical.trials import TERMINATION_KEYWORD_MAP
 

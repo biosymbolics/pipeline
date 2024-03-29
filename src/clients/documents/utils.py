@@ -48,7 +48,7 @@ async def get_doc_ids_for_description(
         search_params (VectorSearchParams): search parameters
     """
     # lazy import
-    from core.ner.spacy import get_transformer_nlp
+    from nlp.ner.spacy import get_transformer_nlp
 
     nlp = get_transformer_nlp(DEFAULT_VECTORIZATION_MODEL)
     vector = nlp(description).vector.tolist()

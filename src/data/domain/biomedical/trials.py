@@ -1,6 +1,6 @@
 from prisma.enums import DropoutReason, TerminationReason
 
-from core.ner.classifier import create_lookup_map
+from nlp.ner.classifier import create_lookup_map
 
 
 TERMINATION_KEYWORD_MAP = create_lookup_map(

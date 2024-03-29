@@ -15,8 +15,8 @@ from prisma.types import (
 
 from clients.low_level.prisma import batch_update, prisma_client
 from clients.sec.sec_client import SecClient
-from core.ner.cleaning import CleanFunction
-from core.ner.normalizer import TermNormalizer
+from nlp.ner.cleaning import CleanFunction
+from nlp.ner.normalizer import TermNormalizer
 from data.etl.entity.base_entity_etl import BaseEntityEtl
 from typings.companies import CompanyInfo
 from typings.prisma import OwnerCreateWithSynonymsInput

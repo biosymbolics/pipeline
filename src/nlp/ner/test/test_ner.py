@@ -1,7 +1,7 @@
 import unittest
 import pytest
 
-from core.ner import NerTagger
+from nlp.ner import NerTagger
 from data.etl.documents.patent.load_patents import INTERVENTION_DOMAINS
 
 
@@ -25,11 +25,10 @@ class TestNerUtils(unittest.TestCase):
     [(t1[0], t1.start_char, t1.end_char) for t1 in t]
     """
 
-    def setUp(self):
-        self.tagger = NerTagger(
+    async def setUp(self):
+        self.tagger = await NerTagger.create(
             entity_types=frozenset([*INTERVENTION_DOMAINS, "diseases"]),
             link=False,
-            normalize=True,
             rule_sets=[],
         )
 

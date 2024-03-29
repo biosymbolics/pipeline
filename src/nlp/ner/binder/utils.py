@@ -8,7 +8,7 @@ from spacy.tokens import Span
 import polars as pl
 import logging
 
-from core.ner.binder.types import Feature, Annotation
+from nlp.ner.binder.types import Feature, Annotation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -5,9 +5,9 @@ from prisma.types import (
     BiomedicalEntityCreateManyNestedWithoutRelationsInput as BiomedicalEntityRelationInput,
 )
 
-from core.ner.cleaning import CleanFunction
-from core.ner.linker.candidate_selector import CandidateSelectorType
-from core.ner.types import CanonicalEntity
+from nlp.ner.cleaning import CleanFunction
+from nlp.ner.linker.candidate_selector import CandidateSelectorType
+from nlp.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from utils.list import uniq_compact
 

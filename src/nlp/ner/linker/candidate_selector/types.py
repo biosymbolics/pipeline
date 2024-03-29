@@ -1,14 +1,14 @@
 from abc import abstractmethod
 from typing import AsyncIterable, AsyncIterator, Iterable, Sequence, TypeVar
 
-from core.ner.types import DocEntity
+from nlp.ner.types import DocEntity
 
 from abc import abstractmethod
 from typing import Literal, TypeVar
 from scispacy.candidate_generation import MentionCandidate
 import torch
 
-from core.ner.types import CanonicalEntity, DocEntity
+from nlp.ner.types import CanonicalEntity, DocEntity
 
 
 CandidateSelectorType = Literal[

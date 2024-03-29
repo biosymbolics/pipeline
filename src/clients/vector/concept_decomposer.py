@@ -9,7 +9,7 @@ from pydash import flatten, omit
 import logging
 
 from clients.llm.llm_client import GptApiClient
-from core.topic import Topics
+from nlp.topic import Topics
 from typings.client import VectorSearchParams
 
 from .vector_report_client import VectorReportClient

@@ -9,7 +9,7 @@ from transformers import AutoTokenizer
 import logging
 from spacy.tokens import Doc
 
-from core.ner.spacy import get_transformer_nlp
+from nlp.ner.spacy import get_transformer_nlp
 from constants.core import (
     DEFAULT_BASE_TOKENIZER_MODEL,
     DEFAULT_TORCH_DEVICE,

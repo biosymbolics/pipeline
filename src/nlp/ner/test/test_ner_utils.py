@@ -5,12 +5,12 @@ import pytest
 from constants.company import OTHER_OWNER_NAME
 from constants.patterns.intervention import PRIMARY_MECHANISM_BASE_TERMS
 
-from core.ner.cleaning import EntityCleaner
-from core.ner.clustering import (
+from nlp.ner.cleaning import EntityCleaner
+from nlp.ner.clustering import (
     cluster_terms,
     _create_cluster_term_map,
 )
-from core.ner.utils import (
+from nlp.ner.utils import (
     rearrange_terms,
     normalize_by_pos,
 )
