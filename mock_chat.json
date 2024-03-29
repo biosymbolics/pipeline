@@ -55,7 +55,7 @@
                 "timestamp": "Wednesday 9:30am"
             },
             {
-                "content": "\n [\n {\n \"stage\": \"Phase 1\",\n \"offset\": 0,\n \"median_duration\": 1.5,\n \"iqr\": 0.5\n },\n {\n \"stage\": \"Phase 2\",\n \"offset\": 1.5,\n \"median_duration\": 2,\n \"iqr\": 0.7\n },\n {\n \"stage\": \"Phase 3\",\n \"offset\": 3.5,\n \"median_duration\": 3,\n \"iqr\": 1\n },\n {\n \"stage\": \"FDA Review\",\n \"offset\": 6.5,\n \"median_duration\": 1.5,\n \"iqr\": 0.5\n }\n ]\n ",
+                "content": "\n [\n {\n \"stage\": \"Phase 1\",\n \"offset\": 0,\n \"medianDuration\": 1.5,\n \"iqr\": 0.5\n },\n {\n \"stage\": \"Phase 2\",\n \"offset\": 1.5,\n \"medianDuration\": 2,\n \"iqr\": 0.7\n },\n {\n \"stage\": \"Phase 3\",\n \"offset\": 3.5,\n \"medianDuration\": 3,\n \"iqr\": 1\n },\n {\n \"stage\": \"FDA Review\",\n \"offset\": 6.5,\n \"medianDuration\": 1.5,\n \"iqr\": 0.5\n }\n ]\n ",
                 "description": "Here are typical clinical development timelines in PAH, in years:",
                 "id": "8",
                 "sender": {

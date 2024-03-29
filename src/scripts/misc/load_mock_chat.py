@@ -33,7 +33,7 @@ if __name__ == "__main__":
         print(
             """
             Usage: python3 -m scripts.misc.load_mock_chat
-            UMLS etl
+            Mock chat etl
         """
         )
         sys.exit()
