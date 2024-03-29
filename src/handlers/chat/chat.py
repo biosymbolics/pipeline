@@ -10,7 +10,7 @@ from prisma.partials import Chat
 
 from clients.biosym_chat.mock_chat import MockChatClient
 from clients.low_level.boto3 import retrieve_with_cache_check
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 from clients.vector import ConceptDecomposer
 from handlers.utils import handle_async
 from typings.core import ResultBase

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 from core.vector import Vectorizer
 from typings.client import VectorSearchParams
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType

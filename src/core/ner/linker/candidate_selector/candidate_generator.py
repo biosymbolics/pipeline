@@ -31,7 +31,7 @@ class CandidateGenerator:
 
     async def get_candidates(
         self,
-        mention: str,
+        mention: str | None,
         mention_vec: torch.Tensor,
         k: int,
         min_similarity: float = 0.85,
@@ -48,25 +48,21 @@ class CandidateGenerator:
                 umls.name AS name,
                 synonyms,
                 type_ids AS types,
-                COALESCE(1 - (vector <=> $2::vector), 0.0) AS semantic_similarity,
-                MAX(similarity($1, term)) AS syntactic_similarity,
+                COALESCE(1 - (vector <=> $1::vector), 0.0) AS semantic_similarity,
+                {'MAX(similarity($2, term))' if mention else '1'} AS syntactic_similarity,
                 vector::text AS vector
             FROM umls_synonym, umls
             JOIN (
                 SELECT * FROM (
                     SELECT id, name
                     FROM umls
-                    WHERE (vector <=> $2::vector) < {max_distance}
+                    WHERE (vector <=> $1::vector) < {max_distance}
                     -- AND is_eligible=true
-                    ORDER BY vector <=> $2::vector ASC
+                    ORDER BY vector <=> $1::vector ASC
                     LIMIT {k}
                 ) s
 
-                UNION
-
-                SELECT distinct umls_id AS id, term AS name
-                FROM umls_synonym
-                WHERE term % $1
+                {'UNION SELECT distinct umls_id AS id, term AS name FROM umls_synonym WHERE term % $2' if mention else ''}
 
                 LIMIT {k}
             ) AS matches ON matches.id = umls.id
@@ -75,9 +71,12 @@ class CandidateGenerator:
             -- AND is_eligible=true
         """
         try:
-            res = await self.db.query_raw(
-                query, mention, json.dumps(mention_vec.tolist())
+            params = (
+                [json.dumps(mention_vec.tolist()), mention]
+                if mention
+                else [json.dumps(mention_vec.tolist())]
             )
+            res = await self.db.query_raw(query, *params)
         except Exception:
             logger.exception("Failed to query for candidates")
             return [], mention_vec
@@ -85,7 +84,7 @@ class CandidateGenerator:
 
     async def __call__(
         self,
-        mentions: list[str],
+        mentions: list[str] | None,
         vectors: list[torch.Tensor] | None = None,
         k: int = 10,
         min_similarity: float = 0.85,
@@ -93,14 +92,17 @@ class CandidateGenerator:
         """
         Generate candidates for a list of mentions
         """
-        _vectors = vectors or self.vectorizer.vectorize(mentions)
-        mention_vecs = [l1_regularize(v) for v in _vectors]
+        if not mentions and not vectors:
+            raise ValueError("Must provide either mentions or vectors")
+
+        mention_vecs = vectors or self.vectorizer.vectorize(mentions or [])
+        mention_texts = mentions or [None] * len(mention_vecs)  # l1_regularize?
 
         candidate_sets = await gather_with_concurrency_limit(
             10,
             *[
                 self.get_candidates(mention, vec, k, min_similarity)
-                for mention, vec in zip(mentions, mention_vecs)
+                for mention, vec in zip(mention_texts, mention_vecs)
             ],
         )
         for candidates, vec in candidate_sets:

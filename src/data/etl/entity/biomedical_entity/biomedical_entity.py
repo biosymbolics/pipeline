@@ -399,7 +399,7 @@ class BiomedicalEntityEtl(BaseEntityEtl):
             ]
 
         logger.info("Linking mapping tables to canonical entities")
-        client = await prisma_client(800)
+        client = await prisma_client(1200)
         for table in ["intervenable", "indicatable"]:
             for query in get_queries(table):
                 await client.execute_raw(query)

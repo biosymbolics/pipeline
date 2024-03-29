@@ -28,7 +28,7 @@ class BiomedicalEntityLoader:
         regulatory_approval_specs = RegulatoryApprovalLoader.entity_specs()
         trial_specs = TrialLoader.entity_specs()
 
-        specs = patent_specs + regulatory_approval_specs + trial_specs
+        specs = regulatory_approval_specs + trial_specs + patent_specs
 
         for spec in specs:
             records = await PsqlDatabaseClient(spec.database).select(spec.sql)

@@ -144,39 +144,6 @@ def batch_as_tensors(
     return [torch.Tensor(batch) for batch in batches]
 
 
-def reverse_embedding(
-    embedded_tensor: torch.Tensor, weights: list[torch.Tensor]
-) -> torch.Tensor:
-    """
-    Reverse multi-field/multi-select embeddings
-
-    Args:
-        embedded_tensor: [seq_length, num_fields, max_selections, emb_size]
-        weights: [dict_size, emb_size]
-    """
-
-    def get_encoding_idx_by_field(field_index: int):
-        w = weights[field_index].unsqueeze(0)
-
-        # outputs batch_size x selections x emb_size (1 per field)
-        field_slice = embedded_tensor[:, field_index, :, :]
-
-        # (batch_size x max selections) x emb_size
-        field_select_slice = field_slice.reshape(-1, field_slice.shape[-1])
-
-        def get_encoding_idx(i):
-            dist = (field_select_slice[i] - w).abs().sum(dim=1)
-            encoding_idx = dist.argmin().item()
-            return encoding_idx
-
-        distances = [get_encoding_idx(i) for i in range(field_select_slice.shape[0])]
-        return torch.Tensor(distances).reshape(field_slice.size(0), field_slice.size(1))
-
-    outputs = [get_encoding_idx_by_field(i) for i in range(len(weights))]
-    output = torch.stack(outputs, dim=1)
-    return output
-
-
 def is_scalar(d):
     """
     Returns True if d is a scalar (int, float, etc.)
@@ -189,6 +156,9 @@ def is_scalar(d):
 def l1_regularize(
     vector: torch.Tensor, sparsity_threshold: float = 0.1
 ) -> torch.Tensor:
+    """
+    l1 regularization with cutoff sparsity option
+    """
     vector[vector.abs() < sparsity_threshold] = 0  # sparsify
     with torch.no_grad():
         return F.normalize(vector, p=1, dim=0)  # l1 normalize
@@ -205,17 +175,16 @@ def combine_tensors(
     return vector
 
 
-def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor:
+def truncated_svd(vector: torch.Tensor, variance_threshold=0.6) -> list[torch.Tensor]:
     """
     Torch implementation of TruncatedSVD
-    (from Anthropic)
     """
     # Reshape x if it's a 1D vector
     if vector.ndim == 1:
         vector = vector.unsqueeze(1)
 
     # l1 reg
-    v_sparse = l1_regularize(vector)
+    v_sparse = l1_regularize(vector, sparsity_threshold=0.1)
 
     # SVD
     U, S, _ = torch.linalg.svd(v_sparse)
@@ -232,7 +201,8 @@ def truncated_svd(vector: torch.Tensor, variance_threshold=0.98) -> torch.Tensor
     # Compute reduced components
     U_reduced = U[:, :k]
 
-    return cast(torch.Tensor, U_reduced)
+    t = [v.squeeze() for v in torch.split(U_reduced, 1, dim=1)]
+    return t
 
 
 def similarity_with_residual_penalty(

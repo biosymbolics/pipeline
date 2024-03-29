@@ -3,19 +3,11 @@ Async utilities
 """
 
 import asyncio
-import builtins
-from contextlib import AsyncExitStack
 from typing import (
-    AsyncIterable,
-    AsyncIterator,
     Callable,
     Coroutine,
-    Iterable,
     List,
-    TypeVar,
 )
-
-from aiostream import streamcontext
 
 
 async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:

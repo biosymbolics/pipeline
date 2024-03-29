@@ -8,7 +8,7 @@ from langchain.output_parsers import ResponseSchema
 from pydash import flatten, omit
 import logging
 
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 from core.topic import Topics
 from typings.client import VectorSearchParams
 

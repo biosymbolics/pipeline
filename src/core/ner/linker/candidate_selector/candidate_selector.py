@@ -72,9 +72,10 @@ class CandidateSelector(AbstractCandidateSelector):
         )
         return sorted_candidates
 
+    @overrides(AbstractCandidateSelector)
     async def select_candidates(
         self,
-        mentions: list[str],
+        mention_texts: list[str] | None,
         vectors: list[torch.Tensor] | None = None,
         min_similarity: float = MIN_SIMILARITY,
         is_composite: bool = False,
@@ -85,12 +86,14 @@ class CandidateSelector(AbstractCandidateSelector):
         candidate_sets = [
             ci
             async for ci in self.candidate_generator(
-                mentions, vectors, K, min_similarity
+                mention_texts, vectors, K, min_similarity
             )
         ]
-        for (candidates, mention_vec), mention in zip(candidate_sets, mentions):
+        _mention_texts = mention_texts or [None] * len(vectors or [])
+
+        for (candidates, mention_vec), mention in zip(candidate_sets, _mention_texts):
             if len(candidates) > 0:
-                candidates = apply_umls_word_overrides(mention, candidates)
+                # candidates = apply_umls_word_overrides(mention or "", candidates)
                 scored_candidates = self._score_candidates(
                     candidates, mention_vec, is_composite
                 )

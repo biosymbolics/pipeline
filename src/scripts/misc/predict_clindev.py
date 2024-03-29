@@ -2,19 +2,18 @@
 Script for running inference with the trial characteristics model,
 which persists these attributes to a table for later use.
 """
+
 import asyncio
 import sys
 import logging
 
-
-from system import initialize
-
-initialize()
-
 from clients.low_level.postgres import PsqlDatabaseClient
+from system import initialize
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+initialize()
 
 
 def predict_clindev():

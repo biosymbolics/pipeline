@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from prisma.enums import OntologyLevel
-from prisma.models import Umls
 
 from .constants import ONTOLOGY_LEVEL_MAP
 
