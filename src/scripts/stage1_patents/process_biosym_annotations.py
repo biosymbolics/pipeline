@@ -43,7 +43,6 @@ from data.domain.biomedical import (
     TARGET_PARENS,
     REMOVAL_WORDS_POST,
     REMOVAL_WORDS_PRE,
-    DELETION_TERMS,
     WordPlace,
 )
 from system import initialize
@@ -253,7 +252,6 @@ async def remove_common_terms():
     logger.info("Removing common terms")
     client = DatabaseClient("patents")
     common_terms = [
-        *DELETION_TERMS,
         *INTERVENTION_BASE_TERMS,
         *EntityCleaner().removal_words,
     ]
