@@ -32,6 +32,6 @@ torch==2.1.2+cpu
 torch_geometric
 pytorch-ignite
 requests_cache
-transformers
+transformers==4.36.0
 typing_extensions
 yfinance
