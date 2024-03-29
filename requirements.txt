@@ -9,7 +9,6 @@ kneed
 langchain
 langchain_openai
 nmslib @ git+https://github.com/nmslib/nmslib.git@ade4bcdc9dd3719990de2503871450b8a62df4a5#subdirectory=python_bindings
-annoy
 openai
 polars
 prisma
@@ -24,14 +23,13 @@ requests
 scispacy
 scikit-learn
 sec-api
-sentence_transformers
+sentence_transformers==2.5.0
 spacy
 spacy-lookups-data
---find-links https://download.pytorch.org/whl/torch_stable.html
-torch==2.1.2+cpu
-torch_geometric
 pytorch-ignite
 requests_cache
 transformers==4.36.0
 typing_extensions
 yfinance
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==2.1.2+cpu
