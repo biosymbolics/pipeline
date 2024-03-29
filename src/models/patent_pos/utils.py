@@ -6,14 +6,15 @@ from typing import Sequence, cast
 import logging
 import torch
 
-from data.prediction.patent_pos.types import AllInput, ModelInput, GnnInput
-from data.prediction.utils import (
+from models.utils import (
     batch_and_pad,
     encode_features,
     resize_and_batch,
 )
 from typings.core import Primitive
 from typings.documents.patents import ScoredPatent as PatentApplication
+
+from .types import AllInput, ModelInput, GnnInput
 
 
 def prepare_inputs(

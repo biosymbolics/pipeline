@@ -1,14 +1,15 @@
 """
 Trial characteristic and duration prediction model
 """
+
 from typing import Literal, Optional
 import torch
 import torch.nn as nn
 import logging
 
-from data.prediction.clindev.utils import embed_cat_inputs
-from data.prediction.model import SaveableModel
-from data.prediction.types import SplitModelInput
+from .utils import embed_cat_inputs
+from models.model import SaveableModel
+from models.types import SplitModelInput
 
 from .constants import (
     CHECKPOINT_PATH,
