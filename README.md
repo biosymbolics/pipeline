@@ -17,8 +17,7 @@ and for discovering latent predictors of success (patent signals, company perfor
 
 ### Data Schema
 Simplified ERD
-![Untitled (1)](https://github.com/biosymbolics/pipeline/assets/9382486/e40affba-ed1b-43f4-8afb-563dfa180d04)
-
+![Untitled (1)](https://github.com/biosymbolics/pipeline/assets/9382486/7443ba7a-4b02-4681-b36c-c47cb1e3bf47)
 
 ### Running locally
 ```
