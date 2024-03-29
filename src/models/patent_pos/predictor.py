@@ -1,11 +1,10 @@
 import logging
 import sys
-from typing import cast
+from typing import TypedDict, cast
 import torch
 from ignite.metrics import Precision, Recall
 
 from clients.documents import patent_search as search_client
-from data.types import ModelMetrics
 from utils.tensor import pad_or_truncate_to_size
 from typings.documents.patents import ScoredPatent as PatentApplication
 
@@ -20,6 +19,11 @@ from .constants import (
 from .core import CombinedModel
 from .types import AllInput
 from .utils import prepare_inputs
+
+
+ModelMetrics = TypedDict(
+    "ModelMetrics", {"precision": float, "recall": float, "f1": float}
+)
 
 
 class ModelPredictor:
