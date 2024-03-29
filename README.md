@@ -1,14 +1,12 @@
 ### Setup
 
-- https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-  - https://d-90679e1dba.awsapps.com/start#/
-  - CLI profile name: default
-- AWS authenticate if needed: `aws configure sso`
-- sls offlne
-  - https://github.com/dherault/serverless-offline/issues/1696
-
 ### Running locally
-- `sls offline`
+```
+aws configure sso # url: https://d-90679e1dba.awsapps.com/start#/; CLI profile name: default
+. .pythonenv
+export DATABASE_URL=...
+sls offline
+```
 
 ### Deploy
 ```
