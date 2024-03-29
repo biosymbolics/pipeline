@@ -3,18 +3,17 @@ Linking/cleaning of terms
 """
 
 import time
-from typing import Sequence
+from typing import AsyncGenerator, Iterable, Sequence
 import logging
-from spacy.tokens import Doc
-
-import torch
 
 
 from core.ner.cleaning import CleanFunction, EntityCleaner
 from core.ner.linker.linker import TermLinker
-from core.ner.linker.types import CandidateSelectorType
 from core.ner.spacy import get_transformer_nlp
 from core.ner.types import DocEntity
+from utils.list import batch
+
+from .linker.candidate_selector import CandidateSelectorType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,128 +23,93 @@ class TermNormalizer:
     """
     Normalizes and attempts to link entities.
     If no canonical entity found, then normalized term is returned.
-
-    Usage:
-        normalizer = TermNormalizer()
-        terms = normalizer.normalize([
-            "Tipranavir (TPV)",
-            "BILR 355 - D4",
-            "bivatuzumab mertansine",
-            "BIBT 986 BS - single rising dose",
-            "RDEA3170 10 mg",
-        ])
-        [(t[0], t[1].name) for t in terms]
     """
 
     def __init__(
         self,
-        link: bool = True,
-        candidate_selector: CandidateSelectorType | None = None,
+        link: bool,
+        term_linker: TermLinker,
         additional_cleaners: Sequence[CleanFunction] = [],
     ):
         """
         Initialize term normalizer
-        """
-        if link:
-            self.term_linker: TermLinker | None = (
-                TermLinker(candidate_selector) if candidate_selector else TermLinker()
-            )
-        else:
-            self.term_linker = None
 
+        Use `create` to instantiate with async dependencies
+        """
+        self.term_linker = term_linker
         self.cleaner = EntityCleaner(
             additional_cleaners=additional_cleaners,
         )
-        self.candidate_selector = candidate_selector
+        self.link = link
+        self.nlp = get_transformer_nlp()
 
-        if self.candidate_selector in [
-            "SemanticCandidateSelector",
-            "CompositeSemanticCandidateSelector",
-        ]:
-            self.nlp = get_transformer_nlp()
-        else:
-            self.nlp = None
+    @classmethod
+    async def create(
+        cls,
+        link: bool = True,
+        candidate_selector_type: CandidateSelectorType | None = None,
+        *args,
+        **kwargs,
+    ):
+        term_linker: TermLinker | None = await (
+            TermLinker.create(candidate_selector_type)
+            if candidate_selector_type
+            else TermLinker.create()
+        )
 
-    def normalize(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
+        return cls(link, term_linker, *args, **kwargs)
+
+    async def normalize(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
         """
         Normalize and link terms to canonical entities
-
-        Args:
-            terms (Sequence[str]): list of terms to normalize
-
-        Note:
-            - canonical linking is based on normalized term
-            - if no linking is found, then normalized term is as canonical_name, with an empty id
         """
         # removed_suppressed must be false to properly index against original terms
         cleaned_entities = self.cleaner.clean(doc_entities, remove_suppressed=False)
 
-        if self.term_linker is not None:
-            return self.term_linker.link(cleaned_entities)
+        if self.link:
+            return await self.term_linker.link(cleaned_entities)
 
         return cleaned_entities
 
-    def normalize_strings(
-        self, terms: Sequence[str], vectors: Sequence[Sequence[float]] | None = None
-    ) -> list[DocEntity]:
+    async def normalize_strings(
+        self,
+        terms: Sequence[str],
+        vectors: Sequence[list[float]] | None = None,
+        batch_size: int = 10000,
+    ) -> AsyncGenerator[DocEntity, None]:
         """
         Normalize and link terms to canonical entities
 
         Args:
             terms (Sequence[str]): list of terms to normalize
-            vectors (Sequence[Sequence[float]]): list of vectors for each term - optional.
-
-        TODO: uniqify terms, when possible?
+            vectors (Sequence[list[float]]): list of vectors for each term - optional.
         """
-
+        start = time.monotonic()
         logger.info("Normalizing %s terms", len(terms))
 
         if vectors is not None and len(terms) != len(vectors):
             raise ValueError("terms and vectors must be the same length")
 
-        def get_vecs(
-            vectors,
-        ) -> tuple[list[Doc] | list[None], list[torch.Tensor] | list[None]]:
-            is_selector_semantic = self.candidate_selector in [
-                "SemanticCandidateSelector",
-                "CompositeSemanticCandidateSelector",
-            ]
-
-            # if no vectors AND candidate selectors are semantic, generate docs / vectors
-            if not vectors and is_selector_semantic:
-                if self.nlp is None:
-                    raise ValueError(
-                        "Vectorizer required for semantic candidate selector"
-                    )
-
-                start = time.monotonic()
-                docs = list(self.nlp.pipe(clean_terms))
-                logger.info(
-                    "Took %ss to docify %s terms",
-                    round(time.monotonic() - start),
-                    len(clean_terms),
-                )
-                return docs, vectors or [torch.tensor(doc.vector) for doc in docs]
-
-            return [None for _ in terms], vectors or [None for _ in terms]
-
         clean_terms = self.cleaner.clean(terms, remove_suppressed=False)
-        docs, _vectors = get_vecs(vectors)
+        batched_terms = batch(clean_terms, batch_size)
+        batched_vectors = batch(vectors or [None for _ in terms], batch_size)  # type: ignore
 
-        doc_ents = [
-            DocEntity.create(
-                term=term,
-                # required for comparing semantic similarity of potential matches
-                vector=torch.tensor(vector),
-                spacy_doc=doc,  # doc for term, NOT the source doc (confusing!!)
-            )
-            for term, vector, doc in zip(clean_terms, _vectors, docs)
-        ]
+        for i, b in enumerate(batched_terms):
+            logger.info("Batch %s (last took: %ss)", i, round(time.monotonic() - start))
+            start = time.monotonic()
+            docs = list(self.nlp.pipe(b))
 
-        if self.term_linker is not None:
-            return self.term_linker.link(doc_ents)
+            doc_entities = [
+                DocEntity.create(term, vector=vector, spacy_doc=doc)
+                for term, doc, vector in zip(b, docs, batched_vectors[i])
+            ]
+            if self.link:
+                linked = await self.term_linker.link(doc_entities)
+                for link in linked:
+                    yield link
+            else:
+                for entity in doc_entities:
+                    yield entity
 
-        return doc_ents
-
-    def __call__(self, doc_entities: Sequence[DocEntity]) -> list[DocEntity]:
-        return self.normalize(doc_entities)
+    async def __call__(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
+        return await self.normalize(doc_entities)

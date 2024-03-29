@@ -47,6 +47,7 @@ class NerTagger:
 
     def __init__(
         self,
+        normalizer: TermNormalizer,
         model: str = "binder.pt",
         entity_types: Optional[frozenset[str]] = None,
         rule_sets: list[SpacyPatterns] = list(
@@ -56,44 +57,19 @@ class NerTagger:
                 MECHANISM_SPACY_PATTERNS,
             ]
         ),
-        additional_cleaners: list[CleanFunction] = [],
-        link: bool = True,
-        normalize: bool = True,
     ):
         """
-        Named-entity recognition using spacy
+        Named-entity recognition via SpaCy + binder model
 
-        NOTE: if using binder, requires binder model class be in PYTHONPATH. (TODO: fix this)
-
-        Args:
-            model (str, optional): torch NER model. Defaults to "binder.pt".
-            rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
-            additional_cleaners (list[Callable[[Sequence[str]], Sequence[str]]], optional): Additional cleaners funs. Defaults to [].
-            link (bool, optional): Whether to link entities. Defaults to True.
-            normalize (bool, optional): Whether to normalize entities. Defaults to True.
+        **Use factory (create) method to instantiate**
         """
-        start_time = time.time()
-
         self.model = model
         self.rule_sets = rule_sets
         self.entity_types = entity_types
-        self.normalizer = (
-            TermNormalizer(link, additional_cleaners=additional_cleaners)
-            if normalize
-            else None
-        )
+        self.normalizer = normalizer
 
         if entity_types is not None and not isinstance(entity_types, frozenset):
             raise ValueError("entity_types must be a frozenset")
-
-        if not normalize:
-            logger.warning("Normalization is disabled")
-            if len(additional_cleaners) > 0:
-                logger.warning("Additional cleaners are disabled")
-            if link:
-                raise ValueError("Cannot link entities without normalizing")
-        if not link:
-            logger.warning("Linking is disabled")
 
         if not self.model.endswith(".pt"):
             raise ValueError("Model must be torch")
@@ -123,9 +99,43 @@ class NerTagger:
         else:
             self.rule_nlp = None
 
-        logger.info(
-            "Init NER pipeline took %s seconds",
-            round(time.time() - start_time, 2),
+    @staticmethod
+    async def create(
+        model: str = "binder.pt",
+        entity_types: Optional[frozenset[str]] = None,
+        rule_sets: list[SpacyPatterns] = list(
+            [
+                INDICATION_SPACY_PATTERNS,
+                INTERVENTION_SPACY_PATTERNS,
+                MECHANISM_SPACY_PATTERNS,
+            ]
+        ),
+        additional_cleaners: list[CleanFunction] = [],
+        link: bool = True,
+    ):
+        """
+        Named-entity recognition via SpaCy + binder model
+
+        NOTE: if using binder, requires binder model class be in PYTHONPATH. (TODO: fix this)
+
+        Args:
+            model (str, optional): torch NER model. Defaults to "binder.pt".
+            rule_sets (Optional[list[SpacyPatterns]], optional): SpaCy patterns. Defaults to None.
+            additional_cleaners (list[Callable[[Sequence[str]], Sequence[str]]], optional): Additional cleaners funs. Defaults to [].
+            link (bool, optional): Whether to link entities. Defaults to True.
+        """
+        normalizer = await TermNormalizer.create(
+            link, additional_cleaners=additional_cleaners
+        )
+
+        if not link:
+            logger.warning("Linking is disabled")
+
+        return NerTagger(
+            normalizer=normalizer,
+            model=model,
+            entity_types=entity_types,
+            rule_sets=rule_sets,
         )
 
     def _prep_for_extract(self, content: Sequence[str]) -> Sequence[str]:
@@ -197,25 +207,15 @@ class NerTagger:
         for es in entity_sets:
             yield [e for e in es if e.type in self.entity_types]
 
-    def _normalize(
+    async def _normalize(
         self,
-        entity_sets: list[DocEntities],
-    ) -> Iterable[DocEntities]:
+        entity_sets: list[list[DocEntity]],
+    ):
         """
         Normalize entity set
-
-        Args:
-            entity_set (DocEntities): Entities to normalize
         """
-        if not self.normalizer:
-            logger.debug("Skipping normalization step")
-            # TODO: why is yield seemingly necessary?
-            for es in entity_sets:
-                yield es
-            return
-
         for es in entity_sets:
-            yield self.normalizer.link(es)
+            yield self.normalizer.normalize(es)
 
     def extract(
         self,

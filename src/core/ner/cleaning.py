@@ -40,23 +40,27 @@ SUBSTITUTIONS = {
     r"[.,:;'\"]+$": "",  # trailing punct
     r"^[.,:;'\"]+": "",  # leading punct
     **{symbol: "" for symbol in LEGAL_SYMBOLS},
-    "compounds?": "",
-    "substituted": "",
-    "candidates?": "",
-    "receptors?": "",
-    "forms?": "",
-    "formulations?": "",
-    "formulae?s?": "",
-    "products?": "",
-    "refactory": "",  # e.g. refractory sarcoidosis
-    "recurrent": "",
-    "severe": "",
-    "mild": "",
-    "progressive": "",
-    "capable": "",
-    "cycling": "",
-    "-?binding": "",
-    "selective": "",
+    r"\bcompounds?\b": "",
+    r"\bsubstitutes?d?\b": "",
+    r"\bcandidates?\b": "",
+    r"\breceptors?\b": "",
+    r"\bforms?(?:ulations?)?\b": "",
+    r"\bformulae?s?\b": "",
+    r"\bproducts?\b": "",
+    r"\bcapable\b": "",
+    r"\buseful\b": "",
+    r"\bbinding\b": "",
+    r"\bselective\b": "",
+    r"\bpresent\b": "",
+    r"\bseparates?d?\b": "",
+    r"\bgroup\b": "",
+    r"\bstabilized\b": "",
+    r"\bchains?\b": "",
+    r"\bsoluble\b": "",
+    r"\bsalt\b": "",
+    r"\bstrands?\b": "",
+    r"\bmatrix?\b": "",
+    r"\btarget(?:ing)?s?\b": "",
 }
 
 
@@ -104,7 +108,7 @@ class EntityCleaner:
     ):
         self.substitutions = substitutions
         self.additional_cleaners = additional_cleaners
-        self.__removal_words: list[str] | None = None
+        self._removal_words: list[str] | None = None
 
     @property
     def removal_words(self) -> list[str]:
@@ -113,7 +117,7 @@ class EntityCleaner:
 
         LEGACY
         """
-        if self.__removal_words is None:
+        if self._removal_words is None:
             with open("10000words.txt", "r") as file:
                 vocab_words = file.read().splitlines()
                 self.__removal_words = vocab_words

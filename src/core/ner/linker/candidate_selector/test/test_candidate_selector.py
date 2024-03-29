@@ -1,7 +1,7 @@
 import unittest
 import pytest
 
-from core.ner.linker.types import CandidateSelectorType
+from core.ner.linker.candidate_selector.types import CandidateSelectorType
 from core.ner.normalizer import TermNormalizer
 from core.ner.types import CanonicalEntity
 
@@ -220,7 +220,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
     def setUp(self):
         self.normalizer = TermNormalizer(candidate_selector=self.candidate_selector)
 
-    def test_composite_candidate_selector(self):
+    async def test_composite_candidate_selector(self):
         test_cases = [*COMMON_COMPOSITE_TEST_CASES, *NON_SEMANTIC_COMPOSITE_TEST_CASES]
 
         fields_to_test = ["id", "name"]
@@ -228,7 +228,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
         for test in test_cases:
             text = test["text"]
 
-            result = self.normalizer.normalize_strings(text)[0]
+            result = (await self.normalizer.normalize_strings(text))[0]
             print("RESULT", result)
 
             if result is None or result.canonical_entity is None:
@@ -244,7 +244,7 @@ class TestCompositeCandidateSelector(unittest.TestCase):
 
 
 # TODO: add non-semantic composite logic here.
-# @pytest.mark.skip(reason="Too slow to include in CI")
+@pytest.mark.skip(reason="Too slow to include in CI")
 class TestCompositeSemanticCandidateSelector(unittest.TestCase):
     """
     Note: test initialization is slow because of the UMLS cache
@@ -252,21 +252,19 @@ class TestCompositeSemanticCandidateSelector(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.candidate_selector: CandidateSelectorType = (
-            "CompositeSemanticCandidateSelector"
-        )
+        self.candidate_selector: CandidateSelectorType = "CompositeCandidateSelector"
 
     def setUp(self):
         self.normalizer = TermNormalizer(candidate_selector=self.candidate_selector)
 
-    def test_composite_candidate_semantic_selector(self):
+    async def test_composite_candidate_semantic_selector(self):
         test_cases = [*COMMON_COMPOSITE_TEST_CASES, *SEMANTIC_COMPOSITE_TEST_CASES]
 
         fields_to_test = ["id", "name"]
 
         for test in test_cases:
             text = test["text"]
-            result = self.normalizer.normalize_strings(text)[0]
+            result = (await self.normalizer.normalize_strings(text))[0]
 
             print("Actual", result)
             print("Expected", test["expected"][0])

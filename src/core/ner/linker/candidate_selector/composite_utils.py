@@ -1,10 +1,9 @@
 from typing import Sequence
-from pydash import flatten
-from spacy.kb import KnowledgeBase
+from pydash import flatten, uniq_by
 
 from constants.patterns.iupac import is_iupac
 from constants.umls import MOST_PREFERRED_UMLS_TYPES
-from core.ner.types import CanonicalEntity, DocEntity
+from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 
@@ -12,9 +11,7 @@ from utils.list import has_intersection
 MIN_WORD_LENGTH = 1
 
 
-def is_composite_eligible(
-    entity: DocEntity, min_word_length: int = MIN_WORD_LENGTH
-) -> bool:
+def is_composite_eligible(term: str, min_word_length: int = MIN_WORD_LENGTH) -> bool:
     """
     Is a text a composite candidate?
 
@@ -22,34 +19,26 @@ def is_composite_eligible(
     - false if it's too short (a single token or word)
     - Otherwise true
     """
-    tokens = entity.spacy_doc or entity.normalized_term.split(" ")
-    if is_iupac(entity.normalized_term):
+    if is_iupac(term):
         return False
-    if len(tokens) <= min_word_length:
+    if len(term.split(" ")) <= min_word_length:
         return False
     return True
 
 
-def form_composite_name(members: Sequence[CanonicalEntity], kb: KnowledgeBase) -> str:
+def form_composite_name(members: Sequence[CanonicalEntity]) -> str:
     """
     Form a composite name from the entities from which it is comprised
     """
 
-    def get_name_part(c: CanonicalEntity):
-        if c.id in kb.cui_to_entity:
-            ce = kb.cui_to_entity[c.id]
-            return clean_umls_name(
-                ce.concept_id, ce.canonical_name, ce.aliases, ce.types, True
-            )
-        return c.name
+    def get_name_part(ce: CanonicalEntity):
+        return clean_umls_name(ce.id or ce.name, ce.name, ce.aliases, ce.types, True)
 
     name = " ".join([get_name_part(c) for c in members])
     return name
 
 
-def form_composite_entity(
-    members: Sequence[CanonicalEntity], kb: KnowledgeBase
-) -> CanonicalEntity:
+def form_composite_entity(members: Sequence[CanonicalEntity]) -> CanonicalEntity:
     """
     Form a composite from a list of member entities
     """
@@ -67,7 +56,7 @@ def form_composite_entity(
     types = flatten([m.types for m in selected_members])
 
     # form name from comprising candidates
-    name = form_composite_name(selected_members, kb)
+    name = form_composite_name(selected_members)
 
     return CanonicalEntity(
         id="|".join(ids),
@@ -80,11 +69,12 @@ def form_composite_entity(
 
 
 def select_composite_members(
-    members: Sequence[CanonicalEntity],
+    _members: Sequence[CanonicalEntity],
 ) -> list[CanonicalEntity]:
     """
     Select composite members to return
     """
+    members = uniq_by(_members, lambda m: m.id)
     real_members = [m for m in members if not m.is_fake]
 
     if len(real_members) == 0:
@@ -108,6 +98,7 @@ def select_composite_members(
     preferred = [
         m
         for m in real_members
+        # TODO: this does exclude things like "viral capsid"
         if has_intersection(m.types, list(MOST_PREFERRED_UMLS_TYPES.keys()))
     ]
     if len(preferred) >= 1:

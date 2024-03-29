@@ -1,12 +1,11 @@
 import re
 from typing import Sequence
 from pydash import flatten, uniq
-from spacy.tokens import Doc, Span, Token
+from spacy.tokens import Token
 import torch
 import networkx as nx
 from functools import reduce
 import logging
-from scispacy.candidate_generation import MentionCandidate, KnowledgeBase
 
 from constants.umls import (
     CANDIDATE_TYPE_WEIGHT_MAP,
@@ -14,6 +13,7 @@ from constants.umls import (
 )
 from core.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
+from typings.documents.common import MentionCandidate
 from utils.re import get_or_re
 from utils.tensor import similarity_with_residual_penalty, tensor_mean
 
@@ -21,7 +21,7 @@ from utils.tensor import similarity_with_residual_penalty, tensor_mean
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SYNTACTIC_SIMILARITY_WEIGHT = 0.3
+SYNTACTIC_SIMILARITY_WEIGHT = 0.25
 MIN_ORTHO_DISTANCE = 0.2
 
 
@@ -96,120 +96,60 @@ def get_orthogonal_members(
 
 
 def score_candidate(
-    id: str,
-    canonical_name: str,
-    type_ids: Sequence[str],
-    aliases: Sequence[str],
-    matching_aliases: Sequence[str],
-    is_composite: bool,
-    syntactic_similarity: float | None = None,
-) -> float:
-    """
-    Generate a score for a candidate (semantic or not)
-
-    - suppresses certain CUIs
-    - suppresses certain names
-    - scores based on
-        1. UMLS type (tui)
-        2. syntactic similarity (if supplied)
-
-    Args:
-        id (str): candidate ID
-        canonical_name (str): candidate canonical name
-        type_ids (list[str]): candidate types
-        aliases (list[str]): candidate aliases
-        matching_aliases (list[str]): aliases that matched the original mention
-        is_composite (bool): whether the candidate is a composite
-        syntactic_similarity (float): syntactic similarity score from tfidf vectorizer
-            if none, then score is based on type only (used by score_semantic_candidate since it weights syntactic vs semantic similarity)
-    """
-
-    if is_umls_suppressed(id, canonical_name, matching_aliases, is_composite):
-        return 0.0
-
-    # give candidates with more aliases a higher score, as proxy for num. ontologies in which it is represented.
-    alias_score = 1.1 if len(aliases) >= 8 else 1.0
-
-    # score based on the UMLS type (tui) of the candidate
-    type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.7) for ct in type_ids])
-
-    if syntactic_similarity is not None:
-        return round(type_score * alias_score * syntactic_similarity, 3)
-
-    return round(type_score * alias_score, 3)
-
-
-def score_semantic_candidate(
-    id: str,
-    canonical_name: str,
-    type_ids: list[str],
-    aliases: list[str],
-    matching_aliases: Sequence[str],
-    original_vector: torch.Tensor,
-    candidate_vector: torch.Tensor,
-    syntactic_similarity: float,
+    candidate: MentionCandidate,
+    mention_vector: torch.Tensor,
     is_composite: bool,
 ) -> float:
     """
     Generate a score for a semantic candidate
 
-    Score based on
-    - "score_candidate" rules
-    - syntactic similarity
-
-
-    Args:
-        candidate_id (str): candidate ID
-        candidate_canonical_name (str): candidate canonical name
-        candidate_types (list[str]): candidate types
-        syntactic_similarity (float): syntactic similarity score
-        original_vector (torch.Tensor): original mention vector
-        candidate_vector (torch.Tensor): candidate vector
+    - suppresses certain CUIs
+    - suppresses certain names
+    - scores based on
+        1. UMLS type (tui)
+        2. syntactic similarity
+        3. semantic similarity (with residual penalty) similarity
     """
-    type_score = score_candidate(
-        id,
-        canonical_name,
-        type_ids=type_ids,
-        aliases=aliases,
-        matching_aliases=matching_aliases,
-        is_composite=is_composite,
-    )
-
-    if type_score == 0:
+    if is_umls_suppressed(candidate.id, candidate.name, [], is_composite):
         return 0.0
 
+    # give candidates with more aliases a higher score, as proxy for num. ontologies in which it is represented.
+    alias_score = 1.05 if len(candidate.synonyms) >= 8 else 1.0
+
+    # score based on the UMLS type (tui) of the candidate
+    type_score = max([CANDIDATE_TYPE_WEIGHT_MAP.get(ct, 0.7) for ct in candidate.types])
+
+    base_score = round(type_score * alias_score, 3)
+
     semantic_similarity = similarity_with_residual_penalty(
-        original_vector, candidate_vector, name=canonical_name
+        mention_vector, torch.tensor(candidate.vector), name=candidate.name
     )
     return (
         (1 - SYNTACTIC_SIMILARITY_WEIGHT) * semantic_similarity
-        + SYNTACTIC_SIMILARITY_WEIGHT * syntactic_similarity
-    ) * type_score
+        + SYNTACTIC_SIMILARITY_WEIGHT * candidate.syntactic_similarity
+    ) * base_score
 
 
-def candidate_to_canonical(
-    candidate: MentionCandidate, kb: KnowledgeBase
-) -> CanonicalEntity:
+def candidate_to_canonical(candidate: MentionCandidate) -> CanonicalEntity:
     """
     Convert a MentionCandidate to a CanonicalEntity
     """
     # go to kb to get canonical name
-    entity = kb.cui_to_entity[candidate.concept_id]
     name = clean_umls_name(
-        entity.concept_id,
-        entity.canonical_name,
-        entity.aliases,
-        entity.types,
+        candidate.id,
+        candidate.name,
+        candidate.synonyms,
+        candidate.types,
         False,
     )
 
     return CanonicalEntity(
-        id=entity.concept_id,
-        ids=[entity.concept_id],
+        id=candidate.id,
+        ids=[candidate.id],
         name=name,
-        aliases=entity.aliases,
-        description=entity.definition,
-        types=entity.types,
+        aliases=candidate.synonyms,
+        description="",
+        types=candidate.types,
     )
 
 
@@ -226,9 +166,14 @@ def apply_umls_word_overrides(
     if has_override:
         return [
             MentionCandidate(
-                concept_id=overrides[text.lower()],
-                aliases=[text],
-                similarities=[1],
+                **{
+                    k: v
+                    for k, v in candidates[0].model_dump().items()
+                    if k not in ["id", "synonyms", "semantic_similarity"]
+                },
+                id=overrides[text.lower()],
+                synonyms=[text],
+                semantic_similarity=1,
             )
         ]
     return candidates

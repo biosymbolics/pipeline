@@ -1,15 +1,21 @@
 import gc
-from typing import Sequence
 from sentence_transformers import SentenceTransformer
 import torch
+import logging
 
 from constants.core import DEFAULT_DEVICE, DEFAULT_VECTORIZATION_MODEL
+from utils.args import make_hashable
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class Vectorizer:
     """
     Vectorize text using a transformer model
     """
+
+    _instances: dict[str, "Vectorizer"] = {}
 
     def __init__(
         self, model: str = DEFAULT_VECTORIZATION_MODEL, device: str = DEFAULT_DEVICE
@@ -21,12 +27,12 @@ class Vectorizer:
     def vectorize_string(self, text: str) -> torch.Tensor:
         return self.vectorize([text])[0]
 
-    def vectorize(self, texts: Sequence[str]) -> list[torch.Tensor]:
+    def vectorize(self, texts: list[str]) -> list[torch.Tensor]:
         if self.embedding_model is None:
             raise ValueError("Embedding model is not initialized")
 
         with torch.no_grad():
-            tensors = self.embedding_model.encode(list(texts))
+            tensors = self.embedding_model.encode(texts)
 
         if isinstance(tensors, torch.Tensor):
             return [tensors]
@@ -47,3 +53,17 @@ class Vectorizer:
 
     def __call__(self, text: str) -> torch.Tensor:
         return self.vectorize_string(text)
+
+    @classmethod
+    def get_instance(
+        cls, model: str = DEFAULT_VECTORIZATION_MODEL, **kwargs
+    ) -> "Vectorizer":
+        args = [("model", model), *sorted(kwargs.items())]
+        args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
+        if args_hash not in cls._instances:
+            logger.info("Returning UNCACHED vectorizer (%s)", model)
+            cls._instances[args_hash] = cls(model, **kwargs)
+        logger.debug(
+            "Returning vectorizer (%s) (all models: %s)", model, cls._instances.keys()
+        )
+        return cls._instances[args_hash]

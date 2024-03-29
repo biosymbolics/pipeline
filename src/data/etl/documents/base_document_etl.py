@@ -24,7 +24,8 @@ logging.basicConfig(level=logging.INFO)
 class BaseDocumentEtl(BaseEtl):
     def __init__(self, document_type: DocType, source_db: str):
         super().__init__(
-            record_type=VectorizableRecordType(document_type), source_db=source_db
+            record_type=VectorizableRecordType.from_doc_type(document_type),
+            source_db=source_db,
         )
 
     @abstractmethod
@@ -35,7 +36,7 @@ class BaseDocumentEtl(BaseEtl):
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_documents(self):
+    async def delete_all(self):
         raise NotImplementedError
 
     @abstractmethod
@@ -46,7 +47,7 @@ class BaseDocumentEtl(BaseEtl):
     async def copy_all(self, is_update: bool = False):
         if is_update:
             logger.info("Deleting documents in order to re-create")
-            await self.delete_documents()
+            await self.delete_all()
         logger.info("Coping documents...")
         await self.copy_documents()
 

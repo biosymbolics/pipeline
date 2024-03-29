@@ -302,4 +302,4 @@ if __name__ == "__main__":
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
     # enricher = PatentClassifier() # only use if wanting to re-classify (comparatively fast)
-    asyncio.run(enricher(starting_id))
+    asyncio.run(enricher(starting_id))  # WO-2023288343-A1

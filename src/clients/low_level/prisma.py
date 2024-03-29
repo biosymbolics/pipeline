@@ -39,9 +39,8 @@ def prisma_context(timeout: int | None) -> Prisma:
     """
     logger.info("Creating Prisma client")
     client = Prisma(
-        # auto_register=True,
         log_queries=False,
-        http={"limits": Limits(max_connections=50), "timeout": timeout},
+        http={"limits": Limits(max_connections=100), "timeout": timeout},
     )
 
     if not client.is_registered():

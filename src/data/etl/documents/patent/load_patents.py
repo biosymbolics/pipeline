@@ -14,7 +14,6 @@ from pydash import uniq
 from clients.low_level.postgres import PsqlDatabaseClient
 from clients.low_level.prisma import prisma_client
 from constants.core import (
-    ETL_BASE_DATABASE_URL,
     GPR_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE,
@@ -163,7 +162,7 @@ class PatentLoader(BaseDocumentEtl):
     @staticmethod
     def entity_specs() -> list[BiomedicalEntityLoadSpec]:
         indication_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
@@ -180,7 +179,7 @@ class PatentLoader(BaseDocumentEtl):
             sql=PatentLoader.get_entity_sql(["diseases"]),
         )
         intervention_spec = BiomedicalEntityLoadSpec(
-            candidate_selector="CompositeCandidateSelector",  # "CompositeSemanticCandidateSelector",
+            candidate_selector="CompositeCandidateSelector",
             database="patents",
             get_source_map=lambda recs: {
                 rec["term"]: {
@@ -196,10 +195,10 @@ class PatentLoader(BaseDocumentEtl):
             ),
             sql=PatentLoader.get_entity_sql(INTERVENTION_DOMAINS),
         )
-        return [indication_spec, intervention_spec]
+        return [intervention_spec, indication_spec]
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         """
         Delete all patent records (which should cascade)
         """
@@ -238,7 +237,7 @@ class PatentLoader(BaseDocumentEtl):
                             "claims": p["claims"],
                             "country_code": p["country"],
                             "family_id": p["family_id"],
-                            "investment": len(p["other_ids"])
+                            "investment": len(p["all_publication_numbers"])
                             * PATENT_WEIGHT_MULTIPLIER,
                             "ipc_codes": p["ipc_codes"],
                             # indications (relation)
@@ -248,7 +247,8 @@ class PatentLoader(BaseDocumentEtl):
                             "priority_date": p["priority_date"],
                             "similar_patents": p["similar_patents"] or [],
                             "title": p["title"],
-                            "traction": len(p["other_ids"]) * PATENT_WEIGHT_MULTIPLIER,
+                            "traction": len(p["all_publication_numbers"])
+                            * PATENT_WEIGHT_MULTIPLIER,
                             "url": p["url"],
                         }
                     )

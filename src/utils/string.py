@@ -207,13 +207,16 @@ def generate_ngram_phrases(tokens: tuple[str, ...], max_n: int) -> list[str]:
     return flatten([generate(n) for n in range(1, max_n + 1)])
 
 
-def generate_ngram_phrases_from_doc(doc: Doc, max_n: int) -> list[Span]:
+def generate_ngram_phrases_from_doc(
+    doc: Doc, max_n: int, min_length: int = 2
+) -> list[Span]:
     """
     Generate n-grams from a Spacy doc, between max-n and 1
 
     Args:
         doc (Doc): spacy doc
         max_n (int): max n-gram size
+        min_length (int): minimum length of n-gram
 
     Returns:
         list[Span]: list of n-grams
@@ -225,7 +228,8 @@ def generate_ngram_phrases_from_doc(doc: Doc, max_n: int) -> list[Span]:
             for z in zip(*[doc[i:] for i in range(n)])
         ]
 
-    return flatten([generate_ngrams(n) for n in range(1, max_n + 1)])
+    ngrams = flatten([generate_ngrams(n) for n in range(1, max_n + 1)])
+    return [ng for ng in ngrams if len(ng.text) > min_length]
 
 
 def tokens_to_string(tokens: Sequence[Span | Token]) -> str:

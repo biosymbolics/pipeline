@@ -2,26 +2,13 @@
 Utils for lists/arrays
 """
 
-from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar, cast
+from typing import Any, Iterable, Mapping, Sequence, TypeGuard, TypeVar
 import numpy as np
 from pydash import compact, merge_with, uniq
 import polars as pl
 
 T = TypeVar("T")
 BATCH_SIZE = 1000
-
-
-def diff_lists(list_one: Sequence[T], list_two: Sequence[T]) -> list[T]:
-    """
-    Returns the items present in list_one but missing in list_two
-
-    Args:
-        list_one (list): list to compare
-        list_two (list): list to compare
-    """
-    set_two = set(list_two)
-    dropped = [x for x in list_one if x not in set_two]
-    return dropped
 
 
 def dedup(a_list: Sequence[T] | Iterable[T]) -> list[T]:
@@ -72,23 +59,6 @@ def batch(items: Sequence[T], batch_size: int = BATCH_SIZE) -> list[list[T]]:
 
 
 BT = TypeVar("BT", bound=Mapping)
-
-
-def batch_dict(data_dict: BT, batch_size: int = BATCH_SIZE) -> list[BT]:
-    """
-    Turns a dict of lists into a list of dicts of lists of size `batch_size`
-
-    Args:
-        data_dict (dict): dict to batch
-        batch_size (int, optional): batch size. Defaults to BATCH_SIZE.
-    """
-    return cast(
-        list[BT],
-        [
-            {k: v[i : i + batch_size] for k, v in data_dict.items()}
-            for i in range(0, len(next(iter(data_dict.values()))), batch_size)
-        ],
-    )
 
 
 def is_sequence(obj: object) -> bool:

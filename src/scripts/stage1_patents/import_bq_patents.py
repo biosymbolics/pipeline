@@ -9,9 +9,6 @@ from pydash import compact
 import logging
 import google.cloud.storage as storage
 
-import system
-
-system.initialize()
 
 from clients.low_level.big_query import BQDatabaseClient, BQ_DATASET_ID
 from clients.low_level.postgres import PsqlDatabaseClient
@@ -20,6 +17,7 @@ from constants.core import (
     GPR_ANNOTATIONS_TABLE,
     SOURCE_BIOSYM_ANNOTATIONS_TABLE,
 )
+import system
 
 from .constants import (
     GPR_PUBLICATIONS_TABLE,
@@ -32,6 +30,8 @@ db_client = BQDatabaseClient()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+system.initialize()
 
 
 def is_dict_list(obj: Any) -> TypeGuard[list[dict[str, Any]]]:

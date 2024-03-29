@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 from core.vector import Vectorizer
 from typings.client import VectorSearchParams
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
@@ -38,7 +38,7 @@ class VectorReportClient:
         self.document_types = document_types
         self.gpt_client = GptApiClient()
         self.recency_decay_factor = recency_decay_factor
-        self.vectorizer = Vectorizer()
+        self.vectorizer = Vectorizer.get_instance()
 
     def _calc_min_similarity(
         self, similarities: Sequence[float], alpha: float
@@ -97,7 +97,7 @@ class VectorReportClient:
                     SELECT id, vector
                     FROM {doc_type.name}
                     WHERE date_part('year', {date_field}) >= {search_params.start_year}
-                    AND NOT id = ANY($1)
+                    AND NOT id = ANY($2)
                 """
 
             doc_queries = " UNION ALL ".join(
@@ -107,13 +107,15 @@ class VectorReportClient:
             query = f"""
                 SELECT
                     id,
-                    1 - (vector <=> '{search_params.vector}') as similarity
+                    1 - (vector <=> $1::vector) as similarity
                 FROM ({doc_queries}) docs
-                ORDER BY (vector <=> '{search_params.vector}') ASC
+                ORDER BY (vector <=> $1::vector) ASC
                 LIMIT {search_params.k}
             """
             async with prisma_context(300) as db:
-                records = await db.query_raw(query, search_params.skip_ids)
+                records = await db.query_raw(
+                    query, search_params.vector, search_params.skip_ids
+                )
 
             scores = [
                 record["similarity"]

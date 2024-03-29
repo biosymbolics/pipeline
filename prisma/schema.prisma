@@ -2,7 +2,7 @@
 datasource db {
     provider   = "postgresql"
     url        = env("DATABASE_URL")
-    extensions = [vector]
+    extensions = [vector, trgm]
 }
 
 // generator
@@ -326,7 +326,9 @@ model Umls {
     id                  String                      @id @unique
     biomedical_entities BiomedicalEntity[]          @relation("entity_to_umls") // backref
     count               Int                         @default(0)
+    is_eligible         Boolean                     @default(true)
     level               OntologyLevel
+    lookup_synonyms     UmlsSynonym[]
     name                String
     preferred_name      String
     rollup_id           String // TODO: add as biomedical parent
@@ -336,6 +338,19 @@ model Umls {
     vector              Unsupported("vector(768)")?
 
     @@map("umls")
+    @@index([is_eligible], name: "umls_is_eligible")
+}
+
+model UmlsSynonym {
+    id      Int    @id @default(autoincrement())
+    umls    Umls   @relation(fields: [umls_id], references: [id])
+    umls_id String
+    term    String
+
+    @@unique([term, umls_id])
+    @@index([term(ops: raw("gin_trgm_ops"))], name: "umls_synonym_term", type: Gin)
+    @@index([umls_id], name: "umls_synonym_umls_id")
+    @@map("umls_synonym")
 }
 
 model UmlsGraph {

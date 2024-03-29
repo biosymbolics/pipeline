@@ -3,14 +3,13 @@ Term Normalizer
 """
 
 import logging
-import time
-from typing import Sequence
+from typing import Iterable, Sequence
 
-from .types import AbstractCandidateSelector, CandidateSelectorType
+
+from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
 from ..types import CanonicalEntity, DocEntity
 
-LinkedEntityMap = dict[str, CanonicalEntity]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -32,62 +31,48 @@ class TermLinker:
         >>> linker(["DNMT1 protein synthase inhibitor"])
     """
 
-    def __init__(
-        self,
-        candidate_selector: CandidateSelectorType = "SemanticCandidateSelector",
+    def __init__(self, candidate_selector: AbstractCandidateSelector):
+        """
+        Initialize term normalizer using existing model
+
+        Use `create` to instantiate with async dependencies
+        """
+        self.candidate_selector = candidate_selector
+
+    @classmethod
+    async def create(
+        cls,
+        candidate_selector_type: CandidateSelectorType = "CandidateSelector",
         *args,
         **kwargs,
     ):
-        """
-        Initialize term normalizer using existing model
-        """
-        # lazy (UMLS is large)
-        logger.info("Loading %s (might be slow...)", candidate_selector)
-        modules = __import__(CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector])
-        self.candidate_selector: AbstractCandidateSelector = getattr(
-            modules, candidate_selector
-        )(*args, **kwargs)
+        modules = __import__(
+            CANDIDATE_SELECTOR_MODULE, fromlist=[candidate_selector_type]
+        )
+        candidate_selector: AbstractCandidateSelector = await getattr(
+            modules, candidate_selector_type
+        ).create(*args, **kwargs)
+        return cls(candidate_selector)
 
-    def link(self, entities: Sequence[DocEntity]) -> list[DocEntity]:
+    async def link(self, entities: Iterable[DocEntity]) -> Iterable[DocEntity]:
         """
         Link term to canonical entity or synonym
 
         Args:
-            terms (Sequence[str]): list of terms to normalize
+            entities (Sequence[DocEntity] | Iterable[DocEntity]): list of entities to link
         """
-        if len(entities) == 0:
-            logging.warning("No entities to link")
-            return []
 
-        start = time.monotonic()
-
-        # generate the candidates (kinda slow)
-        canonical_entities = [self.candidate_selector(e) for e in entities]
-
-        logging.info(
-            "Completed candidate generation, took %ss (%s)",
-            round(time.monotonic() - start),
-            [e.term for e in entities],
-        )
-
-        linked_doc_ents = [
+        candidates = [c async for c in self.candidate_selector(entities)]  # type: ignore
+        return [
             DocEntity.merge(
                 e,
-                canonical_entity=ce
-                or CanonicalEntity(
-                    id="", name=e.normalized_term or e.term, aliases=[e.term]
-                ),
+                canonical_entity=c
+                or CanonicalEntity.create(e.normalized_term or e.term),
             )
-            for e, ce in zip(entities, canonical_entities)
+            for e, c in zip(iter(entities), candidates)
         ]
 
-        logging.info(
-            "Completed linking batch of %s entities, took %ss",
-            len(entities),
-            round(time.monotonic() - start),
-        )
-
-        return linked_doc_ents
-
-    def __call__(self, entity_set: Sequence[DocEntity]) -> list[DocEntity]:
-        return self.link(entity_set)
+    async def __call__(
+        self, entity_set: Sequence[DocEntity] | Iterable[DocEntity]
+    ) -> Iterable[DocEntity]:
+        return await self.link(entity_set)

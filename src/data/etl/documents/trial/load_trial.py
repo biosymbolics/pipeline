@@ -58,9 +58,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-SOURCE_DB = f"{ETL_BASE_DATABASE_URL}/aact"
-
-
 def get_source_fields() -> list[str]:
     single_fields = {
         "studies.nct_id": "id",
@@ -310,7 +307,7 @@ class TrialLoader(BaseDocumentEtl):
         )
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         """
         Delete all trial records
         """

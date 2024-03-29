@@ -14,9 +14,10 @@ from .load_regulatory_approval import RegulatoryApprovalLoader
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_approvals.txt"
-
 initialize()
+
+
+VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_approvals.txt"
 
 
 class ApprovalVectorizer(DocumentVectorizer):

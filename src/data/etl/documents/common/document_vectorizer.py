@@ -1,25 +1,34 @@
 from abc import abstractmethod
+from enum import Enum
+from functools import reduce
 import logging
 import time
 from typing import Optional, Sequence, TypedDict
 import polars as pl
-from pydash import compact, uniq
-import hashlib
+from pydash import compact, flatten, uniq
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
 from core.vector import Vectorizer
 from data.etl.base_etl import BaseEtl
+from typings.core import is_list_string_list, is_string_list
+from utils.tensor import l1_regularize, tensor_mean
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 MAX_TEXT_LENGTH = 2000
+MAX_ARRAY_LENGTH = 10
 VECTORIZED_PROCESSED_DOCS_FILE = "data/vectorized_processed_pubs.txt"
 
 
 VectorizedDoc = TypedDict("VectorizedDoc", {"id": str, "vector": list[float]})
+
+
+class ComboStrategy(Enum):
+    text_concat = "text_concat"
+    average = "average"
 
 
 class DocumentVectorizer(BaseEtl):
@@ -35,6 +44,7 @@ class DocumentVectorizer(BaseEtl):
         id_field: str,
         processed_docs_file: str,
         batch_size: int = 1000,
+        combo_strategy: ComboStrategy = ComboStrategy.text_concat,
     ):
         """
         Initialize the vectorizer
@@ -46,7 +56,8 @@ class DocumentVectorizer(BaseEtl):
         self.text_fields = text_fields
         self.dest_table = dest_table
         self.id_field = id_field
-        self.vectorizer = Vectorizer()
+        self.combo_strategy: ComboStrategy = combo_strategy
+        self.vectorizer = Vectorizer.get_instance()
 
     def _get_processed_docs(self) -> list[str]:
         """
@@ -76,51 +87,66 @@ class DocumentVectorizer(BaseEtl):
         """
         raise NotImplementedError
 
-    def _generate_text(self, doc_df: pl.DataFrame) -> list[str]:
+    def _generate_text(self, doc_df: pl.DataFrame) -> list[str] | list[list[str]]:
         """
         Format documents for vectorization
         Concatenates fields and trucates to MAX_TEXT_LENGTH
         """
-        texts = compact([doc_df[field].to_list() for field in self.text_fields])
-        return [("\n".join(text))[0:MAX_TEXT_LENGTH] for text in zip(*texts)]
+        texts: list[list[str]] = compact(
+            [doc_df[field].to_list() for field in self.text_fields]
+        )
 
-    def _vectorize(self, documents: list[str]) -> list[list[float]]:
+        def prep_text_set(text_set: tuple[list[str] | str]) -> list[str]:
+            return [
+                ", ".join(uniq(ts)[0:MAX_ARRAY_LENGTH]) if isinstance(ts, list) else ts
+                for ts in text_set
+            ]
+
+        if self.combo_strategy == "text_concat":
+            return [
+                (". ".join(prep_text_set(text_set)))[0:MAX_TEXT_LENGTH]
+                for text_set in zip(*texts)
+            ]
+
+        res = [prep_text_set(text_set) for text_set in zip(*texts)]
+
+        if len(doc_df) != len(res):
+            raise ValueError("Mismatched text and document lengths")
+        return res
+
+    def _vectorize(self, docs: list[str] | list[list[str]]) -> list[list[float]]:
         """
         Vectorize document descriptions
-
-        Uniqs the documents before vectorization to reduce redundant processing
-
-        Note: this appears to have a memory leak. Perhaps it is just Spacy Vocab,
-        but it seems like something more.
         """
-        uniq_documents = uniq(documents)
+        # if the combo strategy is text_concat, combine list of strings and then vectorize
+        if self.combo_strategy == ComboStrategy.text_concat and is_string_list(docs):
+            vectors = self.vectorizer.vectorize(docs)
+            return [l1_regularize(v).tolist() for v in vectors]
 
-        if len(uniq_documents) < len(documents):
-            logger.info(
-                f"Avoiding processing of %s duplicate documents",
-                len(documents) - len(uniq_documents),
+        # if the combo strategy is average, vectorize each string and average
+        elif self.combo_strategy == ComboStrategy.average and is_list_string_list(docs):
+            indices: list[tuple[int, int]] = reduce(
+                lambda acc, d: acc + [(acc[-1][1], acc[-1][1] + len(d))],
+                docs,
+                [(0, 0)],  # type: ignore
             )
+            vectors = self.vectorizer.vectorize(flatten(docs))
+            vector_sets = [
+                l1_regularize(tensor_mean(vectors[s:e])).tolist()
+                for s, e in indices[1:]
+            ]
 
-        # vectorize
-        vectors = [v.tolist() for v in self.vectorizer.vectorize(uniq_documents)]
+            if indices[-1][1] != len(flatten(docs)):
+                raise ValueError("Mismatched vector and document lengths")
 
-        # map of content hash to vector
-        vectors_map = {
-            hashlib.sha1(c.encode()).hexdigest(): v
-            for c, v in zip(uniq_documents, vectors)
-        }
+            return vector_sets
 
-        # return vectors for all provided documents (even dups)
-        all_vectors = [
-            vectors_map[hashlib.sha1(doc.encode()).hexdigest()] for doc in documents
-        ]
-
-        return all_vectors
+        raise ValueError("Invalid combination strategy or datatype")
 
     def _preprocess(
         self,
         documents: list[dict],
-    ) -> tuple[list[str], list[str]]:
+    ) -> tuple[list[str], list[str] | list[list[str]]]:
         """
         Preprocess documents for vectorization
         """
@@ -132,7 +158,7 @@ class DocumentVectorizer(BaseEtl):
 
         if len(to_process) == 0:
             logger.info("No documents to process")
-            return [], []
+            return [], []  # type: ignore
 
         ids = to_process[self.id_field].to_list()
 

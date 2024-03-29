@@ -4,6 +4,7 @@ Client stub for GPT
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from langchain_community.llms import HuggingFaceEndpoint
@@ -85,35 +86,39 @@ class GptApiClient:
 
         return answer
 
-    async def _query(self, query: str, is_array: bool = False) -> Any:
-        """
-        Query GPT, applying the prompt template and output parser if response schemas were provided
-        """
+    def get_llm(self) -> BaseChatModel:
         if self.model == "mixtral-8x7b-32768":
-            llm = ChatGroq(
+            return ChatGroq(
                 temperature=DEFAULT_TEMPERATURE, name=self.model, max_tokens=20000
             )
-        elif self.model == "mistralai/Mistral-7B-Instruct-v0.1":
-            llm = HuggingFaceEndpoint(
+
+        if self.model == "mistralai/Mistral-7B-Instruct-v0.1":
+            return HuggingFaceEndpoint(
                 repo_id=self.model,
                 temperature=DEFAULT_TEMPERATURE,
                 max_new_tokens=8000,
                 model_kwargs={"max_tokens": 20000},
             )
-        elif self.model == "biomistral-7b-dare-mps":
-            llm = HuggingFaceEndpoint(
+
+        if self.model == "biomistral-7b-dare-mps":
+            return HuggingFaceEndpoint(
                 endpoint_url="https://v0sk5eajj1ohvc6z.us-east-1.aws.endpoints.huggingface.cloud",
                 temperature=DEFAULT_TEMPERATURE,
                 max_new_tokens=8000,
                 max_tokens=20000,
             )
-        else:
-            llm = ChatOpenAI(
-                temperature=DEFAULT_TEMPERATURE,
-                model=self.model,
-                max_tokens=DEFAULT_MAX_TOKENS,
-            )
 
+        return ChatOpenAI(
+            temperature=DEFAULT_TEMPERATURE,
+            model=self.model,
+            max_tokens=DEFAULT_MAX_TOKENS,
+        )
+
+    async def _query(self, query: str, is_array: bool = False) -> Any:
+        """
+        Query GPT, applying the prompt template and output parser if response schemas were provided
+        """
+        llm = self.get_llm()
         llm_chain = LLMChain(prompt=self.prompt_template, llm=llm)
         output = llm_chain.invoke(input={"query": query})
         try:

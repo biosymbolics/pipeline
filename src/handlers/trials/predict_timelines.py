@@ -2,7 +2,7 @@ import json
 from typing import TypedDict
 import logging
 
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 
 
 class ClinDevParams(TypedDict):

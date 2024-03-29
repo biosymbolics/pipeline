@@ -122,9 +122,11 @@ class OwnerLoader:
         ]
 
     async def copy_all(self, is_force_update: bool = False):
+        owner_etl = await OwnerEtl.create()
+
         names, counts = await self._get_owner_names()
         public_companies = self.load_public_companies()
-        await OwnerEtl().copy_all(names, counts, public_companies, is_force_update)
+        await owner_etl.copy_all(names, counts, public_companies, is_force_update)
         return
 
     @staticmethod

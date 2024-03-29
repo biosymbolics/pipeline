@@ -12,10 +12,6 @@ import polars as pl
 from spacy.tokens import Doc
 
 
-from system import initialize
-
-initialize()
-
 from clients.low_level.postgres import PsqlDatabaseClient as DatabaseClient
 from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
@@ -50,8 +46,11 @@ from data.domain.biomedical import (
     DELETION_TERMS,
     WordPlace,
 )
+from system import initialize
 from utils.list import batch
 from utils.re import get_or_re, get_hacky_stem_re
+
+initialize()
 
 
 logger = logging.getLogger(__name__)
@@ -406,19 +405,6 @@ async def populate_working_biosym_annotations():
 
 
 if __name__ == "__main__":
-    """
-    Checks:
-
-    select term, count(*) from biosym_annotations group by term order by count(*) desc limit 2000;
-    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc limit 1000) s;
-    select sum(count) from (select count(*) as count from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' group by lower(term) order by count(*) desc offset 10000) s;
-    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'' and array_length(regexp_split_to_array(term, ' '), 1) > 1;
-    select count(*) from biosym_annotations where domain not in ('attributes', 'assignees', 'inventors') and term<>'';
-    select domain, count(*) from biosym_annotations group by domain;
-    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 100) s;
-    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc limit 1000) s;
-    select sum(count) from (select term, count(*)  as count from biosym_annotations where term ilike '%inhibit%' group by term order by count(*) desc offset 1000) s;
-    """
     if "-h" in sys.argv:
         print(
             """

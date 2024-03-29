@@ -4,35 +4,28 @@ NER types
 
 from typing import (
     Any,
-    Callable,
     Collection,
     Mapping,
     Optional,
     TypeGuard,
-    TypedDict,
     Union,
 )
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation
+from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydash import compact
-from spacy.language import Language
-from spacy.tokenizer import Tokenizer
 from spacy.tokens import Doc
 from prisma.enums import BiomedicalEntityType
-import torch
+import numpy.typing as npt
 
 from data.domain.biomedical.umls import tuis_to_entity_type
-
-
-NerResult = TypedDict("NerResult", {"word": str, "score": float, "entity_group": str})
 
 
 class CanonicalEntity(BaseModel):
     id: str | None
     name: str
-    ids: Optional[list[str]] = None
-    description: Optional[str] = None
-    aliases: list[str] = Field(default_factory=list)
-    types: list[str] = Field(default_factory=list)
+    ids: list[str] | None = None
+    description: str | None = None
+    aliases: list[str] = []
+    types: list[str] = []
 
     @property
     def is_fake(self):
@@ -51,6 +44,25 @@ class CanonicalEntity(BaseModel):
 
         return tuis_to_entity_type(self.types)
 
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        id: str = "",
+        ids: list[str] | None = None,
+        description: str | None = None,
+        aliases: list[str] | None = None,
+        types: list[str] = [],
+    ):
+        return cls(
+            id=id,
+            name=name,
+            ids=ids,
+            description=description,
+            aliases=aliases or [name],
+            types=types,
+        )
+
 
 class DocEntity(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -59,9 +71,9 @@ class DocEntity(BaseModel):
     end_char: int
     normalized_term: str
     type: str | None = None
-    vector: Optional[torch.Tensor] = None
-    spacy_doc: SkipValidation[Optional[Doc]] = None
-    canonical_entity: SkipValidation[Optional[CanonicalEntity]] = None
+    vector: SkipValidation[list[float] | None] = None
+    spacy_doc: SkipValidation[Doc | None] = None
+    canonical_entity: SkipValidation[CanonicalEntity | None] = None
 
     @staticmethod
     def create(
@@ -70,23 +82,27 @@ class DocEntity(BaseModel):
         start_char=0,
         end_char=0,
         type=None,
-        vector: list[float] | torch.Tensor | None = None,
+        vector: list[float] | None = None,
         spacy_doc=None,
         canonical_entity=None,
     ):
-        _vector = (
-            vector if vector is not None else (spacy_doc.vector if spacy_doc else None)
-        )
-        if not isinstance(_vector, torch.Tensor):
-            _vector = torch.tensor(_vector)
+        def _vector() -> list[float] | None:
+            if vector is not None and isinstance(vector, list):
+                return vector
+            if vector is not None and hasattr(vector, "tolist"):
+                return vector.tolist()
+            elif spacy_doc is not None:
+                return spacy_doc.vector
+            return None
 
         return DocEntity(
             term=term,
             start_char=start_char,
             end_char=end_char,
             normalized_term=normalized_term or term,
-            type=type or (getattr(spacy_doc, "label_", None) if spacy_doc else None),
-            vector=_vector,
+            type=type
+            or None,  # (getattr(spacy_doc, "label_", None) if spacy_doc else None),
+            vector=_vector(),
             spacy_doc=spacy_doc,
             canonical_entity=canonical_entity,
         )
@@ -134,12 +150,6 @@ class DocEntity(BaseModel):
     def __repr__(self):
         return self.__str__()
 
-    @property
-    def doc_vector(self) -> Optional[list[float]]:
-        if self.spacy_doc is not None:
-            return self.spacy_doc.vector.tolist()
-        return None
-
     def to_flat_dict(self):
         """
         Convert to a flat dictionary
@@ -167,20 +177,3 @@ def is_entity_doc_list(obj: Any) -> TypeGuard[DocEntities]:
 
 SpacyPattern = Mapping[str, Union[str, Collection[Mapping[str, Any]]]]
 SpacyPatterns = Collection[SpacyPattern]
-
-
-def is_ner_result(entity: Any) -> TypeGuard[NerResult]:
-    """
-    Check if entity is a valid NER result
-    """
-    return (
-        isinstance(entity, dict)
-        and entity.get("word") is not None
-        and entity.get("score") is not None
-        and entity.get("entity_group") is not None
-    )
-
-
-GetTokenizer = Callable[[Language], Tokenizer]
-
-SynonymRecord = TypedDict("SynonymRecord", {"term": str, "synonym": str})

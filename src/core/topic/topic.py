@@ -8,7 +8,7 @@ import numpy as np
 import polars as pl
 import logging
 
-from clients.openai.gpt_client import GptApiClient
+from clients.llm.llm_client import GptApiClient
 
 RANDOM_STATE = 42
 

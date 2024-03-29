@@ -4,10 +4,10 @@ import sys
 from typing import Optional
 
 from constants.core import UMLS_VECTOR_TABLE
-from data.etl.documents import DocumentVectorizer
-from data.etl.entity.biomedical_entity.umls.load_umls import UmlsLoader
+from data.etl.documents import ComboStrategy, DocumentVectorizer
 from system import initialize
 
+from .utils import get_umls_source_sql
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -29,10 +29,11 @@ class UmlsVectorizer(DocumentVectorizer):
         super().__init__(
             database="umls",
             dest_table=UMLS_VECTOR_TABLE,
-            text_fields=["name"],
+            text_fields=["name", "synonyms"],
             id_field="id",
             processed_docs_file=VECTORIZED_PROCESSED_DOCS_FILE,
             batch_size=10000,
+            combo_strategy=ComboStrategy.average,
         )
 
     async def _fetch_batch(self, last_id: Optional[str] = None) -> list[dict]:
@@ -43,7 +44,7 @@ class UmlsVectorizer(DocumentVectorizer):
             last_id (Optional[str], optional): last id to paginate from. Defaults to None.
         """
         pagination_where = [f"{self.id_field} > '{last_id}'"] if last_id else None
-        source_sql = UmlsLoader.get_source_sql(pagination_where, self.batch_size)
+        source_sql = get_umls_source_sql(pagination_where, self.batch_size)
         umls = await self.db.select(source_sql)
         return umls
 

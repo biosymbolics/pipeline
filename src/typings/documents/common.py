@@ -1,5 +1,8 @@
 from enum import Enum
+import json
+from typing import Any
 from prisma.enums import BiomedicalEntityType
+from pydantic import BaseModel, field_validator
 
 
 class DocType(Enum):
@@ -14,6 +17,14 @@ class VectorizableRecordType(Enum):
     regulatory_approval = "regulatory_approval"
     trial = "trial"
     umls = "umls"
+
+    @staticmethod
+    def from_doc_type(doc_type: DocType) -> "VectorizableRecordType":
+        return {
+            DocType.patent: VectorizableRecordType.patent,
+            DocType.regulatory_approval: VectorizableRecordType.regulatory_approval,
+            DocType.trial: VectorizableRecordType.trial,
+        }[doc_type]
 
 
 DOC_TYPE_DATE_MAP: dict[DocType, str] = {
@@ -58,3 +69,20 @@ DOMAINS_OF_INTEREST = [
     # "inventors",
     # ATTRIBUTE_FIELD,
 ]
+
+
+class MentionCandidate(BaseModel):
+    id: str
+    name: str
+    semantic_similarity: float
+    syntactic_similarity: float
+    synonyms: list[str]
+    types: list[str]
+    vector: list[float]
+
+    @field_validator("vector", mode="before")
+    def vector_from_string(cls, vec):
+        # vec may be a string due to prisma limitations
+        if isinstance(vec, str):
+            return json.loads(vec)
+        return vec

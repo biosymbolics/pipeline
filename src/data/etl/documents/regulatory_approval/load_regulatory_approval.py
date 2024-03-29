@@ -197,7 +197,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
         return [intervention_spec, indication_spec]
 
     @overrides(BaseDocumentEtl)
-    async def delete_documents(self):
+    async def delete_all(self):
         client = await prisma_client(600)
         await Intervenable.prisma(client).query_raw(
             "DELETE FROM intervenable WHERE regulatory_approval_id IS NOT NULL"
@@ -227,7 +227,7 @@ class RegulatoryApprovalLoader(BaseDocumentEtl):
             "ARRAY_REMOVE(ARRAY_AGG(distinct metadata.concept_name), NULL) AS indications",
             "MAX(label_text) as label_text",
             "MAX(label.pdf_url) AS url",
-            "CASE WHEN MAX(prod.marketing_status) in ('NDA', 'BLA') THEN 200 ELSE 30 END AS traction",
+            "SUM(CASE WHEN prod.marketing_status in ('NDA', 'BLA') THEN 200 ELSE 30 END) AS traction",
         ]
         approvals = await PsqlDatabaseClient(self.source_db).select(
             query=RegulatoryApprovalLoader.get_source_sql(fields)

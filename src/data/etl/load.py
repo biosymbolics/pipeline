@@ -71,7 +71,7 @@ def get_entity_map_matview_query() -> list[str]:
 # https://github.com/prisma/prisma/issues/12751
 # check progress: SELECT phase, round(100.0 * blocks_done / nullif(blocks_total, 0), 1) AS "%" FROM pg_stat_progress_create_index
 MANUAL_INDICES = [
-    "SET maintenance_work_mem = '5GB'",
+    "SET maintenance_work_mem = '7GB'",
     """
     CREATE INDEX owner_vector ON owner USING hnsw (vector vector_cosine_ops);
     CREATE INDEX biomedical_entity_search ON biomedical_entity USING GIN(search);
@@ -98,7 +98,7 @@ async def load_all(force_update: bool = False):
 
     # copy all biomedical entities (from all doc types)
     # Takes 3+ hours!!
-    await BiomedicalEntityLoader().copy_all()
+    await BiomedicalEntityLoader().copy_all(force_update)
 
     # copy owner data (across all documents)
     await OwnerLoader().copy_all(force_update)

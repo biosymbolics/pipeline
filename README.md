@@ -250,12 +250,14 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 ```
 
-#### Reloading module in REPL
+#### Profiling
 ```
-from system import initialize
-initialize()
-import importlib
-importlib.reload(common.ner.ner)
+python3 -m cProfile -o profile2.out -m data.etl.entity.biomedical_entity.biomedical_entity_load --force_update
+
+import pstats
+p = pstats.Stats('/Users/kristinlindquist/development/pipeline/profile2.out')
+p.sort_stats('time').print_stats(100)
+
 ```
 
 #### Debugging memory leak
@@ -290,6 +292,8 @@ export DATABASE_URL=postgres://biosym:ok@localhost:5432/biosym
 create role biosym with password 'ok';
 alter role biosym with superuser;
 prisma db push
+
+npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/generated.sql
 ```
 
 ##### Ctgov
@@ -299,34 +303,4 @@ pg_restore -e -v -O -x -d aact --no-owner ~/Downloads/postgres_data.dmp
 alter database aact set search_path = ctgov, public;
 create extension vector;
 create table trial_vectors(id text, vector vector(768));
-```
-
-#### Random
-```
-
-from core.ner.spacy import Spacy
-nlp = Spacy.get_instance(
-            model="en_core_web_trf",
-            disable=["ner", "parser", "tagger"],
-            additional_pipelines={
-                "transformer": {
-                    "config": {
-                        "model": {
-                            "@architectures": "spacy-transformers.TransformerModel.v3",
-                            "name": "bert-base-uncased",
-                            # "tokenizer_config": {"use_fast": True},
-                            # "transformer_config": {},
-                            # "mixed_precision": True,
-                            # "grad_scaler_config": {"init_scale": 32768},
-                            "get_spans": {
-                                "@span_getters": "spacy-transformers.strided_spans.v1",
-                                "window": 128,
-                                "stride": 16,
-                            },
-                        },
-                    },
-                },
-                "tok2vec": {},
-            },
-        )
 ```

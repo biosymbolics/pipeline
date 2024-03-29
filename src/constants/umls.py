@@ -385,6 +385,7 @@ UMLS_MAYBE_FORMULATION_TYPES: dict[str, str] = {}
 
 UMLS_MAYBE_COMPOUND_TYPES = {
     "T167": "Substance",
+    # "T002": "Plant",
     **UMLS_FORMULATION_TYPES,
 }
 
@@ -654,21 +655,23 @@ NAME_TO_UMLS_TYPE = {
 UMLS_TO_ENTITY_TYPE = {v: k for k, vs in ENTITY_TO_UMLS_TYPE.items() for v in vs.keys()}
 
 
-CANDIDATE_TYPE_WEIGHT_MAP = {
-    **{t: 1 for t in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+CANDIDATE_TYPE_WEIGHT_MAP: dict[str, float] = {
+    **{t: 0.95 for t in list(UMLS_MAYBE_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+    **{t: 0.95 for t in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
+    **{t: 0.95 for t in list(UMLS_PATHOGEN_TYPES.keys())},
     **{t: 1 for t in list(UMLS_MAYBE_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
-    **{t: 1 for t in list(UMLS_MAYBE_DISEASE_TYPES.keys())},
-    **{t: 1 for t in list(UMLS_PATHOGEN_TYPES.keys())},
     **{t: 1 for t in list(UMLS_NON_PATHOGEN_DISEASE_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_COMPOUND_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_BIOLOGIC_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_MECHANISM_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_LESS_PREFERRED_TARGET_TYPES.keys())},
-    **{t: 1.2 for t in list(UMLS_PREFERRED_TARGET_TYPES.keys())},
-    **{t: 1.1 for t in list(UMLS_CORE_DISEASE_TYPES.keys())},
-    "T200": 0.7,  # Clinical Drug - too specific. avoid matching.
+    **{t: 1 for t in list(UMLS_NON_PHARMACOLOGIC_INTERVENTION_TYPES.keys())},
+    **{t: 1.02 for t in list(UMLS_COMPOUND_TYPES.keys())},
+    **{t: 1.02 for t in list(UMLS_BIOLOGIC_TYPES.keys())},
+    **{t: 1.02 for t in list(UMLS_MECHANISM_TYPES.keys())},
+    **{t: 1.02 for t in list(UMLS_LESS_PREFERRED_TARGET_TYPES.keys())},
+    **{t: 1.02 for t in list(UMLS_CORE_DISEASE_TYPES.keys())},
+    **{t: 1.05 for t in list(UMLS_PREFERRED_TARGET_TYPES.keys())},
+    "T200": 0.8,  # Clinical Drug - too specific. avoid matching.
 }
+
+KNOWN_UMLS_TYPES = list(CANDIDATE_TYPE_WEIGHT_MAP.keys())
 
 
 PREFERRED_ANCESTOR_TYPE_MAP: dict[str, dict[str, int]] = {

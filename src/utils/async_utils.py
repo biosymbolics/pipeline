@@ -1,8 +1,13 @@
 """
 Async utilities
 """
+
 import asyncio
-from typing import Callable, Coroutine, List
+from typing import (
+    Callable,
+    Coroutine,
+    List,
+)
 
 
 async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
@@ -22,3 +27,13 @@ async def execute_async(functions: List[Callable[[], Coroutine]]) -> None:
     """
     tasks = [asyncio.create_task(func()) for func in functions]
     await asyncio.gather(*tasks)
+
+
+async def gather_with_concurrency_limit(n: int, *coros):
+    semaphore = asyncio.Semaphore(n)
+
+    async def sem_coro(coro):
+        async with semaphore:
+            return await coro
+
+    return await asyncio.gather(*(sem_coro(c) for c in coros))
