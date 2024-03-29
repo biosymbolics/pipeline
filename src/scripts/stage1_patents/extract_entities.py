@@ -12,9 +12,9 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.umls import NER_ENTITY_TYPES
-from core.ner.classifier import classify_by_keywords
-from core.ner.types import DocEntities, DocEntity
-from core.ner import NerTagger
+from nlp.ner.classifier import classify_by_keywords
+from nlp.ner.types import DocEntities, DocEntity
+from nlp.ner import NerTagger
 from system import initialize
 from utils.classes import overrides
 
@@ -302,4 +302,4 @@ if __name__ == "__main__":
     starting_id = sys.argv[1] if len(sys.argv) > 1 else None
     enricher = PatentEnricher()
     # enricher = PatentClassifier() # only use if wanting to re-classify (comparatively fast)
-    asyncio.run(enricher(starting_id))  # WO-2023288343-A1
+    asyncio.run(enricher(starting_id))  # WO-2024006234-A1

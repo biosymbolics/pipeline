@@ -11,7 +11,7 @@ from constants.umls import (
     CANDIDATE_TYPE_WEIGHT_MAP,
     UMLS_WORD_OVERRIDES,
 )
-from core.ner.types import CanonicalEntity
+from nlp.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name, is_umls_suppressed
 from typings.documents.common import MentionCandidate
 from utils.re import get_or_re

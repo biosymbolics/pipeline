@@ -7,10 +7,10 @@ from typing import AsyncGenerator, Iterable, Sequence
 import logging
 
 
-from core.ner.cleaning import CleanFunction, EntityCleaner
-from core.ner.linker.linker import TermLinker
-from core.ner.spacy import get_transformer_nlp
-from core.ner.types import DocEntity
+from nlp.ner.cleaning import CleanFunction, EntityCleaner
+from nlp.ner.linker.linker import TermLinker
+from nlp.ner.spacy import get_transformer_nlp
+from nlp.ner.types import DocEntity
 from utils.list import batch
 
 from .linker.candidate_selector import CandidateSelectorType

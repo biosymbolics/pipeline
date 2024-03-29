@@ -2,7 +2,7 @@ import logging
 from typing import AsyncIterable, AsyncIterator, Iterable
 import torch
 
-from core.ner.types import CanonicalEntity, DocEntity
+from nlp.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 from typings.documents.common import MentionCandidate
 

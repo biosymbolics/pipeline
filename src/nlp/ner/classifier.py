@@ -8,7 +8,7 @@ from pydash import compact, flatten, uniq
 from typing import Mapping, TypeVar
 import logging
 
-from core.ner.utils import lemmatize_all
+from nlp.ner.utils import lemmatize_all
 from utils.re import expand_res
 from utils.string import generate_ngrams
 

@@ -22,10 +22,10 @@ from constants.company import (
     OWNER_TERM_NORMALIZATION_MAP,
     PLURAL_COMMON_OWNER_WORDS,
 )
-from core.ner.classifier import classify_string
-from core.ner.cleaning import RE_FLAGS
-from core.ner.constants import SOLO_CLUSTER_THRESHOLD
-from core.ner.clustering import cluster_terms
+from nlp.ner.classifier import classify_string
+from nlp.ner.cleaning import RE_FLAGS
+from nlp.ner.constants import SOLO_CLUSTER_THRESHOLD
+from nlp.ner.clustering import cluster_terms
 from typings.companies import CompanyInfo
 from utils.re import get_or_re, sub_extra_spaces
 

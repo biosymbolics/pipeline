@@ -3,12 +3,11 @@ from types import UnionType
 from typing import NamedTuple, Sequence, TypeGuard
 from pydash import flatten
 
-from data.prediction.constants import (
+from ..constants import (
     DEFAULT_OPTIMIZER_CLASS,
     DEFAULT_SAVE_FREQUENCY,
     DEFAULT_TRUE_THRESHOLD,
 )
-
 from ..types import AnyFieldLists, FieldLists, InputFieldLists, OutputFieldLists
 
 CHECKPOINT_PATH = "clindev_model_checkpoints"
@@ -111,9 +110,11 @@ def get_fields_to_types(
     vals = _field_lists.__dict__.items()
     vals = flatten(  # type: ignore
         [
-            [(v, _get_type(k))]
-            if isinstance(v, str)
-            else list(zip(v, [_get_type(k)] * len(v)))
+            (
+                [(v, _get_type(k))]
+                if isinstance(v, str)
+                else list(zip(v, [_get_type(k)] * len(v)))
+            )
             for k, v in vals
         ]
     )

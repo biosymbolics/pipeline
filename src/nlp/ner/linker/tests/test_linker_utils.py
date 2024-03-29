@@ -1,6 +1,6 @@
 import unittest
 
-from core.ner.linker.candidate_selector.utils import (
+from nlp.ner.linker.candidate_selector.utils import (
     apply_match_retry_rewrites,
     score_candidate,
 )

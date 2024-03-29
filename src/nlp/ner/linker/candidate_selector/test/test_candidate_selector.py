@@ -1,9 +1,9 @@
 import unittest
 import pytest
 
-from core.ner.linker.candidate_selector.types import CandidateSelectorType
-from core.ner.normalizer import TermNormalizer
-from core.ner.types import CanonicalEntity
+from nlp.ner.linker.candidate_selector.types import CandidateSelectorType
+from nlp.ner.normalizer import TermNormalizer
+from nlp.ner.types import CanonicalEntity
 
 COMMON_COMPOSITE_TEST_CASES = [
     {
@@ -217,8 +217,10 @@ class TestCompositeCandidateSelector(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.candidate_selector: CandidateSelectorType = "CompositeCandidateSelector"
 
-    def setUp(self):
-        self.normalizer = TermNormalizer(candidate_selector=self.candidate_selector)
+    async def setUp(self):
+        self.normalizer = await TermNormalizer.create(
+            candidate_selector=self.candidate_selector
+        )
 
     async def test_composite_candidate_selector(self):
         test_cases = [*COMMON_COMPOSITE_TEST_CASES, *NON_SEMANTIC_COMPOSITE_TEST_CASES]
@@ -228,8 +230,8 @@ class TestCompositeCandidateSelector(unittest.TestCase):
         for test in test_cases:
             text = test["text"]
 
-            result = (await self.normalizer.normalize_strings(text))[0]
-            print("RESULT", result)
+            results = [r async for r in self.normalizer.normalize_strings(text)]
+            result = results[0]
 
             if result is None or result.canonical_entity is None:
                 self.assertEqual(None, test["expected"][0])
@@ -254,8 +256,10 @@ class TestCompositeSemanticCandidateSelector(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.candidate_selector: CandidateSelectorType = "CompositeCandidateSelector"
 
-    def setUp(self):
-        self.normalizer = TermNormalizer(candidate_selector=self.candidate_selector)
+    async def setUp(self):
+        self.normalizer = await TermNormalizer.create(
+            candidate_selector=self.candidate_selector
+        )
 
     async def test_composite_candidate_semantic_selector(self):
         test_cases = [*COMMON_COMPOSITE_TEST_CASES, *SEMANTIC_COMPOSITE_TEST_CASES]
@@ -264,7 +268,8 @@ class TestCompositeSemanticCandidateSelector(unittest.TestCase):
 
         for test in test_cases:
             text = test["text"]
-            result = (await self.normalizer.normalize_strings(text))[0]
+            results = [r async for r in self.normalizer.normalize_strings(text)]
+            result = results[0]
 
             print("Actual", result)
             print("Expected", test["expected"][0])

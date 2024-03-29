@@ -104,11 +104,6 @@ class ModelTrainer:
             input_dict (AllInput): Dictionary of input tensors
             start_epoch (int, optional): Epoch to start training from. Defaults to 0.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 20.
-
-            INFO:root:Precision: 0.5244319242114079
-            INFO:root:Recall: 0.805007245007245
-            INFO:root:F1 score: 0.6351121710238089
-            INFO:root:Saved checkpoint checkpoint_95.pt
         """
         num_batches = input_dict["x1"].size(0)
 

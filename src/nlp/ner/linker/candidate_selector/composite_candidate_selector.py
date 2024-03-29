@@ -4,7 +4,7 @@ import logging
 from spacy.tokens import Doc, Span, Token
 import torch
 
-from core.ner.types import CanonicalEntity, DocEntity
+from nlp.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
 from utils.tensor import combine_tensors, truncated_svd

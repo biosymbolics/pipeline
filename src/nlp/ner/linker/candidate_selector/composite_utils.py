@@ -3,7 +3,7 @@ from pydash import flatten, uniq_by
 
 from constants.patterns.iupac import is_iupac
 from constants.umls import MOST_PREFERRED_UMLS_TYPES
-from core.ner.types import CanonicalEntity
+from nlp.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import clean_umls_name
 from utils.list import has_intersection
 

@@ -32,8 +32,8 @@ from constants.patterns.intervention import (
     RESEARCH_TOOLS_RES,
     ROA_RE,
 )
-from core.ner.cleaning import EntityCleaner
-from core.ner.spacy import Spacy
+from nlp.ner.cleaning import EntityCleaner
+from nlp.ner.spacy import Spacy
 from data.domain.biomedical import (
     expand_term,
     expand_parens_term,

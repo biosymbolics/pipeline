@@ -10,9 +10,9 @@ import logging
 import html
 from spacy.tokens import Span, Doc
 
-from core.ner.cleaning import CleanFunction, remove_parentheticals
-from core.ner.normalizer import TermNormalizer
-from core.ner.spacy import Spacy
+from nlp.ner.cleaning import CleanFunction, remove_parentheticals
+from nlp.ner.normalizer import TermNormalizer
+from nlp.ner.spacy import Spacy
 from utils.args import make_hashable
 from utils.model import get_model_path
 from utils.re import sub_extra_spaces
