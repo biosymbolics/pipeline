@@ -1,6 +1,6 @@
 from prisma.enums import DropoutReason, TerminationReason
 
-from nlp.ner.classifier import create_lookup_map
+from nlp.classifier import create_lookup_map
 
 
 TERMINATION_KEYWORD_MAP = create_lookup_map(
@@ -73,12 +73,12 @@ TERMINATION_KEYWORD_MAP = create_lookup_map(
         TerminationReason.NOT_SAFETY: [
             "not a safety issue",
             "not related to safety",
-            "No Safety or Efficacy Concerns",
+            "no safety or efficacy concerns",
             "no safety concern",
         ],
         TerminationReason.NOT_FUTILITY: [
             "not related to efficacy",
-            "No Safety or Efficacy Concerns",
+            "no safety or efficacy concerns",
         ],
         TerminationReason.LOGISTICS: ["logistics", "logistical"],
     }
@@ -109,7 +109,7 @@ DROPOUT_REASON_KEYWORD_MAP = create_lookup_map(
         DropoutReason.DEATH: [
             "death",
         ],
-        DropoutReason.INELIGABLE: [
+        DropoutReason.INELIGIBLE: [
             "ineligible",
             "not treated",  # ??
             "screen failure",

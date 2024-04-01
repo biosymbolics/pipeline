@@ -29,13 +29,12 @@ from data.domain.biomedical import (
     REMOVAL_WORDS_POST as REMOVAL_WORDS,
 )
 from data.etl.types import BiomedicalEntityLoadSpec
-from data.domain.trials import extract_max_timeframe
 from typings import DocType
 from utils.classes import overrides
 from utils.re import get_or_re
 
 from .constants import CONTROL_TERMS
-from .enums import (
+from .parsers import (
     ComparisonTypeParser,
     DropoutReasonParser,
     HypothesisTypeParser,
@@ -50,6 +49,7 @@ from .enums import (
     TrialStatusParser,
     calc_duration,
 )
+from .parsers import extract_max_timeframe
 
 from ..base_document_etl import BaseDocumentEtl
 

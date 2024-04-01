@@ -5,7 +5,7 @@ import torch
 import logging
 
 from clients.low_level.prisma import prisma_client
-from nlp.vector.vectorizer import Vectorizer
+from nlp.vectorizing.vectorizer import Vectorizer
 from typings.documents.common import MentionCandidate
 from utils.async_utils import gather_with_concurrency_limit
 

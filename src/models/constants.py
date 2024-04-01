@@ -1,4 +1,3 @@
-# model defaults
 import torch
 
 

@@ -6,7 +6,7 @@ from prisma.types import (
 )
 
 from nlp.ner.cleaning import CleanFunction
-from nlp.ner.linker.candidate_selector import CandidateSelectorType
+from nlp.nel import CandidateSelectorType
 from nlp.ner.types import CanonicalEntity
 from typings.core import Dataclass
 from utils.list import uniq_compact

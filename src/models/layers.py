@@ -1,6 +1,7 @@
 """
-Loss functions for patent_pos model.
+Shared Layers
 """
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -10,7 +11,7 @@ class FocalLoss(nn.Module):
     """
     Focal loss is designed to address classification imbalance by down-weighting inliers
     (easy examples) such that their contribution to the total loss is small even if their
-    number is large. (from GPT4)
+    number is large. (Created with GPT4's help)
 
     OG paper: https://arxiv.org/pdf/1708.02002.pdf
     """

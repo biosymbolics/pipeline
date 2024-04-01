@@ -12,9 +12,9 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.umls import NER_ENTITY_TYPES
-from nlp.ner.classifier import classify_by_keywords
+from nlp.classifier import classify_by_keywords
 from nlp.ner.types import DocEntities, DocEntity
-from nlp.ner import NerTagger
+from nlp.ner import Ner
 from system import initialize
 from utils.classes import overrides
 
@@ -256,7 +256,7 @@ class PatentEnricher(BaseEnricher):
 
         batch_size = 100
         super().__init__(ENRICH_PROCESSED_PUBS_FILE, batch_size)
-        self.tagger = NerTagger.get_instance(
+        self.tagger = Ner.get_instance(
             entity_types=NER_ENTITY_TYPES, link=False, normalize=False, rule_sets=[]
         )
 

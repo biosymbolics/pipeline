@@ -6,9 +6,9 @@ import logging
 from typing import Iterable, Sequence
 
 
-from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
+from nlp.ner.types import CanonicalEntity, DocEntity
 
-from ..types import CanonicalEntity, DocEntity
+from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 
 
 logger = logging.getLogger(__name__)

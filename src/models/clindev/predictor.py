@@ -15,8 +15,6 @@ import system
 
 system.initialize()
 
-from data.prediction.clindev.types import PatentTrialPrediction
-from data.prediction.utils import ModelInput, decode_output
 from utils.encoding.json_encoder import DataclassJSONEncoder
 
 from .constants import (
@@ -29,11 +27,14 @@ from .constants import (
     output_field_lists,
 )
 from .model import ClindevPredictionModel
+from .types import PatentTrialPrediction
 from .utils import (
     get_batch,
     prepare_input_data,
     preprocess_inputs,
 )
+
+from ..utils import ModelInput, decode_output
 
 
 logger = logging.getLogger(__name__)

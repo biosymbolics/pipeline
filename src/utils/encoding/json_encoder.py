@@ -13,6 +13,8 @@ class DataclassJSONEncoder(json.JSONEncoder):
     - casts dataclasses to dicts
     - casts dates to isoformat
     - casts enums to str
+
+    TODO: move everything to pydantic
     """
 
     def default(self, o):

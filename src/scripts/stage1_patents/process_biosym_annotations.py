@@ -17,7 +17,6 @@ from constants.core import (
     SOURCE_BIOSYM_ANNOTATIONS_TABLE as SOURCE_TABLE,
     WORKING_BIOSYM_ANNOTATIONS_TABLE as WORKING_TABLE,
 )
-from constants.patterns.device import DEVICE_RES
 from constants.patterns.intervention import (
     BEHAVIOR_RES,
     BIOLOGIC_BASE_TERMS,
@@ -287,7 +286,6 @@ async def normalize_domains():
     compounds_re = rf".*\y{get_or_re(COMPOUND_BASE_TERMS)}.*"
     biologics_re = rf".*\y{get_or_re(BIOLOGIC_BASE_TERMS)}.*"  # TODO: break into intervention vs general biological thing
     mechanism_re = rf".*\y{get_or_re(MECHANISM_BASE_TERMS)}.*"
-    device_re = get_or_re(DEVICE_RES)
     procedure_re = get_or_re(PROCEDURE_RES)
     diagnostic_re = get_or_re(DIAGNOSTIC_RES)
     research_re = get_or_re(RESEARCH_TOOLS_RES)
@@ -305,7 +303,6 @@ async def normalize_domains():
         f"update {WORKING_TABLE} set domain='behavioral_interventions' where domain<>'behavioral_interventions' AND term ~* '^{behavioral_re}$'",
         f"update {WORKING_TABLE} set domain='dosage_forms' where domain<>'dosage_forms' AND term ~* '^{DOSAGE_FORM_RE}$'",
         f"update {WORKING_TABLE} set domain='roas' where domain<>'roas' AND term ~* '^{ROA_RE}$'",
-        f"update {WORKING_TABLE} set domain='devices' where domain<>'devices' AND term ~* '^{device_re}$'",
         f"update {WORKING_TABLE} set domain='diagnostics' where domain<>'diagnostics' AND term ~* '^{diagnostic_re}$'",
         f"update {WORKING_TABLE} set domain='diseases' where term ~* '.* (?:disease|disorder|syndrome|dysfunction|degenerat(?:ion|ive))s?$' and domain<>'diseases' and not term ~* '(?:compounds?|compositions?|reagent|anti|agent|immuni[zs]ing|drug for|imag|treat)'",
         f"delete from {WORKING_TABLE} ba using applications a where a.publication_number=ba.publication_number and array_to_string(ipc_codes, ',') ~* '.*C01.*' and domain='diseases' and not term ~* '(?:cancer|disease|disorder|syndrome|pain|gingivitis|poison|struvite|carcinoma|irritation|sepsis|deficiency|psoriasis|streptococcus|bleed)'",

@@ -337,8 +337,8 @@ model Umls {
     type_names          String[]
     vector              Unsupported("vector(768)")?
 
-    @@map("umls")
     @@index([is_eligible], name: "umls_is_eligible")
+    @@map("umls")
 }
 
 model UmlsSynonym {
@@ -559,7 +559,7 @@ enum DropoutReason {
     COMPLIANCE
     DEATH
     EFFICACY
-    INELIGABLE
+    INELIGIBLE
     INVESTIGATOR
     LOGISTICS
     LOST_TO_FOLLOWUP

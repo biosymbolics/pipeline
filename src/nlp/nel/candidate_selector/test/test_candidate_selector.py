@@ -1,7 +1,7 @@
 import unittest
 import pytest
 
-from nlp.ner.linker.candidate_selector.types import CandidateSelectorType
+from nlp.nel.candidate_selector.types import CandidateSelectorType
 from nlp.ner.normalizer import TermNormalizer
 from nlp.ner.types import CanonicalEntity
 

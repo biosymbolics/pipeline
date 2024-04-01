@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class Topics:
+class TopicModeler:
     @staticmethod
     async def generate_descriptions(
         topic_features: pl.DataFrame,
@@ -103,7 +103,7 @@ class Topics:
         return topic_name_map, topic_description_map
 
     @staticmethod
-    async def model_topics(
+    async def fit_transform(
         vectorized_docs: Sequence[Sequence[float]],
         documents: Sequence[str],
         existing_labels: Sequence[str] = [],
@@ -151,7 +151,7 @@ class Topics:
             )
         ).filter(pl.col("cluster_id") != -1)
 
-        name_map, description_map = await Topics.generate_descriptions(
+        name_map, description_map = await TopicModeler.generate_descriptions(
             df,
             context_strings=context_strings,
             existing_labels=existing_labels,

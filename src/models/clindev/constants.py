@@ -87,7 +87,7 @@ output_field_lists = OutputFieldLists(
 )
 
 
-def _get_type(field_type: str) -> type | UnionType:
+def _get_type(field_type: str) -> UnionType:
     if field_type == "single_select":
         return str | int | float | Enum
     if field_type == "multi_select":
@@ -98,7 +98,7 @@ def _get_type(field_type: str) -> type | UnionType:
         return int | float
     # TODO: hard-coded
     if field_type == "y1_categorical":
-        return str
+        return str | str
     if field_type == "y2":
         return int | float
     raise ValueError(f"Invalid field_type: {field_type}")
@@ -143,14 +143,3 @@ def is_output_records(
     return len(records) > 0 and all(
         is_output_record(record) for record in records[0:10]
     )
-
-
-# INFO:__main__:Evaluation Stage1 design accuracy: 0.7
-# INFO:__main__:Evaluation Stage1 blinding accuracy: 0.65
-# INFO:__main__:Evaluation Stage1 randomization accuracy: 0.72
-# INFO:__main__:Evaluation Stage1 comparison_type accuracy: 0.44
-# INFO:__main__:Evaluation Stage1 enrollment accuracy: 0.59
-# INFO:__main__:Evaluation Stage2 accuracy: 0.91
-# INFO:__main__:Evaluation Stage2 precision: 0.41
-# INFO:__main__:Evaluation Stage2 recall: 0.05
-# INFO:__main__:Evaluation Stage2 mae: 1.18

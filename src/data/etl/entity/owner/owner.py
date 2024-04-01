@@ -23,7 +23,11 @@ from typings.prisma import OwnerCreateWithSynonymsInput
 from utils.classes import overrides
 
 from .constants import OwnerTypePriorityMap
-from .transform import generate_clean_owner_map, OwnerTypeParser, transform_financials
+from .transform_owner import (
+    generate_clean_owner_map,
+    OwnerTypeParser,
+    transform_financials,
+)
 
 
 logger = logging.getLogger(__name__)

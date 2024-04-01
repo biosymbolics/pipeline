@@ -46,6 +46,10 @@ class Vectorizer:
         return [torch.tensor(t) for t in tensors]
 
     def empty_cache(self):
+        """
+        Consider calling periodically to free up memory
+        (doesn't seem like this should be necessary... possibly a MPS-specific bug?)
+        """
         self.embedding_model = None
         gc.collect()
         torch.mps.empty_cache()

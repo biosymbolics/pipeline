@@ -21,17 +21,9 @@ from prisma.enums import (
     TrialStatus,
 )
 
-import system
 
-
-system.initialize()
-
-from data.prediction.utils import (
-    ModelInputAndOutput,
-    decode_output,
-    split_train_and_test,
-)
 from clients.documents.trials import trials_client as trial_client
+import system
 from typings.client import DEFAULT_TRIAL_INCLUDE
 from typings.documents.trials import ScoredTrial
 from utils.list import batch
@@ -59,7 +51,16 @@ from .utils import (
     split_categories,
 )
 
+
 from ..types import AllCategorySizes, ModelInput
+from ..utils import (
+    ModelInputAndOutput,
+    decode_output,
+    split_train_and_test,
+)
+
+
+system.initialize()
 
 
 class MetricWrapper(NamedTuple):

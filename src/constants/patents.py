@@ -1,6 +1,5 @@
 from pydash import flatten
 
-from constants.patterns.device import HIGH_LIKELIHOOD_DEVICES
 from constants.patterns.intervention import ALL_INTERVENTION_BASE_TERMS
 from typings.documents.patents import SuitabilityScoreMap
 
@@ -28,9 +27,7 @@ def get_patent_attribute_map():
             "receptor",
             "therapeutic",  # TODO: will probably over-match
         ],
-        "DEVICE": [
-            *HIGH_LIKELIHOOD_DEVICES,
-        ],
+        "DEVICE": ["device"],
         "DIAGNOSTIC": [
             "analysis",
             "analyte",

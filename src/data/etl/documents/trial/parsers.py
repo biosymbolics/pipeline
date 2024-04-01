@@ -17,8 +17,9 @@ from prisma.enums import (
     TrialRandomization,
     TrialStatus,
 )
+from pydash import compact, flatten
 
-from nlp.ner.classifier import classify_string
+from nlp.classifier import classify_string
 from data.domain.biomedical.trials import (
     DROPOUT_REASON_KEYWORD_MAP,
     TERMINATION_KEYWORD_MAP,
@@ -28,6 +29,8 @@ from typings.documents.trials import TrialStatusGroup
 from utils.classes import ByDefinitionOrderEnum
 from utils.list import has_intersection
 from utils.re import get_or_re
+
+from .constants import DIGIT_MAP, DOSE_TERMS, TIME_IN_DAYS, TIME_UNITS
 
 
 logger = logging.getLogger(__name__)
@@ -70,22 +73,6 @@ class TrialRecord(BaseTrial):
     purpose: str
     randomization: str
     status: str
-
-
-DOSE_TERMS = [
-    "dose",
-    "doses",
-    "dosing",
-    "dosage",
-    "dosages",
-    "mad",
-    "sad",
-    "pharmacokinetic",
-    "pharmacokinetics",
-    "pharmacodynamics",
-    "titration",
-    "titrating",
-]
 
 
 class TrialDesignParser:
@@ -479,3 +466,76 @@ def calc_duration(start_date: datetime | None, end_date: datetime | None) -> int
         return (datetime.today().date() - start_date.date()).days
 
     return (end_date - start_date).days
+
+
+def extract_timeframe(timeframe_desc: str | None) -> int | None:
+    """
+    Extract outcome durations in days
+    """
+    unit_re = get_or_re(flatten(TIME_UNITS.values()))
+    number_re = rf"(?:(?:[0-9]+|[0-9]+\.[0-9]+|[0-9]+,[0-9]+)|{get_or_re(list(DIGIT_MAP.keys()))})"
+    number_units_re = rf"{number_re}+[ -]?{unit_re}"
+    time_joiners = "(?:[-, ±]+| to | and )"
+    units_digit_re = rf"\b{unit_re}[ -]?{number_re}+(?:{time_joiners}+{number_re}+)*"
+    timeframe_re = rf"(?:{number_units_re}|{units_digit_re}|{number_re})"
+
+    if timeframe_desc is None:
+        return None
+
+    timeframe_candidates = re.findall(
+        timeframe_re, timeframe_desc, re.IGNORECASE | re.MULTILINE
+    )
+
+    def get_unit(time_desc: str) -> str | None:
+        units = [
+            k
+            for k, v in TIME_UNITS.items()
+            if re.search(rf"\b{get_or_re(v)}\b", time_desc, re.IGNORECASE) is not None
+        ]
+        if len(units) == 0:
+            return None
+
+        if len(units) > 1:
+            raise ValueError(f"Multiple units found: {units}")
+
+        return units[0]
+
+    def get_number(d: str) -> int | None:
+        if d in DIGIT_MAP:
+            return DIGIT_MAP[d]
+
+        try:
+            return int(d)
+        except ValueError:
+            return None
+
+    def calc_time(time_desc: str) -> int | None:
+        number_strs = re.findall(number_re, time_desc, re.IGNORECASE)
+        unit = get_unit(re.sub(get_or_re(number_strs), "", time_desc))
+
+        if unit is None:
+            return None
+
+        numbers = compact([get_number(num_str.lower()) for num_str in number_strs])
+        v = [int(n) * TIME_IN_DAYS[unit] for n in numbers]
+        if len(v) == 0:
+            return None
+        return round(max(v))
+
+    times = compact([calc_time(candidate) for candidate in timeframe_candidates])
+
+    max_timeframe = max(times) if len(times) > 0 else None
+    return max_timeframe
+
+
+def extract_max_timeframe(timeframe_descs: list[str]) -> int | None:
+    """
+    Returns the largest timeframe in days
+    """
+    times = compact(
+        [
+            extract_timeframe(timeframe_desc)
+            for timeframe_desc in compact(timeframe_descs or [])
+        ]
+    )
+    return max(times) if len(times) > 0 else None

@@ -362,7 +362,7 @@ def __rearrange_adp(
         yield __rearrange(doc)
 
 
-def __normalize_by_pos(doc: Doc) -> str:
+def _normalize_by_pos(doc: Doc) -> str:
     """
     Normalizes a spacy doc by removing tokens based on their POS
     """
@@ -468,7 +468,7 @@ def normalize_by_pos(terms: Sequence[str]) -> Iterable[str]:
             yield doc.text  # if iupac format, don't touch its parens
             continue
 
-        yield __normalize_by_pos(doc)
+        yield _normalize_by_pos(doc)
 
 
 def spans_to_doc_entities(spans: Iterable[Span]) -> list[DocEntity]:

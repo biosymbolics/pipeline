@@ -2,6 +2,7 @@
 Terms for interventions, used in the biosym_annotations cleanup.
 TODO: combine with biologics.py / moa.py / etc.
 """
+
 from pydash import flatten
 from constants.patterns.biologics import BIOLOGIC_BASE_TERMS
 from constants.patterns.iupac import IUPAC_STRINGS

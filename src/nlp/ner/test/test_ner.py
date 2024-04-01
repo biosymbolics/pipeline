@@ -1,7 +1,7 @@
 import unittest
 import pytest
 
-from nlp.ner import NerTagger
+from nlp.ner import Ner
 from data.etl.documents.patent.load_patents import INTERVENTION_DOMAINS
 
 
@@ -20,13 +20,13 @@ from data.etl.documents.patent.load_patents import INTERVENTION_DOMAINS
 @pytest.mark.skip(reason="Too stocastic to include in CI")
 class TestNerUtils(unittest.TestCase):
     """
-    from core.ner import NerTagger; tagger=NerTagger()
+    from core.ner import Ner; tagger=Ner()
     t = tagger.extract([text])[0]
     [(t1[0], t1.start_char, t1.end_char) for t1 in t]
     """
 
     async def setUp(self):
-        self.tagger = await NerTagger.create(
+        self.tagger = await Ner.create(
             entity_types=frozenset([*INTERVENTION_DOMAINS, "diseases"]),
             link=False,
             rule_sets=[],
@@ -351,7 +351,7 @@ class TestNerUtils(unittest.TestCase):
                 ],
             },
             {
-                # TODO: if NerTagger didn't add a space to the beginning, binder wouldn't find it.
+                # TODO: if Ner didn't add a space to the beginning, binder wouldn't find it.
                 "text": "Smg-1-binding protein and method of screening substance controlling its activity",
                 "expected_output": ["smg1 binder protein", "method", "activity"],
             },
