@@ -1,6 +1,6 @@
 import unittest
 
-from data.domain.trials import extract_timeframe
+from data.etl.documents.trial.parsers import extract_timeframe
 
 
 class TestTrialUtils(unittest.TestCase):
