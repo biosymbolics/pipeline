@@ -21,6 +21,10 @@ T = TypeVar("T", bound="SaveableModel")
 
 
 class SaveableModel(nn.Module):
+    """
+    General saveable torch model
+    """
+
     key: str | None = None
     device = DEFAULT_DEVICE  # TODO can this be overwritten?
     checkpoint_path = DEFAULT_CHECKPOINT_PATH

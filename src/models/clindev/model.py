@@ -47,6 +47,10 @@ class OutputCorrelation(nn.Module):
 
 
 class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
+    """
+    Output layer for correlation
+    """
+
     key = "correlation_decoders"
     device = DEVICE
     checkpoint_path = CHECKPOINT_PATH
@@ -68,6 +72,10 @@ class OutputCorrelationDecoders(SaveableModel, nn.ModuleDict):
 
 
 class Stage1Output(SaveableModel, nn.ModuleDict):
+    """
+    Stage 1 output model
+    """
+
     key = "stage1_output"
     device = DEVICE
     checkpoint_path = CHECKPOINT_PATH
@@ -90,6 +98,10 @@ class Stage1Output(SaveableModel, nn.ModuleDict):
 
 
 class InputModel(SaveableModel):
+    """
+    Model for input data
+    """
+
     key = "input"
     device = DEVICE
     checkpoint_path = CHECKPOINT_PATH
@@ -134,7 +146,6 @@ class InputModel(SaveableModel):
                 sizes.quantitative_input, sizes.quantitative_input
             )
             self.text = nn.Linear(sizes.text_input, sizes.text_output)
-
             self.to(self.device)
 
     def forward(
@@ -173,6 +184,10 @@ class InputModel(SaveableModel):
 
 
 class Stage1Model(SaveableModel):
+    """
+    Stage 1 model
+    """
+
     key = "stage1"
     device = DEVICE
     checkpoint_path = CHECKPOINT_PATH
@@ -209,6 +224,10 @@ class Stage1Model(SaveableModel):
 
 
 class Stage2Model(SaveableModel):
+    """
+    Stage 2 model
+    """
+
     key = "stage2"
     device = DEVICE
     checkpoint_path = CHECKPOINT_PATH
@@ -249,11 +268,6 @@ class Stage2Model(SaveableModel):
 class ClinDevModel(nn.Module):
     """
     Predicts characteristics of a clinical trial
-
-    TODO:
-    - enrich interventions with MoA (but may bias - those that have MoA mappings are those that are more likely to have been successful)
-    - biobert for tokenization of conditions and interventions (tokens have meaning e.g. in biologic names)
-    - constrastive learning for stage 1
     """
 
     def __init__(
@@ -332,13 +346,6 @@ class ClinDevModel(nn.Module):
     def forward(
         self, input: SplitModelInput
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[torch.Tensor]]:
-        """
-        Note to self: if not training, first check if weights are updating
-        print(list(self.stage2_model.modules())[0].layer3[0].weight)
-        print(self.stage1_model[0].weight)
-        print(list(self.multi_select_embeddings.values())[0].weight[0:10])
-
-        """
         x = self.input_model(input)
         y1_pred = self.stage1_model(x)
         y1_probs, y1_probs_list = self.stage1_output_model(y1_pred)

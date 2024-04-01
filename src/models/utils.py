@@ -18,22 +18,7 @@ from pydash import is_list
 import torch
 import torch.nn.functional as F
 
-from data.prediction.clindev.constants import (
-    AnyRecord,
-    InputAndOutputRecord,
-    InputRecord,
-    OutputRecord,
-    is_output_records,
-)
-from data.prediction.types import (
-    AllCategorySizes,
-    CategorySizes,
-    InputCategorySizes,
-    ModelInput,
-    ModelInputAndOutput,
-    ModelOutput,
-    OutputCategorySizes,
-)
+
 from typings.core import Dataclass, Primitive
 from typings.documents.trials import ScoredTrial
 from utils.encoding.quant_encoder import BinEncoder
@@ -42,7 +27,26 @@ from utils.encoding.text_encoder import WORD_VECTOR_LENGTH, TextEncoder
 from utils.list import batch
 from utils.tensor import batch_as_tensors, array_to_tensor
 
-from .types import FieldLists, InputFieldLists, OutputFieldLists, is_all_fields_list
+from .clindev.constants import (
+    AnyRecord,
+    InputAndOutputRecord,
+    InputRecord,
+    OutputRecord,
+    is_output_records,
+)
+from .types import (
+    AllCategorySizes,
+    CategorySizes,
+    FieldLists,
+    InputFieldLists,
+    OutputFieldLists,
+    is_all_fields_list,
+    InputCategorySizes,
+    ModelInput,
+    ModelInputAndOutput,
+    ModelOutput,
+    OutputCategorySizes,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -361,9 +365,11 @@ def encode_features(
     }
 
     encoded = {
-        t: Encode(records, getattr(field_lists, t))
-        if len(getattr(field_lists, t)) > 0
-        else torch.Tensor()
+        t: (
+            Encode(records, getattr(field_lists, t))
+            if len(getattr(field_lists, t)) > 0
+            else torch.Tensor()
+        )
         for t, Encode in field_types.items()
     }
 
