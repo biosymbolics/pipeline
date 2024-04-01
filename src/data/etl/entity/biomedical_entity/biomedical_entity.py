@@ -19,7 +19,7 @@ from spacy.lang.en import stop_words
 
 from clients.low_level.prisma import batch_update, prisma_client, prisma_context
 from constants.umls import UMLS_COMMON_BASES
-from nlp.ner.linker.candidate_selector import CandidateSelectorType
+from nlp.nel.candidate_selector import CandidateSelectorType
 from nlp.ner.normalizer import TermNormalizer
 from nlp.ner.types import CanonicalEntity
 from data.domain.biomedical.umls import tuis_to_entity_type

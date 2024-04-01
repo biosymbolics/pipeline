@@ -12,7 +12,7 @@ from clients.low_level.postgres import PsqlDatabaseClient
 from constants.core import SOURCE_BIOSYM_ANNOTATIONS_TABLE
 from constants.patents import ATTRIBUTE_FIELD, get_patent_attribute_map
 from constants.umls import NER_ENTITY_TYPES
-from nlp.ner.classifier import classify_by_keywords
+from nlp.classifier import classify_by_keywords
 from nlp.ner.types import DocEntities, DocEntity
 from nlp.ner import NerTagger
 from system import initialize

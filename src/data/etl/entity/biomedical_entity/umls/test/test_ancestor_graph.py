@@ -20,10 +20,6 @@ LEVEL_INSTANCE_THRESHOLD = 25
 LEVEL_OVERRIDE_DELTA = 500
 LEVEL_MIN_DELTA = 25
 
-# if we ever want an auto-test for UMLS, use this example.
-# g.get_count("C1333196") should be approx sum(list([g.get_count(id) or 0 for id in list(g.G.successors("C1333196"))]))
-# = approx 19228
-
 
 class MockAncestorUmlsGraph(AncestorUmlsGraph):
     @overrides(AncestorUmlsGraph)

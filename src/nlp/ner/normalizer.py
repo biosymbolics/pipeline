@@ -8,12 +8,12 @@ import logging
 
 
 from nlp.ner.cleaning import CleanFunction, EntityCleaner
-from nlp.ner.linker.linker import TermLinker
+from nlp.nel import TermLinker
+from nlp.nel.candidate_selector import CandidateSelectorType
 from nlp.ner.spacy import get_transformer_nlp
 from nlp.ner.types import DocEntity
 from utils.list import batch
 
-from .linker.candidate_selector import CandidateSelectorType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -21,7 +21,7 @@ logger.setLevel(logging.INFO)
 
 class TermNormalizer:
     """
-    Normalizes and attempts to link entities.
+    Normalizes and attempts to link to canonical entity
     If no canonical entity found, then normalized term is returned.
     """
 
@@ -62,8 +62,10 @@ class TermNormalizer:
     async def normalize(self, doc_entities: Sequence[DocEntity]) -> Iterable[DocEntity]:
         """
         Normalize and link terms to canonical entities
+
+        Args:
+            doc_entities (Sequence[DocEntity]): list of terms to normalize
         """
-        # removed_suppressed must be false to properly index against original terms
         cleaned_entities = self.cleaner.clean(doc_entities, remove_suppressed=False)
 
         if self.link:
@@ -83,6 +85,7 @@ class TermNormalizer:
         Args:
             terms (Sequence[str]): list of terms to normalize
             vectors (Sequence[list[float]]): list of vectors for each term - optional.
+            batch_size (int): batch size for processing terms
         """
         start = time.monotonic()
         logger.info("Normalizing %s terms", len(terms))

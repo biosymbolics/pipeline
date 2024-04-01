@@ -9,7 +9,7 @@ from pydash import compact, flatten, uniq
 
 
 from clients.low_level.postgres import PsqlDatabaseClient
-from nlp.vector import Vectorizer
+from nlp.vectorizing import Vectorizer
 from data.etl.base_etl import BaseEtl
 from typings.core import is_list_string_list, is_string_list
 from utils.tensor import l1_regularize, tensor_mean

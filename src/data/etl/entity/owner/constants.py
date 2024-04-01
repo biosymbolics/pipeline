@@ -10,7 +10,7 @@ from constants.company import (
     LARGE_PHARMA_KEYWORDS,
     COMMON_NON_PROFIT_WORDS,
 )
-from nlp.ner.classifier import create_lookup_map
+from nlp.classifier import create_lookup_map
 
 
 OwnerTypePriorityMap = {

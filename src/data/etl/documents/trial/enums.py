@@ -18,7 +18,7 @@ from prisma.enums import (
     TrialStatus,
 )
 
-from nlp.ner.classifier import classify_string
+from nlp.classifier import classify_string
 from data.domain.biomedical.trials import (
     DROPOUT_REASON_KEYWORD_MAP,
     TERMINATION_KEYWORD_MAP,

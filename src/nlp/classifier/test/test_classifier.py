@@ -1,7 +1,7 @@
 import unittest
 from prisma.enums import TerminationReason
 
-from nlp.ner.classifier import classify_by_keywords, classify_string
+from nlp.classifier import classify_by_keywords, classify_string
 from constants.patents import get_patent_attribute_map
 from data.domain.biomedical.trials import TERMINATION_KEYWORD_MAP
 
@@ -52,7 +52,7 @@ class TestClassifier(unittest.TestCase):
                     "Sensor devices and systems for monitoring markers in breath. The disclosure relates to devices, systems and methods for detecting markers in breath, more specifically volatile and non-volatile markers associated with pulmonary diseases such as, for example, asthma, chronic obstructive pulmonary disease (COPD), or cystic fibrosis (CF), in exhaled breath condensate (EBC)."
                 ],
                 "attribute_map": PATENT_ATTRIBUTE_MAP,
-                "expected_output": [["DIAGNOSTIC", "PROCESS"]],  # "DEVICE"
+                "expected_output": [["DEVICE", "DIAGNOSTIC", "PROCESS"]],
             },
             {
                 "docs": [

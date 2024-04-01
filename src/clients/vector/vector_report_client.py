@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from clients.low_level.boto3 import retrieve_with_cache_check, storage_decoder
 from clients.low_level.prisma import prisma_context
 from clients.llm.llm_client import GptApiClient
-from nlp.vector import Vectorizer
+from nlp.vectorizing import Vectorizer
 from typings.client import VectorSearchParams
 from typings.documents.common import DOC_TYPE_DATE_MAP, DOC_TYPE_DEDUP_ID_MAP, DocType
 from utils.string import get_id
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 RECENCY_DECAY_FACTOR = 2
+MIN_SIMILARITY = 0.6
 
 ResultSchema = TypeVar("ResultSchema", bound=BaseModel)
 
@@ -39,42 +40,6 @@ class VectorReportClient:
         self.gpt_client = GptApiClient()
         self.recency_decay_factor = recency_decay_factor
         self.vectorizer = Vectorizer.get_instance()
-
-    def _calc_min_similarity(
-        self, similarities: Sequence[float], alpha: float
-    ) -> float:
-        """
-        Get the default min similarity score
-        min=avg(sim) * (1 / (1 + exp(-α * (σ(sim) - 1))))
-
-        Args:
-            similarities (Sequence[float]): similarity scores
-            alpha (float): alpha for the calculation
-
-        Returns:
-            min similarity score (float)
-        """
-        # if len(similarities) == 0:
-        #     return 0
-
-        # mean = sum(similarities) / len(similarities)
-        # stddev = (
-        #     sum((score - mean) ** 2 for score in similarities) / len(similarities)
-        # ) ** 0.5
-
-        # # if stddev is small, return everything. if stddev is large, return above the mean
-        # sigmoid = 1 / (1 + math.exp(-alpha * (stddev - 1)))
-        # threshold = mean * sigmoid
-
-        # logger.info(
-        #     "Similarity breakdown: mean=%s, stddev=%s, thres=%s (%s)",
-        #     mean,
-        #     stddev,
-        #     threshold,
-        #     similarities,
-        # )
-
-        return 0.6
 
     async def get_top_doc_ids(
         self,
@@ -122,19 +87,18 @@ class VectorReportClient:
                 for record in records
                 if record["similarity"] is not None  # not sure why it returns null
             ]
-            min_similiarity = self._calc_min_similarity(scores, search_params.alpha)
 
             above_threshold_ids = [
                 record["id"]
                 for record in records
-                if (record["similarity"] or 0) >= min_similiarity
+                if (record["similarity"] or 0) >= MIN_SIMILARITY
             ]
 
             logger.info(
                 "Returning %s (of %s) ids above similarity threshold %s",
                 len(above_threshold_ids),
                 len(records),
-                min_similiarity,
+                MIN_SIMILARITY,
             )
 
             return above_threshold_ids

@@ -9,7 +9,7 @@ from pydash import flatten, omit
 import logging
 
 from clients.llm.llm_client import GptApiClient
-from nlp.topic import Topics
+from nlp.clustering import TopicModeler
 from typings.client import VectorSearchParams
 
 from .vector_report_client import VectorReportClient
@@ -131,7 +131,7 @@ class ConceptDecomposer:
             ),
         )
 
-        topic_map = await Topics.model_topics(
+        topic_map = await TopicModeler.fit_transform(
             [d.vector for d in residual_docs],
             [d.description for d in residual_docs],
             existing_labels=[d.name for d in sub_concepts],

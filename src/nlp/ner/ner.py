@@ -18,11 +18,6 @@ from utils.model import get_model_path
 from utils.re import sub_extra_spaces
 
 from .binder import BinderNlp
-from .patterns import (
-    INDICATION_SPACY_PATTERNS,
-    INTERVENTION_SPACY_PATTERNS,
-    MECHANISM_SPACY_PATTERNS,
-)
 from .types import DocEntities, DocEntity, SpacyPatterns
 from .utils import spans_to_doc_entities
 
@@ -39,8 +34,6 @@ logger.setLevel(logging.INFO)
 class NerTagger:
     """
     Named-entity recognition using spacy and other means
-
-    TODO: add abbr resolution
     """
 
     _instances: dict[str, Any] = {}
@@ -50,13 +43,7 @@ class NerTagger:
         normalizer: TermNormalizer,
         model: str = "binder.pt",
         entity_types: Optional[frozenset[str]] = None,
-        rule_sets: list[SpacyPatterns] = list(
-            [
-                INDICATION_SPACY_PATTERNS,
-                INTERVENTION_SPACY_PATTERNS,
-                MECHANISM_SPACY_PATTERNS,
-            ]
-        ),
+        rule_sets: list[SpacyPatterns] = [],
     ):
         """
         Named-entity recognition via SpaCy + binder model
@@ -103,13 +90,7 @@ class NerTagger:
     async def create(
         model: str = "binder.pt",
         entity_types: Optional[frozenset[str]] = None,
-        rule_sets: list[SpacyPatterns] = list(
-            [
-                INDICATION_SPACY_PATTERNS,
-                INTERVENTION_SPACY_PATTERNS,
-                MECHANISM_SPACY_PATTERNS,
-            ]
-        ),
+        rule_sets: list[SpacyPatterns] = [],
         additional_cleaners: list[CleanFunction] = [],
         link: bool = True,
     ):

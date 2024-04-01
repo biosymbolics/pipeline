@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from constants.company import OTHER_OWNER_NAME
 
 
-from .constants import MAX_CLUSTER_SIZE, MAX_DISTINCT_TERMS, SOLO_CLUSTER_THRESHOLD
+from ..ner.constants import MAX_CLUSTER_SIZE, MAX_DISTINCT_TERMS, SOLO_CLUSTER_THRESHOLD
 
 
 logger = logging.getLogger(__name__)
