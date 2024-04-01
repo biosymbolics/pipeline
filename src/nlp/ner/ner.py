@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class NerTagger:
+class Ner:
     """
     Named-entity recognition using spacy and other means
     """
@@ -112,7 +112,7 @@ class NerTagger:
         if not link:
             logger.warning("Linking is disabled")
 
-        return NerTagger(
+        return Ner(
             normalizer=normalizer,
             model=model,
             entity_types=entity_types,
@@ -270,7 +270,7 @@ class NerTagger:
         return self.extract(*args, **kwds)
 
     @classmethod
-    def get_instance(cls, **kwargs) -> "NerTagger":
+    def get_instance(cls, **kwargs) -> "Ner":
         args = sorted(kwargs.items())
         args_hash = make_hashable(args)  # Convert args/kwargs to a hashable type
         if args_hash not in cls._instances:
