@@ -14,7 +14,7 @@ from .candidate_selector import AbstractCandidateSelector, CandidateSelectorType
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-CANDIDATE_SELECTOR_MODULE = "core.ner.linker"
+CANDIDATE_SELECTOR_MODULE = "nlp.nel"
 
 
 class TermLinker:
