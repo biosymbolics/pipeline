@@ -7,7 +7,7 @@ import torch
 from nlp.ner.types import CanonicalEntity, DocEntity
 from utils.classes import overrides
 from utils.string import generate_ngram_phrases_from_doc, tokens_to_string
-from utils.tensor import combine_tensors, truncated_svd
+from utils.tensor import calc_dynamic_cutoff, combine_tensors, truncated_svd
 
 from .candidate_generator import CandidateGenerator
 from .candidate_selector import MIN_SIMILARITY, CandidateSelector
@@ -60,34 +60,140 @@ class CompositeCandidateSelector(CandidateSelector):
         candidate_generator = await CandidateGenerator.create()
         return cls(candidate_generator=candidate_generator, *args, **kwargs)
 
-    async def _generate_composite(self, entity: DocEntity) -> EntityWithScore | None:
+    def _generate_composite_from_ngrams(
+        self,
+        tokens: Sequence[Token | Span],
+        ngram_entity_map: Mapping[str, EntityWithScoreVector],
+    ) -> EntityWithScore:
         """
         Generate a composite candidate from tokens & ngram map
-
         Args:
             tokens (Sequence[Token | Span]): tokens to generate composite from
             ngram_entity_map (dict[str, EntityWithScoreVector]): word-to-candidate map
         """
 
-        components = truncated_svd(torch.tensor(entity.vector))
-        composites: list[EntityWithScore] = compact(
-            [
-                c
-                async for c in self.select_candidates(
-                    None, components, is_composite=True
-                )
-            ]
-        )
+        def get_composite_candidates(
+            tokens: Sequence[Token | Span],
+        ) -> list[EntityWithScoreVector]:
+            """
+            Recursive function to see if the first ngram has a match, then the first n-1, etc.
+            """
+            if len(tokens) == 0:
+                return []
 
-        if not composites:
-            return None
+            actual_ngrams_n = min(self.ngrams_n, len(tokens))
+
+            possible_ngrams = [
+                (n, tokens_to_string(tokens[0:n]))
+                for n in range(actual_ngrams_n, 0, -1)
+            ]
+            ngram_matches = sorted(
+                [
+                    (n, ngram_entity_map[ng])
+                    for n, ng in possible_ngrams
+                    if ng in ngram_entity_map
+                ],
+                key=lambda m: m[1][1],
+                reverse=True,
+            )
+            if len(ngram_matches) > 0:
+                best_match = ngram_matches[0][1]
+                remainder_idx = ngram_matches[0][0]
+
+                return [
+                    best_match,
+                    *get_composite_candidates(tokens[remainder_idx:]),
+                ]
+
+            # otherwise, no match. create a fake CanonicalEntity.
+            return [
+                # concept_id is the word itself, so
+                # composite id will look like "UNMATCHED|C1999216" for "UNMATCHED inhibitor"
+                (
+                    CanonicalEntity(
+                        id=tokens[0].text.lower(),
+                        name=tokens[0].text.lower(),
+                    ),
+                    self.min_composite_similarity,  # TODO: should be the mean of all candidates?
+                    torch.tensor(tokens[0].vector),
+                ),
+                *get_composite_candidates(tokens[1:]),
+            ]
+
+        composites = get_composite_candidates(tokens)
+
+        if len(composites) == 0:
+            raise ValueError("No composites found")
 
         avg_score = sum([m[1] for m in composites]) / len(composites)
         composite_members = select_composite_members([c[0] for c in composites])
-
         return (
             form_composite_entity(composite_members),
             avg_score,
+        )
+
+    async def _generate_composite(self, entity: DocEntity) -> EntityWithScore | None:
+        """
+        Generate a composite candidate from a doc entity
+        """
+
+        def generate_ngram_spans(
+            doc: Doc, context_vector: torch.Tensor | None
+        ) -> tuple[list[str], list[torch.Tensor]]:
+            """
+            Get tokens and vectors from a doc entity
+            """
+            ngram_docs = generate_ngram_phrases_from_doc(doc, self.ngrams_n, 2)
+            ngram_strings = [ng.text for ng in ngram_docs]
+
+            # if the entity has a vector, combine with newly created token vectors
+            # to add context for semantic similarity comparison
+            # TODO: subtract this before calculating residual?
+            if context_vector is not None:
+                vectors = [
+                    combine_tensors(torch.tensor(d.vector), context_vector, 0.95)
+                    for d in ngram_docs
+                ]
+            else:
+                vectors = [torch.tensor(d.vector) for d in ngram_docs]
+
+            return ngram_strings, vectors
+
+        if entity.spacy_doc is None:
+            raise ValueError("Entity must have a spacy doc")
+
+        doc = entity.spacy_doc
+
+        ngrams, ngram_vectors = generate_ngram_spans(doc, torch.tensor(entity.vector))
+        ngram_candidates = [
+            c
+            async for c in self.select_candidates(
+                ngrams,
+                ngram_vectors,
+                self.min_composite_similarity,
+                is_composite=True,
+            )
+        ]
+        ngram_entity_map = {
+            ng: candidate for ng, candidate in zip(ngrams, ngram_candidates)
+        }
+        logger.info(
+            "Ngram entity map: %s",
+            {
+                k: (v[0].name, v[1])
+                for k, v in ngram_entity_map.items()
+                if v is not None
+            },
+        )
+        min_score = calc_dynamic_cutoff(
+            [v[1] for v in ngram_entity_map.values() if v is not None], 0
+        )
+        return self._generate_composite_from_ngrams(
+            list(doc),
+            omit_by(
+                ngram_entity_map,
+                lambda v: v is None or v[1] < min_score,
+            ),
         )
 
     @overrides(CandidateSelector)

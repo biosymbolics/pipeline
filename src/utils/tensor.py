@@ -175,19 +175,15 @@ def combine_tensors(
     return vector
 
 
-def truncated_svd(vector: torch.Tensor, variance_threshold=0.6) -> list[torch.Tensor]:
+def truncated_svd(vector: torch.Tensor, variance_threshold=0.3) -> list[torch.Tensor]:
     """
     Torch implementation of TruncatedSVD
     """
-    # Reshape x if it's a 1D vector
-    if vector.ndim == 1:
-        vector = vector.unsqueeze(1)
-
     # l1 reg
-    v_sparse = l1_regularize(vector, sparsity_threshold=0.1)
+    v_sparse = l1_regularize(vector, sparsity_threshold=0.3)
 
     # SVD
-    U, S, _ = torch.linalg.svd(v_sparse)
+    U, S, V = torch.linalg.svd(v_sparse)
 
     # Sorted eigenvalues
     E = torch.sort(S**2 / torch.sum(S**2), descending=True)
@@ -203,6 +199,33 @@ def truncated_svd(vector: torch.Tensor, variance_threshold=0.6) -> list[torch.Te
 
     t = [v.squeeze() for v in torch.split(U_reduced, 1, dim=1)]
     return t
+
+
+def calc_dynamic_cutoff(scores: list[float], num_stddev=1.0) -> float:
+    """
+    Determine a dynamic cutoff for a list of scores based on the mean and standard deviation.
+
+    Parameters:
+    - scores (list[float]): list of scores
+    - num_stddev (float): standard deviations from the mean to set as the threshold.
+
+    Returns:
+    - the cutoff score
+    """
+    if not scores:
+        logger.error("No scores to calculate threshold")
+        return 0.0
+
+    scores_tensor = torch.tensor(scores)
+
+    # Calculate the mean and standard deviation
+    mean_score = torch.mean(scores_tensor)
+    stddev_score = torch.std(scores_tensor)
+
+    # Calculate the threshold
+    threshold = mean_score - (num_stddev * stddev_score)
+
+    return threshold.item()
 
 
 def similarity_with_residual_penalty(
